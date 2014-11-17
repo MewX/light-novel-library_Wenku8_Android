@@ -1,27 +1,46 @@
 <!DOCTYPE html>
 <html>
 <head>
-	<title>轻小说文库 安卓APP - 项目主页</title>
-	<link href="favicon.ico" mce_href="favicon.ico" rel="bookmark" type="image/x-icon" />
-	<link href="favicon.ico" mce_href="favicon.ico" rel="icon" type="image/x-icon" />
-	<link href="favicon.ico" mce_href="favicon.ico" rel="shortcut icon" type="image/x-icon" />
+    <title>轻小说文库 安卓APP - 项目主页</title>
+    <link href="favicon.ico" mce_href="favicon.ico" rel="bookmark" type="image/x-icon" />
+    <link href="favicon.ico" mce_href="favicon.ico" rel="icon" type="image/x-icon" />
+    <link href="favicon.ico" mce_href="favicon.ico" rel="shortcut icon" type="image/x-icon" />
 </head>
 <body bgcolor="#F9CEE2">
     <div id="TopImage" style="position:absolute;top:0px;left:50%;margin-left:-512px;height:590px;width:864px;padding:30px 80px 30px 80px;background-image:url(imgs/site/tab_bg.jpg);background-size:100% 100%;text-align:right;z-index:1;font-size:18px;font-family:Microsoft YaHei,微软雅黑,simhei,黑体;color: #07E;-webkit-border-radius:10px 10px 0px 0px;-moz-border-radius:10px 10px 0px 0px;border-radius:10px 10px 0px 0px;"><span class="bigTItle" style="font-size:36px;">轻小说文库 APP 安卓版</span> 项目主页<br/>与轻小说文库(<a href="http://www.wenku8.cn" style="color:#07E;" target="_blank">Wenku8.cn</a>)合作的安卓版轻小说APP</div>
-    <div id="MicroBlog" style="position:absolute;top:300px;left:50%;margin-left:-512px;height:auto;width:974px;padding:25px;background-color:#fff;background-size:100% 100%;text-align:left;z-index:2;opacity:0.75;filter:alpha(opacity=75);-webkit-border-radius:10px;-moz-border-radius:10px;border-radius:10px;"></div>
+    <div id="MicroBlog" style="position:absolute;top:300px;left:50%;margin-left:-512px;height:auto;width:974px;padding:25px;background-color:#fff;background-size:100% 100%;text-align:left;z-index:2;opacity:0.75;filter:alpha(opacity=75);-webkit-border-radius:10px;-moz-border-radius:10px;border-radius:10px;">
+        <div id="blog"></div>
+        
+        <!-- Disqus Board -->
+        <div id="disqus_thread"></div>
+        <script type="text/javascript">
+            /* * * CONFIGURATION VARIABLES: EDIT BEFORE PASTING INTO YOUR WEBPAGE * * */
+            var disqus_shortname = 'wenku8android'; // required: replace example with your forum shortname
+        
+            /* * * DON'T EDIT BELOW THIS LINE * * */
+            (function() {
+                var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+                dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+                (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+            })();
+        </script>
+        <noscript>允许 JavaScript 才能看到<a href="http://disqus.com/?ref_noscript">由 Disqus 提供的评论系统。</a></noscript>
+        <a href="http://disqus.com" class="dsq-brlink">评论系统由<span class="logo-disqus">Disqus</span>提供 :)</a>
+        </div>
+    </div>
     
     <!-- It's said that this will improve loading speed. -->
-	<script src="http://www.mewx.org/js/jquery-1.11.0.min.js"></script>
-	<script type="text/javascript">
-	$($("#TopImage").hover(
-		function(){$("#MicroBlog").stop().animate({top:"450px",opacity:"0.25"},500);},
-		function(){$("#MicroBlog").stop().animate({top:"300px",opacity:"0.75"},500);}
-	));
+    <script src="http://www.mewx.org/js/jquery-1.11.0.min.js"></script>
+    <script type="text/javascript">
+    $($("#TopImage").hover(
+        function(){$("#MicroBlog").stop().animate({top:"450px",opacity:"0.25"},500);},
+        function(){$("#MicroBlog").stop().animate({top:"300px",opacity:"0.75"},500);}
+    ));
     
-	$($("#MicroBlog").hover(
-		function(){$("#MicroBlog").stop().animate({opacity:"0.95"},500);},
-		function(){$("#MicroBlog").stop().animate({top:"300px",opacity:"0.75"},500);}
-	));
+    $($("#MicroBlog").hover(
+        function(){$("#MicroBlog").stop().animate({opacity:"0.95"},500);},
+        function(){$("#MicroBlog").stop().animate({top:"300px",opacity:"0.75"},500);}
+    ));
     
     function StandardTaxRate()
     {
@@ -44,7 +63,7 @@
                     var b = $(this).children("blog").text();
                     // alert(d+"&ltbr/&gt"+b+"&ltbr/&gt"+"&ltbr/&gt");
                     
-                    var divshow = $("#MicroBlog");
+                    var divshow = $("#blog");
                     divshow.append(d+"<br/>"+b+"<br/><HR style=\"border:1 dashed #987cb9\" width=\"100%\" color=#987cb9 SIZE=1>");
                 });
             }
@@ -52,9 +71,10 @@
     }
     
     $(document).ready(function() {
-		StandardTaxRate();
-	});
-	</script>
+        StandardTaxRate();
+    });
+    </script>
+    </script>
 </body>
 </html>
 
