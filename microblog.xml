@@ -1,21 +1,25 @@
 <?xml version="1.0" encoding="utf-8"?>
 <microblog>
     <post>
-        <date>2014-11-18 22:53</date>
-        <blog><![CDATA[GitHub二级域名的支持还是有点问题的，总是在commit半个小时后莫名其妙地显示GitHub-404。<br/>嘛，总之本页面的短语名是： <a href="http://l.mewx.org">http://L.mewx.org</a>。]]></blog>
+        <author>MewX</author>
+        <date>2014-11-18 23:46</date>
+        <blog><![CDATA[GitHub二级域名的支持还是有点问题的，总是在commit半个小时后莫名其妙地显示GitHub-404。<br/>嘛，总之本页面的短语名就是这个啦： <a href="http://l.mewx.org">http://L.mewx.org</a>。<br/><br/>还有就是要感谢“空之文库”app，MewX作为一个不成熟的开发者能拿这么成熟的作品作为参考真是非常感激，比如说咱也决定用以下这些开源库了：<br/>　　nostra13.universalImageLoader、uk.co.senab.photoView、de.hdodenhof.circleImageView、etc...]]></blog>
     </post>
 
     <post>
+        <author>MewX</author>
         <date>2014-11-17 21:44</date>
         <blog>开始正式写代码喽~~</blog>
     </post>
 
     <post>
+        <author>MewX</author>
         <date>2014-11-17 20:19</date>
         <blog>动态载入XML文件哦~~~ 手机版也可以调用哈哈</blog>
     </post>
     
     <post>
+        <author>MewX</author>
         <date>2014-11-17 20:18</date>
         <blog>主页即将诞生啦！！</blog>
     </post>

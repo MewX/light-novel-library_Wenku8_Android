@@ -58,12 +58,13 @@
                 $(xml).find("post").each(function(i)
                 {
                     // var oid = $(this).attr("id");
+                    var a = $(this).children("author").text();
                     var d = $(this).children("date").text();
                     var b = $(this).children("blog").text();
                     // alert(d+"&ltbr/&gt"+b+"&ltbr/&gt"+"&ltbr/&gt");
 
                     var divshow = $("#blog");
-                    divshow.append(d+"<br/>"+b+"<br/><HR style=\"border:1 dashed #987cb9\" width=\"100%\" color=#987cb9 SIZE=1>");
+                    divshow.append("[ "+a+" | "+d+" ]<br/>"+b+"<br/><HR style=\"border:1 dashed #987cb9\" width=\"100%\" color=#987cb9 SIZE=1>");
                 });
             }
         });
