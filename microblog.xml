@@ -2,6 +2,12 @@
 <microblog>
     <post>
         <author>MewX</author>
+        <date>2014-11-20 00:53</date>
+        <blog><![CDATA[最近在看软件工程 ww 于是应用到本项目中就是决定要应用“快速原型模型“（RAD）了。<br/>晚上把简约的书库分类入口界面做完了，新的app实用至上嘛。<br/><br/>　　本APP的设计原则——“岂止于全“！<br/>　　轻小说资源全才是王道！<br/><br/>在可用的版本发布之后，咱会大幅度修改界面的，华丽的界面是已经设计好的啦～]]></blog>
+    </post>
+	
+    <post>
+        <author>MewX</author>
         <date>2014-11-18 23:46</date>
         <blog><![CDATA[GitHub二级域名的支持还是有点问题的，总是在commit半个小时后莫名其妙地显示GitHub-404。<br/>嘛，总之本页面的短语名就是这个啦： <a href="http://l.mewx.org">http://L.mewx.org</a>。<br/><br/>还有就是要感谢“空之文库”app，MewX作为一个不成熟的开发者能拿这么成熟的作品作为参考真是非常感激，比如说咱也决定用以下这些开源库了：<br/>　　nostra13.universalImageLoader、uk.co.senab.photoView、de.hdodenhof.circleImageView、etc...]]></blog>
     </post>
