@@ -9,7 +9,7 @@
 
   为了避免“轻小说文库“数据库的遭到**恶意抓库、泄漏**，我删去了部分API的源代码。这也就是说本项目的源代码可以编译通过，但是部分API函数返回的将是空值。这一切的目的就是在一定程度上**保护“轻小说文库”的海量小说数据库**。
 
-  当然，有如此庞大的源码作为提示，你当然可以通过对于已发布的apk采取**逆向**的行为来获取网站的API。但是我还是希望你不要尝试抓取网站数据库！
+  当然，有如此庞大的源码作为提示，你当然可以通过对于已发布的apk采取**逆向**的行为来获取网站的API。**但是我还是希望你不要尝试抓取网站数据库！**网站服务器是做过防范措施的。
 
 
 关于
@@ -22,7 +22,7 @@
 
 
 
-[en-US] Introduction of Light Novel Library for Android
+[en_US] Introduction of Light Novel Library for Android
 ==========
 
 This is "Wenku8.cn" 's Android APP, and this is an open-source project.
@@ -33,7 +33,7 @@ Notice
 
   In order to prevent the **LEAK** of "Wenku8.cn" 's database, I will replace the API's source code, which means the interface will contain full funtion list but with blank function body. I mean this will not affect your compiling, just to **protect the interface between this app and website**.
 
-  Although I know you can easily **REVERSE** this apk with such source code's hints. I still believe you won't try to capture the website's database!
+  Although I know you can easily **REVERSE** this apk with such source code's hints. **I still believe you won't try to capture the website's database!** The website's server has protection.
 
 
 About
