@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+              android:layout_width="match_parent"
+              android:layout_height="match_parent">
+    <ImageView
+            android:id="@+id/iv_background"
+            android:adjustViewBounds="true"
+            android:scaleType="centerCrop"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"/>
+
+    <ImageView
+            android:id="@+id/iv_shadow"
+            android:background="@drawable/shadow"
+            android:layout_width="fill_parent"
+            android:layout_height="fill_parent"
+            android:scaleType="fitXY"/>
+
+    <ScrollView
+        android:id="@+id/sv_left_menu"
+        android:layout_width="170dp"
+        android:layout_height="fill_parent"
+        android:paddingLeft="30dp"
+        android:scrollbars="none" >
+
+        <LinearLayout
+                android:id="@+id/layout_left_menu"
+                android:orientation="vertical"
+                android:layout_gravity="center_vertical"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content">
+
+        </LinearLayout>
+    </ScrollView>
+
+    <ScrollView
+        android:id="@+id/sv_right_menu"
+        android:layout_width="120dp"
+        android:layout_height="fill_parent"
+        android:layout_gravity="right"
+        android:paddingRight="30dp"
+        android:scrollbars="none" >
+
+        <LinearLayout
+                android:id="@+id/layout_right_menu"
+                android:orientation="vertical"
+                android:layout_gravity="center_vertical"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:gravity="right">
+
+        </LinearLayout>
+    </ScrollView>
+
+</FrameLayout>

@@ -2,13 +2,41 @@
 <resources>
 
     <string name="app_name">轻小说文库</string>
-    <string name="hello_world">Hello world!</string>
-    <string name="action_settings">Settings</string>
-    <string name="back">&lt; 返回</string>
-    <string name="more">·  ·  ·</string>
-    <string name="select_cursor">●</string>
-    <string name="select_tab1">文库</string>
-    <string name="select_tab2">书架</string>
-    <string name="select_tab3">更多</string>
+    <string name="tab_library">轻小说文库</string>
+    <string name="tab_bookshelf">本地书架</string>
+    <string name="tab_wenku8">Wenku8.cn</string>
+    <string name="tab_setting">设置</string>
+    <string name="press_twice_to_exit"><b>退出请再抚摸一下返回键哦～</b>\n&lt;(=～￣▽￣)→)￣▽￣=)>o </string>
+    <string name="top_new">最新入库榜</string>
+    <string name="top_hit">热门点击榜</string>
+    <string name="top_fav">热门收藏榜</string>
+    <string name="view_full_list">查看完整榜单</string>
+    <string name="view_all_list">查看所有榜单</string>
+    <string name="view_more">查看更多</string>
+    <string name="novel_name">小说名</string>
+    <string name="novel_hit">点击量：</string>
+    <string name="novel_push">推荐量：</string>
+    <string name="novel_fav">收藏量：</string>
+    <string name="zero">0</string>
+    <string name="entry_name">入口名</string>
+    <string name="search_novel">搜索轻小说</string>
+    <string name="list_special">查看专题列表</string>
+    <string name="postdate">最新入库</string>
+    <string name="goodnum">总收藏榜</string>
+    <string name="fullflag">完结列表</string>
+    <string name="lastupdate">最近更新</string>
+    <string name="allvisit">总排行榜</string>
+    <string name="allvote">总推荐榜</string>
+    <string name="monthvisit">月排行榜</string>
+    <string name="monthvote">月推荐榜</string>
+    <string name="weekvisit">周排行榜</string>
+    <string name="weekvote">周推荐榜</string>
+    <string name="dayvisit">日排行榜</string>
+    <string name="dayvote">日推荐榜</string>
+    <string name="size">字数排行</string>
+    <string name="search_result">搜索结果</string>
+    <string name="novel_writer">小说作者：</string>
+    <string name="novel_press">出版文库：</string>
+    <string name="novel_length">全文字数：</string>
 
 </resources>

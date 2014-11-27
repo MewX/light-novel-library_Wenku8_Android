@@ -3,75 +3,15 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    tools:context="org.mewx.lightnovellibrary.MainActivity" >
+    tools:context="org.mewx.lightnovellibrary.activity.MainActivity" >
 
     <include layout="@layout/activity_titlebar" />
 
-    <LinearLayout
-        android:id="@+id/tabLayoutOut"
+    <FrameLayout
+        android:id="@+id/main_fragment"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:background="#FFFFFF"
-        android:orientation="vertical"
-        android:showDividers="beginning" >
-
-        <LinearLayout
-            android:id="@+id/tabLayoutIn"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content" >
-
-            <TextView
-                android:id="@+id/tabText1"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:layout_marginTop="5dp"
-                android:layout_weight="1.0"
-                android:gravity="center"
-                android:text="@string/select_tab1"
-                android:textAppearance="?android:attr/textAppearanceSmall"
-                android:textColor="#000" />
-
-            <TextView
-                android:id="@+id/tabText2"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:layout_marginTop="5dp"
-                android:layout_weight="1.0"
-                android:gravity="center"
-                android:text="@string/select_tab2"
-                android:textAppearance="?android:attr/textAppearanceSmall"
-                android:textColor="#000" />
-
-            <TextView
-                android:id="@+id/tabText3"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:layout_marginTop="5dp"
-                android:layout_weight="1.0"
-                android:gravity="center"
-                android:text="@string/select_tab3"
-                android:textAppearance="?android:attr/textAppearanceSmall"
-                android:textColor="#000" />
-        </LinearLayout>
-
-        <ImageView
-            android:id="@+id/tabCursor"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="5dp"
-            android:scaleType="matrix"
-            android:contentDescription="@null"
-            android:src="@drawable/tab_cursor" />
-    </LinearLayout>
-
-    <android.support.v4.view.ViewPager
-        android:id="@+id/vPager"
-        android:layout_width="wrap_content"
-        android:layout_height="0dp"
-        android:layout_gravity="center"
-        android:layout_weight="1.0"
-        android:background="#000000"
-        android:flipInterval="30"
-        android:persistentDrawingCache="animation" />
+        android:layout_height="match_parent"
+        android:orientation="vertical" >
+    </FrameLayout>
 
 </LinearLayout>
