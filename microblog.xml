@@ -2,6 +2,12 @@
 <microblog>
     <post>
         <author>MewX</author>
+        <date>2014-11-28 00:29</date>
+        <blog><![CDATA[之前看到有人在广泛fork开源的实用APP，咱们项目也被荣幸收录，所以打算整理以下手头代码commit一下。<a href="https://github.com/MewX/LightNovel/releases/tag/v0.1">Release区</a>也同步发布了这个版本的apk，算是未完成版，版本号定为0.1。]]></blog>
+    </post>
+
+    <post>
+        <author>MewX</author>
         <date>2014-11-26 03:00</date>
         <blog><![CDATA[小说查询列表页面弄好了，翻到底部可以自动加载，加载过的图片再次加载会很快。当然做的时候遇到不少问题，比如getView调用次数异常、异步POST加载图片之类的，还好绝大部分解决了，还有些小问题，例如列表翻的太快图片会更新两次 = =、这些问题都不大，暂时先放着，继续写后面的功能。]]></blog>
     </post>
