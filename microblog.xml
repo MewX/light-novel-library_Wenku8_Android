@@ -2,8 +2,14 @@
 <microblog>
     <post>
         <author>MewX</author>
+        <date>2014-11-28 19:49</date>
+        <blog><![CDATA[感谢<a href="http://www.razorsh.com/" target="_blank">Revo巨巨</a>的美术指导，新技能get！当然要制作出来还是要等软件原型出来之后的升级版本 :P<br/>另外新的界面计划用Material Design搭建，如果系统版本过低则不能显示最佳效果。当然，还是能够运行的（2.3+版本安卓系统）。]]></blog>
+    </post>
+    
+    <post>
+        <author>MewX</author>
         <date>2014-11-28 00:29</date>
-        <blog><![CDATA[之前看到有人在广泛fork开源的实用APP，咱们项目也被荣幸收录，所以打算整理以下手头代码commit一下。<a href="https://github.com/MewX/LightNovel/releases/tag/v0.1">Release区</a>也同步发布了这个版本的apk，算是未完成版，版本号定为0.1。]]></blog>
+        <blog><![CDATA[之前看到有人在广泛fork开源的实用APP，咱们项目也被荣幸收录，所以打算整理以下手头代码commit一下。<a href="https://github.com/MewX/LightNovel/releases/tag/v0.1" target="_blank">Release区</a>也同步发布了这个版本的apk，算是未完成版，版本号定为0.1。]]></blog>
     </post>
 
     <post>
