@@ -2,6 +2,12 @@
 <microblog>
     <post>
         <author>MewX</author>
+        <date>2014-12-02 23:48</date>
+        <blog>最近的考试和课程设计终于是告一段落了 _(:з」∠)_ 白天可以堆代码了</blog>
+    </post>
+    
+    <post>
+        <author>MewX</author>
         <date>2014-11-28 19:49</date>
         <blog><![CDATA[感谢<a href="http://www.razorsh.com/" target="_blank">Revo巨巨</a>的美术指导，新技能get！当然要制作出来还是要等软件原型出来之后的升级版本 :P<br/>另外新的界面计划用Material Design搭建，如果系统版本过低则不能显示最佳效果。当然，还是能够运行的（2.3+版本安卓系统）。]]></blog>
     </post>
