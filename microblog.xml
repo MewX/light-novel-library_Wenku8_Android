@@ -2,6 +2,12 @@
 <microblog>
     <post>
         <author>MewX</author>
+        <date>2014-12-03 23:25</date>
+        <blog>小说详情界面完成一半、RelativeLayout的大量应用使得布局简洁了许多。</blog>
+    </post>
+
+    <post>
+        <author>MewX</author>
         <date>2014-12-02 23:48</date>
         <blog>最近的考试和课程设计终于是告一段落了 _(:з」∠)_ 白天可以堆代码了</blog>
     </post>
