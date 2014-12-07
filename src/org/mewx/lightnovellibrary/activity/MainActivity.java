@@ -71,6 +71,7 @@ public class MainActivity extends ActionBarActivity implements
 		DisplayImageOptions localDisplayImageOptions = new DisplayImageOptions.Builder()
 				.resetViewBeforeLoading(true).cacheOnDisk(true)
 				.cacheInMemory(true).bitmapConfig(Bitmap.Config.RGB_565)
+				.resetViewBeforeLoading(true)
 				.displayer(new FadeInBitmapDisplayer(250)).build();
 		ImageLoaderConfiguration localImageLoaderConfiguration = new ImageLoaderConfiguration.Builder(
 				this).diskCache(localUnlimitedDiscCache)

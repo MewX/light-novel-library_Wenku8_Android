@@ -99,6 +99,8 @@ public class Wenku8Fragment extends Fragment {
 		bgt.execute(testP2);
 
 		// set the two button on the title bar
+		((TextView) getActivity().findViewById(R.id.textTitle))
+		.setText(getResources().getString(R.string.tab_wenku8));
 		((ImageView) parentActivity.findViewById(R.id.btnMenu))
 				.setVisibility(View.VISIBLE);
 		((ImageView) parentActivity.findViewById(R.id.btnEdit))

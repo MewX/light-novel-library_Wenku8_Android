@@ -17,9 +17,18 @@
     <string name="novel_hit">点击量：</string>
     <string name="novel_push">推荐量：</string>
     <string name="novel_fav">收藏量：</string>
-    <string name="zero">0</string>
+    <string name="zero">N/A</string>
     <string name="entry_name">入口名</string>
     <string name="search_novel">搜索轻小说</string>
+    <string name="search_by_author">作者名</string>
+    <string name="search_by_title">小说名</string>
+    <string name="search_keyword">请输入搜索关键词</string>
+    <string name="search">搜索：</string>
+    <string name="search_result_none">没有搜索到符合条件的结果</string>
+    <string name="search_ing">搜索中</string>
+    <string name="search_fetching">正在获取：</string>
+    <string name="search_delete_history_title">删除搜索记录</string>
+    <string name="search_delete_history_question">确定要删除搜索记录吗？</string>
     <string name="list_special">查看专题列表</string>
     <string name="postdate">最新入库</string>
     <string name="goodnum">总收藏榜</string>
@@ -38,5 +47,23 @@
     <string name="novel_writer">小说作者：</string>
     <string name="novel_press">出版文库：</string>
     <string name="novel_length">全文字数：</string>
+    <string name="novel_author">小说作者：</string>
+    <string name="novel_status">连载状态：</string>
+    <string name="novel_status_0">连载中</string>
+    <string name="novel_status_1">已完结</string>
+    <string name="novel_update">最后更新：</string>
+    <string name="novel_intro">剧情预览：</string>
+    <string name="novel_cache">缓存小说</string>
+    <string name="novel_add_to_shelf">加入本地书架</string>
+    <string name="novel_added_to_shelf">已加入本地书架</string>
+    <string name="novel_function">对本书的操作</string>
+    <string name="novel_force_reload">强制更新本地数据</string>
+    <string name="novel_load">读取进度</string>
+    <string name="novel_load_question">是否要从上次阅读的位置继续？</string>
+    <string name="load_status">载入状态</string>
+    <string name="load_loading">载入中……</string>
+    <string name="load_finished">全部载入完毕</string>
+    <string name="network_error">链接服务器失败！\n\n可能的原因有：\n手机网络异常；\n服务器暂时无法响应亲求；\n此时段请求服务器次数过多。</string>
+    <string name="in_building">建设中 orz</string>
 
 </resources>

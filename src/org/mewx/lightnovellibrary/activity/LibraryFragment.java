@@ -17,17 +17,16 @@ import org.mewx.lightnovellibrary.component.EntryElementAdapter;
 
 import android.content.Intent;
 import android.os.Bundle;
-import android.os.Looper;
 import android.support.v4.app.Fragment;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
-import android.view.View.OnClickListener;
 import android.view.ViewGroup;
 import android.widget.AdapterView;
 import android.widget.AdapterView.OnItemClickListener;
 import android.widget.ImageView;
 import android.widget.ListView;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import com.special.ResideMenu.ResideMenu;
@@ -77,15 +76,33 @@ public class LibraryFragment extends Fragment {
 						+ ele.getName());
 
 				// to new activity
-				Intent intent = new Intent();
-				intent.setClass(parentActivity, NovelListActivity.class);
-				intent.putExtra("title", ele.getName());
-				intent.putExtra("code", ele.getCode());
-				startActivity(intent);
+				if (ele.getCode().equals("search_novel")) {
+					// call search activity first
+					Intent intent = new Intent();
+					intent.setClass(parentActivity, NovelSearchActivity.class);
+					intent.putExtra("code", ele.getCode());
+					startActivity(intent);
+
+				} else if (ele.getCode().equals("list_special")) {
+					// call list special first
+					Toast.makeText(parentActivity,
+							getResources().getString(R.string.in_building),
+							Toast.LENGTH_SHORT).show();
+
+				} else {
+					// just the rest lists
+					Intent intent = new Intent();
+					intent.setClass(parentActivity, NovelListActivity.class);
+					intent.putExtra("title", ele.getName());
+					intent.putExtra("code", ele.getCode());
+					startActivity(intent);
+				}
 			}
 		});
 
 		// set the two button on the title bar
+		((TextView) getActivity().findViewById(R.id.textTitle))
+		.setText(getResources().getString(R.string.tab_library));
 		((ImageView) parentActivity.findViewById(R.id.btnMenu))
 				.setVisibility(View.VISIBLE);
 		((ImageView) parentActivity.findViewById(R.id.btnEdit))

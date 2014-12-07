@@ -76,10 +76,10 @@ public class NovelElementAdapter extends BaseAdapter {
 				.findViewById(R.id.novel_cover);
 		Log.v("MewX-View", "ImageView=" + iv.toString());
 
-		ImageLoader.getInstance()
-				.displayImage(
-						(e.getImgUrl() == null ? "assets://icon128.png"
-								: e.getImgUrl()), iv);
+		if (e.getImgUrl() == null)
+			iv.setImageResource(R.drawable.empty_cover);
+		else
+			ImageLoader.getInstance().displayImage(e.getImgUrl(), iv);
 
 		// Asysnc load image
 		class imgTask extends AsyncTask<List<NameValuePair>, Integer, byte[]> {
@@ -153,7 +153,7 @@ public class NovelElementAdapter extends BaseAdapter {
 				e.setImgUrl("file://" + GlobalConfig.getFirstStoragePath()
 						+ "imgs" + File.separator + String.valueOf(e.getAid())
 						+ ".jpg");
-				
+
 				// load image
 				ImageLoader.getInstance().displayImage((e.getImgUrl()), iv);
 			} else if (LightCache.testFileExist(GlobalConfig
@@ -164,7 +164,7 @@ public class NovelElementAdapter extends BaseAdapter {
 				e.setImgUrl("file://" + GlobalConfig.getSecondStoragePath()
 						+ "imgs" + File.separator + String.valueOf(e.getAid())
 						+ ".jpg");
-				
+
 				// load image
 				ImageLoader.getInstance().displayImage((e.getImgUrl()), iv);
 
