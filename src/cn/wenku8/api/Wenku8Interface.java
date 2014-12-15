@@ -111,11 +111,6 @@ public class Wenku8Interface {
 		}
 	}
 
-	private static NameValuePair getEncryptedNVP(String str) {
-		// This funtion achieve the encryption and return the NVP
-		return null;
-	}
-
 	public static NameValuePair getNovelCover(int aid) {
 		// get the aid, and return a "jpg" file or other, in binary
 		return null;

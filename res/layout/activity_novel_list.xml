@@ -10,6 +10,7 @@
 
     <ListView
         android:id="@+id/novel_list"
+        android:listSelector="@android:color/transparent"
         android:layout_below="@+id/wholeTitle"
         android:layout_width="match_parent"
         android:layout_height="match_parent" >

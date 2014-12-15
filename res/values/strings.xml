@@ -27,8 +27,8 @@
     <string name="search_result_none">没有搜索到符合条件的结果</string>
     <string name="search_ing">搜索中</string>
     <string name="search_fetching">正在获取：</string>
-    <string name="search_delete_history_title">删除搜索记录</string>
-    <string name="search_delete_history_question">确定要删除搜索记录吗？</string>
+    <string name="search_delete_history_title">删除确认</string>
+    <string name="search_delete_history_question">确定要删除所有搜索记录吗？</string>
     <string name="list_special">查看专题列表</string>
     <string name="postdate">最新入库</string>
     <string name="goodnum">总收藏榜</string>
@@ -57,13 +57,32 @@
     <string name="novel_add_to_shelf">加入本地书架</string>
     <string name="novel_added_to_shelf">已加入本地书架</string>
     <string name="novel_function">对本书的操作</string>
+    <string name="novels_function">对所有书的操作</string>
     <string name="novel_force_reload">强制更新本地数据</string>
     <string name="novel_load">读取进度</string>
     <string name="novel_load_question">是否要从上次阅读的位置继续？</string>
+    <string name="bookshelf_cache_all">缓存/更新所有小说</string>
+    <string name="bookshelf_force_reload_all">强制覆写本地所有小说数据</string>
+    <string name="bookshelf_cache_one">缓存/更新本书章节</string>
+    <string name="bookshelf_force_reload_one">强制覆写本书章节</string>
+    <string name="bookshelf_remove">将该书移出书架</string>
+    <string name="bookshelf_remove_confirm_title">移除确认</string>
+    <string name="bookshelf_remove_confirm">确定将该书移出书架？</string>
+    <string name="bookshelf_intro_load_failed">小说信息读取失败，此小说自动移出书架。</string>
+    <string name="bookshelf_caching">正在缓存……</string>
+    <string name="bookshelf_cached">缓存成功完成！</string>
+    <string name="bookshelf_not_cached">未缓存，无法本地浏览。</string>
+    <string name="cancelled">操作已取消</string>
     <string name="load_status">载入状态</string>
     <string name="load_loading">载入中……</string>
     <string name="load_finished">全部载入完毕</string>
-    <string name="network_error">链接服务器失败！\n\n可能的原因有：\n手机网络异常；\n服务器暂时无法响应亲求；\n此时段请求服务器次数过多。</string>
+    <string name="network_error">连接服务器失败！\n\n可能的原因有：\n　　手机网络异常；\n　　服务器暂时无法响应请求；\n　　此时段请求服务器次数过多。</string>
+    <string name="parse_failed">数据解析失败！\n\n可能的原因有：\n　　程序内部错误，请反馈给开发者；\n　　你修改了存储的数据。</string>
     <string name="in_building">建设中 orz</string>
+    <string name="setting_unavailable">设置页面暂时不可用\n（建设中）</string>
+    <string name="project_home">项目主页：\nhttp://L.mewx.org\n动态更新，欢迎反馈、</string>
+    <string name="about">关于</string>
+    <string name="developer">开发者: MewX</string>
+    <string name="resource_provider">数据库: Wenku8.cn</string>
 
 </resources>

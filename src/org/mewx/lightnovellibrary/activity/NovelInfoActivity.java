@@ -35,7 +35,7 @@ import android.widget.Toast;
 
 public class NovelInfoActivity extends ActionBarActivity {
 	// get "aid" and "plus"
-	private String name;
+	private String name, from;
 	private int aid;
 	private ActionBarActivity parentActivity = null;
 	private XMLParser.NovelIntro ni = null;
@@ -118,20 +118,32 @@ public class NovelInfoActivity extends ActionBarActivity {
 												case 0:
 													// add to shelf
 													// save introXml, volumeXml
-													GlobalConfig
-															.writeFullFileIntoSaveFolder(
-																	"intro",
-																	aid
-																			+ "-intro.xml",
-																	introXml);
-													GlobalConfig
-															.writeFullFileIntoSaveFolder(
-																	"intro",
-																	aid
-																			+ "-volume.xml",
-																	volumeXml);
-													GlobalConfig
-															.addToLocalBookshelf(aid);
+													if (!GlobalConfig
+															.testInLocalBookshelf(aid)) {
+														// avoid re-add
+														GlobalConfig
+																.writeFullFileIntoSaveFolder(
+																		"intro",
+																		aid
+																				+ "-intro.xml",
+																		introXml);
+
+														GlobalConfig
+																.writeFullFileIntoSaveFolder(
+																		"intro",
+																		aid
+																				+ "-introfull.xml",
+																		ni.intro_full);
+
+														GlobalConfig
+																.writeFullFileIntoSaveFolder(
+																		"intro",
+																		aid
+																				+ "-volume.xml",
+																		volumeXml);
+														GlobalConfig
+																.addToLocalBookshelf(aid);
+													}
 
 													Toast.makeText(
 															parentActivity,
@@ -167,6 +179,9 @@ public class NovelInfoActivity extends ActionBarActivity {
 		// Interpret the in-coming "code" and "plus"
 		name = getIntent().getStringExtra("title");
 		aid = getIntent().getIntExtra("aid", 0);
+		from = getIntent().getStringExtra("from");
+		if (from == null)
+			from = "";
 		((TextView) findViewById(R.id.textTitle)).setText(name);
 
 		if (aid == 0)
@@ -197,20 +212,28 @@ public class NovelInfoActivity extends ActionBarActivity {
 		protected Integer doInBackground(List<NameValuePair>... params) {
 
 			try {
-				introXml = new String(LightNetwork.LightHttpPost(
-						Wenku8Interface.BaseURL, params[0]), "UTF-8");
+				if (from.equals(BookshelfFragment.fromid))
+					introXml = GlobalConfig.loadFullFileFromSaveFolder("intro",
+							aid + "-intro.xml");
+				else
+					introXml = new String(LightNetwork.LightHttpPost(
+							Wenku8Interface.BaseURL, params[0]), "UTF-8");
 				ni = XMLParser.getNovelIntro(introXml);
 				if (ni == null) {
 					Log.e("MewX-Main",
 							"getNullFromParser - XMLParser.NovelIntro");
-					return -1;
+					return -100; // network error
 				}
 
 				List<NameValuePair> targIntro = new ArrayList<NameValuePair>();
 				targIntro.add(Wenku8Interface.getNovelFullIntro(ni.aid,
 						GlobalConfig.getFetchLanguage()));
-				ni.intro_full = new String(LightNetwork.LightHttpPost(
-						Wenku8Interface.BaseURL, targIntro), "UTF-8");
+				if (from.equals(BookshelfFragment.fromid))
+					ni.intro_full = GlobalConfig.loadFullFileFromSaveFolder(
+							"intro", aid + "-introfull.xml");
+				else
+					ni.intro_full = new String(LightNetwork.LightHttpPost(
+							Wenku8Interface.BaseURL, targIntro), "UTF-8");
 
 				return 0;
 			} catch (UnsupportedEncodingException e) {
@@ -227,6 +250,13 @@ public class NovelInfoActivity extends ActionBarActivity {
 
 		@Override
 		protected void onPostExecute(Integer result) {
+			if (result == -100) {
+				Toast.makeText(parentActivity,
+						getResources().getString(R.string.network_error),
+						Toast.LENGTH_LONG).show();
+				return;
+			}
+
 			ImageView iv = (ImageView) parentActivity
 					.findViewById(R.id.novel_cover);
 
@@ -282,14 +312,18 @@ public class NovelInfoActivity extends ActionBarActivity {
 		protected Integer doInBackground(List<NameValuePair>... params) {
 
 			try {
-				volumeXml = new String(LightNetwork.LightHttpPost(
-						Wenku8Interface.BaseURL, params[0]), "UTF-8");
+				if (from.equals(BookshelfFragment.fromid))
+					volumeXml = GlobalConfig.loadFullFileFromSaveFolder(
+							"intro", aid + "-volume.xml");
+				else
+					volumeXml = new String(LightNetwork.LightHttpPost(
+							Wenku8Interface.BaseURL, params[0]), "UTF-8");
 
 				vl = XMLParser.getVolumeList(volumeXml);
 				if (vl == null) {
 					Log.e("MewX-Main",
 							"getNullFromParser (vl = XMLParser.getVolumeList(xml);)");
-					return -1;
+					return -101;
 				}
 
 				return 0;
@@ -307,6 +341,15 @@ public class NovelInfoActivity extends ActionBarActivity {
 
 		@Override
 		protected void onPostExecute(Integer result) {
+			if (result == -1)
+				return;
+			else if (result == -101) {
+				Toast.makeText(parentActivity,
+						getResources().getString(R.string.parse_failed),
+						Toast.LENGTH_LONG).show();
+				return;
+			}
+
 			LinearLayout layout = (LinearLayout) parentActivity
 					.findViewById(R.id.hostLayout);
 
@@ -356,6 +399,7 @@ public class NovelInfoActivity extends ActionBarActivity {
 		intent.putExtra("aid", aid);
 		intent.putExtra("vid", vid);
 		intent.putExtra("cid", cid);
+		intent.putExtra("from", from);
 		startActivity(intent);
 		return;
 	}

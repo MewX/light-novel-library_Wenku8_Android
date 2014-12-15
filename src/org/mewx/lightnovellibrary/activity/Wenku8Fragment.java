@@ -14,10 +14,10 @@ import java.util.List;
 
 import org.apache.http.NameValuePair;
 import org.mewx.lightnovellibrary.R;
-import org.mewx.lightnovellibrary.component.NovelIcon;
-import org.mewx.lightnovellibrary.component.NovelIconAdapter;
 import org.mewx.lightnovellibrary.component.XMLParser;
 import org.mewx.lightnovellibrary.component.XMLParser.NovelListWithInfo;
+import org.mewx.lightnovellibrary.component.adapter.NovelIcon;
+import org.mewx.lightnovellibrary.component.adapter.NovelIconAdapter;
 import org.mewx.lightnovellibrary.util.LightNetwork;
 
 import android.graphics.Bitmap;

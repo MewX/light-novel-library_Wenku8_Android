@@ -19,15 +19,15 @@ import java.util.List;
 import org.apache.http.NameValuePair;
 import org.mewx.lightnovellibrary.R;
 import org.mewx.lightnovellibrary.activity.Wenku8Fragment.asyncTask;
-import org.mewx.lightnovellibrary.component.EntryElement;
-import org.mewx.lightnovellibrary.component.EntryElementAdapter;
 import org.mewx.lightnovellibrary.component.GlobalConfig;
 import org.mewx.lightnovellibrary.component.MyApp;
-import org.mewx.lightnovellibrary.component.NovelElement;
-import org.mewx.lightnovellibrary.component.NovelElementAdapter;
-import org.mewx.lightnovellibrary.component.NovelIcon;
-import org.mewx.lightnovellibrary.component.NovelIconAdapter;
 import org.mewx.lightnovellibrary.component.XMLParser;
+import org.mewx.lightnovellibrary.component.adapter.EntryElement;
+import org.mewx.lightnovellibrary.component.adapter.EntryElementAdapter;
+import org.mewx.lightnovellibrary.component.adapter.NovelElement;
+import org.mewx.lightnovellibrary.component.adapter.NovelElementAdapter;
+import org.mewx.lightnovellibrary.component.adapter.NovelIcon;
+import org.mewx.lightnovellibrary.component.adapter.NovelIconAdapter;
 import org.mewx.lightnovellibrary.util.LightNetwork;
 
 import cn.wenku8.api.Wenku8Interface;
@@ -147,6 +147,16 @@ public class NovelListActivity extends ActionBarActivity {
 		return;
 	}
 
+	@Override
+	protected void onDestroy() {
+		super.onDestroy();
+
+		if (pDialog != null)
+			pDialog.dismiss();
+		pDialog = null;
+		return;
+	}
+
 	private void loadNovelList(int page) {
 		// In fact, I don't need to know what it really is.
 		// I just need to get the NOVELSORTBY
@@ -191,6 +201,8 @@ public class NovelListActivity extends ActionBarActivity {
 			public void onCancel(DialogInterface dialog) {
 				// TODO Auto-generated method stub
 				ast.cancel(true);
+				pDialog.dismiss();
+				pDialog = null;
 			}
 
 		});
@@ -219,12 +231,8 @@ public class NovelListActivity extends ActionBarActivity {
 				totalPage = XMLParser.getNovelListWithInfoPageNum(xml);
 				List<XMLParser.NovelListWithInfo> l = XMLParser
 						.getNovelListWithInfo(xml);
-				if (l == null) {
-					Toast.makeText(parentActivity, R.string.network_error,
-							Toast.LENGTH_SHORT).show();
-					Log.e("MewX-Main", "getNullFromParser");
-					return -1;
-				}
+				if (l == null)
+					return -100; // network error
 
 				for (int i = 0; i < l.size(); i++) {
 					XMLParser.NovelListWithInfo nlwi = l.get(i);
@@ -257,6 +265,13 @@ public class NovelListActivity extends ActionBarActivity {
 
 		@Override
 		protected void onPostExecute(Integer result) {
+			if (result == -100) {
+				Toast.makeText(parentActivity, R.string.network_error,
+						Toast.LENGTH_LONG).show();
+				Log.e("MewX-Main", "getNullFromParser");
+				return;
+			}
+
 			// result:
 			// add imageView, only here can fetch the layout2 id!!!
 			if (currentPage <= 2) {
@@ -364,13 +379,8 @@ public class NovelListActivity extends ActionBarActivity {
 
 				List<Integer> l = XMLParser.getSearchResult(xml);
 				Log.v("MewX-Main", "end fetch XML");
-				if (l == null) {
-					Toast.makeText(parentActivity,
-							getResources().getString(R.string.network_error),
-							Toast.LENGTH_SHORT).show();
-					Log.e("MewX-Main", "getNullFromParser");
-					return -1;
-				}
+				if (l == null)
+					return -100; // network error
 
 				Log.v("MewX-Main", "goto search fetch loop");
 				pDialog.setMax(l.size());
@@ -383,8 +393,8 @@ public class NovelListActivity extends ActionBarActivity {
 					List<NameValuePair> targVarList = new ArrayList<NameValuePair>();
 					targVarList.add(Wenku8Interface.getNovelFullMeta(l.get(i),
 							GlobalConfig.getFetchLanguage()));
-					
-					//XMLParser.NovelIntro ni = XMLParser.getNovelIntro(xml);
+
+					// XMLParser.NovelIntro ni = XMLParser.getNovelIntro(xml);
 
 					XMLParser.NovelListWithInfo nlwi = XMLParser
 							.getNovelShortInfoBySearching(new String(
@@ -413,10 +423,17 @@ public class NovelListActivity extends ActionBarActivity {
 		protected void onPostExecute(Integer result) {
 			pDialog.dismiss();
 
-			if (listResult.size() == 0) {
+			// check the result
+			if (result == -100) {
+				Toast.makeText(parentActivity,
+						getResources().getString(R.string.network_error),
+						Toast.LENGTH_LONG).show();
+				Log.e("MewX-Main", "getNullFromParser");
+				return;
+			} else if (listResult.size() == 0) {
 				Toast.makeText(parentActivity,
 						getResources().getString(R.string.search_result_none),
-						Toast.LENGTH_SHORT).show();
+						Toast.LENGTH_LONG).show();
 				return;
 			}
 

@@ -40,7 +40,8 @@ public class NovelContentParser {
 				result.add(nc);
 
 				// update progress
-				pDialog.setMax(result.size());
+				if (pDialog != null)
+					pDialog.setMax(result.size());
 			} else {
 				Log.v("MewX", "img index = " + temp);
 				// nc.content = nc.content.substring(temp + 12,
@@ -61,7 +62,8 @@ public class NovelContentParser {
 					temp = t2 + 12;
 
 					// update progress
-					pDialog.setMax(result.size());
+					if (pDialog != null)
+						pDialog.setMax(result.size());
 
 				}
 			}
@@ -141,4 +143,39 @@ public class NovelContentParser {
 		return result;
 
 	}
+
+	public static List<NovelContent> NovelContentParser_onlyImage(String raw) {
+		List<NovelContent> result = new ArrayList<NovelContent>();
+
+		// use split
+		String[] s = raw.split("\r\n");
+		int temp = 0;
+		for (String t : s) {
+			// test
+			temp = t.indexOf("<!--image-->", 0);
+			if (temp != -1) {
+				Log.v("MewX", "img index = " + temp);
+				// nc.content = nc.content.substring(temp + 12,
+				// nc.content.indexOf("<!--image-->", temp + 12));
+
+				// one line contains more than one images
+				temp = 0;
+				while (true) {
+					temp = t.indexOf("<!--image-->", temp);
+					if (temp == -1)
+						break;
+
+					NovelContent nc2 = new NovelContent();
+					int t2 = t.indexOf("<!--image-->", temp + 12);
+					nc2.content = t.substring(temp + 12, t2);
+					nc2.type = 'i';
+					result.add(nc2);
+					temp = t2 + 12;
+
+				}
+			}
+		}
+		return result;
+	}
+
 }

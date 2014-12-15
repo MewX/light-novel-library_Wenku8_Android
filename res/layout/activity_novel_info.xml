@@ -21,7 +21,7 @@
             <RelativeLayout
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
-                android:background="@color/btn_bg_color"
+                android:background="@color/btn_style_01"
                 android:orientation="horizontal" >
 
                 <ImageView

@@ -12,8 +12,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.mewx.lightnovellibrary.R;
-import org.mewx.lightnovellibrary.component.EntryElement;
-import org.mewx.lightnovellibrary.component.EntryElementAdapter;
+import org.mewx.lightnovellibrary.component.adapter.EntryElement;
+import org.mewx.lightnovellibrary.component.adapter.EntryElementAdapter;
 
 import android.content.Intent;
 import android.os.Bundle;

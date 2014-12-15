@@ -276,6 +276,9 @@ public class XMLParser {
 
 	// Search result list
 	static public ArrayList<Integer> getSearchResult(String xml) {
+		if (xml.indexOf("java.net.") != -1)
+			return null; // exception
+
 		// This returned XML contains errors, so I have to handle this..
 		ArrayList<Integer> l = new ArrayList<Integer>();
 
@@ -293,6 +296,7 @@ public class XMLParser {
 				l.add(new Integer(xml.substring(a, temp)));
 
 		}
+
 		return l;
 	}
 

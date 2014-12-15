@@ -2,7 +2,7 @@
  *  Light Cache
  **
  *  This class provide straight file operation functions.
- *  Easy save file and read file.
+ *  Easy save file, read file and delete file.
  **/
 
 package org.mewx.lightnovellibrary.util;
@@ -101,5 +101,23 @@ public class LightCache {
 
 		}
 		return true; // say it successful
+	}
+
+	public static boolean deleteFile(String path, String fileName) {
+		Log.v("MewX-File",
+				"Path: "
+						+ path
+						+ (path.charAt(path.length() - 1) != File.separatorChar ? File.separator
+								: "") + fileName);
+		File file = new File(
+				path
+						+ (path.charAt(path.length() - 1) != File.separatorChar ? File.separator
+								: "") + fileName);
+
+		if (file.delete()) {
+			Log.v("MewX-File", "Delete successfully");
+			return true;
+		} else
+			return false;
 	}
 }

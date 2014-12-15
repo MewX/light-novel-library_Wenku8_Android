@@ -33,6 +33,7 @@ import android.widget.Toast;
 import android.widget.ImageView.ScaleType;
 
 public class NovelReaderActivity extends ActionBarActivity {
+	private String from;
 	private int currentAid, currentVid, currentCid;
 	private List<NovelContentParser.NovelContent> nc = null;
 
@@ -62,6 +63,9 @@ public class NovelReaderActivity extends ActionBarActivity {
 		currentAid = getIntent().getIntExtra("aid", 1);
 		currentVid = getIntent().getIntExtra("vid", 1);
 		currentCid = getIntent().getIntExtra("cid", 1);
+		from = getIntent().getStringExtra("from");
+		if (from == null)
+			from = "";
 
 		// fill text
 		getNC();
@@ -84,6 +88,8 @@ public class NovelReaderActivity extends ActionBarActivity {
 			public void onCancel(DialogInterface dialog) {
 				// TODO Auto-generated method stub
 				ast.cancel(true);
+				pDialog.dismiss();
+				pDialog = null;
 			}
 
 		});
@@ -102,14 +108,19 @@ public class NovelReaderActivity extends ActionBarActivity {
 		protected Integer doInBackground(List<NameValuePair>... params) {
 
 			try {
-				String xml = new String(LightNetwork.LightHttpPost(
-						Wenku8Interface.BaseURL, params[0]), "UTF-8");
+				String xml;
+				if (from.equals(BookshelfFragment.fromid))
+					xml = GlobalConfig.loadFullFileFromSaveFolder("novel",
+							currentCid + ".xml");
+				else
+					xml = new String(LightNetwork.LightHttpPost(
+							Wenku8Interface.BaseURL, params[0]), "UTF-8");
 
 				nc = NovelContentParser.parseNovelContent(xml, pDialog);
-				if (nc == null) {
+				if (nc == null || nc.size() == 0) {
 					Log.e("MewX-Main",
 							"getNullFromParser (NovelContentParser.parseNovelContent(xml);)");
-					return -1;
+					return -100; // network error or parse failed
 				}
 
 				return 0;
@@ -127,6 +138,21 @@ public class NovelReaderActivity extends ActionBarActivity {
 
 		@Override
 		protected void onPostExecute(Integer result) {
+			if (result == -100) {
+				if (from.equals(BookshelfFragment.fromid))
+					Toast.makeText(
+							parentActivity,
+							getResources().getString(
+									R.string.bookshelf_not_cached),
+							Toast.LENGTH_LONG).show();
+				else
+					Toast.makeText(parentActivity,
+							getResources().getString(R.string.network_error),
+							Toast.LENGTH_LONG).show();
+				pDialog.dismiss();
+				return;
+			}
+
 			// generate listview to contain the texts and images
 			// ListView lv = (ListView) parentActivity
 			// .findViewById(R.id.content_list);
@@ -151,8 +177,9 @@ public class NovelReaderActivity extends ActionBarActivity {
 					tempTV.setText(nc.get(i).content);
 					tempTV.setTextSize(TypedValue.COMPLEX_UNIT_SP,
 							GlobalConfig.getShowTextSize());
-					tempTV.setPadding(0, GlobalConfig.getShowTextPaddingTop(),
-							0, 0);
+					tempTV.setPadding(GlobalConfig.getShowTextPaddingLeft(),
+							GlobalConfig.getShowTextPaddingTop(),
+							GlobalConfig.getShowTextPaddingRight(), 0);
 					layout.addView(tempTV);
 					break;
 
@@ -228,6 +255,16 @@ public class NovelReaderActivity extends ActionBarActivity {
 						.findViewById(R.id.content_scrollview)).getScrollY(),
 				((LinearLayout) parentActivity.findViewById(R.id.novel_layout))
 						.getMeasuredHeight());
+		return;
+	}
+
+	@Override
+	protected void onDestroy() {
+		super.onDestroy();
+
+		if (pDialog != null)
+			pDialog.dismiss();
+		pDialog = null;
 		return;
 	}
 }

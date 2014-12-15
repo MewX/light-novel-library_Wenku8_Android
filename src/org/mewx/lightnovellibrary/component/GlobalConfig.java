@@ -43,9 +43,14 @@ public class GlobalConfig {
 	public static String getSecondStoragePath() {
 		return MyApp.getContext().getFilesDir() + File.separator;
 	}
+	
+	public static boolean doCacheImage(){
+		return true; // when cache, cache images
+	}
 
 	public static Wenku8Interface.LANG getFetchLanguage() {
 		return Wenku8Interface.LANG.SC;
+		//return Wenku8Interface.LANG.TC;
 	}
 
 	public static int getShowTextSize() {
@@ -54,6 +59,30 @@ public class GlobalConfig {
 
 	public static int getShowTextPaddingTop() {
 		return 18; // in "dp"
+	}
+
+	public static int getShowTextPaddingLeft() {
+		return 18; // in "dp"
+	}
+
+	public static int getShowTextPaddingRight() {
+		return 18; // in "dp"
+	}
+
+	public static int getTextLoadWay() {
+		// 0 - Always load from online, when WLAN available
+		// 1 - Load locally first, then considerate online
+		// 2 - In bookshelf do (1), else do (0)
+
+		return 2;
+	}
+
+	public static String getFirstFullSaveFilePath() {
+		return getFirstStoragePath() + saveFolderName + File.separator;
+	}
+
+	public static String getSecondFullSaveFilePath() {
+		return getSecondStoragePath() + saveFolderName + File.separator;
 	}
 
 	private static String loadFullSaveFileContent(String FileName) {
@@ -359,7 +388,7 @@ public class GlobalConfig {
 
 		bookshelf.remove(temp);
 		bookshelf.add(0, aid);
-		
+
 		writeLocalBookShelf();
 		return;
 	}

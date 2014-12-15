@@ -138,11 +138,14 @@ public class MainActivity extends ActionBarActivity implements
 			changeFragment(new BookshelfFragment());
 			currentViewItemSave = itemBookshelf;
 		} else if (view == itemWenku8) {
-			changeFragment(new Wenku8Fragment());
-			currentViewItemSave = itemWenku8;
+			// changeFragment(new Wenku8Fragment());
+			// currentViewItemSave = itemWenku8;
+			Toast.makeText(this,
+					getResources().getString(R.string.in_building),
+					Toast.LENGTH_SHORT).show();
 		} else if (view == itemSettings) {
-			// changeFragment(new SettingsFragment());
-			// currentViewItemSave= itemSettings;
+			changeFragment(new SettingFragment());
+			currentViewItemSave= itemSettings;
 		}
 
 		resideMenu.closeMenu();
