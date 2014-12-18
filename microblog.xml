@@ -2,6 +2,12 @@
 <microblog>
     <post>
         <author>MewX</author>
+        <date>2014-18-16 2:30</date>
+        <blog><![CDATA[<br/><br/>测试群号：427577610<br/><br/>0.5.1.0007;给页面菜单加上了阴影;提升ResideMenu的敏感度，现在是45度角判定;小说介绍界面加入了最新章节，修复了本地书架0值问题;给小说列表和小说信息界面增加了向右滑动返回的功能，引入了Issacw0ng/SwipeBackLayout这个库;增加了.nomedia文件的生成;修改了搜索的API，提高效率并且减少数据查询操作;]]></blog>
+    </post>
+
+    <post>
+        <author>MewX</author>
         <date>2014-12-16 23:27</date>
         <blog>添加了章节切换功能。文库管理员在招募测试人员了。</blog>
     </post>
