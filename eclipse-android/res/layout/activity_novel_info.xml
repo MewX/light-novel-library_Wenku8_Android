@@ -1,0 +1,158 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/parentLayout"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#fff"
+    android:orientation="vertical" >
+
+    <include layout="@layout/activity_titlebar" />
+
+    <ScrollView
+        android:id="@+id/hostScrollView"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" >
+
+        <LinearLayout
+            android:id="@+id/hostLayout"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical" >
+
+            <RelativeLayout
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:background="@color/btn_style_01"
+                android:orientation="horizontal" >
+
+                <ImageView
+                    android:id="@+id/novel_cover"
+                    android:layout_width="140dp"
+                    android:layout_height="180dp"
+                    android:scaleType="fitStart"
+                    android:src="@drawable/empty_cover" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="180dp"
+                    android:layout_gravity="center_vertical"
+                    android:layout_toRightOf="@+id/novel_cover"
+                    android:gravity="center_vertical"
+                    android:orientation="vertical" >
+
+                    <TextView
+                        android:id="@+id/novel_name"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:ellipsize="end"
+                        android:paddingBottom="2dp"
+                        android:singleLine="false"
+                        android:text="@string/novel_name"
+                        android:textAppearance="?android:attr/textAppearanceMedium" />
+
+                    <TableLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:paddingTop="15dp" >
+
+                        <TableRow
+                            android:id="@+id/tableRowAuthor"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content" >
+
+                            <TextView
+                                android:id="@+id/novel_author"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="@string/novel_author" />
+
+                            <TextView
+                                android:id="@+id/novel_author_text"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="@string/zero" />
+                        </TableRow>
+
+                        <TableRow
+                            android:id="@+id/tableRowStatus"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content" >
+
+                            <TextView
+                                android:id="@+id/novel_status"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="@string/novel_status" />
+
+                            <TextView
+                                android:id="@+id/novel_status_text"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="@string/zero" />
+                        </TableRow>
+
+                        <TableRow
+                            android:id="@+id/tableRowUpdate"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content" >
+
+                            <TextView
+                                android:id="@+id/novel_update"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="@string/novel_update" />
+
+                            <TextView
+                                android:id="@+id/novel_update_text"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="@string/zero" />
+                        </TableRow>
+                        <TableRow
+                            android:id="@+id/tableRowLatest_up"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content" >
+
+                            <TextView
+                                android:id="@+id/novel_latest"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="@string/novel_latest" />
+
+                        </TableRow>
+                    </TableLayout>
+                            <TextView
+                                android:id="@+id/novel_latest_text"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:singleLine="false"
+                                android:text="@string/zero" />
+                </LinearLayout>
+
+                <TextView
+                    android:id="@+id/novel_intro"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_below="@+id/novel_cover"
+                    android:paddingTop="5dp"
+                    android:text="@string/novel_intro" />
+
+                <TextView
+                    android:id="@+id/novel_intro_text"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_below="@+id/novel_intro"
+                    android:paddingBottom="5dp"
+                    android:singleLine="false"
+                    android:text="@string/zero" />
+            </RelativeLayout>
+
+            <ListView
+                android:id="@+id/volume_list"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent" >
+            </ListView>
+        </LinearLayout>
+    </ScrollView>
+
+</LinearLayout>
