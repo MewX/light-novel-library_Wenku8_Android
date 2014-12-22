@@ -2,6 +2,12 @@
 <microblog>
     <post>
         <author>MewX</author>
+        <date>2014-12-22 13:49</date>
+        <blog>用512MB调试机调试时遇到了"W/OpenGLRenderer(7256): Bitmap too large to be uploaded into a texture"这个问题，这个问题的原因是OpenGL硬件加速对于图片大小做了设置，不能载入2000px宽高的图片。于是这个uk.co.senab.photoview.PhotoView库不支持大图片，妥妥地更换成com.davemorrissey.labs.subscaleview.SubsamplingScaleImageView，完美解决！～</blog>
+    </post>
+
+    <post>
+        <author>MewX</author>
         <date>2014-12-21 23:22</date>
         <blog>大部分时间在群里了，目前版本是0.5.1.0030，下一个版本增加设置界面。</blog>
     </post>
