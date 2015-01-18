@@ -25,14 +25,42 @@
         float:left;
         padding:5px;
     }
+    
+    .a-line {
+	    position: relative;
+        z-index:2;
+    }
+    .a-line:before{
+        content: "123123";
+        position: relative;
+        line-height:50px;
+        padding-left:20px;
+        padding-right:20px;
+        height:0px;
+        width:100%;
+        background-color:#fff;
+        top:-20px;
+        opacity:0.0;filter:alpha(opacity=0);
+        z-index:6;
+        
+        transition: all 0.25s ease-in-out;
+        -moz-transition: all 0.25s ease-in-out;
+        -o-transition: all 0.25s ease-in-out;
+        -webkit-transition: all 0.25s ease-in-out;
+    }
+    .a-line:hover:before {
+        height:50px;
+        top:0px;
+        opacity:1.0;filter:alpha(opacity=100);
+    }
     </style> 
 </head>
 <body bgcolor="#F9CEE2">
-    <div id="TopImage" style="position:absolute;top:0px;left:50%;margin-left:-512px;height:590px;width:864px;padding:30px 80px 30px 80px;background-image:url(imgs/site/tab_bg.jpg);background-size:100% 100%;text-align:right;z-index:1;font-size:18px;font-family:Microsoft YaHei,微软雅黑,simhei,黑体;color: #07E;-webkit-border-radius:10px 10px 0px 0px;-moz-border-radius:10px 10px 0px 0px;border-radius:10px 10px 0px 0px;text-shadow:0px 0px 10px #ffffff;"><span class="bigTItle" style="font-size:36px;">轻小说文库 APP 安卓版</span> <a href="https://github.com/MewX/LightNovel" style="color:#000;" target="_blank">项目</a>主页<br/>与轻小说文库(<a href="http://www.wenku8.cn" style="color:#000;" target="_blank">Wenku8.cn</a>)合作的安卓版轻小说APP</div>
+    <div id="TopImage" style="position:absolute;top:0px;left:50%;margin-left:-512px;height:590px;width:864px;padding:30px 80px 30px 80px;background-image:url(imgs/site/tab_bg.jpg);background-size:100% 100%;text-align:right;z-index:1;font-size:18px;font-family:Microsoft YaHei,微软雅黑,simhei,黑体;color: #07E;-webkit-border-radius:10px 10px 0px 0px;-moz-border-radius:10px 10px 0px 0px;border-radius:10px 10px 0px 0px;text-shadow:0px 0px 10px #ffffff;"><span class="bigTItle" style="font-size:36px;">轻小说文库 APP 安卓版</span> <a href="https://github.com/MewX/light-novel-library" style="color:#000;" target="_blank">项目</a>主页<br/>与轻小说文库(<a href="http://www.wenku8.cn" style="color:#000;" target="_blank">Wenku8.cn</a>)合作的安卓版轻小说APP</div>
     <div id="Staff" style="position:absolute;top:140px;left:50%;margin-left:150px;background-color:#fff;height:auto;width:auto;z-index:2;opacity:0.85;filter:alpha(opacity=85);cursor:default">
-        <div><img class="add-img" src="imgs/site/avatar_mewx.jpg" /><div class="staff-info">程序编码：MewX</div></div>
-        <div><img class="add-img" src="imgs/site/avatar_zero.jpg" /><div class="staff-info">视效设计：ZERO</div></div>
-        <div><img class="add-img" src="imgs/site/avatar_rabbit.jpg" /><div class="staff-info">反馈整理：妻兔姬</div></div>
+        <div class="a-line"><img class="add-img" src="imgs/site/avatar_mewx.jpg" /><div class="staff-info">程序编码：MewX</div></div>
+        <div class="a-line"><img class="add-img" src="imgs/site/avatar_zero.jpg" /><div class="staff-info">视效设计：ZERO</div></div>
+        <div class="a-line"><img class="add-img" src="imgs/site/avatar_rabbit.jpg" /><div class="staff-info">反馈整理：妻兔姬</div></div>
     </div>
     <div id="MicroBlog" style="position:absolute;top:300px;left:50%;margin-left:-512px;height:auto;width:974px;padding:25px;background-color:#fff;background-size:100% 100%;text-align:left;font-size:14px;z-index:3;opacity:0.75;filter:alpha(opacity=75);-webkit-border-radius:10px;-moz-border-radius:10px;border-radius:10px;text-shadow:0px 0px 10px #ffffff;">
         <div id="blog" style="float:left;width:600px"></div>
