@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:toggle="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/setting_item_container"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="@drawable/item_style_01_red"
+    android:clickable="true"
+    android:padding="10dp"
+    android:orientation="vertical" >
+
+    <TextView
+        android:id="@+id/main_text"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:paddingLeft="10dp"
+        android:text="@string/zero"
+        android:textAppearance="?android:attr/textAppearanceLarge" />
+
+    <TextView
+        android:id="@+id/sub_text"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_below="@+id/main_text"
+        android:paddingLeft="10dp"
+        android:text="@string/zero"
+        android:textAppearance="?android:attr/textAppearanceSmall" />
+
+    <com.zcw.togglebutton.ToggleButton
+        android:id="@+id/switcher"
+        android:layout_width="54dp"
+        android:layout_height="30dp"
+        android:layout_alignParentRight="true"
+        android:layout_centerVertical="true"
+        android:layout_marginRight="10dp"
+        toggle:borderWidth="1dp"
+        toggle:offBorderColor="#eee"
+        toggle:offColor="#fff"
+        toggle:onColor="#ff0066"
+        toggle:spotColor="#fff" />
+
+</RelativeLayout>

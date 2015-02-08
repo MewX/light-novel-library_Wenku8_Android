@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <string name="app_name">轻小说文库</string>
+    <string name="navigation_drawer_open">Open navigation drawer</string>
+    <string name="navigation_drawer_close">Close navigation drawer</string>
+    <string name="action_example">Example action</string>
+    <string name="action_settings">Settings</string>
+    <string name="drawer_open">Menu opened</string>
+    <string name="drawer_close">Menu closed</string>
+    <string name="action_search">搜索轻小说</string>
+    <string name="main_menu_rklist">排行榜</string>
+    <string name="main_menu_latest">最近更新</string>
+    <string name="main_menu_fav">我的收藏</string>
+    <string name="main_menu_config">设置</string>
+    <string name="main_menu_statement">开源声明</string>
+    <string name="main_menu_dark_mode_switcher">夜间/白天</string>
+    <string name="hello_blank_fragment">Hello blank fragment</string>
+    <string name="novel_item_author_with_colon">小说作者：</string>
+    <string name="na">N/A</string>
+    <string name="novel_item_status_with_colon">连载状态：</string>
+    <string name="novel_item_update_with_colon">更新时间：</string>
+    <string name="novel_item_intro_with_colon">内容简介：</string>
+    <string name="novel_item_cover">小说封面</string>
+    <string name="list_loading">正在载入列表……</string>
+    <string name="system_press_again_to_exit"><b>退出请再抚摸一下返回键哦～</b>\n&lt;(=～￣▽￣)→)￣▽￣=)>o </string>
+    <string name="system_network_error">连接服务器失败！\n\n可能的原因有：\n　　手机网络异常；\n　　服务器暂时无法响应请求；\n　　此时段请求服务器次数过多。</string>
+    <string name="system_parse_failed">数据解析失败！\n\n可能的原因有：\n　　程序内部错误，请反馈给开发者；\n　　你修改了存储的数据。</string>
+    <string name="system_manually_cancelled">任务已被手动取消</string>
+    <string name="task_stop">停止加载</string>
+    <string name="task_retry">重新加载</string>
+
+</resources>

@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/layout_activity_main"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <include layout="@layout/toolbar_default" />
+
+    <android.support.v4.widget.DrawerLayout
+        android:id="@+id/drawer"
+        xmlns:android="http://schemas.android.com/apk/res/android"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_below="@+id/toolbar_actionbar">
+
+        <FrameLayout
+            android:id="@+id/container"
+            android:clickable="true"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent" />
+
+        <!-- android:layout_marginTop="?android:attr/actionBarSize"-->
+        <fragment
+            android:id="@+id/fragment_drawer"
+            android:name="org.mewx.lightnovellibrary.fragment.NavigationDrawerFragment"
+            android:layout_width="@dimen/navigation_drawer_width"
+            android:layout_height="match_parent"
+            android:layout_gravity="start"
+            app:layout="@layout/layout_main_menu"
+            tools:layout="@layout/layout_main_menu" />
+    </android.support.v4.widget.DrawerLayout>
+
+</RelativeLayout>

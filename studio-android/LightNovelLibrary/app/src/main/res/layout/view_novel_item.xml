@@ -1,0 +1,159 @@
+<?xml version="1.0" encoding="utf-8"?>
+<android.support.v7.widget.CardView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:card-view="http://schemas.android.com/apk/res-auto"
+    xmlns:gpb="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="140dp"
+    android:clickable="true"
+    android:foreground="?android:attr/selectableItemBackground"
+    card-view:cardBackgroundColor="@color/novel_item_white"
+    card-view:contentPadding="3dp"
+    card-view:cardElevation="2dp"
+    card-view:cardMaxElevation="4dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="horizontal">
+
+        <!-- have to fix the size, or it's a bit  -->
+        <ImageView
+            android:id="@+id/novel_cover"
+            android:layout_width="100dp"
+            android:layout_height="130dp"
+            android:src="@drawable/ic_empty_image"
+            android:contentDescription="@string/novel_item_cover"
+            android:scaleType="fitStart" />
+
+        <RelativeLayout
+            android:gravity="center_vertical"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textAppearance="?android:attr/textAppearanceMedium"
+                android:text="@string/na"
+                android:textColor="@color/novel_item_title"
+                android:singleLine="true"
+                android:id="@+id/novel_title"
+                android:layout_alignParentTop="true"
+                android:layout_alignParentLeft="true"
+                android:layout_alignParentStart="true" />
+
+            <TableLayout
+                android:paddingTop="5dp"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_below="@+id/novel_title"
+                android:layout_alignParentLeft="true"
+                android:layout_alignParentStart="true">
+
+                <TableRow
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:id="@+id/tableRow">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:textAppearance="?android:attr/textAppearanceSmall"
+                        android:text="@string/novel_item_author_with_colon"
+                        android:textColor="@color/novel_item_text"/>
+
+                    <TextView
+                        android:id="@+id/novel_author"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:singleLine="true"
+                        android:textAppearance="?android:attr/textAppearanceSmall"
+                        android:text="@string/na"
+                        android:textColor="@color/novel_item_text"/>
+                </TableRow>
+
+                <TableRow
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent" >
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:textAppearance="?android:attr/textAppearanceSmall"
+                        android:text="@string/novel_item_status_with_colon"
+                        android:textColor="@color/novel_item_text"/>
+
+                    <TextView
+                        android:id="@+id/novel_status"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:singleLine="true"
+                        android:textAppearance="?android:attr/textAppearanceSmall"
+                        android:text="@string/na"
+                        android:textColor="@color/novel_item_text"/>
+                </TableRow>
+
+                <TableRow
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent" >
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:textAppearance="?android:attr/textAppearanceSmall"
+                        android:text="@string/novel_item_update_with_colon"
+                        android:textColor="@color/novel_item_text"/>
+
+                    <TextView
+                        android:id="@+id/novel_update"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:singleLine="true"
+                        android:textAppearance="?android:attr/textAppearanceSmall"
+                        android:text="@string/na"
+                        android:textColor="@color/novel_item_text"/>
+                </TableRow>
+
+                <TableRow
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent" >
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:textAppearance="?android:attr/textAppearanceSmall"
+                        android:text="@string/novel_item_intro_with_colon"
+                        android:textColor="@color/novel_item_text"/>
+                    <TextView
+                        android:id="@+id/novel_intro"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:textAppearance="?android:attr/textAppearanceSmall"
+                        android:singleLine="true"
+                        android:text="@string/na"
+                        android:ellipsize="end"
+                        android:textColor="@color/novel_item_text"/>
+                </TableRow>
+            </TableLayout>
+        </RelativeLayout>
+
+    </LinearLayout>
+
+    <!-- Loading Frame -->
+    <!--<RelativeLayout-->
+        <!--android:id="@+id/novel_loading"-->
+        <!--android:layout_width="match_parent"-->
+        <!--android:layout_height="match_parent"-->
+        <!--android:visibility="visible"-->
+        <!--android:background="@color/default_mask_background_white">-->
+
+        <!--<com.jpardogo.android.googleprogressbar.library.GoogleProgressBar-->
+            <!--android:id="@+id/google_progress"-->
+            <!--android:layout_width="20dp"-->
+            <!--android:layout_height="20dp"-->
+            <!--gpb:type="folding_circles"-->
+            <!--android:layout_centerVertical="true"-->
+            <!--android:layout_centerHorizontal="true" />-->
+    <!--</RelativeLayout>-->
+
+</android.support.v7.widget.CardView>

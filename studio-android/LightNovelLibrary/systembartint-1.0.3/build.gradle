@@ -1,0 +1,2 @@
+configurations.create("default")
+artifacts.add("default", file('systembartint-1.0.3.jar'))

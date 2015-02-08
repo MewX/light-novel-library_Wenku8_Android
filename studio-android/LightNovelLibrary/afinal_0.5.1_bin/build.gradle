@@ -1,0 +1,2 @@
+configurations.create("default")
+artifacts.add("default", file('afinal_0.5.1_bin.jar'))

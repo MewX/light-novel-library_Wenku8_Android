@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Default Color -->
+    <color name="default_activity_background">#F5F5F5</color>
+    <color name="default_mask_background_white">#A0FFFFFF</color>
+    <color name="default_text_color_black">#444444</color>
+
+    <!-- Menu Item Color -->
+    <color name="menu_item_blue">#3487f4</color>
+    <color name="menu_item_blue_dark">#2F79DB</color>
+    <color name="menu_item_grey">#ffdbdbdb</color>
+    <color name="menu_item_white">#FFFFFF</color>
+    <color name="menu_background">#fff</color>
+    <color name="menu_text_color">#444444</color>
+    <color name="menu_text_color_selected">#fff</color>
+    <color name="avatar_text">#fff</color>
+    <color name="avatar_background">#444444</color>
+
+    <!-- Novel Item Color -->
+    <color name="novel_item_white">#FFFFFF</color>
+    <color name="novel_item_grey">#EAEAEA</color>
+    <color name="novel_item_title">#F44336</color>
+    <color name="novel_item_text">#444444</color>
+
+</resources>

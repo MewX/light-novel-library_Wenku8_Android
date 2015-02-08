@@ -1,0 +1,140 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/scrollView1"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#fff" >
+
+    <LinearLayout
+        android:id="@+id/layout_tab1"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical" >
+
+        <Button
+            android:id="@+id/btn_search_novel"
+            android:layout_width="match_parent"
+            android:layout_height="50dp"
+            android:layout_gravity="center"
+            android:background="@color/btn_bg_color_outline"
+            android:text="@string/search_novel" />
+
+        <Button
+            android:id="@+id/btn_text2"
+            android:layout_width="match_parent"
+            android:layout_height="50dp"
+            android:layout_gravity="center"
+            android:background="@color/btn_bg_color_outline"
+            android:text="@string/list_special" />
+
+        <View
+            android:layout_width="fill_parent"
+            android:layout_height="3dp"
+            android:background="?android:attr/listDivider" />
+
+        <TextView
+            android:id="@+id/text_top_new"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:padding="5dp"
+            android:text="@string/top_new"
+            android:textAppearance="?android:attr/textAppearanceMedium"
+            android:textColor="@color/ThemeColorDefault"
+            android:textStyle="italic" />
+
+        <ListView
+            android:id="@+id/list_top_new"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content" >
+        </ListView>
+
+        <Button
+            android:id="@+id/btn_top_new"
+            android:layout_width="match_parent"
+            android:layout_height="40dp"
+            android:layout_gravity="center"
+            android:background="@color/btn_bg_color_outline"
+            android:text="@string/view_full_list" />
+
+        <View
+            android:layout_width="fill_parent"
+            android:layout_height="3dp"
+            android:background="?android:attr/listDivider" />
+
+        <TextView
+            android:id="@+id/text_top_hit"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:padding="5dp"
+            android:text="@string/top_hit"
+            android:textAppearance="?android:attr/textAppearanceMedium"
+            android:textColor="@color/ThemeColorDefault"
+            android:textStyle="italic" />
+
+        <ListView
+            android:id="@+id/list_top_hit"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content" >
+        </ListView>
+
+        <Button
+            android:id="@+id/btn_top_hit"
+            android:layout_width="match_parent"
+            android:layout_height="40dp"
+            android:layout_gravity="center"
+            android:background="@color/btn_bg_color_outline"
+            android:text="@string/view_full_list" />
+
+        <View
+            android:layout_width="fill_parent"
+            android:layout_height="3dp"
+            android:background="?android:attr/listDivider" />
+
+        <TextView
+            android:id="@+id/text_top_fav"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:padding="5dp"
+            android:text="@string/top_fav"
+            android:textAppearance="?android:attr/textAppearanceMedium"
+            android:textColor="@color/ThemeColorDefault"
+            android:textStyle="italic" />
+
+        <ListView
+            android:id="@+id/list_top_fav"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content" >
+        </ListView>
+
+        <Button
+            android:id="@+id/btn_top_fav"
+            android:layout_width="match_parent"
+            android:layout_height="40dp"
+            android:layout_gravity="center"
+            android:background="@color/btn_bg_color_outline"
+            android:text="@string/view_full_list" />
+
+        <View
+            android:layout_width="fill_parent"
+            android:layout_height="3dp"
+            android:background="?android:attr/listDivider" />
+
+        <Button
+            android:id="@+id/btn_view_all_list"
+            android:layout_width="match_parent"
+            android:layout_height="50dp"
+            android:layout_gravity="center"
+            android:background="@color/btn_bg_color_outline"
+            android:text="@string/view_all_list" />
+
+        <TextView
+            android:id="@+id/textTestMain"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="TextView" />
+    </LinearLayout>
+
+</ScrollView>

@@ -1,0 +1,231 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:background="@color/menu_background"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <!-- Top part -->
+    <RelativeLayout
+        android:id="@+id/linearLayout"
+        android:layout_width="match_parent"
+        android:layout_height="100dp"
+        android:layout_alignParentTop="true"
+        android:layout_centerHorizontal="true"
+        android:gravity="center_vertical"
+        android:paddingLeft="20dp"
+        android:background="@drawable/bg_avatar_01"
+        android:orientation="horizontal">
+
+        <ImageView
+            android:id="@+id/user_avatar"
+            android:layout_width="wrap_content"
+            android:layout_height="60dp"
+            android:paddingLeft="15dp"
+            android:paddingRight="15dp"
+            android:scaleType="fitEnd"
+            android:src="@drawable/ic_launcher"
+            android:layout_centerVertical="true"
+            android:layout_alignParentLeft="true"
+            android:layout_alignParentStart="true" />
+
+        <TextView
+            android:id="@+id/user_level"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="test"
+            android:textAppearance="?android:attr/textAppearanceMedium"
+            android:textColor="@color/avatar_text"
+            android:layout_centerVertical="true"
+            android:layout_toRightOf="@+id/user_avatar"
+            android:layout_toEndOf="@+id/user_avatar" />
+
+        <TextView
+            android:id="@+id/user_text"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="test"
+            android:textAppearance="?android:attr/textAppearanceSmall"
+            android:textColor="@color/avatar_text"
+            android:layout_below="@+id/user_level"
+            android:layout_toRightOf="@+id/user_avatar"
+            android:layout_toEndOf="@+id/user_avatar" />
+    </RelativeLayout>
+
+    <LinearLayout
+        android:id="@+id/main_menu_list_layout"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_alignParentLeft="true"
+        android:layout_alignParentStart="true"
+        android:layout_below="@+id/linearLayout"
+        android:gravity="center"
+        android:paddingTop="15dp"
+        android:orientation="horizontal">
+
+        <TableLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content">
+
+            <TableRow
+                android:id="@+id/main_menu_rklist"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@drawable/btn_menu_item"
+                android:clickable="true"
+                android:gravity="center_vertical"
+                android:paddingLeft="20dp">
+
+                <ImageButton
+                    android:id="@+id/main_menu_ic_rklist"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:padding="15dp"
+                    android:background="@android:color/transparent"
+                    android:clickable="false"
+                    android:focusable="false"
+                    android:src="@drawable/ic_rklist"
+                    android:textIsSelectable="false" />
+
+                <TextView
+                    android:id="@+id/main_menu_text_rklist"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textAppearance="?android:attr/textAppearanceMedium"
+                    android:text="@string/main_menu_rklist"
+                    android:width="150dp"
+                    android:textColor="@color/menu_text_color" />
+            </TableRow>
+
+            <TableRow
+                android:id="@+id/main_menu_latest"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@drawable/btn_menu_item"
+                android:clickable="true"
+                android:gravity="center_vertical"
+                android:paddingLeft="20dp">
+
+                <ImageButton
+                    android:id="@+id/main_menu_ic_latest"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:padding="15dp"
+                    android:background="@android:color/transparent"
+                    android:clickable="false"
+                    android:focusable="false"
+                    android:src="@drawable/ic_latest"
+                    android:textIsSelectable="false" />
+
+                <TextView
+                    android:id="@+id/main_menu_text_latest"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textAppearance="?android:attr/textAppearanceMedium"
+                    android:text="@string/main_menu_latest"
+                    android:width="150dp"
+                    android:textColor="@color/menu_text_color" />
+            </TableRow>
+
+            <TableRow
+                android:id="@+id/main_menu_fav"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@drawable/btn_menu_item"
+                android:clickable="true"
+                android:gravity="center_vertical"
+                android:paddingLeft="20dp">
+
+                <ImageButton
+                    android:id="@+id/main_menu_ic_fav"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:padding="15dp"
+                    android:background="@android:color/transparent"
+                    android:clickable="false"
+                    android:focusable="false"
+                    android:src="@drawable/ic_fav"
+                    android:textIsSelectable="false" />
+
+                <TextView
+                    android:id="@+id/main_menu_text_fav"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textAppearance="?android:attr/textAppearanceMedium"
+                    android:text="@string/main_menu_fav"
+                    android:width="150dp"
+                    android:textColor="@color/menu_text_color" />
+            </TableRow>
+
+            <TableRow
+                android:id="@+id/main_menu_config"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@drawable/btn_menu_item"
+                android:clickable="true"
+                android:gravity="center_vertical"
+                android:paddingLeft="20dp">
+
+                <ImageButton
+                    android:id="@+id/main_menu_ic_config"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:padding="15dp"
+                    android:background="@android:color/transparent"
+                    android:clickable="false"
+                    android:focusable="false"
+                    android:src="@drawable/ic_config"
+                    android:textIsSelectable="false" />
+
+                <TextView
+                    android:id="@+id/main_menu_text_config"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textAppearance="?android:attr/textAppearanceMedium"
+                    android:text="@string/main_menu_config"
+                    android:width="150dp"
+                    android:textColor="@color/menu_text_color" />
+            </TableRow>
+        </TableLayout>
+    </LinearLayout>
+
+    <!-- Bottom Part -->
+    <LinearLayout
+        android:id="@+id/main_menu_bottom_layout"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center"
+        android:orientation="horizontal"
+        android:layout_alignParentBottom="true"
+        android:layout_alignParentLeft="true"
+        android:layout_alignParentStart="true">
+
+        <TextView
+            android:id="@+id/main_menu_about"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:layout_weight="1"
+            android:textAppearance="?android:attr/textAppearanceSmall"
+            android:text="@string/main_menu_statement"
+            android:textColor="@color/menu_text_color"
+            android:background="@drawable/btn_menu_item"
+            android:clickable="true"
+            android:paddingTop="10dp"
+            android:paddingBottom="10dp" />
+
+        <TextView
+            android:id="@+id/main_menu_dark_mode_switcher"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:layout_weight="1"
+            android:textAppearance="?android:attr/textAppearanceSmall"
+            android:text="@string/main_menu_dark_mode_switcher"
+            android:textColor="@color/menu_text_color"
+            android:background="@drawable/btn_menu_item"
+            android:clickable="true"
+            android:paddingTop="10dp"
+            android:paddingBottom="10dp" />
+    </LinearLayout>
+
+</RelativeLayout>

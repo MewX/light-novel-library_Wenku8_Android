@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <declare-styleable name="SwipeBackLayout">
+        <attr name="edge_size" format="dimension" />
+        <attr name="edge_flag">
+            <enum name="left" value="0" />
+            <enum name="right" value="1" />
+            <enum name="bottom" value="2" />
+            <enum name="all" value="3" />
+        </attr>
+        <attr name="shadow_left" format="reference" />
+        <attr name="shadow_right" format="reference" />
+        <attr name="shadow_bottom" format="reference" />
+    </declare-styleable>
+    <declare-styleable name="SubsamplingScaleImageView">
+        <attr name="src" format="reference" />
+        <attr name="assetName" format="string" />
+        <attr name="panEnabled" format="boolean" />
+        <attr name="zoomEnabled" format="boolean" />
+        <attr name="tileBackgroundColor" format="color" />
+    </declare-styleable>
+
+    <attr name="SwipeBackLayoutStyle" format="reference" />
+
+    <declare-styleable name="ToggleButton">
+        <attr name="borderWidth" format="dimension"></attr>
+        <attr name="offBorderColor" format="reference|color"></attr>
+        <attr name="offColor" format="reference|color"></attr>
+        <attr name="onColor" format="reference|color"></attr>
+        <attr name="spotColor" format="reference|color"></attr>
+    </declare-styleable>
+    <declare-styleable name="PullToZoomScrollView">
+        <attr name="scrollHeadView" format="reference" />
+        <attr name="scrollContentView" format="reference" />
+        <attr name="scrollZoomView" format="reference" />
+    </declare-styleable>
+    <declare-styleable name="PullToZoomListView">
+        <attr name="listHeadView" format="reference" />
+        <attr name="isHeadParallax" format="boolean" />
+    </declare-styleable>
+    <declare-styleable name="PullToZoomView">
+        <attr name="headerView" format="reference" />
+        <attr name="contentView" format="reference" />
+        <attr name="zoomView" format="reference" />
+        <attr name="isHeaderParallax" format="boolean" />
+    </declare-styleable>
+
+</resources>
