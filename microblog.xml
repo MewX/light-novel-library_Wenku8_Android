@@ -2,6 +2,12 @@
 <microblog>
     <post>
         <author>MewX</author>
+        <date>2015-03-24 23:30</date>
+        <blog>已经开始继续开发了，现在在研读OSC、DesignerNews、IOSched的源代码，为了开发更美观的MD应用~</blog>
+    </post>
+    
+    <post>
+        <author>MewX</author>
         <date>2015-03-20 20:06</date>
         <blog>CROSS+CHANNEL汉化补丁发布！！！http://tieba.baidu.com/p/3648179205 接下来就是弄文库啦~</blog>
     </post>
