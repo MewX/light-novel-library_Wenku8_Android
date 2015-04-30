@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="utf-8"?>
+<io.codetail.widget.RevealFrameLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:id="@+id/searchbox_rfl"
+    android:layout_height="wrap_content">
+    <RelativeLayout
+        xmlns:app="http://schemas.android.com/apk/res-auto"
+        android:id="@+id/search_root"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginLeft="-4dp"
+        android:layout_marginRight="-4dp"
+        android:layout_marginTop="-4dp"
+        android:background="@drawable/search_bg"
+        android:orientation="vertical" >
+
+        <ListView
+            android:id="@+id/results"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_alignParentLeft="true"
+            android:layout_below="@+id/card_view">
+        </ListView>
+
+        <RelativeLayout
+            android:id="@+id/card_view"
+            android:layout_marginTop="4dp"
+            android:paddingBottom="4dp"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content" >
+
+            <TextView
+                android:id="@+id/logo"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_alignBottom="@+id/material_menu_button"
+                android:layout_alignParentTop="true"
+                android:layout_centerVertical="true"
+                android:layout_toLeftOf="@+id/mic"
+                android:layout_alignParentLeft="true"
+                android:layout_marginLeft="54dp"
+                android:singleLine="true"
+                android:gravity="center_vertical"
+                android:text="Logo"
+                android:textColor="#212121"
+                android:textAppearance="?android:attr/textAppearanceMedium" />
+
+            <EditText
+                android:id="@+id/search"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_alignBottom="@+id/material_menu_button"
+                android:layout_alignParentTop="true"
+                android:layout_alignParentLeft="true"
+                android:layout_marginLeft="64dp"
+                android:background="@null"
+                android:ems="10"
+                android:textColor="#212121"
+                android:singleLine="true"
+                android:imeOptions="actionSearch"
+                android:visibility="gone" >
+
+                <requestFocus />
+            </EditText>
+
+            <ImageView
+                android:id="@+id/mic"
+                android:layout_width="25dp"
+                android:layout_height="25dp"
+                android:layout_alignBottom="@+id/material_menu_button"
+                android:layout_alignParentRight="true"
+                android:layout_alignParentTop="true"
+                android:layout_toLeftOf="@+id/mic"
+                android:onClick="mic"
+                android:layout_marginRight="13dp"
+                android:src="@drawable/ic_action_mic" />
+
+            <com.balysv.materialmenu.MaterialMenuView
+                android:id="@+id/material_menu_button"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginLeft="8dp"
+                app:mm_color="#616161"
+                app:mm_strokeWidth="2"
+                app:mm_transformDuration="500" />
+
+            <ProgressBar
+                android:id="@+id/pb"
+                android:visibility="gone"
+                android:layout_width="25dp"
+                android:layout_height="25dp"
+                android:layout_alignBottom="@+id/material_menu_button"
+                android:layout_alignParentRight="true"
+                android:layout_alignParentTop="true"
+                android:layout_toLeftOf="@+id/mic"
+                android:layout_marginRight="13dp"/>
+
+            <ImageView
+                android:id="@+id/drawer_logo"
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:layout_alignParentLeft="true"
+                android:layout_marginLeft="16dp"
+                android:layout_marginTop="8dp" />
+
+        </RelativeLayout>
+
+    </RelativeLayout>
+</io.codetail.widget.RevealFrameLayout>

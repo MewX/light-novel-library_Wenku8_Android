@@ -4,16 +4,25 @@
     <color name="default_activity_background">#F5F5F5</color>
     <color name="default_mask_background_white">#A0FFFFFF</color>
     <color name="default_text_color_black">#444444</color>
+    <color name="default_divider">#DADADA</color>
+
+    <!-- UI Color -->
+    <color name="myPrimaryColor">#4284F5</color>
+    <color name="myPrimaryDarkColor">#3870d0</color>
+    <color name="myAccentColor">#fe5151</color>
+    <color name="myDrawerBackground">#F2F2F2</color>
+    <color name="myWindowBackground">#DEDEDE</color>
+    <color name="myTextPrimaryColor">#FFFFFF</color>
 
     <!-- Menu Item Color -->
     <color name="menu_item_blue">#3487f4</color>
     <color name="menu_item_blue_dark">#2F79DB</color>
     <color name="menu_item_grey">#ffdbdbdb</color>
     <color name="menu_item_white">#FFFFFF</color>
-    <color name="menu_background">#fff</color>
+    <color name="menu_background">#FFFFFF</color>
     <color name="menu_text_color">#444444</color>
-    <color name="menu_text_color_selected">#fff</color>
-    <color name="avatar_text">#fff</color>
+    <color name="menu_text_color_selected">#FFFFFF</color>
+    <color name="avatar_text">#FFFFFF</color>
     <color name="avatar_background">#444444</color>
 
     <!-- Novel Item Color -->
@@ -21,5 +30,17 @@
     <color name="novel_item_grey">#EAEAEA</color>
     <color name="novel_item_title">#F44336</color>
     <color name="novel_item_text">#444444</color>
+
+    <!-- PagerSlidingTabStrip Color -->
+    <color name="pager_sliding_tab_strip_indicator">#FFFFFF</color>
+    <color name="pager_sliding_tab_strip_text">#EAEAEA</color>
+    <color name="pager_sliding_tab_strip_selected_text">#FFFFFF</color>
+    <color name="pager_sliding_tab_pressed">#1AFFFFFF</color>
+
+    <!-- Google Progress Bar -->
+    <color name="red">#FFC93437</color>
+    <color name="blue">#FF375BF1</color>
+    <color name="yellow">#FFF7D23E</color>
+    <color name="green">#FF34A350</color>
 
 </resources>

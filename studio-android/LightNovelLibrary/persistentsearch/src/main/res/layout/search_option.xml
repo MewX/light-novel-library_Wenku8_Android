@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="48dp"
+    android:layout_marginLeft="8dp"
+    android:layout_marginRight="8dp"
+    android:background="@android:color/white"
+    android:orientation="horizontal" >
+
+    <ImageView
+        android:id="@+id/icon"
+        android:layout_width="32dp"
+        android:layout_height="32dp"
+        android:layout_centerVertical="true"
+        android:layout_margin="10dp"
+        android:paddingLeft="3dp"
+        android:adjustViewBounds="true"
+        android:cropToPadding="true" />
+
+    <TextView
+        android:id="@+id/title"
+        android:singleLine="true"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textColor="#212121"
+        android:layout_centerVertical="true"
+        android:layout_marginLeft="62dp"
+        android:layout_alignParentLeft="true"
+        android:layout_toLeftOf="@+id/up"
+        android:textAppearance="?android:attr/textAppearanceMedium" />
+
+    <ImageView
+        android:id="@+id/up"
+        android:layout_alignParentRight="true"
+        android:layout_width="32dp"
+        android:layout_margin="10dp"
+        android:layout_marginRight="24dp"
+        android:layout_gravity="center|right"
+        android:layout_height="32dp"
+        android:src="@drawable/ic_up" />
+
+    <View
+        android:id="@+id/border"
+        android:layout_width="fill_parent"
+        android:layout_height="1dp"
+        android:background="#E8E8E8" />
+    
+</RelativeLayout>

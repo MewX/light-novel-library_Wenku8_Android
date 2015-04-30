@@ -5,6 +5,18 @@
 
     <!-- Per the design guidelines, navigation drawers should be between 240dp and 320dp:
          https://developer.android.com/design/patterns/navigation-drawer.html -->
-    <dimen name="navigation_drawer_width">260dp</dimen>
+    <dimen name="navigation_drawer_width">-.5dp</dimen>
     <dimen name="toolbar_elevation">4dp</dimen>
+
+    <!-- Tabs attrs -->
+    <dimen name="tabs_indicator_height">3dp</dimen>
+
+    <!-- Google -->
+    <integer-array name="google_colors">
+        <item>@color/red</item>
+        <item>@color/blue</item>
+        <item>@color/yellow</item>
+        <item>@color/green</item>
+    </integer-array>
+    <integer name="default_type">0</integer>
 </resources>

@@ -1,8 +1,0 @@
-<resources>
-    <color name="myPrimaryColor">#f44336</color>
-    <color name="myPrimaryDarkColor">#d0392e</color>
-    <color name="myAccentColor">#ff0000</color>
-    <color name="myDrawerBackground">#F2F2F2</color>
-    <color name="myWindowBackground">#DEDEDE</color>
-    <color name="myTextPrimaryColor">#FFFFFF</color>
-</resources>

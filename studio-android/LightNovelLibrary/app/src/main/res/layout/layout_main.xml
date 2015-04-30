@@ -1,35 +1,55 @@
 <?xml version="1.0" encoding="utf-8"?>
-<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:id="@+id/layout_activity_main"
+
+<android.support.v4.widget.DrawerLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/drawer"
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
-    <include layout="@layout/toolbar_default" />
-
-    <android.support.v4.widget.DrawerLayout
-        android:id="@+id/drawer"
-        xmlns:android="http://schemas.android.com/apk/res/android"
+    <RelativeLayout
+        android:id="@+id/layout_activity_main"
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:layout_below="@+id/toolbar_actionbar">
+        android:layout_height="match_parent">
 
+        <include layout="@layout/toolbar_default" />
         <FrameLayout
             android:id="@+id/container"
             android:clickable="true"
             android:layout_width="match_parent"
-            android:layout_height="match_parent" />
-
-        <!-- android:layout_marginTop="?android:attr/actionBarSize"-->
-        <fragment
-            android:id="@+id/fragment_drawer"
-            android:name="org.mewx.lightnovellibrary.fragment.NavigationDrawerFragment"
-            android:layout_width="@dimen/navigation_drawer_width"
             android:layout_height="match_parent"
-            android:layout_gravity="start"
-            app:layout="@layout/layout_main_menu"
-            tools:layout="@layout/layout_main_menu" />
-    </android.support.v4.widget.DrawerLayout>
+            android:layout_below="@+id/toolbar_actionbar"/>
 
-</RelativeLayout>
+        <!-- Need set as status bar height, but got no results -->
+        <LinearLayout
+            android:id="@+id/searchbox_bg"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:visibility="gone"
+            android:orientation="horizontal"
+            android:fitsSystemWindows="true"
+            android:background="#80000000"
+            android:clickable="true"
+            android:elevation="8dp"/>
+
+        <com.quinny898.library.persistentsearch.SearchBox
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:visibility="gone"
+            android:id="@+id/searchbox"/>
+
+
+    </RelativeLayout>
+    <!-- android:layout_marginTop="?android:attr/actionBarSize"-->
+    <fragment
+        android:id="@+id/fragment_drawer"
+        android:name="org.mewx.wenku8.fragment.NavigationDrawerFragment"
+        android:layout_width="@dimen/navigation_drawer_width"
+        android:layout_height="match_parent"
+        android:layout_gravity="start"
+        app:layout="@layout/layout_main_menu"
+        tools:layout="@layout/layout_main_menu" />
+
+
+</android.support.v4.widget.DrawerLayout>
+

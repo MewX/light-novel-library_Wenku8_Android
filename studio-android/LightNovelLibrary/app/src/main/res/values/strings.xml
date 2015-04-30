@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
 
-    <string name="app_name">轻小说文库</string>
+    <string name="app_name">轻小说文库·预览版</string>
     <string name="navigation_drawer_open">Open navigation drawer</string>
     <string name="navigation_drawer_close">Close navigation drawer</string>
     <string name="action_example">Example action</string>
@@ -11,6 +11,19 @@
     <string name="action_search">搜索轻小说</string>
     <string name="main_menu_rklist">排行榜</string>
     <string name="main_menu_latest">最近更新</string>
+    <string name="tab_postdate">最新入库</string>
+    <string name="tab_goodnum">总收藏量排行</string>
+    <string name="tab_fullflag">完结小说列表</string>
+    <string name="tab_lastupdate">最近更新</string>
+    <string name="tab_allvisit">总点击排行</string>
+    <string name="tab_allvote">总推荐排行</string>
+    <string name="tab_monthvisit">月点击排行</string>
+    <string name="tab_monthvote">月推荐排行</string>
+    <string name="tab_weekvisit">周点击排行</string>
+    <string name="tab_weekvote">周推荐排行</string>
+    <string name="tab_dayvisit">日点击排行</string>
+    <string name="tab_dayvote">日推荐排行</string>
+    <string name="tab_size">字数排行</string>
     <string name="main_menu_fav">我的收藏</string>
     <string name="main_menu_config">设置</string>
     <string name="main_menu_statement">开源声明</string>
@@ -29,5 +42,6 @@
     <string name="system_manually_cancelled">任务已被手动取消</string>
     <string name="task_stop">停止加载</string>
     <string name="task_retry">重新加载</string>
+    <string name="sorry">客观你不要心急啊，你急臣妾也做不到呀，现在代码量已经比之前版本大很多了~请体谅。而且主框架搭的差不多了，后面逻辑快很多，一有时间就好办！</string>
 
 </resources>

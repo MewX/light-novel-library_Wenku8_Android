@@ -4,7 +4,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@color/default_activity_background"
-    tools:context="org.mewx.lightnovellibrary.fragment.LatestFragment">
+    tools:context="org.mewx.wenku8.fragment.LatestFragment">
 
     <!-- Novel List -->
     <android.support.v7.widget.RecyclerView
@@ -12,9 +12,9 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:scrollbars="vertical"
-        android:paddingLeft="5dp"
-        android:paddingRight="5dp"
         android:fastScrollEnabled="true"/>
+    <!--android:paddingLeft="5dp"-->
+    <!--android:paddingRight="5dp"-->
 
     <!-- Loading Frame -->
     <LinearLayout
@@ -24,6 +24,7 @@
         android:gravity="center"
         android:orientation="vertical"
         android:visibility="visible"
+        android:clickable="true"
         android:background="@color/default_mask_background_white">
 
         <com.jpardogo.android.googleprogressbar.library.GoogleProgressBar

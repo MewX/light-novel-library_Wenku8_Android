@@ -4,18 +4,19 @@
     android:layout_height="match_parent"
     android:background="@color/default_activity_background"
     android:orientation="vertical"
-    tools:context="org.mewx.lightnovellibrary.fragment.RKListFragment">
+    tools:context="org.mewx.wenku8.fragment.RKListFragment">
 
     <com.astuetz.PagerSlidingTabStrip
         android:id="@+id/rklist_tabs"
         android:layout_width="match_parent"
         android:layout_height="?attr/actionBarSize"
+        android:elevation="4dp"
         android:background="?attr/colorPrimary" />
 
     <android.support.v4.view.ViewPager
         android:id="@+id/rklist_pager"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        tools:context="org.mewx.lightnovellibrary.fragment.RKListFragment"/>
+        tools:context="org.mewx.wenku8.fragment.RKListFragment"/>
 
 </LinearLayout>
