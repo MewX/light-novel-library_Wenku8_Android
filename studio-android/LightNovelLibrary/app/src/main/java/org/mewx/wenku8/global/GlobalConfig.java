@@ -392,4 +392,13 @@ public class GlobalConfig {
         writeSearchHistory(); // save history file
         return;
     }
+
+    public static int getMaxSearchHistory( ) {
+        return maxSearchHistory;
+    }
+
+    public static void setMaxSearchHistory( int size ) {
+        if(size > 0)
+            maxSearchHistory = size;
+    }
 }

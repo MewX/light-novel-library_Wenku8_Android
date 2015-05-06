@@ -19,6 +19,7 @@
     <application
         android:name="org.mewx.wenku8.MyApp"
         android:allowBackup="true"
+        android:label="@string/app_name"
         android:icon="@drawable/ic_launcher"
         android:theme="@style/AppTheme">
 
@@ -38,7 +39,7 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
 
-            <!-- Search Activity -->
+            <!-- Search View -->
             <intent-filter>
                 <action android:name="android.intent.action.SEARCH" />
             </intent-filter>
@@ -47,6 +48,13 @@
                 android:resource="@layout/searchable" />
 
         </activity>
+
+        <!-- Search Activity -->
+        <activity android:name=".activity.SearchActivity"
+            android:label="@string/action_search"
+            android:screenOrientation="portrait">
+        </activity>
+
     </application>
 
 </manifest>

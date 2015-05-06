@@ -13,6 +13,7 @@
     <color name="myDrawerBackground">#F2F2F2</color>
     <color name="myWindowBackground">#DEDEDE</color>
     <color name="myTextPrimaryColor">#FFFFFF</color>
+    <color name="mySearchToggleColor">#7F7F7F</color>
 
     <!-- Menu Item Color -->
     <color name="menu_item_blue">#3487f4</color>

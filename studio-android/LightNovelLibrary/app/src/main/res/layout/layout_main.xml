@@ -21,22 +21,16 @@
             android:layout_below="@+id/toolbar_actionbar"/>
 
         <!-- Need set as status bar height, but got no results -->
-        <LinearLayout
-            android:id="@+id/searchbox_bg"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:visibility="gone"
-            android:orientation="horizontal"
-            android:fitsSystemWindows="true"
-            android:background="#80000000"
-            android:clickable="true"
-            android:elevation="8dp"/>
-
-        <com.quinny898.library.persistentsearch.SearchBox
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:visibility="gone"
-            android:id="@+id/searchbox"/>
+        <!--<LinearLayout-->
+            <!--android:id="@+id/searchbox_bg"-->
+            <!--android:layout_width="match_parent"-->
+            <!--android:layout_height="match_parent"-->
+            <!--android:visibility="gone"-->
+            <!--android:orientation="horizontal"-->
+            <!--android:fitsSystemWindows="true"-->
+            <!--android:background="#80000000"-->
+            <!--android:clickable="true"-->
+            <!--android:elevation="8dp"/>-->
 
 
     </RelativeLayout>

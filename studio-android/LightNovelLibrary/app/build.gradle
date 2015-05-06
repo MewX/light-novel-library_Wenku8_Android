@@ -7,8 +7,8 @@ android {
         applicationId "org.mewx.wenku8"
         minSdkVersion 15
         targetSdkVersion 22
-        versionCode 10
-        versionName "0.6.0.0000"
+        versionCode 11
+        versionName "0.6.0.0000dev"
     }
     buildTypes {
         release {
@@ -30,7 +30,6 @@ dependencies {
     // external libraries
     compile project(':umeng-analytics-v5.4.2')
     compile project(':volley')
-    compile project(':persistentsearch');
     compile 'com.readystatesoftware.systembartint:systembartint:1.0.3'
     //compile 'com.astuetz:pagerslidingtabstrip:1.0.1'
     //compile 'com.jpardogo.materialtabstrip:library:1.0.9'

@@ -1,6 +1,6 @@
 package org.mewx.wenku8.activity;
 
-import android.content.Context;
+import android.content.Intent;
 import android.graphics.Bitmap;
 import android.os.Build;
 import android.os.Bundle;
@@ -11,8 +11,6 @@ import android.support.v7.app.ActionBarActivity;
 import android.support.v7.widget.Toolbar;
 import android.view.Menu;
 import android.view.MenuItem;
-import android.view.View;
-import android.view.inputmethod.InputMethodManager;
 import android.widget.Toast;
 
 import com.nostra13.universalimageloader.cache.disc.impl.UnlimitedDiscCache;
@@ -20,8 +18,6 @@ import com.nostra13.universalimageloader.core.DisplayImageOptions;
 import com.nostra13.universalimageloader.core.ImageLoader;
 import com.nostra13.universalimageloader.core.ImageLoaderConfiguration;
 import com.nostra13.universalimageloader.core.display.FadeInBitmapDisplayer;
-import com.quinny898.library.persistentsearch.SearchBox;
-import com.quinny898.library.persistentsearch.SearchResult;
 import com.readystatesoftware.systembartint.SystemBarTintManager;
 import com.umeng.analytics.MobclickAgent;
 
@@ -32,7 +28,6 @@ import org.mewx.wenku8.global.GlobalConfig;
 import org.mewx.wenku8.util.LightCache;
 
 import java.io.File;
-import java.util.List;
 
 
 public class MainActivity extends ActionBarActivity {
@@ -54,7 +49,6 @@ public class MainActivity extends ActionBarActivity {
 
     private Toolbar mToolbar;
     private NavigationDrawerFragment mNavigationDrawerFragment;
-    private SearchBox searchbox;
     private String titleSaved;
 
     @Override
@@ -101,18 +95,15 @@ public class MainActivity extends ActionBarActivity {
         mNavigationDrawerFragment.setup(R.id.fragment_drawer, (DrawerLayout) findViewById(R.id.drawer), mToolbar);
 
         // find search box
-        searchbox = (SearchBox) findViewById(R.id.searchbox);
-        searchbox.enableVoiceRecognition(this);
-        searchbox.setLogoText(getResources().getString(R.string.action_search));
-        searchbox.setMaxLength(10);
         mToolbar.setOnMenuItemClickListener(new Toolbar.OnMenuItemClickListener() {
             	@Override
             	public boolean onMenuItemClick(MenuItem item) {
                     Toast.makeText(MyApp.getContext(),"called button",Toast.LENGTH_SHORT).show();
                     if(item.getItemId() == R.id.action_search) {
-                        ((View)findViewById(R.id.searchbox_bg)).setVisibility(View.VISIBLE);
-                        searchbox.setSearchStatus(false);
-                        openSearch();
+                        // start search activity
+                        startActivity(new Intent(MainActivity.this, SearchActivity.class));
+                        overridePendingTransition(R.anim.fade_in,R.anim.hold); // fade in animation
+
                     }
             		return true;
             	}
@@ -134,88 +125,6 @@ public class MainActivity extends ActionBarActivity {
         }
     }
 
-    // search box action
-    public void openSearch() {
-        // save title
-        titleSaved = mToolbar.getTitle().toString();
-
-        mToolbar.setTitle("Searching...");
-        searchbox.revealFromMenuItem(R.id.action_search, this);
-
-        // get search history
-        List<String> bookshelf = GlobalConfig.getSearchHistory();
-        for(String i : bookshelf) {
-            SearchResult option = new SearchResult(
-                    i.charAt(0)=='1' || i.charAt(0)=='2' ? i.substring(1,i.length()) : i,
-                    getResources().getDrawable(R.drawable.ic_launcher));
-            searchbox.addSearchable(option);
-        }
-
-        // set listener
-        searchbox.setSearchListener(new SearchBox.SearchListener() {
-            @Override
-            public void onSearchOpened() {
-                // Use this to tint the screen
-                Toast.makeText(MyApp.getContext(),"search open",Toast.LENGTH_SHORT).show();
-
-            }
-
-            @Override
-            public void onSearchClosed() {
-                // Use this to un-tint the screen
-                closeSearch();
-            }
-
-            @Override
-            public void onSearchTermChanged() {
-                // React to the search term changing
-                // Called after it has updated results
-            }
-
-            @Override
-            public void onSearch(String searchTerm) {
-                Toast.makeText(MyApp.getContext(), searchTerm + " Searched",
-                        Toast.LENGTH_LONG).show();
-                mToolbar.setTitle(searchTerm);
-
-            }
-
-            @Override
-            public void onSearchCleared() {
-
-            }
-
-        });
-
-    }
-
-    private void closeSearch() {
-        mToolbar.setTitle(titleSaved);
-
-        searchbox.hideCircularly(this);
-        searchbox.setSearchStatus(false);
-        ((View) findViewById(R.id.searchbox_bg)).setVisibility(View.GONE);
-
-        InputMethodManager inputManager = (InputMethodManager) this.getSystemService(Context.INPUT_METHOD_SERVICE);
-        inputManager.hideSoftInputFromWindow(MainActivity.this.getCurrentFocus().getWindowToken(), 0);
-
-        return;
-
-    }
-
-//    @Override
-//    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
-//        if (requestCode == 1234 && resultCode == RESULT_OK) {
-//            ArrayList<String> matches = data
-//                    .getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS);
-//            searchbox.populateEditText(matches);
-//        }
-//        super.onActivityResult(requestCode, resultCode, data);
-//    }
-
-
-
-
 
     /**
      * Hard menu button works like the soft menu button.
@@ -231,8 +140,7 @@ public class MainActivity extends ActionBarActivity {
         // to the open status //
         if(mNavigationDrawerFragment.isDrawerOpen()) {
             // close search box and IME
-            if (searchbox != null)
-                closeSearch();
+
         }
 
         // to the close status //
@@ -326,8 +234,10 @@ public class MainActivity extends ActionBarActivity {
     public void onBackPressed() {
         if (mNavigationDrawerFragment.isDrawerOpen())
             mNavigationDrawerFragment.closeDrawer();
-        else if(searchbox.getSearchStatus())
-            closeSearch();
+
+        // check search status and close search box
+//        else if(searchbox.getSearchStatus())
+//            closeSearch();
         else
             super.onBackPressed();
     }
