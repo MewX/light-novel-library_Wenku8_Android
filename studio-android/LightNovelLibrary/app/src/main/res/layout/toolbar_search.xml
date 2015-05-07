@@ -3,7 +3,7 @@
     xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/toolbar_actionbar"
     android:layout_width="match_parent"
-    android:layout_height="wrap_content"
+    android:layout_height="?attr/actionBarSize"
     android:background="@android:color/white"
     android:fitsSystemWindows="true"
     android:elevation="4dp"
@@ -51,13 +51,29 @@
             android:textCursorDrawable="@null"
             android:textColorHint="#999999" />
 
-        <ImageView
+        <!--<ImageView-->
+            <!--android:id="@+id/search_clear"-->
+            <!--android:layout_width="wrap_content"-->
+            <!--android:layout_height="wrap_content"-->
+            <!--android:layout_gravity="center"-->
+            <!--android:paddingLeft="16dp"-->
+            <!--android:paddingRight="16dp"-->
+            <!--android:src="@drawable/ic_clearcache" />-->
+
+        <RelativeLayout
+            android:layout_width="?attr/actionBarSize"
+            android:layout_height="?attr/actionBarSize"
             android:id="@+id/search_clear"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_gravity="center"
-            android:paddingLeft="16dp"
-            android:paddingRight="16dp"
-            android:src="@drawable/ic_clearcache" />
+            android:clickable="true"
+            android:background="@drawable/btn_menu_item">
+
+            <ImageView
+                android:id="@+id/search_clear_icon"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_centerHorizontal="true"
+                android:layout_centerVertical="true"
+                android:src="@drawable/abc_ic_clear_mtrl_alpha"/>
+        </RelativeLayout>
     </LinearLayout>
 </android.support.v7.widget.Toolbar>

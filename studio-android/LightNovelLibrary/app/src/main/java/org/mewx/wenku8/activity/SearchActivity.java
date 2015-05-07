@@ -29,7 +29,8 @@ public class SearchActivity extends ActionBarActivity {
     // private vars
     private LinearLayout searchContainer = null;
     private EditText toolbarSearchView = null;
-    private ImageView searchClearButton = null;
+    private View searchClearButton = null;
+    private ImageView searchClearIcon = null;
     private Toolbar mToolbar = null;
     private ActionBarDrawerToggle mDrawerToggle = null;
     private boolean toolbarHomeButtonAnimating = false;
@@ -42,7 +43,7 @@ public class SearchActivity extends ActionBarActivity {
         // bind views
         searchContainer = (LinearLayout)findViewById(R.id.search_container);
         toolbarSearchView = (EditText) findViewById(R.id.search_view);
-        searchClearButton = (ImageView) findViewById(R.id.search_clear);
+        searchClearButton = (View) findViewById(R.id.search_clear);
 
         // Clear search text when clear button is tapped
         searchClearButton.setOnClickListener(new View.OnClickListener() {
@@ -62,6 +63,10 @@ public class SearchActivity extends ActionBarActivity {
         final Drawable upArrow = getResources().getDrawable(R.drawable.abc_ic_ab_back_mtrl_am_alpha);
         upArrow.setColorFilter(getResources().getColor(R.color.mySearchToggleColor), PorterDuff.Mode.SRC_ATOP);
         getSupportActionBar().setHomeAsUpIndicator(upArrow);
+
+        // set search clear icon color
+        searchClearIcon = (ImageView)findViewById(R.id.search_clear_icon);
+        searchClearIcon.setColorFilter(getResources().getColor(R.color.mySearchToggleColor), PorterDuff.Mode.SRC_ATOP);
 
         // set indicator action
 
