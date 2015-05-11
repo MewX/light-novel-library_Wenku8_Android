@@ -8,6 +8,7 @@ import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.SimpleAdapter;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -103,6 +104,14 @@ public class LatestFragment extends Fragment {
         // use a linear layout manager
         mLayoutManager = new LinearLayoutManager(getActivity());
         mRecyclerView.setLayoutManager(mLayoutManager);
+        mRecyclerView.setAdapter(new RecyclerView.Adapter() {
+            @Override
+            public RecyclerView.ViewHolder onCreateViewHolder(ViewGroup parent, int viewType) { return null; }
+            @Override
+            public void onBindViewHolder(RecyclerView.ViewHolder holder, int position) { }
+            @Override
+            public int getItemCount() { return 0; }
+        });
 
         // Listener
         mRecyclerView.setOnScrollListener(new MyOnScrollListener());

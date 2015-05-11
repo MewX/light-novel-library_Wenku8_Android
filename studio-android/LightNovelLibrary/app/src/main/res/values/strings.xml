@@ -42,6 +42,15 @@
     <string name="system_manually_cancelled">任务已被手动取消</string>
     <string name="task_stop">停止加载</string>
     <string name="task_retry">重新加载</string>
-    <string name="sorry">客观你不要心急啊，你急臣妾也做不到呀，现在代码量已经比之前版本大很多了~请体谅。而且主框架搭的差不多了，后面逻辑快很多，一有时间就好办！</string>
+    <string name="dialog_title_delete_one_search_record">删除一条搜索历史</string>
+    <string name="dialog_content_delete_one_search_record">删除该搜索历史吗？</string>
+    <string name="dialog_positive_ok">OK</string>
+    <string name="dialog_positive_want">要</string>
+    <string name="dialog_positive_sure">好滴~</string>
+    <string name="dialog_positive_likethis">就这样</string>
+    <string name="dialog_negative_no">不要</string>
+    <string name="dialog_negative_pass">算了吧</string>
+    <string name="press_twice_to_exit"><b>退出请再戳一下返回键哦～</b>\n&lt;(=～￣▽￣)→)￣▽￣=)>o </string>
+    <string name="sorry">客官你不要心急啊，你急臣妾也做不到呀，现在代码量已经比之前版本大很多了~请体谅。而且主框架搭的差不多了，后面逻辑快很多，一有时间就好办！</string>
 
 </resources>

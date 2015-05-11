@@ -234,6 +234,7 @@ public class NovelItemListFragment extends Fragment {
             l.add(Wenku8API.getNovelList(Wenku8API.getNOVELSORTBY(type), currentPage));
 
             byte[] temp = LightNetwork.LightHttpPost( Wenku8API.getBaseURL(), l );
+            if(temp == null) return -1;
             try {
                 tempNovelList = Wenku8Parser.parseNovelItemList(new String(temp, "UTF-8"), currentPage);
             }
@@ -263,7 +264,7 @@ public class NovelItemListFragment extends Fragment {
         protected void onPostExecute(Integer integer) {
             if(integer == -1) {
                 // network error
-                GlobalConfig.wantDebugLog("MewX", "AsyncGetNovelItemList:onPostExecute is loading");
+                GlobalConfig.wantDebugLog("MewX", "AsyncGetNovelItemList:onPostExecute network error");
                 return;
             }
 

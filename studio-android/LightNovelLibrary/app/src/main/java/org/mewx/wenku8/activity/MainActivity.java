@@ -8,6 +8,7 @@ import android.support.v4.app.Fragment;
 import android.support.v4.app.FragmentTransaction;
 import android.support.v4.widget.DrawerLayout;
 import android.support.v7.app.ActionBarActivity;
+import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
 import android.view.Menu;
 import android.view.MenuItem;
@@ -28,9 +29,11 @@ import org.mewx.wenku8.global.GlobalConfig;
 import org.mewx.wenku8.util.LightCache;
 
 import java.io.File;
+import java.util.Timer;
+import java.util.TimerTask;
 
 
-public class MainActivity extends ActionBarActivity {
+public class MainActivity extends AppCompatActivity {
     // This is for fragment switch
     public enum FRAGMENT_LIST {
         RKLIST, LATEST, FAV, CONFIG
@@ -49,7 +52,7 @@ public class MainActivity extends ActionBarActivity {
 
     private Toolbar mToolbar;
     private NavigationDrawerFragment mNavigationDrawerFragment;
-    private String titleSaved;
+    private static Boolean isExit = false; // used for exit by twice
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -84,6 +87,8 @@ public class MainActivity extends ActionBarActivity {
         // UMeng settings
         MobclickAgent.updateOnlineConfig( this );
 
+        // Update old save files ----------------
+
 
         // set Toolbar
         mToolbar = (Toolbar) findViewById(R.id.toolbar_actionbar);
@@ -98,7 +103,7 @@ public class MainActivity extends ActionBarActivity {
         mToolbar.setOnMenuItemClickListener(new Toolbar.OnMenuItemClickListener() {
             	@Override
             	public boolean onMenuItemClick(MenuItem item) {
-                    Toast.makeText(MyApp.getContext(),"called button",Toast.LENGTH_SHORT).show();
+                    //Toast.makeText(MyApp.getContext(),"called button",Toast.LENGTH_SHORT).show();
                     if(item.getItemId() == R.id.action_search) {
                         // start search activity
                         startActivity(new Intent(MainActivity.this, SearchActivity.class));
@@ -234,11 +239,31 @@ public class MainActivity extends ActionBarActivity {
     public void onBackPressed() {
         if (mNavigationDrawerFragment.isDrawerOpen())
             mNavigationDrawerFragment.closeDrawer();
-
-        // check search status and close search box
-//        else if(searchbox.getSearchStatus())
-//            closeSearch();
         else
-            super.onBackPressed();
+            exitBy2Click();
+    }
+
+    private void exitBy2Click() {
+        // press twice to exit
+        Timer tExit = null;
+        if (isExit == false) {
+            isExit = true; // ready to exit
+            Toast.makeText(
+                    this,
+                    this.getResources().getString(R.string.press_twice_to_exit),
+                    Toast.LENGTH_SHORT).show();
+            tExit = new Timer();
+            tExit.schedule(new TimerTask() {
+                @Override
+                public void run() {
+                    isExit = false; // cancel exit
+                }
+            }, 2000); // 2 seconds cancel exit task
+
+        } else {
+            finish();
+            // call fragments and end streams and services
+            System.exit(0);
+        }
     }
 }

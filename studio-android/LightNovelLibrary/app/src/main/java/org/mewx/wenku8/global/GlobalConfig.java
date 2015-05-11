@@ -367,6 +367,16 @@ public class GlobalConfig {
         if (searchHistory.indexOf("[") != -1)
             return; // harmful
 
+        // remove same thing
+        while(true) {
+            int pos = searchHistory.indexOf(record);
+
+            if(pos < 0)
+                break;
+            else
+                searchHistory.remove(pos);
+        }
+
         while (searchHistory.size() >= maxSearchHistory)
             searchHistory.remove(maxSearchHistory - 1); // remove the last
         searchHistory.add(0, record); // add to the first place
@@ -374,7 +384,29 @@ public class GlobalConfig {
         writeSearchHistory(); // save history file
         return;
     }
+    public static void deleteSearchHistory(String record) {
+        // record begins with a number, which represent its type
+        if (searchHistory == null)
+            readSearchHistory();
 
+        if (searchHistory.indexOf("[") != -1)
+            return; // harmful
+
+        // remove same thing
+        while(true) {
+            int pos = searchHistory.indexOf(record);
+
+            if(pos < 0)
+                break;
+            else
+                searchHistory.remove(pos);
+        }
+
+        writeSearchHistory(); // save history file
+        return;
+    }
+
+    @Deprecated
     public static void onSearchClicked(int index) {
         if (index >= searchHistory.size())
             return;

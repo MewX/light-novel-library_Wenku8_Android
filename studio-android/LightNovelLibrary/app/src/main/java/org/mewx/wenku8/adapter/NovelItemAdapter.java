@@ -56,13 +56,19 @@ public class NovelItemAdapter extends RecyclerView.Adapter<NovelItemAdapter.View
     public void onBindViewHolder(final ViewHolder viewHolder, int i) {
 
         // set text
-        viewHolder.tvNovelTitle.setText(mDataset.get(i).getTitle());
-        viewHolder.tvNovelAuthor.setText(mDataset.get(i).getAuthor());
-        viewHolder.tvNovelStatus.setText(Wenku8API.getStatusBySTATUS(Wenku8API.getSTATUSByInt(mDataset.get(i).getStatus())));
-        viewHolder.tvNovelUpdate.setText(mDataset.get(i).getUpdate());
-        viewHolder.tvNovelIntro.setText(mDataset.get(i).getIntroShort());
+        if(viewHolder.tvNovelTitle != null)
+            viewHolder.tvNovelTitle.setText(mDataset.get(i).getTitle());
+        if(viewHolder.tvNovelAuthor != null)
+            viewHolder.tvNovelAuthor.setText(mDataset.get(i).getAuthor());
+        if(viewHolder.tvNovelStatus != null)
+            viewHolder.tvNovelStatus.setText(Wenku8API.getStatusBySTATUS(Wenku8API.getSTATUSByInt(mDataset.get(i).getStatus())));
+        if(viewHolder.tvNovelUpdate != null)
+            viewHolder.tvNovelUpdate.setText(mDataset.get(i).getUpdate());
+        if(viewHolder.tvNovelIntro != null)
+            viewHolder.tvNovelIntro.setText(mDataset.get(i).getIntroShort());
 
-        ImageLoader.getInstance().displayImage(Wenku8API.getCoverURL(mDataset.get(i).getAid()), viewHolder.ivNovelCover);
+        if(viewHolder.ivNovelCover != null)
+            ImageLoader.getInstance().displayImage(Wenku8API.getCoverURL(mDataset.get(i).getAid()), viewHolder.ivNovelCover);
 
 
     }
