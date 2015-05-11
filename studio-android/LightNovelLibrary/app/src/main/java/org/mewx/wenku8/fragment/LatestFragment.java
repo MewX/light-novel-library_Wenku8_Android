@@ -114,7 +114,7 @@ public class LatestFragment extends Fragment {
         });
 
         // Listener
-        mRecyclerView.setOnScrollListener(new MyOnScrollListener());
+        mRecyclerView.addOnScrollListener(new MyOnScrollListener());
 
         // set click event
         ((TextView) rootView.findViewById(R.id.btn_loading)).setOnClickListener(new View.OnClickListener() {
@@ -218,9 +218,12 @@ public class LatestFragment extends Fragment {
                          Log.i("MewX", "Loading more...");
 
                      // load more toast
+//                     Toast.makeText(MyApp.getContext(),
+//                             getResources().getString(R.string.list_loading) + "p" + Integer.toString(novelItemList.getCurrentPage() + 1),
+//                             Toast.LENGTH_LONG).show();
                      Toast.makeText(MyApp.getContext(),
-                             getResources().getString(R.string.list_loading) + "p" + Integer.toString(novelItemList.getCurrentPage() + 1),
-                             Toast.LENGTH_LONG).show();
+                             getResources().getString(R.string.list_loading) + "(" + Integer.toString(novelItemList.getCurrentPage() + 1) + "/" + novelItemList.getTotalPage() + ")",
+                             Toast.LENGTH_SHORT).show();
 
                      // load more thread
                      FinalHttp fh = new FinalHttp();

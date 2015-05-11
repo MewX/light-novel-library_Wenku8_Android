@@ -47,7 +47,6 @@
                 android:paddingLeft="16dp"
                 android:paddingRight="16dp"
                 android:text="test"
-                android:width="150dp"
                 android:singleLine="true"
                 android:textColor="@color/menu_text_color" />
 

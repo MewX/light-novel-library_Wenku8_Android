@@ -115,7 +115,9 @@ public class RKListFragment extends Fragment {
 
         @Override
         public Fragment getItem(int type) {
-            return NovelItemListFragment.newInstance(TITLELIST[type]);
+            Bundle bundle = new Bundle();
+            bundle.putString("type", Wenku8API.getNOVELSORTBY(TITLELIST[type]));
+            return NovelItemListFragment.newInstance(bundle);
         }
     }
 

@@ -113,7 +113,7 @@ public class NovelItemInfo {
                                 update = xmlPullParser.getAttributeValue(1);
                             } else if ("IntroPreview".equals(xmlPullParser
                                     .getAttributeValue(0))) {
-                                intro_short = xmlPullParser.nextText();
+                                intro_short = xmlPullParser.nextText().trim().replaceAll("\u3000","");
                             }
                         }
                         break;

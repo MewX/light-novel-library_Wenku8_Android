@@ -100,7 +100,6 @@
                     android:paddingLeft="16dp"
                     android:paddingRight="16dp"
                     android:text="@string/main_menu_latest"
-                    android:width="150dp"
                     android:textColor="@color/menu_text_color" />
             </TableRow>
 
@@ -136,7 +135,6 @@
                     android:paddingLeft="16dp"
                     android:paddingRight="16dp"
                     android:text="@string/main_menu_rklist"
-                    android:width="150dp"
                     android:textColor="@color/menu_text_color" />
             </TableRow>
 
@@ -172,7 +170,6 @@
                     android:paddingLeft="16dp"
                     android:paddingRight="16dp"
                     android:text="@string/main_menu_fav"
-                    android:width="150dp"
                     android:textColor="@color/menu_text_color" />
             </TableRow>
 
@@ -208,7 +205,6 @@
                     android:paddingLeft="16dp"
                     android:paddingRight="16dp"
                     android:text="@string/main_menu_config"
-                    android:width="150dp"
                     android:textColor="@color/menu_text_color" />
             </TableRow>
         </TableLayout>

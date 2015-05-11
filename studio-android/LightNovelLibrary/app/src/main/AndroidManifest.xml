@@ -47,6 +47,12 @@
             android:screenOrientation="portrait">
         </activity>
 
+        <!-- Search Result Activity -->
+        <activity android:name=".activity.SearchResultActivity"
+            android:label="@string/action_search"
+            android:screenOrientation="portrait">
+        </activity>
+
     </application>
 
 </manifest>

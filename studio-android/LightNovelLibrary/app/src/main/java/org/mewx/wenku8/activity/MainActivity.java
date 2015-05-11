@@ -141,18 +141,9 @@ public class MainActivity extends AppCompatActivity {
      */
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
-
-        // to the open status //
-        if(mNavigationDrawerFragment.isDrawerOpen()) {
-            // close search box and IME
-
-        }
-
-        // to the close status //
         // only when the navigation draw closed, I draw the menu bar.
         // the menu items will be drawn automatically
         if(!mNavigationDrawerFragment.isDrawerOpen()) {
-
 
             // change title of toolbar
             switch(status){

@@ -31,7 +31,7 @@
             android:id="@+id/google_progress"
             android:layout_width="30dp"
             android:layout_height="30dp"
-            gpb:type="folding_circles"/>
+            gpb:type="chrome_floating_circles"/>
 
         <!-- If loading failed, update this loading-status info -->
         <TextView

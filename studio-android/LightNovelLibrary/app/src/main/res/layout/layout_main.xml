@@ -15,6 +15,7 @@
         android:layout_height="match_parent">
 
         <include layout="@layout/toolbar_default" />
+
         <FrameLayout
             android:id="@+id/container"
             android:clickable="true"
@@ -34,9 +35,8 @@
             <!--android:clickable="true"-->
             <!--android:elevation="8dp"/>-->
 
-
     </RelativeLayout>
-    <!-- android:layout_marginTop="?android:attr/actionBarSize"-->
+
     <fragment
         android:id="@+id/fragment_drawer"
         android:name="org.mewx.wenku8.fragment.NavigationDrawerFragment"

@@ -1,5 +1,6 @@
 package org.mewx.wenku8.activity;
 
+import android.content.Intent;
 import android.graphics.PorterDuff;
 import android.graphics.drawable.Drawable;
 import android.os.Bundle;
@@ -18,6 +19,7 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import com.afollestad.materialdialogs.DialogAction;
+import com.afollestad.materialdialogs.GravityEnum;
 import com.afollestad.materialdialogs.MaterialDialog;
 import com.afollestad.materialdialogs.Theme;
 
@@ -103,12 +105,16 @@ public class SearchActivity extends AppCompatActivity implements SearchHistoryAd
                 if(temp.length()==0) return false;
 
                 // real action
-                Toast.makeText(MyApp.getContext(), toolbarSearchView.getText().toString(), Toast.LENGTH_SHORT).show();
-                GlobalConfig.addSearchHistory(toolbarSearchView.getText().toString());
+                //Toast.makeText(MyApp.getContext(), temp, Toast.LENGTH_SHORT).show();
+                GlobalConfig.addSearchHistory(temp);
                 refreshHistoryList();
 
                 // jump to search
-
+                Intent intent = new Intent(SearchActivity.this, SearchResultActivity.class);
+                intent.putExtra("key", temp);
+                intent.addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT); // long-press will cause repetitions
+                startActivity(intent);
+                overridePendingTransition( R.anim.fade_in, R.anim.hold);
 
                 return false;
             }
@@ -156,14 +162,13 @@ public class SearchActivity extends AppCompatActivity implements SearchHistoryAd
                 })
                 .theme(Theme.LIGHT)
                 .dividerColorRes(R.color.dlgDividerColor)
-                .titleColorRes(R.color.dlgTitleColor)
                 .contentColorRes(R.color.dlgContentColor)
                 .positiveColorRes(R.color.dlgPositiveButtonColor)
                 .negativeColorRes(R.color.dlgNegativeButtonColor)
-                .title(R.string.dialog_title_delete_one_search_record)
                 .content(getResources().getString(R.string.dialog_content_delete_one_search_record) + "\n" + historyList.get(postion))
+                .contentGravity(GravityEnum.CENTER)
                 .positiveText(R.string.dialog_positive_likethis)
-                .negativeText(R.string.dialog_negative_pass)
+                .negativeText(R.string.dialog_negative_preferno)
                 .show();
     }
 

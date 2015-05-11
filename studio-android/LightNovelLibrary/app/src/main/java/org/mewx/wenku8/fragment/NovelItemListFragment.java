@@ -32,8 +32,9 @@ import java.util.List;
 public class NovelItemListFragment extends Fragment {
 
     // type def
+    private final String searchType = "search";
     private MainActivity mainActivity = null;
-    private String type;
+    private String type, key;
     private boolean isLoading = false; // judge network thread continue
     private int pastVisiblesItems, visibleItemCount, totalItemCount;
 
@@ -53,13 +54,11 @@ public class NovelItemListFragment extends Fragment {
     /**
      * Each position stands an specific list type.
      * Each type represent a specific
-     * @param type
+     * @param args
      * @return
      */
-    public static NovelItemListFragment newInstance(Wenku8API.NOVELSORTBY type) {
+    public static NovelItemListFragment newInstance(Bundle args) {
         NovelItemListFragment fragment = new NovelItemListFragment();
-        Bundle args = new Bundle();
-        args.putString("type", Wenku8API.getNOVELSORTBY(type));
         fragment.setArguments(args);
 
         return fragment;
@@ -74,11 +73,12 @@ public class NovelItemListFragment extends Fragment {
         super.onCreate(savedInstanceState);
         type = getArguments().getString("type");
 
-        // get main activity
-        while (mainActivity == null)
-            mainActivity = (MainActivity) getActivity();
+        // judge if is 'search'
+        key = type.equals(searchType) ? getArguments().getString("key") : "";
 
-        GlobalConfig.setCurrentFragment(this); // backup
+        // get main activity
+        if(getActivity() instanceof MainActivity)
+            mainActivity = (MainActivity) getActivity();
 
         return;
     }
@@ -111,29 +111,33 @@ public class NovelItemListFragment extends Fragment {
         mRecyclerView.setHasFixedSize(false); // set variable size
         mRecyclerView.setItemAnimator(new DefaultItemAnimator());
         mRecyclerView.setLayoutManager(mLayoutManager);
-        // Listener
-        mRecyclerView.setOnScrollListener(new MyOnScrollListener());
+        mRecyclerView.setAdapter(new RecyclerView.Adapter() {
+            @Override
+            public RecyclerView.ViewHolder onCreateViewHolder(ViewGroup parent, int viewType) {
+                return null;
+            }
 
+            @Override
+            public void onBindViewHolder(RecyclerView.ViewHolder holder, int position) {
+            }
 
-        // set adapter
-//        mAdapter = new ListingAdapter(mListing);
-//        mRecyclerView.setAdapter(adapter);
-
-
-        // judge if loading
-//        if(isLoading || listNovelItemAid == null || listNovelItemAid.size() == 0) {
-//            ((View) rootView.findViewById(R.id.list_loading)).setVisibility(View.VISIBLE);
-//            refreshIdList();
-//        }
-//
-//        // else
-//        if( (View) rootView.findViewById(R.id.list_loading)!=null)
-//            ((View) rootView.findViewById(R.id.list_loading)).setVisibility(View.GONE);
-//        refreshIdList();
+            @Override
+            public int getItemCount() {
+                return 0;
+            }
+        });
 
         // List request
-        AsyncGetNovelItemList asyncGetNovelItemList = new AsyncGetNovelItemList();
-        asyncGetNovelItemList.execute(currentPage);
+        if(type.equals(searchType)) {
+
+            Toast.makeText(getActivity(),"search",Toast.LENGTH_SHORT).show();
+        }
+        else {
+            // Listener
+            mRecyclerView.addOnScrollListener(new MyOnScrollListener());
+            AsyncGetNovelItemList asyncGetNovelItemList = new AsyncGetNovelItemList();
+            asyncGetNovelItemList.execute(currentPage);
+        }
 
         return rootView;
     }
@@ -205,8 +209,8 @@ public class NovelItemListFragment extends Fragment {
 
                     // load more toast
                     Toast.makeText(MyApp.getContext(),
-                            getResources().getString(R.string.list_loading) + "(" + Integer.toString(currentPage + 1) + ")",
-                            Toast.LENGTH_LONG).show();
+                            getResources().getString(R.string.list_loading) + "(" + Integer.toString(currentPage + 1) + "/" + Integer.toString(totalPage) + ")",
+                            Toast.LENGTH_SHORT).show();
 
                     // load more thread
                     AsyncGetNovelItemList asynctask = new AsyncGetNovelItemList();
@@ -294,9 +298,28 @@ public class NovelItemListFragment extends Fragment {
         }
     }
 
+    private class AsyncGetSearchResultList extends AsyncTask<String, Integer, Integer> {
+        private int resultSize = 0;
 
-    @Override
-    public void onDetach() {
-        super.onDetach();
+        @Override
+        protected Integer doInBackground(String... params) {
+            return null;
+        }
+
+        @Override
+        protected void onPostExecute(Integer integer) {
+            super.onPostExecute(integer);
+
+            if(integer == -1) {
+                // network error
+                GlobalConfig.wantDebugLog("MewX", "AsyncGetSearchResultList:onPostExecute network error");
+
+                // redo button
+
+                return;
+            }
+        }
     }
+
+
 }

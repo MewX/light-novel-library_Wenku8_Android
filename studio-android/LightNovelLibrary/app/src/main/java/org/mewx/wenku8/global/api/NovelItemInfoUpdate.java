@@ -1,5 +1,7 @@
 package org.mewx.wenku8.global.api;
 
+import android.util.Log;
+
 import org.xmlpull.v1.XmlPullParser;
 import org.xmlpull.v1.XmlPullParserFactory;
 
@@ -65,7 +67,8 @@ public class NovelItemInfoUpdate {
                                 niiu.update = xmlPullParser.getAttributeValue(1);
                             } else if ("IntroPreview".equals(xmlPullParser
                                     .getAttributeValue(0))) {
-                                niiu.intro_short = xmlPullParser.nextText();
+                                // need to remove leading space '\u3000'
+                                niiu.intro_short = xmlPullParser.nextText().trim().replaceAll("\u3000","");
                             }
                         }
                         break;
