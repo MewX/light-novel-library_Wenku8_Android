@@ -22,14 +22,18 @@ import org.mewx.wenku8.global.GlobalConfig;
 import org.mewx.wenku8.global.api.NovelItemInfoUpdate;
 import org.mewx.wenku8.global.api.Wenku8API;
 import org.mewx.wenku8.global.api.Wenku8Parser;
+import org.mewx.wenku8.listener.MyItemClickListener;
+import org.mewx.wenku8.listener.MyItemLongClickListener;
 import org.mewx.wenku8.util.LightNetwork;
 import org.mewx.wenku8.util.Logger;
 
 import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
-public class NovelItemListFragment extends Fragment {
+public class NovelItemListFragment extends Fragment implements MyItemClickListener, MyItemLongClickListener {
 
     // type def
     private final String searchType = "search";
@@ -129,8 +133,12 @@ public class NovelItemListFragment extends Fragment {
 
         // List request
         if(type.equals(searchType)) {
+            // update UI
 
+            // excute task
             Toast.makeText(getActivity(),"search",Toast.LENGTH_SHORT).show();
+            AsyncGetSearchResultList asyncGetSearchResultList = new AsyncGetSearchResultList();
+            asyncGetSearchResultList.execute(key);
         }
         else {
             // Listener
@@ -154,6 +162,27 @@ public class NovelItemListFragment extends Fragment {
     }
 
 
+    /**
+     * Fill on click lister
+     * @param view
+     * @param postion
+     */
+    @Override
+    public void onItemClick(View view, final int postion) {
+        Toast.makeText(getActivity(),"item click detected", Toast.LENGTH_SHORT).show();
+        return;
+    }
+
+    @Override
+    public void onItemLongClick(View view, int postion) {
+        Toast.makeText(getActivity(),"item long click detected", Toast.LENGTH_SHORT).show();
+        return;
+    }
+
+    /**
+     * Refresh all the list with Integer array.
+     * If empty, create;
+     */
     private void refreshIdList() {
         if(listNovelItemAid==null)
             listNovelItemAid = new ArrayList<Integer>();
@@ -170,8 +199,11 @@ public class NovelItemListFragment extends Fragment {
         }
 
         //if(mAdapter == null) {
-        if(mAdapter == null)
+        if(mAdapter == null) {
             mAdapter = new NovelItemAdapterUpdate();
+            mAdapter.setOnItemClickListener(this);
+            mAdapter.setOnItemLongClickListener(this);
+        }
         mAdapter.RefreshDataset(listNovelItemInfo);
             //mAdapter = new NovelItemAdapterUpdate(listNovelItemInfo);
 
@@ -303,7 +335,59 @@ public class NovelItemListFragment extends Fragment {
 
         @Override
         protected Integer doInBackground(String... params) {
-            return null;
+            if (GlobalConfig.inDebugMode())
+                Log.v("MewX", "background search starts");
+
+            // get search result by novel title
+            List<NameValuePair> l1 = new ArrayList<NameValuePair>();
+            l1.add(Wenku8API.searchNovelByNovelName(params[0],GlobalConfig.getCurrentLang()));
+            byte[] tempListTitle = LightNetwork.LightHttpPost(Wenku8API.getBaseURL(),l1);
+            if(tempListTitle == null) return -1;
+
+            // purify returned data
+            List<Integer> listResultList = new ArrayList<>(); // result list
+            try {
+                //Log.i("MewX", new String(tempListTitle, "UTF-8"));
+
+                Pattern p = Pattern.compile("aid=\'(.*)\'"); // match content between "aid=\'" and "\'"
+                Matcher m = p.matcher(new String(tempListTitle, "UTF-8"));
+                while (m.find())
+                    listResultList.add(new Integer(m.group(1)));
+            } catch (UnsupportedEncodingException e) {
+                e.printStackTrace();
+                GlobalConfig.wantDebugLog("MewX", e.toString());
+            }
+
+
+            // get search result by author name
+            List<NameValuePair> l2 = new ArrayList<NameValuePair>();
+            l2.add(Wenku8API.searchNovelByAuthorName(params[0], GlobalConfig.getCurrentLang()));
+            byte[] tempListName = LightNetwork.LightHttpPost(Wenku8API.getBaseURL(),l2);
+            if(tempListName == null) return -1;
+
+            // purify returned data
+            List<Integer> listResultList2 = new ArrayList<>(); // result list
+            try {
+                Log.i("MewX", new String(tempListName, "UTF-8"));
+
+                Pattern p = Pattern.compile("aid=\'(.*)\'"); // match content between "aid=\'" and "\'"
+                Matcher m = p.matcher(new String(tempListName, "UTF-8"));
+                while (m.find()) {
+                    listResultList2.add(new Integer(m.group(1)));
+                    Log.e("MewX", listResultList2.get(listResultList2.size()-1).toString());
+                }
+            } catch (UnsupportedEncodingException e) {
+                e.printStackTrace();
+                GlobalConfig.wantDebugLog("MewX", e.toString());
+            }
+
+            // set migrate
+            listNovelItemAid = new ArrayList<>();
+            listNovelItemAid.addAll(listResultList);
+            listNovelItemAid.removeAll(listResultList2);
+            listNovelItemAid.addAll(listResultList2);
+
+            return 0;
         }
 
         @Override
@@ -314,10 +398,21 @@ public class NovelItemListFragment extends Fragment {
                 // network error
                 GlobalConfig.wantDebugLog("MewX", "AsyncGetSearchResultList:onPostExecute network error");
 
-                // redo button
+                // show redo button
 
                 return;
             }
+
+            if(listNovelItemAid == null || listNovelItemAid.size() == 0) {
+                Toast.makeText(getActivity(), getResources().getString(R.string.task_null),Toast.LENGTH_LONG).show();
+                return;
+            }
+
+            // show all items
+            refreshIdList();
+            GlobalConfig.wantDebugLog("MewX", "refresh over");
+
+            return;
         }
     }
 

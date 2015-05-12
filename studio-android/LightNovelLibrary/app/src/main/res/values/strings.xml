@@ -43,6 +43,7 @@
     <string name="system_manually_cancelled">任务已被手动取消</string>
     <string name="task_stop">停止加载</string>
     <string name="task_retry">重新加载</string>
+    <string name="task_null">没有结果</string>
     <string name="dialog_content_delete_one_search_record">确定要删除该搜索历史吗？\n</string>
     <string name="dialog_positive_ok">OK</string>
     <string name="dialog_positive_want">要</string>

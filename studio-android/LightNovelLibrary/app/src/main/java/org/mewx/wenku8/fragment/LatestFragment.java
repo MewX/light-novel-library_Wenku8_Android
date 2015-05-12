@@ -26,11 +26,13 @@ import org.mewx.wenku8.global.GlobalConfig;
 import org.mewx.wenku8.global.api.NovelItemInfo;
 import org.mewx.wenku8.global.api.NovelItemList;
 import org.mewx.wenku8.global.api.Wenku8API;
+import org.mewx.wenku8.listener.MyItemClickListener;
+import org.mewx.wenku8.listener.MyItemLongClickListener;
 
 import java.util.ArrayList;
 import java.util.List;
 
-public class LatestFragment extends Fragment {
+public class LatestFragment extends Fragment implements MyItemClickListener, MyItemLongClickListener {
 
     private String TAG = "LatestFragment";
 
@@ -140,6 +142,25 @@ public class LatestFragment extends Fragment {
 
         return rootView;
     }
+
+
+    /**
+     * Fill on click lister
+     * @param view
+     * @param postion
+     */
+    @Override
+    public void onItemClick(View view, final int postion) {
+        Toast.makeText(getActivity(),"item click detected", Toast.LENGTH_SHORT).show();
+        return;
+    }
+
+    @Override
+    public void onItemLongClick(View view, int postion) {
+        Toast.makeText(getActivity(),"item long click detected", Toast.LENGTH_SHORT).show();
+        return;
+    }
+
 
     @Override
     public void onDetach() {
@@ -313,6 +334,8 @@ public class LatestFragment extends Fragment {
             // hide loading layout
             if (mAdapter == null) {
                 mAdapter = new NovelItemAdapter(listNovelItemInfo);
+                mAdapter.setOnItemClickListener(LatestFragment.this);
+                mAdapter.setOnItemLongClickListener(LatestFragment.this);
                 mRecyclerView.setAdapter(mAdapter);
             }
             if ((View) mainActivity.findViewById(R.id.list_loading) != null)

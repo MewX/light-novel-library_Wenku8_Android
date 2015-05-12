@@ -207,6 +207,7 @@ public class Wenku8API {
         return new BasicNameValuePair("request", LightBase64.EncodeBase64(str));
     }
 
+    @Deprecated
     public static NameValuePair getNovelCover(int aid) {
         // get the aid, and return a "jpg" file or other, in binary
         return getEncryptedNVP("action=book&do=cover&aid=" + aid);
@@ -334,7 +335,6 @@ public class Wenku8API {
     // ##########
     // ReqTest07 = ''
     // #return getResult( ReqTest07, True );
-
     public static NameValuePair searchNovelByNovelName(String novelName, LANG l) {
         // get a list of search results, here is an example:
         // Note: there are extra line-break.

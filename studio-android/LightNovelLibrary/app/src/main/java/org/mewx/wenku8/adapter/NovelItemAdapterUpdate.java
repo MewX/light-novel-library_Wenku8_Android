@@ -16,6 +16,8 @@ import org.mewx.wenku8.R;
 import org.mewx.wenku8.global.GlobalConfig;
 import org.mewx.wenku8.global.api.NovelItemInfoUpdate;
 import org.mewx.wenku8.global.api.Wenku8API;
+import org.mewx.wenku8.listener.MyItemClickListener;
+import org.mewx.wenku8.listener.MyItemLongClickListener;
 
 import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
@@ -27,6 +29,8 @@ import java.util.Map;
  */
 public class NovelItemAdapterUpdate extends RecyclerView.Adapter<NovelItemAdapterUpdate.ViewHolder> {
 
+    private MyItemClickListener mItemClickListener;
+    private MyItemLongClickListener mItemLongClickListener;
     private List<NovelItemInfoUpdate> mDataset;
 
     // empty list, then use append method to add list elements
@@ -58,7 +62,7 @@ public class NovelItemAdapterUpdate extends RecyclerView.Adapter<NovelItemAdapte
     public ViewHolder onCreateViewHolder(ViewGroup viewGroup, int i) {
         View view = View.inflate(viewGroup.getContext(), R.layout.view_novel_item, null);
 
-        ViewHolder holder = new ViewHolder(view);
+        ViewHolder holder = new ViewHolder(view, mItemClickListener, mItemLongClickListener);
         return holder;
     }
 
@@ -140,12 +144,24 @@ public class NovelItemAdapterUpdate extends RecyclerView.Adapter<NovelItemAdapte
         return mDataset.size();
     }
 
+
+    public void setOnItemClickListener(MyItemClickListener listener){
+        this.mItemClickListener = listener;
+    }
+
+    public void setOnItemLongClickListener(MyItemLongClickListener listener){
+        this.mItemLongClickListener = listener;
+    }
+
+
     /**
      * View Holder:
      * Called by RecyclerView to display the data at the specified position.
      */
-    public static class ViewHolder extends RecyclerView.ViewHolder {
+    public static class ViewHolder extends RecyclerView.ViewHolder implements View.OnClickListener, View.OnLongClickListener {
 
+        private MyItemClickListener mClickListener;
+        private MyItemLongClickListener mLongClickListener;
         public int position;
         public boolean isLoading = false;
 
@@ -157,8 +173,12 @@ public class NovelItemAdapterUpdate extends RecyclerView.Adapter<NovelItemAdapte
         public TextView tvNovelUpdate;
         public TextView tvNovelIntro;
 
-        public ViewHolder(View itemView) {
+        public ViewHolder(View itemView, MyItemClickListener clickListener, MyItemLongClickListener longClickListener) {
             super(itemView);
+            this.mClickListener = clickListener;
+            this.mLongClickListener = longClickListener;
+            itemView.findViewById(R.id.item_card).setOnClickListener(this);
+            itemView.findViewById(R.id.item_card).setOnLongClickListener(this);
 
             // get all views
             //loadingLayout = (View) itemView.findViewById(R.id.novel_loading);
@@ -170,6 +190,21 @@ public class NovelItemAdapterUpdate extends RecyclerView.Adapter<NovelItemAdapte
             tvNovelIntro = (TextView) itemView.findViewById(R.id.novel_intro);
 
             return;
+        }
+
+        @Override
+        public void onClick(View v) {
+            if(mClickListener != null){
+                mClickListener.onItemClick(v,getAdapterPosition());
+            }
+        }
+
+        @Override
+        public boolean onLongClick(View v) {
+            if(mLongClickListener != null){
+                mLongClickListener.onItemLongClick(v, getAdapterPosition());
+            }
+            return true;
         }
     }
 

@@ -7,6 +7,8 @@ import android.view.ViewGroup;
 import android.widget.TextView;
 
 import org.mewx.wenku8.R;
+import org.mewx.wenku8.listener.MyItemClickListener;
+import org.mewx.wenku8.listener.MyItemLongClickListener;
 
 import java.util.List;
 
@@ -21,14 +23,6 @@ public class SearchHistoryAdapter extends RecyclerView.Adapter<SearchHistoryAdap
 
     // on click listener
     private TextView searchText; // this is for set search text
-
-    // declare the click interface
-    public interface MyItemClickListener {
-        void onItemClick(View view,int postion);
-    }
-    public interface MyItemLongClickListener {
-        void onItemLongClick(View view,int postion);
-    }
 
     public SearchHistoryAdapter(List<String> h) {
         this.history = h;

@@ -27,13 +27,15 @@ import org.mewx.wenku8.MyApp;
 import org.mewx.wenku8.R;
 import org.mewx.wenku8.adapter.SearchHistoryAdapter;
 import org.mewx.wenku8.global.GlobalConfig;
+import org.mewx.wenku8.listener.MyItemClickListener;
+import org.mewx.wenku8.listener.MyItemLongClickListener;
 
 import java.util.List;
 
 /**
  * Created by MewX on 2015/5/7.
  */
-public class SearchActivity extends AppCompatActivity implements SearchHistoryAdapter.MyItemClickListener, SearchHistoryAdapter.MyItemLongClickListener {
+public class SearchActivity extends AppCompatActivity implements MyItemClickListener, MyItemLongClickListener {
 
     // private vars
     private LinearLayout searchContainer = null;
@@ -161,7 +163,7 @@ public class SearchActivity extends AppCompatActivity implements SearchHistoryAd
                     }
                 })
                 .theme(Theme.LIGHT)
-                .dividerColorRes(R.color.dlgDividerColor)
+                .backgroundColorRes(R.color.dlgBackgroundColor)
                 .contentColorRes(R.color.dlgContentColor)
                 .positiveColorRes(R.color.dlgPositiveButtonColor)
                 .negativeColorRes(R.color.dlgNegativeButtonColor)

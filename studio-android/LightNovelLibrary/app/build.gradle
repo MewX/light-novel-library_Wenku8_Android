@@ -34,5 +34,5 @@ dependencies {
     //compile 'com.astuetz:pagerslidingtabstrip:1.0.1'
     //compile 'com.jpardogo.materialtabstrip:library:1.0.9'
     compile 'com.nostra13.universalimageloader:universal-image-loader:1.9.3'
-    compile 'com.afollestad:material-dialogs:0.7.3.4'
+    compile 'com.afollestad:material-dialogs:0.7.4.0'
 }
