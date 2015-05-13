@@ -53,6 +53,12 @@
             android:screenOrientation="portrait">
         </activity>
 
+        <!-- Novel Info Activity -->
+        <activity android:name=".activity.NovelInfoActivity"
+            android:label="@string/action_novel_info"
+            android:screenOrientation="portrait">
+        </activity>
+
     </application>
 
 </manifest>

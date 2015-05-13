@@ -7,6 +7,8 @@ import android.widget.ImageView;
 import android.widget.TextView;
 
 import com.nostra13.universalimageloader.core.ImageLoader;
+import com.nostra13.universalimageloader.core.imageaware.ImageAware;
+import com.nostra13.universalimageloader.core.imageaware.ImageViewAware;
 
 import org.mewx.wenku8.R;
 import org.mewx.wenku8.global.api.NovelItemInfo;
@@ -71,9 +73,8 @@ public class NovelItemAdapter extends RecyclerView.Adapter<NovelItemAdapter.View
         if(viewHolder.tvNovelIntro != null)
             viewHolder.tvNovelIntro.setText(mDataset.get(i).getIntroShort());
 
-        if(viewHolder.ivNovelCover != null)
-            ImageLoader.getInstance().displayImage(Wenku8API.getCoverURL(mDataset.get(i).getAid()), viewHolder.ivNovelCover);
-
+        // need to solve flicking problem
+        ImageLoader.getInstance().displayImage(Wenku8API.getCoverURL(mDataset.get(i).getAid()), viewHolder.ivNovelCover);
 
     }
 

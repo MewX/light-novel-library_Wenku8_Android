@@ -1,5 +1,6 @@
 package org.mewx.wenku8.fragment;
 
+import android.content.Intent;
 import android.os.Bundle;
 import android.support.v4.app.Fragment;
 import android.support.v7.widget.LinearLayoutManager;
@@ -21,6 +22,7 @@ import net.tsz.afinal.http.AjaxCallBack;
 import org.mewx.wenku8.MyApp;
 import org.mewx.wenku8.R;
 import org.mewx.wenku8.activity.MainActivity;
+import org.mewx.wenku8.activity.NovelInfoActivity;
 import org.mewx.wenku8.adapter.NovelItemAdapter;
 import org.mewx.wenku8.global.GlobalConfig;
 import org.mewx.wenku8.global.api.NovelItemInfo;
@@ -151,13 +153,23 @@ public class LatestFragment extends Fragment implements MyItemClickListener, MyI
      */
     @Override
     public void onItemClick(View view, final int postion) {
-        Toast.makeText(getActivity(),"item click detected", Toast.LENGTH_SHORT).show();
+        //Toast.makeText(getActivity(),"item click detected", Toast.LENGTH_SHORT).show();
+
+        // go to detail activity
+        Intent intent = new Intent(getActivity(), NovelInfoActivity.class);
+        intent.putExtra("aid", listNovelItem.get(postion));
+        startActivity(intent);
+
         return;
     }
 
     @Override
     public void onItemLongClick(View view, int postion) {
         Toast.makeText(getActivity(),"item long click detected", Toast.LENGTH_SHORT).show();
+
+        // show popup menu
+
+
         return;
     }
 

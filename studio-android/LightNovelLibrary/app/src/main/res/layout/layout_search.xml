@@ -4,7 +4,7 @@
     android:layout_height="match_parent"
     android:orientation="horizontal"
     android:fitsSystemWindows="true"
-    android:background="#ECECEC">
+    android:background="@color/default_white">
 
     <include layout="@layout/toolbar_search" />
 
@@ -21,6 +21,7 @@
         android:layout_below="@id/divider"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
+        android:background="@color/default_mask_background_white"
         android:scrollbars="vertical"
         android:fastScrollEnabled="true"/>
 

@@ -3,7 +3,10 @@ package org.mewx.wenku8.global.api;
 import android.util.Log;
 
 import org.mewx.wenku8.global.GlobalConfig;
+import org.xmlpull.v1.XmlPullParser;
+import org.xmlpull.v1.XmlPullParserFactory;
 
+import java.io.StringReader;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -61,4 +64,151 @@ public class Wenku8Parser {
         return list;
     }
 
+
+    static public NovelItemMeta parsetNovelFullMeta(String xml) {
+        try {
+            XmlPullParserFactory factory = XmlPullParserFactory.newInstance();
+            XmlPullParser xmlPullParser = factory.newPullParser();
+            NovelItemMeta nfi = null;
+            xmlPullParser.setInput(new StringReader(xml));
+            int eventType = xmlPullParser.getEventType();
+
+            while (eventType != XmlPullParser.END_DOCUMENT) {
+                switch (eventType) {
+                    case XmlPullParser.START_DOCUMENT:
+                        break;
+
+                    case XmlPullParser.START_TAG:
+
+                        if ("metadata".equals(xmlPullParser.getName())) {
+                            nfi = new NovelItemMeta();
+                        } else if ("data".equals(xmlPullParser.getName())) {
+                            if ("Title".equals(xmlPullParser.getAttributeValue(0))) {
+                                nfi.aid = new Integer(
+                                        xmlPullParser.getAttributeValue(1));
+                                nfi.title = xmlPullParser.nextText();
+                            } else if ("Author".equals(xmlPullParser
+                                    .getAttributeValue(0))) {
+                                nfi.author = xmlPullParser.getAttributeValue(1);
+                            } else if ("DayHitsCount".equals(xmlPullParser
+                                    .getAttributeValue(0))) {
+                                nfi.dayHitsCount = new Integer(xmlPullParser.getAttributeValue(1));
+                            } else if ("TotalHitsCount".equals(xmlPullParser
+                                    .getAttributeValue(0))) {
+                                nfi.totalHitsCount = new Integer(xmlPullParser.getAttributeValue(1));
+                            } else if ("PushCount".equals(xmlPullParser
+                                    .getAttributeValue(0))) {
+                                nfi.pushCount = new Integer(xmlPullParser.getAttributeValue(1));
+                            } else if ("FavCount".equals(xmlPullParser
+                                    .getAttributeValue(0))) {
+                                nfi.favCount = new Integer(xmlPullParser.getAttributeValue(1));
+                            } else if ("PressId".equals(xmlPullParser
+                                    .getAttributeValue(0))) {
+                                nfi.pressId = xmlPullParser.getAttributeValue(1);
+                            } else if ("BookStatus".equals(xmlPullParser
+                                    .getAttributeValue(0))) {
+                                nfi.bookStatus = xmlPullParser.getAttributeValue(1);
+                            } else if ("BookLength".equals(xmlPullParser
+                                    .getAttributeValue(0))) {
+                                nfi.bookLength = new Integer(xmlPullParser.getAttributeValue(1));
+                            } else if ("LastUpdate".equals(xmlPullParser
+                                    .getAttributeValue(0))) {
+                                nfi.lastUpdate = xmlPullParser.getAttributeValue(1);
+                            } else if ("LatestSection".equals(xmlPullParser
+                                    .getAttributeValue(0))) {
+                                nfi.latestSectionCid = new Integer(
+                                        xmlPullParser.getAttributeValue(1));
+                                nfi.latestSectionName=xmlPullParser.nextText();
+                            }
+                        }
+                        break;
+                }
+                eventType = xmlPullParser.next();
+            }
+            return nfi;
+        } catch (Exception e) {
+            e.printStackTrace();
+            return null;
+        }
+    }
+
+
+    static public ArrayList<VolumeList> getVolumeList(String xml) {
+        try {
+            XmlPullParserFactory factory = XmlPullParserFactory.newInstance();
+            XmlPullParser xmlPullParser = factory.newPullParser();
+            ArrayList<VolumeList> l = null;
+            VolumeList vl = null;
+            ChapterInfo ci = null;
+            xmlPullParser.setInput(new StringReader(xml));
+            int eventType = xmlPullParser.getEventType();
+
+            while (eventType != XmlPullParser.END_DOCUMENT) {
+                switch (eventType) {
+                    case XmlPullParser.START_DOCUMENT:
+                        l = new ArrayList<VolumeList>();
+                        break;
+
+                    case XmlPullParser.START_TAG:
+
+                        if ("volume".equals(xmlPullParser.getName())) {
+                            vl = new VolumeList();
+                            vl.chapterList = new ArrayList<ChapterInfo>();
+                            vl.vid = new Integer(xmlPullParser.getAttributeValue(0));
+
+                            // Here the returned text has some format error
+                            // And I will handle them then
+                            Log.v("MewX-XML", "+ " + vl.vid + "; ");
+                        } else if ("chapter".equals(xmlPullParser.getName())) {
+                            ci = new ChapterInfo();
+                            ci.cid = new Integer(xmlPullParser.getAttributeValue(0));
+                            ci.chapterName = xmlPullParser.nextText();
+                            Log.v("MewX-XML", ci.cid + "; " + ci.chapterName);
+                            vl.chapterList.add(ci);
+                            ci = null;
+                        }
+                        break;
+
+                    case XmlPullParser.END_TAG:
+                        if ("volume".equals(xmlPullParser.getName())) {
+                            l.add(vl);
+                            vl = null;
+                        }
+                        break;
+                }
+                eventType = xmlPullParser.next();
+            }
+
+            /** Handle the rest problem */
+            // Problem like this:
+            // <volume vid="41748"><![CDATA[第一卷 告白于苍刻之夜]]>
+            // <chapter cid="41749"><![CDATA[序章]]></chapter>
+            int currentIndex = 0;
+            for (int i = 0; i < l.size(); i++) {
+                currentIndex = xml.indexOf("volume", currentIndex);
+                if (currentIndex != -1) {
+                    currentIndex = xml.indexOf("CDATA[", currentIndex);
+                    if (xml.indexOf("volume", currentIndex) != -1) {
+                        int beg = currentIndex + 6;
+                        int end = xml.indexOf("]]", currentIndex);
+
+                        if (end != -1) {
+                            l.get(i).volumeName = xml.substring(beg, end);
+                            Log.v("MewX-XML", "+ " + l.get(i).volumeName + "; ");
+                            currentIndex = end + 1;
+                        } else
+                            break;
+
+                    } else
+                        break;
+                } else
+                    break;
+            }
+
+            return l;
+        } catch (Exception e) {
+            e.printStackTrace();
+            return null;
+        }
+    }
 }

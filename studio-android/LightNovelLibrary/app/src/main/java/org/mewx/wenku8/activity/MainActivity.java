@@ -115,7 +115,7 @@ public class MainActivity extends AppCompatActivity {
             });
 
 
-        // change status bar color, and this require SDK16
+        // change status bar color tint, and this require SDK16
         if (Build.VERSION.SDK_INT >= 16 ) { //&& Build.VERSION.SDK_INT <= 21) {
             // Android API 22 has more effects on status bar, so ignore
 

@@ -35,4 +35,5 @@ dependencies {
     //compile 'com.jpardogo.materialtabstrip:library:1.0.9'
     compile 'com.nostra13.universalimageloader:universal-image-loader:1.9.3'
     compile 'com.afollestad:material-dialogs:0.7.4.0'
+    compile 'com.getbase:floatingactionbutton:1.9.0'
 }

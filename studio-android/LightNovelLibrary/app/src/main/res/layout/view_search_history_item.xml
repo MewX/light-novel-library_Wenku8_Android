@@ -8,18 +8,18 @@
     android:paddingTop="2dp">
 
     <android.support.v7.widget.CardView
-        android:id="@+id/item_card"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         card-view:cardBackgroundColor="@color/novel_item_white"
-        android:clickable="true"
         card-view:cardElevation="2dp"
         card-view:cardUseCompatPadding="true"
         card-view:cardMaxElevation="2dp">
 
         <LinearLayout
+            android:id="@+id/item_card"
+            android:clickable="true"
             android:layout_width="match_parent"
-            android:layout_height="60dp"
+            android:layout_height="wrap_content"
             android:gravity="center_vertical"
             android:background="@drawable/btn_menu_item"
             android:orientation="horizontal">
@@ -39,7 +39,7 @@
 
             <TextView
                 android:id="@+id/search_history_text"
-                android:layout_width="wrap_content"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:textSize="16sp"
                 android:paddingTop="12dp"

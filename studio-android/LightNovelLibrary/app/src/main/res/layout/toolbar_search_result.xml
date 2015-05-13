@@ -7,7 +7,7 @@
     android:layout_height="?attr/actionBarSize"
     android:fitsSystemWindows="true"
     android:elevation="@dimen/toolbar_elevation"
-    android:background="@android:color/white" >
+    android:background="@color/default_white" >
 
     <LinearLayout
         android:id="@+id/search_container"
@@ -20,7 +20,6 @@
             android:id="@+id/search_result_title"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:background="@android:color/transparent"
             android:paddingRight="16dp"
             android:gravity="center_vertical"
             android:textColor="#000000"

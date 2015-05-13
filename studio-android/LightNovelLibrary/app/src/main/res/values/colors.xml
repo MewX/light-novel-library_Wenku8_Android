@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!-- Default Color -->
+    <color name="default_white">#FFFFFF</color>
     <color name="default_activity_background">#F5F5F5</color>
     <color name="default_mask_background_white">#A0FFFFFF</color>
     <color name="default_text_color_black">#444444</color>
@@ -23,7 +24,16 @@
     <color name="dlgNegativeButtonColor">#444444</color>
     <color name="dlgDividerColor">#DADADA</color>
 
+    <!-- Floating Action Button Color-->
+    <color name="fabRed">#FF5252</color>
+    <color name="fabRedPressed">#E54949</color>
+    <color name="fabGreen">#00BE9C</color>
+    <color name="fabGreenPressed">#00A687</color>
+    <color name="fabYellow">#FF9100</color>
+    <color name="fabYellowPressed">#E58200</color>
+
     <!-- Menu Item Color -->
+    <color name="menu_transparent">#00FFFFFF</color>
     <color name="menu_item_blue">#3487f4</color>
     <color name="menu_item_blue_dark">#2F79DB</color>
     <color name="menu_item_grey">#ffdbdbdb</color>

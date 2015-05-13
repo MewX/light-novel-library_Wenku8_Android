@@ -9,6 +9,8 @@
     <string name="drawer_open">Menu opened</string>
     <string name="drawer_close">Menu closed</string>
     <string name="action_search">搜索轻小说</string>
+    <string name="action_novel_info">小说信息</string>
+    <string name="action_continue_read_progress">继续上次阅读进度</string>
     <string name="title_search">搜索：</string>
     <string name="main_menu_rklist">排行榜</string>
     <string name="main_menu_latest">最近更新</string>
@@ -41,6 +43,7 @@
     <string name="system_network_error">连接服务器失败！\n\n可能的原因有：\n　　手机网络异常；\n　　服务器暂时无法响应请求；\n　　此时段请求服务器次数过多。</string>
     <string name="system_parse_failed">数据解析失败！\n\n可能的原因有：\n　　程序内部错误，请反馈给开发者；\n　　你修改了存储的数据。</string>
     <string name="system_manually_cancelled">任务已被手动取消</string>
+    <string name="system_loading_please_wait">加载中……请稍后再试</string>
     <string name="task_stop">停止加载</string>
     <string name="task_retry">重新加载</string>
     <string name="task_null">没有结果</string>
@@ -52,6 +55,10 @@
     <string name="dialog_negative_no">不要</string>
     <string name="dialog_negative_preferno">还是不了</string>
     <string name="dialog_negative_pass">算了吧</string>
+    <string name="fab_favorate">收藏</string>
+    <string name="fab_download">下载</string>
+    <string name="fab_synchronize">同步</string>
+    <string name="fab_refresh">刷新</string>
     <string name="press_twice_to_exit"><b>退出请再戳一下返回键哦～</b>\n&lt;(=～￣▽￣)→)￣▽￣=)>o </string>
     <string name="sorry">客官你不要心急啊，你急臣妾也做不到呀，现在代码量已经比之前版本大很多了~请体谅。而且主框架搭的差不多了，后面逻辑快很多，一有时间就好办！</string>
 

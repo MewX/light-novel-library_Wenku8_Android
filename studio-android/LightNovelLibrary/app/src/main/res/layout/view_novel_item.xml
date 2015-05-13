@@ -8,73 +8,58 @@
     android:paddingTop="2dp">
 
     <android.support.v7.widget.CardView
-        android:id="@+id/item_card"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:clickable="true"
         card-view:cardBackgroundColor="@color/novel_item_white"
         card-view:cardElevation="2dp"
         card-view:cardUseCompatPadding="true"
         card-view:cardMaxElevation="2dp">
 
         <LinearLayout
-            android:id="@+id/novel_card"
+            android:id="@+id/item_card"
+            android:clickable="true"
             android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:gravity="center"
+            android:layout_height="wrap_content"
+            android:gravity="center_horizontal"
             android:background="@drawable/btn_menu_item"
             android:orientation="horizontal">
 
             <!-- have to fix the size, or it's a bit  -->
             <ImageView
                 android:id="@+id/novel_cover"
-                android:layout_width="75dp"
+                android:layout_width="80dp"
                 android:layout_height="112dp"
                 android:layout_margin="8dp"
                 android:src="@drawable/ic_empty_image"
                 android:contentDescription="@string/novel_item_cover"
-                android:scaleType="fitStart" />
+                android:scaleType="fitXY" />
 
             <RelativeLayout
-                android:gravity="center_vertical"
                 android:layout_marginTop="8dp"
-                android:layout_marginRight="16dp"
+                android:layout_marginRight="8dp"
                 android:layout_marginBottom="8dp"
-                android:layout_marginLeft="8dp"
+                android:layout_marginLeft="0dp"
+                android:adjustViewBounds="true"
+                android:minHeight="112dp"
                 android:layout_width="match_parent"
-                android:layout_height="match_parent">
+                android:layout_height="wrap_content">
 
-                <TextView
-                    android:id="@+id/novel_title"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:textSize="16sp"
-                    android:text="@string/na"
-                    android:textColor="@color/novel_item_title"
-                    android:singleLine="true"
-                    android:layout_alignParentTop="true"
-                    android:layout_alignParentLeft="true"
-                    android:layout_alignParentStart="true" />
-
-                <View
-                    android:id="@+id/divider"
-                    android:layout_width="match_parent"
-                    android:layout_height="1px"
-                    android:layout_below="@+id/novel_title"
-                    android:background="@color/default_divider"/>
-
+                <!-- 112dp - 32dp - 1dp = 79dp-->
                 <TableLayout
                     android:paddingTop="5dp"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_below="@+id/divider"
+                    android:adjustViewBounds="true"
+                    android:minHeight="80dp"
                     android:layout_alignParentLeft="true"
                     android:layout_alignParentStart="true">
 
                     <TableRow
                         android:id="@+id/tableRow"
                         android:layout_width="match_parent"
-                        android:layout_height="match_parent">
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1" >
 
                         <TextView
                             android:layout_width="wrap_content"
@@ -95,7 +80,8 @@
 
                     <TableRow
                         android:layout_width="match_parent"
-                        android:layout_height="match_parent" >
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1" >
 
                         <TextView
                             android:layout_width="wrap_content"
@@ -116,7 +102,8 @@
 
                     <TableRow
                         android:layout_width="match_parent"
-                        android:layout_height="match_parent" >
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1" >
 
                         <TextView
                             android:layout_width="wrap_content"
@@ -136,8 +123,10 @@
                     </TableRow>
 
                     <TableRow
+                        android:id="@+id/novel_intro_row"
                         android:layout_width="match_parent"
-                        android:layout_height="match_parent" >
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1" >
 
                         <TextView
                             android:layout_width="wrap_content"
@@ -156,10 +145,37 @@
                             android:textColor="@color/novel_item_text"/>
                     </TableRow>
                 </TableLayout>
+
+                <TextView
+                    android:id="@+id/novel_title"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textSize="16sp"
+                    android:text="@string/na"
+                    android:textColor="@color/novel_item_title"
+                    android:singleLine="true"
+                    android:layout_alignBottom="@+id/novel_option"
+                    android:layout_alignParentLeft="true"
+                    android:layout_alignParentStart="true" />
+
+                <View
+                    android:id="@+id/divider"
+                    android:layout_width="match_parent"
+                    android:layout_height="1px"
+                    android:layout_below="@+id/novel_option"
+                    android:background="@color/default_divider"/>
+
+                <ImageButton
+                    android:id="@+id/novel_option"
+                    android:layout_width="32dp"
+                    android:layout_height="32dp"
+                    android:src="@drawable/ic_option"
+                    android:background="@drawable/btn_menu_item"
+                    android:layout_alignParentTop="true"
+                    android:layout_alignParentRight="true"
+                    android:layout_alignParentEnd="true" />
             </RelativeLayout>
 
         </LinearLayout>
-
     </android.support.v7.widget.CardView>
-
 </RelativeLayout>

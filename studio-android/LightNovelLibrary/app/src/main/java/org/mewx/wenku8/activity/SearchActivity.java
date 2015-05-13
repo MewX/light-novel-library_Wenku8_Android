@@ -3,6 +3,7 @@ package org.mewx.wenku8.activity;
 import android.content.Intent;
 import android.graphics.PorterDuff;
 import android.graphics.drawable.Drawable;
+import android.os.Build;
 import android.os.Bundle;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.DefaultItemAnimator;
@@ -22,6 +23,7 @@ import com.afollestad.materialdialogs.DialogAction;
 import com.afollestad.materialdialogs.GravityEnum;
 import com.afollestad.materialdialogs.MaterialDialog;
 import com.afollestad.materialdialogs.Theme;
+import com.readystatesoftware.systembartint.SystemBarTintManager;
 
 import org.mewx.wenku8.MyApp;
 import org.mewx.wenku8.R;
@@ -72,10 +74,19 @@ public class SearchActivity extends AppCompatActivity implements MyItemClickList
         getSupportActionBar().setDisplayHomeAsUpEnabled(true);
         getSupportActionBar().setHomeButtonEnabled(true);
 
-        // set back arrow icon
-        final Drawable upArrow = getResources().getDrawable(R.drawable.abc_ic_ab_back_mtrl_am_alpha);
-        upArrow.setColorFilter(getResources().getColor(R.color.mySearchToggleColor), PorterDuff.Mode.SRC_ATOP);
-        getSupportActionBar().setHomeAsUpIndicator(upArrow);
+        // change status bar color tint, and this require SDK16
+        if (Build.VERSION.SDK_INT >= 16 ) { //&& Build.VERSION.SDK_INT <= 21) {
+            // Android API 22 has more effects on status bar, so ignore
+
+            // create our manager instance after the content view is set
+            SystemBarTintManager tintManager = new SystemBarTintManager(this);
+            // enable all tint
+            tintManager.setStatusBarTintEnabled(true);
+            tintManager.setNavigationBarTintEnabled(true);
+            tintManager.setTintAlpha(0.15f);
+            // set all color
+            tintManager.setTintColor(getResources().getColor(android.R.color.black));
+        }
 
         // set search clear icon color
         searchClearIcon = (ImageView)findViewById(R.id.search_clear_icon);
@@ -128,6 +139,11 @@ public class SearchActivity extends AppCompatActivity implements MyItemClickList
     @Override
     protected void onResume() {
         super.onResume();
+
+        // set back arrow icon
+        final Drawable upArrow = getResources().getDrawable(R.drawable.abc_ic_ab_back_mtrl_am_alpha);
+        upArrow.setColorFilter(getResources().getColor(R.color.mySearchToggleColor), PorterDuff.Mode.SRC_ATOP);
+        getSupportActionBar().setHomeAsUpIndicator(upArrow);
 
         refreshHistoryList();
 
