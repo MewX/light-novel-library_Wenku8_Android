@@ -12,7 +12,7 @@
     <color name="myPrimaryDarkColor">#3870d0</color>
     <color name="myAccentColor">#fe5151</color>
     <color name="myDrawerBackground">#F2F2F2</color>
-    <color name="myWindowBackground">#DEDEDE</color>
+    <color name="myWindowBackground">#F5F5F5</color>
     <color name="myTextPrimaryColor">#FFFFFF</color>
     <color name="mySearchToggleColor">#7F7F7F</color>
 

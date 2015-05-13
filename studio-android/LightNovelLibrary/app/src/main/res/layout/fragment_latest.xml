@@ -3,7 +3,7 @@
     xmlns:gpb="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/default_activity_background"
+    android:background="@color/myWindowBackground"
     tools:context="org.mewx.wenku8.fragment.LatestFragment">
 
     <!-- Novel List -->
@@ -25,7 +25,7 @@
         android:orientation="vertical"
         android:visibility="visible"
         android:clickable="true"
-        android:background="@color/default_mask_background_white">
+        android:background="@color/myWindowBackground">
 
         <com.jpardogo.android.googleprogressbar.library.GoogleProgressBar
             android:id="@+id/google_progress"

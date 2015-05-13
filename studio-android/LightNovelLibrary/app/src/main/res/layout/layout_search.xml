@@ -15,14 +15,18 @@
         android:layout_height="1px"
         android:background="@color/mySearchToggleColor"/>
 
-    <!-- History List -->
-    <android.support.v7.widget.RecyclerView
-        android:id="@+id/search_history_list"
-        android:layout_below="@id/divider"
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:background="@color/default_mask_background_white"
-        android:scrollbars="vertical"
-        android:fastScrollEnabled="true"/>
+        android:layout_below="@id/divider"
+        android:background="@color/myWindowBackground">
 
+        <!-- History List -->
+        <android.support.v7.widget.RecyclerView
+            android:id="@+id/search_history_list"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:scrollbars="vertical"
+            android:fastScrollEnabled="true"/>
+    </LinearLayout>
 </RelativeLayout>

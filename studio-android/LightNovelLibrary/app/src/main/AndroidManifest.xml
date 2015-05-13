@@ -59,6 +59,12 @@
             android:screenOrientation="portrait">
         </activity>
 
+        <!-- Novel Chapter List Activity -->
+        <activity android:name=".activity.NovelChapterActivity"
+            android:label="@string/action_chapter_list"
+            android:screenOrientation="portrait">
+        </activity>
+
     </application>
 
 </manifest>

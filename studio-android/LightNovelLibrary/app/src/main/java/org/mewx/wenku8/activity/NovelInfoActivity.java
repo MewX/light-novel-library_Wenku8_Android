@@ -1,5 +1,6 @@
 package org.mewx.wenku8.activity;
 
+import android.content.Intent;
 import android.graphics.PorterDuff;
 import android.graphics.drawable.Drawable;
 import android.os.Build;
@@ -97,7 +98,7 @@ public class NovelInfoActivity extends AppCompatActivity {
             tintManager.setTintColor(getResources().getColor(android.R.color.black));
         }
 
-        // get scroll view
+        // get views
         mLinearLayout = (LinearLayout) findViewById(R.id.novel_info_scroll);
         llCardLayout = (LinearLayout) findViewById(R.id.item_card);
         ivNovelCover = (ImageView) findViewById(R.id.novel_cover);
@@ -121,7 +122,7 @@ public class NovelInfoActivity extends AppCompatActivity {
         llCardLayout.setBackgroundResource(R.color.menu_transparent);
 
         // fetch all info
-        mToolbar.setTitle(R.string.action_novel_info);
+        getSupportActionBar().setTitle(R.string.action_novel_info);
         isLoading = true;
         FetchInfoAsyncTask fetchInfoAsyncTask = new FetchInfoAsyncTask();
         fetchInfoAsyncTask.execute(aid);
@@ -251,7 +252,7 @@ public class NovelInfoActivity extends AppCompatActivity {
                     tvNovelAuthor.setText(mNovelItemMeta.author);
                     tvNovelStatus.setText(mNovelItemMeta.bookStatus);
                     tvNovelUpdate.setText(mNovelItemMeta.lastUpdate);
-                    mToolbar.setTitle(mNovelItemMeta.title); // set action bar title
+                    NovelInfoActivity.this.getSupportActionBar().setTitle(mNovelItemMeta.title); // set action bar title
 
                     break;
 
@@ -280,11 +281,11 @@ public class NovelInfoActivity extends AppCompatActivity {
             else if(integer < 0)
                 return; // ignore other exceptions
 
-            for(VolumeList vl : listVolume) {
+            for(final VolumeList vl : listVolume) {
                 // get view
                 RelativeLayout rl = (RelativeLayout) LayoutInflater.from(NovelInfoActivity.this).inflate(R.layout.view_novel_chapter_item, null);
 
-                // set text and on click listener
+                // set text and listeners
                 TextView tv = (TextView) rl.findViewById(R.id.chapter_title);
                 tv.setText(vl.volumeName);
                 tv.setOnTouchListener(new View.OnTouchListener() {
@@ -300,6 +301,9 @@ public class NovelInfoActivity extends AppCompatActivity {
                     @Override
                     public void onClick(View v) {
                         // jump to chapter select activity
+                        Intent intent = new Intent(NovelInfoActivity.this, NovelChapterActivity.class);
+                        intent.putExtra("volume", vl);
+                        startActivity(intent);
                     }
                 });
 

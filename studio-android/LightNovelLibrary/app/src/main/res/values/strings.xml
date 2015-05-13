@@ -11,6 +11,7 @@
     <string name="action_search">搜索轻小说</string>
     <string name="action_novel_info">小说信息</string>
     <string name="action_continue_read_progress">继续上次阅读进度</string>
+    <string name="action_chapter_list">章节列表</string>
     <string name="title_search">搜索：</string>
     <string name="main_menu_rklist">排行榜</string>
     <string name="main_menu_latest">最近更新</string>
