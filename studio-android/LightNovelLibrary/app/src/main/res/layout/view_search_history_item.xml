@@ -5,7 +5,7 @@
     android:layout_height="wrap_content"
     android:paddingLeft="6dp"
     android:paddingRight="6dp"
-    android:paddingTop="2dp">
+    android:paddingTop="2dp">wo
 
     <android.support.v7.widget.CardView
         android:layout_width="match_parent"

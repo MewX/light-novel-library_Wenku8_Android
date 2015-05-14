@@ -1,14 +1,187 @@
-<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
-    android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#FDC"
-    tools:context="org.mewx.wenku8.fragment.ConfigFragment">
+    android:layout_width="match_parent"
+    android:background="@color/myWindowBackground">
 
-    <!-- TODO: Update blank fragment layout -->
-    <TextView
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:text="@string/sorry" />
+        android:orientation="vertical"
+        android:paddingTop="8dp"
+        android:paddingBottom="8dp"
+        tools:context="org.mewx.wenku8.fragment.ConfigFragment">
 
-</FrameLayout>
+        <!-- Layout DataBackup -->
+        <RelativeLayout
+            android:id="@+id/btn_data_backup"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:clickable="true"
+            android:background="@drawable/btn_menu_item">
+            <ImageView
+                android:id="@+id/image_upload"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:paddingLeft="16dp"
+                android:layout_centerVertical="true"
+                android:src="@drawable/ic_upload"/>
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginLeft="32dp"
+                android:layout_centerVertical="true"
+                android:layout_toRightOf="@id/image_upload"
+                android:textColor="@color/dlgTitleColor"
+                android:text="@string/config_data_backup"/>
+        </RelativeLayout>
+
+        <!-- Layout DataRestore -->
+        <RelativeLayout
+            android:id="@+id/btn_data_restore"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:clickable="true"
+            android:background="@drawable/btn_menu_item">
+            <ImageView
+                android:id="@+id/image_restore"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:paddingLeft="16dp"
+                android:layout_centerVertical="true"
+                android:src="@drawable/ic_restore"/>
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginLeft="32dp"
+                android:layout_centerVertical="true"
+                android:layout_toRightOf="@id/image_restore"
+                android:textColor="@color/dlgTitleColor"
+                android:text="@string/config_data_restore"/>
+        </RelativeLayout>
+
+        <!-- Layout ClearCache -->
+        <RelativeLayout
+            android:id="@+id/btn_clear_cache"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:clickable="true"
+            android:background="@drawable/btn_menu_item">
+            <ImageView
+                android:id="@+id/image_clearcache"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:paddingLeft="16dp"
+                android:layout_centerVertical="true"
+                android:src="@drawable/ic_clearcache"/>
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginLeft="32dp"
+                android:layout_centerVertical="true"
+                android:layout_toRightOf="@id/image_clearcache"
+                android:textColor="@color/dlgTitleColor"
+                android:text="@string/config_clear_cache"/>
+        </RelativeLayout>
+
+        <!-- Layout NavigationDrawerWallpaper -->
+        <RelativeLayout
+            android:id="@+id/btn_navigation_drawer_wallpaper"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:clickable="true"
+            android:background="@drawable/btn_menu_item">
+            <ImageView
+                android:id="@+id/image_wallpaper"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:paddingLeft="16dp"
+                android:layout_centerVertical="true"
+                android:src="@drawable/ic_wallpaper"/>
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginLeft="32dp"
+                android:layout_centerVertical="true"
+                android:layout_toRightOf="@id/image_wallpaper"
+                android:textColor="@color/dlgTitleColor"
+                android:text="@string/config_navigation_drawer_wallpaper"/>
+
+            <ImageView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:src="@drawable/ic_rightarrow"
+                android:paddingRight="16dp"
+                android:layout_centerVertical="true"
+                android:layout_alignParentRight="true"
+                android:layout_alignParentEnd="true" />
+        </RelativeLayout>
+
+        <!-- Layout CheckUpdate -->
+        <RelativeLayout
+            android:id="@+id/btn_check_update"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:clickable="true"
+            android:background="@drawable/btn_menu_item">
+            <ImageView
+                android:id="@+id/image_update"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:paddingLeft="16dp"
+                android:layout_centerVertical="true"
+                android:src="@drawable/ic_update"/>
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginLeft="32dp"
+                android:layout_centerVertical="true"
+                android:layout_toRightOf="@id/image_update"
+                android:textColor="@color/dlgTitleColor"
+                android:text="@string/config_check_update"/>
+
+            <ImageView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:src="@drawable/ic_rightarrow"
+                android:paddingRight="16dp"
+                android:layout_centerVertical="true"
+                android:layout_alignParentRight="true"
+                android:layout_alignParentEnd="true" />
+        </RelativeLayout>
+
+        <!-- Layout About -->
+        <RelativeLayout
+            android:id="@+id/btn_about"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:clickable="true"
+            android:background="@drawable/btn_menu_item">
+            <ImageView
+                android:id="@+id/image_about"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:paddingLeft="16dp"
+                android:layout_centerVertical="true"
+                android:src="@drawable/ic_about"/>
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginLeft="32dp"
+                android:layout_centerVertical="true"
+                android:layout_toRightOf="@id/image_about"
+                android:textColor="@color/dlgTitleColor"
+                android:text="@string/config_about"/>
+
+            <ImageView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:src="@drawable/ic_rightarrow"
+                android:paddingRight="16dp"
+                android:layout_centerVertical="true"
+                android:layout_alignParentRight="true"
+                android:layout_alignParentEnd="true" />
+        </RelativeLayout>
+
+    </LinearLayout>
+</ScrollView>

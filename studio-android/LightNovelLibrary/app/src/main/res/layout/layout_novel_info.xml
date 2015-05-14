@@ -61,11 +61,20 @@
         </LinearLayout>
     </ScrollView>
 
+    <!-- White Mask -->
+    <RelativeLayout
+        android:id="@+id/white_mask"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@color/default_mask_background_white"
+        android:clickable="true"
+        android:visibility="invisible"/>
+
     <!-- Floating action button -->
     <com.getbase.floatingactionbutton.FloatingActionsMenu
         android:id="@+id/multiple_actions"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
         android:layout_alignParentBottom="true"
         android:layout_alignParentRight="true"
         android:layout_alignParentEnd="true"
@@ -73,9 +82,9 @@
         fab:fab_addButtonColorPressed="@color/fabRedPressed"
         fab:fab_addButtonPlusIconColor="@color/myTextPrimaryColor"
         fab:fab_labelStyle="@style/menu_labels_style"
-        android:layout_marginBottom="8dp"
-        android:layout_marginRight="8dp"
-        android:layout_marginEnd="8dp">
+        android:layout_marginBottom="0dp"
+        android:layout_marginRight="0dp"
+        android:layout_marginEnd="0dp">
 
         <com.getbase.floatingactionbutton.FloatingActionButton
             android:id="@+id/fab_favorate"

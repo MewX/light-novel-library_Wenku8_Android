@@ -19,6 +19,7 @@ import com.nostra13.universalimageloader.core.DisplayImageOptions;
 import com.nostra13.universalimageloader.core.ImageLoader;
 import com.nostra13.universalimageloader.core.ImageLoaderConfiguration;
 import com.nostra13.universalimageloader.core.display.FadeInBitmapDisplayer;
+import com.nostra13.universalimageloader.core.process.BitmapProcessor;
 import com.readystatesoftware.systembartint.SystemBarTintManager;
 import com.umeng.analytics.MobclickAgent;
 
@@ -72,12 +73,14 @@ public class MainActivity extends AppCompatActivity {
                 new File(GlobalConfig.getFirstStoragePath() + "cache"),
                 new File(getCacheDir() + File.separator + "imgs"));
         DisplayImageOptions localDisplayImageOptions = new DisplayImageOptions.Builder()
-                .resetViewBeforeLoading(true).cacheOnDisk(true)
-                .cacheInMemory(true).bitmapConfig(Bitmap.Config.RGB_565)
+                .resetViewBeforeLoading(true)
+                .cacheOnDisk(true)
+                .cacheInMemory(true)
+                .bitmapConfig(Bitmap.Config.RGB_565)
                 .resetViewBeforeLoading(true)
                 .displayer(new FadeInBitmapDisplayer(250)).build();
-        ImageLoaderConfiguration localImageLoaderConfiguration = new ImageLoaderConfiguration.Builder(
-                this).diskCache(localUnlimitedDiscCache)
+        ImageLoaderConfiguration localImageLoaderConfiguration = new ImageLoaderConfiguration.Builder(this)
+                .diskCache(localUnlimitedDiscCache)
                 .defaultDisplayImageOptions(localDisplayImageOptions).build();
         ImageLoader.getInstance().init(localImageLoaderConfiguration);
 

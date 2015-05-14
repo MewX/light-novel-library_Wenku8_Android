@@ -86,6 +86,10 @@ public class SearchActivity extends AppCompatActivity implements MyItemClickList
             tintManager.setTintAlpha(0.15f);
             // set all color
             tintManager.setTintColor(getResources().getColor(android.R.color.black));
+
+            // set Navigation bar color
+            if(Build.VERSION.SDK_INT >= 21)
+                getWindow().setNavigationBarColor(getResources().getColor(R.color.myNavigationColorWhite));
         }
 
         // set search clear icon color

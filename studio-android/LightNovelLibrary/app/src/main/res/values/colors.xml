@@ -15,6 +15,9 @@
     <color name="myWindowBackground">#F5F5F5</color>
     <color name="myTextPrimaryColor">#FFFFFF</color>
     <color name="mySearchToggleColor">#7F7F7F</color>
+    <!-- Navigation Color is 30% black mask attack to primary color -->
+    <color name="myNavigationColor">#2E5CAB</color>
+    <color name="myNavigationColorWhite">#B2B2B2</color>
 
     <!-- Material Dialog Color -->
     <color name="dlgTitleColor">#4D4D4D</color>

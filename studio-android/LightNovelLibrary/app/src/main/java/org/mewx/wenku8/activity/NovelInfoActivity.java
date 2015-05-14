@@ -50,6 +50,7 @@ public class NovelInfoActivity extends AppCompatActivity {
     private int aid = 1;
     private boolean isLoading = true;
     private Toolbar mToolbar = null;
+    private RelativeLayout rlMask = null; // mask layout
     private LinearLayout mLinearLayout = null;
     private LinearLayout llCardLayout = null;
     private ImageView ivNovelCover = null;
@@ -96,9 +97,11 @@ public class NovelInfoActivity extends AppCompatActivity {
             tintManager.setTintAlpha(0.15f);
             // set all color
             tintManager.setTintColor(getResources().getColor(android.R.color.black));
+
         }
 
         // get views
+        rlMask = (RelativeLayout) findViewById(R.id.white_mask);
         mLinearLayout = (LinearLayout) findViewById(R.id.novel_info_scroll);
         llCardLayout = (LinearLayout) findViewById(R.id.item_card);
         ivNovelCover = (ImageView) findViewById(R.id.novel_cover);
@@ -128,13 +131,23 @@ public class NovelInfoActivity extends AppCompatActivity {
         fetchInfoAsyncTask.execute(aid);
 
         // set on click listeners
-        mLinearLayout.setOnTouchListener(new View.OnTouchListener() {
+        famMenu.setOnFloatingActionsMenuUpdateListener(new FloatingActionsMenu.OnFloatingActionsMenuUpdateListener() {
             @Override
-            public boolean onTouch(View v, MotionEvent event) {
-                // Collapse the fam 1
-                if(famMenu.isExpanded())
+            public void onMenuExpanded() {
+                rlMask.setVisibility(View.VISIBLE);
+            }
+
+            @Override
+            public void onMenuCollapsed() {
+                rlMask.setVisibility(View.INVISIBLE);
+            }
+        });
+        rlMask.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                // Collapse the fam
+                if (famMenu.isExpanded())
                     famMenu.collapse();
-                return false;
             }
         });
         fabFavorate.setOnClickListener(new View.OnClickListener() {
@@ -165,11 +178,9 @@ public class NovelInfoActivity extends AppCompatActivity {
 
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
-
         if(getSupportActionBar()!=null)
             getSupportActionBar().setTitle(getResources().getString(R.string.action_novel_info));
         getMenuInflater().inflate(R.menu.menu_novel_info, menu);
-
 
         return true;
     }
@@ -177,11 +188,22 @@ public class NovelInfoActivity extends AppCompatActivity {
     @Override
     public boolean onOptionsItemSelected(MenuItem menuItem) {
         if (menuItem.getItemId() == android.R.id.home) {
-            onBackPressed();
+            finish(); // end directly
         }
         return super.onOptionsItemSelected(menuItem);
     }
 
+    @Override
+    public void onBackPressed() {
+        // end famMenu first
+        if(famMenu.isExpanded()) {
+            famMenu.collapse();
+            return;
+        }
+
+        // normal exit
+        super.onBackPressed();
+    }
 
     private class FetchInfoAsyncTask extends AsyncTask<Integer, Integer, Integer> {
         @Override
@@ -288,15 +310,6 @@ public class NovelInfoActivity extends AppCompatActivity {
                 // set text and listeners
                 TextView tv = (TextView) rl.findViewById(R.id.chapter_title);
                 tv.setText(vl.volumeName);
-                tv.setOnTouchListener(new View.OnTouchListener() {
-                    @Override
-                    public boolean onTouch(View v, MotionEvent event) {
-                        // Collapse the fam2
-                        if(famMenu.isExpanded())
-                            famMenu.collapse();
-                        return false;
-                    }
-                });
                 tv.setOnClickListener(new View.OnClickListener() {
                     @Override
                     public void onClick(View v) {

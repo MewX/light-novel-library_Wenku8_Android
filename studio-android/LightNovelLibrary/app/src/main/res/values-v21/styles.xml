@@ -3,6 +3,6 @@
     <style name="menu_labels_style">
         <item name="android:background">@drawable/fab_label_background</item>
         <item name="android:textColor">@color/default_text_color_black</item>
-        <item name="android:elevation">2dp</item>
+        <item name="android:elevation">6dp</item>
     </style>
 </resources>
