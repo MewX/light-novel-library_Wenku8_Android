@@ -2,6 +2,12 @@
 <microblog>
     <post>
         <author>MewX</author>
+        <date>2015-05-15 23:04</date>
+        <blog>这两个礼拜会持续更新app（在内测群里），之前一直没写新的blog是因为git版本在linux和windows下不一致，懒得同步了……预览版神马的可以加群（群号你们猜，还挺难进的），留邮箱没用的~这个礼拜写了5天，进度良好~</blog>
+    </post>
+    
+    <post>
+        <author>MewX</author>
         <date>2015-03-24 23:30</date>
         <blog>已经开始继续开发了，现在在研读OSC、DesignerNews、IOSched的源代码，为了开发更美观的MD应用~</blog>
     </post>
