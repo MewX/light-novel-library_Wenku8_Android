@@ -127,6 +127,7 @@ public class NovelInfoActivity extends AppCompatActivity {
         fabFavorate.setColorFilter(getResources().getColor(R.color.default_white), PorterDuff.Mode.SRC_ATOP);
         fabDownload.setColorFilter(getResources().getColor(R.color.default_white), PorterDuff.Mode.SRC_ATOP);
         llCardLayout.setBackgroundResource(R.color.menu_transparent);
+        spb.setVisibility(View.VISIBLE);
 
         // fetch all info
         getSupportActionBar().setTitle(R.string.action_novel_info);

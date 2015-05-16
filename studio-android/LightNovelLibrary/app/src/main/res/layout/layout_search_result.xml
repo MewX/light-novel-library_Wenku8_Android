@@ -23,19 +23,32 @@
         android:layout_height="match_parent" />
 
     <!-- Progress Bar -->
+    <!--<fr.castorflex.android.smoothprogressbar.SmoothProgressBar-->
+        <!--android:id="@+id/spb"-->
+        <!--android:layout_width="match_parent"-->
+        <!--android:layout_height="4dp"-->
+        <!--android:layout_below="@id/divider"-->
+        <!--android:indeterminate="true"-->
+        <!--spb:spb_sections_count="4"-->
+        <!--spb:spb_color="@color/mySearchToggleColor"-->
+        <!--spb:spb_speed="1.0"-->
+        <!--spb:spb_stroke_width="4dp"-->
+        <!--spb:spb_stroke_separator_length="4dp"-->
+        <!--spb:spb_reversed="false"-->
+        <!--spb:spb_interpolator="spb_interpolator_acceleratedecelerate"-->
+        <!--spb:spb_mirror_mode="false" />-->
     <fr.castorflex.android.smoothprogressbar.SmoothProgressBar
         android:id="@+id/spb"
         android:layout_width="match_parent"
         android:layout_height="4dp"
         android:layout_below="@id/divider"
         android:indeterminate="true"
+        android:visibility="invisible"
+        spb:spb_stroke_separator_length="4dp"
         spb:spb_sections_count="4"
-        spb:spb_color="@color/mySearchToggleColor"
         spb:spb_speed="1.0"
         spb:spb_stroke_width="4dp"
-        spb:spb_stroke_separator_length="4dp"
-        spb:spb_reversed="false"
         spb:spb_interpolator="spb_interpolator_acceleratedecelerate"
-        spb:spb_mirror_mode="false" />
+        spb:spb_colors="@array/gplus_colors"/>
 
 </RelativeLayout>

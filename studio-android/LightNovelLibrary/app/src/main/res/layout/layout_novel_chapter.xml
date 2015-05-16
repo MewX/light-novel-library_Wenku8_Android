@@ -7,7 +7,7 @@
     android:background="@color/myPrimaryColor"
     android:fitsSystemWindows="true">
 
-    <include layout="@layout/toolbar_novel_info" />
+    <include layout="@layout/toolbar_pure" />
 
     <ScrollView
         android:layout_width="match_parent"

@@ -140,6 +140,7 @@ public class NovelItemListFragment extends Fragment implements MyItemClickListen
         if(type.equals(searchType)) {
             // update UI
             spb = (SmoothProgressBar) getActivity().findViewById(R.id.spb);
+            spb.setVisibility(View.VISIBLE);
 
             // excute task
             Toast.makeText(getActivity(),"search",Toast.LENGTH_SHORT).show();

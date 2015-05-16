@@ -2,6 +2,7 @@
 <resources>
 
     <string name="app_name">轻小说文库·预览版</string>
+    <string name="app_description">与轻小说文库(Wenku8.cn)合作的轻小说阅读app。</string>
     <string name="navigation_drawer_open">Open navigation drawer</string>
     <string name="navigation_drawer_close">Close navigation drawer</string>
     <string name="action_example">Example action</string>
@@ -67,6 +68,10 @@
     <string name="config_navigation_drawer_wallpaper">侧栏壁纸</string>
     <string name="config_check_update">检查更新</string>
     <string name="config_about">关于</string>
+    <string name="login_username">用户名</string>
+    <string name="login_password">密码</string>
+    <string name="login_login">登录</string>
+    <string name="login_register">注册</string>
     <string name="press_twice_to_exit"><b>退出请再戳一下返回键哦～</b>\n&lt;(=～￣▽￣)→)￣▽￣=)>o </string>
     <string name="sorry">客官你不要心急啊，你急臣妾也做不到呀，现在代码量已经比之前版本大很多了~请体谅。而且主框架搭的差不多了，后面逻辑快很多，一有时间就好办！</string>
 

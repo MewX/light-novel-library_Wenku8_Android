@@ -9,12 +9,13 @@
 
     <!-- Top part -->
     <RelativeLayout
-        android:id="@+id/linearLayout"
+        android:id="@+id/top_background"
         android:layout_width="match_parent"
         android:layout_height="168dp"
         android:layout_alignParentTop="true"
         android:layout_centerHorizontal="true"
         android:fitsSystemWindows="true"
+        android:clickable="true"
         android:background="@drawable/bg_avatar_05"
         android:gravity="bottom"
         android:orientation="horizontal">
@@ -81,7 +82,7 @@
         android:layout_height="wrap_content"
         android:layout_alignParentLeft="true"
         android:layout_alignParentStart="true"
-        android:layout_below="@+id/linearLayout"
+        android:layout_below="@+id/top_background"
         android:gravity="center"
         android:paddingTop="15dp"
         android:orientation="horizontal">

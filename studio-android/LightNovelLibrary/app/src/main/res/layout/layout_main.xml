@@ -14,7 +14,7 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent">
 
-        <include layout="@layout/toolbar_default" />
+        <include layout="@layout/toolbar_main" />
 
         <FrameLayout
             android:id="@+id/container"
