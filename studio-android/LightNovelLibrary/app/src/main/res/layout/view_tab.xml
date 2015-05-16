@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-
+<!-- Used in PagerSlidingTabStrip -->
 <TextView xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/tab_title"
     android:layout_width="match_parent"

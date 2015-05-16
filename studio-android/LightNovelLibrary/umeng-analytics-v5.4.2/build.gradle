@@ -1,2 +1,0 @@
-configurations.create("default")
-artifacts.add("default", file('umeng-analytics-v5.4.2.jar'))

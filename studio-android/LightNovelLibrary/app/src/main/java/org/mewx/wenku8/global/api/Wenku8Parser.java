@@ -181,8 +181,8 @@ public class Wenku8Parser {
 
             /** Handle the rest problem */
             // Problem like this:
-            // <volume vid="41748"><![CDATA[µÚÒ»¾í ¸æ°×ÓÚ²Ô¿ÌÖ®Ò¹]]>
-            // <chapter cid="41749"><![CDATA[ÐòÕÂ]]></chapter>
+            // <volume vid="41748"><![CDATA[ç¬¬ä¸€å· å‘Šç™½äºŽè‹åˆ»ä¹‹å¤œ]]>
+            // <chapter cid="41749"><![CDATA[åºç« ]]></chapter>
             int currentIndex = 0;
             for (int i = 0; i < l.size(); i++) {
                 currentIndex = xml.indexOf("volume", currentIndex);

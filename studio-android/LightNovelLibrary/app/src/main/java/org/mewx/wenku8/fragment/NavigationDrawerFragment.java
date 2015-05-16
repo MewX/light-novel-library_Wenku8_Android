@@ -48,7 +48,7 @@ public class NavigationDrawerFragment extends Fragment {
         super.onActivityCreated(savedInstanceState);
 
         // here change and add all I need
-        ((TextView) mainActivity.findViewById(R.id.user_text)).setText("This is a test");
+        //((TextView) mainActivity.findViewById(R.id.user_text)).setText("This is a test");
 
         // init other things ...
         Toast.makeText(mainActivity, "called onActivityCreated", Toast.LENGTH_SHORT).show();

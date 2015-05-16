@@ -41,6 +41,8 @@ import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
 import java.util.List;
 
+import fr.castorflex.android.smoothprogressbar.SmoothProgressBar;
+
 /**
  * Created by MewX on 2015/5/13.
  */
@@ -64,6 +66,7 @@ public class NovelInfoActivity extends AppCompatActivity {
     private FloatingActionButton fabFavorate = null;
     private FloatingActionButton fabDownload = null;
     private FloatingActionsMenu famMenu = null;
+    private SmoothProgressBar spb = null;
     private NovelItemMeta mNovelItemMeta = null;
     private List<VolumeList> listVolume = null;
 
@@ -115,6 +118,7 @@ public class NovelInfoActivity extends AppCompatActivity {
         fabFavorate = (FloatingActionButton) findViewById(R.id.fab_favorate);
         fabDownload = (FloatingActionButton) findViewById(R.id.fab_download);
         famMenu = (FloatingActionsMenu) findViewById(R.id.multiple_actions);
+        spb = (SmoothProgressBar) findViewById(R.id.spb);
 
         // hide view and set colors
         ImageLoader.getInstance().displayImage(Wenku8API.getCoverURL(aid), ivNovelCover);
@@ -325,6 +329,7 @@ public class NovelInfoActivity extends AppCompatActivity {
             }
 
             isLoading = false;
+            spb.setVisibility(View.GONE);
             super.onPostExecute(integer);
         }
     }

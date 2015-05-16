@@ -5,7 +5,7 @@
       <module fileurl="file://$PROJECT_DIR$/LightNovelLibrary.iml" filepath="$PROJECT_DIR$/LightNovelLibrary.iml" />
       <module fileurl="file://$PROJECT_DIR$/app/app.iml" filepath="$PROJECT_DIR$/app/app.iml" />
       <module fileurl="file://$PROJECT_DIR$/systembartint-1.0.3/systembartint-1.0.3.iml" filepath="$PROJECT_DIR$/systembartint-1.0.3/systembartint-1.0.3.iml" />
-      <module fileurl="file://$PROJECT_DIR$/umeng-analytics-v5.4.2/umeng-analytics-v5.4.2.iml" filepath="$PROJECT_DIR$/umeng-analytics-v5.4.2/umeng-analytics-v5.4.2.iml" />
+      <module fileurl="file://$PROJECT_DIR$/umeng-analytics/umeng-analytics.iml" filepath="$PROJECT_DIR$/umeng-analytics/umeng-analytics.iml" />
       <module fileurl="file://$PROJECT_DIR$/volley/volley.iml" filepath="$PROJECT_DIR$/volley/volley.iml" />
     </modules>
   </component>

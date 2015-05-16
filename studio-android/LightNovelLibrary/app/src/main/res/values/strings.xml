@@ -32,6 +32,7 @@
     <string name="main_menu_config">设置</string>
     <string name="main_menu_statement">开源声明</string>
     <string name="main_menu_dark_mode_switcher">夜间/白天</string>
+    <string name="main_menu_not_login">[未登录]</string>
     <string name="hello_blank_fragment">Hello blank fragment</string>
     <string name="novel_item_author_with_colon">小说作者：</string>
     <string name="na">N/A</string>

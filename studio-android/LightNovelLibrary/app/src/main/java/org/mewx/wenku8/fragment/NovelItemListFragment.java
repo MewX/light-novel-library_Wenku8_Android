@@ -35,6 +35,8 @@ import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import fr.castorflex.android.smoothprogressbar.SmoothProgressBar;
+
 public class NovelItemListFragment extends Fragment implements MyItemClickListener, MyItemLongClickListener {
 
     // type def
@@ -47,6 +49,7 @@ public class NovelItemListFragment extends Fragment implements MyItemClickListen
     // members
     LinearLayoutManager mLayoutManager = null;
     RecyclerView mRecyclerView = null;
+    SmoothProgressBar spb = null;
 
     // novel list info
     private List<Integer> listNovelItemAid = null; // aid list
@@ -136,6 +139,7 @@ public class NovelItemListFragment extends Fragment implements MyItemClickListen
         // List request
         if(type.equals(searchType)) {
             // update UI
+            spb = (SmoothProgressBar) getActivity().findViewById(R.id.spb);
 
             // excute task
             Toast.makeText(getActivity(),"search",Toast.LENGTH_SHORT).show();
@@ -413,6 +417,7 @@ public class NovelItemListFragment extends Fragment implements MyItemClickListen
 
             if(listNovelItemAid == null || listNovelItemAid.size() == 0) {
                 Toast.makeText(getActivity(), getResources().getString(R.string.task_null),Toast.LENGTH_LONG).show();
+                spb.setVisibility(View.GONE);
                 return;
             }
 
@@ -420,6 +425,7 @@ public class NovelItemListFragment extends Fragment implements MyItemClickListen
             refreshIdList();
             GlobalConfig.wantDebugLog("MewX", "refresh over");
 
+            spb.setVisibility(View.GONE);
             return;
         }
     }

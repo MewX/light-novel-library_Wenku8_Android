@@ -8,7 +8,7 @@ android {
         minSdkVersion 15
         targetSdkVersion 22
         versionCode 11
-        versionName "0.6.0.0000dev"
+        versionName "0.6.0.1000dev"
     }
     buildTypes {
         release {
@@ -28,7 +28,7 @@ dependencies {
     compile 'com.android.support:recyclerview-v7:22.1.1'
 
     // external libraries
-    compile project(':umeng-analytics-v5.4.2')
+    compile project(':umeng-analytics')
     compile project(':volley')
     compile 'com.readystatesoftware.systembartint:systembartint:1.0.3'
     //compile 'com.astuetz:pagerslidingtabstrip:1.0.1'
@@ -36,4 +36,7 @@ dependencies {
     compile 'com.nostra13.universalimageloader:universal-image-loader:1.9.3'
     compile 'com.afollestad:material-dialogs:0.7.4.0'
     compile 'com.getbase:floatingactionbutton:1.9.0'
+    compile 'com.makeramen:roundedimageview:2.0.1'
+    compile 'com.github.castorflex.smoothprogressbar:library:0.2.0'
+    compile 'com.davemorrissey.labs:subsampling-scale-image-view:3.1.3'
 }
