@@ -30,6 +30,7 @@ public class GlobalConfig {
     private static final String saveSearchHistoryFileName = "search_history.wk8";
     private static final String saveReadSavesFileName = "read_saves.wk8";
     private static final String saveLocalBookshelfFileName = "bookshelf_local.wk8";
+    private static final String saveUserAccountFileName = "cert.wk8"; // certification file
     private static int maxSearchHistory = 10; // default
 
     // vars
@@ -155,6 +156,19 @@ public class GlobalConfig {
         return getSecondStoragePath() + saveFolderName + File.separator;
     }
 
+    public static String getFirstFullUserAccountSaveFilePath() {
+        return getFirstFullSaveFilePath() + saveUserAccountFileName;
+    }
+
+    public static String getSecondFullUserAccountSaveFilePath() {
+        return getSecondFullSaveFilePath() + saveUserAccountFileName;
+    }
+
+    /**
+     * Extract image name.
+     * @param url <!--image-->http://pic.wenku8.cn/pictures/1/1305/41759/50471.jpg<!--image-->
+     * @return 50471.jpg
+     */
     public static String generateImageFileNameByURL(String url) {
         String[] s = url.split("/");
         String result = "";

@@ -36,4 +36,13 @@ public class LightBase64 {
         b = Base64.decode( s, Base64.DEFAULT);
         return b;
 	}
+
+	static public String DecodeBase64String(String s) {
+		try {
+			return new String( DecodeBase64(s), "UTF-8" );
+		} catch (UnsupportedEncodingException e) {
+			e.printStackTrace();
+			return null;
+		}
+	}
 }

@@ -9,9 +9,13 @@ package org.mewx.wenku8.util;
 
 import java.io.BufferedInputStream;
 import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.UnsupportedEncodingException;
+import java.net.HttpURLConnection;
+import java.net.MalformedURLException;
 import java.net.URLEncoder;
+import java.net.URL;
 import java.util.List;
 import java.util.zip.GZIPInputStream;
 
@@ -26,7 +30,9 @@ import org.apache.http.client.methods.HttpPost;
 import org.apache.http.impl.client.DefaultHttpClient;
 import org.apache.http.protocol.HTTP;
 import org.apache.http.util.EntityUtils;
+import org.mewx.wenku8.global.api.Wenku8API;
 
+import android.content.ContentValues;
 import android.util.Log;
 
 public class LightNetwork {
@@ -73,6 +79,7 @@ public class LightNetwork {
 	 *            : post content NVP
 	 * @return: return correct bytes or null
 	 */
+	@Deprecated
 	public static byte[] LightHttpPost(String URL, List<NameValuePair> params) {
 		// Post transfer through NameValuePair[ ] array
 		// on server: request.getParameter("name")
@@ -128,6 +135,67 @@ public class LightNetwork {
 			Log.v("MewX-Net", e.getMessage());
 			e.printStackTrace();
 			return null;
+		}
+	}
+
+	/**
+	 * A post method, the values must to be <String, String> pair.
+	 * @param URL base url
+	 * @param values <String, String> pair
+	 * @return raw bytes or null!
+	 */
+	public static byte[] LightHttpPostConnection(String URL, ContentValues values) {
+
+		// new API, initial
+		URL url = null;
+		HttpURLConnection http = null;
+		try {
+			url = new URL(Wenku8API.getBaseURL());
+			http = (HttpURLConnection) url.openConnection();
+			http.setRequestMethod("POST");
+			http.setRequestProperty("Accept-Encoding", "gzip"); // set gzip
+			http.setConnectTimeout(10000);
+			http.setReadTimeout(10000);
+			http.setDoOutput(true); // has input name value pair
+			http.setInstanceFollowRedirects(true); // enable redirects
+		} catch (Exception e) {
+			e.printStackTrace();
+			return null; // null means failure
+		}
+
+		// make request args
+		StringBuffer params = new StringBuffer("");
+		for( String key : values.keySet() ) {
+			if( !(values.get(key) instanceof String)) continue;
+			params.append("&").append(key).append("=").append(values.get(key)); // now, like "&a=1&b=1&c=1"
+		}
+
+		// request
+		byte[] bypes = params.toString().getBytes();
+		try {
+			http.getOutputStream().write(bypes); // set args
+
+			InputStream inStream=http.getInputStream(); // input stream
+			ByteArrayOutputStream outStream = new ByteArrayOutputStream(); // output stream
+
+			if(http.getContentEncoding() != null && http.getContentEncoding().toLowerCase().indexOf("gzip") >= 0) {
+				// using 'gzip'
+				inStream = new GZIPInputStream(new BufferedInputStream(inStream));
+			}
+
+			byte[] buffer = new byte[1024];
+			int len = 0;
+			while( (len = inStream.read(buffer)) !=-1 )
+				outStream.write(buffer, 0, len); // read to outStream
+			byte[] data = outStream.toByteArray(); // copy to ByteArray
+			outStream.close();
+			inStream.close();
+
+			return data; // return value
+
+		} catch (IOException e) {
+			e.printStackTrace();
+			return null; // null means failure
 		}
 	}
 

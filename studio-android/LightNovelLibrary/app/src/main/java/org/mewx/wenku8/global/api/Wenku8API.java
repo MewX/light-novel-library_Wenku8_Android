@@ -1,5 +1,7 @@
 package org.mewx.wenku8.global.api;
 
+import android.content.ContentValues;
+
 import net.tsz.afinal.http.AjaxParams;
 
 import org.apache.http.NameValuePair;
@@ -190,6 +192,53 @@ public class Wenku8API {
         }
     }
 
+    public static int getErrorInfo_ResId(int errNo) {
+        switch (errNo) {
+            case 0:
+                // 请求发生错误
+                return R.string.error_00;
+            case 1:
+                // 成功(登陆、添加、删除、发帖)
+                return R.string.error_01;
+            case 2:
+                // 用户名错误
+                return R.string.error_02;
+            case 3:
+                // 密码错误
+                return R.string.error_03;
+            case 4:
+                // 请先登陆
+                return R.string.error_04;
+            case 5:
+                // 已经在书架
+                return R.string.error_05;
+            case 6:
+                // 书架已满
+                return R.string.error_06;
+            case 7:
+                // 小说不在书架
+                return R.string.error_07;
+            case 8:
+                // 回复帖子主题不存在
+                return R.string.error_08;
+            case 9:
+                // 签到失败
+                return R.string.error_09;
+            case 10:
+                // 推荐失败
+                return R.string.error_10;
+            case 11:
+                // 帖子发送失败
+                return R.string.error_11;
+            case 22:
+                // refer page 0
+                return R.string.error_22;
+            default:
+                // unknown
+                return R.string.error_unknown;
+        }
+    }
+
 
     /**
      * This part are the old API writing ways.
@@ -205,6 +254,12 @@ public class Wenku8API {
     private static NameValuePair getEncryptedNVP(String str) {
         // This funtion achieve the encryption and return the NVP
         return new BasicNameValuePair("request", LightBase64.EncodeBase64(str));
+    }
+
+    private static ContentValues getEncryptedCV(String str) {
+        ContentValues cv = new ContentValues();
+        cv.put("request",LightBase64.EncodeBase64(str));
+        return cv;
     }
 
     @Deprecated
@@ -503,6 +558,88 @@ public class Wenku8API {
         // </metadata>
 
         return getEncryptedAjaxParams("action=book&do=info&aid=" + aid + "&t=" + getLANG(l));
+    }
+
+
+    /**
+     * This part is user related, and is using the latest API 22 features.
+     * Banned NameValuePair, HttpPost.
+     */
+
+    public static ContentValues getUserLoginParams(String username, String password) {
+        // 使用session方式判断是否已登录（是否可以用来作心跳包）
+        return getEncryptedCV("action=login&username=" + LightNetwork.encodeToHttp(username) + "&password=" + password);
+    }
+
+    public static ContentValues getUserLogoutParams( ) {
+        return getEncryptedCV("action=logout");
+    }
+
+    public static ContentValues getUserInfoParams( ) {
+        return getEncryptedCV("action=userinfo");
+    }
+
+    public static ContentValues getUserSignParams( ) {
+        return getEncryptedCV("action=block&do=sign"); // 增加一个积分/天
+    }
+
+    public static ContentValues getVoteNovelParams(int aid) {
+        // 推荐小说  (就是网站上面那个喜欢小说 就推一下那个，app日限制5次/需要登录账号)
+        return getEncryptedCV("action=book&do=vote&aid=" + aid);
+    }
+
+    public static ContentValues getBookshelfListParams(LANG l) {
+        // 查询书架列表
+
+        // Return:
+        //
+
+        return getEncryptedCV("action=bookcase&t=" + getLANG(l));
+    }
+
+    public static ContentValues getAddToBookshelfParams(int aid) {
+        // 新增书架 aid为文章ID
+        return getEncryptedCV("action=bookcase&do=add&aid=" + aid);
+    }
+
+    public static ContentValues getDelFromBookshelfParams(int aid) {
+        // 删除书架 aid为文章ID
+        return getEncryptedCV("action=bookcase&do=del&aid=" + aid);
+    }
+
+    public static ContentValues getCommentListParams(int aid, int page) {
+        // 书评列表 aid为文章ID  page不得为空（从1开始）
+
+        // Return:
+        //
+
+        return getEncryptedCV("action=review&do=list&aid=" + aid + "&page=" + page);
+    }
+
+    public static ContentValues getCommentContentParams(int rid, int page) {
+        // 书评内容 rid为主题ID（不是aid）  page不得为空
+
+        // Return:
+        //
+
+        return getEncryptedCV("action=review&do=show&rid=" + rid + "&page=" + page);
+    }
+
+    public static ContentValues getCommentNewThreadParams(int aid, String title, String content) {
+        // 书评发帖 aid为文章ID
+
+        // 需要敏感词过滤，特殊符号处理
+
+        return getEncryptedCV("action=review&do=post&aid=" + aid + "&title="+ LightBase64.EncodeBase64(title)
+                +"&content=" + LightBase64.EncodeBase64(content));
+    }
+
+    public static ContentValues getCommentReplyParams(int rid, String content) {
+        // 书评回帖 rid为主题ID
+
+        // 需要敏感词过滤，特殊符号处理
+
+        return getEncryptedCV("action=review&do=reply&rid=" + rid + "&content=" + LightBase64.EncodeBase64(content));
     }
 
 }
