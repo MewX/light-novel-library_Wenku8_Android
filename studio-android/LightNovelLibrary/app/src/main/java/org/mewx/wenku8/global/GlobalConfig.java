@@ -12,6 +12,7 @@ import com.android.volley.toolbox.Volley;
 import org.mewx.wenku8.MyApp;
 import org.mewx.wenku8.global.api.Wenku8API;
 import org.mewx.wenku8.util.LightCache;
+import org.mewx.wenku8.util.LightNetwork;
 
 import java.io.File;
 import java.io.UnsupportedEncodingException;
@@ -41,8 +42,15 @@ public class GlobalConfig {
 
     // static variables
     private static ArrayList<String> searchHistory = null;
-    //private static ArrayList<ReadSaves> readSaves = null;
+    private static ArrayList<ReadSaves> readSaves = null; // deprecated
     private static ArrayList<Integer> bookshelf = null;
+
+    /** Structures */
+    public static class ReadSaves { // deprecated
+        public int cid;
+        public int pos; // last time scroll Y pos
+        public int height; // last time scroll Y height
+    }
 
     // debug info
     public static boolean inDebugMode() {
@@ -446,5 +454,168 @@ public class GlobalConfig {
     public static void setMaxSearchHistory( int size ) {
         if(size > 0)
             maxSearchHistory = size;
+    }
+
+
+    /** Read Saves */
+    public static void loadReadSaves() {
+        // Format:
+        // cid,,pos,,height||cid,,pos,,height
+        // just use split function
+        readSaves = new ArrayList<ReadSaves>();
+
+        // read history from file, if not exist, create.
+        String h = loadFullSaveFileContent(saveReadSavesFileName);
+
+        // split string h
+        String[] p = h.split("\\|\\|"); // regular expression
+        for (String temp : p) {
+            Log.v("MewX", temp);
+            String[] parts = temp.split(",,");
+            if (parts.length != 3)
+                continue;
+
+            ReadSaves rs = new ReadSaves();
+            rs.cid = new Integer(parts[0]);
+            rs.pos = new Integer(parts[1]);
+            rs.height = new Integer(parts[2]);
+            readSaves.add(rs);
+        }
+    }
+
+    public static void writeReadSaves() {
+        if (readSaves == null)
+            loadReadSaves();
+
+        String t = "";
+        for (int i = 0; i < readSaves.size(); i++) {
+            if (i != 0)
+                t += "||";
+            t += readSaves.get(i).cid + ",," + readSaves.get(i).pos + ",,"
+                    + readSaves.get(i).height;
+        }
+
+        writeFullSaveFileContent(saveReadSavesFileName, t);
+        return;
+    }
+
+    public static void addReadSavesRecord(int c, int p, int h) {
+        if (p < 100)
+            return; // no necessary to save it
+
+        if (readSaves == null)
+            loadReadSaves();
+
+        // judge if exist, and if legal, update it
+        for (int i = 0; i < readSaves.size(); i++) {
+            if (readSaves.get(i).cid == c) {
+                // judge if need to update
+                readSaves.get(i).pos = p;
+                readSaves.get(i).height = h;
+
+                writeReadSaves();
+                return;
+            }
+        }
+
+        // new record
+        ReadSaves rs = new ReadSaves();
+        rs.cid = c;
+        rs.pos = p;
+        rs.height = h;
+        readSaves.add(rs);
+
+        writeReadSaves();
+        return;
+    }
+
+    public static int getReadSavesRecord(int c, int h) {
+        if (readSaves == null)
+            loadReadSaves();
+
+        for (int i = 0; i < readSaves.size(); i++) {
+            if (readSaves.get(i).cid == c) {
+                // return h * readSaves.get(i).pos / readSaves.get(i).height;
+                return readSaves.get(i).pos;
+            }
+        }
+
+        // by default
+        return 0;
+    }
+
+
+    /** Novel content */
+    /**
+     * saveNovelContentImage:
+     *
+     * get image url and download to save folder's image folder
+     *
+     * @param url
+     *            : full http url of target image
+     * @return: if file finally exist, if already exist before saving, still
+     *          return true; if finally the file does not exist, return false.
+     */
+    public static boolean saveNovelContentImage(String url) {
+        String imgFileName = generateImageFileNameByURL(url);
+        if (!LightCache.testFileExist(getFirstFullSaveFilePath()
+                + imgsSaveFolderName + File.separator + imgFileName)
+                && !LightCache.testFileExist(getSecondFullSaveFilePath()
+                + imgsSaveFolderName + File.separator + imgFileName)) {
+            // neither of the file exist
+            byte[] fileContent = LightNetwork.LightHttpDownload(url);
+            if (fileContent == null)
+                return false; // network error
+            if (!LightCache.saveFile(getFirstFullSaveFilePath()
+                            + imgsSaveFolderName + File.separator, imgFileName,
+                    fileContent, true))
+                // fail to first path
+                return LightCache.saveFile(getSecondFullSaveFilePath()
+                                + imgsSaveFolderName + File.separator, imgFileName,
+                        fileContent, true);
+            return true; // saved to first directory
+        }
+        return true; // file exist
+    }
+
+    /**
+     * removeNovelContentImage:
+     *
+     * get image url and delete the corresponding local file
+     *
+     * @param url
+     *            : full http url of target image
+     * @return: true if file deleted successfully.
+     */
+    public static boolean removeNovelContentImage(String url) {
+        String imgFileName = generateImageFileNameByURL(url);
+
+        // in fact, one of them deleted is ok, so use "or"
+        return LightCache.deleteFile(getFirstFullSaveFilePath()
+                + imgsSaveFolderName + File.separator, imgFileName)
+                || LightCache.deleteFile(getSecondFullSaveFilePath()
+                + imgsSaveFolderName + File.separator, imgFileName);
+    }
+
+    /**
+     * getAvailableNovolContentImagePath:
+     *
+     * get available local saving path of target image.
+     *
+     * @param fileName
+     *            : just need the fileName
+     * @return: direct fileName or just null
+     */
+    public static String getAvailableNovolContentImagePath(String fileName) {
+        if (LightCache.testFileExist(getFirstFullSaveFilePath()
+                + imgsSaveFolderName + File.separator + fileName)) {
+            return getFirstFullSaveFilePath() + imgsSaveFolderName
+                    + File.separator + fileName;
+        } else if (LightCache.testFileExist(getSecondFullSaveFilePath()
+                + imgsSaveFolderName + File.separator + fileName)) {
+            return getSecondFullSaveFilePath() + imgsSaveFolderName
+                    + File.separator + fileName;
+        } else
+            return null;
     }
 }

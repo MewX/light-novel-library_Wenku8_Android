@@ -9,6 +9,7 @@
         <item name="android:textColorPrimary">@color/myTextPrimaryColor</item>
         <item name="drawerArrowStyle">@style/DrawerArrowStyle</item>
         <item name="android:windowTranslucentStatus">true</item>
+        <item name="android:windowTranslucentNavigation">true</item>
         <item name="android:windowContentOverlay">@null</item>
 
         <item name="android:windowBackground">@color/myWindowBackground</item>

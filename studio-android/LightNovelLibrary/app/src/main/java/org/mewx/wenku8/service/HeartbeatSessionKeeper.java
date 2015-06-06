@@ -34,6 +34,7 @@ public class HeartbeatSessionKeeper extends Service {
         timer.schedule(new TimerTask() {
             @Override
             public void run() {
+                // frequently request
 
             }
         }, 0, interval);

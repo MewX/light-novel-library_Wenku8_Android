@@ -130,6 +130,10 @@ public class MainActivity extends AppCompatActivity {
             tintManager.setTintAlpha(0.15f);
             // set all color
             tintManager.setTintColor(getResources().getColor(android.R.color.black));
+
+            // set Navigation bar color
+            if(Build.VERSION.SDK_INT >= 21)
+                getWindow().setNavigationBarColor(getResources().getColor(R.color.myNavigationColor));
         }
     }
 
@@ -216,6 +220,7 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onPause() {
         super.onPause();
+        MobclickAgent.onPageEnd("MainActivity");
         MobclickAgent.onPause(this);
 
         return;
@@ -224,6 +229,7 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onResume() {
         super.onResume();
+        MobclickAgent.onPageStart("MainActivity");
         MobclickAgent.onResume(this);
 
         return;

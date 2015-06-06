@@ -244,8 +244,8 @@ public class LatestFragment extends Fragment implements MyItemClickListener, MyI
              pastVisiblesItems = mLayoutManager.findFirstVisibleItemPosition();
 
              if (!isLoading) {
-                 // 滚动到一半的时候加载，即：剩余5个元素的时候就加载
-                 if (visibleItemCount + pastVisiblesItems + 5 >= totalItemCount) {
+                 // 滚动到一半的时候加载，即：剩余3个元素的时候就加载
+                 if (visibleItemCount + pastVisiblesItems + 3 >= totalItemCount) {
                      isLoading = true;
                      if (GlobalConfig.inDebugMode())
                          Log.i("MewX", "Loading more...");
@@ -385,15 +385,15 @@ public class LatestFragment extends Fragment implements MyItemClickListener, MyI
     }
 
     @Override
-    public void onResume() {
-        super.onResume();
-        MobclickAgent.onPageStart(TAG);
-    }
-
-    @Override
     public void onPause() {
         super.onPause();
         MobclickAgent.onPageEnd(TAG);
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        MobclickAgent.onPageStart(TAG);
     }
 
     /**

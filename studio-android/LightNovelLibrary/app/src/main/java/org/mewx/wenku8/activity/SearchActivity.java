@@ -24,6 +24,7 @@ import com.afollestad.materialdialogs.GravityEnum;
 import com.afollestad.materialdialogs.MaterialDialog;
 import com.afollestad.materialdialogs.Theme;
 import com.readystatesoftware.systembartint.SystemBarTintManager;
+import com.umeng.analytics.MobclickAgent;
 
 import org.mewx.wenku8.MyApp;
 import org.mewx.wenku8.R;
@@ -143,11 +144,37 @@ public class SearchActivity extends AppCompatActivity implements MyItemClickList
     @Override
     protected void onResume() {
         super.onResume();
+        MobclickAgent.onResume(this);
 
         // set back arrow icon
         final Drawable upArrow = getResources().getDrawable(R.drawable.abc_ic_ab_back_mtrl_am_alpha);
         upArrow.setColorFilter(getResources().getColor(R.color.mySearchToggleColor), PorterDuff.Mode.SRC_ATOP);
         getSupportActionBar().setHomeAsUpIndicator(upArrow);
+
+        // set navigation bar status, remember to disable "setNavigationBarTintEnabled"
+//        final int flags = View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+//                | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+//                | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+//                | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+//                | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY;
+//
+//        // This work only for android 4.4+
+//        if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
+//            getWindow().getDecorView().setSystemUiVisibility(flags);
+//
+//            // Code below is to handle presses of Volume up or Volume down.
+//            // Without this, after pressing volume buttons, the navigation bar will
+//            // show up and won't hide
+//            final View decorView = getWindow().getDecorView();
+//            decorView.setOnSystemUiVisibilityChangeListener(new View.OnSystemUiVisibilityChangeListener() {
+//                @Override
+//                public void onSystemUiVisibilityChange(int visibility) {
+//                    if((visibility & View.SYSTEM_UI_FLAG_FULLSCREEN) == 0) {
+//                        decorView.setSystemUiVisibility(flags);
+//                    }
+//                }
+//            });
+//        }
 
         refreshHistoryList();
 
@@ -208,5 +235,11 @@ public class SearchActivity extends AppCompatActivity implements MyItemClickList
 
         // leave animation: fade out
         overridePendingTransition(0, R.anim.fade_out);
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        MobclickAgent.onPause(this);
     }
 }

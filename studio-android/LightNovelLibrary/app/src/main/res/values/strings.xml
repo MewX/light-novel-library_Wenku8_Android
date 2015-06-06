@@ -27,6 +27,7 @@
     <string name="action_novel_info">小说信息</string>
     <string name="action_continue_read_progress">继续上次阅读进度</string>
     <string name="action_chapter_list">章节列表</string>
+    <string name="action_old_vertical_reader">旧引擎阅读界面</string>
     <string name="title_search">搜索：</string>
     <string name="main_menu_rklist">排行榜</string>
     <string name="main_menu_latest">最近更新</string>
@@ -88,5 +89,9 @@
     <string name="login_register">注册</string>
     <string name="press_twice_to_exit"><b>退出请再戳一下返回键哦～</b>\n&lt;(=～￣▽￣)→)￣▽￣=)>o </string>
     <string name="sorry">客官你不要心急啊，你急臣妾也做不到呀，现在代码量已经比之前版本大很多了~请体谅。而且主框架搭的差不多了，后面逻辑快很多，一有时间就好办！</string>
-
+    <string name="sorry_old_engine_no_image_preview">旧的引擎暂不可查看大图</string>
+    <string name="sorry_old_engine_preprocess">旧的引擎正在预处理</string>
+    <string name="sorry_old_engine_merging">旧的引擎正在整理小说内容，请稍后~</string>
+    <string name="sorry_old_engine_notify">旧引擎提示</string>
+    <string name="sorry_old_engine_jump">是否跳转到上次阅览的地方？</string>
 </resources>

@@ -248,8 +248,8 @@ public class NovelItemListFragment extends Fragment implements MyItemClickListen
             pastVisiblesItems = mLayoutManager.findFirstVisibleItemPosition();
 
             if (!isLoading) {
-                // 滚动到一半的时候加载，即：剩余5个元素的时候就加载
-                if (visibleItemCount + pastVisiblesItems + 5 >= totalItemCount && (totalPage==0 || currentPage < totalPage)) {
+                // 滚动到一半的时候加载，即：剩余3个元素的时候就加载
+                if (visibleItemCount + pastVisiblesItems + 3 >= totalItemCount && (totalPage==0 || currentPage < totalPage)) {
                     GlobalConfig.wantDebugLog("MewX", "Loading more...");
 
                     // load more toast

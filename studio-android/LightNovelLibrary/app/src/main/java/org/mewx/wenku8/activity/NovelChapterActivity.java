@@ -15,6 +15,7 @@ import android.widget.RelativeLayout;
 import android.widget.TextView;
 
 import com.readystatesoftware.systembartint.SystemBarTintManager;
+import com.umeng.analytics.MobclickAgent;
 
 import org.mewx.wenku8.R;
 import org.mewx.wenku8.global.api.ChapterInfo;
@@ -28,6 +29,7 @@ import java.util.List;
 public class NovelChapterActivity extends AppCompatActivity {
 
     // private vars
+    private int aid = 1;
     private LinearLayout mLinearLayout = null;
     private Toolbar mToolbar = null;
     private VolumeList volumeList= null;
@@ -38,6 +40,7 @@ public class NovelChapterActivity extends AppCompatActivity {
         setContentView(R.layout.layout_novel_chapter);
 
         // fetch values
+        aid = getIntent().getIntExtra("aid", 1);
         volumeList = (VolumeList) getIntent().getSerializableExtra("volume");
 
         // set indicator enable
@@ -77,7 +80,11 @@ public class NovelChapterActivity extends AppCompatActivity {
                 @Override
                 public void onClick(View v) {
                     // jump to reader activity
-
+                    Intent intent = new Intent(NovelChapterActivity.this, VerticalReaderActivity.class);
+                    intent.putExtra("aid", aid);
+                    intent.putExtra("volume", volumeList);
+                    intent.putExtra("cid", ci.cid);
+                    startActivity(intent);
                 }
             });
 
@@ -87,6 +94,17 @@ public class NovelChapterActivity extends AppCompatActivity {
 
     }
 
+    @Override
+    protected void onPause() {
+        super.onPause();
+        MobclickAgent.onPause(this);
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        MobclickAgent.onResume(this);
+    }
 
     @Override
     public boolean onOptionsItemSelected(MenuItem menuItem) {

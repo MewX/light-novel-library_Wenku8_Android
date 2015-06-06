@@ -25,6 +25,7 @@ import com.getbase.floatingactionbutton.FloatingActionButton;
 import com.getbase.floatingactionbutton.FloatingActionsMenu;
 import com.nostra13.universalimageloader.core.ImageLoader;
 import com.readystatesoftware.systembartint.SystemBarTintManager;
+import com.umeng.analytics.MobclickAgent;
 
 import net.tsz.afinal.core.AsyncTask;
 
@@ -320,6 +321,7 @@ public class NovelInfoActivity extends AppCompatActivity {
                     public void onClick(View v) {
                         // jump to chapter select activity
                         Intent intent = new Intent(NovelInfoActivity.this, NovelChapterActivity.class);
+                        intent.putExtra("aid", aid);
                         intent.putExtra("volume", vl);
                         startActivity(intent);
                     }
@@ -333,5 +335,17 @@ public class NovelInfoActivity extends AppCompatActivity {
             spb.setVisibility(View.GONE);
             super.onPostExecute(integer);
         }
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        MobclickAgent.onPause(this);
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        MobclickAgent.onResume(this);
     }
 }

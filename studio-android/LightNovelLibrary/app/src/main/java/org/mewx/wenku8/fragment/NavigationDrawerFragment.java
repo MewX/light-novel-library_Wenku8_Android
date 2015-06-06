@@ -8,19 +8,25 @@ import android.support.annotation.Nullable;
 import android.support.v4.widget.DrawerLayout;
 import android.support.v7.app.ActionBarDrawerToggle;
 import android.support.v7.widget.Toolbar;
+import android.view.KeyCharacterMap;
+import android.view.KeyEvent;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageButton;
+import android.widget.LinearLayout;
 import android.widget.TableRow;
 import android.widget.TextView;
 import android.widget.Toast;
+
+import com.umeng.analytics.MobclickAgent;
 
 import org.mewx.wenku8.R;
 import org.mewx.wenku8.activity.MainActivity;
 
 @TargetApi(16)
 public class NavigationDrawerFragment extends Fragment {
+    private final String TAG = "NavigationDrawerFragment";
     private View mFragmentContainerView;
     private MainActivity mainActivity = null;
     private DrawerLayout mDrawerLayout;
@@ -51,7 +57,7 @@ public class NavigationDrawerFragment extends Fragment {
         //((TextView) mainActivity.findViewById(R.id.user_text)).setText("This is a test");
 
         // init other things ...
-        Toast.makeText(mainActivity, "called onActivityCreated", Toast.LENGTH_SHORT).show();
+        //Toast.makeText(mainActivity, "called onActivityCreated", Toast.LENGTH_SHORT).show();
 
         // set button clicked listener
         // mainly working on change fragment in MainActivity.
@@ -451,6 +457,28 @@ public class NavigationDrawerFragment extends Fragment {
         return;
     }
 
+    @Override
+    public void onResume() {
+        super.onResume();
+        MobclickAgent.onPageStart(TAG);
+
+        boolean hasBackKey = KeyCharacterMap.deviceHasKey(KeyEvent.KEYCODE_BACK);
+        boolean hasHomeKey = KeyCharacterMap.deviceHasKey(KeyEvent.KEYCODE_HOME);
+        if (hasBackKey && hasHomeKey) {
+            // no navigation bar, unless it is enabled in the settings
+            TextView tv = (TextView)mainActivity.findViewById(R.id.taken);
+            if(tv != null) // v19- has no 'taken'
+                tv.setVisibility(View.GONE);
+            LinearLayout ll = (LinearLayout)mainActivity.findViewById(R.id.main_menu_bottom_layout);
+            ViewGroup.LayoutParams lp = ll.getLayoutParams();
+            if( lp instanceof ViewGroup.MarginLayoutParams) {
+                ((ViewGroup.MarginLayoutParams) lp).bottomMargin = 0;
+            }
+        } else {
+            // 99% sure there's a navigation bar
+        }
+    }
+
     public void openDrawer() {
         mDrawerLayout.openDrawer(mFragmentContainerView);
     }
@@ -480,5 +508,11 @@ public class NavigationDrawerFragment extends Fragment {
 
     public void setDrawerLayout(DrawerLayout drawerLayout) {
         mDrawerLayout = drawerLayout;
+    }
+
+    @Override
+    public void onPause() {
+        super.onPause();
+        MobclickAgent.onPageEnd(TAG);
     }
 }

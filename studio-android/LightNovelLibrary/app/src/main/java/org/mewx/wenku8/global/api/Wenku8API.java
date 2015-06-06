@@ -28,6 +28,14 @@ public class Wenku8API {
         return BaseURL;
     }
 
+    public static String[] badWords = {
+            "共产党", "政府",  "毛泽东",  "邓小平",  "江泽民",  "胡锦涛",  "温家宝",  "习近平",
+            "李克强", "台独",  "藏独", "反日", "反共", "反中", "达赖", "刘晓波", "毛主席", "愤青",
+            "反华", "右翼", "游行", "示威", "静坐", "公安", "李洪志", "法轮功", "刷分", "路过路过",
+            ".......", "。。。。", "色情", "吃屎", "你妈", "他妈", "她妈", "操你", "垃圾", "去死",
+            "迷魂药", "催情药", "毒品"
+    };
+
 
     /**
      * Basic converter functions
@@ -627,6 +635,8 @@ public class Wenku8API {
 
     public static ContentValues getCommentNewThreadParams(int aid, String title, String content) {
         // 书评发帖 aid为文章ID
+        // 书评那边限制不少于7个中文字符才可发送，每次发送间隔10s以上
+        // 采用简体！
 
         // 需要敏感词过滤，特殊符号处理
 
@@ -636,6 +646,8 @@ public class Wenku8API {
 
     public static ContentValues getCommentReplyParams(int rid, String content) {
         // 书评回帖 rid为主题ID
+        // 书评那边限制不少于7个中文字符才可发送，每次发送间隔10s以上
+        // 采用简体！
 
         // 需要敏感词过滤，特殊符号处理
 
