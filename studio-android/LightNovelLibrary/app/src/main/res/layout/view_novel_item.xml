@@ -14,6 +14,9 @@
         card-view:cardElevation="2dp"
         card-view:cardUseCompatPadding="true"
         card-view:cardMaxElevation="2dp">
+        <!-- This part write in code, not here -->
+        <!--android:foreground="@drawable/ribbon_local_only"-->
+        <!--android:foregroundGravity="right|bottom"-->
 
         <LinearLayout
             android:id="@+id/item_card"

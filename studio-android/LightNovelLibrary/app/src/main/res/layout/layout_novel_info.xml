@@ -93,7 +93,6 @@
         android:layout_height="4dp"
         android:layout_below="@id/toolbar_actionbar"
         android:indeterminate="true"
-        android:visibility="invisible"
         spb:spb_stroke_separator_length="4dp"
         spb:spb_sections_count="4"
         spb:spb_speed="1.0"

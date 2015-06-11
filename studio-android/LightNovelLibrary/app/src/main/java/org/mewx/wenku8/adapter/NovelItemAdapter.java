@@ -3,6 +3,7 @@ package org.mewx.wenku8.adapter;
 import android.support.v7.widget.RecyclerView;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.TextView;
 
@@ -11,6 +12,7 @@ import com.nostra13.universalimageloader.core.imageaware.ImageAware;
 import com.nostra13.universalimageloader.core.imageaware.ImageViewAware;
 
 import org.mewx.wenku8.R;
+import org.mewx.wenku8.global.GlobalConfig;
 import org.mewx.wenku8.global.api.NovelItemInfo;
 import org.mewx.wenku8.global.api.Wenku8API;
 import org.mewx.wenku8.listener.MyItemClickListener;
@@ -103,7 +105,7 @@ public class NovelItemAdapter extends RecyclerView.Adapter<NovelItemAdapter.View
         public int position;
         public boolean isLoading = false;
 
-        //public View loadingLayout;
+        private ImageButton ibNovelOption;
         public ImageView ivNovelCover;
         public TextView tvNovelTitle;
         public TextView tvNovelStatus;
@@ -119,13 +121,17 @@ public class NovelItemAdapter extends RecyclerView.Adapter<NovelItemAdapter.View
             itemView.findViewById(R.id.item_card).setOnLongClickListener(this);
 
             // get all views
-            //loadingLayout = (View) itemView.findViewById(R.id.novel_loading);
+            ibNovelOption = (ImageButton) itemView.findViewById(R.id.novel_option);
             ivNovelCover = (ImageView) itemView.findViewById(R.id.novel_cover);
             tvNovelTitle = (TextView) itemView.findViewById(R.id.novel_title);
             tvNovelAuthor = (TextView) itemView.findViewById(R.id.novel_author);
             tvNovelStatus = (TextView) itemView.findViewById(R.id.novel_status);
             tvNovelUpdate = (TextView) itemView.findViewById(R.id.novel_update);
             tvNovelIntro = (TextView) itemView.findViewById(R.id.novel_intro);
+
+            // test current fragment
+            if(!GlobalConfig.testInBookshelf())
+                ibNovelOption.setVisibility(View.INVISIBLE);
 
             return;
         }

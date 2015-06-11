@@ -140,7 +140,7 @@ public class NovelItemListFragment extends Fragment implements MyItemClickListen
         if(type.equals(searchType)) {
             // update UI
             spb = (SmoothProgressBar) getActivity().findViewById(R.id.spb);
-            spb.setVisibility(View.VISIBLE);
+            spb.progressiveStart();
 
             // excute task
             Toast.makeText(getActivity(),"search",Toast.LENGTH_SHORT).show();
@@ -181,6 +181,7 @@ public class NovelItemListFragment extends Fragment implements MyItemClickListen
         // go to detail activity
         Intent intent = new Intent(getActivity(), NovelInfoActivity.class);
         intent.putExtra("aid", listNovelItemAid.get(postion));
+        intent.putExtra("from", "list");
         startActivity(intent);
 
         return;
@@ -426,7 +427,7 @@ public class NovelItemListFragment extends Fragment implements MyItemClickListen
             refreshIdList();
             GlobalConfig.wantDebugLog("MewX", "refresh over");
 
-            spb.setVisibility(View.GONE);
+            spb.progressiveStop();
             return;
         }
     }

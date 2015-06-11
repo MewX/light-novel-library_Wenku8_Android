@@ -132,7 +132,6 @@ public class LightNetwork {
 				return null;
 			}
 		} catch (Exception e) {
-			Log.v("MewX-Net", e.getMessage());
 			e.printStackTrace();
 			return null;
 		}

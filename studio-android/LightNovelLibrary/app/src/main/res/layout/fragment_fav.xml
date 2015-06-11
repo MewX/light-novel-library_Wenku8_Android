@@ -1,14 +1,14 @@
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#AAA"
-    tools:context="org.mewx.wenku8.fragment.FavFragment">
+    android:background="@color/myWindowBackground" >
 
-    <!-- TODO: Update blank fragment layout -->
-    <TextView
+    <!-- Novel List -->
+    <android.support.v7.widget.RecyclerView
+        android:id="@+id/novel_item_list"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:text="@string/sorry" />
+        android:scrollbars="vertical"
+        android:fastScrollEnabled="true"/>
 
 </FrameLayout>

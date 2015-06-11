@@ -62,13 +62,19 @@
     <string name="system_parse_failed">数据解析失败！\n\n可能的原因有：\n　　程序内部错误，请反馈给开发者；\n　　你修改了存储的数据。</string>
     <string name="system_manually_cancelled">任务已被手动取消</string>
     <string name="system_loading_please_wait">加载中……请稍后再试</string>
+    <string name="system_fav_it_first">请先收藏后再下载！</string>
     <string name="task_stop">停止加载</string>
     <string name="task_retry">重新加载</string>
     <string name="task_null">没有结果</string>
     <string name="dialog_content_delete_one_search_record">确定要删除该搜索历史吗？\n</string>
+    <string name="dialog_content_load_from_cloud">该章节未缓存，是否立即联网阅读？</string>
+    <string name="dialog_content_verify_download">确定要开始联网下载该书吗？（高清原图也会下载）</string>
+    <string name="dialog_content_downloading">正在缓存……</string>
+    <string name="dialog_content_sure_to_unfav">确定要取消收藏？</string>
     <string name="dialog_positive_ok">OK</string>
     <string name="dialog_positive_want">要</string>
     <string name="dialog_positive_sure">好滴~</string>
+    <string name="dialog_positive_yes">是的</string>
     <string name="dialog_positive_likethis">就这样吧</string>
     <string name="dialog_negative_no">不要</string>
     <string name="dialog_negative_preferno">还是不了</string>
@@ -94,4 +100,9 @@
     <string name="sorry_old_engine_merging">旧的引擎正在整理小说内容，请稍后~</string>
     <string name="sorry_old_engine_notify">旧引擎提示</string>
     <string name="sorry_old_engine_jump">是否跳转到上次阅览的地方？</string>
+    <string name="notice_volume_to_dark_mode">按音量上下调节日间模式/夜间模式</string>
+    <string name="bookshelf_error">未知错误，操作失败！</string>
+    <string name="bookshelf_removed">已取消收藏！</string>
+    <string name="bookshelf_added">成功添加到收藏！</string>
+    <string name="bookshelf_intro_load_failed">小说信息读取失败，此小说信息需要手动同步。</string>
 </resources>

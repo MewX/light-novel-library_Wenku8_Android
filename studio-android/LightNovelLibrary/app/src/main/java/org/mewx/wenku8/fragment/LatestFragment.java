@@ -158,6 +158,7 @@ public class LatestFragment extends Fragment implements MyItemClickListener, MyI
         // go to detail activity
         Intent intent = new Intent(getActivity(), NovelInfoActivity.class);
         intent.putExtra("aid", listNovelItem.get(postion));
+        intent.putExtra("from", "latest");
         startActivity(intent);
 
         return;
@@ -227,8 +228,10 @@ public class LatestFragment extends Fragment implements MyItemClickListener, MyI
 
         @Override
         public void onFailure(Throwable t, int errorNo, String strMsg) {
-            mTextView.setText(getResources().getString(R.string.system_network_error));
-            showRetryButton();
+            if(isAdded()) {
+                mTextView.setText(getResources().getString(R.string.system_network_error));
+                showRetryButton();
+            }
             isLoading = false;
             return;
         }
@@ -315,9 +318,6 @@ public class LatestFragment extends Fragment implements MyItemClickListener, MyI
                 return 0;
             } catch (Exception e) {
                 e.printStackTrace();
-                mTextView.setText(getResources().getString(R.string.system_parse_failed) + e.getMessage());
-                showRetryButton();
-                isLoading = false;
             }
 
             return -1;
@@ -339,7 +339,9 @@ public class LatestFragment extends Fragment implements MyItemClickListener, MyI
             if (result == -1) {
                 doReverseOperation();
 
+                mTextView.setText(getResources().getString(R.string.system_parse_failed));
                 showRetryButton();
+                isLoading = false;
                 return;
             }
 

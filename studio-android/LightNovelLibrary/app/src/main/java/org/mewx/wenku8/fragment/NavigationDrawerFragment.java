@@ -23,6 +23,7 @@ import com.umeng.analytics.MobclickAgent;
 
 import org.mewx.wenku8.R;
 import org.mewx.wenku8.activity.MainActivity;
+import org.mewx.wenku8.global.GlobalConfig;
 
 @TargetApi(16)
 public class NavigationDrawerFragment extends Fragment {
@@ -142,9 +143,18 @@ public class NavigationDrawerFragment extends Fragment {
         }
 
         // Initial: set color states here ...
-        clearAllButtonColor();
-        setHighLightButton(mainActivity.getCurrentFragment());
-        mainActivity.changeFragment(new LatestFragment());
+        // get net work status, no net -> FAV
+        if(!GlobalConfig.isNetworkAvailable(getActivity())) {
+            clearAllButtonColor();
+            setHighLightButton(MainActivity.FRAGMENT_LIST.FAV);
+            mainActivity.setCurrentFragment(MainActivity.FRAGMENT_LIST.FAV);
+            mainActivity.changeFragment(new FavFragment());
+        }
+        else {
+            clearAllButtonColor();
+            setHighLightButton(mainActivity.getCurrentFragment());
+            mainActivity.changeFragment(new LatestFragment());
+        }
 
         return;
     }

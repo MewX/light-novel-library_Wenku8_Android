@@ -48,7 +48,6 @@ public class MainActivity extends AppCompatActivity {
 
     public void setCurrentFragment(FRAGMENT_LIST f) {
         status = f;
-        return;
     }
 
     private Toolbar mToolbar;
@@ -93,6 +92,7 @@ public class MainActivity extends AppCompatActivity {
         // Update old save files ----------------
 
 
+
         // set Toolbar
         mToolbar = (Toolbar) findViewById(R.id.toolbar_actionbar);
         setSupportActionBar(mToolbar);
@@ -104,19 +104,18 @@ public class MainActivity extends AppCompatActivity {
 
         // find search box
         mToolbar.setOnMenuItemClickListener(new Toolbar.OnMenuItemClickListener() {
-            	@Override
-            	public boolean onMenuItemClick(MenuItem item) {
-                    //Toast.makeText(MyApp.getContext(),"called button",Toast.LENGTH_SHORT).show();
-                    if(item.getItemId() == R.id.action_search) {
-                        // start search activity
-                        startActivity(new Intent(MainActivity.this, SearchActivity.class));
-                        overridePendingTransition(R.anim.fade_in,R.anim.hold); // fade in animation
+            @Override
+            public boolean onMenuItemClick(MenuItem item) {
+                //Toast.makeText(MyApp.getContext(),"called button",Toast.LENGTH_SHORT).show();
+                if (item.getItemId() == R.id.action_search) {
+                    // start search activity
+                    startActivity(new Intent(MainActivity.this, SearchActivity.class));
+                    overridePendingTransition(R.anim.fade_in, R.anim.hold); // fade in animation
 
-                    }
-            		return true;
-            	}
-            });
-
+                }
+                return true;
+            }
+        });
 
         // change status bar color tint, and this require SDK16
         if (Build.VERSION.SDK_INT >= 16 ) { //&& Build.VERSION.SDK_INT <= 21) {

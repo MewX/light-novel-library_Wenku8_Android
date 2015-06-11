@@ -29,8 +29,8 @@
 
         <com.jpardogo.android.googleprogressbar.library.GoogleProgressBar
             android:id="@+id/google_progress"
-            android:layout_width="30dp"
-            android:layout_height="30dp"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
             gpb:type="chrome_floating_circles"/>
 
         <!-- If loading failed, update this loading-status info -->

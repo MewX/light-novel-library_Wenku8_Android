@@ -1,5 +1,8 @@
 package org.mewx.wenku8.global;
 
+import android.content.Context;
+import android.net.ConnectivityManager;
+import android.net.NetworkInfo;
 import android.os.Environment;
 import android.support.v4.app.Fragment;
 import android.util.Log;
@@ -26,7 +29,7 @@ import java.util.ArrayList;
 public class GlobalConfig {
 
     private static final boolean inDebug = true; // true - in debug mode
-    private static final String saveFolderName = "saves";
+    public static final String saveFolderName = "saves";
     public static final String imgsSaveFolderName = "imgs";
     private static final String saveSearchHistoryFileName = "search_history.wk8";
     private static final String saveReadSavesFileName = "read_saves.wk8";
@@ -35,6 +38,7 @@ public class GlobalConfig {
     private static int maxSearchHistory = 10; // default
 
     // vars
+    private static boolean isInBookshelf = false;
     private static boolean FirstStoragePathStatus = true;
     private static Wenku8API.LANG currentLang = Wenku8API.LANG.SC;
     private static Fragment currentFragment;
@@ -137,15 +141,15 @@ public class GlobalConfig {
     }
 
     public static int getShowTextPaddingTop() {
-        return 16; // in "dp"
+        return 48; // in "dp"
     }
 
     public static int getShowTextPaddingLeft() {
-        return 16; // in "dp"
+        return 32; // in "dp"
     }
 
     public static int getShowTextPaddingRight() {
-        return 16; // in "dp"
+        return 32; // in "dp"
     }
 
     public static int getTextLoadWay() {
@@ -333,6 +337,18 @@ public class GlobalConfig {
 
         writeLocalBookShelf();
         return;
+    }
+
+    public static boolean testInBookshelf() {
+        return isInBookshelf;
+    }
+
+    public static void EnterBookshelf() {
+        isInBookshelf = true;
+    }
+
+    public static void LeaveBookshelf() {
+        isInBookshelf = false;
     }
 
 
@@ -617,5 +633,21 @@ public class GlobalConfig {
                     + File.separator + fileName;
         } else
             return null;
+    }
+
+
+    public static boolean isNetworkAvailable(Context context) {
+        ConnectivityManager cm = (ConnectivityManager) context
+                .getSystemService(Context.CONNECTIVITY_SERVICE);
+        if (cm != null) {
+            NetworkInfo[] info = cm.getAllNetworkInfo();
+            if (info != null) {
+                for (int i = 0; i < info.length; i++) {
+                    if (info[i].getState() == NetworkInfo.State.CONNECTED)
+                        return true;
+                }
+            }
+        }
+        return false;
     }
 }

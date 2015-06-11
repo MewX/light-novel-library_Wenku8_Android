@@ -26,6 +26,17 @@ public class NovelItemInfoUpdate {
     public boolean imageReady = false; // image
 
     // static function
+    public static NovelItemInfoUpdate convertFromMeta(NovelItemMeta nim) {
+        NovelItemInfoUpdate niiu = new NovelItemInfoUpdate(0);
+        niiu.aid = nim.aid;
+        niiu.title = nim.title;
+        niiu.author = nim.author;
+        niiu.status = nim.bookStatus;
+        niiu.update = nim.lastUpdate;
+
+        return niiu;
+    }
+
     public static NovelItemInfoUpdate parse(String xml) {
         NovelItemInfoUpdate niiu = new NovelItemInfoUpdate(0);
         try {

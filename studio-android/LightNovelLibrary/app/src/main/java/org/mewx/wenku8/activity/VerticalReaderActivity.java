@@ -9,7 +9,6 @@ import android.graphics.Typeface;
 import android.os.AsyncTask;
 import android.os.Build;
 import android.os.Bundle;
-import android.os.CancellationSignal;
 import android.os.Handler;
 import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
@@ -23,6 +22,9 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.afollestad.materialdialogs.GravityEnum;
+import com.afollestad.materialdialogs.MaterialDialog;
+import com.afollestad.materialdialogs.Theme;
 import com.nostra13.universalimageloader.core.ImageLoader;
 import com.umeng.analytics.MobclickAgent;
 
@@ -43,10 +45,15 @@ import java.util.List;
  * Created by MewX on 2015/6/6.
  */
 public class VerticalReaderActivity extends AppCompatActivity {
+    // constant
+    private final String FromLocal = "fav";
 
+    // private vars
+    private String from = "";
     private int aid, vid, cid;
     private VolumeList volumeList= null;
-    private ProgressDialog pDialog = null;
+    private MaterialDialog pDialog = null;
+    private LinearLayout TextListLayout = null;
     private List<OldNovelContentParser.NovelContent> nc = null;
     private Typeface typeface;
 
@@ -56,9 +63,7 @@ public class VerticalReaderActivity extends AppCompatActivity {
         public void run() {
             ((ScrollViewNoFling) VerticalReaderActivity.this.findViewById(R.id.content_scrollview))
                     .scrollTo(0, GlobalConfig.getReadSavesRecord(cid,
-                            ((LinearLayout) VerticalReaderActivity.this
-                                    .findViewById(R.id.novel_content_layout))
-                                    .getMeasuredHeight()));
+                            TextListLayout.getMeasuredHeight()));
         }
     };
 
@@ -73,10 +78,16 @@ public class VerticalReaderActivity extends AppCompatActivity {
         aid = getIntent().getIntExtra("aid", 1);
         volumeList = (VolumeList) getIntent().getSerializableExtra("volume");
         cid = getIntent().getIntExtra("cid",1);
+        from = getIntent().getStringExtra("from");
 
         // get Novel Content
         typeface = Typeface.createFromAsset(getAssets(), "fonts/fzss-gbk.ttf");
         getNovelContent();
+
+        // get view
+        TextListLayout = (LinearLayout) VerticalReaderActivity.this
+                .findViewById(R.id.novel_content_layout);
+        Toast.makeText(this, getString(R.string.notice_volume_to_dark_mode), Toast.LENGTH_SHORT).show();
     }
 
     @Override
@@ -116,23 +127,24 @@ public class VerticalReaderActivity extends AppCompatActivity {
         final asyncNovelContentTask ast = new asyncNovelContentTask();
         ast.execute(targVar);
 
-        pDialog = new ProgressDialog(this);
-        pDialog.setTitle(getResources().getString(R.string.sorry_old_engine_preprocess));
-        pDialog.setProgressStyle(ProgressDialog.STYLE_HORIZONTAL);
-        pDialog.setCancelable(true);
-        pDialog.setOnCancelListener(new DialogInterface.OnCancelListener() {
-            @Override
-            public void onCancel(DialogInterface dialog) {
-                // TODO Auto-generated method stub
-                ast.cancel(true);
-                pDialog.dismiss();
-                pDialog = null;
-            }
+        pDialog = new MaterialDialog.Builder(this)
+                .theme(Theme.LIGHT)
+                .title(R.string.sorry_old_engine_preprocess)
+                .content(R.string.sorry_old_engine_merging)
+                .progress(false, 1, true)
+                .cancelable(true)
+                .cancelListener(new DialogInterface.OnCancelListener() {
+                    @Override
+                    public void onCancel(DialogInterface dialog) {
+                        ast.cancel(true);
+                        pDialog.dismiss();
+                        pDialog = null;
+                    }
+                })
+                .show();
 
-        });
-        pDialog.setMessage(getResources().getString(R.string.sorry_old_engine_merging));
         pDialog.setProgress(0);
-        pDialog.setMax(1);
+        pDialog.setMaxProgress(1);
         pDialog.show();
 
         return;
@@ -146,16 +158,15 @@ public class VerticalReaderActivity extends AppCompatActivity {
 
             try {
                 String xml;
-//                if (from.equals(BookshelfFragment.fromid))
-//                    xml = GlobalConfig.loadFullFileFromSaveFolder("novel",
-//                            currentCid + ".xml");
-//                else {
+                if (from.equals(FromLocal))
+                    xml = GlobalConfig.loadFullFileFromSaveFolder("novel", cid + ".xml");
+                else {
                     byte[] tempXml = LightNetwork.LightHttpPost(
                             Wenku8API.getBaseURL(), params[0]);
                     if (tempXml == null)
                         return -100;
                     xml = new String(tempXml, "UTF-8");
-//                }
+                }
 
                 nc = OldNovelContentParser.parseNovelContent(xml, pDialog);
                 if (nc == null || nc.size() == 0) {
@@ -168,7 +179,6 @@ public class VerticalReaderActivity extends AppCompatActivity {
 
                 return 0;
             } catch (UnsupportedEncodingException e) {
-                // TODO Auto-generated catch block
                 e.printStackTrace();
             }
             return -1;
@@ -182,61 +192,6 @@ public class VerticalReaderActivity extends AppCompatActivity {
         @Override
         protected void onPostExecute(Integer result) {
             if (result == -100) {
-//                if (from.equals(BookshelfFragment.fromid)) {
-//                    Toast.makeText(
-//                            parentActivity,
-//                            getResources().getString(
-//                                    R.string.bookshelf_not_cached),
-//                            Toast.LENGTH_LONG).show();
-//
-//                    new AlertDialog.Builder(parentActivity)
-//                            .setTitle(
-//                                    getResources()
-//                                            .getString(
-//                                                    R.string.bookshelf_did_not_find_cache))
-//                            .setMessage(
-//                                    getResources()
-//                                            .getString(
-//                                                    R.string.bookshelf_want_to_connect_to_Internet))
-//                            .setPositiveButton(
-//                                    "YES",
-//                                    new android.content.DialogInterface.OnClickListener() {
-//
-//                                        @Override
-//                                        public void onClick(
-//                                                DialogInterface dialog,
-//                                                int which) {
-//                                            if (pDialog != null)
-//                                                pDialog.dismiss();
-//
-//                                            // connect to the Internet to load
-//                                            from = "";
-//                                            List<NameValuePair> targVar = new ArrayList<NameValuePair>();
-//                                            targVar.add(Wenku8Interface
-//                                                    .getNovelContent(
-//                                                            currentAid,
-//                                                            currentCid,
-//                                                            GlobalConfig
-//                                                                    .getFetchLanguage()));
-//
-//                                            final asyncNovelContentTask ast = new asyncNovelContentTask();
-//                                            ast.execute(targVar);
-//                                            return;
-//                                        }
-//
-//                                    })
-//                            .setNegativeButton(
-//                                    "NO",
-//                                    new android.content.DialogInterface.OnClickListener() {
-//
-//                                        @Override
-//                                        public void onClick(
-//                                                DialogInterface dialog,
-//                                                int which) {
-//                                            onBackPressed();
-//                                        }
-//                                    }).show();
-//                } else
                     Toast.makeText(VerticalReaderActivity.this,
                             getResources().getString(R.string.system_network_error),
                             Toast.LENGTH_LONG).show();
@@ -245,21 +200,7 @@ public class VerticalReaderActivity extends AppCompatActivity {
                 return;
             }
 
-            // generate listview to contain the texts and images
-            // ListView lv = (ListView) parentActivity
-            // .findViewById(R.id.content_list);
-            // if (lv == null) {
-            // Log.e("MewX", "NovelReaderActivity ListView == null!");
-            // return;
-            // }
-            // lv.setDivider(null);
-            // lv.setAdapter(new NovelContentAdapter(parentActivity, nc));
-            // pDialog.setProgress(nc.size());
-
-            // The abandoned way - dynamically addign textview into layout
-            LinearLayout layout = (LinearLayout) VerticalReaderActivity.this
-                    .findViewById(R.id.novel_content_layout);
-
+            // The abandoned way - dynamically adding textview into layout
             for (int i = 0; i < nc.size(); i++) {
                 if (pDialog != null)
                     pDialog.setProgress(i);
@@ -279,12 +220,13 @@ public class VerticalReaderActivity extends AppCompatActivity {
                                     GlobalConfig.getShowTextSize());
                         }
                         tempTV.setText(nc.get(i).content);
+                        tempTV.setLineSpacing(GlobalConfig.getShowTextSize() * 2.0f, 1.0f); // set line space
                         tempTV.setTypeface(typeface);
-                        tempTV.setTextColor(getResources().getColor(R.color.default_text_color_black));
+                        tempTV.setTextColor(getResources().getColor(R.color.reader_default_text_dark));
                         tempTV.setPadding(GlobalConfig.getShowTextPaddingLeft(),
                                 GlobalConfig.getShowTextPaddingTop(),
                                 GlobalConfig.getShowTextPaddingRight(), 0);
-                        layout.addView(tempTV);
+                        TextListLayout.addView(tempTV);
                         break;
 
                     case 'i':
@@ -309,7 +251,6 @@ public class VerticalReaderActivity extends AppCompatActivity {
                             tempIV.setOnClickListener(new View.OnClickListener() {
                                 @Override
                                 public void onClick(View v) {
-                                    // TODO Auto-generated method stub
 //                                    Intent intent = new Intent();
 //                                    intent.setClass(VerticalReaderActivity.this,
 //                                            NovelImageActivity.class);
@@ -363,7 +304,7 @@ public class VerticalReaderActivity extends AppCompatActivity {
                             async.execute(nc.get(i).content);
                         }
 
-                        layout.addView(tempIV);
+                        TextListLayout.addView(tempIV);
                         break;
 
                 }
@@ -375,37 +316,32 @@ public class VerticalReaderActivity extends AppCompatActivity {
 
             // show dialog
             if (GlobalConfig.getReadSavesRecord(cid,
-                    ((LinearLayout) VerticalReaderActivity.this
-                            .findViewById(R.id.novel_content_layout))
-                            .getMeasuredHeight()) > 100) {
-                new AlertDialog.Builder(VerticalReaderActivity.this)
-                        .setTitle(getResources().getString(R.string.sorry_old_engine_notify))
-                        .setMessage(getResources().getString(R.string.sorry_old_engine_jump))
-                        .setPositiveButton(
-                                "YES",
-                                new android.content.DialogInterface.OnClickListener() {
+                    TextListLayout.getMeasuredHeight()) > 100) {
+                new MaterialDialog.Builder(VerticalReaderActivity.this)
+                        .callback(new MaterialDialog.ButtonCallback() {
+                            @Override
+                            public void onPositive(MaterialDialog dialog) {
+                                super.onPositive(dialog);
+                                // set scroll view
+                                Handler handler = new Handler();
+                                handler.postDelayed(runnableScroll, 200);
 
-                                    @Override
-                                    public void onClick(DialogInterface dialog,
-                                                        int which) {
-                                        // set scroll view
-                                        Handler handler = new Handler();
-                                        handler.postDelayed(runnableScroll, 200);
-
-                                        Toast.makeText(
-                                                VerticalReaderActivity.this,
-                                                "Scroll to = "
-                                                        + GlobalConfig
-                                                        .getReadSavesRecord(
-                                                                cid,
-                                                                ((LinearLayout) VerticalReaderActivity.this
-                                                                        .findViewById(R.id.novel_content_layout))
-                                                                        .getMeasuredHeight()),
-                                                Toast.LENGTH_SHORT).show();
-
-                                    }
-
-                                }).setNegativeButton("NO", null).show();
+                                Toast.makeText(VerticalReaderActivity.this, "Scroll to = "
+                                                + GlobalConfig.getReadSavesRecord(cid, TextListLayout.getMeasuredHeight()),
+                                        Toast.LENGTH_SHORT).show();
+                            }
+                        })
+                        .theme(Theme.LIGHT)
+                        .backgroundColorRes(R.color.dlgBackgroundColor)
+                        .contentColorRes(R.color.dlgContentColor)
+                        .positiveColorRes(R.color.dlgPositiveButtonColor)
+                        .negativeColorRes(R.color.dlgNegativeButtonColor)
+                        .title(R.string.sorry_old_engine_notify)
+                        .content(R.string.sorry_old_engine_jump)
+                        .contentGravity(GravityEnum.CENTER)
+                        .positiveText(R.string.dialog_positive_sure)
+                        .negativeText(R.string.dialog_negative_preferno)
+                        .show();
             }
 
             return;
@@ -426,9 +362,7 @@ public class VerticalReaderActivity extends AppCompatActivity {
         GlobalConfig.addReadSavesRecord(cid,
                 ((ScrollViewNoFling) VerticalReaderActivity.this
                         .findViewById(R.id.content_scrollview)).getScrollY(),
-                ((LinearLayout) VerticalReaderActivity.this
-                        .findViewById(R.id.novel_content_layout))
-                        .getMeasuredHeight());
+                TextListLayout.getMeasuredHeight());
         return;
     }
 
@@ -446,14 +380,26 @@ public class VerticalReaderActivity extends AppCompatActivity {
     public boolean onKeyDown(int keyCode, KeyEvent event) {
         switch (keyCode) {
             case KeyEvent.KEYCODE_VOLUME_DOWN:
-                ((LinearLayout) VerticalReaderActivity.this
-                        .findViewById(R.id.novel_content_layout))
-                        .setBackgroundColor(0xff666666);
+                TextListLayout.setBackgroundColor(getResources().getColor(R.color.reader_default_bg_black));
+
+                // change text color
+                for(int i = 1; i < TextListLayout.getChildCount(); i ++) {
+                    View view = TextListLayout.getChildAt(i);
+                    if(view instanceof TextView)
+                        ((TextView)view).setTextColor(getResources().getColor(R.color.reader_default_text_light));
+                }
+
                 return true;
             case KeyEvent.KEYCODE_VOLUME_UP:
-                ((LinearLayout) VerticalReaderActivity.this
-                        .findViewById(R.id.novel_content_layout))
-                        .setBackgroundColor(0xffeeeeee);
+                TextListLayout.setBackgroundColor(getResources().getColor(R.color.reader_default_bg_yellow));
+
+                // change text color
+                for(int i = 1; i < TextListLayout.getChildCount(); i ++) {
+                    View view = TextListLayout.getChildAt(i);
+                    if(view instanceof TextView)
+                        ((TextView)view).setTextColor(getResources().getColor(R.color.reader_default_text_dark));
+                }
+
                 return true;
         }
         return super.onKeyDown(keyCode, event);

@@ -81,4 +81,10 @@
     <color name="login_btn_white">#FFFFFF</color>
     <color name="login_btn_dark">#444444</color>
 
+    <!-- Reader Color -->
+    <color name="reader_default_bg_yellow">#CDBDB5</color>
+    <color name="reader_default_bg_black">#666</color>
+    <color name="reader_default_text_light">#fff</color>
+    <color name="reader_default_text_dark">#444</color>
+
 </resources>

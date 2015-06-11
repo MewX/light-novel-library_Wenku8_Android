@@ -74,6 +74,7 @@ MERGED from com.android.support:recyclerview-v7:22.1.1:22:5
 MERGED from com.android.support:support-v4:22.1.1:22:5
 MERGED from com.getbase:floatingactionbutton:1.9.0:12:5
 MERGED from com.wrapp.floatlabelededittext:library:0.0.6:11:5
+MERGED from com.github.castorflex.smoothprogressbar:library:1.1.0:12:5
 	android:label
 		ADDED from AndroidManifest.xml:22:9
 	android:allowBackup
@@ -173,9 +174,9 @@ MERGED from com.android.support:recyclerview-v7:22.1.1:20:5
 MERGED from com.android.support:support-v4:22.1.1:20:5
 MERGED from com.getbase:floatingactionbutton:1.9.0:8:5
 MERGED from com.makeramen:roundedimageview:2.0.1:7:5
-MERGED from com.github.castorflex.smoothprogressbar:library:0.2.0:2:5
 MERGED from com.davemorrissey.labs:subsampling-scale-image-view:3.1.3:7:5
 MERGED from com.wrapp.floatlabelededittext:library:0.0.6:7:5
+MERGED from com.github.castorflex.smoothprogressbar:library:1.1.0:8:5
 	android:targetSdkVersion
 		INJECTED from AndroidManifest.xml:0:0
 		INJECTED from AndroidManifest.xml:0:0

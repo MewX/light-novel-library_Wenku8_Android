@@ -1,9 +1,13 @@
 package org.mewx.wenku8.adapter;
 
+import android.app.Activity;
+import android.app.FragmentManager;
 import android.support.v7.widget.RecyclerView;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.ImageButton;
 import android.widget.ImageView;
+import android.widget.TableRow;
 import android.widget.TextView;
 
 import com.android.volley.Request;
@@ -12,6 +16,7 @@ import com.android.volley.VolleyError;
 import com.android.volley.toolbox.StringRequest;
 import com.nostra13.universalimageloader.core.ImageLoader;
 
+import org.mewx.wenku8.MyApp;
 import org.mewx.wenku8.R;
 import org.mewx.wenku8.global.GlobalConfig;
 import org.mewx.wenku8.global.api.NovelItemInfoUpdate;
@@ -115,7 +120,10 @@ public class NovelItemAdapterUpdate extends RecyclerView.Adapter<NovelItemAdapte
 
             if(postRequest==null)
                 GlobalConfig.wantDebugLog("MewX", "NovelItemAdapterUpdate:onBindViewHolder: postRequest==null");
-            GlobalConfig.volleyRequestQueue.add(postRequest); // meet errors
+            else if(GlobalConfig.volleyRequestQueue == null)
+                GlobalConfig.wantDebugLog("MewX", "NovelItemAdapterUpdate:onBindViewHolder: volleyRequestQueue==null");
+            else
+                GlobalConfig.volleyRequestQueue.add(postRequest); // meet errors
         }
 
         refreshAllContent(viewHolder, i);
@@ -124,13 +132,17 @@ public class NovelItemAdapterUpdate extends RecyclerView.Adapter<NovelItemAdapte
     }
 
     private void refreshAllContent( final ViewHolder viewHolder, int i ) {
+        // unknown NPE, just make
+        if(viewHolder == null)
+            return;
 
         // set text
         viewHolder.tvNovelTitle.setText(mDataset.get(i).title);
         viewHolder.tvNovelAuthor.setText(mDataset.get(i).author);
         viewHolder.tvNovelStatus.setText(mDataset.get(i).status);
         viewHolder.tvNovelUpdate.setText(mDataset.get(i).update);
-        viewHolder.tvNovelIntro.setText(mDataset.get(i).intro_short);
+        if(!GlobalConfig.testInBookshelf())
+            viewHolder.tvNovelIntro.setText(mDataset.get(i).intro_short);
 
         ImageLoader.getInstance().displayImage(Wenku8API.getCoverURL(mDataset.get(i).aid), viewHolder.ivNovelCover);
     }
@@ -166,6 +178,8 @@ public class NovelItemAdapterUpdate extends RecyclerView.Adapter<NovelItemAdapte
         public boolean isLoading = false;
 
         //public View loadingLayout;
+        private ImageButton ibNovelOption;
+        private TableRow trNovelIntro;
         public ImageView ivNovelCover;
         public TextView tvNovelTitle;
         public TextView tvNovelStatus;
@@ -181,13 +195,20 @@ public class NovelItemAdapterUpdate extends RecyclerView.Adapter<NovelItemAdapte
             itemView.findViewById(R.id.item_card).setOnLongClickListener(this);
 
             // get all views
-            //loadingLayout = (View) itemView.findViewById(R.id.novel_loading);
+            ibNovelOption = (ImageButton) itemView.findViewById(R.id.novel_option);
+            trNovelIntro = (TableRow) itemView.findViewById(R.id.novel_intro_row);
             ivNovelCover = (ImageView) itemView.findViewById(R.id.novel_cover);
             tvNovelTitle = (TextView) itemView.findViewById(R.id.novel_title);
             tvNovelAuthor = (TextView) itemView.findViewById(R.id.novel_author);
             tvNovelStatus = (TextView) itemView.findViewById(R.id.novel_status);
             tvNovelUpdate = (TextView) itemView.findViewById(R.id.novel_update);
             tvNovelIntro = (TextView) itemView.findViewById(R.id.novel_intro);
+
+            // test current fragment
+            if(!GlobalConfig.testInBookshelf())
+                ibNovelOption.setVisibility(View.INVISIBLE);
+            else
+                trNovelIntro.setVisibility(View.GONE);
 
             return;
         }

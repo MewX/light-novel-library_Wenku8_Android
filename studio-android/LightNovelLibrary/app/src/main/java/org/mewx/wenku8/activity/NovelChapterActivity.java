@@ -13,14 +13,21 @@ import android.view.View;
 import android.widget.LinearLayout;
 import android.widget.RelativeLayout;
 import android.widget.TextView;
+import android.widget.Toast;
 
+import com.afollestad.materialdialogs.GravityEnum;
+import com.afollestad.materialdialogs.MaterialDialog;
+import com.afollestad.materialdialogs.Theme;
 import com.readystatesoftware.systembartint.SystemBarTintManager;
 import com.umeng.analytics.MobclickAgent;
 
 import org.mewx.wenku8.R;
+import org.mewx.wenku8.global.GlobalConfig;
 import org.mewx.wenku8.global.api.ChapterInfo;
 import org.mewx.wenku8.global.api.VolumeList;
+import org.mewx.wenku8.util.LightCache;
 
+import java.io.File;
 import java.util.List;
 
 /**
@@ -28,8 +35,12 @@ import java.util.List;
  */
 public class NovelChapterActivity extends AppCompatActivity {
 
+    // constant
+    private final String FromLocal = "fav";
+
     // private vars
     private int aid = 1;
+    private String from = "";
     private LinearLayout mLinearLayout = null;
     private Toolbar mToolbar = null;
     private VolumeList volumeList= null;
@@ -41,6 +52,7 @@ public class NovelChapterActivity extends AppCompatActivity {
 
         // fetch values
         aid = getIntent().getIntExtra("aid", 1);
+        from = getIntent().getStringExtra("from");
         volumeList = (VolumeList) getIntent().getSerializableExtra("volume");
 
         // set indicator enable
@@ -79,11 +91,47 @@ public class NovelChapterActivity extends AppCompatActivity {
             tv.setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View v) {
+                    // test does file exist
+                    if(from.equals(FromLocal) &&
+                            !LightCache.testFileExist(GlobalConfig.getFirstStoragePath()
+                                    + GlobalConfig.saveFolderName + File.separator + "novel" + File.separator + ci.cid + ".xml") &&
+                            !LightCache.testFileExist(GlobalConfig.getSecondStoragePath()
+                                    + GlobalConfig.saveFolderName + File.separator + "novel" + File.separator + ci.cid + ".xml")) {
+                        // local file not download, ask to download an read or cancel
+                        new MaterialDialog.Builder(NovelChapterActivity.this)
+                                .callback(new MaterialDialog.ButtonCallback() {
+                                    @Override
+                                    public void onPositive(MaterialDialog dialog) {
+                                        super.onPositive(dialog);
+
+                                        // jump to reader activity
+                                        Intent intent = new Intent(NovelChapterActivity.this, VerticalReaderActivity.class);
+                                        intent.putExtra("aid", aid);
+                                        intent.putExtra("volume", volumeList);
+                                        intent.putExtra("cid", ci.cid);
+                                        intent.putExtra("from", "cloud"); // from cloud
+                                        startActivity(intent);
+                                    }
+                                })
+                                .theme(Theme.LIGHT)
+                                .backgroundColorRes(R.color.dlgBackgroundColor)
+                                .contentColorRes(R.color.dlgContentColor)
+                                .positiveColorRes(R.color.dlgPositiveButtonColor)
+                                .negativeColorRes(R.color.dlgNegativeButtonColor)
+                                .content(getResources().getString(R.string.dialog_content_load_from_cloud))
+                                .contentGravity(GravityEnum.CENTER)
+                                .positiveText(R.string.dialog_positive_likethis)
+                                .negativeText(R.string.dialog_negative_preferno)
+                                .show();
+                        return;
+                    }
+
                     // jump to reader activity
                     Intent intent = new Intent(NovelChapterActivity.this, VerticalReaderActivity.class);
                     intent.putExtra("aid", aid);
                     intent.putExtra("volume", volumeList);
                     intent.putExtra("cid", ci.cid);
+                    intent.putExtra("from", from); // from "fav"
                     startActivity(intent);
                 }
             });
@@ -91,7 +139,6 @@ public class NovelChapterActivity extends AppCompatActivity {
             // add to scroll view
             mLinearLayout.addView(rl);
         }
-
     }
 
     @Override
