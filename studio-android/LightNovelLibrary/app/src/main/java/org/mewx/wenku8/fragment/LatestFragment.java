@@ -149,15 +149,20 @@ public class LatestFragment extends Fragment implements MyItemClickListener, MyI
     /**
      * Fill on click lister
      * @param view
-     * @param postion
+     * @param position
      */
     @Override
-    public void onItemClick(View view, final int postion) {
+    public void onItemClick(View view, final int position) {
         //Toast.makeText(getActivity(),"item click detected", Toast.LENGTH_SHORT).show();
+        if(position < 0 || position >= listNovelItem.size()) {
+            // ArrayIndexOutOfBoundsException
+            Toast.makeText(getActivity(), "ArrayIndexOutOfBoundsException: " + position + " in size " + listNovelItem.size(), Toast.LENGTH_SHORT).show();
+            return;
+        }
 
         // go to detail activity
         Intent intent = new Intent(getActivity(), NovelInfoActivity.class);
-        intent.putExtra("aid", listNovelItem.get(postion));
+        intent.putExtra("aid", listNovelItem.get(position));
         intent.putExtra("from", "latest");
         startActivity(intent);
 
@@ -168,7 +173,7 @@ public class LatestFragment extends Fragment implements MyItemClickListener, MyI
     public void onItemLongClick(View view, int postion) {
         Toast.makeText(getActivity(),"item long click detected", Toast.LENGTH_SHORT).show();
 
-        // show popup menu
+        // TODO: show popup menu
 
 
         return;

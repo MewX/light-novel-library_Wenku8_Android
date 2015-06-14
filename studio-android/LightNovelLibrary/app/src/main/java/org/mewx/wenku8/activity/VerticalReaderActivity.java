@@ -221,7 +221,7 @@ public class VerticalReaderActivity extends AppCompatActivity {
                                     GlobalConfig.getShowTextSize());
                         }
                         tempTV.setText(nc.get(i).content);
-                        tempTV.setLineSpacing(GlobalConfig.getShowTextSize() * 2.0f, 1.0f); // set line space
+                        tempTV.setLineSpacing(GlobalConfig.getShowTextSize() * 1.0f, 1.0f); // set line space
                         tempTV.setTypeface(typeface);
                         tempTV.setTextColor(getResources().getColor(R.color.reader_default_text_dark));
                         tempTV.setPadding(GlobalConfig.getShowTextPaddingLeft(),

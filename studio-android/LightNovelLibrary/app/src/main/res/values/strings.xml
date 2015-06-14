@@ -87,6 +87,8 @@
     <string name="dialog_content_verify_register">注册需要去wenku8.cn进行。\n是否打开浏览器去注册？</string>
     <string name="dialog_content_downloading">正在缓存……</string>
     <string name="dialog_content_sure_to_unfav">确定要取消收藏？\n（缓存的小说内容也会删除）</string>
+    <string name="dialog_content_sure_to_logout">确定要解除契约吗，魔法师？</string>
+    <string name="dialog_content_sync">正在同步书架（双向）……</string>
     <string name="dialog_positive_ok">OK</string>
     <string name="dialog_positive_want">要</string>
     <string name="dialog_positive_sure">好滴~</string>

@@ -64,7 +64,7 @@ public class LightUserSession {
         }
 
         try {
-            Log.e("MewX", new String(bytes, "UTF-8"));
+            //Log.e("MewX", new String(bytes, "UTF-8"));
             decAndSetUserFile(new String(bytes, "UTF-8"));
         } catch (UnsupportedEncodingException e) {
             e.printStackTrace();
@@ -129,7 +129,7 @@ public class LightUserSession {
                 password = pwd;
                 saveUserInfoSet();
 
-                // activate session keeper
+                // TODO: activate session keeper
 
             }
 
@@ -181,7 +181,6 @@ public class LightUserSession {
     public static void decAndSetUserFile(String raw) {
         try {
             String[] a = raw.split("\\|"); // a[0]: username; a[1]: password;
-            Log.e("MewX", "1:" + a[0] + "|" + a[1]);
             if (a == null || a.length != 2 || a[0].length() == 0 || a[1].length() == 0) {
                 username = "";
                 password = "";
@@ -191,7 +190,6 @@ public class LightUserSession {
             // dec once
             char[] temp_username = LightBase64.DecodeBase64String(a[0]).toCharArray();
             char[] temp_password = LightBase64.DecodeBase64String(a[1]).toCharArray();
-            Log.e("MewX", "2:" + new String(temp_username));
 
             // reverse main part
             int equal_pos;
@@ -212,10 +210,8 @@ public class LightUserSession {
             }
 
             // dec twice
-            Log.e("MewX", "3:" + new String(temp_username));
             temp_username = LightBase64.DecodeBase64String(new String(temp_username)).toCharArray();
             temp_password = LightBase64.DecodeBase64String(new String(temp_password)).toCharArray();
-            Log.e("MewX", "3:" + new String(temp_username));
 
             // exchange caps and uncaps
             for (int i = 0; i < temp_username.length; i++) {
@@ -238,7 +234,6 @@ public class LightUserSession {
             // dec three times
             username = LightBase64.DecodeBase64String(new String(temp_username));
             password = LightBase64.DecodeBase64String(new String(temp_password));
-            Log.e("MewX", "4:" + new String(temp_username));
         }
         catch (Exception e) {
             e.printStackTrace();
@@ -259,10 +254,8 @@ public class LightUserSession {
         String result = "";
 
         // username, password enc to base64
-        Log.e("MewX", "00:"+username);
         char[] temp_username = LightBase64.EncodeBase64(username).toCharArray();
         char[] temp_password = LightBase64.EncodeBase64(password).toCharArray();
-        Log.e("MewX", "01:"+new String(temp_username));
 
         // cap to uncap, uncap to cap
         for(int i = 0; i < temp_username.length; i ++) {
@@ -281,20 +274,17 @@ public class LightUserSession {
             else
                 continue;
         }
-        Log.e("MewX", "02:"+new String(temp_username));
 
         // twice base64, exchange char position, beg to end, end to beg
         int equal_pos;
         temp_username = LightBase64.EncodeBase64(new String(temp_username)).toCharArray();
         result = new String(temp_username);
         equal_pos = result.indexOf('=');
-        Log.e("MewX", "03:"+new String(temp_username));
         for(int i = 0, j = equal_pos == -1 ? temp_username.length - 1 : equal_pos - 1; i < j; i ++, j --) {
             char temp = temp_username[i];
             temp_username[i] = temp_username[j];
             temp_username[j] = temp;
         }
-        Log.e("MewX", "04:"+new String(temp_username));
 
         temp_password = LightBase64.EncodeBase64(new String(temp_password)).toCharArray();
         result = new String(temp_password);
@@ -307,7 +297,6 @@ public class LightUserSession {
 
         // three times base64
         result = LightBase64.EncodeBase64(new String(temp_username)) + "|" + LightBase64.EncodeBase64(new String(temp_password));
-        Log.e("MewX", new String(temp_username) + ", " + new String(temp_password) + ", " + result);
 
         // return value
         return result;
@@ -339,12 +328,13 @@ public class LightUserSession {
 
             if(LightUserSession.logStatus == true) {
                 // heart beat service
-                Toast.makeText(MyApp.getContext(), e.toString(), Toast.LENGTH_SHORT).show();
+                // Toast.makeText(MyApp.getContext(), e.toString(), Toast.LENGTH_SHORT).show();
                 Intent intent = new Intent(MyApp.getContext(),HeartbeatSessionKeeper.class);
                 MyApp.getContext().startService(intent);
             }
-            else
-                Toast.makeText(MyApp.getContext(), e.toString(), Toast.LENGTH_SHORT).show();
+            else {
+                // Toast.makeText(MyApp.getContext(), e.toString(), Toast.LENGTH_SHORT).show();
+            }
         }
     }
 }

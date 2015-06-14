@@ -54,10 +54,11 @@ public class NovelItemAdapterUpdate extends RecyclerView.Adapter<NovelItemAdapte
     public void RefreshDataset(List<NovelItemInfoUpdate> dataset) {
         int origSize = mDataset.size();
 
-        if(dataset.size()>mDataset.size())
-            mDataset.addAll(dataset.subList(origSize,dataset.size()));
-        //mDataset = dataset; // reference
-        //int currSize = mDataset.size();
+        if(dataset.size()>origSize) {
+            mDataset.addAll(dataset.subList(origSize, dataset.size()));
+            //mDataset = dataset; // reference
+            //int currSize = mDataset.size();
+        }
 
         return;
     }
@@ -133,7 +134,7 @@ public class NovelItemAdapterUpdate extends RecyclerView.Adapter<NovelItemAdapte
 
     private void refreshAllContent( final ViewHolder viewHolder, int i ) {
         // unknown NPE, just make
-        if(viewHolder == null)
+        if(viewHolder == null || mDataset == null || mDataset.get(i) == null)
             return;
 
         // set text

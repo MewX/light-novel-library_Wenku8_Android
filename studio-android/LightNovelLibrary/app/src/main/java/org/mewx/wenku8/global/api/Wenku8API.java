@@ -613,6 +613,24 @@ public class Wenku8API {
         return getEncryptedCV("action=book&do=vote&aid=" + aid);
     }
 
+    public static ContentValues getBookshelfListAid(LANG l) {
+        // 查询书架列表，只含有aid
+
+        /**
+         * <?xml version="1.0" encoding="utf-8"?>
+         * <metadata>
+         *     <book aid="1499" />
+         *     <book aid="1754" />
+         *     <book aid="1605" />
+         *     <book aid="1483" />
+         *     <book aid="1469" />
+         *     <book aid="1087" />
+         * </metadata>
+         */
+
+        return getEncryptedCV("action=bookcase&do=list&t=" + getLANG(l));
+    }
+
     public static ContentValues getBookshelfListParams(LANG l) {
         // 查询书架列表
 

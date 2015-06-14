@@ -7,6 +7,7 @@ import android.graphics.drawable.Drawable;
 import android.os.AsyncTask;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.CardView;
 import android.support.v7.widget.Toolbar;
@@ -17,6 +18,7 @@ import android.view.View;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.afollestad.materialdialogs.GravityEnum;
 import com.afollestad.materialdialogs.MaterialDialog;
 import com.afollestad.materialdialogs.Theme;
 import com.makeramen.roundedimageview.RoundedImageView;
@@ -44,7 +46,7 @@ public class UserInfoActivity extends AppCompatActivity {
     private Toolbar mToolbar = null;
     private RoundedImageView rivAvatar;
     private TextView tvUserName, tvNickyName, tvScore, tvExperience, tvRank;
-    private CardView cvLogout;
+    private TextView tvLogout;
     private UserInfo ui;
     private AsyncGetUserInfo agui;
 
@@ -84,7 +86,7 @@ public class UserInfoActivity extends AppCompatActivity {
         tvScore = (TextView)findViewById(R.id.score);
         tvExperience = (TextView)findViewById(R.id.experience);
         tvRank = (TextView)findViewById(R.id.rank);
-        cvLogout = (CardView)findViewById(R.id.btn_logout);
+        tvLogout = (TextView)findViewById(R.id.btn_logout);
 
         // sync get info
         agui = new AsyncGetUserInfo();
@@ -187,17 +189,34 @@ public class UserInfoActivity extends AppCompatActivity {
                     rivAvatar.setImageBitmap(bm);
 
                 // set texts
-//                Log.e("MewX", ui.username + "; " + ui.nickyname + ";" + ui.score + ";" + ui.experience + ";" + ui.rank);
                 tvUserName.setText(ui.username);
                 tvNickyName.setText(ui.nickyname);
                 tvScore.setText(Integer.toString(ui.score));
                 tvExperience.setText(Integer.toString(ui.experience));
                 tvRank.setText(ui.rank);
-                cvLogout.setOnClickListener(new View.OnClickListener() {
+                tvLogout.setOnClickListener(new View.OnClickListener() {
                     @Override
                     public void onClick(View v) {
-                        AsyncLogout al = new AsyncLogout();
-                        al.execute();
+                        new MaterialDialog.Builder(UserInfoActivity.this)
+                                .callback(new MaterialDialog.ButtonCallback() {
+                                    @Override
+                                    public void onPositive(MaterialDialog dialog) {
+                                        super.onPositive(dialog);
+                                        AsyncLogout al = new AsyncLogout();
+                                        al.execute();
+                                    }
+                                })
+                                .theme(Theme.LIGHT)
+                                .titleColor(R.color.default_text_color_black)
+                                .backgroundColorRes(R.color.dlgBackgroundColor)
+                                .contentColorRes(R.color.dlgContentColor)
+                                .positiveColorRes(R.color.dlgPositiveButtonColor)
+                                .negativeColorRes(R.color.dlgNegativeButtonColor)
+                                .content(R.string.dialog_content_sure_to_logout)
+                                .contentGravity(GravityEnum.CENTER)
+                                .positiveText(R.string.dialog_positive_ok)
+                                .negativeText(R.string.dialog_negative_biao)
+                                .show();
                     }
                 });
             }

@@ -48,8 +48,8 @@ public class UserLoginActivity extends AppCompatActivity {
     private Toolbar mToolbar = null;
     private EditText etUserName = null;
     private EditText etPassword = null;
-    private CardView cvLogin = null;
-    private CardView cvRegister = null;
+    private TextView tvLogin = null;
+    private TextView tvRegister = null;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -83,11 +83,11 @@ public class UserLoginActivity extends AppCompatActivity {
         // get views
         etUserName = (EditText)findViewById(R.id.edit_username);
         etPassword = (EditText)findViewById(R.id.edit_password);
-        cvLogin = (CardView)findViewById(R.id.btn_login);
-        cvRegister = (CardView)findViewById(R.id.btn_register);
+        tvLogin = (TextView)findViewById(R.id.btn_login);
+        tvRegister = (TextView)findViewById(R.id.btn_register);
 
         // listeners
-        cvLogin.setOnClickListener(new View.OnClickListener() {
+        tvLogin.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 if(etUserName.getText().toString().length() == 0 || etUserName.getText().toString().length() > 30
@@ -102,7 +102,7 @@ public class UserLoginActivity extends AppCompatActivity {
             }
         });
 
-        cvRegister.setOnClickListener(new View.OnClickListener() {
+        tvRegister.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 new MaterialDialog.Builder(UserLoginActivity.this)
@@ -180,7 +180,7 @@ public class UserLoginActivity extends AppCompatActivity {
             super.onPostExecute(i);
 
             md.dismiss();
-            Toast.makeText(MyApp.getContext(),"session=" + LightUserSession.getSession(), Toast.LENGTH_SHORT).show();
+            //  Toast.makeText(MyApp.getContext(),"session=" + LightUserSession.getSession(), Toast.LENGTH_SHORT).show();
             switch(i) {
                 case SYSTEM_1_SUCCEEDED:
                     Toast.makeText(MyApp.getContext(), getResources().getString(R.string.system_logged), Toast.LENGTH_SHORT).show();

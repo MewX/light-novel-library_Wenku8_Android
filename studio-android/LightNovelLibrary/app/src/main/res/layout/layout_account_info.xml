@@ -20,8 +20,8 @@
 
             <com.makeramen.roundedimageview.RoundedImageView
                 android:id="@+id/userinfo_avatar"
-                android:layout_height="160dp"
-                android:layout_width="160dp"
+                android:layout_height="132dp"
+                android:layout_width="132dp"
                 android:src="@drawable/ic_noavatar"
                 android:scaleType="fitXY"
                 app:riv_corner_radius="24dp"
@@ -138,16 +138,15 @@
                 android:layout_marginBottom="16dp">
 
                 <android.support.v7.widget.CardView
-                    android:id="@+id/btn_logout"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:clickable="true"
                     app:cardBackgroundColor="@color/novel_item_white"
                     app:cardElevation="2dp"
                     app:cardUseCompatPadding="true"
                     app:cardMaxElevation="2dp">
 
                     <TextView
+                        android:id="@+id/btn_logout"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:gravity="center"
@@ -159,6 +158,7 @@
                         android:background="@drawable/btn_menu_item"
                         android:text="@string/login_logout"
                         android:singleLine="true"
+                        android:clickable="true"
                         android:textColor="@color/login_btn_dark" />
                 </android.support.v7.widget.CardView>
             </RelativeLayout>

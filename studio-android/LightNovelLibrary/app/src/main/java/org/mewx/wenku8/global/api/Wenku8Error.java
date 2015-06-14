@@ -29,6 +29,7 @@ public class Wenku8Error {
         NETWORK_ERROR,
         STRING_CONVERSION_ERROR,
         XML_PARSE_FAILED,
+        USER_CANCELLED_TASK,
     }
 
     public static String translateErrorCode(ErrorCode ec) {
@@ -38,18 +39,18 @@ public class Wenku8Error {
 
     public static ErrorCode getSystemDefinedErrorCode(int err) {
         /*
-        0?请求发生错误
-        1?成功(登陆、添加、删除、发帖)
-        2?用户名错误
-        3?密码错误
-        4?请先登陆
-        5?已经在书架
-        6?书架已满
-        7?小说不在书架
-        8?回复帖子主题不存在
-        9?签到失败
-        10?推荐失败
-        11?帖子发送失败
+        0 请求发生错误
+        1 成功(登陆、添加、删除、发帖)
+        2 用户名错误
+        3 密码错误
+        4 请先登陆
+        5 已经在书架
+        6 书架已满
+        7 小说不在书架
+        8 回复帖子主题不存在
+        9 签到失败
+        10 推荐失败
+        11 帖子发送失败
         22 refer page 0
         */
 

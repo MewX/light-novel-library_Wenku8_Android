@@ -166,10 +166,16 @@ public class SearchActivity extends AppCompatActivity implements MyItemClickList
     }
 
     @Override
-    public void onItemClick(View view, final int postion) {
+    public void onItemClick(View view, final int position) {
         //Toast.makeText(this,postion+"",Toast.LENGTH_SHORT).show();
-        toolbarSearchView.setText(historyList.get(postion)); // copy text to editText
-        toolbarSearchView.setSelection(historyList.get(postion).length()); // move cursor
+        if(position < 0 || position >= historyList.size()) {
+            // ArrayIndexOutOfBoundsException
+            Toast.makeText(this, "ArrayIndexOutOfBoundsException: " + position + " in size " + historyList.size(), Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        toolbarSearchView.setText(historyList.get(position)); // copy text to editText
+        toolbarSearchView.setSelection(historyList.get(position).length()); // move cursor
     }
 
     @Override
@@ -189,7 +195,8 @@ public class SearchActivity extends AppCompatActivity implements MyItemClickList
                 .contentColorRes(R.color.dlgContentColor)
                 .positiveColorRes(R.color.dlgPositiveButtonColor)
                 .negativeColorRes(R.color.dlgNegativeButtonColor)
-                .content(getResources().getString(R.string.dialog_content_delete_one_search_record) + "\n" + historyList.get(postion))
+                .title(getResources().getString(R.string.dialog_content_delete_one_search_record))
+                .content(historyList.get(postion))
                 .contentGravity(GravityEnum.CENTER)
                 .positiveText(R.string.dialog_positive_likethis)
                 .negativeText(R.string.dialog_negative_preferno)
