@@ -141,6 +141,7 @@ public class VerticalReaderActivity extends AppCompatActivity {
                         pDialog = null;
                     }
                 })
+                .titleColor(R.color.default_text_color_black)
                 .show();
 
         pDialog.setProgress(0);
@@ -332,6 +333,7 @@ public class VerticalReaderActivity extends AppCompatActivity {
                             }
                         })
                         .theme(Theme.LIGHT)
+                        .titleColor(R.color.default_text_color_black)
                         .backgroundColorRes(R.color.dlgBackgroundColor)
                         .contentColorRes(R.color.dlgContentColor)
                         .positiveColorRes(R.color.dlgPositiveButtonColor)
@@ -340,7 +342,7 @@ public class VerticalReaderActivity extends AppCompatActivity {
                         .content(R.string.sorry_old_engine_jump)
                         .contentGravity(GravityEnum.CENTER)
                         .positiveText(R.string.dialog_positive_sure)
-                        .negativeText(R.string.dialog_negative_preferno)
+                        .negativeText(R.string.dialog_negative_biao)
                         .show();
             }
 

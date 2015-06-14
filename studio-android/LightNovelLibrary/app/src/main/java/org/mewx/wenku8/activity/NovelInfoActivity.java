@@ -528,12 +528,9 @@ public class NovelInfoActivity extends AppCompatActivity {
                     ni.fullIntro = new String(tempFullIntro, "UTF-8");
 
                     // write into saved file
-                    GlobalConfig.writeFullFileIntoSaveFolder("intro", param
-                            + "-intro.xml", introXml);
-                    GlobalConfig.writeFullFileIntoSaveFolder("intro", param
-                            + "-introfull.xml", ni.fullIntro);
-                    GlobalConfig.writeFullFileIntoSaveFolder("intro", param
-                            + "-volume.xml", volumeXml);
+                    GlobalConfig.writeFullFileIntoSaveFolder("intro", param + "-intro.xml", introXml);
+                    GlobalConfig.writeFullFileIntoSaveFolder("intro", param + "-introfull.xml", ni.fullIntro);
+                    GlobalConfig.writeFullFileIntoSaveFolder("intro", param + "-volume.xml", volumeXml);
 
                 } catch (UnsupportedEncodingException e) {
                     e.printStackTrace();
@@ -599,31 +596,16 @@ public class NovelInfoActivity extends AppCompatActivity {
                                                         + File.separator
                                                         + imgFileName)) {
                                             // neither of the file exist
-                                            byte[] fileContent = LightNetwork
-                                                    .LightHttpDownload(nc
-                                                            .get(i).content);
+                                            byte[] fileContent = LightNetwork.LightHttpDownload(nc.get(i).content);
                                             if (fileContent == null)
                                                 return -100; // network error
-                                            if (!LightCache
-                                                    .saveFile(
-                                                            GlobalConfig
-                                                                    .getFirstFullSaveFilePath()
-                                                                    + GlobalConfig.imgsSaveFolderName
-                                                                    + File.separator,
-                                                            imgFileName,
-                                                            fileContent, true)) // fail
-                                                // to
-                                                // first
-                                                // path
-                                                LightCache
-                                                        .saveFile(
-                                                                GlobalConfig
-                                                                        .getSecondFullSaveFilePath()
-                                                                        + GlobalConfig.imgsSaveFolderName
-                                                                        + File.separator,
-                                                                imgFileName,
-                                                                fileContent,
-                                                                true);
+                                            if (!LightCache.saveFile(GlobalConfig.getFirstFullSaveFilePath()
+                                                            + GlobalConfig.imgsSaveFolderName + File.separator,
+                                                    imgFileName, fileContent, true)) // fail
+                                                // to first path
+                                                LightCache.saveFile(GlobalConfig.getSecondFullSaveFilePath()
+                                                                + GlobalConfig.imgsSaveFolderName + File.separator,
+                                                        imgFileName, fileContent, true);
                                         }
 
                                         if (!isLoading)
@@ -653,7 +635,7 @@ public class NovelInfoActivity extends AppCompatActivity {
             return;
         }
 
-        protected void onPostExecute(Integer result)// 执行耗时操作之后处理UI线程事件
+        protected void onPostExecute(Integer result)
         {
             if (result == -222) {
                 // user cancelled
@@ -661,23 +643,27 @@ public class NovelInfoActivity extends AppCompatActivity {
                 if (pDialog != null)
                     pDialog.dismiss();
                 onResume();
+                isLoading = false;
                 return;
             } else if (result == -100) {
                 Toast.makeText(NovelInfoActivity.this, getResources().getString(R.string.system_network_error), Toast.LENGTH_LONG).show();
                 if (pDialog != null)
                     pDialog.dismiss();
                 onResume();
+                isLoading = false;
                 return;
             } else if (result == -101) {
                 Toast.makeText(NovelInfoActivity.this, "Parse failed!", Toast.LENGTH_LONG).show();
                 if (pDialog != null)
                     pDialog.dismiss();
                 onResume();
+                isLoading = false;
                 return;
             }
 
             // cache successfully
             Toast.makeText(NovelInfoActivity.this, "OK", Toast.LENGTH_LONG).show();
+            isLoading = false;
             if (pDialog != null)
                 pDialog.dismiss();
             onResume();

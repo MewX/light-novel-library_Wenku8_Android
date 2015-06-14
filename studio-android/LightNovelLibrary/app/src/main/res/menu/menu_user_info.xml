@@ -1,0 +1,10 @@
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    tools:context=".NovelInfoActivity">
+    <item
+    android:id="@+id/action_sign"
+    android:title="@string/action_sign"
+    android:icon="@drawable/ic_sign"
+    app:showAsAction="withText|ifRoom" />
+</menu>

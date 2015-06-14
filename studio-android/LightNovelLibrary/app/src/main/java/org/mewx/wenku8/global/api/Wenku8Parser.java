@@ -66,6 +66,23 @@ public class Wenku8Parser {
 
 
     static public NovelItemMeta parsetNovelFullMeta(String xml) {
+        // get full XML metadata of a novel, here is an example:
+        // -----------------------------------------------------
+        // <?xml version="1.0" encoding="utf-8"?>
+        // <metadata>
+        // <data name="Title" aid="1306"><![CDATA[向森之魔物献上花束(向森林的魔兽少女献花)]]></data>
+        // <data name="Author" value="小木君人"/>
+        // <data name="DayHitsCount" value="26"/>
+        // <data name="TotalHitsCount" value="43984"/>
+        // <data name="PushCount" value="1735"/>
+        // <data name="FavCount" value="848"/>
+        // <data name="PressId" value="小学馆" sid="10"/>
+        // <data name="BookStatus" value="已完成"/>
+        // <data name="BookLength" value="105985"/>
+        // <data name="LastUpdate" value="2012-11-02"/>
+        // <data name="LatestSection" cid="41897"><![CDATA[第一卷 插图]]></data>
+        // </metadata>
+
         try {
             XmlPullParserFactory factory = XmlPullParserFactory.newInstance();
             XmlPullParser xmlPullParser = factory.newPullParser();

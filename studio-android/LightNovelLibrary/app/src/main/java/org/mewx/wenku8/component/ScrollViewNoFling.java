@@ -30,7 +30,7 @@ public class ScrollViewNoFling extends ScrollView {
     /*Scroll view is no longer gonna handle scroll velocity.
      * super.fling(velocityY);
     */
-        super.fling(velocityY / 4);
+        super.fling(velocityY / 3);
     }
 
 }

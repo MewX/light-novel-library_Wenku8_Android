@@ -2,8 +2,13 @@ package org.mewx.wenku8.fragment;
 
 import android.annotation.TargetApi;
 import android.app.Fragment;
+import android.content.DialogInterface;
+import android.content.Intent;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.os.Build;
 import android.os.Bundle;
+import android.provider.Settings;
 import android.support.annotation.Nullable;
 import android.support.v4.widget.DrawerLayout;
 import android.support.v7.app.ActionBarDrawerToggle;
@@ -15,15 +20,24 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageButton;
 import android.widget.LinearLayout;
+import android.widget.RelativeLayout;
 import android.widget.TableRow;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.android.volley.toolbox.ImageLoader;
+import com.makeramen.roundedimageview.RoundedImageView;
 import com.umeng.analytics.MobclickAgent;
 
 import org.mewx.wenku8.R;
 import org.mewx.wenku8.activity.MainActivity;
+import org.mewx.wenku8.activity.UserInfoActivity;
+import org.mewx.wenku8.activity.UserLoginActivity;
 import org.mewx.wenku8.global.GlobalConfig;
+import org.mewx.wenku8.global.api.Wenku8API;
+import org.mewx.wenku8.util.LightCache;
+import org.mewx.wenku8.util.LightUserSession;
+import org.w3c.dom.Text;
 
 @TargetApi(16)
 public class NavigationDrawerFragment extends Fragment {
@@ -32,6 +46,8 @@ public class NavigationDrawerFragment extends Fragment {
     private MainActivity mainActivity = null;
     private DrawerLayout mDrawerLayout;
     private ActionBarDrawerToggle mActionBarDrawerToggle;
+    private TextView tvUserName;
+    private RoundedImageView rivUserAvatar;
 
     private boolean fakeDarkSwitcher = false;
 
@@ -141,6 +157,38 @@ public class NavigationDrawerFragment extends Fragment {
             Toast.makeText(mainActivity, "NullPointerException in onActivityCreated();", Toast.LENGTH_SHORT).show();
             e.printStackTrace();
         }
+
+        // User Account
+        RelativeLayout rlBackground = (RelativeLayout)getActivity().findViewById(R.id.top_background);
+        rivUserAvatar = (RoundedImageView)getActivity().findViewById(R.id.user_avatar);
+        tvUserName = (TextView)getActivity().findViewById(R.id.user_name);
+
+        View.OnClickListener ocl = new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if(!LightUserSession.getLogStatus() && GlobalConfig.isNetworkAvailable(getActivity())) {
+                    if(!LightUserSession.isUserInfoSet()) {
+                        Intent intent = new Intent(getActivity(), UserLoginActivity.class);
+                        startActivity(intent);
+                    }
+                    else {
+                        // show dialog to login, error to jump to login activity
+                        LightUserSession.aiui.execute();
+                    }
+                }
+                else if(!GlobalConfig.isNetworkAvailable(getActivity())) {
+                    // no network, no log in
+                    Toast.makeText(getActivity(), getResources().getString(R.string.system_network_error), Toast.LENGTH_SHORT).show();
+                }
+                else {
+                    // Logged, click to info page
+                    Intent intent = new Intent(getActivity(), UserInfoActivity.class);
+                    startActivity(intent);
+                }
+            }
+        };
+        rivUserAvatar.setOnClickListener(ocl);
+        tvUserName.setOnClickListener(ocl);
 
         // Initial: set color states here ...
         // get net work status, no net -> FAV
@@ -472,6 +520,29 @@ public class NavigationDrawerFragment extends Fragment {
         super.onResume();
         MobclickAgent.onPageStart(TAG);
 
+        // user info update
+        if(LightUserSession.isUserInfoSet() && !tvUserName.getText().toString().equals(LightUserSession.getUsername())
+                && (LightCache.testFileExist(GlobalConfig.getFirstUserAvatarSaveFilePath())
+                || LightCache.testFileExist(GlobalConfig.getSecondUserAvatarSaveFilePath()))) {
+            tvUserName.setText(LightUserSession.getUsername());
+
+            String avatarPath;
+            if(LightCache.testFileExist(GlobalConfig.getFirstUserAvatarSaveFilePath()))
+                avatarPath = GlobalConfig.getFirstUserAvatarSaveFilePath();
+            else
+                avatarPath = GlobalConfig.getSecondUserAvatarSaveFilePath();
+            BitmapFactory.Options options = new BitmapFactory.Options();
+            options.inSampleSize = 2;
+            Bitmap bm = BitmapFactory.decodeFile(avatarPath, options);
+            if(bm != null)
+                rivUserAvatar.setImageBitmap(bm);
+        }
+        else if(!LightUserSession.isUserInfoSet()) {
+            tvUserName.setText(getResources().getString(R.string.main_menu_not_login));
+            rivUserAvatar.setImageDrawable(getResources().getDrawable(R.drawable.ic_noavatar));
+        }
+
+        // test navigation bar exist
         boolean hasBackKey = KeyCharacterMap.deviceHasKey(KeyEvent.KEYCODE_BACK);
         boolean hasHomeKey = KeyCharacterMap.deviceHasKey(KeyEvent.KEYCODE_HOME);
         if (hasBackKey && hasHomeKey) {

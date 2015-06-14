@@ -30,16 +30,21 @@
 
         <!-- Activity list -->
         <activity
-            android:name="org.mewx.wenku8.activity.MainActivity"
+            android:name="org.mewx.wenku8.activity.WelcomeActivity"
             android:label="@string/app_name"
             android:screenOrientation="portrait">
 
-            <!-- Main Activity -->
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+        </activity>
 
+        <!-- Main Activity -->
+        <activity
+            android:name="org.mewx.wenku8.activity.MainActivity"
+            android:label="@string/app_name"
+            android:screenOrientation="portrait">
         </activity>
 
         <!-- Search Activity -->
@@ -69,6 +74,18 @@
         <!-- Novel Content Activity (Vertical Old Engine) -->
         <activity android:name=".activity.VerticalReaderActivity"
             android:label="@string/action_old_vertical_reader"
+            android:screenOrientation="portrait">
+        </activity>
+
+        <!-- User Login Activity -->
+        <activity android:name=".activity.UserLoginActivity"
+            android:label="@string/action_user_login"
+            android:screenOrientation="portrait">
+        </activity>
+
+        <!-- User Info Activity -->
+        <activity android:name=".activity.UserInfoActivity"
+            android:label="@string/action_user_info"
             android:screenOrientation="portrait">
         </activity>
 

@@ -73,6 +73,10 @@
             android:layout_marginLeft="32dp"
             android:layout_marginStart="32dp"
             android:layout_marginBottom="16dp"
+            android:shadowColor="#000"
+            android:shadowDx="3.0"
+            android:shadowDy="3.0"
+            android:shadowRadius="2.0"
             android:clickable="true"/>
     </RelativeLayout>
 

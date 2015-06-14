@@ -35,6 +35,7 @@ public class GlobalConfig {
     private static final String saveReadSavesFileName = "read_saves.wk8";
     private static final String saveLocalBookshelfFileName = "bookshelf_local.wk8";
     private static final String saveUserAccountFileName = "cert.wk8"; // certification file
+    private static final String saveUserAvatarFileName = "avatar.jpg";
     private static int maxSearchHistory = 10; // default
 
     // vars
@@ -176,6 +177,14 @@ public class GlobalConfig {
         return getSecondFullSaveFilePath() + saveUserAccountFileName;
     }
 
+    public static String getFirstUserAvatarSaveFilePath() {
+        return getFirstFullSaveFilePath() + saveUserAvatarFileName;
+    }
+
+    public static String getSecondUserAvatarSaveFilePath() {
+        return getSecondFullSaveFilePath() + saveUserAvatarFileName;
+    }
+
     /**
      * Extract image name.
      * @param url <!--image-->http://pic.wenku8.cn/pictures/1/1305/41759/50471.jpg<!--image-->
@@ -203,7 +212,6 @@ public class GlobalConfig {
                 h = new String(LightCache.loadFile(getFirstStoragePath()
                         + saveFolderName + File.separator + FileName), "UTF-8");
             } catch (UnsupportedEncodingException e) {
-                // TODO Auto-generated catch block
                 e.printStackTrace();
             }
 
@@ -213,7 +221,6 @@ public class GlobalConfig {
                 h = new String(LightCache.loadFile(getSecondStoragePath()
                         + saveFolderName + File.separator + FileName), "UTF-8");
             } catch (UnsupportedEncodingException e) {
-                // TODO Auto-generated catch block
                 e.printStackTrace();
             }
 

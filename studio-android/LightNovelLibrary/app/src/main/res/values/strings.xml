@@ -3,6 +3,10 @@
 
     <string name="app_name">轻小说文库·预览版</string>
     <string name="app_description">与轻小说文库(Wenku8.cn)合作的轻小说阅读app。</string>
+    <string name="app_architect">MewX</string>
+    <string name="app_ui_designer">ZERO</string>
+    <string name="app_architect_text">Architect</string>
+    <string name="app_ui_designer_text">UI-Designer</string>
     <string name="navigation_drawer_open">Open navigation drawer</string>
     <string name="navigation_drawer_close">Close navigation drawer</string>
     <string name="error_unknown">未知错误，请将触发步骤反馈给开发者。</string>
@@ -28,6 +32,9 @@
     <string name="action_continue_read_progress">继续上次阅读进度</string>
     <string name="action_chapter_list">章节列表</string>
     <string name="action_old_vertical_reader">旧引擎阅读界面</string>
+    <string name="action_user_login">Wenku8账号登录</string>
+    <string name="action_user_info">账号信息</string>
+    <string name="action_sign">签到</string>
     <string name="title_search">搜索：</string>
     <string name="main_menu_rklist">排行榜</string>
     <string name="main_menu_latest">最近更新</string>
@@ -48,7 +55,7 @@
     <string name="main_menu_config">设置</string>
     <string name="main_menu_statement">开源声明</string>
     <string name="main_menu_dark_mode_switcher">夜间/白天</string>
-    <string name="main_menu_not_login">[未登录]</string>
+    <string name="main_menu_not_login">未登录</string>
     <string name="hello_blank_fragment">Hello blank fragment</string>
     <string name="novel_item_author_with_colon">小说作者：</string>
     <string name="na">N/A</string>
@@ -63,14 +70,23 @@
     <string name="system_manually_cancelled">任务已被手动取消</string>
     <string name="system_loading_please_wait">加载中……请稍后再试</string>
     <string name="system_fav_it_first">请先收藏后再下载！</string>
+    <string name="system_choose_browser">选择你的本命浏览器吧！</string>
+    <string name="system_info_fill_not_complete">这么奇葩的表单你就忍心提交上去吗\n〒_〒</string>
+    <string name="system_logging_in">正在与服务器进行契约……</string>
+    <string name="system_logged">契约完成！</string>
+    <string name="system_username_error">契约失败，魔法师你的名字不是真名！（用户名不存在）</string>
+    <string name="system_password_error">契约失败，发现冒牌魔法师！（密码错误）</string>
+    <string name="system_log_info_outofdate">登录信息已经改变，登陆失败！</string>
+    <string name="system_fetching">正在从服务器获取信息……</string>
     <string name="task_stop">停止加载</string>
     <string name="task_retry">重新加载</string>
     <string name="task_null">没有结果</string>
     <string name="dialog_content_delete_one_search_record">确定要删除该搜索历史吗？\n</string>
     <string name="dialog_content_load_from_cloud">该章节未缓存，是否立即联网阅读？</string>
-    <string name="dialog_content_verify_download">确定要开始联网下载该书吗？（高清原图也会下载）</string>
+    <string name="dialog_content_verify_download">确定要开始联网下载该书吗？\n（高清原图也会下载）</string>
+    <string name="dialog_content_verify_register">注册需要去wenku8.cn进行。\n是否打开浏览器去注册？</string>
     <string name="dialog_content_downloading">正在缓存……</string>
-    <string name="dialog_content_sure_to_unfav">确定要取消收藏？</string>
+    <string name="dialog_content_sure_to_unfav">确定要取消收藏？\n（缓存的小说内容也会删除）</string>
     <string name="dialog_positive_ok">OK</string>
     <string name="dialog_positive_want">要</string>
     <string name="dialog_positive_sure">好滴~</string>
@@ -78,6 +94,7 @@
     <string name="dialog_positive_likethis">就这样吧</string>
     <string name="dialog_negative_no">不要</string>
     <string name="dialog_negative_preferno">还是不了</string>
+    <string name="dialog_negative_biao">嫑 >3&lt;</string>
     <string name="dialog_negative_pass">算了吧</string>
     <string name="fab_favorate">收藏</string>
     <string name="fab_download">下载</string>
@@ -93,6 +110,7 @@
     <string name="login_password">密码</string>
     <string name="login_login">登录</string>
     <string name="login_register">注册</string>
+    <string name="login_logout">登出账号</string>
     <string name="press_twice_to_exit"><b>退出请再戳一下返回键哦～</b>\n&lt;(=～￣▽￣)→)￣▽￣=)>o </string>
     <string name="sorry">客官你不要心急啊，你急臣妾也做不到呀，现在代码量已经比之前版本大很多了~请体谅。而且主框架搭的差不多了，后面逻辑快很多，一有时间就好办！</string>
     <string name="sorry_old_engine_no_image_preview">旧的引擎暂不可查看大图</string>
@@ -105,4 +123,11 @@
     <string name="bookshelf_removed">已取消收藏！</string>
     <string name="bookshelf_added">成功添加到收藏！</string>
     <string name="bookshelf_intro_load_failed">小说信息读取失败，此小说信息需要手动同步。</string>
+    <string name="userinfo_username">用户名</string>
+    <string name="userinfo_nickyname">昵称</string>
+    <string name="userinfo_score">可用积分</string>
+    <string name="userinfo_experience">经验值</string>
+    <string name="userinfo_rank">头衔</string>
+    <string name="userinfo_sign_successful">签到成功\n（积分更新大约有10分钟缓冲）</string>
+    <string name="userinfo_sign_failed">然而再怎么点也没什么卵用，一天只能签到一次的。\n╮（╯＿╰）╭</string>
 </resources>

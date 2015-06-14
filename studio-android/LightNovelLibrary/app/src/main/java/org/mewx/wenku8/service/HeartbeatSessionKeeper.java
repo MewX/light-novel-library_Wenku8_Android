@@ -3,6 +3,11 @@ package org.mewx.wenku8.service;
 import android.app.Service;
 import android.content.Intent;
 import android.os.IBinder;
+import android.widget.Toast;
+
+import org.mewx.wenku8.MyApp;
+import org.mewx.wenku8.global.api.Wenku8Error;
+import org.mewx.wenku8.util.LightUserSession;
 
 import java.util.Timer;
 import java.util.TimerTask;
@@ -11,7 +16,7 @@ import java.util.TimerTask;
  * Created by MewX on 2015/5/17.
  */
 public class HeartbeatSessionKeeper extends Service {
-    private int interval = 10 * 60 * 1000;
+    private int interval = 10 * 1000; //60 *
     private Timer timer;
 
     /**
@@ -35,6 +40,8 @@ public class HeartbeatSessionKeeper extends Service {
             @Override
             public void run() {
                 // frequently request
+                Wenku8Error.ErrorCode err = LightUserSession.heartbeatLogin();
+                Toast.makeText(MyApp.getContext(), err.toString(), Toast.LENGTH_SHORT).show();
 
             }
         }, 0, interval);

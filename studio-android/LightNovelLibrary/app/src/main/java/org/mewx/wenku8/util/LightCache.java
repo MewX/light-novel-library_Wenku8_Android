@@ -51,21 +51,14 @@ public class LightCache {
 		return null;
 	}
 
-	public static boolean saveFile(String path, String fileName, byte[] bs,
-			boolean forceUpdate) {
+	public static boolean saveFile(String path, String fileName, byte[] bs, boolean forceUpdate) {
 		// if forceUpdate == true then update the file
 		File file = new File(path);
 		file.mkdirs();
 
-		file = new File(
-				path
-						+ (path.charAt(path.length() - 1) != File.separatorChar ? File.separator
-								: "") + fileName);
+		file = new File(path + (path.charAt(path.length() - 1) != File.separatorChar ? File.separator : "") + fileName);
 		Log.v("MewX-File",
-				"Path: "
-						+ path
-						+ (path.charAt(path.length() - 1) != File.separatorChar ? File.separator
-								: "") + fileName);
+				"Path: " + path + (path.charAt(path.length() - 1) != File.separatorChar ? File.separator : "") + fileName);
 		if (!file.exists() || forceUpdate) {
 			if (file.exists() && !file.isFile()) {
 				Log.v("MewX-File", "Write failed0");
@@ -94,7 +87,46 @@ public class LightCache {
 				Log.v("MewX-File", "Write successfully");
 				return true;
 			} catch (IOException e) {
-				// TODO Auto-generated catch block
+				e.printStackTrace();
+				return false;
+			}
+
+		}
+		return true; // say it successful
+	}
+
+	public static boolean saveFile(String filepath, byte[] bs, boolean forceUpdate) {
+		// if forceUpdate == true then update the file
+		File file = new File(filepath);
+		Log.v("MewX-File", "Path: " + filepath);
+		if (!file.exists() || forceUpdate) {
+			if (file.exists() && !file.isFile()) {
+				Log.v("MewX-File", "Write failed0");
+				return false; // is not a file
+			}
+
+			try {
+				file.createNewFile(); // create file
+
+				FileOutputStream out = new FileOutputStream(file); // trunc
+				if (out == null) {
+					Log.v("MewX-File", "Write failed1");
+					return false;
+				}
+				DataOutputStream dos = new DataOutputStream(out);
+				if (dos == null) {
+					Log.v("MewX-File", "Write failed2");
+					return false;
+				}
+
+				// write all
+				dos.write(bs);
+
+				dos.close();
+				out.close();
+				Log.v("MewX-File", "Write successfully");
+				return true;
+			} catch (IOException e) {
 				e.printStackTrace();
 				return false;
 			}
@@ -113,6 +145,17 @@ public class LightCache {
 				path
 						+ (path.charAt(path.length() - 1) != File.separatorChar ? File.separator
 								: "") + fileName);
+
+		if (file.delete()) {
+			Log.v("MewX-File", "Delete successfully");
+			return true;
+		} else
+			return false;
+	}
+
+	public static boolean deleteFile(String filepath) {
+		Log.v("MewX-File", "Path: " + filepath);
+		File file = new File(filepath);
 
 		if (file.delete()) {
 			Log.v("MewX-File", "Delete successfully");

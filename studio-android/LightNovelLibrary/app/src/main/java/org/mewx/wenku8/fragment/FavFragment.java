@@ -24,6 +24,7 @@ import org.mewx.wenku8.global.api.NovelItemMeta;
 import org.mewx.wenku8.global.api.Wenku8Parser;
 import org.mewx.wenku8.listener.MyItemClickListener;
 import org.mewx.wenku8.listener.MyItemLongClickListener;
+import org.mewx.wenku8.util.LightUserSession;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -82,12 +83,6 @@ public class FavFragment extends Fragment implements MyItemClickListener, MyItem
                 return 0;
             }
         }); // an empty one?
-
-        // load all info to recycler view
-        listNovelItemAid = GlobalConfig.getLocalBookshelfList();
-        listNovelItemInfo = new ArrayList<NovelItemInfoUpdate>();
-        AsyncLoadAllLocal alal = new AsyncLoadAllLocal();
-        alal.execute();
 
         return rootView;
     }
@@ -153,6 +148,14 @@ public class FavFragment extends Fragment implements MyItemClickListener, MyItem
                     return -1;
                 listNovelItemInfo.add(niiu);
             }
+
+            // publish first, then download network list
+            if(LightUserSession.getLogStatus()) {
+                // logged in, fetch
+
+            }
+
+            // then upload all local books
 
             return 0;
         }

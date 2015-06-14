@@ -25,16 +25,21 @@ public class LightBase64 {
         try {
 			return EncodeBase64( s.getBytes("UTF-8") );
 		} catch (UnsupportedEncodingException e) {
-			// TODO Auto-generated catch block
 			e.printStackTrace();
 			return null;
 		}
 	}
 	
 	static public byte[ ] DecodeBase64( String s ) {
-		byte[] b;
-        b = Base64.decode( s, Base64.DEFAULT);
-        return b;
+		try {
+			byte[] b;
+			b = Base64.decode(s, Base64.DEFAULT);
+			return b;
+		}
+		catch (Exception e) {
+			e.printStackTrace();
+			return null;
+		}
 	}
 
 	static public String DecodeBase64String(String s) {

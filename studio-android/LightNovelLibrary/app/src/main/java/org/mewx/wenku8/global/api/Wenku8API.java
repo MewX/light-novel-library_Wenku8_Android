@@ -20,6 +20,7 @@ public class Wenku8API {
      * Basic definitions
      */
 
+    final public static String RegisterURL = "http://www.wenku8.cn/register.php";
     final private static String BaseURL = "http://app.wenku8.cn/android.php";
     final private static String NovelFinishedSC = "已完成", NovelFinishedTC = "已完成",
             NovelNotFinishedSC = "连载中", NovelNotFinishedTC = "連載中";
@@ -252,21 +253,20 @@ public class Wenku8API {
      * This part are the old API writing ways.
      * It's not efficient enough, and maybe bug-hidden.
      */
-
     private static Map<String,String> getEncryptedMAP(String str) {
         Map<String, String> params = new HashMap<String, String>();
-        params.put("request", LightBase64.EncodeBase64(str));
+        params.put("request", LightBase64.EncodeBase64(str+"&timetoken="+System.currentTimeMillis()));
         return params;
     }
 
     private static NameValuePair getEncryptedNVP(String str) {
         // This funtion achieve the encryption and return the NVP
-        return new BasicNameValuePair("request", LightBase64.EncodeBase64(str));
+        return new BasicNameValuePair("request", LightBase64.EncodeBase64(str+"&timetoken="+System.currentTimeMillis()));
     }
 
     private static ContentValues getEncryptedCV(String str) {
         ContentValues cv = new ContentValues();
-        cv.put("request",LightBase64.EncodeBase64(str));
+        cv.put("request",LightBase64.EncodeBase64(str+"&timetoken="+System.currentTimeMillis()));
         return cv;
     }
 
@@ -573,10 +573,14 @@ public class Wenku8API {
      * This part is user related, and is using the latest API 22 features.
      * Banned NameValuePair, HttpPost.
      */
-
     public static ContentValues getUserLoginParams(String username, String password) {
         // 使用session方式判断是否已登录（是否可以用来作心跳包）
         return getEncryptedCV("action=login&username=" + LightNetwork.encodeToHttp(username) + "&password=" + password);
+    }
+
+    public static ContentValues getUserAvatar( ) {
+        // return jpeg raw data
+        return getEncryptedCV("action=avatar");
     }
 
     public static ContentValues getUserLogoutParams( ) {
@@ -584,10 +588,23 @@ public class Wenku8API {
     }
 
     public static ContentValues getUserInfoParams( ) {
+        /**
+         * <?xml version="1.0" encoding="utf-8"?>
+         * <metadata>
+         * <item name="uname"><![CDATA[apptest]]></item>
+         * <item name="nickname"><![CDATA[apptest]]></item>
+         * <item name="score">10</item>
+         * <item name="experience">10</item>
+         * <item name="rank"><![CDATA[新手上路]]></item>
+         * </metadata>
+         */
         return getEncryptedCV("action=userinfo");
     }
 
     public static ContentValues getUserSignParams( ) {
+        /**
+         * _cb({"ret":0});
+         */
         return getEncryptedCV("action=block&do=sign"); // 增加一个积分/天
     }
 
@@ -599,8 +616,43 @@ public class Wenku8API {
     public static ContentValues getBookshelfListParams(LANG l) {
         // 查询书架列表
 
-        // Return:
-        //
+        // find "aid", find first \" to second \"
+        /**
+         * <?xml version="1.0" encoding="utf-8"?>
+         * <metadata>
+         *
+         * <book aid="1499" date="2015-04-19">
+         * <name><![CDATA[時鐘機關之星Clockwork Planet]]></name>
+         * <chapter cid="64896"><![CDATA[插圖]]></chapter>
+         * </book>
+         *
+         * <book aid="1754" date="2014-12-05">
+         * <name><![CDATA[貓耳天使與戀愛蘋果]]></name>
+         * <chapter cid="60552"><![CDATA[插圖]]></chapter>
+         * </book>
+         *
+         * <book aid="1605" date="2014-05-06">
+         * <name><![CDATA[驚悚文集]]></name>
+         * <chapter cid="54722"><![CDATA[插圖]]></chapter>
+         * </book>
+         *
+         * <book aid="1483" date="2013-08-24">
+         * <name><![CDATA[茉建寺埃莉諾的非主流科學研究室]]></name>
+         * <chapter cid="49057"><![CDATA[插圖]]></chapter>
+         * </book>
+         *
+         * <book aid="1469" date="2013-08-05">
+         * <name><![CDATA[塔京靈魂術士]]></name>
+         * <chapter cid="48537"><![CDATA[插圖]]></chapter>
+         * </book>
+         *
+         * <book aid="1087" date="2013-05-15">
+         * <name><![CDATA[我的她是戰爭妖精]]></name>
+         * <chapter cid="46779"><![CDATA[插圖]]></chapter>
+         * </book>
+         *
+         * </metadata>
+         */
 
         return getEncryptedCV("action=bookcase&t=" + getLANG(l));
     }

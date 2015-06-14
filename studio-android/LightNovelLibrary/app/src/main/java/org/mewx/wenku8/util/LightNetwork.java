@@ -153,8 +153,11 @@ public class LightNetwork {
 			http = (HttpURLConnection) url.openConnection();
 			http.setRequestMethod("POST");
 			http.setRequestProperty("Accept-Encoding", "gzip"); // set gzip
-			http.setConnectTimeout(10000);
-			http.setReadTimeout(10000);
+			if(LightUserSession.getSession().length() != 0) {
+				http.setRequestProperty("Cookie", "PHPSESSID=" + LightUserSession.getSession());
+			}
+			http.setConnectTimeout(5000);
+			http.setReadTimeout(5000);
 			http.setDoOutput(true); // has input name value pair
 			http.setInstanceFollowRedirects(true); // enable redirects
 		} catch (Exception e) {
@@ -170,9 +173,9 @@ public class LightNetwork {
 		}
 
 		// request
-		byte[] bypes = params.toString().getBytes();
+		byte[] bytes = params.toString().getBytes();
 		try {
-			http.getOutputStream().write(bypes); // set args
+			http.getOutputStream().write(bytes); // set args
 
 			InputStream inStream=http.getInputStream(); // input stream
 			ByteArrayOutputStream outStream = new ByteArrayOutputStream(); // output stream
@@ -180,6 +183,14 @@ public class LightNetwork {
 			if(http.getContentEncoding() != null && http.getContentEncoding().toLowerCase().indexOf("gzip") >= 0) {
 				// using 'gzip'
 				inStream = new GZIPInputStream(new BufferedInputStream(inStream));
+			}
+
+			// get session, save it all the time, prevent getting new session id
+			if (http.getHeaderField("Set-Cookie") != null && http.getHeaderField("Set-Cookie").contains("PHPSESSID")) {
+				int index =http.getHeaderField("Set-Cookie").indexOf("PHPSESSID");
+				LightUserSession.setSession(
+						http.getHeaderField("Set-Cookie").substring(index + 9 + 1, http.getHeaderField("Set-Cookie").indexOf(";", index))
+				);
 			}
 
 			byte[] buffer = new byte[1024];
@@ -233,10 +244,21 @@ public class LightNetwork {
 			}
 
 		} catch (Exception e) {
-			// TODO Auto-generated catch block
 			e.printStackTrace();
 			return null;
 		}
+	}
+
+	/**
+	 * Download to file, part by part, prevent OOM error.
+	 * @param url
+	 * @param filepath
+	 * @return
+	 */
+	public static boolean LightHttpDownloadToFile(String url, String filepath) {
+
+
+		return false;
 	}
 
 }
