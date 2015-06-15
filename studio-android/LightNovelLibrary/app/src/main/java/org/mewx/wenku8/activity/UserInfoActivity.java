@@ -166,13 +166,11 @@ public class UserInfoActivity extends AppCompatActivity {
             md.dismiss();
             if(operation == 1) {
                 // fetch from sign
-                if(errorCode == Wenku8Error.ErrorCode.SYSTEM_9_SIGN_FAILED) {
+                if(errorCode == Wenku8Error.ErrorCode.SYSTEM_9_SIGN_FAILED)
                     Toast.makeText(UserInfoActivity.this, getResources().getString(R.string.userinfo_sign_failed), Toast.LENGTH_SHORT).show();
-                    return;
-                }
-                else {
+                else
                     Toast.makeText(UserInfoActivity.this, getResources().getString(R.string.userinfo_sign_successful), Toast.LENGTH_SHORT).show();
-                }
+                return; // just return
             }
 
             if(errorCode == Wenku8Error.ErrorCode.SYSTEM_1_SUCCEEDED) {
@@ -220,8 +218,10 @@ public class UserInfoActivity extends AppCompatActivity {
                     }
                 });
             }
-            else
+            else {
                 Toast.makeText(UserInfoActivity.this, errorCode.toString(), Toast.LENGTH_SHORT).show();
+                UserInfoActivity.this.finish(); // end dialog
+            }
         }
     }
 

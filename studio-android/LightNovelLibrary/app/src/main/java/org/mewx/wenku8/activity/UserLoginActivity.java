@@ -3,6 +3,8 @@ package org.mewx.wenku8.activity;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.graphics.PorterDuff;
 import android.graphics.drawable.Drawable;
 import android.net.Uri;
@@ -36,6 +38,7 @@ import org.mewx.wenku8.util.LightCache;
 import org.mewx.wenku8.util.LightNetwork;
 import org.mewx.wenku8.util.LightUserSession;
 
+import java.io.ByteArrayOutputStream;
 import java.io.UnsupportedEncodingException;
 import java.math.RoundingMode;
 
@@ -166,7 +169,14 @@ public class UserLoginActivity extends AppCompatActivity {
             if(we == Wenku8Error.ErrorCode.SYSTEM_1_SUCCEEDED) {
                 // fetch avatar
                 byte[] b = LightNetwork.LightHttpPostConnection(Wenku8API.getBaseURL(), Wenku8API.getUserAvatar());
-                if(b != null) {
+                if(b == null) {
+                    Bitmap bmp = BitmapFactory.decodeResource(getResources(), R.drawable.ic_noavatar);
+                    ByteArrayOutputStream baos = new ByteArrayOutputStream();
+                    bmp.compress(Bitmap.CompressFormat.JPEG, 100, baos);
+                    if(!LightCache.saveFile(GlobalConfig.getFirstUserAvatarSaveFilePath(), baos.toByteArray(), true))
+                        LightCache.saveFile(GlobalConfig.getSecondUserAvatarSaveFilePath(), baos.toByteArray(), true);
+                }
+                else {
                     if(!LightCache.saveFile(GlobalConfig.getFirstUserAvatarSaveFilePath(), b, true))
                         LightCache.saveFile(GlobalConfig.getSecondUserAvatarSaveFilePath(), b, true);
                 }

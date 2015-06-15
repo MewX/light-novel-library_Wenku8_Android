@@ -7,6 +7,7 @@ import android.graphics.drawable.Drawable;
 import android.os.AsyncTask;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
 import android.view.LayoutInflater;
@@ -170,6 +171,28 @@ public class NovelInfoActivity extends AppCompatActivity {
                 // Collapse the fam
                 if (famMenu.isExpanded())
                     famMenu.collapse();
+            }
+        });
+        tvNovelTitle.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if(isLoading) {
+                    Toast.makeText(NovelInfoActivity.this, getResources().getString(R.string.system_loading_please_wait), Toast.LENGTH_SHORT).show();
+                    return;
+                }
+
+                // show aid: title
+                new MaterialDialog.Builder(NovelInfoActivity.this)
+                        .theme(Theme.LIGHT)
+                        .titleColor(R.color.default_text_color_black)
+                        .backgroundColorRes(R.color.dlgBackgroundColor)
+                        .contentColorRes(R.color.dlgContentColor)
+                        .positiveColorRes(R.color.dlgPositiveButtonColor)
+                        .title(R.string.dialog_content_novel_title)
+                        .content(aid + ": " + mNovelItemMeta.title)
+                        .contentGravity(GravityEnum.CENTER)
+                        .positiveText(R.string.dialog_positive_known)
+                        .show();
             }
         });
         fabFavorate.setOnClickListener(new View.OnClickListener() {

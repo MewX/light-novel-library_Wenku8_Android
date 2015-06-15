@@ -6,6 +6,7 @@ import android.content.DialogInterface;
 import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.os.AsyncTask;
 import android.os.Build;
 import android.os.Bundle;
 import android.provider.Settings;
@@ -173,7 +174,10 @@ public class NavigationDrawerFragment extends Fragment {
                     }
                     else {
                         // show dialog to login, error to jump to login activity
-                        LightUserSession.aiui.execute();
+                        if(LightUserSession.aiui.getStatus() == AsyncTask.Status.FINISHED) {
+                            LightUserSession.aiui = new LightUserSession.AsyncInitUserInfo();
+                            LightUserSession.aiui.execute();
+                        }
                     }
                 }
                 else if(!GlobalConfig.isNetworkAvailable(getActivity())) {

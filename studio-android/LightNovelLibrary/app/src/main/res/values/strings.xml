@@ -89,11 +89,13 @@
     <string name="dialog_content_sure_to_unfav">确定要取消收藏？\n（缓存的小说内容也会删除）</string>
     <string name="dialog_content_sure_to_logout">确定要解除契约吗，魔法师？</string>
     <string name="dialog_content_sync">正在同步书架（双向）……</string>
+    <string name="dialog_content_novel_title">小说完整标题</string>
     <string name="dialog_positive_ok">OK</string>
     <string name="dialog_positive_want">要</string>
     <string name="dialog_positive_sure">好滴~</string>
     <string name="dialog_positive_yes">是的</string>
     <string name="dialog_positive_likethis">就这样吧</string>
+    <string name="dialog_positive_known">りょうかい</string>
     <string name="dialog_negative_no">不要</string>
     <string name="dialog_negative_preferno">还是不了</string>
     <string name="dialog_negative_biao">嫑 >3&lt;</string>
