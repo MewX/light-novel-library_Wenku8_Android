@@ -8,6 +8,7 @@ import android.os.AsyncTask;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
+import android.support.design.widget.Snackbar;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
 import android.view.LayoutInflater;
@@ -118,6 +119,11 @@ public class NovelInfoActivity extends AppCompatActivity {
 
         }
 
+        // UIL setting
+        if(ImageLoader.getInstance() == null || !ImageLoader.getInstance().isInited()) {
+            GlobalConfig.initImageLoader(this);
+        }
+
         // get views
         rlMask = (RelativeLayout) findViewById(R.id.white_mask);
         mLinearLayout = (LinearLayout) findViewById(R.id.novel_info_scroll);
@@ -182,9 +188,10 @@ public class NovelInfoActivity extends AppCompatActivity {
                 }
 
                 // show aid: title
+                // Snackbar.make(mLinearLayout, aid + ": " + mNovelItemMeta.title, Snackbar.LENGTH_SHORT).show();
                 new MaterialDialog.Builder(NovelInfoActivity.this)
                         .theme(Theme.LIGHT)
-                        .titleColor(R.color.default_text_color_black)
+                        .titleColor(R.color.dlgTitleColor)
                         .backgroundColorRes(R.color.dlgBackgroundColor)
                         .contentColorRes(R.color.dlgContentColor)
                         .positiveColorRes(R.color.dlgPositiveButtonColor)
@@ -277,51 +284,87 @@ public class NovelInfoActivity extends AppCompatActivity {
                 }
 
                 // download / update activity or verify downloading action (add to queue)
-                // verify download first
+                // use list dialog to provide more functions
                 new MaterialDialog.Builder(NovelInfoActivity.this)
-                        .callback(new MaterialDialog.ButtonCallback() {
+                        .theme(Theme.LIGHT)
+                        .title(R.string.dialog_title_choose_download_option)
+                        .backgroundColorRes(R.color.dlgBackgroundColor)
+                        .titleColor(R.color.dlgTitleColor)
+                        .negativeText(R.string.dialog_negative_pass)
+                        .negativeColorRes(R.color.dlgNegativeButtonColor)
+                        .itemsGravity(GravityEnum.CENTER)
+                        .items(R.array.download_option)
+                        .itemsCallback(new MaterialDialog.ListCallback() {
                             @Override
-                            public void onPositive(MaterialDialog dialog) {
-                                super.onPositive(dialog);
+                            public void onSelection(MaterialDialog dialog, View view, int which, CharSequence text) {
+                                /**
+                                 * 0 <string name="dialog_option_check_for_update">检查更新</string>
+                                 * 1 <string name="dialog_option_update_uncached_volumes">更新下载</string>
+                                 * 2 <string name="dialog_option_force_update_all">覆盖下载</string>
+                                 * 3 <string name="dialog_option_select_and_update">分卷下载</string>
+                                 */
+                                switch (which) {
+                                    case 0:
+                                        break;
 
-                                // async task
-                                isLoading = true;
-                                final AsyncUpdateCacheTask auct = new AsyncUpdateCacheTask();
-                                auct.execute(aid);
+                                    case 1:
 
-                                // show progress
-                                pDialog = new MaterialDialog.Builder(NovelInfoActivity.this)
-                                        .theme(Theme.LIGHT)
-                                        .content(R.string.dialog_content_downloading)
-                                        .progress(false, 1, true)
-                                        .cancelable(true)
-                                        .cancelListener(new DialogInterface.OnCancelListener() {
-                                            @Override
-                                            public void onCancel(DialogInterface dialog) {
-                                                isLoading = false;
-                                                auct.cancel(true);
-                                                pDialog.dismiss();
-                                                pDialog = null;
-                                            }
-                                        })
-                                        .show();
+                                        new MaterialDialog.Builder(NovelInfoActivity.this)
+                                                .callback(new MaterialDialog.ButtonCallback() {
+                                                    @Override
+                                                    public void onPositive(MaterialDialog dialog) {
+                                                        super.onPositive(dialog);
 
-                                pDialog.setProgress(0);
-                                pDialog.setMaxProgress(1);
-                                pDialog.show();
+                                                        // async task
+                                                        isLoading = true;
+                                                        final AsyncUpdateCacheTask auct = new AsyncUpdateCacheTask();
+                                                        auct.execute(aid);
 
+                                                        // show progress
+                                                        pDialog = new MaterialDialog.Builder(NovelInfoActivity.this)
+                                                                .theme(Theme.LIGHT)
+                                                                .content(R.string.dialog_content_downloading)
+                                                                .progress(false, 1, true)
+                                                                .cancelable(true)
+                                                                .cancelListener(new DialogInterface.OnCancelListener() {
+                                                                    @Override
+                                                                    public void onCancel(DialogInterface dialog) {
+                                                                        isLoading = false;
+                                                                        auct.cancel(true);
+                                                                        pDialog.dismiss();
+                                                                        pDialog = null;
+                                                                    }
+                                                                })
+                                                                .show();
+
+                                                        pDialog.setProgress(0);
+                                                        pDialog.setMaxProgress(1);
+                                                        pDialog.show();
+
+
+                                                    }
+                                                })
+                                                .theme(Theme.LIGHT)
+                                                .backgroundColorRes(R.color.dlgBackgroundColor)
+                                                .contentColorRes(R.color.dlgContentColor)
+                                                .positiveColorRes(R.color.dlgPositiveButtonColor)
+                                                .negativeColorRes(R.color.dlgNegativeButtonColor)
+                                                .content(R.string.dialog_content_verify_download)
+                                                .contentGravity(GravityEnum.CENTER)
+                                                .positiveText(R.string.dialog_positive_likethis)
+                                                .negativeText(R.string.dialog_negative_preferno)
+                                                .show();
+                                        break;
+
+                                    case 2:
+                                        break;
+
+                                    case 3:
+                                        break;
+                                }
 
                             }
                         })
-                        .theme(Theme.LIGHT)
-                        .backgroundColorRes(R.color.dlgBackgroundColor)
-                        .contentColorRes(R.color.dlgContentColor)
-                        .positiveColorRes(R.color.dlgPositiveButtonColor)
-                        .negativeColorRes(R.color.dlgNegativeButtonColor)
-                        .content(R.string.dialog_content_verify_download)
-                        .contentGravity(GravityEnum.CENTER)
-                        .positiveText(R.string.dialog_positive_likethis)
-                        .negativeText(R.string.dialog_negative_preferno)
                         .show();
             }
         });

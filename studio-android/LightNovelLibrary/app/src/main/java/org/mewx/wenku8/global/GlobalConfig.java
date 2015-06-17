@@ -1,6 +1,7 @@
 package org.mewx.wenku8.global;
 
 import android.content.Context;
+import android.graphics.Bitmap;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
 import android.os.Environment;
@@ -11,6 +12,11 @@ import com.android.volley.Cache;
 import com.android.volley.Network;
 import com.android.volley.RequestQueue;
 import com.android.volley.toolbox.Volley;
+import com.nostra13.universalimageloader.cache.disc.impl.UnlimitedDiscCache;
+import com.nostra13.universalimageloader.core.DisplayImageOptions;
+import com.nostra13.universalimageloader.core.ImageLoader;
+import com.nostra13.universalimageloader.core.ImageLoaderConfiguration;
+import com.nostra13.universalimageloader.core.display.FadeInBitmapDisplayer;
 
 import org.mewx.wenku8.MyApp;
 import org.mewx.wenku8.global.api.Wenku8API;
@@ -76,6 +82,9 @@ public class GlobalConfig {
     private static Cache volleyCache = null;
     private static Network volleyNetwork = null;
     public static RequestQueue volleyRequestQueue = null;
+    private static UnlimitedDiscCache localUnlimitedDiscCache;
+    private static DisplayImageOptions localDisplayImageOptions;
+    private static ImageLoaderConfiguration localImageLoaderConfiguration;
 
     // global configs, need to call first
     public static void initVolleyNetwork() {
@@ -93,6 +102,24 @@ public class GlobalConfig {
             }
         }
 
+        return;
+    }
+
+    public static void initImageLoader(Context context) {
+        localUnlimitedDiscCache = new UnlimitedDiscCache(
+                new File(GlobalConfig.getFirstStoragePath() + "cache"),
+                new File(context.getCacheDir() + File.separator + "imgs"));
+        localDisplayImageOptions = new DisplayImageOptions.Builder()
+                .resetViewBeforeLoading(true)
+                .cacheOnDisk(true)
+                .cacheInMemory(true)
+                .bitmapConfig(Bitmap.Config.RGB_565)
+                .resetViewBeforeLoading(true)
+                .displayer(new FadeInBitmapDisplayer(250)).build();
+        localImageLoaderConfiguration = new ImageLoaderConfiguration.Builder(context)
+                .diskCache(localUnlimitedDiscCache)
+                .defaultDisplayImageOptions(localDisplayImageOptions).build();
+        ImageLoader.getInstance().init(localImageLoaderConfiguration);
         return;
     }
 
@@ -206,27 +233,24 @@ public class GlobalConfig {
     private static String loadFullSaveFileContent(String FileName) {
         // get full file in file save path
         String h = "";
-        if (LightCache.testFileExist(getFirstStoragePath() + saveFolderName
-                + File.separator + FileName)) {
+        if (LightCache.testFileExist(getFirstStoragePath() + saveFolderName + File.separator + FileName)) {
             try {
-                h = new String(LightCache.loadFile(getFirstStoragePath()
-                        + saveFolderName + File.separator + FileName), "UTF-8");
+                byte[] b = LightCache.loadFile(getFirstStoragePath() + saveFolderName + File.separator + FileName);
+                if(b == null) return "";
+                h = new String(b, "UTF-8");
             } catch (UnsupportedEncodingException e) {
                 e.printStackTrace();
             }
 
-        } else if (LightCache.testFileExist(getSecondStoragePath()
-                + saveFolderName + File.separator + FileName)) {
+        } else if (LightCache.testFileExist(getSecondStoragePath() + saveFolderName + File.separator + FileName)) {
             try {
-                h = new String(LightCache.loadFile(getSecondStoragePath()
-                        + saveFolderName + File.separator + FileName), "UTF-8");
+                byte[] b = LightCache.loadFile(getSecondStoragePath() + saveFolderName + File.separator + FileName);
+                if(b == null) return "";
+                h = new String(b, "UTF-8");
             } catch (UnsupportedEncodingException e) {
                 e.printStackTrace();
             }
 
-        } else {
-            // so, there is no search history file, need to create
-            // nothing need to put here
         }
         return h;
     }

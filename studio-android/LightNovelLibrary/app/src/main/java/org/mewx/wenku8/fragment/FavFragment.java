@@ -20,6 +20,7 @@ import com.afollestad.materialdialogs.Theme;
 import com.umeng.analytics.MobclickAgent;
 
 import org.apache.http.NameValuePair;
+import org.mewx.wenku8.MyApp;
 import org.mewx.wenku8.R;
 import org.mewx.wenku8.activity.NovelInfoActivity;
 import org.mewx.wenku8.adapter.NovelItemAdapterUpdate;
@@ -166,6 +167,8 @@ public class FavFragment extends Fragment implements MyItemClickListener, MyItem
 
         @Override
         protected Integer doInBackground(Integer... params) {
+            int retValue = -1;
+
             // load all meta file
             for(Integer aid : listNovelItemAid) {
                 String xml = GlobalConfig.loadFullFileFromSaveFolder("intro", aid + "-intro.xml");
@@ -173,8 +176,7 @@ public class FavFragment extends Fragment implements MyItemClickListener, MyItem
 
                 if (xml.equals("")) {
                     // the intro file was deleted
-                    Toast.makeText(getActivity(), aid + getResources().getString( R.string.bookshelf_intro_load_failed),
-                            Toast.LENGTH_SHORT).show();
+                    retValue = -2;
                     niiu = new NovelItemInfoUpdate(aid);
                 }
                 else {
@@ -182,7 +184,7 @@ public class FavFragment extends Fragment implements MyItemClickListener, MyItem
                 }
 
                 if(niiu == null)
-                    return -1;
+                    return retValue;
                 listNovelItemInfo.add(niiu);
             }
 
@@ -195,6 +197,10 @@ public class FavFragment extends Fragment implements MyItemClickListener, MyItem
 
             if(integer == -1) {
                 Toast.makeText(getActivity(), "Error: niiu == null", Toast.LENGTH_SHORT).show();
+                return;
+            }
+            else if(integer == -2) {
+                Toast.makeText(getActivity(), "Error: Some intro load failed, please redownload.", Toast.LENGTH_SHORT).show();
                 return;
             }
 
@@ -427,7 +433,7 @@ public class FavFragment extends Fragment implements MyItemClickListener, MyItem
             isLoading = false;
             md.dismiss();
             if(errorCode != Wenku8Error.ErrorCode.SYSTEM_1_SUCCEEDED) {
-                Toast.makeText(getActivity(), errorCode.toString(), Toast.LENGTH_SHORT).show();
+                Toast.makeText(MyApp.getContext(), errorCode.toString(), Toast.LENGTH_SHORT).show();
             }
 
             AsyncLoadAllLocal alal = new AsyncLoadAllLocal();

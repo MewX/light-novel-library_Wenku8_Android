@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string-array name="download_option">
+        <item>@string/dialog_option_check_for_update</item>
+        <item>@string/dialog_option_update_uncached_volumes</item>
+        <item>@string/dialog_option_force_update_all</item>
+        <item>@string/dialog_option_select_and_update</item>
+    </string-array>
+</resources>

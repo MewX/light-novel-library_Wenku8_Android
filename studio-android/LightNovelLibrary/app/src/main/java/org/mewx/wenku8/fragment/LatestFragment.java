@@ -1,6 +1,7 @@
 package org.mewx.wenku8.fragment;
 
 import android.content.Intent;
+import android.os.AsyncTask;
 import android.os.Bundle;
 import android.support.v4.app.Fragment;
 import android.support.v7.widget.LinearLayoutManager;
@@ -16,7 +17,6 @@ import android.widget.Toast;
 import com.umeng.analytics.MobclickAgent;
 
 import net.tsz.afinal.FinalHttp;
-import net.tsz.afinal.core.AsyncTask;
 import net.tsz.afinal.http.AjaxCallBack;
 
 import org.mewx.wenku8.MyApp;
@@ -247,31 +247,31 @@ public class LatestFragment extends Fragment implements MyItemClickListener, MyI
         public void onScrolled(RecyclerView recyclerView, int dx, int dy) {
             super.onScrolled(recyclerView, dx, dy);
 
-             visibleItemCount = mLayoutManager.getChildCount();
-             totalItemCount = mLayoutManager.getItemCount();
-             pastVisiblesItems = mLayoutManager.findFirstVisibleItemPosition();
+            visibleItemCount = mLayoutManager.getChildCount();
+            totalItemCount = mLayoutManager.getItemCount();
+            pastVisiblesItems = mLayoutManager.findFirstVisibleItemPosition();
 
-             if (!isLoading) {
-                 // 滚动到一半的时候加载，即：剩余3个元素的时候就加载
-                 if (visibleItemCount + pastVisiblesItems + 3 >= totalItemCount) {
-                     isLoading = true;
-                     if (GlobalConfig.inDebugMode())
-                         Log.i("MewX", "Loading more...");
+            if (!isLoading) {
+                // 滚动到一半的时候加载，即：剩余3个元素的时候就加载
+                if (visibleItemCount + pastVisiblesItems + 3 >= totalItemCount) {
+                    isLoading = true;
+                    if (GlobalConfig.inDebugMode())
+                        Log.i("MewX", "Loading more...");
 
-                     // load more toast
-//                     Toast.makeText(MyApp.getContext(),
-//                             getResources().getString(R.string.list_loading) + "p" + Integer.toString(novelItemList.getCurrentPage() + 1),
-//                             Toast.LENGTH_LONG).show();
-                     Toast.makeText(MyApp.getContext(),
-                             getResources().getString(R.string.list_loading) + "(" + Integer.toString(novelItemList.getCurrentPage() + 1) + "/" + novelItemList.getTotalPage() + ")",
-                             Toast.LENGTH_SHORT).show();
+                    // load more toast
+//                    Toast.makeText(MyApp.getContext(),
+//                            getResources().getString(R.string.list_loading) + "p" + Integer.toString(novelItemList.getCurrentPage() + 1),
+//                            Toast.LENGTH_LONG).show();
+                    Toast.makeText(MyApp.getContext(),
+                            getResources().getString(R.string.list_loading) + "(" + Integer.toString(novelItemList.getCurrentPage() + 1) + "/" + novelItemList.getTotalPage() + ")",
+                            Toast.LENGTH_SHORT).show();
 
-                     // load more thread
-                     FinalHttp fh = new FinalHttp();
-                     fh.post(Wenku8API.getBaseURL(), Wenku8API.getNovelItemList(Wenku8API.NOVELSORTBY.lastUpdate, novelItemList.getCurrentPage() + 1),
-                             new AjaxGetNovelItemCallBack());
-                 }
-             }
+                    // load more thread
+                    FinalHttp fh = new FinalHttp();
+                    fh.post(Wenku8API.getBaseURL(), Wenku8API.getNovelItemList(Wenku8API.NOVELSORTBY.lastUpdate, novelItemList.getCurrentPage() + 1),
+                            new AjaxGetNovelItemCallBack());
+                }
+            }
         }
     }
 

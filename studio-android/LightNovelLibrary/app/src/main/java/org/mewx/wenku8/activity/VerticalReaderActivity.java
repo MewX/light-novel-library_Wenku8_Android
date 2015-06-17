@@ -80,6 +80,11 @@ public class VerticalReaderActivity extends AppCompatActivity {
         cid = getIntent().getIntExtra("cid",1);
         from = getIntent().getStringExtra("from");
 
+        // UIL setting
+        if(ImageLoader.getInstance() == null || !ImageLoader.getInstance().isInited()) {
+            GlobalConfig.initImageLoader(this);
+        }
+
         // get Novel Content
         typeface = Typeface.createFromAsset(getAssets(), "fonts/fzss-gbk.ttf");
         getNovelContent();

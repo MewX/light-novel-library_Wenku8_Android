@@ -81,6 +81,7 @@
     <string name="task_stop">停止加载</string>
     <string name="task_retry">重新加载</string>
     <string name="task_null">没有结果</string>
+    <string name="dialog_title_choose_download_option">选择执行的下载操作：</string>
     <string name="dialog_content_delete_one_search_record">确定要删除该搜索历史吗？\n</string>
     <string name="dialog_content_load_from_cloud">该章节未缓存，是否立即联网阅读？</string>
     <string name="dialog_content_verify_download">确定要开始联网下载该书吗？\n（高清原图也会下载）</string>
@@ -134,4 +135,8 @@
     <string name="userinfo_rank">头衔</string>
     <string name="userinfo_sign_successful">签到成功\n（积分更新大约有10分钟缓冲）</string>
     <string name="userinfo_sign_failed">然而再怎么点也没什么卵用，一天只能签到一次的。\n╮（╯＿╰）╭</string>
+    <string name="dialog_option_check_for_update">检查更新</string>
+    <string name="dialog_option_update_uncached_volumes">更新下载</string>
+    <string name="dialog_option_force_update_all">覆盖下载</string>
+    <string name="dialog_option_select_and_update">分卷下载</string>
 </resources>

@@ -68,20 +68,9 @@ public class MainActivity extends AppCompatActivity {
                 ".nomedia", "".getBytes(), false);
 
         // UIL setting
-        UnlimitedDiscCache localUnlimitedDiscCache = new UnlimitedDiscCache(
-                new File(GlobalConfig.getFirstStoragePath() + "cache"),
-                new File(getCacheDir() + File.separator + "imgs"));
-        DisplayImageOptions localDisplayImageOptions = new DisplayImageOptions.Builder()
-                .resetViewBeforeLoading(true)
-                .cacheOnDisk(true)
-                .cacheInMemory(true)
-                .bitmapConfig(Bitmap.Config.RGB_565)
-                .resetViewBeforeLoading(true)
-                .displayer(new FadeInBitmapDisplayer(250)).build();
-        ImageLoaderConfiguration localImageLoaderConfiguration = new ImageLoaderConfiguration.Builder(this)
-                .diskCache(localUnlimitedDiscCache)
-                .defaultDisplayImageOptions(localDisplayImageOptions).build();
-        ImageLoader.getInstance().init(localImageLoaderConfiguration);
+        if(ImageLoader.getInstance() == null || !ImageLoader.getInstance().isInited()) {
+            GlobalConfig.initImageLoader(this);
+        }
 
         // global settings
         GlobalConfig.initVolleyNetwork();

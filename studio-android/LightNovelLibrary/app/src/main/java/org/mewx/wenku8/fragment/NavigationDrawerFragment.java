@@ -1,32 +1,26 @@
 package org.mewx.wenku8.fragment;
 
-import android.annotation.TargetApi;
 import android.app.Fragment;
-import android.content.DialogInterface;
 import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.graphics.Point;
 import android.os.AsyncTask;
 import android.os.Build;
 import android.os.Bundle;
-import android.provider.Settings;
 import android.support.annotation.Nullable;
 import android.support.v4.widget.DrawerLayout;
 import android.support.v7.app.ActionBarDrawerToggle;
 import android.support.v7.widget.Toolbar;
-import android.view.KeyCharacterMap;
-import android.view.KeyEvent;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageButton;
-import android.widget.LinearLayout;
 import android.widget.RelativeLayout;
 import android.widget.TableRow;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import com.android.volley.toolbox.ImageLoader;
 import com.makeramen.roundedimageview.RoundedImageView;
 import com.umeng.analytics.MobclickAgent;
 
@@ -35,12 +29,11 @@ import org.mewx.wenku8.activity.MainActivity;
 import org.mewx.wenku8.activity.UserInfoActivity;
 import org.mewx.wenku8.activity.UserLoginActivity;
 import org.mewx.wenku8.global.GlobalConfig;
-import org.mewx.wenku8.global.api.Wenku8API;
 import org.mewx.wenku8.util.LightCache;
+import org.mewx.wenku8.util.LightTool;
 import org.mewx.wenku8.util.LightUserSession;
-import org.w3c.dom.Text;
 
-@TargetApi(16)
+//@TargetApi(16)
 public class NavigationDrawerFragment extends Fragment {
     private final String TAG = "NavigationDrawerFragment";
     private View mFragmentContainerView;
@@ -61,12 +54,6 @@ public class NavigationDrawerFragment extends Fragment {
         return view;
     }
 
-    /**
-     * In this function, I can use findViewById to get any object shown.
-     * And this is after setup().
-     *
-     * @param savedInstanceState
-     */
     @Override
     public void onActivityCreated(Bundle savedInstanceState) {
         super.onActivityCreated(savedInstanceState);
@@ -91,7 +78,6 @@ public class NavigationDrawerFragment extends Fragment {
                             mainActivity.setCurrentFragment(MainActivity.FRAGMENT_LIST.RKLIST);
                             mainActivity.changeFragment(new RKListFragment());
                             closeDrawer();
-                            return;
                         }
                     }
             );
@@ -107,7 +93,6 @@ public class NavigationDrawerFragment extends Fragment {
                             mainActivity.setCurrentFragment(MainActivity.FRAGMENT_LIST.LATEST);
                             mainActivity.changeFragment(new LatestFragment());
                             closeDrawer();
-                            return;
                         }
                     }
             );
@@ -123,7 +108,6 @@ public class NavigationDrawerFragment extends Fragment {
                             mainActivity.setCurrentFragment(MainActivity.FRAGMENT_LIST.FAV);
                             mainActivity.changeFragment(new FavFragment());
                             closeDrawer();
-                            return;
                         }
                     }
             );
@@ -139,7 +123,6 @@ public class NavigationDrawerFragment extends Fragment {
                             mainActivity.setCurrentFragment(MainActivity.FRAGMENT_LIST.CONFIG);
                             mainActivity.changeFragment(new ConfigFragment());
                             closeDrawer();
-                            return;
                         }
                     }
             );
@@ -149,7 +132,6 @@ public class NavigationDrawerFragment extends Fragment {
                         @Override
                         public void onClick(View v) {
                             openOrCloseDarkMode();
-                            return;
                         }
                     }
             );
@@ -207,14 +189,11 @@ public class NavigationDrawerFragment extends Fragment {
             setHighLightButton(mainActivity.getCurrentFragment());
             mainActivity.changeFragment(new LatestFragment());
         }
-
-        return;
     }
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        return;
     }
 
     public ActionBarDrawerToggle getActionBarDrawerToggle() {
@@ -225,13 +204,6 @@ public class NavigationDrawerFragment extends Fragment {
         mActionBarDrawerToggle = actionBarDrawerToggle;
     }
 
-    /**
-     * This funtion is called before all other function, so I need to fetch mainActivity here.
-     *
-     * @param fragmentId
-     * @param drawerLayout
-     * @param toolbar
-     */
     public void setup(int fragmentId, DrawerLayout drawerLayout, Toolbar toolbar) {
         // get MainActivity
         mainActivity = (MainActivity) getActivity();
@@ -247,9 +219,6 @@ public class NavigationDrawerFragment extends Fragment {
                 if (!isAdded()) return;
 
                 mainActivity.invalidateOptionsMenu();
-
-                // This is called after the animation's over
-                // Toast.makeText(getActivity(), "called onDrawerClosed", Toast.LENGTH_SHORT).show();
             }
 
             @Override
@@ -259,8 +228,16 @@ public class NavigationDrawerFragment extends Fragment {
 
                 mainActivity.invalidateOptionsMenu();
 
-                // This is called after the animation's over
-                // Toast.makeText(getActivity(), "called onDrawerOpened", Toast.LENGTH_SHORT).show();
+                // test navigation bar exist
+                Point navBar = LightTool.getNavigationBarSize(getActivity());
+//                Toast.makeText(getActivity(), "width = " + navBar.x + "; height = " + navBar.y, Toast.LENGTH_SHORT).show();
+                RelativeLayout rl = (RelativeLayout)mainActivity.findViewById(R.id.bot_background);
+                RelativeLayout.LayoutParams layoutParams = (RelativeLayout.LayoutParams)rl.getLayoutParams();
+                if(navBar.y == 0)
+                    layoutParams.setMargins(0, 0, 0, 0); // hide
+                else
+                    layoutParams.setMargins(0, 0, 0, navBar.y); // show
+                rl.setLayoutParams(layoutParams);
             }
         };
 
@@ -355,7 +332,6 @@ public class NavigationDrawerFragment extends Fragment {
                 e.printStackTrace();
             }
         }
-        return;
     }
 
     /**
@@ -516,7 +492,6 @@ public class NavigationDrawerFragment extends Fragment {
         }
 
         fakeDarkSwitcher = !fakeDarkSwitcher;
-        return;
     }
 
     @Override
@@ -545,23 +520,6 @@ public class NavigationDrawerFragment extends Fragment {
             tvUserName.setText(getResources().getString(R.string.main_menu_not_login));
             rivUserAvatar.setImageDrawable(getResources().getDrawable(R.drawable.ic_noavatar));
         }
-
-        // test navigation bar exist
-        boolean hasBackKey = KeyCharacterMap.deviceHasKey(KeyEvent.KEYCODE_BACK);
-        boolean hasHomeKey = KeyCharacterMap.deviceHasKey(KeyEvent.KEYCODE_HOME);
-        if (hasBackKey && hasHomeKey) {
-            // no navigation bar, unless it is enabled in the settings
-            TextView tv = (TextView)mainActivity.findViewById(R.id.taken);
-            if(tv != null) // v19- has no 'taken'
-                tv.setVisibility(View.GONE);
-            LinearLayout ll = (LinearLayout)mainActivity.findViewById(R.id.main_menu_bottom_layout);
-            ViewGroup.LayoutParams lp = ll.getLayoutParams();
-            if( lp instanceof ViewGroup.MarginLayoutParams) {
-                ((ViewGroup.MarginLayoutParams) lp).bottomMargin = 0;
-            }
-        } else {
-            // 99% sure there's a navigation bar
-        }
     }
 
     public void openDrawer() {
@@ -584,7 +542,6 @@ public class NavigationDrawerFragment extends Fragment {
     @Override
     public void onSaveInstanceState(Bundle outState) {
         super.onSaveInstanceState(outState);
-        return;
     }
 
     public DrawerLayout getDrawerLayout() {
