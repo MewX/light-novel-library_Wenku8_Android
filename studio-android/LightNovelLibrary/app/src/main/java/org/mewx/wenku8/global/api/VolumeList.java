@@ -9,5 +9,6 @@ import java.util.ArrayList;
 public class VolumeList implements Serializable {
     public String volumeName;
     public int vid;
+    public boolean inLocal = false;
     public ArrayList<ChapterInfo> chapterList;
 }

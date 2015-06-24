@@ -5,11 +5,16 @@ import android.support.v4.app.Fragment;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.Toast;
 
 import com.umeng.analytics.MobclickAgent;
 import com.umeng.update.UmengUpdateAgent;
+import com.umeng.update.UmengUpdateListener;
+import com.umeng.update.UpdateResponse;
+import com.umeng.update.UpdateStatus;
 
 import org.mewx.wenku8.R;
+import org.mewx.wenku8.global.GlobalConfig;
 
 public class ConfigFragment extends Fragment {
 
@@ -41,7 +46,33 @@ public class ConfigFragment extends Fragment {
         getActivity().findViewById(R.id.btn_check_update).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                UmengUpdateAgent.forceUpdate(getActivity());
+
+                if(!GlobalConfig.inAlphaBuild()) {
+                    // alpha version does not contains auto-update function
+                    // check for update
+                    UmengUpdateAgent.setUpdateListener(new UmengUpdateListener() {
+                        @Override
+                        public void onUpdateReturned(int updateStatus, UpdateResponse updateInfo) {
+                            switch (updateStatus) {
+                                case UpdateStatus.Yes: // has update
+                                    break;
+                                case UpdateStatus.No: // has no update
+                                    Toast.makeText(getActivity(), getResources().getString(R.string.system_update_latest_version), Toast.LENGTH_SHORT).show();
+                                    break;
+                                case UpdateStatus.NoneWifi: // none wifi
+                                    Toast.makeText(getActivity(), getResources().getString(R.string.system_update_nonewifi), Toast.LENGTH_SHORT).show();
+                                    break;
+                                case UpdateStatus.Timeout: // time out
+                                    Toast.makeText(getActivity(), getResources().getString(R.string.system_update_timeout), Toast.LENGTH_SHORT).show();
+                                    break;
+                            }
+                        }
+                    });
+                    UmengUpdateAgent.forceUpdate(getActivity());
+                }
+                else {
+                    Toast.makeText(getActivity(), "值得骄傲的内测用户：\n请从群共享里面下载最新版本~", Toast.LENGTH_SHORT).show();
+                }
             }
         });
     }

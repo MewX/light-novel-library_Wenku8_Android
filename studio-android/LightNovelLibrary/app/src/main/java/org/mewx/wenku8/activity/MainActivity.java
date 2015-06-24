@@ -1,30 +1,22 @@
 package org.mewx.wenku8.activity;
 
 import android.content.Intent;
-import android.graphics.Bitmap;
 import android.os.Build;
 import android.os.Bundle;
 import android.support.v4.app.Fragment;
 import android.support.v4.app.FragmentTransaction;
 import android.support.v4.widget.DrawerLayout;
-import android.support.v7.app.ActionBarActivity;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.widget.Toast;
 
-import com.nostra13.universalimageloader.cache.disc.impl.UnlimitedDiscCache;
-import com.nostra13.universalimageloader.core.DisplayImageOptions;
 import com.nostra13.universalimageloader.core.ImageLoader;
-import com.nostra13.universalimageloader.core.ImageLoaderConfiguration;
-import com.nostra13.universalimageloader.core.display.FadeInBitmapDisplayer;
-import com.nostra13.universalimageloader.core.process.BitmapProcessor;
 import com.readystatesoftware.systembartint.SystemBarTintManager;
 import com.umeng.analytics.MobclickAgent;
 import com.umeng.update.UmengUpdateAgent;
 
-import org.mewx.wenku8.MyApp;
 import org.mewx.wenku8.R;
 import org.mewx.wenku8.fragment.NavigationDrawerFragment;
 import org.mewx.wenku8.global.GlobalConfig;
@@ -77,9 +69,14 @@ public class MainActivity extends AppCompatActivity {
         GlobalConfig.initVolleyNetwork();
 
         // UMeng settings
-        MobclickAgent.updateOnlineConfig( this );
-        UmengUpdateAgent.update(this);
-        //UmengUpdateAgent.setUpdateCheckConfig(false);
+        MobclickAgent.updateOnlineConfig(this);
+        if(!GlobalConfig.inAlphaBuild()) {
+            // alpha version does not contains auto-update function
+            UmengUpdateAgent.setUpdateCheckConfig(false); // disable res check
+            UmengUpdateAgent.setDeltaUpdate(true);
+            UmengUpdateAgent.update(this);
+            Toast.makeText(this, "该软件尚处内测阶段，对外发布的为稳定版，带有检查更新功能。\n★请勿上传应用市场！\n☆内测群：427577610 有最新内测版", Toast.LENGTH_LONG).show();
+        }
 
         // Update old save files ----------------
 

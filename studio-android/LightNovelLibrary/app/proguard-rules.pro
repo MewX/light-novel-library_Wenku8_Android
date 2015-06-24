@@ -16,61 +16,122 @@
 #   public *;
 #}
 
--libraryjars   libs/android-support-v4.jar
+# general
+-target 1.7
+-optimizationpasses 5
+#-dontoptimize
+-dontusemixedcaseclassnames
+-dontskipnonpubliclibraryclasses
+-dontpreverify
+-overloadaggressively
+-repackageclasses ''
+-allowaccessmodification
+-verbose
+-dump class_files.txt
+-printseeds seeds.txt
+-printusage unused.txt
+-printmapping mapping.txt
+
+# universal
+#-keepnames class * implements java.io.Serializable
+#-keep public class * extends android.app.Activity
+#-keep public class * extends android.support.v7.app.AppCompatActivity
+#-keep public class * extends android.support.v4.app.Fragment
+#-keep public class * extends android.app.Application
+#-keep public class * extends android.app.Service
+#-keep public class * extends android.content.BroadcastReceiver
+#-keep public class * extends android.content.ContentProvider
+#-keep public class * extends android.preference.Preference
+#-keep public class com.android.vending.billing.IInAppBillingService
+#-keep public class * extends android.view.View {
+#    public <init>(android.content.Context);
+#    public <init>(android.content.Context, android.util.AttributeSet);
+#    public <init>(android.content.Context, android.util.AttributeSet, int);
+#}
+#-keepclasseswithmembers class * {
+#    public <init>(android.content.Context, android.util.AttributeSet);
+#}
+#-keepclasseswithmembers class * {
+#    public <init>(android.content.Context, android.util.AttributeSet, int);
+#}
+#-keepclassmembers class * extends android.content.Context {
+#    public void *(android.view.View);
+#    public void *(android.view.MenuItem);
+#}
+#-keepclassmembers enum * {
+#    public static **[] values();
+#    public static ** valueOf(java.lang.String);
+#}
+
+# support v4
 -dontwarn android.support.v4.**
 -keep class android.support.v4.** { *; }
 -keep interface android.support.v4.app.** { *; }
 
--libraryjars   libs/android-support-v7.jar
+# support v7
 -dontwarn android.support.v7.**
 -keep class android.support.v7.** { *; }
--keep interface android.support.v7.app.** { *; }
+-keep interface android.support.v7.** { *; }
 
--keep class com.jpardogo.android.googleprogressbar.** { *; }
--dontwarn com.squareup.okhttp.**
+# support design
+-dontwarn android.support.design.**
+-keep class android.support.design.** { *; }
+-keep interface android.support.design.** { *; }
+-keep public class android.support.design.R$* { *; }
 
+# serializable
+-keepnames class * implements java.io.Serializable
+-keepclassmembers class * implements java.io.Serializable { *; }
 
-# Baidu
--keep public class * extends android.app.Activity
--keep public class * extends android.app.Application
--keep public class * extends android.app.Service
--keep public class * extends android.content.BroadcastReceiver
--keep public class * extends android.content.ContentProvider
--keep public class * extends android.app.backup.BackupAgentHelper
--keep public class * extends android.preference.Preference
--keep public class com.android.vending.licensing.ILicensingService
+# umeng self
+-dontwarn com.umeng.**
+-keep public class * extends com.umeng.**
+-keep class com.umeng.** { *; }
+-keep class com.alimama.** { *; }
+-keep public class com.umeng.fb.ui.ThreadView { }
 
--dontwarn android.support.v4.**
--keep class android.support.v4.** { *; }
--keep public class * extends android.support.v4.**
--keep public class * extends android.app.Fragment
--keep class android.support.v4.view.**{ *;}
--keep class android.support.v4.content.**{ *;}
-
--dontwarn com.baidu.mobstat.**
--keep class com.baidu.mobstat.** { *;}
--keep class * extends com.baidu.mobstat.**
--keep class com.baidu.kirin.** {*; }
-
--keepclasseswithmembers class * {
-    native <methods>;
+# umeng reflection
+-keepclassmembers class * {
+    public <init>(org.json.JSONObject);
 }
-
--keepclasseswithmembers class * {
-    public <init>(android.content.Context, android.util.AttributeSet);
+-keep public class org.mewx.wenku8.R$* {
+    public static final int *;
 }
-
--keepclasseswithmembers class * {
-    public <init>(android.content.Context, android.util.AttributeSet, int);
-}
-
 -keepclassmembers enum * {
     public static **[] values();
     public static ** valueOf(java.lang.String);
 }
 
--keep class * implements android.os.Parcelable {
-  public static final android.os.Parcelable$Creator *;
-}
+# volley
+#-keep class com.android.volley.** { *; }
+#-keep class com.android.volley.toolbox.** { *; }
+#-keep class com.android.volley.Response$* { *; }
+#-keep class com.android.volley.Request$* { *; }
+#-keep class com.android.volley.RequestQueue$* { *; }
+#-keep class com.android.volley.toolbox.HurlStack$* { *; }
+#-keep class com.android.volley.toolbox.ImageLoader$* { *; }
 
--keep class com.baidu.*.*
+# system bar tint
+
+# universal image loader
+#-keep class com.nostra13.universalimageloader.** { *; }
+#-keepclassmembers class com.nostra13.universalimageloader.** { *; }
+
+# material dialogs
+#-keep class com.afollestad.materialdialogs.** { *; }
+#-keep interface com.afollestad.materialdialogs.** { *; }
+
+# floating action button
+-keep class com.squareup.picasso.** { *; }
+-dontwarn com.makeramen.roundedimageview.**
+-keep class com.makeramen.roundedimageview.** { *; }
+-keep interface com.makeramen.roundedimageview.** { *; }
+
+# rounded image view
+
+# subsampling scale image view
+
+# smooth progressbar
+
+# google progressbar
+#-keep class com.jpardogo.android.googleprogressbar.** { *; }

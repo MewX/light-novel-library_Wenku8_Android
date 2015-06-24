@@ -117,12 +117,12 @@ public class VerticalReaderActivity extends AppCompatActivity {
 
                     if(y < screenHeight * 5 / 6 && y >= screenHeight / 2) {
                         // move down
-                        svTextListLayout.smoothScrollBy(0, 300);
+                        svTextListLayout.smoothScrollBy(0, screenHeight / 2);
                         return true;
                     }
                     else if(y < screenHeight / 2 && y > screenHeight / 6) {
                         // move up
-                        svTextListLayout.smoothScrollBy(0, -300);
+                        svTextListLayout.smoothScrollBy(0, -screenHeight / 2);
                         return true;
                     }
                     return false;

@@ -35,6 +35,7 @@ import java.util.ArrayList;
 public class GlobalConfig {
 
     private static final boolean inDebug = true; // true - in debug mode
+    private static final boolean inAlphaBuild = true; // in alpha mode, no update function
     public static final String saveFolderName = "saves";
     public static final String imgsSaveFolderName = "imgs";
     private static final String saveSearchHistoryFileName = "search_history.wk8";
@@ -66,6 +67,10 @@ public class GlobalConfig {
     // debug info
     public static boolean inDebugMode() {
         return inDebug; // set log out operation
+    }
+
+    public static boolean inAlphaBuild() {
+        return inAlphaBuild;
     }
 
     public static void wantDebugLog(String one, String two) {

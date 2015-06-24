@@ -170,6 +170,7 @@ public class LatestFragment extends Fragment implements MyItemClickListener, MyI
 
     @Override
     public void onDetach() {
+        isLoading = false;
         super.onDetach();
     }
 
@@ -323,8 +324,10 @@ public class LatestFragment extends Fragment implements MyItemClickListener, MyI
 
             // This means manually cancelled this task
             if (result == -1) {
-                doReverseOperation();
+                if(!isAdded())
+                    return; // detached
 
+                doReverseOperation();
                 mTextView.setText(getResources().getString(R.string.system_parse_failed));
                 showRetryButton();
                 isLoading = false;

@@ -1,6 +1,5 @@
 package org.mewx.wenku8.activity;
 
-import android.app.Activity;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.graphics.PorterDuff;
@@ -98,11 +97,13 @@ public class NovelInfoActivity extends AppCompatActivity {
         // set indicator enable
         mToolbar = (Toolbar) findViewById(R.id.toolbar_actionbar);
         setSupportActionBar(mToolbar);
-        getSupportActionBar().setDisplayHomeAsUpEnabled(true);
-        getSupportActionBar().setHomeButtonEnabled(true);
         final Drawable upArrow = getResources().getDrawable(R.drawable.abc_ic_ab_back_mtrl_am_alpha);
-        upArrow.setColorFilter(getResources().getColor(R.color.default_white), PorterDuff.Mode.SRC_ATOP);
-        getSupportActionBar().setHomeAsUpIndicator(upArrow);
+        if(getSupportActionBar() != null && upArrow != null) {
+            getSupportActionBar().setHomeButtonEnabled(true);
+            getSupportActionBar().setDisplayHomeAsUpEnabled(true);
+            upArrow.setColorFilter(getResources().getColor(R.color.default_white), PorterDuff.Mode.SRC_ATOP);
+            getSupportActionBar().setHomeAsUpIndicator(upArrow);
+        }
 
         // change status bar color tint, and this require SDK16
         if (Build.VERSION.SDK_INT >= 16 ) {
@@ -571,7 +572,19 @@ public class NovelInfoActivity extends AppCompatActivity {
             }
             publishProgress(3); // procedure 3/3
 
-            // TODO: Check local volume files exists, express in another color
+            // Check local volume files exists, express in another color
+            for(VolumeList vl : listVolume) {
+                for(ChapterInfo ci : vl.chapterList) {
+                    if(!LightCache.testFileExist(GlobalConfig.getFirstFullSaveFilePath() + "novel" + File.separator + ci.cid + ".xml")
+                            && !LightCache.testFileExist(GlobalConfig.getSecondFullSaveFilePath() + File.separator + "novel" + ci.cid + ".xml"))
+                        break;
+                    //String content = GlobalConfig.loadFullFileFromSaveFolder("novel", listVolume.get(i).chapterList.get(j).cid + ".xml");
+                    //List<OldNovelContentParser.NovelContent> listImage = OldNovelContentParser.NovelContentParser_onlyImage(content);
+
+                    if(vl.chapterList.indexOf(ci) == vl.chapterList.size() - 1)
+                        vl.inLocal = true;
+                }
+            }
 
             return 0;
         }
@@ -629,7 +642,9 @@ public class NovelInfoActivity extends AppCompatActivity {
                 // set text and listeners
                 TextView tv = (TextView) rl.findViewById(R.id.chapter_title);
                 tv.setText(vl.volumeName);
-                tv.setOnClickListener(new View.OnClickListener() {
+                if(vl.inLocal)
+                    ((TextView) rl.findViewById(R.id.chapter_status)).setText(getResources().getString(R.string.bookshelf_inlocal));
+                rl.findViewById(R.id.chapter_btn).setOnClickListener(new View.OnClickListener() {
                     @Override
                     public void onClick(View v) {
                         // jump to chapter select activity
