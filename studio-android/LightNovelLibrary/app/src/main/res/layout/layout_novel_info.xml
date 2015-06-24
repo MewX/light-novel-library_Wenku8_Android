@@ -17,7 +17,7 @@
         <LinearLayout
             android:id="@+id/novel_info_scroll"
             android:layout_width="match_parent"
-            android:layout_height="match_parent"
+            android:layout_height="wrap_content"
             android:orientation="vertical"
             android:clickable="true">
 
@@ -72,21 +72,6 @@
     <!-- Here to set below mask layer -->
     <include layout="@layout/toolbar_pure" />
 
-    <!-- Progress Bar -->
-    <!--<fr.castorflex.android.smoothprogressbar.SmoothProgressBar-->
-        <!--android:id="@+id/spb"-->
-        <!--android:layout_width="match_parent"-->
-        <!--android:layout_height="4dp"-->
-        <!--android:layout_below="@id/toolbar_actionbar"-->
-        <!--android:indeterminate="true"-->
-        <!--spb:spb_sections_count="4"-->
-        <!--spb:spb_color="@color/myPrimaryColor"-->
-        <!--spb:spb_speed="1.0"-->
-        <!--spb:spb_stroke_width="4dp"-->
-        <!--spb:spb_stroke_separator_length="4dp"-->
-        <!--spb:spb_reversed="false"-->
-        <!--spb:spb_interpolator="spb_interpolator_acceleratedecelerate"-->
-        <!--spb:spb_mirror_mode="false" />-->
     <fr.castorflex.android.smoothprogressbar.SmoothProgressBar
         android:id="@+id/spb"
         android:layout_width="match_parent"
@@ -137,6 +122,5 @@
             fab:fab_title="@string/fab_download"
             fab:fab_colorNormal="@color/fabGreen"
             fab:fab_colorPressed="@color/fabGreenPressed"/>
-
     </com.getbase.floatingactionbutton.FloatingActionsMenu>
 </RelativeLayout>

@@ -1,5 +1,6 @@
 package org.mewx.wenku8.activity;
 
+import android.app.Activity;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.graphics.PorterDuff;
@@ -8,19 +9,16 @@ import android.os.AsyncTask;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
-import android.support.design.widget.Snackbar;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
 import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuItem;
-import android.view.MotionEvent;
 import android.view.View;
 import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.RelativeLayout;
-import android.widget.ScrollView;
 import android.widget.TableRow;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -42,6 +40,7 @@ import org.mewx.wenku8.global.api.NovelItemMeta;
 import org.mewx.wenku8.global.api.OldNovelContentParser;
 import org.mewx.wenku8.global.api.VolumeList;
 import org.mewx.wenku8.global.api.Wenku8API;
+import org.mewx.wenku8.global.api.Wenku8Error;
 import org.mewx.wenku8.global.api.Wenku8Parser;
 import org.mewx.wenku8.util.LightCache;
 import org.mewx.wenku8.util.LightNetwork;
@@ -94,6 +93,7 @@ public class NovelInfoActivity extends AppCompatActivity {
         // fetch values
         aid = getIntent().getIntExtra("aid", 1);
         from = getIntent().getStringExtra("from");
+        String title = getIntent().getStringExtra("title");
 
         // set indicator enable
         mToolbar = (Toolbar) findViewById(R.id.toolbar_actionbar);
@@ -105,7 +105,7 @@ public class NovelInfoActivity extends AppCompatActivity {
         getSupportActionBar().setHomeAsUpIndicator(upArrow);
 
         // change status bar color tint, and this require SDK16
-        if (Build.VERSION.SDK_INT >= 16 ) { //&& Build.VERSION.SDK_INT <= 21) {
+        if (Build.VERSION.SDK_INT >= 16 ) {
             // Android API 22 has more effects on status bar, so ignore
 
             // create our manager instance after the content view is set
@@ -142,22 +142,32 @@ public class NovelInfoActivity extends AppCompatActivity {
         spb = (SmoothProgressBar) findViewById(R.id.spb);
 
         // hide view and set colors
+        tvNovelTitle.setText(title);
         ImageLoader.getInstance().displayImage(Wenku8API.getCoverURL(aid), ivNovelCover); // move to onCreateView!
         tvNovelShortIntro.setVisibility(TextView.GONE);
         ibNovelOption.setVisibility(ImageButton.INVISIBLE);
         fabFavorate.setColorFilter(getResources().getColor(R.color.default_white), PorterDuff.Mode.SRC_ATOP);
         fabDownload.setColorFilter(getResources().getColor(R.color.default_white), PorterDuff.Mode.SRC_ATOP);
         llCardLayout.setBackgroundResource(R.color.menu_transparent);
-        spb.progressiveStart();
         if (GlobalConfig.testInLocalBookshelf(aid)) {
             fabFavorate.setIcon(R.drawable.ic_favorate_pressed);
         }
 
         // fetch all info
         getSupportActionBar().setTitle(R.string.action_novel_info);
-        isLoading = true;
-        FetchInfoAsyncTask fetchInfoAsyncTask = new FetchInfoAsyncTask();
-        fetchInfoAsyncTask.execute(aid);
+        spb.setVisibility(View.INVISIBLE); // wait for runnable
+        Handler handler = new Handler();
+        handler.postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                spb.setVisibility(View.VISIBLE);
+                if(from.equals(FromLocal))
+                    refreshInfoFromLocal();
+                else
+                    refreshInfoFromCloud();
+            }
+        }, 500);
+
 
         // set on click listeners
         famMenu.setOnFloatingActionsMenuUpdateListener(new FloatingActionsMenu.OnFloatingActionsMenuUpdateListener() {
@@ -212,8 +222,7 @@ public class NovelInfoActivity extends AppCompatActivity {
 
                 // add to favorate
                 if(GlobalConfig.testInLocalBookshelf(aid)) {
-                    new MaterialDialog.Builder(NovelInfoActivity.this)
-                            .callback(new MaterialDialog.ButtonCallback() {
+                    new MaterialDialog.Builder(NovelInfoActivity.this).callback(new MaterialDialog.ButtonCallback() {
                                 @Override
                                 public void onPositive(MaterialDialog dialog) {
                                     super.onPositive(dialog);
@@ -305,10 +314,6 @@ public class NovelInfoActivity extends AppCompatActivity {
                                  */
                                 switch (which) {
                                     case 0:
-                                        break;
-
-                                    case 1:
-
                                         new MaterialDialog.Builder(NovelInfoActivity.this)
                                                 .callback(new MaterialDialog.ButtonCallback() {
                                                     @Override
@@ -318,7 +323,7 @@ public class NovelInfoActivity extends AppCompatActivity {
                                                         // async task
                                                         isLoading = true;
                                                         final AsyncUpdateCacheTask auct = new AsyncUpdateCacheTask();
-                                                        auct.execute(aid);
+                                                        auct.execute(aid, 0);
 
                                                         // show progress
                                                         pDialog = new MaterialDialog.Builder(NovelInfoActivity.this)
@@ -340,8 +345,52 @@ public class NovelInfoActivity extends AppCompatActivity {
                                                         pDialog.setProgress(0);
                                                         pDialog.setMaxProgress(1);
                                                         pDialog.show();
+                                                    }
+                                                })
+                                                .theme(Theme.LIGHT)
+                                                .backgroundColorRes(R.color.dlgBackgroundColor)
+                                                .contentColorRes(R.color.dlgContentColor)
+                                                .positiveColorRes(R.color.dlgPositiveButtonColor)
+                                                .negativeColorRes(R.color.dlgNegativeButtonColor)
+                                                .content(R.string.dialog_content_verify_update)
+                                                .contentGravity(GravityEnum.CENTER)
+                                                .positiveText(R.string.dialog_positive_likethis)
+                                                .negativeText(R.string.dialog_negative_preferno)
+                                                .show();
+                                        break;
 
+                                    case 1:
+                                        new MaterialDialog.Builder(NovelInfoActivity.this)
+                                                .callback(new MaterialDialog.ButtonCallback() {
+                                                    @Override
+                                                    public void onPositive(MaterialDialog dialog) {
+                                                        super.onPositive(dialog);
 
+                                                        // async task
+                                                        isLoading = true;
+                                                        final AsyncUpdateCacheTask auct = new AsyncUpdateCacheTask();
+                                                        auct.execute(aid, 1);
+
+                                                        // show progress
+                                                        pDialog = new MaterialDialog.Builder(NovelInfoActivity.this)
+                                                                .theme(Theme.LIGHT)
+                                                                .content(R.string.dialog_content_downloading)
+                                                                .progress(false, 1, true)
+                                                                .cancelable(true)
+                                                                .cancelListener(new DialogInterface.OnCancelListener() {
+                                                                    @Override
+                                                                    public void onCancel(DialogInterface dialog) {
+                                                                        isLoading = false;
+                                                                        auct.cancel(true);
+                                                                        pDialog.dismiss();
+                                                                        pDialog = null;
+                                                                    }
+                                                                })
+                                                                .show();
+
+                                                        pDialog.setProgress(0);
+                                                        pDialog.setMaxProgress(1);
+                                                        pDialog.show();
                                                     }
                                                 })
                                                 .theme(Theme.LIGHT)
@@ -357,9 +406,54 @@ public class NovelInfoActivity extends AppCompatActivity {
                                         break;
 
                                     case 2:
+                                        new MaterialDialog.Builder(NovelInfoActivity.this)
+                                                .callback(new MaterialDialog.ButtonCallback() {
+                                                    @Override
+                                                    public void onPositive(MaterialDialog dialog) {
+                                                        super.onPositive(dialog);
+
+                                                        // async task
+                                                        isLoading = true;
+                                                        final AsyncUpdateCacheTask auct = new AsyncUpdateCacheTask();
+                                                        auct.execute(aid, 2);
+
+                                                        // show progress
+                                                        pDialog = new MaterialDialog.Builder(NovelInfoActivity.this)
+                                                                .theme(Theme.LIGHT)
+                                                                .content(R.string.dialog_content_downloading)
+                                                                .progress(false, 1, true)
+                                                                .cancelable(true)
+                                                                .cancelListener(new DialogInterface.OnCancelListener() {
+                                                                    @Override
+                                                                    public void onCancel(DialogInterface dialog) {
+                                                                        isLoading = false;
+                                                                        auct.cancel(true);
+                                                                        pDialog.dismiss();
+                                                                        pDialog = null;
+                                                                    }
+                                                                })
+                                                                .show();
+
+                                                        pDialog.setProgress(0);
+                                                        pDialog.setMaxProgress(1);
+                                                        pDialog.show();
+                                                    }
+                                                })
+                                                .theme(Theme.LIGHT)
+                                                .backgroundColorRes(R.color.dlgBackgroundColor)
+                                                .contentColorRes(R.color.dlgContentColor)
+                                                .positiveColorRes(R.color.dlgPositiveButtonColor)
+                                                .negativeColorRes(R.color.dlgNegativeButtonColor)
+                                                .content(R.string.dialog_content_verify_force_update)
+                                                .contentGravity(GravityEnum.CENTER)
+                                                .positiveText(R.string.dialog_positive_likethis)
+                                                .negativeText(R.string.dialog_negative_preferno)
+                                                .show();
                                         break;
 
                                     case 3:
+                                        // TODO: new activity to hold selectable items
+                                        Toast.makeText(NovelInfoActivity.this, getResources().getString(R.string.system_wait_for_next_version), Toast.LENGTH_SHORT).show();
                                         break;
                                 }
 
@@ -384,7 +478,10 @@ public class NovelInfoActivity extends AppCompatActivity {
     @Override
     public boolean onOptionsItemSelected(MenuItem menuItem) {
         if (menuItem.getItemId() == android.R.id.home) {
-            finish(); // end directly
+            if(Build.VERSION.SDK_INT < 21)
+                finish();
+            else
+                finishAfterTransition(); // end directly
         }
         return super.onOptionsItemSelected(menuItem);
     }
@@ -402,12 +499,17 @@ public class NovelInfoActivity extends AppCompatActivity {
     }
 
     private class FetchInfoAsyncTask extends AsyncTask<Integer, Integer, Integer> {
+        boolean fromLocal = false;
+
         @Override
         protected Integer doInBackground(Integer... params) {
+            // transfer '1' to this task represent loading from local
+            if(params != null && params.length == 1 && params[0] == 1)
+                fromLocal = true;
 
             // get novel full meta
             try {
-                if(from.equals(FromLocal)) {
+                if(fromLocal) {
                     novelFullMeta = GlobalConfig.loadFullFileFromSaveFolder("intro", aid + "-intro.xml");
                     if(novelFullMeta == null || novelFullMeta.equals("")) return -9;
                 }
@@ -428,7 +530,7 @@ public class NovelInfoActivity extends AppCompatActivity {
 
             // get novel full intro
             try {
-                if(from.equals(FromLocal)) {
+                if(fromLocal) {
                     novelFullIntro = GlobalConfig.loadFullFileFromSaveFolder("intro", aid + "-introfull.xml");
                     if(novelFullIntro == null || novelFullIntro.equals("")) return -9;
                 }
@@ -449,7 +551,7 @@ public class NovelInfoActivity extends AppCompatActivity {
 
             // get novel chapter list
             try {
-                if(from.equals(FromLocal)) {
+                if(fromLocal) {
                     novelFullVolume = GlobalConfig.loadFullFileFromSaveFolder("intro", aid + "-volume.xml");
                     if(novelFullVolume == null || novelFullVolume.equals("")) return -9;
                 }
@@ -468,6 +570,8 @@ public class NovelInfoActivity extends AppCompatActivity {
                 return -2;
             }
             publishProgress(3); // procedure 3/3
+
+            // TODO: Check local volume files exists, express in another color
 
             return 0;
         }
@@ -499,8 +603,6 @@ public class NovelInfoActivity extends AppCompatActivity {
                 default:
                     break;
             }
-
-            return;
         }
 
         @Override
@@ -515,6 +617,10 @@ public class NovelInfoActivity extends AppCompatActivity {
             }
             else if(integer < 0)
                 return; // ignore other exceptions
+
+            // remove all TextView(in CardView, in RelativeView)
+            if(mLinearLayout.getChildCount() >= 3)
+                mLinearLayout.removeViews(2, mLinearLayout.getChildCount() - 2);
 
             for(final VolumeList vl : listVolume) {
                 // get view
@@ -545,8 +651,8 @@ public class NovelInfoActivity extends AppCompatActivity {
         }
     }
 
-    class AsyncUpdateCacheTask extends AsyncTask<Integer, Integer, Integer> {
-        // in: Aid
+    class AsyncUpdateCacheTask extends AsyncTask<Integer, Integer, Wenku8Error.ErrorCode> {
+        // in: Aid, OperationType
         // out: current loading
         String volumeXml, introXml;
         List<VolumeList> vl = null;
@@ -555,142 +661,124 @@ public class NovelInfoActivity extends AppCompatActivity {
         int size_a = 0, current = 0;
 
         @Override
-        protected Integer doInBackground(Integer... params) {
-            for (Integer param : params) {
-                // get full range online, always
-                try {
-                    // fetch intro
-                    if (!isLoading)
-                        return -222; // cancel
-                    List<NameValuePair> targVarListVolume = new ArrayList<NameValuePair>();
-                    targVarListVolume.add(Wenku8API.getNovelIndex(param, GlobalConfig.getCurrentLang()));
-                    byte[] tempVolumeXml = LightNetwork.LightHttpPost(Wenku8API.getBaseURL(), targVarListVolume);
-                    if (tempVolumeXml == null)
-                        return -100; // network error
-                    volumeXml = new String(tempVolumeXml, "UTF-8");
+        protected Wenku8Error.ErrorCode doInBackground(Integer... params) {
+            if(params == null || params.length < 2) return Wenku8Error.ErrorCode.PARAM_COUNT_NOT_MATCHED;
+            int taskaid = params[0];
+            int operationType = params[1]; // type = 0, 1, 2
 
-                    if (!isLoading)
-                        return -222; // cancel
-                    List<NameValuePair> targVarList = new ArrayList<NameValuePair>();
-                    targVarList.add(Wenku8API.getNovelFullMeta(param, GlobalConfig.getCurrentLang()));
-                    byte[] tempIntroXml = LightNetwork.LightHttpPost(Wenku8API.getBaseURL(), targVarList);
-                    if (tempIntroXml == null)
-                        return -100; // network error
-                    introXml = new String(tempIntroXml, "UTF-8");
+            // get full range online, always
+            try {
+                // fetch intro
+                if (!isLoading)
+                    return Wenku8Error.ErrorCode.USER_CANCELLED_TASK; // cancel
+                List<NameValuePair> targVarListVolume = new ArrayList<NameValuePair>();
+                targVarListVolume.add(Wenku8API.getNovelIndex(taskaid, GlobalConfig.getCurrentLang()));
+                byte[] tempVolumeXml = LightNetwork.LightHttpPost(Wenku8API.getBaseURL(), targVarListVolume);
+                if (tempVolumeXml == null) return Wenku8Error.ErrorCode.NETWORK_ERROR; // network error
+                volumeXml = new String(tempVolumeXml, "UTF-8");
 
-                    // parse into structures
-                    vl = Wenku8Parser.getVolumeList(volumeXml);
-                    ni = Wenku8Parser.parsetNovelFullMeta(introXml);
-                    if (vl == null || ni == null)
-                        return -101; // parse failed
+                if (!isLoading)
+                    return Wenku8Error.ErrorCode.USER_CANCELLED_TASK; // cancel
+                List<NameValuePair> targVarList = new ArrayList<NameValuePair>();
+                targVarList.add(Wenku8API.getNovelFullMeta(taskaid, GlobalConfig.getCurrentLang()));
+                byte[] tempIntroXml = LightNetwork.LightHttpPost(Wenku8API.getBaseURL(), targVarList);
+                if (tempIntroXml == null) return Wenku8Error.ErrorCode.NETWORK_ERROR; // network error
+                introXml = new String(tempIntroXml, "UTF-8");
 
-                    if (!isLoading)
-                        return -222; // calcel
-                    List<NameValuePair> targIntro = new ArrayList<NameValuePair>();
-                    targIntro.add(Wenku8API.getNovelFullIntro(ni.aid, GlobalConfig.getCurrentLang()));
-                    byte[] tempFullIntro = LightNetwork.LightHttpPost(Wenku8API.getBaseURL(), targIntro);
-                    if (tempFullIntro == null)
-                        return -100; // network error
-                    ni.fullIntro = new String(tempFullIntro, "UTF-8");
+                // parse into structures
+                vl = Wenku8Parser.getVolumeList(volumeXml);
+                ni = Wenku8Parser.parsetNovelFullMeta(introXml);
+                if (vl == null || ni == null) return Wenku8Error.ErrorCode.XML_PARSE_FAILED; // parse failed
 
-                    // write into saved file
-                    GlobalConfig.writeFullFileIntoSaveFolder("intro", param + "-intro.xml", introXml);
-                    GlobalConfig.writeFullFileIntoSaveFolder("intro", param + "-introfull.xml", ni.fullIntro);
-                    GlobalConfig.writeFullFileIntoSaveFolder("intro", param + "-volume.xml", volumeXml);
+                if (!isLoading)
+                    return Wenku8Error.ErrorCode.USER_CANCELLED_TASK; // calcel
+                List<NameValuePair> targIntro = new ArrayList<NameValuePair>();
+                targIntro.add(Wenku8API.getNovelFullIntro(ni.aid, GlobalConfig.getCurrentLang()));
+                byte[] tempFullIntro = LightNetwork.LightHttpPost(Wenku8API.getBaseURL(), targIntro);
+                if (tempFullIntro == null) return Wenku8Error.ErrorCode.NETWORK_ERROR; // network error
+                ni.fullIntro = new String(tempFullIntro, "UTF-8");
 
-                } catch (UnsupportedEncodingException e) {
-                    e.printStackTrace();
-                }
+                // write into saved file
+                GlobalConfig.writeFullFileIntoSaveFolder("intro", taskaid + "-intro.xml", introXml);
+                GlobalConfig.writeFullFileIntoSaveFolder("intro", taskaid + "-introfull.xml", ni.fullIntro);
+                GlobalConfig.writeFullFileIntoSaveFolder("intro", taskaid + "-volume.xml", volumeXml);
 
-                // calc size
-                for (VolumeList tempVl : vl) {
-                    size_a += tempVl.chapterList.size();
-                }
-                pDialog.setMaxProgress(size_a);
+            } catch (UnsupportedEncodingException e) {
+                e.printStackTrace();
+            }
+            if(operationType == 0) return Wenku8Error.ErrorCode.SYSTEM_1_SUCCEEDED; // update info
 
-                // cache each cid to save the whole book
-                // and will need to download all the images
-                for (VolumeList tempVl : vl) {
-                    for (ChapterInfo tempCi : tempVl.chapterList) {
-                        try {
-                            List<NameValuePair> targVar = new ArrayList<NameValuePair>();
-                            targVar.add(Wenku8API.getNovelContent(ni.aid, tempCi.cid, GlobalConfig.getCurrentLang()));
+            // calc size
+            for (VolumeList tempVl : vl) {
+                size_a += tempVl.chapterList.size();
+            }
+            pDialog.setMaxProgress(size_a);
 
-                            // load from local first
-                            if (!isLoading)
-                                return -222; // calcel
-                            String xml = GlobalConfig
-                                    .loadFullFileFromSaveFolder("novel",
-                                            tempCi.cid + ".xml");
-                            if (xml == null || xml.length() == 0) {
-                                byte[] tempXml = LightNetwork.LightHttpPost(Wenku8API.getBaseURL(), targVar);
-                                if (tempXml == null)
-                                    return -100; // network error
-                                xml = new String(tempXml, "UTF-8");
+            // cache each cid to save the whole book
+            // and will need to download all the images
+            for (VolumeList tempVl : vl) {
+                for (ChapterInfo tempCi : tempVl.chapterList) {
+                    try {
+                        List<NameValuePair> targVar = new ArrayList<NameValuePair>();
+                        targVar.add(Wenku8API.getNovelContent(ni.aid, tempCi.cid, GlobalConfig.getCurrentLang()));
 
-                                // save file (cid.xml), didn't format it
-                                // future version may format it for better
-                                // performance
-                                GlobalConfig.writeFullFileIntoSaveFolder(
-                                        "novel", tempCi.cid + ".xml", xml);
-                            }
+                        // load from local first
+                        if (!isLoading) return Wenku8Error.ErrorCode.USER_CANCELLED_TASK; // calcel
+                        String xml = GlobalConfig.loadFullFileFromSaveFolder("novel", tempCi.cid + ".xml"); // prevent empty file
+                        if (xml == null || xml.length() == 0 || operationType == 2) {
+                            byte[] tempXml = LightNetwork.LightHttpPost(Wenku8API.getBaseURL(), targVar);
+                            if (tempXml == null) return Wenku8Error.ErrorCode.NETWORK_ERROR; // network error
+                            xml = new String(tempXml, "UTF-8");
 
-                            // cache image
-                            if (GlobalConfig.doCacheImage()) {
-                                List<OldNovelContentParser.NovelContent> nc = OldNovelContentParser.NovelContentParser_onlyImage(xml);
-                                if (nc == null)
-                                    return -100;
+                            // save file (cid.xml), didn't format it future version may format it for better performance
+                            GlobalConfig.writeFullFileIntoSaveFolder("novel", tempCi.cid + ".xml", xml);
+                        }
 
-                                for (int i = 0; i < nc.size(); i++) {
-                                    if (nc.get(i).type == 'i') {
-                                        pDialog.setMaxProgress(++size_a);
+                        // cache image
+                        if (GlobalConfig.doCacheImage()) {
+                            List<OldNovelContentParser.NovelContent> nc = OldNovelContentParser.NovelContentParser_onlyImage(xml);
+                            if (nc == null) return Wenku8Error.ErrorCode.NETWORK_ERROR;
 
-                                        // save this images, judge exist first
-                                        String imgFileName = GlobalConfig
-                                                .generateImageFileNameByURL(nc
-                                                        .get(i).content);
-                                        if (!LightCache
-                                                .testFileExist(GlobalConfig
-                                                        .getFirstFullSaveFilePath()
-                                                        + GlobalConfig.imgsSaveFolderName
-                                                        + File.separator
-                                                        + imgFileName)
-                                                && !LightCache
-                                                .testFileExist(GlobalConfig
-                                                        .getSecondFullSaveFilePath()
-                                                        + GlobalConfig.imgsSaveFolderName
-                                                        + File.separator
-                                                        + imgFileName)) {
-                                            // neither of the file exist
-                                            byte[] fileContent = LightNetwork.LightHttpDownload(nc.get(i).content);
-                                            if (fileContent == null)
-                                                return -100; // network error
-                                            if (!LightCache.saveFile(GlobalConfig.getFirstFullSaveFilePath()
+                            for (int i = 0; i < nc.size(); i++) {
+                                if (nc.get(i).type == 'i') {
+                                    pDialog.setMaxProgress(++size_a);
+
+                                    // save this images, judge exist first
+                                    String imgFileName = GlobalConfig
+                                            .generateImageFileNameByURL(nc
+                                                    .get(i).content);
+                                    if (!LightCache.testFileExist(GlobalConfig.getFirstFullSaveFilePath()
+                                            + GlobalConfig.imgsSaveFolderName + File.separator + imgFileName)
+                                            && !LightCache.testFileExist(GlobalConfig.getSecondFullSaveFilePath()
+                                            + GlobalConfig.imgsSaveFolderName + File.separator + imgFileName)
+                                            || operationType == 2) {
+                                        // neither of the file exist
+                                        byte[] fileContent = LightNetwork.LightHttpDownload(nc.get(i).content);
+                                        if (fileContent == null) return Wenku8Error.ErrorCode.NETWORK_ERROR; // network error
+                                        if (!LightCache.saveFile(GlobalConfig.getFirstFullSaveFilePath()
+                                                        + GlobalConfig.imgsSaveFolderName + File.separator,
+                                                imgFileName, fileContent, true)) // fail
+                                            // to first path
+                                            LightCache.saveFile(GlobalConfig.getSecondFullSaveFilePath()
                                                             + GlobalConfig.imgsSaveFolderName + File.separator,
-                                                    imgFileName, fileContent, true)) // fail
-                                                // to first path
-                                                LightCache.saveFile(GlobalConfig.getSecondFullSaveFilePath()
-                                                                + GlobalConfig.imgsSaveFolderName + File.separator,
-                                                        imgFileName, fileContent, true);
-                                        }
-
-                                        if (!isLoading)
-                                            return -222;
-                                        publishProgress(++current); // update
-                                        // progress
+                                                    imgFileName, fileContent, true);
                                     }
+
+                                    if (!isLoading) return Wenku8Error.ErrorCode.USER_CANCELLED_TASK;
+                                    publishProgress(++current); // update
+                                    // progress
                                 }
                             }
-                            publishProgress(++current); // update progress
-
-                        } catch (UnsupportedEncodingException e) {
-                            e.printStackTrace();
                         }
+                        publishProgress(++current); // update progress
+
+                    } catch (UnsupportedEncodingException e) {
+                        e.printStackTrace();
                     }
                 }
             }
 
-            return 0;
+            return Wenku8Error.ErrorCode.SYSTEM_1_SUCCEEDED;
         }
 
         @Override
@@ -698,12 +786,11 @@ public class NovelInfoActivity extends AppCompatActivity {
         {
             if (pDialog != null)
                 pDialog.setProgress(values[0]);
-            return;
         }
 
-        protected void onPostExecute(Integer result)
+        protected void onPostExecute(Wenku8Error.ErrorCode result)
         {
-            if (result == -222) {
+            if (result == Wenku8Error.ErrorCode.USER_CANCELLED_TASK) {
                 // user cancelled
                 Toast.makeText(NovelInfoActivity.this, "User cancelled!", Toast.LENGTH_LONG).show();
                 if (pDialog != null)
@@ -711,14 +798,14 @@ public class NovelInfoActivity extends AppCompatActivity {
                 onResume();
                 isLoading = false;
                 return;
-            } else if (result == -100) {
+            } else if (result == Wenku8Error.ErrorCode.NETWORK_ERROR) {
                 Toast.makeText(NovelInfoActivity.this, getResources().getString(R.string.system_network_error), Toast.LENGTH_LONG).show();
                 if (pDialog != null)
                     pDialog.dismiss();
                 onResume();
                 isLoading = false;
                 return;
-            } else if (result == -101) {
+            } else if (result == Wenku8Error.ErrorCode.XML_PARSE_FAILED) {
                 Toast.makeText(NovelInfoActivity.this, "Parse failed!", Toast.LENGTH_LONG).show();
                 if (pDialog != null)
                     pDialog.dismiss();
@@ -732,8 +819,8 @@ public class NovelInfoActivity extends AppCompatActivity {
             isLoading = false;
             if (pDialog != null)
                 pDialog.dismiss();
-            onResume();
-            return;
+
+            refreshInfoFromLocal();
         }
 
     }
@@ -748,5 +835,19 @@ public class NovelInfoActivity extends AppCompatActivity {
     protected void onResume() {
         super.onResume();
         MobclickAgent.onResume(this);
+    }
+
+    private void refreshInfoFromLocal() {
+        isLoading = true;
+        spb.progressiveStart();
+        FetchInfoAsyncTask fetchInfoAsyncTask = new FetchInfoAsyncTask();
+        fetchInfoAsyncTask.execute(1); // load from local
+    }
+
+    private void refreshInfoFromCloud() {
+        isLoading = true;
+        spb.progressiveStart();
+        FetchInfoAsyncTask fetchInfoAsyncTask = new FetchInfoAsyncTask();
+        fetchInfoAsyncTask.execute();
     }
 }

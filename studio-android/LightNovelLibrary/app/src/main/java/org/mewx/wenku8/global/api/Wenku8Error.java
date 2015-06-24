@@ -30,6 +30,7 @@ public class Wenku8Error {
         STRING_CONVERSION_ERROR,
         XML_PARSE_FAILED,
         USER_CANCELLED_TASK,
+        PARAM_COUNT_NOT_MATCHED,
     }
 
     public static String translateErrorCode(ErrorCode ec) {

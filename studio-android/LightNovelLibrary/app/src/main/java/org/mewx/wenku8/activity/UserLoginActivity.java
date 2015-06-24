@@ -194,7 +194,7 @@ public class UserLoginActivity extends AppCompatActivity {
             switch(i) {
                 case SYSTEM_1_SUCCEEDED:
                     Toast.makeText(MyApp.getContext(), getResources().getString(R.string.system_logged), Toast.LENGTH_SHORT).show();
-                    UserLoginActivity.this.onBackPressed();
+                    UserLoginActivity.this.finish();
                     break;
 
                 case SYSTEM_2_ERROR_USERNAME:

@@ -19,7 +19,7 @@
             android:layout_height="match_parent">
 
             <com.makeramen.roundedimageview.RoundedImageView
-                android:id="@+id/userinfo_avatar"
+                android:id="@+id/user_avatar"
                 android:layout_height="132dp"
                 android:layout_width="132dp"
                 android:src="@drawable/ic_noavatar"
@@ -41,7 +41,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="16dp"
                 android:layout_centerHorizontal="true"
-                android:layout_below="@id/userinfo_avatar">
+                android:layout_below="@id/user_avatar">
 
                 <TableRow>
                     <TextView

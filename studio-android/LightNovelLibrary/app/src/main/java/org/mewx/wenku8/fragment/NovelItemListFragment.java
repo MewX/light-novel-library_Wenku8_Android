@@ -2,9 +2,15 @@ package org.mewx.wenku8.fragment;
 
 import android.content.Intent;
 import android.os.AsyncTask;
+import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
 import android.support.annotation.Nullable;
+import android.support.design.widget.Snackbar;
+import android.support.v4.app.ActivityCompat;
+import android.support.v4.app.ActivityOptionsCompat;
 import android.support.v4.app.Fragment;
+import android.support.v4.util.Pair;
 import android.support.v7.widget.DefaultItemAnimator;
 import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
@@ -12,10 +18,10 @@ import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import org.apache.http.NameValuePair;
-import org.mewx.wenku8.MyApp;
 import org.mewx.wenku8.R;
 import org.mewx.wenku8.activity.MainActivity;
 import org.mewx.wenku8.activity.NovelInfoActivity;
@@ -32,6 +38,9 @@ import org.mewx.wenku8.util.Logger;
 import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -60,12 +69,6 @@ public class NovelItemListFragment extends Fragment implements MyItemClickListen
     private int currentPage = 1; // default 1
     private int totalPage = 0; // default 0
 
-    /**
-     * Each position stands an specific list type.
-     * Each type represent a specific
-     * @param args
-     * @return
-     */
     public static NovelItemListFragment newInstance(Bundle args) {
         NovelItemListFragment fragment = new NovelItemListFragment();
         fragment.setArguments(args);
@@ -73,10 +76,6 @@ public class NovelItemListFragment extends Fragment implements MyItemClickListen
         return fragment;
     }
 
-    /**
-     * On create
-     * @param savedInstanceState
-     */
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -88,17 +87,8 @@ public class NovelItemListFragment extends Fragment implements MyItemClickListen
         // get main activity
         if(getActivity() instanceof MainActivity)
             mainActivity = (MainActivity) getActivity();
-
-        return;
     }
 
-    /**
-     * On create view
-     * @param inflater
-     * @param container
-     * @param savedInstanceState
-     * @return
-     */
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
                              Bundle savedInstanceState) {
@@ -157,23 +147,11 @@ public class NovelItemListFragment extends Fragment implements MyItemClickListen
         return rootView;
     }
 
-    /**
-     * on Activity Created
-     * @param savedInstanceState
-     */
     @Override
     public void onActivityCreated(@Nullable Bundle savedInstanceState) {
         super.onActivityCreated(savedInstanceState);
-
-        return;
     }
 
-
-    /**
-     * Fill on click lister
-     * @param view
-     * @param position
-     */
     @Override
     public void onItemClick(View view, final int position) {
         //Toast.makeText(getActivity(),"item click detected", Toast.LENGTH_SHORT).show();
@@ -187,9 +165,17 @@ public class NovelItemListFragment extends Fragment implements MyItemClickListen
         Intent intent = new Intent(getActivity(), NovelInfoActivity.class);
         intent.putExtra("aid", listNovelItemAid.get(position));
         intent.putExtra("from", "list");
-        startActivity(intent);
+        intent.putExtra("title", ((TextView) view.findViewById(R.id.novel_title)).getText());
 
-        return;
+        if(Build.VERSION.SDK_INT < 21) {
+            startActivity(intent);
+        }
+        else {
+            ActivityOptionsCompat options = ActivityOptionsCompat.makeSceneTransitionAnimation(getActivity(),
+                    Pair.create(view.findViewById(R.id.novel_cover), "novel_cover"),
+                    Pair.create(view.findViewById(R.id.novel_title), "novel_title"));
+            ActivityCompat.startActivity(getActivity(), intent, options.toBundle());
+        }
     }
 
     @Override
@@ -197,8 +183,6 @@ public class NovelItemListFragment extends Fragment implements MyItemClickListen
         Toast.makeText(getActivity(),"item long click detected", Toast.LENGTH_SHORT).show();
 
         // TODO: show pop up
-
-        return;
     }
 
     /**
@@ -207,11 +191,11 @@ public class NovelItemListFragment extends Fragment implements MyItemClickListen
      */
     private void refreshIdList() {
         if(listNovelItemAid==null)
-            listNovelItemAid = new ArrayList<Integer>();
+            listNovelItemAid = new ArrayList<>();
 
         // set empty list with id only
         if(listNovelItemInfo == null)
-            listNovelItemInfo = new ArrayList<NovelItemInfoUpdate>();
+            listNovelItemInfo = new ArrayList<>();
         else
             listNovelItemInfo.clear();
 
@@ -234,17 +218,12 @@ public class NovelItemListFragment extends Fragment implements MyItemClickListen
         }
         else
             mAdapter.notifyDataSetChanged();
-
-
-        return;
     }
 
     private void appendToIdList(List<Integer> l) {
         if(listNovelItemAid==null)
             listNovelItemAid = new ArrayList<>();
         listNovelItemAid.addAll(l);
-
-        return;
     }
 
     private class MyOnScrollListener extends RecyclerView.OnScrollListener {
@@ -262,9 +241,9 @@ public class NovelItemListFragment extends Fragment implements MyItemClickListen
                     GlobalConfig.wantDebugLog("MewX", "Loading more...");
 
                     // load more toast
-                    Toast.makeText(MyApp.getContext(),
-                            getResources().getString(R.string.list_loading) + "(" + Integer.toString(currentPage + 1) + "/" + Integer.toString(totalPage) + ")",
-                            Toast.LENGTH_SHORT).show();
+                    Snackbar.make(mRecyclerView, getResources().getString(R.string.list_loading)
+                            + "(" + Integer.toString(currentPage + 1) + "/" + Integer.toString(totalPage) + ")",
+                            Snackbar.LENGTH_SHORT).show();
 
                     // load more thread
                     AsyncGetNovelItemList asynctask = new AsyncGetNovelItemList();
@@ -279,6 +258,11 @@ public class NovelItemListFragment extends Fragment implements MyItemClickListen
 
         @Override
         protected Integer doInBackground(Integer... params) {
+            try {
+                Thread.sleep(1000);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
             if(isLoading)
                 return -1;
 
@@ -288,7 +272,7 @@ public class NovelItemListFragment extends Fragment implements MyItemClickListen
             // params[0] is current page number
             if (GlobalConfig.inDebugMode())
                 Log.v("MewX", "background starts");
-            List<NameValuePair> l = new ArrayList<NameValuePair>();
+            List<NameValuePair> l = new ArrayList<>();
             l.add(Wenku8API.getNovelList(Wenku8API.getNOVELSORTBY(type), currentPage));
 
             byte[] temp = LightNetwork.LightHttpPost( Wenku8API.getBaseURL(), l );
@@ -310,11 +294,6 @@ public class NovelItemListFragment extends Fragment implements MyItemClickListen
 
             totalPage = tempNovelList.get(0);
             tempNovelList.remove(0);
-
-
-            if (GlobalConfig.inDebugMode())
-                Log.v("MewX", "background ends");
-
             return 0;
         }
 
@@ -361,7 +340,7 @@ public class NovelItemListFragment extends Fragment implements MyItemClickListen
                 Log.v("MewX", "background search starts");
 
             // get search result by novel title
-            List<NameValuePair> l1 = new ArrayList<NameValuePair>();
+            List<NameValuePair> l1 = new ArrayList<>();
             l1.add(Wenku8API.searchNovelByNovelName(params[0],GlobalConfig.getCurrentLang()));
             byte[] tempListTitle = LightNetwork.LightHttpPost(Wenku8API.getBaseURL(),l1);
             if(tempListTitle == null) return -1;
@@ -374,7 +353,7 @@ public class NovelItemListFragment extends Fragment implements MyItemClickListen
                 Pattern p = Pattern.compile("aid=\'(.*)\'"); // match content between "aid=\'" and "\'"
                 Matcher m = p.matcher(new String(tempListTitle, "UTF-8"));
                 while (m.find())
-                    listResultList.add(new Integer(m.group(1)));
+                    listResultList.add(Integer.valueOf(m.group(1)));
             } catch (UnsupportedEncodingException e) {
                 e.printStackTrace();
                 GlobalConfig.wantDebugLog("MewX", e.toString());
@@ -382,7 +361,7 @@ public class NovelItemListFragment extends Fragment implements MyItemClickListen
 
 
             // get search result by author name
-            List<NameValuePair> l2 = new ArrayList<NameValuePair>();
+            List<NameValuePair> l2 = new ArrayList<>();
             l2.add(Wenku8API.searchNovelByAuthorName(params[0], GlobalConfig.getCurrentLang()));
             byte[] tempListName = LightNetwork.LightHttpPost(Wenku8API.getBaseURL(),l2);
             if(tempListName == null) return -1;
@@ -395,7 +374,7 @@ public class NovelItemListFragment extends Fragment implements MyItemClickListen
                 Pattern p = Pattern.compile("aid=\'(.*)\'"); // match content between "aid=\'" and "\'"
                 Matcher m = p.matcher(new String(tempListName, "UTF-8"));
                 while (m.find()) {
-                    listResultList2.add(new Integer(m.group(1)));
+                    listResultList2.add(Integer.valueOf(m.group(1)));
                     Log.e("MewX", listResultList2.get(listResultList2.size()-1).toString());
                 }
             } catch (UnsupportedEncodingException e) {
@@ -436,7 +415,6 @@ public class NovelItemListFragment extends Fragment implements MyItemClickListen
             GlobalConfig.wantDebugLog("MewX", "refresh over");
 
             spb.progressiveStop();
-            return;
         }
     }
 

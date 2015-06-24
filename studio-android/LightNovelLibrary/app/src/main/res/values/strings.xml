@@ -78,6 +78,7 @@
     <string name="system_password_error">契约失败，发现冒牌魔法师！（密码错误）</string>
     <string name="system_log_info_outofdate">登录信息已经改变，登陆失败！</string>
     <string name="system_fetching">正在从服务器获取信息……</string>
+    <string name="system_wait_for_next_version">请等待下一个版本，端午节之后~</string>
     <string name="task_stop">停止加载</string>
     <string name="task_retry">重新加载</string>
     <string name="task_null">没有结果</string>
@@ -85,6 +86,8 @@
     <string name="dialog_content_delete_one_search_record">确定要删除该搜索历史吗？\n</string>
     <string name="dialog_content_load_from_cloud">该章节未缓存，是否立即联网阅读？</string>
     <string name="dialog_content_verify_download">确定要开始联网下载该书吗？\n（高清原图也会下载）</string>
+    <string name="dialog_content_verify_update">确定要开始联网检查更新吗？\n（只会更新卷目）</string>
+    <string name="dialog_content_verify_force_update">确定要开始覆盖下载更新吗？\n（高清原图也会重复下载）</string>
     <string name="dialog_content_verify_register">注册需要去wenku8.cn进行。\n是否打开浏览器去注册？</string>
     <string name="dialog_content_downloading">正在缓存……</string>
     <string name="dialog_content_sure_to_unfav">确定要取消收藏？\n（缓存的小说内容也会删除）</string>

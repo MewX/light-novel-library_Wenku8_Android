@@ -27,6 +27,14 @@
         <!-- UMeng Mob Statistics -->
         <meta-data android:value="55220944fd98c5d81f000a71" android:name="UMENG_APPKEY"/>
         <meta-data android:value="alpha" android:name="UMENG_CHANNEL"/>
+        <service
+            android:name="com.umeng.update.net.DownloadingService"
+            android:process=":DownloadingService" >
+        </service>
+        <activity
+            android:name="com.umeng.update.UpdateDialogActivity"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar" >
+        </activity>
 
         <!-- Activity list -->
         <activity

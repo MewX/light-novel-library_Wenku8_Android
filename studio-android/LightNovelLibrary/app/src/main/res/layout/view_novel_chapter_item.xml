@@ -13,7 +13,7 @@
         card-view:cardBackgroundColor="@color/novel_item_white"
         card-view:cardElevation="2dp"
         card-view:cardUseCompatPadding="true"
-        card-view:cardMaxElevation="2dp">
+        card-view:cardMaxElevation="4dp">
 
         <TextView
             android:id="@+id/chapter_title"
@@ -27,7 +27,7 @@
             android:paddingRight="16dp"
             android:background="@drawable/btn_menu_item"
             android:clickable="true"
-            android:text="test"
+            android:text="@string/na"
             android:singleLine="true"
             android:textColor="@color/menu_text_color" />
 

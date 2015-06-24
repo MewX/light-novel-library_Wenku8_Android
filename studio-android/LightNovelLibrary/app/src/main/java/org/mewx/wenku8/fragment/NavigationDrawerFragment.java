@@ -1,5 +1,6 @@
 package org.mewx.wenku8.fragment;
 
+import android.app.ActivityOptions;
 import android.app.Fragment;
 import android.content.Intent;
 import android.graphics.Bitmap;
@@ -9,6 +10,8 @@ import android.os.AsyncTask;
 import android.os.Build;
 import android.os.Bundle;
 import android.support.annotation.Nullable;
+import android.support.v4.app.ActivityOptionsCompat;
+import android.support.v4.util.Pair;
 import android.support.v4.widget.DrawerLayout;
 import android.support.v7.app.ActionBarDrawerToggle;
 import android.support.v7.widget.Toolbar;
@@ -16,6 +19,7 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageButton;
+import android.widget.ImageView;
 import android.widget.RelativeLayout;
 import android.widget.TableRow;
 import android.widget.TextView;
@@ -227,17 +231,7 @@ public class NavigationDrawerFragment extends Fragment {
                 if (!isAdded()) return;
 
                 mainActivity.invalidateOptionsMenu();
-
-                // test navigation bar exist
-                Point navBar = LightTool.getNavigationBarSize(getActivity());
-//                Toast.makeText(getActivity(), "width = " + navBar.x + "; height = " + navBar.y, Toast.LENGTH_SHORT).show();
-                RelativeLayout rl = (RelativeLayout)mainActivity.findViewById(R.id.bot_background);
-                RelativeLayout.LayoutParams layoutParams = (RelativeLayout.LayoutParams)rl.getLayoutParams();
-                if(navBar.y == 0)
-                    layoutParams.setMargins(0, 0, 0, 0); // hide
-                else
-                    layoutParams.setMargins(0, 0, 0, navBar.y); // show
-                rl.setLayoutParams(layoutParams);
+                updateNavigationBar();
             }
         };
 
@@ -247,8 +241,8 @@ public class NavigationDrawerFragment extends Fragment {
                 mActionBarDrawerToggle.syncState();
             }
         });
-
         mDrawerLayout.setDrawerListener(mActionBarDrawerToggle);
+        updateNavigationBar();
     }
 
     /**
@@ -492,6 +486,19 @@ public class NavigationDrawerFragment extends Fragment {
         }
 
         fakeDarkSwitcher = !fakeDarkSwitcher;
+    }
+
+    private void updateNavigationBar() {
+        // test navigation bar exist
+        Point navBar = LightTool.getNavigationBarSize(getActivity());
+//                Toast.makeText(getActivity(), "width = " + navBar.x + "; height = " + navBar.y, Toast.LENGTH_SHORT).show();
+        RelativeLayout rl = (RelativeLayout)mainActivity.findViewById(R.id.bot_background);
+        RelativeLayout.LayoutParams layoutParams = (RelativeLayout.LayoutParams)rl.getLayoutParams();
+        if(navBar.y == 0)
+            layoutParams.setMargins(0, 0, 0, 0); // hide
+        else
+            layoutParams.setMargins(0, 0, 0, navBar.y); // show
+        rl.setLayoutParams(layoutParams);
     }
 
     @Override

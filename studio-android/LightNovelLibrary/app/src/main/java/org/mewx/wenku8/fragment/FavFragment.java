@@ -3,9 +3,12 @@ package org.mewx.wenku8.fragment;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.os.AsyncTask;
+import android.os.Build;
 import android.os.Bundle;
-import android.support.annotation.IntegerRes;
+import android.support.v4.app.ActivityCompat;
+import android.support.v4.app.ActivityOptionsCompat;
 import android.support.v4.app.Fragment;
+import android.support.v4.util.Pair;
 import android.support.v7.widget.DefaultItemAnimator;
 import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
@@ -13,6 +16,7 @@ import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import com.afollestad.materialdialogs.MaterialDialog;
@@ -25,22 +29,18 @@ import org.mewx.wenku8.R;
 import org.mewx.wenku8.activity.NovelInfoActivity;
 import org.mewx.wenku8.adapter.NovelItemAdapterUpdate;
 import org.mewx.wenku8.global.GlobalConfig;
-import org.mewx.wenku8.global.api.ChapterInfo;
 import org.mewx.wenku8.global.api.NovelItemInfoUpdate;
 import org.mewx.wenku8.global.api.NovelItemMeta;
-import org.mewx.wenku8.global.api.OldNovelContentParser;
 import org.mewx.wenku8.global.api.VolumeList;
 import org.mewx.wenku8.global.api.Wenku8API;
 import org.mewx.wenku8.global.api.Wenku8Error;
 import org.mewx.wenku8.global.api.Wenku8Parser;
 import org.mewx.wenku8.listener.MyItemClickListener;
 import org.mewx.wenku8.listener.MyItemLongClickListener;
-import org.mewx.wenku8.util.LightCache;
 import org.mewx.wenku8.util.LightNetwork;
 import org.mewx.wenku8.util.LightTool;
 import org.mewx.wenku8.util.LightUserSession;
 
-import java.io.File;
 import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
 import java.util.List;
@@ -116,8 +116,18 @@ public class FavFragment extends Fragment implements MyItemClickListener, MyItem
         Intent intent = new Intent(getActivity(), NovelInfoActivity.class);
         intent.putExtra("aid", listNovelItemAid.get(position));
         intent.putExtra("from", "fav");
+        intent.putExtra("title", ((TextView) view.findViewById(R.id.novel_title)).getText());
         GlobalConfig.accessToLocalBookshelf(listNovelItemAid.get(position)); // sort event
-        startActivity(intent);
+
+        if(Build.VERSION.SDK_INT < 21) {
+            startActivity(intent);
+        }
+        else {
+            ActivityOptionsCompat options = ActivityOptionsCompat.makeSceneTransitionAnimation(getActivity(),
+                    Pair.create(view.findViewById(R.id.novel_cover), "novel_cover"),
+                    Pair.create(view.findViewById(R.id.novel_title), "novel_title"));
+            ActivityCompat.startActivity(getActivity(), intent, options.toBundle());
+        }
     }
 
     @Override
@@ -162,7 +172,7 @@ public class FavFragment extends Fragment implements MyItemClickListener, MyItem
         protected void onPreExecute() {
             super.onPreExecute();
             listNovelItemAid = GlobalConfig.getLocalBookshelfList();
-            listNovelItemInfo = new ArrayList<NovelItemInfoUpdate>();
+            listNovelItemInfo = new ArrayList<>();
         }
 
         @Override
@@ -172,7 +182,7 @@ public class FavFragment extends Fragment implements MyItemClickListener, MyItem
             // load all meta file
             for(Integer aid : listNovelItemAid) {
                 String xml = GlobalConfig.loadFullFileFromSaveFolder("intro", aid + "-intro.xml");
-                NovelItemInfoUpdate niiu = null;
+                NovelItemInfoUpdate niiu;
 
                 if (xml.equals("")) {
                     // the intro file was deleted
@@ -249,7 +259,7 @@ public class FavFragment extends Fragment implements MyItemClickListener, MyItem
             if(b == null) return Wenku8Error.ErrorCode.NETWORK_ERROR;
 
             if(LightTool.isInteger(new String(b))) {
-                if(Wenku8Error.getSystemDefinedErrorCode(new Integer(new String(b))) == Wenku8Error.ErrorCode.SYSTEM_4_NOT_LOGGED_IN) {
+                if(Wenku8Error.getSystemDefinedErrorCode(Integer.valueOf(new String(b))) == Wenku8Error.ErrorCode.SYSTEM_4_NOT_LOGGED_IN) {
                     // do log in
                     Wenku8Error.ErrorCode temp = LightUserSession.doLoginFromFile();
                     if(temp != Wenku8Error.ErrorCode.SYSTEM_1_SUCCEEDED) return temp; // return an error code
@@ -268,7 +278,7 @@ public class FavFragment extends Fragment implements MyItemClickListener, MyItem
                 Pattern p = Pattern.compile("aid=\"(.*)\""); // match content between "aid=\"" and "\""
                 Matcher m = p.matcher(new String(b, "UTF-8"));
                 while (m.find())
-                    listResultList.add(new Integer(m.group(1)));
+                    listResultList.add(Integer.valueOf(m.group(1)));
             } catch (UnsupportedEncodingException e) {
                 e.printStackTrace();
                 GlobalConfig.wantDebugLog("MewX", e.toString());
@@ -303,15 +313,16 @@ public class FavFragment extends Fragment implements MyItemClickListener, MyItem
                 NovelItemMeta ni;
                 try {
                     // fetch intro
-                    List<NameValuePair> targVarListVolume = new ArrayList<NameValuePair>();
+                    List<NameValuePair> targVarListVolume = new ArrayList<>();
                     targVarListVolume.add(Wenku8API.getNovelIndex(aid, GlobalConfig.getCurrentLang()));
                     byte[] tempVolumeXml = LightNetwork.LightHttpPost(Wenku8API.getBaseURL(), targVarListVolume);
                     if(!isLoading) return Wenku8Error.ErrorCode.USER_CANCELLED_TASK;
+                    if(tempVolumeXml == null) return Wenku8Error.ErrorCode.NETWORK_ERROR;
                     volumeXml = new String(tempVolumeXml, "UTF-8");
 
                     // fetch volumes
                     if(!isLoading) return Wenku8Error.ErrorCode.USER_CANCELLED_TASK;
-                    List<NameValuePair> targVarList = new ArrayList<NameValuePair>();
+                    List<NameValuePair> targVarList = new ArrayList<>();
                     targVarList.add(Wenku8API.getNovelFullMeta(aid, GlobalConfig.getCurrentLang()));
                     byte[] tempIntroXml = LightNetwork.LightHttpPost(Wenku8API.getBaseURL(), targVarList);
                     if (tempIntroXml == null) return Wenku8Error.ErrorCode.NETWORK_ERROR;
@@ -323,7 +334,7 @@ public class FavFragment extends Fragment implements MyItemClickListener, MyItem
                     if (vl == null || ni == null) return Wenku8Error.ErrorCode.XML_PARSE_FAILED;
 
                     if(!isLoading) return Wenku8Error.ErrorCode.USER_CANCELLED_TASK;
-                    List<NameValuePair> targIntro = new ArrayList<NameValuePair>();
+                    List<NameValuePair> targIntro = new ArrayList<>();
                     targIntro.add(Wenku8API.getNovelFullIntro(ni.aid, GlobalConfig.getCurrentLang()));
                     byte[] tempFullIntro = LightNetwork.LightHttpPost(Wenku8API.getBaseURL(), targIntro);
                     if (tempFullIntro == null) return Wenku8Error.ErrorCode.NETWORK_ERROR;
@@ -401,15 +412,12 @@ public class FavFragment extends Fragment implements MyItemClickListener, MyItem
 
                 try {
                     if(LightTool.isInteger(new String(b, "UTF-8"))) {
-                        Wenku8Error.ErrorCode result = Wenku8Error.getSystemDefinedErrorCode(new Integer(new String(b, "UTF-8")));
+                        Wenku8Error.ErrorCode result = Wenku8Error.getSystemDefinedErrorCode(Integer.valueOf(new String(b, "UTF-8")));
                         if(result == Wenku8Error.ErrorCode.SYSTEM_6_BOOKSHELF_FULL) {
                             return result;
                         }
                         else if(result == Wenku8Error.ErrorCode.SYSTEM_1_SUCCEEDED || result == Wenku8Error.ErrorCode.SYSTEM_5_ALREADY_IN_BOOKSHELF) {
                             localOnly.remove(aid); // remove Obj
-                        }
-                        else {
-                            // ignore
                         }
                     }
                 } catch (UnsupportedEncodingException e) {

@@ -2,14 +2,20 @@ package org.mewx.wenku8.fragment;
 
 import android.content.Intent;
 import android.os.AsyncTask;
+import android.os.Build;
 import android.os.Bundle;
+import android.support.design.widget.Snackbar;
+import android.support.v4.app.ActivityCompat;
+import android.support.v4.app.ActivityOptionsCompat;
 import android.support.v4.app.Fragment;
+import android.support.v4.util.Pair;
 import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.ImageView;
 import android.widget.SimpleAdapter;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -59,18 +65,8 @@ public class LatestFragment extends Fragment implements MyItemClickListener, MyI
         // Required empty public constructor
     }
 
-    /**
-     * Use this factory method to create a new instance of
-     * this fragment using the provided parameters.
-     *
-     * @param param1 Parameter 1.
-     * @param param2 Parameter 2.
-     * @return A new instance of fragment LatestFragment.
-     */
-    public static LatestFragment newInstance(String param1, String param2) {
-        LatestFragment fragment = new LatestFragment();
-
-        return fragment;
+    public static LatestFragment newInstance() {
+        return new LatestFragment();
     }
 
     @Override
@@ -82,16 +78,10 @@ public class LatestFragment extends Fragment implements MyItemClickListener, MyI
             mainActivity = (MainActivity) getActivity();
 
         GlobalConfig.setCurrentFragment(this); // backup
-
-        return;
     }
 
     public NovelItemAdapter getNovelItemAdapter() {
         return mAdapter;
-    }
-
-    public void syncNovelItemList(List<NovelItemInfo> l) {
-        // this will used to sync novel item list
     }
 
     @Override
@@ -121,7 +111,7 @@ public class LatestFragment extends Fragment implements MyItemClickListener, MyI
         mRecyclerView.addOnScrollListener(new MyOnScrollListener());
 
         // set click event
-        ((TextView) rootView.findViewById(R.id.btn_loading)).setOnClickListener(new View.OnClickListener() {
+        rootView.findViewById(R.id.btn_loading).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 if (isLoading) {
@@ -145,12 +135,6 @@ public class LatestFragment extends Fragment implements MyItemClickListener, MyI
         return rootView;
     }
 
-
-    /**
-     * Fill on click lister
-     * @param view
-     * @param position
-     */
     @Override
     public void onItemClick(View view, final int position) {
         //Toast.makeText(getActivity(),"item click detected", Toast.LENGTH_SHORT).show();
@@ -164,9 +148,16 @@ public class LatestFragment extends Fragment implements MyItemClickListener, MyI
         Intent intent = new Intent(getActivity(), NovelInfoActivity.class);
         intent.putExtra("aid", listNovelItem.get(position));
         intent.putExtra("from", "latest");
-        startActivity(intent);
-
-        return;
+        intent.putExtra("title", listNovelItemInfo.get(position).getTitle());
+        if(Build.VERSION.SDK_INT < 21) {
+            startActivity(intent);
+        }
+        else {
+            ActivityOptionsCompat options = ActivityOptionsCompat.makeSceneTransitionAnimation(getActivity(),
+                    Pair.create(view.findViewById(R.id.novel_cover), "novel_cover"),
+                    Pair.create(view.findViewById(R.id.novel_title), "novel_title"));
+            ActivityCompat.startActivity(getActivity(), intent, options.toBundle());
+        }
     }
 
     @Override
@@ -174,9 +165,6 @@ public class LatestFragment extends Fragment implements MyItemClickListener, MyI
         Toast.makeText(getActivity(),"item long click detected", Toast.LENGTH_SHORT).show();
 
         // TODO: show popup menu
-
-
-        return;
     }
 
 
@@ -204,10 +192,10 @@ public class LatestFragment extends Fragment implements MyItemClickListener, MyI
                     throw new Exception("MewX Exception: novelItemList failed to parse.");
                 listNovelItem = novelItemList.getNovelItemList();
                 if (listNovelItemInfo == null)
-                    listNovelItemInfo = new ArrayList<NovelItemInfo>();
+                    listNovelItemInfo = new ArrayList<>();
 
                 // asc task
-                Integer[] li = (Integer[]) listNovelItem.subList((listNovelItem.size() / 10) * 10 - 10, listNovelItem.size())
+                Integer[] li = listNovelItem.subList((listNovelItem.size() / 10) * 10 - 10, listNovelItem.size())
                         .toArray(new Integer[listNovelItem.size() - ((listNovelItem.size() / 10) * 10 - 10)]);
                 if (GlobalConfig.inDebugMode())
                     Log.i("MewX", "size of Integer[] li: " + Integer.toString(li.length));
@@ -225,10 +213,7 @@ public class LatestFragment extends Fragment implements MyItemClickListener, MyI
                     mTextView.setText(getResources().getString(R.string.system_parse_failed) + e.getMessage());
                 showRetryButton();
                 isLoading = false;
-                return;
             }
-
-            return;
         }
 
         @Override
@@ -238,7 +223,6 @@ public class LatestFragment extends Fragment implements MyItemClickListener, MyI
                 showRetryButton();
             }
             isLoading = false;
-            return;
         }
     }
 
@@ -259,12 +243,12 @@ public class LatestFragment extends Fragment implements MyItemClickListener, MyI
                         Log.i("MewX", "Loading more...");
 
                     // load more toast
+                    Snackbar.make(mRecyclerView, getResources().getString(R.string.list_loading)
+                                    + "(" + Integer.toString(novelItemList.getCurrentPage() + 1) + "/" + novelItemList.getTotalPage() + ")",
+                            Snackbar.LENGTH_SHORT).show();
 //                    Toast.makeText(MyApp.getContext(),
-//                            getResources().getString(R.string.list_loading) + "p" + Integer.toString(novelItemList.getCurrentPage() + 1),
-//                            Toast.LENGTH_LONG).show();
-                    Toast.makeText(MyApp.getContext(),
-                            getResources().getString(R.string.list_loading) + "(" + Integer.toString(novelItemList.getCurrentPage() + 1) + "/" + novelItemList.getTotalPage() + ")",
-                            Toast.LENGTH_SHORT).show();
+//                            getResources().getString(R.string.list_loading) + "(" + Integer.toString(novelItemList.getCurrentPage() + 1) + "/" + novelItemList.getTotalPage() + ")",
+//                            Toast.LENGTH_SHORT).show();
 
                     // load more thread
                     FinalHttp fh = new FinalHttp();
@@ -295,7 +279,7 @@ public class LatestFragment extends Fragment implements MyItemClickListener, MyI
             try {
                 //for (int i = listNovelItemInfo.size(); i < listNovelItem.size(); i++) {
                 for (int i = 0; i < totalNumber; i++) {
-                    if (isLoading == false)
+                    if (!isLoading)
                         return -1;
                     if (GlobalConfig.inDebugMode())
                         Log.i("MewX", "Loading: " + Integer.toString(i + 1) + " / " + Integer.toString(totalNumber));
@@ -313,7 +297,6 @@ public class LatestFragment extends Fragment implements MyItemClickListener, MyI
                     listNovelItemInfo.get(baseNumber + i).setNovelItemInfo(sin);
 
                     // release memory
-                    bytes = null;
                     sin[0] = null;
 
                     // update progress
@@ -331,9 +314,7 @@ public class LatestFragment extends Fragment implements MyItemClickListener, MyI
         @Override
         protected void onProgressUpdate(Integer... values) {
             super.onProgressUpdate(values);
-
             mTextView.setText("Loading ... " + "(" + Integer.toString(values[0]) + "/" + Integer.toString(totalNumber) + ")");
-            return;
         }
 
         @Override
@@ -357,13 +338,12 @@ public class LatestFragment extends Fragment implements MyItemClickListener, MyI
                 mAdapter.setOnItemLongClickListener(LatestFragment.this);
                 mRecyclerView.setAdapter(mAdapter);
             }
-            if ((View) mainActivity.findViewById(R.id.list_loading) != null)
-                ((View) mainActivity.findViewById(R.id.list_loading)).setVisibility(View.GONE);
+            if (mainActivity.findViewById(R.id.list_loading) != null)
+                mainActivity.findViewById(R.id.list_loading).setVisibility(View.GONE);
             mAdapter.notifyDataSetChanged();
 
             hideRetryButton();
             isLoading = false;
-            return;
         }
 
 
@@ -372,23 +352,17 @@ public class LatestFragment extends Fragment implements MyItemClickListener, MyI
     private void doReverseOperation() {
         // reverse operation
         novelItemList.requestForReverse();
-//        if (GlobalConfig.inDebugMode())
-//            Log.i("MewX", "listNovelItem: " + Integer.toString(listNovelItem.size())
-//                    + "; novelItemList.getNovelItemList(): "
-//                    + Integer.toString(novelItemList.getNovelItemList().size()));
+
         listNovelItem = novelItemList.getNovelItemList();
         for (int i = listNovelItem.size(); i < listNovelItemInfo.size(); i++)
             listNovelItemInfo.remove(i);
-
-        return;
     }
 
     private void showRetryButton() {
         if (mainActivity.findViewById(R.id.btn_loading) == null) return;
 
         ((TextView) mainActivity.findViewById(R.id.btn_loading)).setText(getResources().getString(R.string.task_retry));
-        ((TextView) mainActivity.findViewById(R.id.btn_loading)).setVisibility(TextView.VISIBLE);
-        return;
+        mainActivity.findViewById(R.id.btn_loading).setVisibility(TextView.VISIBLE);
     }
 
     @Override
@@ -409,8 +383,7 @@ public class LatestFragment extends Fragment implements MyItemClickListener, MyI
     private void hideRetryButton() {
         if (mainActivity.findViewById(R.id.btn_loading) == null) return;
 
-        ((TextView) mainActivity.findViewById(R.id.btn_loading)).setVisibility(TextView.GONE);
-        return;
+        mainActivity.findViewById(R.id.btn_loading).setVisibility(TextView.GONE);
     }
 
 

@@ -3,6 +3,7 @@ package org.mewx.wenku8.activity;
 import android.app.ProgressDialog;
 import android.content.DialogInterface;
 import android.content.Intent;
+import android.gesture.Gesture;
 import android.graphics.LinearGradient;
 import android.graphics.Shader;
 import android.graphics.Typeface;
@@ -10,11 +11,14 @@ import android.os.AsyncTask;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
+import android.support.v4.view.MotionEventCompat;
 import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
 import android.util.TypedValue;
+import android.view.GestureDetector;
 import android.view.KeyEvent;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.WindowManager;
 import android.widget.ImageView;
@@ -53,9 +57,11 @@ public class VerticalReaderActivity extends AppCompatActivity {
     private int aid, vid, cid;
     private VolumeList volumeList= null;
     private MaterialDialog pDialog = null;
+    private ScrollViewNoFling svTextListLayout = null;
     private LinearLayout TextListLayout = null;
     private List<OldNovelContentParser.NovelContent> nc = null;
     private Typeface typeface;
+    private boolean isScrolling = false;
 
     // Scroll runnable to last read position
     private Runnable runnableScroll = new Runnable() {
@@ -90,8 +96,83 @@ public class VerticalReaderActivity extends AppCompatActivity {
         getNovelContent();
 
         // get view
-        TextListLayout = (LinearLayout) VerticalReaderActivity.this
-                .findViewById(R.id.novel_content_layout);
+        TextListLayout = (LinearLayout) findViewById(R.id.novel_content_layout);
+        svTextListLayout = (ScrollViewNoFling) findViewById(R.id.content_scrollview);
+        svTextListLayout.setOnTouchListener(new View.OnTouchListener() {
+            // Gesture detector
+            GestureDetector gestureDetector = new GestureDetector(VerticalReaderActivity.this, new GestureDetector.OnGestureListener() {
+                @Override
+                public boolean onDown(MotionEvent e) {
+                    return false;
+                }
+
+                @Override
+                public void onShowPress(MotionEvent e) {
+                }
+
+                @Override
+                public boolean onSingleTapUp(MotionEvent e) {
+                    int screenHeight = getResources().getDisplayMetrics().heightPixels;
+                    int y = (int) e.getY();
+
+                    if(y < screenHeight * 5 / 6 && y >= screenHeight / 2) {
+                        // move down
+                        svTextListLayout.smoothScrollBy(0, 300);
+                        return true;
+                    }
+                    else if(y < screenHeight / 2 && y > screenHeight / 6) {
+                        // move up
+                        svTextListLayout.smoothScrollBy(0, -300);
+                        return true;
+                    }
+                    return false;
+                }
+
+                @Override
+                public boolean onScroll(MotionEvent e1, MotionEvent e2, float distanceX, float distanceY) {
+                    return false;
+                }
+
+                @Override
+                public void onLongPress(MotionEvent e) {
+
+                }
+
+                @Override
+                public boolean onFling(MotionEvent e1, MotionEvent e2, float velocityX, float velocityY) {
+                    return false;
+                }
+            });
+
+            @Override
+            public boolean onTouch(View v, MotionEvent event) {
+//                if(MotionEventCompat.getActionMasked(event) == MotionEvent.ACTION_DOWN) {
+//                    int screenHeight = getResources().getDisplayMetrics().heightPixels;
+//                    int y = (int) event.getY();
+//
+//                    if(y < screenHeight * 5 / 6 && y >= screenHeight / 2) {
+//                        // move down
+//                        svTextListLayout.scrollBy(0, 20);
+//                        //isScrolling = true;
+//                        //autoScrollRunnable.run();
+//                        return true;
+//                    }
+//                    else if(y < screenHeight / 2 && y > screenHeight / 6) {
+//                        // move up
+//                        svTextListLayout.scrollBy(0, -20);
+//                        //isScrolling = true;
+//                        //autoScrollRunnable.run();
+//                        return true;
+//                    }
+//                }
+//                else if(MotionEventCompat.getActionMasked(event) == MotionEvent.ACTION_UP) {
+//                    isScrolling = false;
+//                }
+//
+//                return false; // sent to parent
+                return gestureDetector.onTouchEvent(event);
+            }
+        });
         Toast.makeText(this, getString(R.string.notice_volume_to_dark_mode), Toast.LENGTH_SHORT).show();
     }
 
@@ -156,8 +237,7 @@ public class VerticalReaderActivity extends AppCompatActivity {
         return;
     }
 
-    class asyncNovelContentTask extends
-            AsyncTask<List<NameValuePair>, Integer, Integer> {
+    class asyncNovelContentTask extends AsyncTask<List<NameValuePair>, Integer, Integer> {
         // fail return -1
         @Override
         protected Integer doInBackground(List<NameValuePair>... params) {
@@ -301,8 +381,6 @@ public class VerticalReaderActivity extends AppCompatActivity {
 //                                                            R.anim.keep);
                                         }
                                     });
-
-                                    return;
                                 }
 
                             }
@@ -312,7 +390,6 @@ public class VerticalReaderActivity extends AppCompatActivity {
 
                         TextListLayout.addView(tempIV);
                         break;
-
                 }
             }
 
@@ -321,8 +398,7 @@ public class VerticalReaderActivity extends AppCompatActivity {
                 pDialog.dismiss();
 
             // show dialog
-            if (GlobalConfig.getReadSavesRecord(cid,
-                    TextListLayout.getMeasuredHeight()) > 100) {
+            if (GlobalConfig.getReadSavesRecord(cid, TextListLayout.getMeasuredHeight()) > 100) {
                 new MaterialDialog.Builder(VerticalReaderActivity.this)
                         .callback(new MaterialDialog.ButtonCallback() {
                             @Override
@@ -350,8 +426,6 @@ public class VerticalReaderActivity extends AppCompatActivity {
                         .negativeText(R.string.dialog_negative_biao)
                         .show();
             }
-
-            return;
         }
     }
 
@@ -361,16 +435,12 @@ public class VerticalReaderActivity extends AppCompatActivity {
         MobclickAgent.onPause(this);
 
         saveRecord();
-        return;
     }
 
     private void saveRecord() {
         // cannot get height easily, except sum one by one
-        GlobalConfig.addReadSavesRecord(cid,
-                ((ScrollViewNoFling) VerticalReaderActivity.this
-                        .findViewById(R.id.content_scrollview)).getScrollY(),
+        GlobalConfig.addReadSavesRecord(cid, ((ScrollViewNoFling) VerticalReaderActivity.this.findViewById(R.id.content_scrollview)).getScrollY(),
                 TextListLayout.getMeasuredHeight());
-        return;
     }
 
     @Override
@@ -380,7 +450,6 @@ public class VerticalReaderActivity extends AppCompatActivity {
         if (pDialog != null)
             pDialog.dismiss();
         pDialog = null;
-        return;
     }
 
     @Override

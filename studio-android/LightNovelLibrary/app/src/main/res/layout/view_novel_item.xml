@@ -8,10 +8,13 @@
     android:paddingTop="2dp">
 
     <android.support.v7.widget.CardView
+        android:id="@+id/novel_card"
+        android:transitionName="novel_card"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         card-view:cardBackgroundColor="@color/novel_item_white"
         card-view:cardElevation="2dp"
+        card-view:cardPreventCornerOverlap="true"
         card-view:cardUseCompatPadding="true"
         card-view:cardMaxElevation="2dp">
         <!-- This part write in code, not here -->
@@ -33,6 +36,7 @@
                 android:layout_width="80dp"
                 android:layout_height="112dp"
                 android:layout_margin="8dp"
+                android:transitionName="novel_cover"
                 android:src="@drawable/ic_empty_image"
                 android:contentDescription="@string/novel_item_cover"
                 android:scaleType="fitXY" />
@@ -151,6 +155,7 @@
 
                 <TextView
                     android:id="@+id/novel_title"
+                    android:transitionName="novel_title"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:textSize="16sp"

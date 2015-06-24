@@ -1,16 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- GoogleProgressBar -->
-    <declare-styleable name="GoogleProgressBar">
-        <attr name="type" format="enum">
-            <enum name="folding_circles" value="0" />
-            <enum name="google_music_dices" value="1" />
-            <enum name="nexus_rotation_cross" value="2" />
-            <enum name="chrome_floating_circles" value="3" />
-        </attr>
-        <attr name="colors" format="reference"/>
-    </declare-styleable>
-
     <!-- PagerSlidingTabStrip -->
     <declare-styleable name="PagerSlidingTabStrip">
         <attr name="pstsIndicatorColor" format="color" />

@@ -80,7 +80,7 @@ public class UserInfoActivity extends AppCompatActivity {
         }
 
         // get views
-        rivAvatar = (RoundedImageView)findViewById(R.id.userinfo_avatar);
+        rivAvatar = (RoundedImageView)findViewById(R.id.user_avatar);
         tvUserName = (TextView)findViewById(R.id.username);
         tvNickyName = (TextView)findViewById(R.id.nickname);
         tvScore = (TextView)findViewById(R.id.score);

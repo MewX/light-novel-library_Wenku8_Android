@@ -1,7 +1,5 @@
 package org.mewx.wenku8.adapter;
 
-import android.app.Activity;
-import android.app.FragmentManager;
 import android.support.v7.widget.RecyclerView;
 import android.view.View;
 import android.view.ViewGroup;
@@ -16,7 +14,6 @@ import com.android.volley.VolleyError;
 import com.android.volley.toolbox.StringRequest;
 import com.nostra13.universalimageloader.core.ImageLoader;
 
-import org.mewx.wenku8.MyApp;
 import org.mewx.wenku8.R;
 import org.mewx.wenku8.global.GlobalConfig;
 import org.mewx.wenku8.global.api.NovelItemInfoUpdate;
@@ -59,17 +56,13 @@ public class NovelItemAdapterUpdate extends RecyclerView.Adapter<NovelItemAdapte
             //mDataset = dataset; // reference
             //int currSize = mDataset.size();
         }
-
-        return;
     }
 
 
     @Override
     public ViewHolder onCreateViewHolder(ViewGroup viewGroup, int i) {
         View view = View.inflate(viewGroup.getContext(), R.layout.view_novel_item, null);
-
-        ViewHolder holder = new ViewHolder(view, mItemClickListener, mItemLongClickListener);
-        return holder;
+        return new ViewHolder(view, mItemClickListener, mItemLongClickListener);
     }
 
     @Override
@@ -96,7 +89,7 @@ public class NovelItemAdapterUpdate extends RecyclerView.Adapter<NovelItemAdapte
                             //GlobalConfig.wantDebugLog("VolleyResponse", response);
 
                             // update info
-                            NovelItemInfoUpdate nuui = new NovelItemInfoUpdate(tempAid);
+                            //NovelItemInfoUpdate nuui = new NovelItemInfoUpdate(tempAid);
                             mDataset.set(tempAid,NovelItemInfoUpdate.parse(response));
                             refreshAllContent(viewHolder, tempAid);
                             viewHolder.isLoading = false;
@@ -128,8 +121,6 @@ public class NovelItemAdapterUpdate extends RecyclerView.Adapter<NovelItemAdapte
         }
 
         refreshAllContent(viewHolder, i);
-
-
     }
 
     private void refreshAllContent( final ViewHolder viewHolder, int i ) {
@@ -210,8 +201,6 @@ public class NovelItemAdapterUpdate extends RecyclerView.Adapter<NovelItemAdapte
                 ibNovelOption.setVisibility(View.INVISIBLE);
             else
                 trNovelIntro.setVisibility(View.GONE);
-
-            return;
         }
 
         @Override

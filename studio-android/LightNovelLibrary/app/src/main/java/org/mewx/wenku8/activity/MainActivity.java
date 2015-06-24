@@ -22,6 +22,7 @@ import com.nostra13.universalimageloader.core.display.FadeInBitmapDisplayer;
 import com.nostra13.universalimageloader.core.process.BitmapProcessor;
 import com.readystatesoftware.systembartint.SystemBarTintManager;
 import com.umeng.analytics.MobclickAgent;
+import com.umeng.update.UmengUpdateAgent;
 
 import org.mewx.wenku8.MyApp;
 import org.mewx.wenku8.R;
@@ -77,6 +78,8 @@ public class MainActivity extends AppCompatActivity {
 
         // UMeng settings
         MobclickAgent.updateOnlineConfig( this );
+        UmengUpdateAgent.update(this);
+        //UmengUpdateAgent.setUpdateCheckConfig(false);
 
         // Update old save files ----------------
 

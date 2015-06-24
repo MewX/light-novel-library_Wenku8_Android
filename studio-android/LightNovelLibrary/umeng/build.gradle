@@ -1,0 +1,4 @@
+configurations.create("default")
+artifacts.add("default", file('umeng-analytics-v5.5.2.jar'))
+artifacts.add("default", file('umeng-update-v2.6.0.1.jar'))
+artifacts.add("default", file('armeabi/libbspatch.so'))
