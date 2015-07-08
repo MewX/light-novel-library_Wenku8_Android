@@ -168,8 +168,7 @@ public class NovelItemListFragment extends Fragment implements MyItemClickListen
 
     @Override
     public void onItemLongClick(View view, int postion) {
-        Toast.makeText(getActivity(),"item long click detected", Toast.LENGTH_SHORT).show();
-
+        //Toast.makeText(getActivity(),"item long click detected", Toast.LENGTH_SHORT).show();
 
         // TODO: show pop up
     }

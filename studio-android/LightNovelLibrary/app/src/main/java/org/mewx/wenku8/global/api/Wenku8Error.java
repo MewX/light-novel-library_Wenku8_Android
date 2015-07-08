@@ -31,6 +31,7 @@ public class Wenku8Error {
         XML_PARSE_FAILED,
         USER_CANCELLED_TASK,
         PARAM_COUNT_NOT_MATCHED,
+        LOCAL_BOOK_REMOVE_FAILED
     }
 
     public static String translateErrorCode(ErrorCode ec) {

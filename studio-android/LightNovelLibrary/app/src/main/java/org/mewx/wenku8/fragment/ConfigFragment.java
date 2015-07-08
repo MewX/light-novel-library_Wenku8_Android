@@ -1,12 +1,17 @@
 package org.mewx.wenku8.fragment;
 
 import android.os.Bundle;
+import android.os.Handler;
 import android.support.v4.app.Fragment;
+import android.support.v4.app.FragmentActivity;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Toast;
 
+import com.afollestad.materialdialogs.GravityEnum;
+import com.afollestad.materialdialogs.MaterialDialog;
+import com.afollestad.materialdialogs.Theme;
 import com.umeng.analytics.MobclickAgent;
 import com.umeng.update.UmengUpdateAgent;
 import com.umeng.update.UmengUpdateListener;
@@ -14,6 +19,7 @@ import com.umeng.update.UpdateResponse;
 import com.umeng.update.UpdateStatus;
 
 import org.mewx.wenku8.R;
+import org.mewx.wenku8.activity.MainActivity;
 import org.mewx.wenku8.global.GlobalConfig;
 
 public class ConfigFragment extends Fragment {
@@ -71,7 +77,44 @@ public class ConfigFragment extends Fragment {
                     UmengUpdateAgent.forceUpdate(getActivity());
                 }
                 else {
-                    Toast.makeText(getActivity(), "值得骄傲的内测用户：\n请从群共享里面下载最新版本~", Toast.LENGTH_SHORT).show();
+                    //Toast.makeText(getActivity(), "值得骄傲的内测用户：\n请从群共享里面下载最新版本~", Toast.LENGTH_SHORT).show();
+
+                    UmengUpdateAgent.setUpdateAutoPopup(false);
+                    UmengUpdateAgent.setUpdateListener(new UmengUpdateListener() {
+                        @Override
+                        public void onUpdateReturned(int updateStatus, UpdateResponse updateInfo) {
+                            switch (updateStatus) {
+                                case UpdateStatus.Yes: // has update
+//                                    if (UmengUpdateAgent.isIgnore(getActivity(), updateInfo)) {
+//                                        Toast.makeText(getActivity(), getResources().getString(R.string.system_update_ignored), Toast.LENGTH_SHORT).show();
+//                                    } else {
+                                        new MaterialDialog.Builder(getActivity())
+                                                .forceStacking(true)
+                                                .theme(Theme.LIGHT)
+                                                .titleColor(R.color.default_text_color_black)
+                                                .backgroundColorRes(R.color.dlgBackgroundColor)
+                                                .contentColorRes(R.color.dlgContentColor)
+                                                .positiveColorRes(R.color.dlgPositiveButtonColor)
+                                                .title("New: " + updateInfo.version)
+                                                .content(updateInfo.updateLog)
+                                                .titleGravity(GravityEnum.CENTER)
+                                                .positiveText(R.string.dialog_positive_gotit)
+                                                .show();
+//                                    }
+                                    break;
+                                case UpdateStatus.No: // has no update
+                                    Toast.makeText(getActivity(), getResources().getString(R.string.system_update_latest_version), Toast.LENGTH_SHORT).show();
+                                    break;
+                                case UpdateStatus.NoneWifi: // none wifi
+                                    Toast.makeText(getActivity(), getResources().getString(R.string.system_update_nonewifi), Toast.LENGTH_SHORT).show();
+                                    break;
+                                case UpdateStatus.Timeout: // time out
+                                    Toast.makeText(getActivity(), getResources().getString(R.string.system_update_timeout), Toast.LENGTH_SHORT).show();
+                                    break;
+                            }
+                        }
+                    });
+                    UmengUpdateAgent.update(getActivity());
                 }
             }
         });

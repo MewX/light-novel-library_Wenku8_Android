@@ -12,10 +12,16 @@ import android.view.Menu;
 import android.view.MenuItem;
 import android.widget.Toast;
 
+import com.afollestad.materialdialogs.GravityEnum;
+import com.afollestad.materialdialogs.MaterialDialog;
+import com.afollestad.materialdialogs.Theme;
 import com.nostra13.universalimageloader.core.ImageLoader;
 import com.readystatesoftware.systembartint.SystemBarTintManager;
 import com.umeng.analytics.MobclickAgent;
 import com.umeng.update.UmengUpdateAgent;
+import com.umeng.update.UmengUpdateListener;
+import com.umeng.update.UpdateResponse;
+import com.umeng.update.UpdateStatus;
 
 import org.mewx.wenku8.R;
 import org.mewx.wenku8.fragment.NavigationDrawerFragment;
@@ -70,12 +76,52 @@ public class MainActivity extends AppCompatActivity {
 
         // UMeng settings
         MobclickAgent.updateOnlineConfig(this);
+        UmengUpdateAgent.setUpdateCheckConfig(false); // disable res check
+        UmengUpdateAgent.setDeltaUpdate(true);
         if(!GlobalConfig.inAlphaBuild()) {
             // alpha version does not contains auto-update function
-            UmengUpdateAgent.setUpdateCheckConfig(false); // disable res check
-            UmengUpdateAgent.setDeltaUpdate(true);
             UmengUpdateAgent.update(this);
             Toast.makeText(this, "该软件尚处内测阶段，对外发布的为稳定版，带有检查更新功能。\n★请勿上传应用市场！\n☆内测群：427577610 有最新内测版", Toast.LENGTH_LONG).show();
+        }
+        else {
+            // update dialog show up
+            UmengUpdateAgent.setUpdateAutoPopup(false);
+            UmengUpdateAgent.setUpdateListener(new UmengUpdateListener() {
+                @Override
+                public void onUpdateReturned(int updateStatus, final UpdateResponse updateInfo) {
+                    switch (updateStatus) {
+                        case UpdateStatus.Yes: // has update
+                            if (UmengUpdateAgent.isIgnore(MainActivity.this, updateInfo)) {
+                                //Toast.makeText(MainActivity.this, getResources().getString(R.string.system_update_ignored), Toast.LENGTH_SHORT).show();
+                                break;
+                            } else {
+                                new MaterialDialog.Builder(MainActivity.this)
+                                        .callback(new MaterialDialog.ButtonCallback() {
+                                            @Override
+                                            public void onNegative(MaterialDialog dialog) {
+                                                super.onNegative(dialog);
+                                                UmengUpdateAgent.ignoreUpdate(MainActivity.this, updateInfo);
+                                            }
+                                        })
+                                        .forceStacking(true)
+                                        .theme(Theme.LIGHT)
+                                        .titleColor(R.color.default_text_color_black)
+                                        .backgroundColorRes(R.color.dlgBackgroundColor)
+                                        .contentColorRes(R.color.dlgContentColor)
+                                        .positiveColorRes(R.color.dlgPositiveButtonColor)
+                                        .negativeColorRes(R.color.dlgNegativeButtonColor)
+                                        .title("New: " + updateInfo.version)
+                                        .content(updateInfo.updateLog)
+                                        .titleGravity(GravityEnum.CENTER)
+                                        .positiveText(R.string.dialog_positive_gotit)
+                                        .negativeText(R.string.dialog_negative_ignore_this_version)
+                                        .show();
+                            }
+                            break;
+                    }
+                }
+            });
+            UmengUpdateAgent.update(this);
         }
 
         // Update old save files ----------------

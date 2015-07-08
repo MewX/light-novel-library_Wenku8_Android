@@ -1,5 +1,6 @@
 package org.mewx.wenku8.activity;
 
+import android.content.ContentValues;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.graphics.PorterDuff;
@@ -9,7 +10,9 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.support.v7.app.AppCompatActivity;
+import android.support.v7.widget.CardView;
 import android.support.v7.widget.Toolbar;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuItem;
@@ -43,6 +46,7 @@ import org.mewx.wenku8.global.api.Wenku8Error;
 import org.mewx.wenku8.global.api.Wenku8Parser;
 import org.mewx.wenku8.util.LightCache;
 import org.mewx.wenku8.util.LightNetwork;
+import org.mewx.wenku8.util.LightTool;
 
 import java.io.File;
 import java.io.UnsupportedEncodingException;
@@ -228,31 +232,9 @@ public class NovelInfoActivity extends AppCompatActivity {
                                 public void onPositive(MaterialDialog dialog) {
                                     super.onPositive(dialog);
 
-                                    // already in bookshelf
-                                    for (VolumeList tempVl : listVolume) {
-                                        for (ChapterInfo tempCi : tempVl.chapterList) {
-                                            LightCache.deleteFile(GlobalConfig.getFirstFullSaveFilePath(), "novel" + File.separator + tempCi.cid + ".xml");
-                                            LightCache.deleteFile(GlobalConfig.getSecondFullSaveFilePath(), "novel" + File.separator + tempCi.cid + ".xml");
-                                        }
-                                    }
-
-                                    // delete files
-                                    LightCache.deleteFile(GlobalConfig.getFirstFullSaveFilePath(), "intro" + File.separator + aid + "-intro.xml");
-                                    LightCache.deleteFile(GlobalConfig.getFirstFullSaveFilePath(), "intro" + File.separator + aid + "-introfull.xml");
-                                    LightCache.deleteFile(GlobalConfig.getFirstFullSaveFilePath(), "intro" + File.separator + aid + "-volume.xml");
-                                    LightCache.deleteFile(GlobalConfig.getSecondFullSaveFilePath(), "intro" + File.separator + aid + "-intro.xml");
-                                    LightCache.deleteFile(GlobalConfig.getSecondFullSaveFilePath(), "intro" + File.separator + aid + "-introfull.xml");
-                                    LightCache.deleteFile(GlobalConfig.getSecondFullSaveFilePath(), "intro" + File.separator + aid + "-volume.xml");
-
-                                    // remove from bookshelf
-                                    GlobalConfig.removeFromLocalBookshelf(aid);
-                                    if (!GlobalConfig.testInLocalBookshelf(aid)) { // not in
-                                        Toast.makeText(NovelInfoActivity.this, getResources().getString(R.string.bookshelf_removed), Toast.LENGTH_SHORT).show();
-                                        fabFavorate.setIcon(R.drawable.ic_favorate);
-                                    } else {
-                                        Toast.makeText(NovelInfoActivity.this, getResources().getString(R.string.bookshelf_error), Toast.LENGTH_SHORT).show();
-                                    }
-
+                                    // delete from cloud first, if succeed then delete from local
+                                    AsyncRemoveBookFromCloud arbfc = new AsyncRemoveBookFromCloud();
+                                    arbfc.execute(aid);
                                 }
                             })
                             .theme(Theme.LIGHT)
@@ -837,7 +819,85 @@ public class NovelInfoActivity extends AppCompatActivity {
 
             refreshInfoFromLocal();
         }
+    }
 
+    class AsyncRemoveBookFromCloud extends AsyncTask<Integer, Integer, Wenku8Error.ErrorCode> {
+        MaterialDialog md;
+
+        @Override
+        protected void onPreExecute() {
+            super.onPreExecute();
+
+            md = new MaterialDialog.Builder(NovelInfoActivity.this)
+                    .theme(Theme.LIGHT)
+                    .content(R.string.dialog_content_novel_remove_from_cloud)
+                    .contentColorRes(R.color.dlgContentColor)
+                    .progress(true, 0)
+                    .show();
+        }
+
+        @Override
+        protected Wenku8Error.ErrorCode doInBackground(Integer... params) {
+            // params: aid
+            byte[] bytes = LightNetwork.LightHttpPostConnection(Wenku8API.getBaseURL(), Wenku8API.getDelFromBookshelfParams(params[0]));
+            if(bytes == null) return Wenku8Error.ErrorCode.NETWORK_ERROR;
+
+            String result;
+            try {
+                result = new String(bytes, "UTF-8");
+                Log.e("MewX", result);
+                if(Integer.parseInt(result) != 1) {
+                    if (LightTool.isInteger(result))
+                        return Wenku8Error.getSystemDefinedErrorCode(Integer.parseInt(result));
+                    else
+                        return Wenku8Error.ErrorCode.RETURNED_VALUE_EXCEPTION;
+                }
+                else {
+                    // remove from local bookshelf
+                    // already in bookshelf
+                    for (VolumeList tempVl : listVolume) {
+                        for (ChapterInfo tempCi : tempVl.chapterList) {
+                            LightCache.deleteFile(GlobalConfig.getFirstFullSaveFilePath(), "novel" + File.separator + tempCi.cid + ".xml");
+                            LightCache.deleteFile(GlobalConfig.getSecondFullSaveFilePath(), "novel" + File.separator + tempCi.cid + ".xml");
+                        }
+                    }
+
+                    // delete files
+                    LightCache.deleteFile(GlobalConfig.getFirstFullSaveFilePath(), "intro" + File.separator + aid + "-intro.xml");
+                    LightCache.deleteFile(GlobalConfig.getFirstFullSaveFilePath(), "intro" + File.separator + aid + "-introfull.xml");
+                    LightCache.deleteFile(GlobalConfig.getFirstFullSaveFilePath(), "intro" + File.separator + aid + "-volume.xml");
+                    LightCache.deleteFile(GlobalConfig.getSecondFullSaveFilePath(), "intro" + File.separator + aid + "-intro.xml");
+                    LightCache.deleteFile(GlobalConfig.getSecondFullSaveFilePath(), "intro" + File.separator + aid + "-introfull.xml");
+                    LightCache.deleteFile(GlobalConfig.getSecondFullSaveFilePath(), "intro" + File.separator + aid + "-volume.xml");
+
+                    // remove from bookshelf
+                    GlobalConfig.removeFromLocalBookshelf(aid);
+                    if (!GlobalConfig.testInLocalBookshelf(aid)) { // not in
+                        return Wenku8Error.ErrorCode.SYSTEM_1_SUCCEEDED;
+                    } else {
+                        return Wenku8Error.ErrorCode.LOCAL_BOOK_REMOVE_FAILED;
+                        //Toast.makeText(NovelInfoActivity.this, getResources().getString(R.string.bookshelf_error), Toast.LENGTH_SHORT).show();
+                    }
+                }
+            } catch (UnsupportedEncodingException e) {
+                e.printStackTrace();
+                return Wenku8Error.ErrorCode.BYTE_TO_STRING_EXCEPTION;
+            }
+        }
+
+        @Override
+        protected void onPostExecute(Wenku8Error.ErrorCode err) {
+            super.onPostExecute(err);
+
+            md.dismiss();
+            if(err == Wenku8Error.ErrorCode.SYSTEM_1_SUCCEEDED) {
+                Toast.makeText(NovelInfoActivity.this, getResources().getString(R.string.bookshelf_removed), Toast.LENGTH_SHORT).show();
+                if(fabFavorate != null)
+                    fabFavorate.setIcon(R.drawable.ic_favorate);
+            }
+            else
+                Toast.makeText(NovelInfoActivity.this, err.toString(), Toast.LENGTH_SHORT).show();
+        }
     }
 
     @Override

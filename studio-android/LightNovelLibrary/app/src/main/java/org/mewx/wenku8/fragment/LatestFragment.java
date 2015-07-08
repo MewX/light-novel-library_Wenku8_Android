@@ -162,7 +162,7 @@ public class LatestFragment extends Fragment implements MyItemClickListener, MyI
 
     @Override
     public void onItemLongClick(View view, int postion) {
-        Toast.makeText(getActivity(),"item long click detected", Toast.LENGTH_SHORT).show();
+        //Toast.makeText(getActivity(),"item long click detected", Toast.LENGTH_SHORT).show();
 
         // TODO: show popup menu
     }

@@ -23,7 +23,7 @@
     <color name="dlgTitleColor">#4D4D4D</color>
     <color name="dlgContentColor">#666666</color>
     <color name="dlgBackgroundColor">#FAFAFA</color>
-    <color name="dlgPositiveButtonColor">#2196F3</color>
+    <color name="dlgPositiveButtonColor">#3870d0</color>
     <color name="dlgNegativeButtonColor">#444444</color>
     <color name="dlgDividerColor">#DADADA</color>
 

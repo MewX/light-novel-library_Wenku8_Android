@@ -2,10 +2,13 @@ package org.mewx.wenku8.global.api;
 
 import android.content.ContentValues;
 
+import com.umeng.analytics.MobclickAgent;
+
 import net.tsz.afinal.http.AjaxParams;
 
 import org.apache.http.NameValuePair;
 import org.apache.http.message.BasicNameValuePair;
+import org.mewx.wenku8.MyApp;
 import org.mewx.wenku8.global.GlobalConfig;
 import org.mewx.wenku8.util.LightBase64;
 import org.mewx.wenku8.util.LightNetwork;
@@ -26,6 +29,9 @@ public class Wenku8API {
             NovelNotFinishedSC = "连载中", NovelNotFinishedTC = "連載中";
 
     public static String getBaseURL() {
+//        if(BaseURL.equals("") || BaseURL.equals("http://wenku8.mewx.org")) {
+//            BaseURL = MobclickAgent.getConfigParams(MyApp.getContext(), "wenku8_api_url");
+//        }
         return BaseURL;
     }
 
@@ -58,7 +64,7 @@ public class Wenku8API {
         }
     }
 
-    public static enum STATUS {
+    public enum STATUS {
         FINISHED, // novel's publishing finished
         NOTFINISHED // novel's publishing not finished
     }

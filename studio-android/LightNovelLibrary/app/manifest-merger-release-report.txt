@@ -69,7 +69,7 @@ MERGED from com.android.support:appcompat-v7:22.2.0:22:5
 MERGED from com.android.support:support-v4:22.2.0:22:5
 MERGED from com.android.support:support-v4:22.2.0:22:5
 MERGED from LightNovelLibrary:volley:unspecified:9:5
-MERGED from com.afollestad:material-dialogs:0.7.4.0:12:5
+MERGED from com.afollestad:material-dialogs:0.7.6.0:12:5
 MERGED from com.android.support:support-v4:22.2.0:22:5
 MERGED from com.android.support:appcompat-v7:22.2.0:22:5
 MERGED from com.android.support:support-v4:22.2.0:22:5
@@ -208,7 +208,7 @@ MERGED from com.android.support:appcompat-v7:22.2.0:20:5
 MERGED from com.android.support:support-v4:22.2.0:20:5
 MERGED from com.android.support:support-v4:22.2.0:20:5
 MERGED from LightNovelLibrary:volley:unspecified:7:5
-MERGED from com.afollestad:material-dialogs:0.7.4.0:8:5
+MERGED from com.afollestad:material-dialogs:0.7.6.0:8:5
 MERGED from com.android.support:support-v4:22.2.0:20:5
 MERGED from com.android.support:appcompat-v7:22.2.0:20:5
 MERGED from com.android.support:support-v4:22.2.0:20:5
