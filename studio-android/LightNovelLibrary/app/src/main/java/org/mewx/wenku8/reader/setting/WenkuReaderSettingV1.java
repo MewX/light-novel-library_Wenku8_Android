@@ -38,7 +38,7 @@ public class WenkuReaderSettingV1 {
     /**
      * Construct Function
      */
-    WenkuReaderSettingV1() {
+    public WenkuReaderSettingV1() {
         // TODO: update values
     }
 

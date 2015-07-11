@@ -21,6 +21,7 @@ import android.widget.Toast;
 
 import com.afollestad.materialdialogs.MaterialDialog;
 import com.afollestad.materialdialogs.Theme;
+import com.nostra13.universalimageloader.core.ImageLoader;
 import com.umeng.analytics.MobclickAgent;
 
 import org.apache.http.NameValuePair;
@@ -132,7 +133,7 @@ public class FavFragment extends Fragment implements MyItemClickListener, MyItem
 
     @Override
     public void onItemLongClick(View view, int position) {
-        Toast.makeText(getActivity(),"item long click detected", Toast.LENGTH_SHORT).show();
+        // Toast.makeText(getActivity(),"item long click detected", Toast.LENGTH_SHORT).show();
 
     }
 
@@ -345,55 +346,6 @@ public class FavFragment extends Fragment implements MyItemClickListener, MyItem
                     GlobalConfig.writeFullFileIntoSaveFolder("intro", aid + "-introfull.xml", ni.fullIntro);
                     GlobalConfig.writeFullFileIntoSaveFolder("intro", aid + "-intro.xml", introXml);
 
-                    // cache each cid to save the whole book and will need to download all the images
-//                    for (VolumeList tempVl : vl) {
-//                        for (ChapterInfo tempCi : tempVl.chapterList) {
-//                            List<NameValuePair> targVar = new ArrayList<NameValuePair>();
-//                            targVar.add(Wenku8API.getNovelContent(ni.aid, tempCi.cid, GlobalConfig.getCurrentLang()));
-//
-//                            // load from local first
-//                            if(!isLoading) return Wenku8Error.ErrorCode.USER_CANCELLED_TASK;
-//                            String xml = GlobalConfig.loadFullFileFromSaveFolder("novel", tempCi.cid + ".xml");
-//                            if (xml == null || xml.length() == 0) {
-//                                byte[] tempXml = LightNetwork.LightHttpPost(Wenku8API.getBaseURL(), targVar);
-//                                if (tempXml == null) return Wenku8Error.ErrorCode.USER_CANCELLED_TASK;
-//                                xml = new String(tempXml, "UTF-8");
-//
-//                                // save file (cid.xml), didn't format it future version may format it for better performance
-//                                GlobalConfig.writeFullFileIntoSaveFolder("novel", tempCi.cid + ".xml", xml);
-//                            }
-//
-//                            // cache image
-//                            if (GlobalConfig.doCacheImage()) {
-//                                List<OldNovelContentParser.NovelContent> nc = OldNovelContentParser.NovelContentParser_onlyImage(xml);
-//                                if (nc == null) return Wenku8Error.ErrorCode.USER_CANCELLED_TASK;
-//
-//                                for (int i = 0; i < nc.size(); i++) {
-//                                    if (nc.get(i).type == 'i') {
-//                                        // save this images, judge exist first
-//                                        String imgFileName = GlobalConfig.generateImageFileNameByURL(nc.get(i).content);
-//                                        if (!LightCache.testFileExist(GlobalConfig.getFirstFullSaveFilePath()
-//                                                + GlobalConfig.imgsSaveFolderName + File.separator + imgFileName)
-//                                                && !LightCache.testFileExist(GlobalConfig.getSecondFullSaveFilePath()
-//                                                + GlobalConfig.imgsSaveFolderName + File.separator + imgFileName)) {
-//                                            // neither of the file exist
-//                                            byte[] fileContent = LightNetwork.LightHttpDownload(nc.get(i).content);
-//                                            if (fileContent == null) return Wenku8Error.ErrorCode.USER_CANCELLED_TASK;
-//                                            if (!LightCache.saveFile(GlobalConfig.getFirstFullSaveFilePath()
-//                                                            + GlobalConfig.imgsSaveFolderName + File.separator,
-//                                                    imgFileName, fileContent, true)) // fail
-//                                                // to first path
-//                                                LightCache.saveFile(GlobalConfig.getSecondFullSaveFilePath()
-//                                                                + GlobalConfig.imgsSaveFolderName + File.separator,
-//                                                        imgFileName, fileContent, true);
-//                                        }
-//
-//                                        if (nc == null) return Wenku8Error.ErrorCode.USER_CANCELLED_TASK;
-//                                    }
-//                                }
-//                            }
-//                        }
-//                    }
                 } catch (Exception e) {
                     e.printStackTrace();
                 }

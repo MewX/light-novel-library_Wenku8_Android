@@ -17,26 +17,30 @@ public abstract class WenkuReaderLoader {
         IMAGE_DEPENDENT, // may be in the same line with text
     }
 
-    abstract void initLoader(String srcPath);
+    public abstract void initLoader(String srcPath);
 
-    abstract ElementType getNextType(); // next is {index}, nullable
+    public abstract boolean hasNext(int wordIndex); // word in current line
 
-    abstract String getNextAsString();
+    public abstract boolean hasPrevious(int wordIndex); // word in current line
 
-    abstract Bitmap getNextAsBitmap();
+    public abstract ElementType getNextType(); // next is {index}, nullable
 
-    abstract ElementType getPreviousType(); // nullable
+    public abstract String getNextAsString();
 
-    abstract String getPreviousAsString();
+    public abstract Bitmap getNextAsBitmap();
 
-    abstract Bitmap getPreviousAsBitmap();
+    public abstract ElementType getPreviousType(); // nullable
 
-    abstract int getElementCount();
+    public abstract String getPreviousAsString();
 
-    abstract int getCurrentIndex(); // from 0, to {Count - 1}
+    public abstract Bitmap getPreviousAsBitmap();
 
-    abstract int setCurrentIndex(int i); // set a index
+    public abstract int getElementCount();
 
-    abstract void closeLoader();
+    public abstract int getCurrentIndex(); // from 0, to {Count - 1}
+
+    public abstract int setCurrentIndex(int i); // set a index, should optimize for the same or relation lines
+
+    public abstract void closeLoader();
 
 }

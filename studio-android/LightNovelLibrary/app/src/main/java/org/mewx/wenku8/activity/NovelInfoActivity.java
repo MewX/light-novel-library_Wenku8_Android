@@ -9,6 +9,7 @@ import android.os.AsyncTask;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
+import android.support.design.widget.Snackbar;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.CardView;
 import android.support.v7.widget.Toolbar;
@@ -16,6 +17,8 @@ import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuItem;
+import android.view.MotionEvent;
+import android.view.VelocityTracker;
 import android.view.View;
 import android.widget.ImageButton;
 import android.widget.ImageView;
@@ -448,7 +451,6 @@ public class NovelInfoActivity extends AppCompatActivity {
 
     }
 
-
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
         if(getSupportActionBar()!=null)
@@ -478,7 +480,10 @@ public class NovelInfoActivity extends AppCompatActivity {
         }
 
         // normal exit
-        super.onBackPressed();
+        if(Build.VERSION.SDK_INT < 21)
+            finish();
+        else
+            finishAfterTransition(); // end directly
     }
 
     private class FetchInfoAsyncTask extends AsyncTask<Integer, Integer, Integer> {

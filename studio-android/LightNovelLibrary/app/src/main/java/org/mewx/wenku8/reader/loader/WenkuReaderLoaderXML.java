@@ -9,57 +9,67 @@ import android.graphics.Bitmap;
  */
 public class WenkuReaderLoaderXML extends WenkuReaderLoader {
     @Override
-    void initLoader(String srcPath) {
+    public void initLoader(String srcPath) {
 
     }
 
     @Override
-    ElementType getNextType() {
+    public boolean hasNext(int wordIndex) {
+        return false;
+    }
+
+    @Override
+    public boolean hasPrevious(int wordIndex) {
+        return false;
+    }
+
+    @Override
+    public ElementType getNextType() {
         return null;
     }
 
     @Override
-    String getNextAsString() {
+    public String getNextAsString() {
         return null;
     }
 
     @Override
-    Bitmap getNextAsBitmap() {
+    public Bitmap getNextAsBitmap() {
         return null;
     }
 
     @Override
-    ElementType getPreviousType() {
+    public ElementType getPreviousType() {
         return null;
     }
 
     @Override
-    String getPreviousAsString() {
+    public String getPreviousAsString() {
         return null;
     }
 
     @Override
-    Bitmap getPreviousAsBitmap() {
+    public Bitmap getPreviousAsBitmap() {
         return null;
     }
 
     @Override
-    int getElementCount() {
+    public int getElementCount() {
         return 0;
     }
 
     @Override
-    int getCurrentIndex() {
+    public int getCurrentIndex() {
         return 0;
     }
 
     @Override
-    int setCurrentIndex(int i) {
+    public int setCurrentIndex(int i) {
         return 0;
     }
 
     @Override
-    void closeLoader() {
+    public void closeLoader() {
 
     }
 }

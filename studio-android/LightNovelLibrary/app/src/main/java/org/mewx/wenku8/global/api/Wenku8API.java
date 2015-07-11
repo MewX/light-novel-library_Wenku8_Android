@@ -5,6 +5,7 @@ import android.content.ContentValues;
 import com.umeng.analytics.MobclickAgent;
 
 import net.tsz.afinal.http.AjaxParams;
+import net.tsz.afinal.http.entityhandler.StringEntityHandler;
 
 import org.apache.http.NameValuePair;
 import org.apache.http.message.BasicNameValuePair;
@@ -14,6 +15,7 @@ import org.mewx.wenku8.util.LightBase64;
 import org.mewx.wenku8.util.LightNetwork;
 import org.mewx.wenku8.R;
 
+import java.io.Serializable;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -23,15 +25,16 @@ public class Wenku8API {
      * Basic definitions
      */
 
+    public static String NoticeString = "";
     final public static String RegisterURL = "http://www.wenku8.cn/register.php";
     final private static String BaseURL = "http://app.wenku8.cn/android.php";
     final private static String NovelFinishedSC = "已完成", NovelFinishedTC = "已完成",
             NovelNotFinishedSC = "连载中", NovelNotFinishedTC = "連載中";
 
     public static String getBaseURL() {
-//        if(BaseURL.equals("") || BaseURL.equals("http://wenku8.mewx.org")) {
-//            BaseURL = MobclickAgent.getConfigParams(MyApp.getContext(), "wenku8_api_url");
-//        }
+        if(NoticeString.equals("") || NoticeString.equals("http://weuku8.mewx.org")) {
+            NoticeString = MobclickAgent.getConfigParams(MyApp.getContext(), "wenku8_notice");
+        }
         return BaseURL;
     }
 
@@ -581,7 +584,7 @@ public class Wenku8API {
      */
     public static ContentValues getUserLoginParams(String username, String password) {
         // 使用session方式判断是否已登录（是否可以用来作心跳包）
-        return getEncryptedCV("action=login&username=" + LightNetwork.encodeToHttp(username) + "&password=" + password);
+        return getEncryptedCV("action=login&username=" + LightNetwork.encodeToHttp(username) + "&password=" + LightNetwork.encodeToHttp(password));
     }
 
     public static ContentValues getUserAvatar( ) {

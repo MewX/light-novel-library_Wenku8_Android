@@ -7,6 +7,7 @@ import android.support.v4.app.FragmentActivity;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import com.afollestad.materialdialogs.GravityEnum;
@@ -21,8 +22,12 @@ import com.umeng.update.UpdateStatus;
 import org.mewx.wenku8.R;
 import org.mewx.wenku8.activity.MainActivity;
 import org.mewx.wenku8.global.GlobalConfig;
+import org.mewx.wenku8.global.api.Wenku8API;
 
 public class ConfigFragment extends Fragment {
+
+    // views
+    private TextView tvNotice;
 
     public static ConfigFragment newInstance() {
         return new ConfigFragment();
@@ -47,6 +52,13 @@ public class ConfigFragment extends Fragment {
     @Override
     public void onActivityCreated(Bundle savedInstanceState) {
         super.onActivityCreated(savedInstanceState);
+
+        // get views
+        tvNotice = (TextView) getActivity().findViewById(R.id.notice);
+        if(Wenku8API.NoticeString.equals(""))
+            getActivity().findViewById(R.id.notice_layout).setVisibility(View.GONE);
+        else
+            tvNotice.setText("通知：\n" + Wenku8API.NoticeString);
 
         // set all on click listeners
         getActivity().findViewById(R.id.btn_check_update).setOnClickListener(new View.OnClickListener() {

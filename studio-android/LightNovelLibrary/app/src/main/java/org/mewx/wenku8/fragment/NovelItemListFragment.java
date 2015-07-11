@@ -1,5 +1,6 @@
 package org.mewx.wenku8.fragment;
 
+import android.app.Notification;
 import android.content.Intent;
 import android.os.AsyncTask;
 import android.os.Build;
@@ -10,17 +11,22 @@ import android.support.v4.app.ActivityCompat;
 import android.support.v4.app.ActivityOptionsCompat;
 import android.support.v4.app.Fragment;
 import android.support.v4.util.Pair;
+import android.support.v7.app.ActionBar;
+import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.DefaultItemAnimator;
 import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
+import android.support.v7.widget.Toolbar;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.animation.AccelerateInterpolator;
+import android.view.animation.DecelerateInterpolator;
+import android.widget.FrameLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 import org.apache.http.NameValuePair;
-import org.mewx.wenku8.MyApp;
 import org.mewx.wenku8.R;
 import org.mewx.wenku8.activity.MainActivity;
 import org.mewx.wenku8.activity.NovelInfoActivity;
@@ -32,6 +38,7 @@ import org.mewx.wenku8.global.api.Wenku8Parser;
 import org.mewx.wenku8.listener.MyItemClickListener;
 import org.mewx.wenku8.listener.MyItemLongClickListener;
 import org.mewx.wenku8.util.LightNetwork;
+import org.mewx.wenku8.util.LightTool;
 import org.mewx.wenku8.util.Logger;
 import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
@@ -50,9 +57,10 @@ public class NovelItemListFragment extends Fragment implements MyItemClickListen
     private int pastVisiblesItems, visibleItemCount, totalItemCount;
 
     // members
-    LinearLayoutManager mLayoutManager = null;
-    RecyclerView mRecyclerView = null;
-    SmoothProgressBar spb = null;
+    private ActionBar actionBar = null;
+    private LinearLayoutManager mLayoutManager = null;
+    private RecyclerView mRecyclerView = null;
+    private SmoothProgressBar spb = null;
 
     // novel list info
     private List<Integer> listNovelItemAid = null; // aid list
@@ -78,6 +86,8 @@ public class NovelItemListFragment extends Fragment implements MyItemClickListen
         // get main activity
         if(getActivity() instanceof MainActivity)
             mainActivity = (MainActivity) getActivity();
+
+        actionBar = ((AppCompatActivity) getActivity()).getSupportActionBar();
     }
 
     @Override
@@ -128,6 +138,7 @@ public class NovelItemListFragment extends Fragment implements MyItemClickListen
         else {
             // Listener
             mRecyclerView.addOnScrollListener(new MyOnScrollListener());
+            mRecyclerView.addOnScrollListener(new OnHidingScrollListener());
             AsyncGetNovelItemList asyncGetNovelItemList = new AsyncGetNovelItemList();
             asyncGetNovelItemList.execute(currentPage);
         }
@@ -171,6 +182,21 @@ public class NovelItemListFragment extends Fragment implements MyItemClickListen
         //Toast.makeText(getActivity(),"item long click detected", Toast.LENGTH_SHORT).show();
 
         // TODO: show pop up
+    }
+
+    private class OnHidingScrollListener extends RecyclerView.OnScrollListener {
+        int toolbarMarginOffset = 0;
+
+        @Override
+        public void onScrolled(RecyclerView recyclerView, int dx, int dy) {
+            super.onScrolled(recyclerView, dx, dy);
+
+            toolbarMarginOffset += dy;
+            if (toolbarMarginOffset > actionBar.getHeight())
+                actionBar.hide();
+            if (toolbarMarginOffset == 0)
+                actionBar.show();
+        }
     }
 
 
@@ -384,5 +410,12 @@ public class NovelItemListFragment extends Fragment implements MyItemClickListen
             GlobalConfig.wantDebugLog("MewX", "refresh over");
             spb.progressiveStop();
         }
+    }
+
+    @Override
+    public void onDetach() {
+        super.onDetach();
+        if(actionBar != null)
+            actionBar.show();
     }
 }

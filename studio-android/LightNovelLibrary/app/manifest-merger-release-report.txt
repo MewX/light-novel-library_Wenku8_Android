@@ -50,15 +50,15 @@ ADDED from AndroidManifest.xml:14:5
 	android:name
 		ADDED from AndroidManifest.xml:14:22
 uses-permission#android.permission.WRITE_USER_DICTIONARY
-ADDED from AndroidManifest.xml:15:5
-	android:name
-		ADDED from AndroidManifest.xml:15:22
-uses-permission#android.permission.MOUNT_UNMOUNT_FILESYSTEMS
 ADDED from AndroidManifest.xml:16:5
 	android:name
 		ADDED from AndroidManifest.xml:16:22
+uses-permission#android.permission.MOUNT_UNMOUNT_FILESYSTEMS
+ADDED from AndroidManifest.xml:17:5
+	android:name
+		ADDED from AndroidManifest.xml:17:22
 application
-ADDED from AndroidManifest.xml:19:5
+ADDED from AndroidManifest.xml:20:5
 MERGED from com.android.support:support-v4:22.2.0:22:5
 MERGED from com.android.support:appcompat-v7:22.2.0:22:5
 MERGED from com.android.support:support-v4:22.2.0:22:5
@@ -78,123 +78,123 @@ MERGED from com.getbase:floatingactionbutton:1.9.0:12:5
 MERGED from com.github.castorflex.smoothprogressbar:library:1.1.0:12:5
 MERGED from com.jpardogo.googleprogressbar:library:1.2.0:12:5
 	android:label
-		ADDED from AndroidManifest.xml:22:9
-	android:allowBackup
-		ADDED from AndroidManifest.xml:21:9
-	android:icon
-		ADDED from AndroidManifest.xml:24:9
-	android:theme
-		ADDED from AndroidManifest.xml:25:9
-	android:description
 		ADDED from AndroidManifest.xml:23:9
+	android:allowBackup
+		ADDED from AndroidManifest.xml:22:9
+	android:icon
+		ADDED from AndroidManifest.xml:25:9
+	android:theme
+		ADDED from AndroidManifest.xml:26:9
+	android:description
+		ADDED from AndroidManifest.xml:24:9
 	android:name
-		ADDED from AndroidManifest.xml:20:9
+		ADDED from AndroidManifest.xml:21:9
 meta-data#UMENG_APPKEY
-ADDED from AndroidManifest.xml:28:9
-	android:name
-		ADDED from AndroidManifest.xml:28:61
-	android:value
-		ADDED from AndroidManifest.xml:28:20
-meta-data#UMENG_CHANNEL
 ADDED from AndroidManifest.xml:29:9
 	android:name
-		ADDED from AndroidManifest.xml:29:42
+		ADDED from AndroidManifest.xml:29:61
 	android:value
 		ADDED from AndroidManifest.xml:29:20
-service#com.umeng.update.net.DownloadingService
+meta-data#UMENG_CHANNEL
 ADDED from AndroidManifest.xml:30:9
+	android:name
+		ADDED from AndroidManifest.xml:30:42
+	android:value
+		ADDED from AndroidManifest.xml:30:20
+service#com.umeng.update.net.DownloadingService
+ADDED from AndroidManifest.xml:31:9
 	android:process
+		ADDED from AndroidManifest.xml:33:13
+	android:name
 		ADDED from AndroidManifest.xml:32:13
-	android:name
-		ADDED from AndroidManifest.xml:31:13
 activity#com.umeng.update.UpdateDialogActivity
-ADDED from AndroidManifest.xml:34:9
+ADDED from AndroidManifest.xml:35:9
 	android:theme
+		ADDED from AndroidManifest.xml:37:13
+	android:name
 		ADDED from AndroidManifest.xml:36:13
-	android:name
-		ADDED from AndroidManifest.xml:35:13
 activity#org.mewx.wenku8.activity.WelcomeActivity
-ADDED from AndroidManifest.xml:40:9
+ADDED from AndroidManifest.xml:41:9
 	android:screenOrientation
-		ADDED from AndroidManifest.xml:43:13
+		ADDED from AndroidManifest.xml:44:13
 	android:label
+		ADDED from AndroidManifest.xml:43:13
+	android:name
 		ADDED from AndroidManifest.xml:42:13
-	android:name
-		ADDED from AndroidManifest.xml:41:13
 intent-filter#android.intent.action.MAIN+android.intent.category.LAUNCHER
-ADDED from AndroidManifest.xml:45:13
+ADDED from AndroidManifest.xml:46:13
 action#android.intent.action.MAIN
-ADDED from AndroidManifest.xml:46:17
-	android:name
-		ADDED from AndroidManifest.xml:46:25
-category#android.intent.category.LAUNCHER
 ADDED from AndroidManifest.xml:47:17
 	android:name
-		ADDED from AndroidManifest.xml:47:27
+		ADDED from AndroidManifest.xml:47:25
+category#android.intent.category.LAUNCHER
+ADDED from AndroidManifest.xml:48:17
+	android:name
+		ADDED from AndroidManifest.xml:48:27
 activity#org.mewx.wenku8.activity.MainActivity
-ADDED from AndroidManifest.xml:52:9
+ADDED from AndroidManifest.xml:53:9
 	android:screenOrientation
+		ADDED from AndroidManifest.xml:56:13
+	android:label
 		ADDED from AndroidManifest.xml:55:13
-	android:label
+	android:name
 		ADDED from AndroidManifest.xml:54:13
-	android:name
-		ADDED from AndroidManifest.xml:53:13
 activity#org.mewx.wenku8.activity.SearchActivity
-ADDED from AndroidManifest.xml:59:9
+ADDED from AndroidManifest.xml:60:9
 	android:screenOrientation
+		ADDED from AndroidManifest.xml:62:13
+	android:label
 		ADDED from AndroidManifest.xml:61:13
-	android:label
-		ADDED from AndroidManifest.xml:60:13
 	android:name
-		ADDED from AndroidManifest.xml:59:19
+		ADDED from AndroidManifest.xml:60:19
 activity#org.mewx.wenku8.activity.SearchResultActivity
-ADDED from AndroidManifest.xml:65:9
+ADDED from AndroidManifest.xml:66:9
 	android:screenOrientation
+		ADDED from AndroidManifest.xml:68:13
+	android:label
 		ADDED from AndroidManifest.xml:67:13
-	android:label
-		ADDED from AndroidManifest.xml:66:13
 	android:name
-		ADDED from AndroidManifest.xml:65:19
+		ADDED from AndroidManifest.xml:66:19
 activity#org.mewx.wenku8.activity.NovelInfoActivity
-ADDED from AndroidManifest.xml:71:9
+ADDED from AndroidManifest.xml:72:9
 	android:screenOrientation
+		ADDED from AndroidManifest.xml:74:13
+	android:label
 		ADDED from AndroidManifest.xml:73:13
-	android:label
-		ADDED from AndroidManifest.xml:72:13
 	android:name
-		ADDED from AndroidManifest.xml:71:19
+		ADDED from AndroidManifest.xml:72:19
 activity#org.mewx.wenku8.activity.NovelChapterActivity
-ADDED from AndroidManifest.xml:77:9
+ADDED from AndroidManifest.xml:78:9
 	android:screenOrientation
+		ADDED from AndroidManifest.xml:80:13
+	android:label
 		ADDED from AndroidManifest.xml:79:13
-	android:label
-		ADDED from AndroidManifest.xml:78:13
 	android:name
-		ADDED from AndroidManifest.xml:77:19
+		ADDED from AndroidManifest.xml:78:19
 activity#org.mewx.wenku8.activity.VerticalReaderActivity
-ADDED from AndroidManifest.xml:83:9
+ADDED from AndroidManifest.xml:84:9
 	android:screenOrientation
+		ADDED from AndroidManifest.xml:86:13
+	android:label
 		ADDED from AndroidManifest.xml:85:13
-	android:label
-		ADDED from AndroidManifest.xml:84:13
 	android:name
-		ADDED from AndroidManifest.xml:83:19
+		ADDED from AndroidManifest.xml:84:19
 activity#org.mewx.wenku8.activity.UserLoginActivity
-ADDED from AndroidManifest.xml:89:9
+ADDED from AndroidManifest.xml:90:9
 	android:screenOrientation
+		ADDED from AndroidManifest.xml:92:13
+	android:label
 		ADDED from AndroidManifest.xml:91:13
-	android:label
-		ADDED from AndroidManifest.xml:90:13
 	android:name
-		ADDED from AndroidManifest.xml:89:19
+		ADDED from AndroidManifest.xml:90:19
 activity#org.mewx.wenku8.activity.UserInfoActivity
-ADDED from AndroidManifest.xml:95:9
+ADDED from AndroidManifest.xml:96:9
 	android:screenOrientation
-		ADDED from AndroidManifest.xml:97:13
+		ADDED from AndroidManifest.xml:98:13
 	android:label
-		ADDED from AndroidManifest.xml:96:13
+		ADDED from AndroidManifest.xml:97:13
 	android:name
-		ADDED from AndroidManifest.xml:95:19
+		ADDED from AndroidManifest.xml:96:19
 uses-sdk
 INJECTED from AndroidManifest.xml:0:0 reason: use-sdk injection requested
 MERGED from com.android.support:support-v4:22.2.0:20:5

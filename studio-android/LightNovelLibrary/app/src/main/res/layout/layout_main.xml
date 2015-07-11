@@ -12,7 +12,8 @@
         android:id="@+id/layout_activity_main"
         android:fitsSystemWindows="true"
         android:layout_width="match_parent"
-        android:layout_height="match_parent">
+        android:layout_height="match_parent"
+        android:animateLayoutChanges="true">
 
         <include layout="@layout/toolbar_main" />
 
