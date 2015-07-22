@@ -25,6 +25,8 @@ import android.widget.TableRow;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.afollestad.materialdialogs.MaterialDialog;
+import com.afollestad.materialdialogs.Theme;
 import com.makeramen.roundedimageview.RoundedImageView;
 import com.umeng.analytics.MobclickAgent;
 
@@ -62,14 +64,7 @@ public class NavigationDrawerFragment extends Fragment {
     public void onActivityCreated(Bundle savedInstanceState) {
         super.onActivityCreated(savedInstanceState);
 
-        // here change and add all I need
-        //((TextView) mainActivity.findViewById(R.id.user_text)).setText("This is a test");
-
-        // init other things ...
-        //Toast.makeText(mainActivity, "called onActivityCreated", Toast.LENGTH_SHORT).show();
-
-        // set button clicked listener
-        // mainly working on change fragment in MainActivity.
+        // set button clicked listener, mainly working on change fragment in MainActivity.
         try {
             ((TableRow) mainActivity.findViewById(R.id.main_menu_rklist)).setOnClickListener(
                     new View.OnClickListener() {
@@ -127,6 +122,22 @@ public class NavigationDrawerFragment extends Fragment {
                             mainActivity.setCurrentFragment(MainActivity.FRAGMENT_LIST.CONFIG);
                             mainActivity.changeFragment(new ConfigFragment());
                             closeDrawer();
+                        }
+                    }
+            );
+
+            ((TextView) mainActivity.findViewById(R.id.main_menu_open_source)).setOnClickListener(
+                    new View.OnClickListener() {
+                        @Override
+                        public void onClick(View v) {
+                            new MaterialDialog.Builder(getActivity())
+                                    .theme(Theme.LIGHT)
+                                    .title(R.string.main_menu_statement)
+                                    .content(GlobalConfig.getOpensourceLicense())
+                                    .forceStacking(true)
+                                    .positiveColorRes(R.color.dlgPositiveButtonColor)
+                                    .positiveText(R.string.dialog_positive_known)
+                                    .show();
                         }
                     }
             );
@@ -486,6 +497,7 @@ public class NavigationDrawerFragment extends Fragment {
         }
 
         fakeDarkSwitcher = !fakeDarkSwitcher;
+        Toast.makeText(getActivity(), "这个按钮暂时没有用滴~", Toast.LENGTH_SHORT).show();
     }
 
     private void updateNavigationBar() {

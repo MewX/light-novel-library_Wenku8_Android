@@ -5,6 +5,7 @@ import android.graphics.Bitmap;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
 import android.os.Environment;
+import android.support.annotation.Nullable;
 import android.support.v4.app.Fragment;
 import android.util.Log;
 
@@ -22,6 +23,7 @@ import org.mewx.wenku8.MyApp;
 import org.mewx.wenku8.global.api.Wenku8API;
 import org.mewx.wenku8.util.LightCache;
 import org.mewx.wenku8.util.LightNetwork;
+import org.mewx.wenku8.util.LightTool;
 
 import java.io.File;
 import java.io.UnsupportedEncodingException;
@@ -40,6 +42,7 @@ public class GlobalConfig {
     public static final String imgsSaveFolderName = "imgs";
     private static final String saveSearchHistoryFileName = "search_history.wk8";
     private static final String saveReadSavesFileName = "read_saves.wk8";
+    private static final String saveReadSavesV1FileName = "read_saves_v1.wk8";
     private static final String saveLocalBookshelfFileName = "bookshelf_local.wk8";
     private static final String saveUserAccountFileName = "cert.wk8"; // certification file
     private static final String saveUserAvatarFileName = "avatar.jpg";
@@ -49,13 +52,14 @@ public class GlobalConfig {
     private static boolean isInBookshelf = false;
     private static boolean FirstStoragePathStatus = true;
     private static Wenku8API.LANG currentLang = Wenku8API.LANG.SC;
-    private static Fragment currentFragment;
 
 
     // static variables
     private static ArrayList<String> searchHistory = null;
     private static ArrayList<ReadSaves> readSaves = null; // deprecated
     private static ArrayList<Integer> bookshelf = null;
+    private static ArrayList<ReadSavesV1> readSavesV1 = null; // deprecated
+
 
     /** Structures */
     public static class ReadSaves { // deprecated
@@ -63,6 +67,15 @@ public class GlobalConfig {
         public int pos; // last time scroll Y pos
         public int height; // last time scroll Y height
     }
+
+    public static class ReadSavesV1 { // deprecated
+        public int aid;
+        public int vid;
+        public int cid;
+        public int lineId;
+        public int wordId;
+    }
+
 
     // debug info
     public static boolean inDebugMode() {
@@ -106,8 +119,6 @@ public class GlobalConfig {
                 Log.e("MewX", "GlobalConfig:initVolleyNetwork volleyRequestQueue is NULL");
             }
         }
-
-        return;
     }
 
     public static void initImageLoader(Context context) {
@@ -125,22 +136,37 @@ public class GlobalConfig {
                 .diskCache(localUnlimitedDiscCache)
                 .defaultDisplayImageOptions(localDisplayImageOptions).build();
         ImageLoader.getInstance().init(localImageLoaderConfiguration);
-        return;
     }
 
     // settings
     public static void setCurrentLang(Wenku8API.LANG l) {
         currentLang = l;
-        return;
     }
 
-    public static void setCurrentFragment(Fragment f){
-        currentFragment = f;
-        return;
-    }
-
-    public static Fragment getCurrentFragment(){
-        return currentFragment;
+    public static String getOpensourceLicense() {
+        return "# Used Open Source Library:\n--------\n" +
+                "- yangfuhai / afinal (Unknown License)\n" +
+                "- jgilfelt / SystemBarTint (Apache License 2.0)\n" +
+                "- nostra13 / Android-Universal-Image-Loader (Apache License 2.0)\n" +
+                "- astuetz / PagerSlidingTabStrip (Apache License 2.0)\n" +
+                "  -> branch: jpardogo / PagerSlidingTabStrip\n" +
+                "- jpardogo / GoogleProgressBar (Apache License 2.0)\n" +
+                "  -> branch: MewX / google-progress-bar\n" +
+                "- Google / Volley (Apache License 2.0)\n" +
+                "- afollestad / material-dialogs (MIT License)\n" +
+                "- futuresimple / android-floating-action-button (Apache License 2.0)\n" +
+                "- vinc3m1 / RoundedImageView (Apache License 2.0)\n" +
+                "- chrisbanes / SmoothProgressBar (BEER-WARE LICENSE)\n" +
+                "- davemorrissey / subsampling-scale-image-view (Apache License 2.0)\n" +
+                "- martiansutdio / SlidingLayout (Unknown License)\n" +
+                "- AnderWeb / discreteSeekBar (Apache License 2.0)\n\n========\n\n" +
+                "# Notice:\n--------\n" +
+                "( A previous version 0.5.2.0 is open-sourced in https://github.com/MewX/light-novel-library_Wenku8_Android/ )\n" +
+                "This project will be partially open-sourced in the future, for example, the universal reader activity. But this needs time to be cleaned up. The code is messy now!\n\n========\n\n" +
+                "# Copyright:\n--------\n" +
+                "- Source/Bytecode Copyright: MewX (http://mewx.org/);\n" +
+                "- Design/Assemble Copyright: ZERO (http://kurosaki.coding.io/);\n" +
+                "- Data Collects: 轻小说文库 (http://wenku8.cn/), from the Internet.";
     }
 
     /**
@@ -304,8 +330,6 @@ public class GlobalConfig {
                 continue;
             bookshelf.add(new Integer(t));
         }
-
-        return;
     }
 
     public static void writeLocalBookShelf() {
@@ -320,7 +344,6 @@ public class GlobalConfig {
         }
 
         writeFullSaveFileContent(saveLocalBookshelfFileName, s);
-        return;
     }
 
     public static void addToLocalBookshelf(int aid) {
@@ -331,7 +354,6 @@ public class GlobalConfig {
             bookshelf.add(0, aid); // add to the first place
 
         writeLocalBookShelf();
-        return;
     }
 
     public static void removeFromLocalBookshelf(int aid) {
@@ -343,7 +365,6 @@ public class GlobalConfig {
             bookshelf.remove(i);
 
         writeLocalBookShelf();
-        return;
     }
 
     public static ArrayList<Integer> getLocalBookshelfList() {
@@ -372,7 +393,6 @@ public class GlobalConfig {
         bookshelf.add(0, aid);
 
         writeLocalBookShelf();
-        return;
     }
 
     public static boolean testInBookshelf() {
@@ -411,7 +431,6 @@ public class GlobalConfig {
             // ok, get a part
             searchHistory.add(h.substring(i, temp));
         }
-        return;
     }
 
     public static void writeSearchHistory() {
@@ -423,8 +442,6 @@ public class GlobalConfig {
 
         // write file
         writeFullSaveFileContent(saveSearchHistoryFileName, temp);
-
-        return;
     }
 
     public static ArrayList<String> getSearchHistory() {
@@ -456,7 +473,6 @@ public class GlobalConfig {
         searchHistory.add(0, record); // add to the first place
 
         writeSearchHistory(); // save history file
-        return;
     }
     public static void deleteSearchHistory(String record) {
         // record begins with a number, which represent its type
@@ -477,7 +493,6 @@ public class GlobalConfig {
         }
 
         writeSearchHistory(); // save history file
-        return;
     }
 
     @Deprecated
@@ -490,13 +505,11 @@ public class GlobalConfig {
         searchHistory.add(0, temp);
 
         writeSearchHistory(); // save history file
-        return;
     }
 
     public static void clearSearchHistory() {
         searchHistory = new ArrayList<String>();
         writeSearchHistory(); // save history file
-        return;
     }
 
     public static int getMaxSearchHistory( ) {
@@ -509,7 +522,7 @@ public class GlobalConfig {
     }
 
 
-    /** Read Saves */
+    /** Read Saves (Old) */
     public static void loadReadSaves() {
         // Format:
         // cid,,pos,,height||cid,,pos,,height
@@ -548,7 +561,6 @@ public class GlobalConfig {
         }
 
         writeFullSaveFileContent(saveReadSavesFileName, t);
-        return;
     }
 
     public static void addReadSavesRecord(int c, int p, int h) {
@@ -578,7 +590,6 @@ public class GlobalConfig {
         readSaves.add(rs);
 
         writeReadSaves();
-        return;
     }
 
     public static int getReadSavesRecord(int c, int h) {
@@ -597,6 +608,105 @@ public class GlobalConfig {
     }
 
 
+    /** Read Saves (V1) */
+    public static void loadReadSavesV1() {
+        // Format:
+        // cid,,pos,,height||cid,,pos,,height
+        // just use split function
+        readSavesV1 = new ArrayList<ReadSavesV1>();
+
+        // read history from file, if not exist, create.
+        String h = loadFullSaveFileContent(saveReadSavesV1FileName);
+
+        // split string h
+        String[] p = h.split("\\|\\|"); // regular expression
+        OutLoop:
+        for (String temp : p) {
+            Log.v("MewX", temp);
+            String[] parts = temp.split("\\:");
+            if (parts.length != 5)
+                continue;
+
+            // judge legal
+            for(String str : parts) if(!LightTool.isInteger(str)) continue OutLoop;
+
+            // add to list
+            ReadSavesV1 rs = new ReadSavesV1();
+            rs.aid = new Integer(parts[0]);
+            rs.vid = new Integer(parts[1]);
+            rs.cid = new Integer(parts[2]);
+            rs.lineId = new Integer(parts[3]);
+            rs.wordId = new Integer(parts[4]);
+            readSavesV1.add(rs);
+        }
+    }
+
+    public static void writeReadSavesV1() {
+        if (readSavesV1 == null)
+            loadReadSavesV1();
+
+        String t = "";
+        for (int i = 0; i < readSavesV1.size(); i++) {
+            if (i != 0)
+                t += "||";
+            t += readSavesV1.get(i).aid + ":" + readSavesV1.get(i).vid + ":" + readSavesV1.get(i).cid + ":"
+                    + readSavesV1.get(i).lineId + ":" + readSavesV1.get(i).wordId;
+        }
+        writeFullSaveFileContent(saveReadSavesV1FileName, t);
+    }
+
+    public static void addReadSavesRecordV1(int aid, int vid, int cid, int lineId, int wordId) {
+        if (readSavesV1 == null)
+            loadReadSavesV1();
+
+        // judge if exist, and if legal, update it
+        for (int i = 0; i < readSavesV1.size(); i ++) {
+            if (readSavesV1.get(i).aid == aid) {
+                // need to update
+                readSavesV1.get(i).vid = vid;
+                readSavesV1.get(i).cid = cid;
+                readSavesV1.get(i).lineId = lineId;
+                readSavesV1.get(i).wordId = wordId;
+                writeReadSavesV1();
+                return;
+            }
+        }
+
+        // new record
+        ReadSavesV1 rs = new ReadSavesV1();
+        rs.aid = aid;
+        rs.vid = vid;
+        rs.cid = cid;
+        rs.lineId = lineId;
+        rs.wordId = wordId;
+        readSavesV1.add(rs);
+        writeReadSavesV1();
+    }
+
+    public static void removeReadSavesRecordV1(int aid) {
+        if (readSavesV1 == null)
+            loadReadSavesV1();
+
+        int i = 0;
+        for( ; i < readSavesV1.size(); i ++) {
+            if(readSavesV1.get(i).aid == aid) break;
+        }
+        if(i < readSavesV1.size()) readSavesV1.remove(i);
+        writeReadSavesV1();
+    }
+
+    @Nullable
+    public static ReadSavesV1 getReadSavesRecordV1(int aid) {
+        if (readSavesV1 == null)
+            loadReadSavesV1();
+
+        for (int i = 0; i < readSavesV1.size(); i ++) {
+            if (readSavesV1.get(i).aid == aid) return readSavesV1.get(i);
+        }
+        return null;
+    }
+
+
     /** Novel content */
     /**
      * saveNovelContentImage:
@@ -605,7 +715,7 @@ public class GlobalConfig {
      *
      * @param url
      *            : full http url of target image
-     * @return: if file finally exist, if already exist before saving, still
+     * @return if file finally exist, if already exist before saving, still
      *          return true; if finally the file does not exist, return false.
      */
     public static boolean saveNovelContentImage(String url) {
@@ -637,7 +747,7 @@ public class GlobalConfig {
      *
      * @param url
      *            : full http url of target image
-     * @return: true if file deleted successfully.
+     * @return true if file deleted successfully.
      */
     public static boolean removeNovelContentImage(String url) {
         String imgFileName = generateImageFileNameByURL(url);
@@ -656,7 +766,7 @@ public class GlobalConfig {
      *
      * @param fileName
      *            : just need the fileName
-     * @return: direct fileName or just null
+     * @return direct fileName or just null
      */
     public static String getAvailableNovolContentImagePath(String fileName) {
         if (LightCache.testFileExist(getFirstFullSaveFilePath()

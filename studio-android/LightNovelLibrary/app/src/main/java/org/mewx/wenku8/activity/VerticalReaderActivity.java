@@ -54,7 +54,7 @@ public class VerticalReaderActivity extends AppCompatActivity {
 
     // private vars
     private String from = "";
-    private int aid, vid, cid;
+    private int aid, cid;
     private VolumeList volumeList= null;
     private MaterialDialog pDialog = null;
     private ScrollViewNoFling svTextListLayout = null;
@@ -76,8 +76,7 @@ public class VerticalReaderActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN,
-                WindowManager.LayoutParams.FLAG_FULLSCREEN);
+        getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN, WindowManager.LayoutParams.FLAG_FULLSCREEN);
         setContentView(R.layout.layout_vertical_reader_temp);
 
         // fetch values
@@ -146,30 +145,6 @@ public class VerticalReaderActivity extends AppCompatActivity {
 
             @Override
             public boolean onTouch(View v, MotionEvent event) {
-//                if(MotionEventCompat.getActionMasked(event) == MotionEvent.ACTION_DOWN) {
-//                    int screenHeight = getResources().getDisplayMetrics().heightPixels;
-//                    int y = (int) event.getY();
-//
-//                    if(y < screenHeight * 5 / 6 && y >= screenHeight / 2) {
-//                        // move down
-//                        svTextListLayout.scrollBy(0, 20);
-//                        //isScrolling = true;
-//                        //autoScrollRunnable.run();
-//                        return true;
-//                    }
-//                    else if(y < screenHeight / 2 && y > screenHeight / 6) {
-//                        // move up
-//                        svTextListLayout.scrollBy(0, -20);
-//                        //isScrolling = true;
-//                        //autoScrollRunnable.run();
-//                        return true;
-//                    }
-//                }
-//                else if(MotionEventCompat.getActionMasked(event) == MotionEvent.ACTION_UP) {
-//                    isScrolling = false;
-//                }
-//
-//                return false; // sent to parent
                 return gestureDetector.onTouchEvent(event);
             }
         });
@@ -479,5 +454,11 @@ public class VerticalReaderActivity extends AppCompatActivity {
                 return true;
         }
         return super.onKeyDown(keyCode, event);
+    }
+
+    @Override
+    public void onBackPressed() {
+        super.onBackPressed();
+        overridePendingTransition(0, R.anim.fade_out);
     }
 }

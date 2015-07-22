@@ -61,10 +61,33 @@ public class ConfigFragment extends Fragment {
             tvNotice.setText("通知：\n" + Wenku8API.NoticeString);
 
         // set all on click listeners
+        getActivity().findViewById(R.id.btn_data_backup).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                Toast.makeText(getActivity(), "这个按钮暂时没有用滴~", Toast.LENGTH_SHORT).show();
+            }
+        });
+        getActivity().findViewById(R.id.btn_data_restore).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                Toast.makeText(getActivity(), "这个按钮暂时没有用滴~", Toast.LENGTH_SHORT).show();
+            }
+        });
+        getActivity().findViewById(R.id.btn_clear_cache).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                Toast.makeText(getActivity(), "这个按钮暂时没有用滴~", Toast.LENGTH_SHORT).show();
+            }
+        });
+        getActivity().findViewById(R.id.btn_navigation_drawer_wallpaper).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                Toast.makeText(getActivity(), "这个按钮暂时没有用滴~", Toast.LENGTH_SHORT).show();
+            }
+        });
         getActivity().findViewById(R.id.btn_check_update).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-
                 if(!GlobalConfig.inAlphaBuild()) {
                     // alpha version does not contains auto-update function
                     // check for update
@@ -89,8 +112,6 @@ public class ConfigFragment extends Fragment {
                     UmengUpdateAgent.forceUpdate(getActivity());
                 }
                 else {
-                    //Toast.makeText(getActivity(), "值得骄傲的内测用户：\n请从群共享里面下载最新版本~", Toast.LENGTH_SHORT).show();
-
                     UmengUpdateAgent.setUpdateAutoPopup(false);
                     UmengUpdateAgent.setUpdateListener(new UmengUpdateListener() {
                         @Override
@@ -128,6 +149,12 @@ public class ConfigFragment extends Fragment {
                     });
                     UmengUpdateAgent.update(getActivity());
                 }
+            }
+        });
+        getActivity().findViewById(R.id.btn_about).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                Toast.makeText(getActivity(), "这个按钮暂时没有用滴~", Toast.LENGTH_SHORT).show();
             }
         });
     }

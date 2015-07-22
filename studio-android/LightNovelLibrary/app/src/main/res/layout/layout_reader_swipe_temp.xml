@@ -1,10 +1,192 @@
 <?xml version="1.0" encoding="utf-8"?>
 <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/slider_holder"
     android:layout_width="match_parent"
     android:layout_height="match_parent">
+    <!--android:animateLayoutChanges="true"-->
 
-    <com.martian.libsliding.SlidingLayout
-        android:id="@+id/sliding_layout"
+    <RelativeLayout
+        android:id="@+id/reader_top"
+        android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:layout_width="match_parent" />
+        android:layout_alignParentTop="true"
+        android:visibility="invisible"
+        android:fitsSystemWindows="true"
+        android:clipToPadding="false">
+
+        <android.support.v7.widget.Toolbar
+            style="@style/ToolBarStyle"
+            android:id="@+id/toolbar_actionbar"
+            android:layout_width="match_parent"
+            android:layout_height="?attr/actionBarSize"
+            android:clickable="true"
+            android:background="@color/reader_default_bg_toolbar" />
+
+        <RelativeLayout
+            android:id="@+id/btn_previous"
+            android:layout_width="wrap_content"
+            android:layout_height="match_parent"
+            android:layout_below="@id/toolbar_actionbar"
+            android:background="@color/reader_default_bg_toolbar"
+            android:layout_alignParentLeft="true"
+            android:layout_alignParentStart="true">
+
+            <TextView
+                android:id="@+id/text_previous"
+                android:layout_width="wrap_content"
+                android:layout_height="match_parent"
+                android:gravity="center"
+                android:padding="16dp"
+                android:clickable="true"
+                android:background="@drawable/btn_menu_item"
+                android:textColor="@color/default_white"
+                android:text="@string/reader_previous_chapter"/>
+        </RelativeLayout>
+
+        <RelativeLayout
+            android:id="@+id/btn_next"
+            android:layout_width="wrap_content"
+            android:layout_height="match_parent"
+            android:layout_below="@id/toolbar_actionbar"
+            android:background="@color/reader_default_bg_toolbar"
+            android:layout_alignParentRight="true"
+            android:layout_alignParentEnd="true">
+
+            <TextView
+                android:id="@+id/text_next"
+                android:layout_width="wrap_content"
+                android:layout_height="match_parent"
+                android:gravity="center"
+                android:padding="16dp"
+                android:clickable="true"
+                android:background="@drawable/btn_menu_item"
+                android:textColor="@color/default_white"
+                android:text="@string/reader_next_chapter"/>
+        </RelativeLayout>
+    </RelativeLayout>
+
+    <!--<org.mewx.wenku8.reader.slider.SlidingLayout-->
+        <!--android:id="@+id/sliding_layout"-->
+        <!--android:layout_height="match_parent"-->
+        <!--android:layout_width="match_parent" />-->
+
+    <LinearLayout
+        android:id="@+id/reader_bot"
+        android:layout_width="match_parent"
+        android:layout_height="@dimen/reader_bot_toolbar_height"
+        android:fitsSystemWindows="true"
+        android:background="@color/reader_default_bg_toolbar"
+        android:orientation="horizontal"
+        android:visibility="invisible"
+        android:clickable="true"
+        android:layout_alignParentBottom="true"
+        android:layout_alignParentLeft="true"
+        android:layout_alignParentStart="true"
+        android:baselineAligned="false">
+
+        <LinearLayout
+            android:id="@+id/btn_daylight"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:clickable="true"
+            android:background="@drawable/btn_menu_item">
+
+            <ImageButton
+                android:id="@+id/ic_daylight"
+                android:layout_width="32dp"
+                android:layout_height="32dp"
+                android:scaleType="fitCenter"
+                android:clickable="false"
+                android:background="@android:color/transparent"
+                android:src="@drawable/icl_daynight"/>
+        </LinearLayout>
+
+
+        <LinearLayout
+            android:id="@+id/btn_jump"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:clickable="true"
+            android:background="@drawable/btn_menu_item">
+
+            <ImageButton
+                android:id="@+id/ic_jump"
+                android:layout_width="32dp"
+                android:layout_height="32dp"
+                android:scaleType="fitCenter"
+                android:clickable="false"
+                android:background="@android:color/transparent"
+                android:src="@drawable/ic_jump"/>
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/btn_viewlable"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:clickable="true"
+            android:background="@drawable/btn_menu_item">
+
+            <ImageButton
+                android:id="@+id/ic_viewlable"
+                android:layout_width="32dp"
+                android:layout_height="32dp"
+                android:scaleType="fitCenter"
+                android:clickable="false"
+                android:background="@android:color/transparent"
+                android:src="@drawable/ic_viewlable"/>
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/btn_config"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:clickable="true"
+            android:background="@drawable/btn_menu_item">
+
+            <ImageButton
+                android:id="@+id/ic_config"
+                android:layout_width="32dp"
+                android:layout_height="32dp"
+                android:scaleType="fitCenter"
+                android:clickable="false"
+                android:background="@android:color/transparent"
+                android:src="@drawable/icl_config"/>
+        </LinearLayout>
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/reader_bot_seeker"
+        android:layout_width="match_parent"
+        android:layout_height="@dimen/reader_bot_toolbar_height"
+        android:fitsSystemWindows="true"
+        android:background="@color/reader_default_bg_toolbar"
+        android:orientation="horizontal"
+        android:visibility="invisible"
+        android:clickable="true"
+        android:layout_alignParentBottom="true"
+        android:layout_alignParentLeft="true"
+        android:layout_alignParentStart="true"
+        android:gravity="center"
+        android:baselineAligned="false">
+
+        <org.adw.library.widgets.discreteseekbar.DiscreteSeekBar
+            android:id="@+id/reader_seekbar"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:paddingLeft="16dp"
+            android:paddingRight="16dp"
+            app:dsb_indicatorColor="@color/myAccentColor"
+            app:dsb_progressColor="@color/myPrimaryColor"
+            app:dsb_trackColor="@color/default_white"
+            app:dsb_indicatorElevation="4dp"/>
+        </LinearLayout>
 </RelativeLayout>

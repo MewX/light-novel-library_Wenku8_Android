@@ -41,7 +41,7 @@ public class OldNovelContentParser {
             if (temp == -1) {
                 NovelContent nc = new NovelContent();
                 nc.type = 't';
-                nc.content = t;
+                nc.content = t.trim(); //.replaceAll("[ |　]", " ").trim();
                 result.add(nc);
 
                 // update progress

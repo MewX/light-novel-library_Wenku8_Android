@@ -1,4 +1,4 @@
-package com.martian.libsliding.slider;
+package org.mewx.wenku8.reader.slider.base;
 
 /**
  * Created by xuzb on 1/16/15.

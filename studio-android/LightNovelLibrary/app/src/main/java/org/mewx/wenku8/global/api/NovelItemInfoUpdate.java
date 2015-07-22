@@ -79,7 +79,7 @@ public class NovelItemInfoUpdate {
                             } else if ("IntroPreview".equals(xmlPullParser
                                     .getAttributeValue(0))) {
                                 // need to remove leading space '\u3000'
-                                niiu.intro_short = xmlPullParser.nextText().trim().replaceAll("\u3000","");
+                                niiu.intro_short = xmlPullParser.nextText().replaceAll("[ |　]", " ").trim();//.trim().replaceAll("\u3000","");
                             }
                         }
                         break;

@@ -1,6 +1,7 @@
 package org.mewx.wenku8.global.api;
 
 import android.content.ContentValues;
+import android.util.Log;
 
 import com.umeng.analytics.MobclickAgent;
 
@@ -276,6 +277,7 @@ public class Wenku8API {
     private static ContentValues getEncryptedCV(String str) {
         ContentValues cv = new ContentValues();
         cv.put("request",LightBase64.EncodeBase64(str+"&timetoken="+System.currentTimeMillis()));
+//        Log.e("MewX", "request = " + LightBase64.EncodeBase64(str+"&timetoken="+System.currentTimeMillis()));
         return cv;
     }
 
@@ -312,6 +314,10 @@ public class Wenku8API {
         //return params;
 
         return getEncryptedMAP("action=book&do=bookinfo&aid=" + aid + "&t=" + getLANG(l));
+    }
+
+    public static ContentValues getNovelShortInfoUpdate_CV(int aid, LANG l) {
+        return getEncryptedCV("action=book&do=bookinfo&aid=" + aid + "&t=" + getLANG(l));
     }
 
     public static NameValuePair getNovelFullIntro(int aid, LANG l) {
@@ -583,8 +589,10 @@ public class Wenku8API {
      * Banned NameValuePair, HttpPost.
      */
     public static ContentValues getUserLoginParams(String username, String password) {
-        // 使用session方式判断是否已登录（是否可以用来作心跳包）
-        return getEncryptedCV("action=login&username=" + LightNetwork.encodeToHttp(username) + "&password=" + LightNetwork.encodeToHttp(password));
+        // 使用session方式判断是否已登录
+        Log.e("MewX", "Uname: " + username + "\nPwd: " + password + " (" + LightNetwork.encodeToHttp(password) + ")");
+        String temp = "action=login&username=" + LightNetwork.encodeToHttp(username) + "&password=" + LightNetwork.encodeToHttp(password);
+        return getEncryptedCV(temp);
     }
 
     public static ContentValues getUserAvatar( ) {

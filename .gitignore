@@ -27,6 +27,7 @@ studio-android/LightNovelLibrary/app/unused.txt
 studio-android/LightNovelLibrary/app/seeds.txt
 studio-android/LightNovelLibrary/app/mapping.txt
 studio-android/LightNovelLibrary/app/class_files.txt
+studio-android/LightNovelLibrary/app/*.mapping.txt
 
 # Intellij project files
 *.iml

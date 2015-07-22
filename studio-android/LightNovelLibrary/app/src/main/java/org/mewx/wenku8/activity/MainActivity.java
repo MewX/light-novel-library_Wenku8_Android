@@ -59,12 +59,11 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.layout_main); // have 3 styles
 
         // create save folder
-        LightCache.saveFile(GlobalConfig.getFirstStoragePath() + "imgs",
-                ".nomedia", "".getBytes(), false);
-        GlobalConfig.setFirstStoragePathStatus(LightCache.testFileExist(GlobalConfig.getFirstStoragePath()
-                + "imgs" + File.separator + ".nomedia")); // set status
-        LightCache.saveFile(GlobalConfig.getSecondStoragePath() + "imgs",
-                ".nomedia", "".getBytes(), false);
+        LightCache.saveFile(GlobalConfig.getFirstStoragePath() + "imgs", ".nomedia", "".getBytes(), false);
+        GlobalConfig.setFirstStoragePathStatus(LightCache.testFileExist(GlobalConfig.getFirstStoragePath() + "imgs" + File.separator + ".nomedia")); // TODO: set status?
+        LightCache.saveFile(GlobalConfig.getSecondStoragePath() + "imgs", ".nomedia", "".getBytes(), false);
+        LightCache.saveFile(GlobalConfig.getFirstFullSaveFilePath() + "imgs", ".nomedia", "".getBytes(), false);
+        LightCache.saveFile(GlobalConfig.getSecondFullSaveFilePath() + "imgs", ".nomedia", "".getBytes(), false);
 
         // UIL setting
         if(ImageLoader.getInstance() == null || !ImageLoader.getInstance().isInited()) {
@@ -78,6 +77,7 @@ public class MainActivity extends AppCompatActivity {
         MobclickAgent.updateOnlineConfig(this);
         UmengUpdateAgent.setUpdateCheckConfig(false); // disable res check
         UmengUpdateAgent.setDeltaUpdate(true);
+        UmengUpdateAgent.setUpdateOnlyWifi(false);
         if(!GlobalConfig.inAlphaBuild()) {
             // alpha version does not contains auto-update function
             UmengUpdateAgent.update(this);
@@ -162,9 +162,9 @@ public class MainActivity extends AppCompatActivity {
             tintManager.setStatusBarTintEnabled(true);
             tintManager.setNavigationBarTintEnabled(true);
             tintManager.setTintAlpha(0.15f);
+            tintManager.setNavigationBarAlpha(0.0f);
             // set all color
             tintManager.setTintColor(getResources().getColor(android.R.color.black));
-
             // set Navigation bar color
             if(Build.VERSION.SDK_INT >= 21)
                 getWindow().setNavigationBarColor(getResources().getColor(R.color.myNavigationColor));

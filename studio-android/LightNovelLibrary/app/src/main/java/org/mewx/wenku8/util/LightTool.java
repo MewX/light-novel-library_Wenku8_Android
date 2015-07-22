@@ -10,6 +10,8 @@ import java.lang.reflect.InvocationTargetException;
 
 /**
  * Created by MewX on 2015/6/13.
+ *
+ * Util tools collects.
  */
 public class LightTool {
 
@@ -82,8 +84,26 @@ public class LightTool {
         return size;
     }
 
+    public static int getStatusBarHeightValue(Context context) {
+        int result = 0;
+        int resourceId = context.getResources().getIdentifier("status_bar_height", "dimen", "android");
+        if (resourceId > 0) {
+            result = context.getResources().getDimensionPixelSize(resourceId);
+        }
+        return result;
+    }
 
-    /* dp px tools */
+    public static int getNavigationBarHeightValue(Context context) {
+        int result = 0;
+        int resourceId = context.getResources().getIdentifier("navigation_bar_height", "dimen", "android");
+        if (resourceId > 0) {
+            result = context.getResources().getDimensionPixelSize(resourceId);
+        }
+        return result;
+    }
+
+
+    /* dp px sp tools */
     public static int dip2px(Context context, float dpValue) {
         final float scale = context.getResources().getDisplayMetrics().density;
         return (int) (dpValue * scale + 0.5f);
@@ -92,5 +112,15 @@ public class LightTool {
     public static int px2dip(Context context, float pxValue) {
         final float scale = context.getResources().getDisplayMetrics().density;
         return (int) (pxValue / scale + 0.5f);
+    }
+
+    public static float px2sp(Context context, float px) {
+        float scaledDensity = context.getResources().getDisplayMetrics().scaledDensity;
+        return px / scaledDensity;
+    }
+
+    public static float sp2px(Context context, float sp) {
+        float scaledDensity = context.getResources().getDisplayMetrics().scaledDensity;
+        return sp * scaledDensity;
     }
 }

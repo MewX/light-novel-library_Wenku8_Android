@@ -19,4 +19,7 @@
         <item>@color/green</item>
     </integer-array>
     <integer name="default_type">0</integer>
+
+    <!-- Reader -->
+    <dimen name="reader_bot_toolbar_height">80dp</dimen>
 </resources>

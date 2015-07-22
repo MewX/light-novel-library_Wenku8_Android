@@ -65,7 +65,7 @@
             android:layout_height="?attr/actionBarSize"
             android:id="@+id/search_clear"
             android:clickable="true"
-            android:background="@drawable/btn_menu_item">
+            android:background="@drawable/btn_menu_item_oval">
 
             <ImageView
                 android:id="@+id/search_clear_icon"

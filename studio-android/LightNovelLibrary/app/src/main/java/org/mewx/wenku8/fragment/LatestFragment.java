@@ -76,8 +76,6 @@ public class LatestFragment extends Fragment implements MyItemClickListener, MyI
         // get main activity
         while (mainActivity == null)
             mainActivity = (MainActivity) getActivity();
-
-        GlobalConfig.setCurrentFragment(this); // backup
     }
 
     public NovelItemAdapter getNovelItemAdapter() {

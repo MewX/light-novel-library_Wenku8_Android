@@ -47,6 +47,7 @@ import org.mewx.wenku8.global.api.VolumeList;
 import org.mewx.wenku8.global.api.Wenku8API;
 import org.mewx.wenku8.global.api.Wenku8Error;
 import org.mewx.wenku8.global.api.Wenku8Parser;
+import org.mewx.wenku8.reader.activity.Wenku8ReaderActivityV1;
 import org.mewx.wenku8.util.LightCache;
 import org.mewx.wenku8.util.LightNetwork;
 import org.mewx.wenku8.util.LightTool;
@@ -122,8 +123,12 @@ public class NovelInfoActivity extends AppCompatActivity {
             tintManager.setStatusBarTintEnabled(true);
             tintManager.setNavigationBarTintEnabled(true);
             tintManager.setTintAlpha(0.15f);
+            tintManager.setNavigationBarAlpha(0.0f);
             // set all color
             tintManager.setTintColor(getResources().getColor(android.R.color.black));
+            // set Navigation bar color
+            if(Build.VERSION.SDK_INT >= 21)
+                getWindow().setNavigationBarColor(getResources().getColor(R.color.myNavigationColor));
 
         }
 
@@ -169,7 +174,7 @@ public class NovelInfoActivity extends AppCompatActivity {
             @Override
             public void run() {
                 spb.setVisibility(View.VISIBLE);
-                if(from.equals(FromLocal))
+                if (from.equals(FromLocal))
                     refreshInfoFromLocal();
                 else
                     refreshInfoFromCloud();
@@ -197,6 +202,7 @@ public class NovelInfoActivity extends AppCompatActivity {
                     famMenu.collapse();
             }
         });
+        if(Build.VERSION.SDK_INT >= 16) tvNovelTitle.setBackground(getResources().getDrawable(R.drawable.btn_menu_item));
         tvNovelTitle.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -468,6 +474,96 @@ public class NovelInfoActivity extends AppCompatActivity {
             else
                 finishAfterTransition(); // end directly
         }
+        else if (menuItem.getItemId() == R.id.action_continue_read_progress) {
+            // show dialog, jump to last read position
+            if (GlobalConfig.getReadSavesRecordV1(aid) != null) {
+                final GlobalConfig.ReadSavesV1 rs = GlobalConfig.getReadSavesRecordV1(aid);
+                int findVidIndex = 0, findCidIndex = 0;
+                for( ; findVidIndex < listVolume.size(); findVidIndex ++) {
+                    if(rs.vid == listVolume.get(findVidIndex).vid) break;
+                }
+                if(findVidIndex < listVolume.size()) {
+                    for (; findCidIndex < listVolume.get(findVidIndex).chapterList.size(); findCidIndex++) {
+                        if(rs.cid == listVolume.get(findVidIndex).chapterList.get(findCidIndex).cid) break;
+                    }
+                    if(findCidIndex < listVolume.get(findVidIndex).chapterList.size()) {
+                        final int findVidIndex_bak = findVidIndex, findCidIndex_bak = findCidIndex;
+                        new MaterialDialog.Builder(this)
+                                .callback(new MaterialDialog.ButtonCallback() {
+                                    @Override
+                                    public void onPositive(MaterialDialog dialog) {
+                                        super.onPositive(dialog);
+
+                                        // test does file exist
+                                        if (from.equals(FromLocal) &&
+                                                !LightCache.testFileExist(GlobalConfig.getFirstStoragePath()
+                                                        + GlobalConfig.saveFolderName + File.separator + "novel"
+                                                        + File.separator + listVolume.get(findVidIndex_bak).chapterList.get(findCidIndex_bak).cid + ".xml") &&
+                                                !LightCache.testFileExist(GlobalConfig.getSecondStoragePath()
+                                                        + GlobalConfig.saveFolderName + File.separator + "novel"
+                                                        + File.separator + listVolume.get(findVidIndex_bak).chapterList.get(findCidIndex_bak).cid + ".xml")) {
+                                            // local file not download, ask to download an read or cancel
+                                            new MaterialDialog.Builder(NovelInfoActivity.this)
+                                                    .callback(new MaterialDialog.ButtonCallback() {
+                                                        @Override
+                                                        public void onPositive(MaterialDialog dialog) {
+                                                            super.onPositive(dialog);
+
+                                                            // jump to reader activity
+                                                            Intent intent = new Intent(NovelInfoActivity.this, Wenku8ReaderActivityV1.class);
+                                                            intent.putExtra("aid", aid);
+                                                            intent.putExtra("volume", listVolume.get(findVidIndex_bak));
+                                                            intent.putExtra("cid", listVolume.get(findVidIndex_bak).chapterList.get(findCidIndex_bak).cid);
+                                                            intent.putExtra("from", "cloud"); // from cloud
+                                                            intent.putExtra("forcejump", "yes");
+                                                            startActivity(intent);
+                                                            overridePendingTransition(R.anim.fade_in, R.anim.hold); // fade in animation
+                                                        }
+                                                    })
+                                                    .theme(Theme.LIGHT)
+                                                    .backgroundColorRes(R.color.dlgBackgroundColor)
+                                                    .contentColorRes(R.color.dlgContentColor)
+                                                    .positiveColorRes(R.color.dlgPositiveButtonColor)
+                                                    .negativeColorRes(R.color.dlgNegativeButtonColor)
+                                                    .content(getResources().getString(R.string.dialog_content_load_from_cloud))
+                                                    .contentGravity(GravityEnum.CENTER)
+                                                    .positiveText(R.string.dialog_positive_likethis)
+                                                    .negativeText(R.string.dialog_negative_preferno)
+                                                    .show();
+                                            return;
+                                        }
+
+                                        // jump to reader activity
+                                        Intent intent = new Intent(NovelInfoActivity.this, Wenku8ReaderActivityV1.class);
+                                        intent.putExtra("aid", aid);
+                                        intent.putExtra("volume", listVolume.get(findVidIndex_bak));
+                                        intent.putExtra("cid", listVolume.get(findVidIndex_bak).chapterList.get(findCidIndex_bak).cid);
+                                        intent.putExtra("from", from); // from "fav"
+                                        intent.putExtra("forcejump", "yes");
+                                        startActivity(intent);
+                                        overridePendingTransition(R.anim.fade_in, R.anim.hold); // fade in animation
+                                    }
+                                })
+                                .theme(Theme.LIGHT)
+                                .titleColor(R.color.default_text_color_black)
+                                .backgroundColorRes(R.color.dlgBackgroundColor)
+                                .contentColorRes(R.color.dlgContentColor)
+                                .positiveColorRes(R.color.dlgPositiveButtonColor)
+                                .negativeColorRes(R.color.dlgNegativeButtonColor)
+                                .title(R.string.reader_v1_notice)
+                                .content(R.string.reader_jump_last)
+                                .contentGravity(GravityEnum.CENTER)
+                                .positiveText(R.string.dialog_positive_sure)
+                                .negativeText(R.string.dialog_negative_biao)
+                                .show();
+                    }
+                }
+            }
+            else {
+                Toast.makeText(this, "未发现保存的进度，可能是未读或上次读完了某卷~ 那么，开始下一卷吧~", Toast.LENGTH_SHORT).show();
+            }
+
+        }
         return super.onOptionsItemSelected(menuItem);
     }
 
@@ -563,7 +659,7 @@ public class NovelInfoActivity extends AppCompatActivity {
             for(VolumeList vl : listVolume) {
                 for(ChapterInfo ci : vl.chapterList) {
                     if(!LightCache.testFileExist(GlobalConfig.getFirstFullSaveFilePath() + "novel" + File.separator + ci.cid + ".xml")
-                            && !LightCache.testFileExist(GlobalConfig.getSecondFullSaveFilePath() + File.separator + "novel" + ci.cid + ".xml"))
+                            && !LightCache.testFileExist(GlobalConfig.getSecondFullSaveFilePath() + "novel" + File.separator + ci.cid + ".xml"))
                         break;
                     //String content = GlobalConfig.loadFullFileFromSaveFolder("novel", listVolume.get(i).chapterList.get(j).cid + ".xml");
                     //List<OldNovelContentParser.NovelContent> listImage = OldNovelContentParser.NovelContentParser_onlyImage(content);
@@ -588,13 +684,11 @@ public class NovelInfoActivity extends AppCompatActivity {
                     tvNovelStatus.setText(mNovelItemMeta.bookStatus);
                     tvNovelUpdate.setText(mNovelItemMeta.lastUpdate);
                     NovelInfoActivity.this.getSupportActionBar().setTitle(mNovelItemMeta.title); // set action bar title
-
                     break;
 
                 case 2:
                     //update novel info full
                     tvNovelFullIntro.setText(mNovelItemMeta.fullIntro);
-
                     break;
 
                 case 3:
@@ -832,7 +926,6 @@ public class NovelInfoActivity extends AppCompatActivity {
         @Override
         protected void onPreExecute() {
             super.onPreExecute();
-
             md = new MaterialDialog.Builder(NovelInfoActivity.this)
                     .theme(Theme.LIGHT)
                     .content(R.string.dialog_content_novel_remove_from_cloud)
@@ -851,7 +944,9 @@ public class NovelInfoActivity extends AppCompatActivity {
             try {
                 result = new String(bytes, "UTF-8");
                 Log.e("MewX", result);
-                if(Integer.parseInt(result) != 1) {
+                if(Wenku8Error.getSystemDefinedErrorCode(Integer.parseInt(result)) != Wenku8Error.ErrorCode.SYSTEM_1_SUCCEEDED
+                        && Wenku8Error.getSystemDefinedErrorCode(Integer.parseInt(result)) != Wenku8Error.ErrorCode.SYSTEM_4_NOT_LOGGED_IN
+                        && Wenku8Error.getSystemDefinedErrorCode(Integer.parseInt(result)) != Wenku8Error.ErrorCode.SYSTEM_7_NOVEL_NOT_IN_BOOKSHELF) {
                     if (LightTool.isInteger(result))
                         return Wenku8Error.getSystemDefinedErrorCode(Integer.parseInt(result));
                     else

@@ -1,9 +1,9 @@
-package com.martian.libsliding.slider;
+package org.mewx.wenku8.reader.slider.base;
 
 import android.view.MotionEvent;
 
-import com.martian.libsliding.SlidingLayout;
-import com.martian.libsliding.SlidingAdapter;
+import org.mewx.wenku8.reader.slider.SlidingAdapter;
+import org.mewx.wenku8.reader.slider.SlidingLayout;
 
 /**
  * Created by xuzb on 1/16/15.

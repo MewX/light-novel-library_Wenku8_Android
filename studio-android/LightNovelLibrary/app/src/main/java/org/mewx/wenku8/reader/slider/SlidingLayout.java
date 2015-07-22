@@ -1,4 +1,4 @@
-package com.martian.libsliding;
+package org.mewx.wenku8.reader.slider;
 
 import android.content.Context;
 import android.os.Parcel;
@@ -10,7 +10,7 @@ import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
 
-import com.martian.libsliding.slider.Slider;
+import org.mewx.wenku8.reader.slider.base.Slider;
 
 /**
  * Created by xuzb on 10/23/14.

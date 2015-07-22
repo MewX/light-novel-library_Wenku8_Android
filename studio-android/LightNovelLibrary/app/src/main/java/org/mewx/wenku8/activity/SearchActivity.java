@@ -19,14 +19,12 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import com.afollestad.materialdialogs.DialogAction;
 import com.afollestad.materialdialogs.GravityEnum;
 import com.afollestad.materialdialogs.MaterialDialog;
 import com.afollestad.materialdialogs.Theme;
 import com.readystatesoftware.systembartint.SystemBarTintManager;
 import com.umeng.analytics.MobclickAgent;
 
-import org.mewx.wenku8.MyApp;
 import org.mewx.wenku8.R;
 import org.mewx.wenku8.adapter.SearchHistoryAdapter;
 import org.mewx.wenku8.global.GlobalConfig;
@@ -59,7 +57,7 @@ public class SearchActivity extends AppCompatActivity implements MyItemClickList
         // bind views
         searchContainer = (LinearLayout)findViewById(R.id.search_container);
         toolbarSearchView = (EditText) findViewById(R.id.search_view);
-        searchClearButton = (View) findViewById(R.id.search_clear);
+        searchClearButton = findViewById(R.id.search_clear);
 
         // Clear search text when clear button is tapped
         searchClearButton.setOnClickListener(new View.OnClickListener() {
@@ -72,8 +70,10 @@ public class SearchActivity extends AppCompatActivity implements MyItemClickList
         // set indicator enable
         mToolbar = (Toolbar) findViewById(R.id.toolbar_actionbar);
         setSupportActionBar(mToolbar);
-        getSupportActionBar().setDisplayHomeAsUpEnabled(true);
-        getSupportActionBar().setHomeButtonEnabled(true);
+        if(getSupportActionBar() != null) {
+            getSupportActionBar().setDisplayHomeAsUpEnabled(true);
+            getSupportActionBar().setHomeButtonEnabled(true);
+        }
 
         // change status bar color tint, and this require SDK16
         if (Build.VERSION.SDK_INT >= 16 ) { //&& Build.VERSION.SDK_INT <= 21) {
@@ -85,9 +85,9 @@ public class SearchActivity extends AppCompatActivity implements MyItemClickList
             tintManager.setStatusBarTintEnabled(true);
             tintManager.setNavigationBarTintEnabled(true);
             tintManager.setTintAlpha(0.15f);
+            tintManager.setNavigationBarAlpha(0.0f);
             // set all color
             tintManager.setTintColor(getResources().getColor(android.R.color.black));
-
             // set Navigation bar color
             if(Build.VERSION.SDK_INT >= 21)
                 getWindow().setNavigationBarColor(getResources().getColor(R.color.myNavigationColorWhite));

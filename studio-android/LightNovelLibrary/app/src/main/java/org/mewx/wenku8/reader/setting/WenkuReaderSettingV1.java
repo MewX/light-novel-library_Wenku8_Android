@@ -1,5 +1,7 @@
 package org.mewx.wenku8.reader.setting;
 
+import android.graphics.Color;
+
 /**
  * Created by MewX on 2015/7/8.
  *
@@ -19,15 +21,24 @@ public class WenkuReaderSettingV1 {
         CUSTOM
     }
 
+    // global settings
+    public boolean inDayMode = true; // use dark color text
+    public final int fontColorLight = Color.parseColor("#32414E"); // for dark background (ARGB)
+    public final int fontColorDark = Color.parseColor("#444444"); // for light background
+    public final int bgColorLight = Color.parseColor("#CFBEB6");
+    public final int bgColorDark = Color.parseColor("#090C13");
+    public final int widgetHeight = 24; // in "dp"
+    public final int widgetTextSize = 12; // in "sp"
+
     // font setting
     private int fontSize = 18; // in "sp"
     private boolean useCustomFont = false; // Custom font must declare this first!
     private String customFontPath = "";
 
     // paragraph setting
-    private int lineDistance = 32; // in "dp"
-    private int paragraphDistance = 48; // in "dp"
-    private int paragraghEdgeDistance = 32; // in "dp", text part edge distance (left&right)
+    private int lineDistance = 16; // in "dp"
+    private int paragraphDistance = 20; // in "dp"
+    private int paragraghEdgeDistance = 8; // in "dp", text part edge distance (left&right)
 
     // page setting
     private int pageEdgeDistance = 8; // in "dp", top&right&bottom&left 4 directions distances to screen edge, and paragraph to side view widgets
@@ -46,6 +57,10 @@ public class WenkuReaderSettingV1 {
     /**
      * gets & sets functions
      */
+
+    public void switchDayNightMode() {
+        inDayMode = !inDayMode;
+    }
 
     public void setFontSize(int s) {
         fontSize = s;

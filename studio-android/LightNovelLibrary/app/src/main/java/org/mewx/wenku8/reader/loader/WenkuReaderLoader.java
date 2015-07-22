@@ -2,6 +2,8 @@ package org.mewx.wenku8.reader.loader;
 
 import android.graphics.Bitmap;
 
+import java.util.Objects;
+
 /**
  * Created by MewX on 2015/7/8.
  *
@@ -11,35 +13,47 @@ public abstract class WenkuReaderLoader {
     /**
      * ElementType: the type of next element to get
      */
-    enum ElementType {
+    public enum ElementType {
         TEXT,
         IMAGE_INDEPENDENT, // be in different line from text
         IMAGE_DEPENDENT, // may be in the same line with text
     }
 
-    public abstract void initLoader(String srcPath);
+    // public abstract void initLoader(String srcPath);
+
+    public abstract void setChapterName(String name); // set chapter name
+
+    public abstract String getChapterName(); // get chapter name
 
     public abstract boolean hasNext(int wordIndex); // word in current line
 
     public abstract boolean hasPrevious(int wordIndex); // word in current line
 
-    public abstract ElementType getNextType(); // next is {index}, nullable
+    public abstract ElementType getNextType(); // next is {index}, nullable (index keep)
 
-    public abstract String getNextAsString();
+    public abstract String getNextAsString(); // index ++
 
-    public abstract Bitmap getNextAsBitmap();
+    public abstract Bitmap getNextAsBitmap(); // index ++
 
-    public abstract ElementType getPreviousType(); // nullable
+    public abstract ElementType getCurrentType(); //
 
-    public abstract String getPreviousAsString();
+    public abstract String getCurrentAsString(); // index keep
 
-    public abstract Bitmap getPreviousAsBitmap();
+    public abstract Bitmap getCurrentAsBitmap(); // index keep
+
+    public abstract ElementType getPreviousType(); // nullable (index keep)
+
+    public abstract String getPreviousAsString(); // index --
+
+    public abstract Bitmap getPreviousAsBitmap(); // index --
+
+    public abstract int getStringLength(int n);
 
     public abstract int getElementCount();
 
     public abstract int getCurrentIndex(); // from 0, to {Count - 1}
 
-    public abstract int setCurrentIndex(int i); // set a index, should optimize for the same or relation lines
+    public abstract void setCurrentIndex(int i); // set a index, should optimize for the same or relation lines
 
     public abstract void closeLoader();
 

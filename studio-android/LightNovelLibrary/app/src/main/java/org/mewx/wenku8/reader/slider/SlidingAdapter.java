@@ -1,4 +1,4 @@
-package com.martian.libsliding;
+package org.mewx.wenku8.reader.slider;
 
 import android.os.Bundle;
 import android.os.Parcelable;

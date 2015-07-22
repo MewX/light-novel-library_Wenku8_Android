@@ -40,8 +40,6 @@ public class RKListFragment extends Fragment {
         // get main activity
         while (mainActivity == null)
             mainActivity = (MainActivity) getActivity();
-
-        GlobalConfig.setCurrentFragment(this); // backup
     }
 
     @Override

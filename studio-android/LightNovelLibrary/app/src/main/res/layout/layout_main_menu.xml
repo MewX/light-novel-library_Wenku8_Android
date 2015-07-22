@@ -243,7 +243,7 @@
             android:layout_alignParentStart="true">
 
             <TextView
-                android:id="@+id/main_menu_about"
+                android:id="@+id/main_menu_open_source"
                 android:layout_width="0dp"
                 android:layout_height="match_parent"
                 android:gravity="center"

@@ -32,6 +32,7 @@
     <string name="action_continue_read_progress">继续上次阅读进度</string>
     <string name="action_chapter_list">章节列表</string>
     <string name="action_old_vertical_reader">旧引擎阅读界面</string>
+    <string name="action_horizontal_reader_v1">V1阅读引擎</string>
     <string name="action_user_login">Wenku8账号登录</string>
     <string name="action_user_info">账号信息</string>
     <string name="action_sign">签到</string>
@@ -65,24 +66,25 @@
     <string name="novel_item_cover">小说封面</string>
     <string name="list_loading">正在载入列表……</string>
     <string name="system_press_again_to_exit"><b>退出请再抚摸一下返回键哦～</b>\n&lt;(=～￣▽￣)→)￣▽￣=)>o </string>
-    <string name="system_network_error">连接服务器失败！\n\n可能的原因有：\n　　手机网络异常；\n　　服务器暂时无法响应请求；\n　　此时段请求服务器次数过多。</string>
+    <string name="system_network_error">连接服务器失败！\n\n可能的原因有：\n手机网络异常；\n运营商劫持（部分地区的10086）；\nWIFI切换到数据需等待域名解析缓存刷新（约10min）；\n服务器暂时无法响应请求；\n此时段请求服务器次数过多。</string>
     <string name="system_parse_failed">数据解析失败！\n\n可能的原因有：\n　　程序内部错误，请反馈给开发者；\n　　你修改了存储的数据。</string>
     <string name="system_manually_cancelled">任务已被手动取消</string>
     <string name="system_loading_please_wait">加载中……请稍后再试</string>
     <string name="system_fav_it_first">请先收藏后再下载！</string>
     <string name="system_choose_browser">选择你的本命浏览器吧！</string>
     <string name="system_info_fill_not_complete">这么奇葩的表单你就忍心提交上去吗\n〒_〒</string>
-    <string name="system_logging_in">正在与服务器进行契约……</string>
-    <string name="system_logged">契约完成！</string>
-    <string name="system_username_error">契约失败，魔法师你的名字不是真名！（用户名不存在）</string>
-    <string name="system_password_error">契约失败，发现冒牌魔法师！（密码错误）</string>
+    <string name="system_logging_in">正在勾搭服务姬……</string>
+    <string name="system_logged">勾搭成功！</string>
+    <string name="system_username_error">勾搭失败，服务姬说不认识你不约！（用户名不存在）</string>
+    <string name="system_password_error">勾搭失败，傲娇的安卓app的服务姬说蜀黍你不像个好人！（密码错误 / 密码中存在SQL注入的特殊字符，请修改密码）</string>
     <string name="system_log_info_outofdate">登录信息已经改变，登陆失败！</string>
     <string name="system_fetching">正在从服务器获取信息……</string>
-    <string name="system_wait_for_next_version">请等待下一个版本，端午节之后~</string>
+    <string name="system_wait_for_next_version">请等待下一个版本~</string>
     <string name="system_update_latest_version">已是最新版本~</string>
     <string name="system_update_timeout">连接服务器超时</string>
     <string name="system_update_nonewifi">没有Wi-Fi，臣妾不敢轻举妄动</string>
     <string name="system_update_ignored">已忽略</string>
+    <string name="system_choose_reader_engine">选择一个阅读界面引擎</string>
     <string name="task_stop">停止加载</string>
     <string name="task_retry">重新加载</string>
     <string name="task_null">没有结果</string>
@@ -99,6 +101,7 @@
     <string name="dialog_content_sync">正在同步书架（双向）……</string>
     <string name="dialog_content_novel_title">小说完整标题</string>
     <string name="dialog_content_novel_remove_from_cloud">正在从云端书架移除……</string>
+    <string name="dialog_sure_to_jump_chapter">确定要跳转章节？</string>
     <string name="dialog_positive_ok">OK</string>
     <string name="dialog_positive_want">要</string>
     <string name="dialog_positive_sure">好滴~</string>
@@ -150,4 +153,18 @@
     <string name="dialog_option_update_uncached_volumes">更新下载</string>
     <string name="dialog_option_force_update_all">覆盖下载</string>
     <string name="dialog_option_select_and_update">分卷下载</string>
+    <string name="dialog_option_reader_engine_v1">左右翻页引擎 V1</string>
+    <string name="dialog_option_reader_engine_old">上下滑动引擎（旧）</string>
+    <string name="reader_please_wait">请稍候……</string>
+    <string name="reader_engine_v1_parsing">V1引擎正在获取并解析文本内容</string>
+    <string name="reader_already_first_chapter">已是第一章</string>
+    <string name="reader_already_last_chapter">已是最后一章</string>
+    <string name="reader_previous_chapter">上\n一\n章</string>
+    <string name="reader_next_chapter">下\n一\n章</string>
+    <string name="reader_daynight">切换日间/夜间模式</string>
+    <string name="reader_jump">跳转页面</string>
+    <string name="reader_label_list">书签列表</string>
+    <string name="reader_config">阅读器设置</string>
+    <string name="reader_v1_notice">V1 引擎提示</string>
+    <string name="reader_jump_last">是否跳转到上次阅读记录？</string>
 </resources>

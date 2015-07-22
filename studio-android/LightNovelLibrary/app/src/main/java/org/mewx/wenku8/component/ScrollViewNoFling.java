@@ -6,18 +6,18 @@ import android.widget.ScrollView;
 
 /**
  * Created by MewX on 2015/6/6.
+ *
+ * A sticky scroll view.
  */
 public class ScrollViewNoFling extends ScrollView {
+    final int f = 1; // sticky
+
     public ScrollViewNoFling(Context context) {
         super(context);
     }
 
     public ScrollViewNoFling(Context context, AttributeSet attrs) {
         super(context, attrs);
-    }
-
-    public ScrollViewNoFling(Context context, AttributeSet attrs, int defStyleAttr, int defStyleRes) {
-        super(context, attrs, defStyleAttr, defStyleRes);
     }
 
     public ScrollViewNoFling(Context context, AttributeSet attrs, int defStyleAttr) {
@@ -30,7 +30,7 @@ public class ScrollViewNoFling extends ScrollView {
     /*Scroll view is no longer gonna handle scroll velocity.
      * super.fling(velocityY);
     */
-        super.fling(velocityY / 3);
+        super.fling(velocityY / f);
     }
 
 }

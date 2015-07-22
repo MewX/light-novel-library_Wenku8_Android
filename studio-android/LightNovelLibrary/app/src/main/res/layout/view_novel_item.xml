@@ -9,7 +9,6 @@
 
     <android.support.v7.widget.CardView
         android:id="@+id/novel_card"
-        android:transitionName="novel_card"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         card-view:cardBackgroundColor="@color/novel_item_white"
@@ -156,7 +155,7 @@
                 <TextView
                     android:id="@+id/novel_title"
                     android:transitionName="novel_title"
-                    android:layout_width="wrap_content"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:textSize="16sp"
                     android:text="@string/na"

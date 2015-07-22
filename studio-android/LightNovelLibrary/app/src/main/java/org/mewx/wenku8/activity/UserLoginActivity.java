@@ -78,8 +78,12 @@ public class UserLoginActivity extends AppCompatActivity {
             tintManager.setStatusBarTintEnabled(true);
             tintManager.setNavigationBarTintEnabled(true);
             tintManager.setTintAlpha(0.15f);
+            tintManager.setNavigationBarAlpha(0.0f);
             // set all color
             tintManager.setTintColor(getResources().getColor(android.R.color.black));
+            // set Navigation bar color
+            if(Build.VERSION.SDK_INT >= 21)
+                getWindow().setNavigationBarColor(getResources().getColor(R.color.myNavigationColor));
 
         }
 

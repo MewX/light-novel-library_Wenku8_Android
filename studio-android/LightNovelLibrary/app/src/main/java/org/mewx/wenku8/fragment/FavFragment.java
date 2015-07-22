@@ -1,5 +1,6 @@
 package org.mewx.wenku8.fragment;
 
+import android.content.ContentValues;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.os.AsyncTask;
@@ -313,7 +314,7 @@ public class FavFragment extends Fragment implements MyItemClickListener, MyItem
                 List<VolumeList> vl;
                 NovelItemMeta ni;
                 try {
-                    // fetch intro
+                    // fetch volumes
                     List<NameValuePair> targVarListVolume = new ArrayList<>();
                     targVarListVolume.add(Wenku8API.getNovelIndex(aid, GlobalConfig.getCurrentLang()));
                     byte[] tempVolumeXml = LightNetwork.LightHttpPost(Wenku8API.getBaseURL(), targVarListVolume);
@@ -321,11 +322,14 @@ public class FavFragment extends Fragment implements MyItemClickListener, MyItem
                     if(tempVolumeXml == null) return Wenku8Error.ErrorCode.NETWORK_ERROR;
                     volumeXml = new String(tempVolumeXml, "UTF-8");
 
-                    // fetch volumes
+                    // fetch intro
                     if(!isLoading) return Wenku8Error.ErrorCode.USER_CANCELLED_TASK;
-                    List<NameValuePair> targVarList = new ArrayList<>();
-                    targVarList.add(Wenku8API.getNovelFullMeta(aid, GlobalConfig.getCurrentLang()));
-                    byte[] tempIntroXml = LightNetwork.LightHttpPost(Wenku8API.getBaseURL(), targVarList);
+//                    List<NameValuePair> targVarList = new ArrayList<>();
+//                    targVarList.add(Wenku8API.getNovelFullMeta(aid, GlobalConfig.getCurrentLang()));
+//                    byte[] tempIntroXml = LightNetwork.LightHttpPost(Wenku8API.getBaseURL(), targVarList);
+                    // use short intro
+                    byte[] tempIntroXml = LightNetwork.LightHttpPostConnection(Wenku8API.getBaseURL(),
+                            Wenku8API.getNovelShortInfoUpdate_CV(aid, GlobalConfig.getCurrentLang()));
                     if (tempIntroXml == null) return Wenku8Error.ErrorCode.NETWORK_ERROR;
                     introXml = new String(tempIntroXml, "UTF-8");
 

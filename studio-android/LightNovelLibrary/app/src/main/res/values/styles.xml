@@ -5,6 +5,11 @@
         <item name="android:textColor">@color/default_text_color_black</item>
     </style>
 
+    <style name="reader_seeker" parent="android:TextAppearance.Small">
+        <item name="android:textSize">12sp</item>
+        <item name="android:textColor">@color/default_white</item>
+    </style>
+
     <!--<style name="edit_hint_text_style" parent="android:TextAppearance">-->
         <!--<item name="android:textColor">@color/login_hint_text</item>-->
     <!--</style>-->
