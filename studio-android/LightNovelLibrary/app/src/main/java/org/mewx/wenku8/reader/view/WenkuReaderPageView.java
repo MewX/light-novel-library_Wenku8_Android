@@ -7,6 +7,7 @@ import android.graphics.Point;
 import android.graphics.Typeface;
 import android.net.wifi.WifiManager;
 import android.os.AsyncTask;
+import android.os.Build;
 import android.text.TextPaint;
 import android.util.AttributeSet;
 import android.util.Log;
@@ -137,8 +138,10 @@ public class WenkuReaderPageView extends View {
         // get environmental vars
         // TODO: this should use actual layout size
         screenSize = LightTool.getRealScreenSize(getContext());
+        if(Build.VERSION.SDK_INT < 19) screenSize.y = screenSize.y - LightTool.getStatusBarHeightValue(getContext());
         textAreaSize = new Point(screenSize.x - 2 * (pxPageEdgeDistance + pxParagraphEdgeDistance),
                 screenSize.y - 2 * (pxPageEdgeDistance + pxWidgetHeight));
+        if(Build.VERSION.SDK_INT < 19) textAreaSize.y = textAreaSize.y + pxWidgetHeight;
 
         // save vars, calc all ints
         switch (directionForward) {
@@ -456,7 +459,7 @@ public class WenkuReaderPageView extends View {
 
         // draw divider
         Paint paintDivider = new Paint();
-        paintDivider.setColor(getContext().getResources().getColor(R.color.dlgDividerColor));
+        paintDivider.setColor(getContext().getResources().getColor(mSetting.inDayMode ? R.color.dlgDividerColor : R.color.reader_default_text_light));
         canvas.drawLine(1, 1, 1, screenSize.y - 1, paintDivider);
         canvas.drawLine(screenSize.x - 1, 1, screenSize.x - 1, screenSize.y - 1, paintDivider);
 
@@ -468,6 +471,7 @@ public class WenkuReaderPageView extends View {
 
         // TODO: draw text on average in page and line
         int heightSum = fontHeight + pxPageEdgeDistance + pxWidgetHeight;
+        if(Build.VERSION.SDK_INT < 19) heightSum -= pxWidgetHeight;
         for(int i = 0; i < lineInfoList.size(); i ++) {
             LineInfo li = lineInfoList.get(i);
             if( i != 0 ) {

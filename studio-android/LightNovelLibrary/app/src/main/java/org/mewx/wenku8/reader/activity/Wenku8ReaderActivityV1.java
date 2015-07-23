@@ -433,6 +433,7 @@ public class Wenku8ReaderActivityV1 extends AppCompatActivity {
                                     public void onClick(View v) {
                                         // switch day/night mode
                                         setting.switchDayNightMode();
+                                        WenkuReaderPageView.setViewComponents(loader, setting);
                                         mSlidingPageAdapter.notifyDataSetChanged();
                                     }
                                 });
@@ -455,7 +456,7 @@ public class Wenku8ReaderActivityV1 extends AppCompatActivity {
 
                                         DiscreteSeekBar seeker = (DiscreteSeekBar) findViewById(R.id.reader_seekbar);
                                         seeker.setMin(1);
-                                        seeker.setProgress(mSlidingPageAdapter.getCurrentFirstLineIndex() + 1);
+                                        seeker.setProgress(mSlidingPageAdapter.getCurrentFirstLineIndex() + 1); // bug here
                                         seeker.setMax(loader.getElementCount());
                                         seeker.setOnProgressChangeListener(new DiscreteSeekBar.OnProgressChangeListener() {
                                             @Override
