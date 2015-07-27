@@ -159,11 +159,11 @@
     <string name="reader_engine_v1_parsing">V1引擎正在获取并解析文本内容</string>
     <string name="reader_already_first_chapter">已是第一章</string>
     <string name="reader_already_last_chapter">已是最后一章</string>
-    <string name="reader_previous_chapter">上\n一\n章</string>
-    <string name="reader_next_chapter">下\n一\n章</string>
+    <string name="reader_previous_chapter">上一章</string>
+    <string name="reader_next_chapter">下一章</string>
     <string name="reader_daynight">切换日间/夜间模式</string>
     <string name="reader_jump">跳转页面</string>
-    <string name="reader_label_list">书签列表</string>
+    <string name="reader_find">查找内容</string>
     <string name="reader_config">阅读器设置</string>
     <string name="reader_v1_notice">V1 引擎提示</string>
     <string name="reader_jump_last">是否跳转到上次阅读记录？</string>

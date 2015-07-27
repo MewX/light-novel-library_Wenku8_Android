@@ -82,7 +82,7 @@
     <color name="login_btn_dark">#444444</color>
 
     <!-- Reader Color -->
-    <color name="reader_default_bg_toolbar">#80000000</color>
+    <color name="reader_default_bg_toolbar">#CC000000</color>
     <color name="reader_default_bg_yellow">#CFBEB6</color>
     <color name="reader_default_bg_black">#090C13</color>
     <color name="reader_default_text_light">#32414E</color>

@@ -139,11 +139,40 @@ public class Wenku8ReaderActivityV1 extends AppCompatActivity {
         super.onResume();
         MobclickAgent.onResume(this);
 
+        hideNavigationBar();
+    }
+
+    private void hideNavigationBar() {
         // set navigation bar status, remember to disable "setNavigationBarTintEnabled"
         final int flags = View.SYSTEM_UI_FLAG_LAYOUT_STABLE
                 | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
                 | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
                 | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY;
+        // This work only for android 4.4+
+        if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
+            getWindow().getDecorView().setSystemUiVisibility(flags);
+
+            // Code below is to handle presses of Volume up or Volume down.
+            // Without this, after pressing volume buttons, the navigation bar will
+            // show up and won't hide
+            final View decorView = getWindow().getDecorView();
+            decorView.setOnSystemUiVisibilityChangeListener(new View.OnSystemUiVisibilityChangeListener() {
+                @Override
+                public void onSystemUiVisibilityChange(int visibility) {
+                    if((visibility & View.SYSTEM_UI_FLAG_FULLSCREEN) == 0) {
+                        decorView.setSystemUiVisibility(flags);
+                    }
+                }
+            });
+        }
+    }
+
+    private void showNavigationBar() {
+        // set navigation bar status, remember to disable "setNavigationBarTintEnabled"
+        final int flags = View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+                | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
                 | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY;
         // This work only for android 4.4+
         if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
@@ -412,28 +441,27 @@ public class Wenku8ReaderActivityV1 extends AppCompatActivity {
                     int y = (int) event.getY();
 
                     if(x > screenWidth / 3 && x < screenWidth * 2 / 3 && y > screenHeight / 3 && y < screenHeight * 2 / 3) {
+                        // first init
                         if(!barStatus) {
+                            showNavigationBar();
                             findViewById(R.id.reader_top).setVisibility(View.VISIBLE);
                             findViewById(R.id.reader_bot).setVisibility(View.VISIBLE);
-//                            findViewById(R.id.toolbar_actionbar).setVisibility(View.VISIBLE);
-//                            findViewById(R.id.btn_previous).setVisibility(View.VISIBLE);
-//                            findViewById(R.id.btn_next).setVisibility(View.VISIBLE);
+
                             if (Build.VERSION.SDK_INT >= 16 ) {
-                                tintManager.setStatusBarAlpha(0.65f); // 0.5 + 0.15
+                                tintManager.setStatusBarAlpha(0.90f);
+                                tintManager.setNavigationBarAlpha(0.80f);
                             }
                             barStatus = true;
 
                             if(!isSet) {
-                                // change button color, and add action to each
-                                ImageButton imageButton;
-                                imageButton = (ImageButton) Wenku8ReaderActivityV1.this.findViewById(R.id.ic_daylight);
-                                imageButton.setColorFilter(getResources().getColor(R.color.default_white));
+                                // add action to each
                                 findViewById(R.id.btn_daylight).setOnClickListener(new View.OnClickListener() {
                                     @Override
                                     public void onClick(View v) {
                                         // switch day/night mode
                                         setting.switchDayNightMode();
-                                        WenkuReaderPageView.setViewComponents(loader, setting);
+                                        WenkuReaderPageView.resetTextColor();
+                                        mSlidingPageAdapter.restoreState(null, null);
                                         mSlidingPageAdapter.notifyDataSetChanged();
                                     }
                                 });
@@ -445,14 +473,16 @@ public class Wenku8ReaderActivityV1 extends AppCompatActivity {
                                     }
                                 });
 
-                                imageButton = (ImageButton) Wenku8ReaderActivityV1.this.findViewById(R.id.ic_jump);
-                                imageButton.setColorFilter(getResources().getColor(R.color.default_white));
                                 findViewById(R.id.btn_jump).setOnClickListener(new View.OnClickListener() {
+                                    boolean isOpen = false;
                                     @Override
                                     public void onClick(View v) {
                                         // show jump dialog
-                                        findViewById(R.id.reader_bot).setVisibility(View.INVISIBLE);
-                                        findViewById(R.id.reader_bot_seeker).setVisibility(View.VISIBLE);
+                                        if(!isOpen)
+                                            findViewById(R.id.reader_bot_seeker).setVisibility(View.VISIBLE);
+                                        else
+                                            findViewById(R.id.reader_bot_seeker).setVisibility(View.INVISIBLE);
+                                        isOpen = !isOpen;
 
                                         DiscreteSeekBar seeker = (DiscreteSeekBar) findViewById(R.id.reader_seekbar);
                                         seeker.setMin(1);
@@ -460,10 +490,12 @@ public class Wenku8ReaderActivityV1 extends AppCompatActivity {
                                         seeker.setMax(loader.getElementCount());
                                         seeker.setOnProgressChangeListener(new DiscreteSeekBar.OnProgressChangeListener() {
                                             @Override
-                                            public void onProgressChanged(DiscreteSeekBar discreteSeekBar, int i, boolean b) { }
+                                            public void onProgressChanged(DiscreteSeekBar discreteSeekBar, int i, boolean b) {
+                                            }
 
                                             @Override
-                                            public void onStartTrackingTouch(DiscreteSeekBar discreteSeekBar) { }
+                                            public void onStartTrackingTouch(DiscreteSeekBar discreteSeekBar) {
+                                            }
 
                                             @Override
                                             public void onStopTrackingTouch(DiscreteSeekBar discreteSeekBar) {
@@ -482,25 +514,21 @@ public class Wenku8ReaderActivityV1 extends AppCompatActivity {
                                     }
                                 });
 
-                                imageButton = (ImageButton) Wenku8ReaderActivityV1.this.findViewById(R.id.ic_viewlable);
-                                imageButton.setColorFilter(getResources().getColor(R.color.default_white));
-                                findViewById(R.id.btn_viewlable).setOnClickListener(new View.OnClickListener() {
+                                findViewById(R.id.btn_find).setOnClickListener(new View.OnClickListener() {
                                     @Override
                                     public void onClick(View v) {
                                         // show label page
                                         Toast.makeText(Wenku8ReaderActivityV1.this, "书签功能暂时还木有。", Toast.LENGTH_SHORT).show();
                                     }
                                 });
-                                findViewById(R.id.btn_viewlable).setOnLongClickListener(new View.OnLongClickListener() {
+                                findViewById(R.id.btn_find).setOnLongClickListener(new View.OnLongClickListener() {
                                     @Override
                                     public boolean onLongClick(View v) {
-                                        Toast.makeText(Wenku8ReaderActivityV1.this, getResources().getString(R.string.reader_label_list), Toast.LENGTH_SHORT).show();
+                                        Toast.makeText(Wenku8ReaderActivityV1.this, getResources().getString(R.string.reader_find), Toast.LENGTH_SHORT).show();
                                         return true;
                                     }
                                 });
 
-                                imageButton = (ImageButton) Wenku8ReaderActivityV1.this.findViewById(R.id.ic_config);
-                                imageButton.setColorFilter(getResources().getColor(R.color.default_white));
                                 findViewById(R.id.btn_config).setOnClickListener(new View.OnClickListener() {
                                     @Override
                                     public void onClick(View v) {
@@ -517,12 +545,12 @@ public class Wenku8ReaderActivityV1 extends AppCompatActivity {
                                 });
 
                                 // adjust chapter button style, and add action to each
-                                RelativeLayout.LayoutParams lp = (RelativeLayout.LayoutParams) findViewById(R.id.btn_previous).getLayoutParams();
-                                lp.setMargins(0, 0, 0,
-                                        tempNavBarHeight >= 1 ? (int) Wenku8ReaderActivityV1.this.getResources().getDimension(R.dimen.reader_bot_toolbar_height) - tempNavBarHeight // in px
-//                                                - LightTool.getNavigationBarHeightValue(Wenku8ReaderActivityV1.this)
-                                                : (int) Wenku8ReaderActivityV1.this.getResources().getDimension(R.dimen.reader_bot_toolbar_height)); // in px
-                                findViewById(R.id.btn_previous).setLayoutParams(lp);
+//                                RelativeLayout.LayoutParams lp = (RelativeLayout.LayoutParams) findViewById(R.id.text_previous).getLayoutParams();
+//                                lp.setMargins(0, 0, 0,
+//                                        tempNavBarHeight >= 1 ? (int) Wenku8ReaderActivityV1.this.getResources().getDimension(R.dimen.reader_bot_toolbar_height) - tempNavBarHeight // in px
+////                                                - LightTool.getNavigationBarHeightValue(Wenku8ReaderActivityV1.this)
+//                                                : (int) Wenku8ReaderActivityV1.this.getResources().getDimension(R.dimen.reader_bot_toolbar_height)); // in px
+//                                findViewById(R.id.text_previous).setLayoutParams(lp);
                                 findViewById(R.id.text_previous).setOnClickListener(new View.OnClickListener() {
                                     @Override
                                     public void onClick(View v) {
@@ -570,12 +598,12 @@ public class Wenku8ReaderActivityV1 extends AppCompatActivity {
                                     }
                                 });
 
-                                lp = (RelativeLayout.LayoutParams) findViewById(R.id.btn_next).getLayoutParams();
-                                lp.setMargins(0, 0, 0,
-                                        tempNavBarHeight >= 1 ? (int) Wenku8ReaderActivityV1.this.getResources().getDimension(R.dimen.reader_bot_toolbar_height) - tempNavBarHeight // in px
-//                                                - LightTool.getNavigationBarHeightValue(Wenku8ReaderActivityV1.this)
-                                                : (int) Wenku8ReaderActivityV1.this.getResources().getDimension(R.dimen.reader_bot_toolbar_height)); // in px
-                                findViewById(R.id.btn_next).setLayoutParams(lp);
+//                                lp = (RelativeLayout.LayoutParams) findViewById(R.id.text_next).getLayoutParams();
+//                                lp.setMargins(0, 0, 0,
+//                                        tempNavBarHeight >= 1 ? (int) Wenku8ReaderActivityV1.this.getResources().getDimension(R.dimen.reader_bot_toolbar_height) - tempNavBarHeight // in px
+////                                                - LightTool.getNavigationBarHeightValue(Wenku8ReaderActivityV1.this)
+//                                                : (int) Wenku8ReaderActivityV1.this.getResources().getDimension(R.dimen.reader_bot_toolbar_height)); // in px
+//                                findViewById(R.id.text_next).setLayoutParams(lp);
                                 findViewById(R.id.text_next).setOnClickListener(new View.OnClickListener() {
                                     @Override
                                     public void onClick(View v) {
@@ -625,14 +653,14 @@ public class Wenku8ReaderActivityV1 extends AppCompatActivity {
                             }
                         }
                         else {
+                            // show menu
+                            hideNavigationBar();
                             findViewById(R.id.reader_top).setVisibility(View.INVISIBLE);
                             findViewById(R.id.reader_bot).setVisibility(View.INVISIBLE);
                             findViewById(R.id.reader_bot_seeker).setVisibility(View.INVISIBLE);
-//                            findViewById(R.id.toolbar_actionbar).setVisibility(View.INVISIBLE);
-//                            findViewById(R.id.btn_previous).setVisibility(View.INVISIBLE);
-//                            findViewById(R.id.btn_next).setVisibility(View.INVISIBLE);
                             if (Build.VERSION.SDK_INT >= 16 ) {
                                 tintManager.setStatusBarAlpha(0.0f);
+                                tintManager.setNavigationBarAlpha(0.0f);
                             }
                             barStatus = false;
                         }
@@ -640,6 +668,7 @@ public class Wenku8ReaderActivityV1 extends AppCompatActivity {
                     }
 
                     if (x > screenWidth / 2) {
+                        // TODO: judge last page
                         sl.slideNext();
                     } else if (x <= screenWidth / 2) {
                         sl.slidePrevious();

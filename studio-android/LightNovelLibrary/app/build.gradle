@@ -7,13 +7,13 @@ android {
         applicationId "org.mewx.wenku8"
         minSdkVersion 15
         targetSdkVersion 22
-        versionCode 21
-        versionName "0.8.0.1"
+        versionCode 23
+        versionName "0.8.1.0dev"
     }
     buildTypes {
         debug {
             debuggable true
-            minifyEnabled true
+            minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
         release {

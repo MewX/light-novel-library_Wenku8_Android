@@ -944,13 +944,12 @@ public class NovelInfoActivity extends AppCompatActivity {
             try {
                 result = new String(bytes, "UTF-8");
                 Log.e("MewX", result);
+                if (!LightTool.isInteger(result))
+                    return Wenku8Error.ErrorCode.RETURNED_VALUE_EXCEPTION;
                 if(Wenku8Error.getSystemDefinedErrorCode(Integer.parseInt(result)) != Wenku8Error.ErrorCode.SYSTEM_1_SUCCEEDED
                         && Wenku8Error.getSystemDefinedErrorCode(Integer.parseInt(result)) != Wenku8Error.ErrorCode.SYSTEM_4_NOT_LOGGED_IN
                         && Wenku8Error.getSystemDefinedErrorCode(Integer.parseInt(result)) != Wenku8Error.ErrorCode.SYSTEM_7_NOVEL_NOT_IN_BOOKSHELF) {
-                    if (LightTool.isInteger(result))
-                        return Wenku8Error.getSystemDefinedErrorCode(Integer.parseInt(result));
-                    else
-                        return Wenku8Error.ErrorCode.RETURNED_VALUE_EXCEPTION;
+                    return Wenku8Error.getSystemDefinedErrorCode(Integer.parseInt(result));
                 }
                 else {
                     // remove from local bookshelf

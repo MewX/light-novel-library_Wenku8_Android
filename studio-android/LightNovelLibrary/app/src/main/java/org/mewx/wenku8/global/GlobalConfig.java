@@ -246,14 +246,14 @@ public class GlobalConfig {
     /**
      * Extract image name.
      * @param url <!--image-->http://pic.wenku8.cn/pictures/1/1305/41759/50471.jpg<!--image-->
-     * @return 50471.jpg
+     * @return pictures113054175950471.jpg
      */
     public static String generateImageFileNameByURL(String url) {
         String[] s = url.split("/");
         String result = "";
         boolean canStart = false;
         for (String temp : s) {
-            if (!canStart && temp.indexOf(".") != -1)
+            if (!canStart && temp.contains("."))
                 canStart = true; // judge canStart first
             else if (canStart)
                 result += temp;
@@ -711,7 +711,7 @@ public class GlobalConfig {
     /**
      * saveNovelContentImage:
      *
-     * get image url and download to save folder's image folder
+     * Async get image url and download to save folder's image folder
      *
      * @param url
      *            : full http url of target image
@@ -720,22 +720,15 @@ public class GlobalConfig {
      */
     public static boolean saveNovelContentImage(String url) {
         String imgFileName = generateImageFileNameByURL(url);
-        if (!LightCache.testFileExist(getFirstFullSaveFilePath()
-                + imgsSaveFolderName + File.separator + imgFileName)
-                && !LightCache.testFileExist(getSecondFullSaveFilePath()
-                + imgsSaveFolderName + File.separator + imgFileName)) {
+        if (!LightCache.testFileExist(getFirstFullSaveFilePath() + imgsSaveFolderName + File.separator + imgFileName)
+                && !LightCache.testFileExist(getSecondFullSaveFilePath() + imgsSaveFolderName + File.separator + imgFileName)) {
             // neither of the file exist
             byte[] fileContent = LightNetwork.LightHttpDownload(url);
             if (fileContent == null)
                 return false; // network error
-            if (!LightCache.saveFile(getFirstFullSaveFilePath()
-                            + imgsSaveFolderName + File.separator, imgFileName,
-                    fileContent, true))
-                // fail to first path
-                return LightCache.saveFile(getSecondFullSaveFilePath()
-                                + imgsSaveFolderName + File.separator, imgFileName,
-                        fileContent, true);
-            return true; // saved to first directory
+
+            return LightCache.saveFile(getFirstFullSaveFilePath() + imgsSaveFolderName + File.separator, imgFileName, fileContent, true)
+                || LightCache.saveFile(getSecondFullSaveFilePath() + imgsSaveFolderName + File.separator, imgFileName, fileContent, true);
         }
         return true; // file exist
     }
@@ -769,14 +762,10 @@ public class GlobalConfig {
      * @return direct fileName or just null
      */
     public static String getAvailableNovolContentImagePath(String fileName) {
-        if (LightCache.testFileExist(getFirstFullSaveFilePath()
-                + imgsSaveFolderName + File.separator + fileName)) {
-            return getFirstFullSaveFilePath() + imgsSaveFolderName
-                    + File.separator + fileName;
-        } else if (LightCache.testFileExist(getSecondFullSaveFilePath()
-                + imgsSaveFolderName + File.separator + fileName)) {
-            return getSecondFullSaveFilePath() + imgsSaveFolderName
-                    + File.separator + fileName;
+        if (LightCache.testFileExist(getFirstFullSaveFilePath() + imgsSaveFolderName + File.separator + fileName)) {
+            return getFirstFullSaveFilePath() + imgsSaveFolderName + File.separator + fileName;
+        } else if (LightCache.testFileExist(getSecondFullSaveFilePath() + imgsSaveFolderName + File.separator + fileName)) {
+            return getSecondFullSaveFilePath() + imgsSaveFolderName + File.separator + fileName;
         } else
             return null;
     }

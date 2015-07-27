@@ -8,12 +8,15 @@
 package org.mewx.wenku8.util;
 
 import java.io.BufferedInputStream;
+import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.io.UnsupportedEncodingException;
 import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
+import java.net.URLConnection;
 import java.net.URLEncoder;
 import java.net.URL;
 import java.util.List;
@@ -34,6 +37,8 @@ import org.mewx.wenku8.global.api.Wenku8API;
 
 import android.content.ContentValues;
 import android.util.Log;
+
+import net.tsz.afinal.bitmap.core.BytesBufferPool;
 
 public class LightNetwork {
 	/**
@@ -139,17 +144,17 @@ public class LightNetwork {
 
 	/**
 	 * A post method, the values must to be <String, String> pair.
-	 * @param URL base url
+	 * @param u base url
 	 * @param values <String, String> pair
 	 * @return raw bytes or null!
 	 */
-	public static byte[] LightHttpPostConnection(String URL, ContentValues values) {
+	public static byte[] LightHttpPostConnection(String u, ContentValues values) {
 
 		// new API, initial
 		URL url = null;
 		HttpURLConnection http = null;
 		try {
-			url = new URL(Wenku8API.getBaseURL());
+			url = new URL(u);
 			http = (HttpURLConnection) url.openConnection();
 			http.setRequestMethod("POST");
 			http.setRequestProperty("Accept-Encoding", "gzip"); // set gzip
@@ -220,29 +225,52 @@ public class LightNetwork {
 	 * @return: return correct bytes or null
 	 */
 	public static byte[] LightHttpDownload(String url) {
-		// httpGet connection object
-		HttpGet httpRequest = new HttpGet(url);
-		// get HttpClient object
-		HttpClient httpclient = new DefaultHttpClient();
+//		// httpGet connection object
+//		HttpGet httpRequest = new HttpGet(url);
+//		// get HttpClient object
+//		HttpClient httpclient = new DefaultHttpClient();
+//		try {
+//			// request httpClient, get HttpRestponse
+//			HttpResponse httpResponse = httpclient.execute(httpRequest);
+//			if (httpResponse.getStatusLine().getStatusCode() == HttpStatus.SC_OK) {
+//				// // get HttpEntiy
+//				// HttpEntity httpEntity = httpResponse.getEntity();
+//				// // get InputStream
+//				// InputStream is = httpEntity.getContent();
+//				// Bitmap bitmap = BitmapFactory.decodeStream(is);
+//				// is.close();
+//
+//				byte[] strResult = EntityUtils.toByteArray(httpResponse.getEntity());
+//				return strResult;
+//			} else {
+//				Log.i("MewX", "HttpStatus bad. code: " + httpResponse.getStatusLine().getStatusCode());
+//				return null;
+//			}
+//
+//		} catch (Exception e) {
+//			e.printStackTrace();
+//			return null;
+//		}
+
+		InputStream inputStream = null;
 		try {
-			// request httpClient, get HttpRestponse
-			HttpResponse httpResponse = httpclient.execute(httpRequest);
-			if (httpResponse.getStatusLine().getStatusCode() == HttpStatus.SC_OK) {
-				// // get HttpEntiy
-				// HttpEntity httpEntity = httpResponse.getEntity();
-				// // get InputStream
-				// InputStream is = httpEntity.getContent();
-				// Bitmap bitmap = BitmapFactory.decodeStream(is);
-				// is.close();
+			URL localURL = new URL(url);
+			HttpURLConnection httpURLConnection = (HttpURLConnection)localURL.openConnection();
 
-				byte[] strResult = EntityUtils.toByteArray(httpResponse
-						.getEntity());
-				return strResult;
-			} else {
-				Log.i("MewX", "HttpStatus bad.");
-				return null;
-			}
+			if (httpURLConnection.getResponseCode() != HttpURLConnection.HTTP_OK)
+				throw new Exception("HTTP Request is not success, Response code is " + httpURLConnection.getResponseCode());
 
+			inputStream = httpURLConnection.getInputStream();
+
+            byte[] b = new byte[1024];
+            ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
+            int len = -1;
+            while ((len = inputStream.read(b)) != -1) byteArrayOutputStream.write(b, 0, len);
+            byteArrayOutputStream.close();
+
+			inputStream.close();
+            byteArrayOutputStream.close();
+			return byteArrayOutputStream.toByteArray();
 		} catch (Exception e) {
 			e.printStackTrace();
 			return null;

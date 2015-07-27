@@ -1,6 +1,7 @@
 package org.mewx.wenku8.reader.view;
 
 import android.content.Context;
+import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Paint;
 import android.graphics.Point;
@@ -12,10 +13,18 @@ import android.text.TextPaint;
 import android.util.AttributeSet;
 import android.util.Log;
 import android.util.TypedValue;
+import android.view.MotionEvent;
 import android.view.View;
+import android.widget.Toast;
+
+import com.android.volley.toolbox.Volley;
+import com.nostra13.universalimageloader.core.DisplayImageOptions;
+import com.nostra13.universalimageloader.core.ImageLoader;
+import com.nostra13.universalimageloader.core.assist.ImageSize;
 
 import org.mewx.wenku8.MyApp;
 import org.mewx.wenku8.R;
+import org.mewx.wenku8.global.GlobalConfig;
 import org.mewx.wenku8.global.api.Wenku8Error;
 import org.mewx.wenku8.reader.loader.WenkuReaderLoader;
 import org.mewx.wenku8.reader.setting.WenkuReaderSettingV1;
@@ -52,6 +61,13 @@ public class WenkuReaderPageView extends View {
         String text;
     }
     List<LineInfo> lineInfoList;
+    private class BitmapInfo {
+        int idxLineInfo;
+        int width, height;
+        int x_beg, y_beg;
+        Bitmap bm;
+    }
+    List<BitmapInfo> bitmapInfoList;
 
     // core variables
     static private String sampleText = "轻";
@@ -119,6 +135,15 @@ public class WenkuReaderPageView extends View {
     }
 
     /**
+     * Reset text color, to fit day/night mode.
+     * If textPaint is null, then do nothing.
+     */
+    static public void resetTextColor() {
+        textPaint.setColor(mSetting.inDayMode ? mSetting.fontColorDark : mSetting.fontColorLight);
+        widgetTextPaint.setColor(mSetting.inDayMode ? mSetting.fontColorDark : mSetting.fontColorLight);
+    }
+
+    /**
      * This function init the view class。
      * Notice: (-1, -1), (-1, 0), (0, -1) means first page.
      * @param context current context, should be WenkuReaderActivity
@@ -133,6 +158,7 @@ public class WenkuReaderPageView extends View {
         // TODO: split a setter, this function is useless, so set everything first before system's getView
 
         lineInfoList = new ArrayList<>();
+        bitmapInfoList = new ArrayList<>();
         mLoader.setCurrentIndex(lineIndex);
 
         // get environmental vars
@@ -484,8 +510,51 @@ public class WenkuReaderPageView extends View {
             }
 
             Log.e("MewX", "draw: " + li.text);
-            canvas.drawText(li.type == WenkuReaderLoader.ElementType.TEXT ? li.text : "（！请先用旧引擎浏览）图片" + li.text.substring(20, li.text.length()), (float) (pxPageEdgeDistance + pxParagraphEdgeDistance), (float) heightSum, textPaint);
-            heightSum += fontHeight;
+            if(li.type == WenkuReaderLoader.ElementType.TEXT) {
+                canvas.drawText( li.text, (float) (pxPageEdgeDistance + pxParagraphEdgeDistance), (float) heightSum, textPaint);
+                heightSum += fontHeight;
+            }
+            else if(li.type == WenkuReaderLoader.ElementType.IMAGE_DEPENDENT){
+                if(bitmapInfoList != null) {
+                    int foundIndex = -1;
+                    for(BitmapInfo bi : bitmapInfoList) {
+                        if(bi.idxLineInfo == i) {
+                            foundIndex = bitmapInfoList.indexOf(bi);
+                            break;
+                        }
+                    }
+
+                    if(foundIndex == -1) {
+                        // not found, new load task
+                        canvas.drawText("Loading: " + li.text.substring(20, li.text.length()), (float) (pxPageEdgeDistance + pxParagraphEdgeDistance), (float) heightSum, textPaint);
+                        BitmapInfo bitmapInfo = new BitmapInfo();
+                        bitmapInfo.idxLineInfo = i;
+                        bitmapInfo.x_beg = pxPageEdgeDistance + pxParagraphEdgeDistance;
+                        bitmapInfo.y_beg = pxPageEdgeDistance + pxWidgetHeight;
+                        if(Build.VERSION.SDK_INT < 19) bitmapInfo.y_beg -= pxWidgetHeight;
+                        bitmapInfo.height = textAreaSize.y;
+                        bitmapInfo.width = textAreaSize.x;
+                        bitmapInfoList.add(0, bitmapInfo);
+
+                        AsyncLoadImage ali = new AsyncLoadImage();
+                        ali.execute(bitmapInfoList.get(0));
+                    }
+                    else {
+                        if(bitmapInfoList.get(foundIndex).bm == null) {
+                            canvas.drawText("Loading: " + li.text.substring(20, li.text.length()), (float) (pxPageEdgeDistance + pxParagraphEdgeDistance), (float) heightSum, textPaint);
+                        }
+                        else {
+                            canvas.drawBitmap(bitmapInfoList.get(foundIndex).bm, bitmapInfoList.get(foundIndex).x_beg, bitmapInfoList.get(foundIndex).y_beg, new Paint());
+                        }
+                    }
+                }
+                else {
+                    canvas.drawText("Unexpected array: " + li.text.substring(20, li.text.length()), (float) (pxPageEdgeDistance + pxParagraphEdgeDistance), (float) heightSum, textPaint);
+                }
+            }
+            else {
+                canvas.drawText("（！请先用旧引擎浏览）图片" + li.text.substring(20, li.text.length()), (float) (pxPageEdgeDistance + pxParagraphEdgeDistance), (float) heightSum, textPaint);
+            }
         }
     }
 
@@ -505,25 +574,40 @@ public class WenkuReaderPageView extends View {
         return lastWordIndex;
     }
 
-    private class AsyncLoadImage extends AsyncTask<String, Integer, Wenku8Error.ErrorCode> {
+    private class AsyncLoadImage extends AsyncTask<BitmapInfo, Integer, Wenku8Error.ErrorCode> {
         @Override
-        protected void onPreExecute() {
-            super.onPreExecute();
+        protected Wenku8Error.ErrorCode doInBackground(BitmapInfo... params) {
+            String imgFileName = GlobalConfig.generateImageFileNameByURL(lineInfoList.get(params[0].idxLineInfo).text);
+            if(GlobalConfig.getAvailableNovolContentImagePath(imgFileName) == null) {
+                if(!GlobalConfig.saveNovelContentImage(lineInfoList.get(params[0].idxLineInfo).text))
+                    return Wenku8Error.ErrorCode.NETWORK_ERROR;
+                imgFileName = GlobalConfig.generateImageFileNameByURL(lineInfoList.get(params[0].idxLineInfo).text);
+            }
+
+            ImageSize targetSize = new ImageSize(params[0].width, params[0].height); // result Bitmap will be fit to this size
+            params[0].bm = ImageLoader.getInstance().loadImageSync("file://" + GlobalConfig.getAvailableNovolContentImagePath(imgFileName), targetSize);
+            int width = params[0].bm.getWidth(), height = params[0].bm.getHeight();
+            if(params[0].height / (float)params[0].width > height / (float)width) {
+                // fit width
+                float percentage = (float)height / width;
+                params[0].height = (int)(params[0].width * percentage);
+            }
+            else {
+                // fit height
+                float percentage = (float)width / height;
+                params[0].width = (int)(params[0].height * percentage);
+            }
+            params[0].bm = Bitmap.createScaledBitmap(params[0].bm, params[0].width, params[0].height, true);
+            return Wenku8Error.ErrorCode.SYSTEM_1_SUCCEEDED;
         }
 
         @Override
         protected void onPostExecute(Wenku8Error.ErrorCode errorCode) {
             super.onPostExecute(errorCode);
-        }
-
-        @Override
-        protected void onProgressUpdate(Integer... values) {
-            super.onProgressUpdate(values);
-        }
-
-        @Override
-        protected Wenku8Error.ErrorCode doInBackground(String... params) {
-            return null;
+            if(errorCode == Wenku8Error.ErrorCode.SYSTEM_1_SUCCEEDED)
+                WenkuReaderPageView.this.postInvalidate();
+            else
+                Toast.makeText(getContext(), errorCode.toString(), Toast.LENGTH_SHORT).show();
         }
     }
 }
