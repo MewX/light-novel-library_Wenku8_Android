@@ -8,12 +8,12 @@ android {
         minSdkVersion 15
         targetSdkVersion 22
         versionCode 23
-        versionName "0.8.1.0dev"
+        versionName "0.9.0.0"
     }
     buildTypes {
         debug {
             debuggable true
-            minifyEnabled false
+            minifyEnabled true
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
         release {
@@ -50,4 +50,6 @@ dependencies {
     compile 'com.github.castorflex.smoothprogressbar:library:1.1.0'
     compile 'com.jpardogo.googleprogressbar:library:1.2.0'
     compile 'org.adw.library:discrete-seekbar:1.0.0'
+    compile 'com.davemorrissey.labs:subsampling-scale-image-view:3.1.4'
+    compile 'com.nononsenseapps:filepicker:2.2'
 }

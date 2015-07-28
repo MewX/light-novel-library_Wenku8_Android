@@ -69,7 +69,7 @@ public class NovelInfoActivity extends AppCompatActivity {
 
     // private vars
     private int aid = 1;
-    private String from = "";
+    private String from = "", title = "";
     private boolean isLoading = true;
     private Toolbar mToolbar = null;
     private RelativeLayout rlMask = null; // mask layout
@@ -100,7 +100,7 @@ public class NovelInfoActivity extends AppCompatActivity {
         // fetch values
         aid = getIntent().getIntExtra("aid", 1);
         from = getIntent().getStringExtra("from");
-        String title = getIntent().getStringExtra("title");
+        title = getIntent().getStringExtra("title");
 
         // set indicator enable
         mToolbar = (Toolbar) findViewById(R.id.toolbar_actionbar);
@@ -115,8 +115,6 @@ public class NovelInfoActivity extends AppCompatActivity {
 
         // change status bar color tint, and this require SDK16
         if (Build.VERSION.SDK_INT >= 16 ) {
-            // Android API 22 has more effects on status bar, so ignore
-
             // create our manager instance after the content view is set
             SystemBarTintManager tintManager = new SystemBarTintManager(this);
             // enable all tint
@@ -129,7 +127,6 @@ public class NovelInfoActivity extends AppCompatActivity {
             // set Navigation bar color
             if(Build.VERSION.SDK_INT >= 21)
                 getWindow().setNavigationBarColor(getResources().getColor(R.color.myNavigationColor));
-
         }
 
         // UIL setting
@@ -551,7 +548,8 @@ public class NovelInfoActivity extends AppCompatActivity {
                                 .positiveColorRes(R.color.dlgPositiveButtonColor)
                                 .negativeColorRes(R.color.dlgNegativeButtonColor)
                                 .title(R.string.reader_v1_notice)
-                                .content(R.string.reader_jump_last)
+                                .content(getResources().getString(R.string.reader_jump_last) + "\n" + title + "\n" + listVolume.get(findVidIndex_bak).volumeName + "\n"
+                                        + listVolume.get(findVidIndex_bak).chapterList.get(findCidIndex_bak).chapterName)
                                 .contentGravity(GravityEnum.CENTER)
                                 .positiveText(R.string.dialog_positive_sure)
                                 .negativeText(R.string.dialog_negative_biao)

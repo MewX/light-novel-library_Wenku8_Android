@@ -1,6 +1,6 @@
 package org.mewx.wenku8.util;
 
-import net.tsz.afinal.core.Queue;
+import java.util.Queue;
 
 /**
  * Created by MewX on 2015/1/24.

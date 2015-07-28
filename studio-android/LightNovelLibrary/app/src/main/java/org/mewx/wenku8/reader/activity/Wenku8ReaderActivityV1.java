@@ -1,16 +1,21 @@
 package org.mewx.wenku8.reader.activity;
 
 import android.app.ActionBar;
+import android.app.Activity;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.graphics.PorterDuff;
+import android.graphics.Rect;
 import android.graphics.drawable.Drawable;
 import android.os.AsyncTask;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
 import android.util.Log;
+import android.view.KeyEvent;
+import android.view.Menu;
 import android.view.MenuItem;
 import android.view.MotionEvent;
 import android.view.View;
@@ -52,10 +57,12 @@ import org.mewx.wenku8.util.LightTool;
 
 import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
+import java.util.Calendar;
 import java.util.List;
 
 /**
  * Created by MewX on 2015/7/10.
+ * Novel Reader Engine V1.
  */
 public class Wenku8ReaderActivityV1 extends AppCompatActivity {
     // constant
@@ -139,7 +146,23 @@ public class Wenku8ReaderActivityV1 extends AppCompatActivity {
         super.onResume();
         MobclickAgent.onResume(this);
 
-        hideNavigationBar();
+        if(findViewById(R.id.toolbar_actionbar).getVisibility() == View.INVISIBLE)
+            hideNavigationBar();
+        else
+            showNavigationBar();
+    }
+
+    @Override
+    public boolean onCreateOptionsMenu(Menu menu) {
+        getMenuInflater().inflate(R.menu.menu_reader_v1, menu);
+
+        Drawable drawable = menu.getItem(0).getIcon();
+        if (drawable != null) {
+            drawable.mutate();
+            drawable.setColorFilter(getResources().getColor(R.color.default_white), PorterDuff.Mode.SRC_ATOP);
+        }
+
+        return true;
     }
 
     private void hideNavigationBar() {
@@ -208,6 +231,20 @@ public class Wenku8ReaderActivityV1 extends AppCompatActivity {
         }
     }
 
+    @Override
+    public boolean onKeyDown(int keyCode, KeyEvent event) {
+        switch(keyCode) {
+            case KeyEvent.KEYCODE_VOLUME_DOWN:
+                if(sl != null) sl.slideNext();
+                return true;
+
+            case KeyEvent.KEYCODE_VOLUME_UP:
+                if(sl != null) sl.slidePrevious();
+                return true;
+        }
+        return super.onKeyDown(keyCode, event);
+    }
+
     class SlidingPageAdapter extends SlidingAdapter<WenkuReaderPageView> {
         int firstLineIndex = 0; // line index of first index of this page
         int firstWordIndex = 0; // first index of this page
@@ -218,6 +255,7 @@ public class Wenku8ReaderActivityV1 extends AppCompatActivity {
         WenkuReaderPageView previousPage;
         boolean isLoadingNext = false;
         boolean isLoadingPrevious = false;
+        private boolean longClickActive = false;
 
         public SlidingPageAdapter(int begLineIndex, int begWordIndex) {
             super();
@@ -243,10 +281,93 @@ public class Wenku8ReaderActivityV1 extends AppCompatActivity {
                 contentView = getLayoutInflater().inflate(R.layout.layout_reader_swipe_page, null);
 
             // prevent memory leak
-            RelativeLayout rl = (RelativeLayout) contentView.findViewById(R.id.page_holder);
+            final RelativeLayout rl = (RelativeLayout) contentView.findViewById(R.id.page_holder);
             rl.removeAllViews();
             ViewGroup.LayoutParams lp = new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
             rl.addView(pageView, lp);
+
+            // on touch
+//            final Handler mLongPressHandler = new Handler();
+//            rl.setOnTouchListener(new View.OnTouchListener() {
+//                private Rect mNoteRect;
+//                private Integer runCount = 0;
+//                private static final int MIN_CLICK_DURATION = 500;
+//
+//                private boolean isDown = false;
+//                private boolean isUp = false;
+//
+//                private final Runnable runnable = new Runnable() {
+//                        @Override
+//                        public void run() {
+//                            longClickActive = true;
+//                            Toast.makeText(Wenku8ReaderActivityV1.this, "LONG PRESSED!",Toast.LENGTH_SHORT).show();
+//                        }
+//                };
+//
+//                @Override
+//                public boolean onTouch(View v, MotionEvent event) {
+//                    switch (event.getAction()) {
+//                        case MotionEvent.ACTION_DOWN:
+////                            mLongPressHandler.removeCallbacks(runnable);
+//                            if(isDown) {
+//                                // dispatch one event first
+//                                Log.e("MewX", "down1");
+//                                return false;
+//                            }
+//                            Log.e("MewX", "down2");
+//                            isDown = true;
+//                            mLongPressHandler.postDelayed(runnable, MIN_CLICK_DURATION);
+//                            return false;
+//
+//                        case MotionEvent.ACTION_UP:
+//                            Log.e("MewX", "up");
+//                            mLongPressHandler.removeCallbacks(runnable);
+//                            isDown = false;
+//                            return false;
+//
+//                        case MotionEvent.ACTION_MOVE:
+//                            Log.e("MewX", "move");
+//                            mLongPressHandler.removeCallbacks(runnable);
+//                            isDown = false;
+//                            return false;
+//                    }
+//                    return false;
+//                }
+//
+////                @Override
+////                public boolean onTouch(View v, MotionEvent event) {
+////                    if (event.getAction() == MotionEvent.ACTION_DOWN) {
+//////                        mStartRawX = (int) event.getX();
+//////                        mStartRawY = (int) event.getY();
+//////                        mStartX = mStartRawX - mNoteRect.left;
+//////                        mStartY = mStartRawY - mNoteRect.top;
+////                        mLongPressHandler.postDelayed(runnable, 1000);
+////                        return true;
+////                    }
+////                    else if (event.getAction() == MotionEvent.ACTION_MOVE) {
+//////                        if ((mStartRawX + 10 < (int) event.getX() || mStartRawX - 10 > (int) event.getX())
+//////                                || (mStartRawY + 10 < (int) event.getY() || mStartRawY - 10 > (int) event.getY())) {
+////                            mLongPressHandler.removeCallbacks(runnable);
+//////                        }
+////                    }
+////                    else if (event.getAction() == MotionEvent.ACTION_UP) {
+////                        mLongPressHandler.removeCallbacks(runnable);
+////                    }
+////                    return true;
+////                }
+//            });
+////            rl.setOnClickListener(new View.OnClickListener() {
+////                @Override
+////                public void onClick(View v) {
+////                }
+////            });
+////            rl.setOnLongClickListener(new View.OnLongClickListener() {
+////                @Override
+////                public boolean onLongClick(View v) {
+////                    Toast.makeText(Wenku8ReaderActivityV1.this, "test", Toast.LENGTH_SHORT).show();
+////                    return false;
+////                }
+////            });
 
             return contentView;
         }
@@ -668,10 +789,99 @@ public class Wenku8ReaderActivityV1 extends AppCompatActivity {
                     }
 
                     if (x > screenWidth / 2) {
-                        // TODO: judge last page
-                        sl.slideNext();
+                        if(mSlidingPageAdapter != null && !mSlidingPageAdapter.hasNext()) {
+                            // goto next chapter
+                            for (int i = 0; i < volumeList.chapterList.size(); i++) {
+                                if (cid == volumeList.chapterList.get(i).cid) {
+                                    // found self
+                                    if (i + 1 >= volumeList.chapterList.size()) {
+                                        // no more previous
+                                        Toast.makeText(Wenku8ReaderActivityV1.this, getResources().getString(R.string.reader_already_last_chapter), Toast.LENGTH_SHORT).show();
+                                    } else {
+                                        // jump to previous
+                                        final int i_bak = i;
+                                        new MaterialDialog.Builder(Wenku8ReaderActivityV1.this)
+                                                .callback(new MaterialDialog.ButtonCallback() {
+                                                    @Override
+                                                    public void onPositive(MaterialDialog dialog) {
+                                                        super.onPositive(dialog);
+                                                        Intent intent = new Intent(Wenku8ReaderActivityV1.this, Wenku8ReaderActivityV1.class); //VerticalReaderActivity.class);
+                                                        intent.putExtra("aid", aid);
+                                                        intent.putExtra("volume", volumeList);
+                                                        intent.putExtra("cid", volumeList.chapterList.get(i_bak + 1).cid);
+                                                        intent.putExtra("from", from); // from cloud
+                                                        startActivity(intent);
+                                                        overridePendingTransition(R.anim.fade_in, R.anim.hold); // fade in animation
+                                                        Wenku8ReaderActivityV1.this.finish();
+                                                    }
+                                                })
+                                                .theme(Theme.LIGHT)
+                                                .titleColorRes(R.color.dlgTitleColor)
+                                                .backgroundColorRes(R.color.dlgBackgroundColor)
+                                                .contentColorRes(R.color.dlgContentColor)
+                                                .positiveColorRes(R.color.dlgPositiveButtonColor)
+                                                .negativeColorRes(R.color.dlgNegativeButtonColor)
+                                                .title(R.string.dialog_sure_to_jump_chapter)
+                                                .content(volumeList.chapterList.get(i_bak + 1).chapterName)
+                                                .contentGravity(GravityEnum.CENTER)
+                                                .positiveText(R.string.dialog_positive_yes)
+                                                .negativeText(R.string.dialog_negative_no)
+                                                .show();
+                                    }
+                                    break;
+                                }
+                            }
+                        }
+                        else {
+                            sl.slideNext();
+                        }
                     } else if (x <= screenWidth / 2) {
-                        sl.slidePrevious();
+                        if(mSlidingPageAdapter != null && !mSlidingPageAdapter.hasPrevious()) {
+                            // goto previous chapter
+                            for (int i = 0; i < volumeList.chapterList.size(); i++) {
+                                if (cid == volumeList.chapterList.get(i).cid) {
+                                    // found self
+                                    if (i == 0) {
+                                        // no more previous
+                                        Toast.makeText(Wenku8ReaderActivityV1.this, getResources().getString(R.string.reader_already_first_chapter), Toast.LENGTH_SHORT).show();
+                                    } else {
+                                        // jump to previous
+                                        final int i_bak = i;
+                                        new MaterialDialog.Builder(Wenku8ReaderActivityV1.this)
+                                                .callback(new MaterialDialog.ButtonCallback() {
+                                                    @Override
+                                                    public void onPositive(MaterialDialog dialog) {
+                                                        super.onPositive(dialog);
+                                                        Intent intent = new Intent(Wenku8ReaderActivityV1.this, Wenku8ReaderActivityV1.class); //VerticalReaderActivity.class);
+                                                        intent.putExtra("aid", aid);
+                                                        intent.putExtra("volume", volumeList);
+                                                        intent.putExtra("cid", volumeList.chapterList.get(i_bak - 1).cid);
+                                                        intent.putExtra("from", from); // from cloud
+                                                        startActivity(intent);
+                                                        overridePendingTransition(R.anim.fade_in, R.anim.hold); // fade in animation
+                                                        Wenku8ReaderActivityV1.this.finish();
+                                                    }
+                                                })
+                                                .theme(Theme.LIGHT)
+                                                .titleColorRes(R.color.dlgTitleColor)
+                                                .backgroundColorRes(R.color.dlgBackgroundColor)
+                                                .contentColorRes(R.color.dlgContentColor)
+                                                .positiveColorRes(R.color.dlgPositiveButtonColor)
+                                                .negativeColorRes(R.color.dlgNegativeButtonColor)
+                                                .title(R.string.dialog_sure_to_jump_chapter)
+                                                .content(volumeList.chapterList.get(i_bak - 1).chapterName)
+                                                .contentGravity(GravityEnum.CENTER)
+                                                .positiveText(R.string.dialog_positive_yes)
+                                                .negativeText(R.string.dialog_negative_no)
+                                                .show();
+                                    }
+                                    break;
+                                }
+                            }
+                        }
+                        else {
+                            sl.slidePrevious();
+                        }
                     }
                 }
             });
@@ -722,8 +932,15 @@ public class Wenku8ReaderActivityV1 extends AppCompatActivity {
 
     @Override
     public boolean onOptionsItemSelected(MenuItem menuItem) {
-        if (menuItem.getItemId() == android.R.id.home)
-            onBackPressed();
+        switch (menuItem.getItemId()) {
+            case android.R.id.home:
+                onBackPressed();
+                break;
+            case R.id.action_watch_image:
+                if(sl != null && sl.getAdapter().getCurrentView() != null && (WenkuReaderPageView) ((RelativeLayout) sl.getAdapter().getCurrentView()).getChildAt(0) instanceof WenkuReaderPageView)
+                    ((WenkuReaderPageView) ((RelativeLayout) sl.getAdapter().getCurrentView()).getChildAt(0)).watchImageDetailed(this);
+                break;
+        }
         return super.onOptionsItemSelected(menuItem);
     }
 

@@ -163,4 +163,27 @@ public class LightCache {
 		} else
 			return false;
 	}
+
+	public static void copyfile(String from, String to, Boolean forceWrite ) {
+		File fromFile = new File(from);
+		File toFile = new File(to);
+		if (!fromFile.exists() || !fromFile.isFile() || !fromFile.canRead())
+			return;
+
+		if (!toFile.getParentFile().exists()) toFile.getParentFile().mkdirs();
+		if (toFile.exists() && forceWrite) toFile.delete();
+
+		try {
+			java.io.FileInputStream fosfrom = new java.io.FileInputStream(fromFile);
+			java.io.FileOutputStream fosto = new FileOutputStream(toFile);
+
+			byte bt[] = new byte[1024];
+			int c;
+			while ((c = fosfrom.read(bt)) > 0) fosto.write(bt, 0, c);
+			fosfrom.close();
+			fosto.close();
+		} catch (Exception ex) {
+			ex.printStackTrace();
+		}
+	}
 }

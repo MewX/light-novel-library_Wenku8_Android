@@ -333,7 +333,7 @@ public class LightUserSession {
                 MyApp.getContext().startService(intent);
             }
             else {
-                // Toast.makeText(MyApp.getContext(), e.toString(), Toast.LENGTH_SHORT).show();
+//                 Toast.makeText(MyApp.getContext(), e.toString(), Toast.LENGTH_SHORT).show();
             }
         }
     }

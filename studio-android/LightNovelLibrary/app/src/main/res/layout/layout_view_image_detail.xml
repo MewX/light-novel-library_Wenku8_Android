@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@android:color/black">
+
+    <com.davemorrissey.labs.subscaleview.SubsamplingScaleImageView
+        android:id="@+id/image_scalable"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"/>
+
+    <RelativeLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:fitsSystemWindows="true">
+
+        <android.support.v7.widget.Toolbar
+            style="@style/ToolBarStyle"
+            android:id="@+id/toolbar_actionbar"
+            android:layout_width="match_parent"
+            android:layout_height="?attr/actionBarSize"
+            android:clickable="true"
+            android:layout_alignParentTop="true"
+            android:background="@color/reader_default_bg_toolbar" />
+
+        <LinearLayout
+            android:id="@+id/image_detail_bot"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:fitsSystemWindows="true"
+            android:background="@color/reader_default_bg_toolbar"
+            android:orientation="horizontal"
+            android:visibility="visible"
+            android:clickable="true"
+            android:layout_alignParentBottom="true"
+            android:layout_alignParentLeft="true"
+            android:layout_alignParentStart="true"
+            android:baselineAligned="false">
+
+            <LinearLayout
+                android:id="@+id/btn_rotate"
+                android:layout_width="wrap_content"
+                android:layout_height="match_parent"
+                android:clickable="true"
+                android:background="@drawable/btn_menu_item_boardless"
+                android:layout_weight="1"
+                android:gravity="center">
+
+                <ImageButton
+                    android:id="@+id/ic_rotate"
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
+                    android:scaleType="fitCenter"
+                    android:clickable="false"
+                    android:background="@android:color/transparent"
+                    android:src="@drawable/ic_reader_jump"/>
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/btn_download"
+                android:layout_width="wrap_content"
+                android:layout_height="match_parent"
+                android:clickable="true"
+                android:background="@drawable/btn_menu_item_boardless"
+                android:layout_weight="1"
+                android:gravity="center">
+
+                <ImageButton
+                    android:id="@+id/ic_download"
+                    android:layout_width="32dp"
+                    android:layout_height="32dp"
+                    android:scaleType="fitCenter"
+                    android:clickable="false"
+                    android:background="@android:color/transparent"
+                    android:src="@drawable/ic_download"/>
+            </LinearLayout>
+        </LinearLayout>
+    </RelativeLayout>
+</RelativeLayout>

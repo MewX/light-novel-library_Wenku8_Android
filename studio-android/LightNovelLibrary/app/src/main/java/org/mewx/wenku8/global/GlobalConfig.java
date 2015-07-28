@@ -20,12 +20,17 @@ import com.nostra13.universalimageloader.core.ImageLoaderConfiguration;
 import com.nostra13.universalimageloader.core.display.FadeInBitmapDisplayer;
 
 import org.mewx.wenku8.MyApp;
+import org.mewx.wenku8.R;
 import org.mewx.wenku8.global.api.Wenku8API;
 import org.mewx.wenku8.util.LightCache;
 import org.mewx.wenku8.util.LightNetwork;
 import org.mewx.wenku8.util.LightTool;
 
+import java.io.BufferedReader;
 import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
 
@@ -40,6 +45,7 @@ public class GlobalConfig {
     private static final boolean inAlphaBuild = true; // in alpha mode, no update function
     public static final String saveFolderName = "saves";
     public static final String imgsSaveFolderName = "imgs";
+    public static final String imgsSaveOutFolderName = "imgs_save";
     private static final String saveSearchHistoryFileName = "search_history.wk8";
     private static final String saveReadSavesFileName = "read_saves.wk8";
     private static final String saveReadSavesV1FileName = "read_saves_v1.wk8";
@@ -52,7 +58,7 @@ public class GlobalConfig {
     private static boolean isInBookshelf = false;
     private static boolean FirstStoragePathStatus = true;
     private static Wenku8API.LANG currentLang = Wenku8API.LANG.SC;
-
+    public static String pathPickedSave; // dir picker save path
 
     // static variables
     private static ArrayList<String> searchHistory = null;
@@ -144,29 +150,24 @@ public class GlobalConfig {
     }
 
     public static String getOpensourceLicense() {
-        return "# Used Open Source Library:\n--------\n" +
-                "- yangfuhai / afinal (Unknown License)\n" +
-                "- jgilfelt / SystemBarTint (Apache License 2.0)\n" +
-                "- nostra13 / Android-Universal-Image-Loader (Apache License 2.0)\n" +
-                "- astuetz / PagerSlidingTabStrip (Apache License 2.0)\n" +
-                "  -> branch: jpardogo / PagerSlidingTabStrip\n" +
-                "- jpardogo / GoogleProgressBar (Apache License 2.0)\n" +
-                "  -> branch: MewX / google-progress-bar\n" +
-                "- Google / Volley (Apache License 2.0)\n" +
-                "- afollestad / material-dialogs (MIT License)\n" +
-                "- futuresimple / android-floating-action-button (Apache License 2.0)\n" +
-                "- vinc3m1 / RoundedImageView (Apache License 2.0)\n" +
-                "- chrisbanes / SmoothProgressBar (BEER-WARE LICENSE)\n" +
-                "- davemorrissey / subsampling-scale-image-view (Apache License 2.0)\n" +
-                "- martiansutdio / SlidingLayout (Unknown License)\n" +
-                "- AnderWeb / discreteSeekBar (Apache License 2.0)\n\n========\n\n" +
-                "# Notice:\n--------\n" +
-                "( A previous version 0.5.2.0 is open-sourced in https://github.com/MewX/light-novel-library_Wenku8_Android/ )\n" +
-                "This project will be partially open-sourced in the future, for example, the universal reader activity. But this needs time to be cleaned up. The code is messy now!\n\n========\n\n" +
-                "# Copyright:\n--------\n" +
-                "- Source/Bytecode Copyright: MewX (http://mewx.org/);\n" +
-                "- Design/Assemble Copyright: ZERO (http://kurosaki.coding.io/);\n" +
-                "- Data Collects: 轻小说文库 (http://wenku8.cn/), from the Internet.";
+        InputStream is = MyApp.getContext().getResources().openRawResource(R.raw.license);
+        BufferedReader reader = new BufferedReader(new InputStreamReader(is));
+        StringBuilder sb = new StringBuilder();
+        String line = null;
+        try {
+            while ((line = reader.readLine()) != null) {
+                sb.append(line + "\n");
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        } finally {
+            try {
+                is.close();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+        return sb.toString();
     }
 
     /**

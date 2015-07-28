@@ -5,9 +5,6 @@ import android.util.Log;
 
 import com.umeng.analytics.MobclickAgent;
 
-import net.tsz.afinal.http.AjaxParams;
-import net.tsz.afinal.http.entityhandler.StringEntityHandler;
-
 import org.apache.http.NameValuePair;
 import org.apache.http.message.BasicNameValuePair;
 import org.mewx.wenku8.MyApp;
@@ -37,6 +34,11 @@ public class Wenku8API {
             NoticeString = MobclickAgent.getConfigParams(MyApp.getContext(), "wenku8_notice");
         }
         return BaseURL;
+    }
+
+    public static String getCoverURL(int aid) {
+        return "http://img.wenku8.cn/image/" + Integer.toString(aid / 1000)
+                + "/" + Integer.toString(aid) + "/" + Integer.toString(aid) + "s.jpg";
     }
 
     public static String[] badWords = {
@@ -532,57 +534,6 @@ public class Wenku8API {
      * The old APIs are above, and use HttpRequest.
      * This part uses AFinal and that's more efficient.
      */
-
-    private static AjaxParams getEncryptedAjaxParams(String str) {
-        AjaxParams params = new AjaxParams();
-        params.put("request", LightBase64.EncodeBase64(str));
-
-        return params;
-    }
-
-    public static String getCoverURL(int aid) {
-        return "http://img.wenku8.cn/image/" + Integer.toString(aid / 1000)
-                + "/" + Integer.toString(aid) + "/" + Integer.toString(aid) + "s.jpg";
-    }
-
-    public static AjaxParams getNovelItemList(NOVELSORTBY n, int page) {
-        // here get a specific list of novels, sorted by NOVELSORTBY
-        // ---------------------------------------------------------
-        // <?xml version="1.0" encoding="utf-8"?>
-        // <result>
-        // <page num='166'/>
-        // <item aid='1143'/>
-        // <item aid='1034'/>
-        // <item aid='1213'/>
-        // <item aid='1'/>
-        // <item aid='1011'/>
-        // <item aid='1192'/>
-        // <item aid='433'/>
-        // <item aid='47'/>
-        // <item aid='7'/>
-        // <item aid='374'/>
-        // </result>
-
-        return getEncryptedAjaxParams("action=articlelist&sort=" + getNOVELSORTBY(n)
-                + "&page=" + page);
-    }
-
-    public static AjaxParams getNovelItemIntroShort(int aid, LANG l) {
-        // get short XML info of a novel, here is an example:
-        // --------------------------------------------------
-        // <?xml version="1.0" encoding="utf-8"?>
-        // <metadata>
-        // <data name="Title" aid="1305"><![CDATA[绝对双刃absolute duo]]></data>
-        // <data name="Author" value="柊★巧"/>
-        // <data name="BookStatus" value="0"/>
-        // <data name="LastUpdate" value="2014-10-01"/>
-        // <data
-        // name="IntroPreview"><![CDATA[　　「焰牙」——那是藉由超化之后的精神力将自身灵...]]></data>
-        // </metadata>
-
-        return getEncryptedAjaxParams("action=book&do=info&aid=" + aid + "&t=" + getLANG(l));
-    }
-
 
     /**
      * This part is user related, and is using the latest API 22 features.

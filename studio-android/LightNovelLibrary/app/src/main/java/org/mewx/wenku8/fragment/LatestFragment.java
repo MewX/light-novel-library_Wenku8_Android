@@ -22,9 +22,7 @@ import android.widget.Toast;
 
 import com.umeng.analytics.MobclickAgent;
 
-import net.tsz.afinal.FinalHttp;
-import net.tsz.afinal.http.AjaxCallBack;
-
+import org.apache.http.NameValuePair;
 import org.mewx.wenku8.MyApp;
 import org.mewx.wenku8.R;
 import org.mewx.wenku8.activity.MainActivity;
@@ -34,8 +32,10 @@ import org.mewx.wenku8.global.GlobalConfig;
 import org.mewx.wenku8.global.api.NovelItemInfo;
 import org.mewx.wenku8.global.api.NovelItemList;
 import org.mewx.wenku8.global.api.Wenku8API;
+import org.mewx.wenku8.global.api.Wenku8Error;
 import org.mewx.wenku8.listener.MyItemClickListener;
 import org.mewx.wenku8.listener.MyItemLongClickListener;
+import org.mewx.wenku8.util.LightNetwork;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -117,18 +117,20 @@ public class LatestFragment extends Fragment implements MyItemClickListener, MyI
 
                 } else {
                     // need to reload novel list all
-                    FinalHttp fh = new FinalHttp();
-                    fh.post(Wenku8API.getBaseURL(), Wenku8API.getNovelItemList(Wenku8API.NOVELSORTBY.lastUpdate, 1),
-                            new AjaxGetNovelItemCallBack());
+                    AsyncGetNovelItem agni = new AsyncGetNovelItem();
+                    List<NameValuePair> list = new ArrayList<>();
+                    list.add(Wenku8API.getNovelList(Wenku8API.NOVELSORTBY.lastUpdate, 1));
+                    agni.execute(list);
                 }
 
             }
         });
 
         // Load novel list
-        FinalHttp fh = new FinalHttp();
-        fh.post(Wenku8API.getBaseURL(), Wenku8API.getNovelItemList(Wenku8API.NOVELSORTBY.lastUpdate, 1),
-                new AjaxGetNovelItemCallBack());
+        AsyncGetNovelItem agni = new AsyncGetNovelItem();
+        List<NameValuePair> list = new ArrayList<>();
+        list.add(Wenku8API.getNovelList(Wenku8API.NOVELSORTBY.lastUpdate, 1));
+        agni.execute(list);
 
         return rootView;
     }
@@ -172,56 +174,63 @@ public class LatestFragment extends Fragment implements MyItemClickListener, MyI
         super.onDetach();
     }
 
-    private class AjaxGetNovelItemCallBack extends AjaxCallBack<byte[]> {
+    private class AsyncGetNovelItem extends AsyncTask<List<NameValuePair>, Integer, Wenku8Error.ErrorCode> {
+        private byte[] b;
+
         @Override
-        public void onSuccess(byte[] b) {
-            String[] s = new String[1];
-            try {
-                // convert byte[] to String
-                s[0] = new String(b, "UTF-8");
-                if (GlobalConfig.inDebugMode())
-                    Log.i("MewX", "in AjaxGetNovelItemCallBack.");
-
-                // add elements to RecylerView
-                if (novelItemList == null)
-                    novelItemList = new NovelItemList(s, 1);
-                else
-                    novelItemList.setNovelItemList(s, novelItemList.getCurrentPage() + 1);
-                if (!novelItemList.getParseStatus())
-                    throw new Exception("MewX Exception: novelItemList failed to parse.");
-                listNovelItem = novelItemList.getNovelItemList();
-                if (listNovelItemInfo == null)
-                    listNovelItemInfo = new ArrayList<>();
-
-                // asc task
-                Integer[] li = listNovelItem.subList((listNovelItem.size() / 10) * 10 - 10, listNovelItem.size())
-                        .toArray(new Integer[listNovelItem.size() - ((listNovelItem.size() / 10) * 10 - 10)]);
-                if (GlobalConfig.inDebugMode())
-                    Log.i("MewX", "size of Integer[] li: " + Integer.toString(li.length));
-                AsyncGetNovelItemList asc = new AsyncGetNovelItemList();
-                hideRetryButton();
-                isLoading = true;
-                asc.execute(li);
-
-                // release memory
-                s[0] = null;
-
-            } catch (Exception e) {
-                e.printStackTrace();
-                if (mTextView != null)
-                    mTextView.setText(getResources().getString(R.string.system_parse_failed) + e.getMessage());
-                showRetryButton();
-                isLoading = false;
-            }
+        protected Wenku8Error.ErrorCode doInBackground(List<NameValuePair>... params) {
+            b = LightNetwork.LightHttpPost(Wenku8API.getBaseURL(), params[0]);
+            if(b == null) return Wenku8Error.ErrorCode.NETWORK_ERROR;
+            return Wenku8Error.ErrorCode.SYSTEM_1_SUCCEEDED;
         }
 
         @Override
-        public void onFailure(Throwable t, int errorNo, String strMsg) {
-            if(isAdded()) {
-                mTextView.setText(getResources().getString(R.string.system_network_error));
-                showRetryButton();
+        protected void onPostExecute(Wenku8Error.ErrorCode errorCode) {
+            super.onPostExecute(errorCode);
+            if(errorCode == Wenku8Error.ErrorCode.SYSTEM_1_SUCCEEDED) {
+                String[] s = new String[1];
+                try {
+                    // convert byte[] to String
+                    s[0] = new String(b, "UTF-8");
+                    if (GlobalConfig.inDebugMode())
+                        Log.i("MewX", "in AjaxGetNovelItemCallBack.");
+
+                    // add elements to RecylerView
+                    if (novelItemList == null)
+                        novelItemList = new NovelItemList(s, 1);
+                    else
+                        novelItemList.setNovelItemList(s, novelItemList.getCurrentPage() + 1);
+                    if (!novelItemList.getParseStatus())
+                        throw new Exception("MewX Exception: novelItemList failed to parse.");
+                    listNovelItem = novelItemList.getNovelItemList();
+                    if (listNovelItemInfo == null)
+                        listNovelItemInfo = new ArrayList<>();
+
+                    // asc task
+                    Integer[] li = listNovelItem.subList((listNovelItem.size() / 10) * 10 - 10, listNovelItem.size())
+                            .toArray(new Integer[listNovelItem.size() - ((listNovelItem.size() / 10) * 10 - 10)]);
+                    AsyncGetNovelItemList asc = new AsyncGetNovelItemList();
+                    hideRetryButton();
+                    isLoading = true;
+                    asc.execute(li);
+
+                    // release memory
+                    s[0] = null;
+                } catch (Exception e) {
+                    e.printStackTrace();
+                    if (mTextView != null)
+                        mTextView.setText(getResources().getString(R.string.system_parse_failed) + e.getMessage());
+                    showRetryButton();
+                    isLoading = false;
+                }
             }
-            isLoading = false;
+            else if(errorCode == Wenku8Error.ErrorCode.NETWORK_ERROR) {
+                if(isAdded()) {
+                    mTextView.setText(getResources().getString(R.string.system_network_error));
+                    showRetryButton();
+                }
+                isLoading = false;
+            }
         }
     }
 
@@ -245,14 +254,12 @@ public class LatestFragment extends Fragment implements MyItemClickListener, MyI
                     Snackbar.make(mRecyclerView, getResources().getString(R.string.list_loading)
                                     + "(" + Integer.toString(novelItemList.getCurrentPage() + 1) + "/" + novelItemList.getTotalPage() + ")",
                             Snackbar.LENGTH_SHORT).show();
-//                    Toast.makeText(MyApp.getContext(),
-//                            getResources().getString(R.string.list_loading) + "(" + Integer.toString(novelItemList.getCurrentPage() + 1) + "/" + novelItemList.getTotalPage() + ")",
-//                            Toast.LENGTH_SHORT).show();
 
                     // load more thread
-                    FinalHttp fh = new FinalHttp();
-                    fh.post(Wenku8API.getBaseURL(), Wenku8API.getNovelItemList(Wenku8API.NOVELSORTBY.lastUpdate, novelItemList.getCurrentPage() + 1),
-                            new AjaxGetNovelItemCallBack());
+                    AsyncGetNovelItem agni = new AsyncGetNovelItem();
+                    List<NameValuePair> list = new ArrayList<>();
+                    list.add(Wenku8API.getNovelList(Wenku8API.NOVELSORTBY.lastUpdate, novelItemList.getCurrentPage() + 1));
+                    agni.execute(list);
                 }
             }
         }
@@ -285,12 +292,13 @@ public class LatestFragment extends Fragment implements MyItemClickListener, MyI
 
                     listNovelItemInfo.add(new NovelItemInfo(params[i]));
 
-                    FinalHttp fhNovelItem = new FinalHttp();
-                    byte[] bytes = null;
+                    // generate list name value pair
+                    List<NameValuePair> list = new ArrayList<>();
+                    list.add(Wenku8API.getNovelShortInfo(listNovelItemInfo.get(baseNumber + i).getAid(), GlobalConfig.getCurrentLang()));
 
+                    byte[] bytes = null;
                     while (bytes == null) // SocketTimeoutException, ConnectTimeoutException
-                        bytes = (byte[]) fhNovelItem.postSync(Wenku8API.getBaseURL(), Wenku8API.getNovelItemIntroShort(
-                                listNovelItemInfo.get(baseNumber + i).getAid(), GlobalConfig.getCurrentLang()));
+                        bytes = LightNetwork.LightHttpPost(Wenku8API.getBaseURL(), list);
                     String[] sin = new String[1];
                     sin[0] = new String(bytes, "UTF-8");
                     listNovelItemInfo.get(baseNumber + i).setNovelItemInfo(sin);

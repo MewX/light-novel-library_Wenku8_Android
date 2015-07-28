@@ -312,14 +312,10 @@ public class VerticalReaderActivity extends AppCompatActivity {
                             tempIV.setOnClickListener(new View.OnClickListener() {
                                 @Override
                                 public void onClick(View v) {
-//                                    Intent intent = new Intent();
-//                                    intent.setClass(VerticalReaderActivity.this,
-//                                            NovelImageActivity.class);
-//                                    intent.putExtra("path", path);
-//                                    startActivity(intent);
-                                    Toast.makeText(VerticalReaderActivity.this, getResources().getString(R.string.sorry_old_engine_no_image_preview), Toast.LENGTH_SHORT).show();
-//                                    VerticalReaderActivity.this.overridePendingTransition(
-//                                            R.anim.in_from_right, R.anim.keep);
+                                    Intent intent = new Intent(VerticalReaderActivity.this, ViewImageDetailActivity.class);
+                                    intent.putExtra("path", path);
+                                    VerticalReaderActivity.this.startActivity(intent);
+                                    VerticalReaderActivity.this.overridePendingTransition(R.anim.fade_in, R.anim.hold); // fade in animation
                                 }
                             });
                         } else {
@@ -344,16 +340,10 @@ public class VerticalReaderActivity extends AppCompatActivity {
                                     tempIV.setOnClickListener(new View.OnClickListener() {
                                         @Override
                                         public void onClick(View v) {
-//                                            Intent intent(intent); = new Intent();
-//                                            intent.setClass(VerticalReaderActivity.this,
-//                                                    NovelImageActivity.class);
-//                                            intent.putExtra("path", result);
-                                            Toast.makeText(VerticalReaderActivity.this, getResources().getString(R.string.sorry_old_engine_no_image_preview), Toast.LENGTH_SHORT).show();
-//                                            startActivity
-//                                            VerticalReaderActivity.this
-//                                                    .overridePendingTransition(
-//                                                            R.anim.in_from_right,
-//                                                            R.anim.keep);
+                                            Intent intent = new Intent(VerticalReaderActivity.this, ViewImageDetailActivity.class);
+                                            intent.putExtra("path", result);
+                                            VerticalReaderActivity.this.startActivity(intent);
+                                            VerticalReaderActivity.this.overridePendingTransition(R.anim.fade_in, R.anim.hold); // fade in animation
                                         }
                                     });
                                 }

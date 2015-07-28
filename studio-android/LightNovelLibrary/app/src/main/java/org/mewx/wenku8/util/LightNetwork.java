@@ -38,8 +38,6 @@ import org.mewx.wenku8.global.api.Wenku8API;
 import android.content.ContentValues;
 import android.util.Log;
 
-import net.tsz.afinal.bitmap.core.BytesBufferPool;
-
 public class LightNetwork {
 	/**
 	 * "Status" is an entry to monitor vars 0 - resting 1 -

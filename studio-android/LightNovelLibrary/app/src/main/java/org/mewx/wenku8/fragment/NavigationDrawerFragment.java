@@ -172,6 +172,7 @@ public class NavigationDrawerFragment extends Fragment {
                     else {
                         // show dialog to login, error to jump to login activity
                         if(LightUserSession.aiui.getStatus() == AsyncTask.Status.FINISHED) {
+                            Toast.makeText(getActivity(), "Relogged.", Toast.LENGTH_SHORT).show();
                             LightUserSession.aiui = new LightUserSession.AsyncInitUserInfo();
                             LightUserSession.aiui.execute();
                         }

@@ -1,20 +1,27 @@
 package org.mewx.wenku8.reader.view;
 
+import android.app.Activity;
 import android.content.Context;
+import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Paint;
 import android.graphics.Point;
 import android.graphics.Typeface;
+import android.media.Image;
 import android.net.wifi.WifiManager;
 import android.os.AsyncTask;
 import android.os.Build;
+import android.os.Handler;
 import android.text.TextPaint;
 import android.util.AttributeSet;
 import android.util.Log;
 import android.util.TypedValue;
 import android.view.MotionEvent;
 import android.view.View;
+import android.view.ViewGroup;
+import android.widget.ImageView;
+import android.widget.RelativeLayout;
 import android.widget.Toast;
 
 import com.android.volley.toolbox.Volley;
@@ -24,6 +31,7 @@ import com.nostra13.universalimageloader.core.assist.ImageSize;
 
 import org.mewx.wenku8.MyApp;
 import org.mewx.wenku8.R;
+import org.mewx.wenku8.activity.ViewImageDetailActivity;
 import org.mewx.wenku8.global.GlobalConfig;
 import org.mewx.wenku8.global.api.Wenku8Error;
 import org.mewx.wenku8.reader.loader.WenkuReaderLoader;
@@ -544,6 +552,7 @@ public class WenkuReaderPageView extends View {
                             canvas.drawText("Loading: " + li.text.substring(20, li.text.length()), (float) (pxPageEdgeDistance + pxParagraphEdgeDistance), (float) heightSum, textPaint);
                         }
                         else {
+//                            canvas.drawText("Can you see image?", (float) (pxPageEdgeDistance + pxParagraphEdgeDistance), (float) heightSum, textPaint);
                             canvas.drawBitmap(bitmapInfoList.get(foundIndex).bm, bitmapInfoList.get(foundIndex).x_beg, bitmapInfoList.get(foundIndex).y_beg, new Paint());
                         }
                     }
@@ -575,8 +584,12 @@ public class WenkuReaderPageView extends View {
     }
 
     private class AsyncLoadImage extends AsyncTask<BitmapInfo, Integer, Wenku8Error.ErrorCode> {
+        BitmapInfo bi_bak;
+
         @Override
         protected Wenku8Error.ErrorCode doInBackground(BitmapInfo... params) {
+            bi_bak = params[0];
+
             String imgFileName = GlobalConfig.generateImageFileNameByURL(lineInfoList.get(params[0].idxLineInfo).text);
             if(GlobalConfig.getAvailableNovolContentImagePath(imgFileName) == null) {
                 if(!GlobalConfig.saveNovelContentImage(lineInfoList.get(params[0].idxLineInfo).text))
@@ -604,10 +617,31 @@ public class WenkuReaderPageView extends View {
         @Override
         protected void onPostExecute(Wenku8Error.ErrorCode errorCode) {
             super.onPostExecute(errorCode);
+
+//            RelativeLayout rl = (RelativeLayout) getParent();
+//            ImageView imageView = new ImageView(getContext());
+//            RelativeLayout.LayoutParams lp = new RelativeLayout.LayoutParams(bi_bak.width, bi_bak.height);
+//            lp.setMargins(bi_bak.x_beg, bi_bak.y_beg, 0, 0);
+//            if(rl == null || imageView == null) return; // ??
+//            rl.addView(imageView, lp);
+//            imageView.setImageBitmap(bi_bak.bm);
+
             if(errorCode == Wenku8Error.ErrorCode.SYSTEM_1_SUCCEEDED)
                 WenkuReaderPageView.this.postInvalidate();
             else
                 Toast.makeText(getContext(), errorCode.toString(), Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    public void watchImageDetailed(Activity activity) {
+        if(bitmapInfoList == null || bitmapInfoList.size() == 0) {
+            Toast.makeText(getContext(), "本页无图~", Toast.LENGTH_SHORT).show();
+        }
+        else {
+            Intent intent = new Intent(activity, ViewImageDetailActivity.class);
+            intent.putExtra("path", GlobalConfig.getAvailableNovolContentImagePath(GlobalConfig.generateImageFileNameByURL(lineInfoList.get(bitmapInfoList.get(0).idxLineInfo).text)));
+            activity.startActivity(intent);
+            activity.overridePendingTransition(R.anim.fade_in, R.anim.hold); // fade in animation
         }
     }
 }
