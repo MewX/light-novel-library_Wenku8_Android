@@ -30,7 +30,7 @@
 
         <!-- UMeng Mob Statistics -->
         <meta-data android:value="55220944fd98c5d81f000a71" android:name="UMENG_APPKEY"/>
-        <meta-data android:value="alpha" android:name="UMENG_CHANNEL"/>
+        <meta-data android:value="${UMENG_CHANNEL_NAME}" android:name="UMENG_CHANNEL"/>
         <service
             android:name="com.umeng.update.net.DownloadingService"
             android:process=":DownloadingService" >

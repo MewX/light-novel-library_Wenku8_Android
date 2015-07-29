@@ -537,7 +537,7 @@ public class NavigationDrawerFragment extends Fragment {
         }
 
         fakeDarkSwitcher = !fakeDarkSwitcher;
-        Toast.makeText(getActivity(), "这个按钮暂时没有用滴~", Toast.LENGTH_SHORT).show();
+        Toast.makeText(getActivity(), "夜间模式到阅读界面去试试~", Toast.LENGTH_SHORT).show();
     }
 
     private void updateNavigationBar() {

@@ -74,7 +74,7 @@ public class MainActivity extends AppCompatActivity {
         if(!GlobalConfig.inAlphaBuild()) {
             // alpha version does not contains auto-update function
             UmengUpdateAgent.update(this);
-            Toast.makeText(this, "该软件尚处内测阶段，对外发布的为稳定版，带有检查更新功能。\n★请勿上传应用市场！\n☆内测群：427577610 有最新内测版", Toast.LENGTH_LONG).show();
+//            Toast.makeText(this, "该软件尚处内测阶段，对外发布的为稳定版，带有检查更新功能。\n★请勿上传应用市场！\n☆内测群：427577610 有最新内测版", Toast.LENGTH_LONG).show();
         }
         else {
             // update dialog show up

@@ -38,7 +38,7 @@
     <string name="action_sign">签到</string>
     <string name="action_watch_image">查看本页大图</string>
     <string name="action_menu_background_selector">选择一个背景图片</string>
-    <string name="action_custom_bg">选择自定义的图片（高度不得大于宽度，不支持外置SD卡，请自行裁剪好）</string>
+    <string name="action_custom_bg">选择自定义的图片（不支持外置SD卡，请自行裁剪好）</string>
     <string name="action_about">关于轻小说文库APP</string>
     <string name="title_search">搜索：</string>
     <string name="main_menu_rklist">排行榜</string>
