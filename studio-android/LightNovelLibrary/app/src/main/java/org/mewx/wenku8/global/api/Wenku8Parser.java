@@ -3,6 +3,7 @@ package org.mewx.wenku8.global.api;
 import android.util.Log;
 
 import org.mewx.wenku8.global.GlobalConfig;
+import org.mewx.wenku8.util.LightTool;
 import org.xmlpull.v1.XmlPullParser;
 import org.xmlpull.v1.XmlPullParserFactory;
 
@@ -43,9 +44,8 @@ public class Wenku8Parser {
         beg = str.indexOf(SEPERATOR);
         temp = str.indexOf(SEPERATOR, beg + 1);
         if (beg == -1 || temp == -1) return null; // this is an exception
-        list.add(Integer.parseInt(str.substring(beg + 1, temp)));
-        if (GlobalConfig.inDebugMode())
-            Log.v("MewX", "Add novel page number: " + list.get(list.size() - 1));
+        if(LightTool.isInteger(str.substring(beg + 1, temp)))
+            list.add(Integer.parseInt(str.substring(beg + 1, temp)));
         beg = temp + 1; // prepare for loop
 
         // init array
@@ -54,7 +54,8 @@ public class Wenku8Parser {
             temp = str.indexOf(SEPERATOR, beg + 1);
             if (beg == -1 || temp == -1) break;
 
-            list.add(Integer.parseInt(str.substring(beg + 1, temp)));
+            if(LightTool.isInteger(str.substring(beg + 1, temp)))
+                list.add(Integer.parseInt(str.substring(beg + 1, temp)));
             if (GlobalConfig.inDebugMode())
                 Log.v("MewX", "Add novel aid: " + list.get(list.size() - 1));
 

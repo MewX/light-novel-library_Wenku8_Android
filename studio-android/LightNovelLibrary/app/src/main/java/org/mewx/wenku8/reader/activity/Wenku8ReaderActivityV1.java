@@ -1081,12 +1081,18 @@ public class Wenku8ReaderActivityV1 extends AppCompatActivity {
 
     private void runSaveCustomBackgroundPath(String path) {
         try {
-            Bitmap bm = BitmapFactory.decodeFile(path);
-            if(bm == null) throw new Exception("PictureDecodeFailedException");
-        }
-        catch (Exception e) {
-            Toast.makeText(this, "Exception: " + e.toString(), Toast.LENGTH_SHORT).show();
-            return;
+            Bitmap bitmap = BitmapFactory.decodeFile(path);
+        } catch (OutOfMemoryError oome) {
+            try {
+                BitmapFactory.Options options = new BitmapFactory.Options();
+                options.inSampleSize = 2;
+                Bitmap bitmap = BitmapFactory.decodeFile(path, options);
+                if(bitmap == null) throw new Exception("PictureDecodeFailedException");
+            } catch(Exception e) {
+                e.printStackTrace();
+                Toast.makeText(this, "Exception: " + e.toString(), Toast.LENGTH_SHORT).show();
+                return;
+            }
         }
         setting.setPageBackgroundCustomPath(path);
         WenkuReaderPageView.setViewComponents(loader, setting, true);

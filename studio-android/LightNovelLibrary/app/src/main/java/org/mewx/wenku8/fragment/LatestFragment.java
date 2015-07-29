@@ -216,7 +216,7 @@ public class LatestFragment extends Fragment implements MyItemClickListener, MyI
                     s[0] = null;
                 } catch (Exception e) {
                     e.printStackTrace();
-                    if (mTextView != null)
+                    if (isAdded() && mTextView != null)
                         mTextView.setText(getResources().getString(R.string.system_parse_failed) + e.getMessage());
                     showRetryButton();
                     isLoading = false;
@@ -366,8 +366,7 @@ public class LatestFragment extends Fragment implements MyItemClickListener, MyI
     }
 
     private void showRetryButton() {
-        if (mainActivity.findViewById(R.id.btn_loading) == null) return;
-
+        if (mainActivity.findViewById(R.id.btn_loading) == null || !isAdded()) return;
         ((TextView) mainActivity.findViewById(R.id.btn_loading)).setText(getResources().getString(R.string.task_retry));
         mainActivity.findViewById(R.id.btn_loading).setVisibility(TextView.VISIBLE);
     }

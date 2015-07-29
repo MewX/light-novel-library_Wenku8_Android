@@ -181,18 +181,37 @@ public class MenuBackgroundSelectorActivity extends AppCompatActivity {
     }
 
     private void runSaveCustomMenuBackground(String path) {
+        BitmapFactory.Options options;
+        try {
+            Bitmap bitmap = BitmapFactory.decodeFile(path);
+        } catch (OutOfMemoryError oome) {
+            try {
+                options = new BitmapFactory.Options();
+                options.inSampleSize = 2;
+                Bitmap bitmap = BitmapFactory.decodeFile(path, options);
+                if(bitmap == null) throw new Exception("PictureDecodeFailedException");
+            } catch(Exception e) {
+                e.printStackTrace();
+                Toast.makeText(this, "Exception: " + e.toString(), Toast.LENGTH_SHORT).show();
+                return;
+            }
+        }
+        GlobalConfig.setToAllSetting(GlobalConfig.SettingItems.menu_bg_id, "0");
+        GlobalConfig.setToAllSetting(GlobalConfig.SettingItems.menu_bg_path, path);
+        finish();
+
 
         try {
+            BitmapFactory.Options opt = new BitmapFactory.Options();
+            opt.inPreferredConfig = Bitmap.Config.RGB_565;
+            opt.inPurgeable = true;
+            opt.inInputShareable = true;
             Bitmap bm = BitmapFactory.decodeFile(path);
-            if(bm == null) throw new Exception("PictureDecodeFailedException");
-            if(bm.getHeight() > bm.getWidth()) throw new Exception("HeightTooLargeException");
+            if(bm == null) throw new Exception("PictureDecodeFailedException: " + path);
         }
         catch (Exception e) {
             Toast.makeText(this, "Exception: " + e.toString(), Toast.LENGTH_SHORT).show();
             return;
         }
-        GlobalConfig.setToAllSetting(GlobalConfig.SettingItems.menu_bg_id, "0");
-        GlobalConfig.setToAllSetting(GlobalConfig.SettingItems.menu_bg_path, path);
-        finish();
     }
 }

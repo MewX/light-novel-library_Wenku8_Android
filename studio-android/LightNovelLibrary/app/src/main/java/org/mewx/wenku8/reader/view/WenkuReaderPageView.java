@@ -177,13 +177,18 @@ public class WenkuReaderPageView extends View {
 
             if(mSetting.getPageBackgroundType() == WenkuReaderSettingV1.PAGE_BACKGROUND_TYPE.CUSTOM) {
                 try {
-                    // custom background
                     bmBackgroundYellow = BitmapFactory.decodeFile(mSetting.getPageBackgrounCustomPath());
-                    bmdBackground = null;
+                } catch (OutOfMemoryError oome) {
+                    try {
+                        BitmapFactory.Options options = new BitmapFactory.Options();
+                        options.inSampleSize = 2;
+                        bmBackgroundYellow = BitmapFactory.decodeFile(mSetting.getPageBackgrounCustomPath(), options);
+                    } catch(Exception e) {
+                        e.printStackTrace();
+                        return;
+                    }
                 }
-                catch (Exception e) {
-                    Toast.makeText(MyApp.getContext(), e.toString(), Toast.LENGTH_SHORT).show();
-                }
+                bmdBackground = null;
             }
             if(mSetting.getPageBackgroundType() == WenkuReaderSettingV1.PAGE_BACKGROUND_TYPE.SYSTEM_DEFAULT || bmBackgroundYellow == null) {
                 // use system default

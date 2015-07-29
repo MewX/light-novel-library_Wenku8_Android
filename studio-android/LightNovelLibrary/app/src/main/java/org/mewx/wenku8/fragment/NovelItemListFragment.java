@@ -296,8 +296,10 @@ public class NovelItemListFragment extends Fragment implements MyItemClickListen
                 GlobalConfig.wantDebugLog("MewX", error);
                 Logger.writeLogger(error);
             }
-            totalPage = tempNovelList.get(0);
-            tempNovelList.remove(0);
+            else {
+                totalPage = tempNovelList.get(0);
+                tempNovelList.remove(0);
+            }
 
             return 0;
         }

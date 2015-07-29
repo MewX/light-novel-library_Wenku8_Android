@@ -3,6 +3,7 @@ package org.mewx.wenku8.global.api;
 import android.util.Log;
 
 import org.mewx.wenku8.global.GlobalConfig;
+import org.mewx.wenku8.util.LightTool;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -103,7 +104,8 @@ public class NovelItemList {
         beg = str[0].indexOf(SEPERATOR);
         temp = str[0].indexOf(SEPERATOR, beg + 1);
         if (beg == -1 || temp == -1) return false; // this is an exception
-        totalPage = Integer.parseInt(str[0].substring(beg + 1, temp));
+        if(LightTool.isInteger(str[0].substring(beg + 1, temp)))
+            totalPage = Integer.parseInt(str[0].substring(beg + 1, temp));
         if (GlobalConfig.inDebugMode())
             Log.v("MewX", "TotalPage = " + totalPage + "; CurrentPage = " + currentPage + ".");
         beg = temp + 1; // prepare for loop
@@ -116,7 +118,8 @@ public class NovelItemList {
             temp = str[0].indexOf(SEPERATOR, beg + 1);
             if (beg == -1 || temp == -1) break;
 
-            l.add(Integer.parseInt(str[0].substring(beg + 1, temp)));
+            if(LightTool.isInteger(str[0].substring(beg + 1, temp)))
+                l.add(Integer.parseInt(str[0].substring(beg + 1, temp)));
             if (GlobalConfig.inDebugMode())
                 Log.v("MewX", "Add novel aid: " + l.get(l.size() - 1));
 

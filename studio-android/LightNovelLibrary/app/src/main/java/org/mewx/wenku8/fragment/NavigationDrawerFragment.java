@@ -20,6 +20,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageButton;
 import android.widget.ImageView;
+import android.widget.LinearLayout;
 import android.widget.RelativeLayout;
 import android.widget.TableRow;
 import android.widget.TextView;
@@ -211,14 +212,20 @@ public class NavigationDrawerFragment extends Fragment {
                 case "0":
                     try {
                         bmMenuBackground = BitmapFactory.decodeFile(GlobalConfig.getFromAllSetting(GlobalConfig.SettingItems.menu_bg_path));
-                        if(bmMenuBackground == null) throw new Exception("PictureLoadFailureException");
-                        bgImage.setImageBitmap(bmMenuBackground);
+                    } catch (OutOfMemoryError oome) {
+                        try {
+                            BitmapFactory.Options options = new BitmapFactory.Options();
+                            options.inSampleSize = 2;
+                            bmMenuBackground = BitmapFactory.decodeFile(GlobalConfig.getFromAllSetting(GlobalConfig.SettingItems.menu_bg_path), options);
+                            if(bmMenuBackground == null) throw new Exception("PictureLoadFailureException");
+                        } catch(Exception e) {
+                            e.printStackTrace();
+                            Toast.makeText(getActivity(), "Exception: " + e.toString(), Toast.LENGTH_SHORT).show();
+                            bgImage.setImageDrawable(getResources().getDrawable(R.drawable.bg_avatar_04));
+                            return;
+                        }
                     }
-                    catch (Exception e) {
-                        e.printStackTrace();
-                        Toast.makeText(getActivity(), e.toString(), Toast.LENGTH_SHORT).show();
-                        bgImage.setImageDrawable(getResources().getDrawable(R.drawable.bg_avatar_04));
-                    }
+                    bgImage.setImageBitmap(bmMenuBackground);
                     break;
                 case "1":
                     bgImage.setImageDrawable(getResources().getDrawable(R.drawable.bg_avatar_01));
@@ -537,13 +544,11 @@ public class NavigationDrawerFragment extends Fragment {
         // test navigation bar exist
         Point navBar = LightTool.getNavigationBarSize(getActivity());
 //                Toast.makeText(getActivity(), "width = " + navBar.x + "; height = " + navBar.y, Toast.LENGTH_SHORT).show();
-        RelativeLayout rl = (RelativeLayout)mainActivity.findViewById(R.id.bot_background);
-        RelativeLayout.LayoutParams layoutParams = (RelativeLayout.LayoutParams)rl.getLayoutParams();
+        LinearLayout ll = (LinearLayout)mainActivity.findViewById(R.id.main_menu_bottom_layout);
         if(navBar.y == 0)
-            layoutParams.setMargins(0, 0, 0, 0); // hide
+            ll.setPadding(0, 0, 0, 0); // hide
         else
-            layoutParams.setMargins(0, 0, 0, navBar.y); // show
-        rl.setLayoutParams(layoutParams);
+            ll.setPadding(0, 0, 0, navBar.y); // show
     }
 
     @Override
@@ -579,14 +584,20 @@ public class NavigationDrawerFragment extends Fragment {
                 case "0":
                     try {
                         bmMenuBackground = BitmapFactory.decodeFile(GlobalConfig.getFromAllSetting(GlobalConfig.SettingItems.menu_bg_path));
-                        if(bmMenuBackground == null) throw new Exception("PictureLoadFailureException");
-                        bgImage.setImageBitmap(bmMenuBackground);
+                    } catch (OutOfMemoryError oome) {
+                        try {
+                            BitmapFactory.Options options = new BitmapFactory.Options();
+                            options.inSampleSize = 2;
+                            bmMenuBackground = BitmapFactory.decodeFile(GlobalConfig.getFromAllSetting(GlobalConfig.SettingItems.menu_bg_path), options);
+                            if(bmMenuBackground == null) throw new Exception("PictureLoadFailureException");
+                        } catch(Exception e) {
+                            e.printStackTrace();
+                            Toast.makeText(getActivity(), "Exception: " + e.toString(), Toast.LENGTH_SHORT).show();
+                            bgImage.setImageDrawable(getResources().getDrawable(R.drawable.bg_avatar_04));
+                            return;
+                        }
                     }
-                    catch (Exception e) {
-                        e.printStackTrace();
-                        Toast.makeText(getActivity(), e.toString(), Toast.LENGTH_SHORT).show();
-                        bgImage.setImageDrawable(getResources().getDrawable(R.drawable.bg_avatar_04));
-                    }
+                    bgImage.setImageBitmap(bmMenuBackground);
                     break;
                 case "1":
                     bgImage.setImageDrawable(getResources().getDrawable(R.drawable.bg_avatar_01));
