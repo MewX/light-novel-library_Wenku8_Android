@@ -42,8 +42,8 @@ import java.util.ArrayList;
  */
 public class GlobalConfig {
 
-    private static final boolean inDebug = false; // true - in debug mode
-    private static final boolean inAlphaBuild = false; // in alpha mode, no update function
+    private static final boolean inDebug = true; // true - in debug mode
+    private static final boolean inAlphaBuild = true; // in alpha mode, no update function
     public static final String saveFolderName = "saves";
     public static final String imgsSaveFolderName = "imgs";
     public static final String customFolderName = "custom";

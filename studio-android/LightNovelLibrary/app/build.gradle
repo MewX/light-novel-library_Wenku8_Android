@@ -7,8 +7,8 @@ android {
         applicationId "org.mewx.wenku8"
         minSdkVersion 15
         targetSdkVersion 22
-        versionCode 26
-        versionName "1.0.0"
+        versionCode 27
+        versionName "1.0.0.1dev"
     }
     buildTypes {
         debug {
