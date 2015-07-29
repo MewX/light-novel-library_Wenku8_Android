@@ -6,10 +6,12 @@ import android.content.Intent;
 import android.os.AsyncTask;
 import android.os.Build;
 import android.os.Bundle;
+import android.renderscript.ScriptIntrinsicHistogram;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.app.ActivityOptionsCompat;
 import android.support.v4.app.Fragment;
 import android.support.v4.util.Pair;
+import android.support.v4.widget.SwipeRefreshLayout;
 import android.support.v7.widget.DefaultItemAnimator;
 import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
@@ -45,6 +47,7 @@ import org.mewx.wenku8.util.LightUserSession;
 
 import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -53,6 +56,7 @@ import java.util.regex.Pattern;
 public class FavFragment extends Fragment implements MyItemClickListener, MyItemLongClickListener {
 
     // local vars
+    private SwipeRefreshLayout mSwipeRefreshLayout;
     private LinearLayoutManager mLayoutManager = null;
     private RecyclerView mRecyclerView = null;
     private int timecount;
@@ -83,10 +87,13 @@ public class FavFragment extends Fragment implements MyItemClickListener, MyItem
         // Inflate the layout for this fragment
         View rootView = inflater.inflate(R.layout.fragment_fav, container, false);
 
+        // find view
+        mSwipeRefreshLayout = (SwipeRefreshLayout) rootView.findViewById(R.id.swipe_refresh_layout);
+
         // init values
         timecount = 0;
 
-        // find view
+        // view setting
         mLayoutManager = new LinearLayoutManager(getActivity());
         mLayoutManager.setOrientation(LinearLayoutManager.VERTICAL);
         mRecyclerView = (RecyclerView) rootView.findViewById(R.id.novel_item_list);
@@ -108,6 +115,15 @@ public class FavFragment extends Fragment implements MyItemClickListener, MyItem
                 return 0;
             }
         }); // an empty one?
+
+        mSwipeRefreshLayout.setColorSchemeColors(getResources().getColor(R.color.myAccentColor));
+        mSwipeRefreshLayout.setOnRefreshListener(new SwipeRefreshLayout.OnRefreshListener() {
+            @Override
+            public void onRefresh() {
+                AsyncLoadAllCloud alac = new AsyncLoadAllCloud();
+                alac.execute(1);
+            }
+        });
 
         return rootView;
     }
@@ -160,6 +176,7 @@ public class FavFragment extends Fragment implements MyItemClickListener, MyItem
 //            alal.execute();
 //        }
         if(time == 0) {
+            mSwipeRefreshLayout.setRefreshing(true);
             AsyncLoadAllCloud alac = new AsyncLoadAllCloud();
             alac.execute();
         }
@@ -221,12 +238,14 @@ public class FavFragment extends Fragment implements MyItemClickListener, MyItem
             mAdapter.setOnItemClickListener(FavFragment.this);
             mAdapter.setOnItemLongClickListener(FavFragment.this);
             mRecyclerView.setAdapter(mAdapter);
+            mSwipeRefreshLayout.setRefreshing(false);
         }
     }
 
     private class AsyncLoadAllCloud extends AsyncTask<Integer, Integer, Wenku8Error.ErrorCode> {
         private MaterialDialog md;
         private boolean isLoading; // check in "doInBackground" to make sure to continue or not
+        private boolean forceLoad = false;
 
         @Override
         protected void onPreExecute() {
@@ -254,6 +273,8 @@ public class FavFragment extends Fragment implements MyItemClickListener, MyItem
 
         @Override
         protected Wenku8Error.ErrorCode doInBackground(Integer... params) {
+            // if params.length != 0, force async
+            if(params != null && params.length != 0) forceLoad = true;
 
             // ! any network problem will interrupt this procedure
             // load bookshelf list, don't save
@@ -297,7 +318,16 @@ public class FavFragment extends Fragment implements MyItemClickListener, MyItem
 
             List<Integer> listDiff = new ArrayList<>();
             listDiff.addAll(listAll);
-            listDiff.removeAll(GlobalConfig.getLocalBookshelfList()); // cloud only
+            if(!forceLoad) {
+                // cloud only
+                listDiff.removeAll(GlobalConfig.getLocalBookshelfList());
+            }
+            else {
+                // local and cloud together
+                HashSet<Integer> hs = new HashSet<>(listDiff);
+                listDiff.clear();
+                listDiff.addAll(hs);
+            }
             if(listDiff.size() == 0 && localOnly.size() == 0) {
                 // equal, so exit
                 return Wenku8Error.ErrorCode.SYSTEM_1_SUCCEEDED;

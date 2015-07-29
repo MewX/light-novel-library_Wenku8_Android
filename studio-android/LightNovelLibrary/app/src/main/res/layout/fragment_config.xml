@@ -47,54 +47,54 @@
         </RelativeLayout>
 
         <!-- Layout DataBackup -->
-        <RelativeLayout
-            android:id="@+id/btn_data_backup"
-            android:layout_width="match_parent"
-            android:layout_height="48dp"
-            android:clickable="true"
-            android:background="@drawable/btn_menu_item">
-            <ImageView
-                android:id="@+id/image_upload"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:paddingLeft="16dp"
-                android:layout_centerVertical="true"
-                android:src="@drawable/ic_upload"/>
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginLeft="32dp"
-                android:textSize="16sp"
-                android:layout_centerVertical="true"
-                android:layout_toRightOf="@id/image_upload"
-                android:textColor="@color/dlgTitleColor"
-                android:text="@string/config_data_backup"/>
-        </RelativeLayout>
+        <!--<RelativeLayout-->
+            <!--android:id="@+id/btn_data_backup"-->
+            <!--android:layout_width="match_parent"-->
+            <!--android:layout_height="48dp"-->
+            <!--android:clickable="true"-->
+            <!--android:background="@drawable/btn_menu_item">-->
+            <!--<ImageView-->
+                <!--android:id="@+id/image_upload"-->
+                <!--android:layout_width="wrap_content"-->
+                <!--android:layout_height="wrap_content"-->
+                <!--android:paddingLeft="16dp"-->
+                <!--android:layout_centerVertical="true"-->
+                <!--android:src="@drawable/ic_upload"/>-->
+            <!--<TextView-->
+                <!--android:layout_width="wrap_content"-->
+                <!--android:layout_height="wrap_content"-->
+                <!--android:layout_marginLeft="32dp"-->
+                <!--android:textSize="16sp"-->
+                <!--android:layout_centerVertical="true"-->
+                <!--android:layout_toRightOf="@id/image_upload"-->
+                <!--android:textColor="@color/dlgTitleColor"-->
+                <!--android:text="@string/config_data_backup"/>-->
+        <!--</RelativeLayout>-->
 
-        <!-- Layout DataRestore -->
-        <RelativeLayout
-            android:id="@+id/btn_data_restore"
-            android:layout_width="match_parent"
-            android:layout_height="48dp"
-            android:clickable="true"
-            android:background="@drawable/btn_menu_item">
-            <ImageView
-                android:id="@+id/image_restore"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:paddingLeft="16dp"
-                android:layout_centerVertical="true"
-                android:src="@drawable/ic_restore"/>
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginLeft="32dp"
-                android:textSize="16sp"
-                android:layout_centerVertical="true"
-                android:layout_toRightOf="@id/image_restore"
-                android:textColor="@color/dlgTitleColor"
-                android:text="@string/config_data_restore"/>
-        </RelativeLayout>
+        <!--&lt;!&ndash; Layout DataRestore &ndash;&gt;-->
+        <!--<RelativeLayout-->
+            <!--android:id="@+id/btn_data_restore"-->
+            <!--android:layout_width="match_parent"-->
+            <!--android:layout_height="48dp"-->
+            <!--android:clickable="true"-->
+            <!--android:background="@drawable/btn_menu_item">-->
+            <!--<ImageView-->
+                <!--android:id="@+id/image_restore"-->
+                <!--android:layout_width="wrap_content"-->
+                <!--android:layout_height="wrap_content"-->
+                <!--android:paddingLeft="16dp"-->
+                <!--android:layout_centerVertical="true"-->
+                <!--android:src="@drawable/ic_restore"/>-->
+            <!--<TextView-->
+                <!--android:layout_width="wrap_content"-->
+                <!--android:layout_height="wrap_content"-->
+                <!--android:layout_marginLeft="32dp"-->
+                <!--android:textSize="16sp"-->
+                <!--android:layout_centerVertical="true"-->
+                <!--android:layout_toRightOf="@id/image_restore"-->
+                <!--android:textColor="@color/dlgTitleColor"-->
+                <!--android:text="@string/config_data_restore"/>-->
+        <!--</RelativeLayout>-->
 
         <!-- Layout ClearCache -->
         <RelativeLayout

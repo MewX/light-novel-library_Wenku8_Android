@@ -2,6 +2,10 @@ package org.mewx.wenku8.reader.setting;
 
 import android.graphics.Color;
 
+import org.mewx.wenku8.global.GlobalConfig;
+import org.mewx.wenku8.util.LightCache;
+import org.mewx.wenku8.util.LightTool;
+
 /**
  * Created by MewX on 2015/7/8.
  *
@@ -17,12 +21,10 @@ public class WenkuReaderSettingV1 {
     // enum type
     public enum PAGE_BACKGROUND_TYPE {
         SYSTEM_DEFAULT,
-        SYSTEM_01,
         CUSTOM
     }
 
     // global settings
-    public boolean inDayMode = true; // use dark color text
     public final int fontColorLight = Color.parseColor("#32414E"); // for dark background (ARGB)
     public final int fontColorDark = Color.parseColor("#444444"); // for light background
     public final int bgColorLight = Color.parseColor("#CFBEB6");
@@ -50,7 +52,61 @@ public class WenkuReaderSettingV1 {
      * Construct Function
      */
     public WenkuReaderSettingV1() {
-        // TODO: update values
+        // font size
+        String size = GlobalConfig.getFromAllSetting(GlobalConfig.SettingItems.reader_font_size);
+        if(size != null && LightTool.isInteger(size)) {
+            int temp = Integer.parseInt(size);
+            if(8 <= temp && temp <= 32)
+                fontSize = temp;
+        }
+
+        // line distance
+        size = GlobalConfig.getFromAllSetting(GlobalConfig.SettingItems.reader_line_distance);
+        if(size != null && LightTool.isInteger(size)) {
+            int temp = Integer.parseInt(size);
+            if(0 <= temp && temp <= 32)
+                lineDistance = temp;
+        }
+
+        // paragraph distance
+        size = GlobalConfig.getFromAllSetting(GlobalConfig.SettingItems.reader_paragraph_distance);
+        if(size != null && LightTool.isInteger(size)) {
+            int temp = Integer.parseInt(size);
+            if(0 <= temp && temp <= 48)
+                paragraphDistance = temp;
+        }
+
+        // paragraph edge distance
+        size = GlobalConfig.getFromAllSetting(GlobalConfig.SettingItems.reader_paragraph_edge_distance);
+        if(size != null && LightTool.isInteger(size)) {
+            int temp = Integer.parseInt(size);
+            if(0 <= temp && temp <= 16)
+                paragraghEdgeDistance = temp;
+        }
+
+        // background path
+        size = GlobalConfig.getFromAllSetting(GlobalConfig.SettingItems.reader_background_path);
+        if(size != null) {
+            if(size.equals("0")) {
+                pageBackgroundType = PAGE_BACKGROUND_TYPE.SYSTEM_DEFAULT;
+            }
+            else if(LightCache.testFileExist(size)) {
+                pageBackgroundType = PAGE_BACKGROUND_TYPE.CUSTOM;
+                pageBackgrounCustomPath = size;
+            }
+        }
+
+        // font path
+        size = GlobalConfig.getFromAllSetting(GlobalConfig.SettingItems.reader_font_path);
+        if(size != null) {
+            if(size.equals("0")) {
+                useCustomFont = false;
+            }
+            else if(LightCache.testFileExist(size)) {
+                useCustomFont = true;
+                customFontPath = size;
+            }
+        }
     }
 
 
@@ -58,12 +114,9 @@ public class WenkuReaderSettingV1 {
      * gets & sets functions
      */
 
-    public void switchDayNightMode() {
-        inDayMode = !inDayMode;
-    }
-
     public void setFontSize(int s) {
         fontSize = s;
+        GlobalConfig.setToAllSetting(GlobalConfig.SettingItems.reader_font_size, Integer.toString(s));
     }
 
     public int getFontSize() {
@@ -71,6 +124,7 @@ public class WenkuReaderSettingV1 {
     }
 
     public void setUseCustomFont(boolean b) {
+        if(!b) setCustomFontPath("0");
         useCustomFont = b;
     }
 
@@ -81,6 +135,8 @@ public class WenkuReaderSettingV1 {
     public void setCustomFontPath(String s) {
         // should test file before set this value, allow setting, but not allow use!
         customFontPath = s;
+        useCustomFont = !s.equals("0");
+        GlobalConfig.setToAllSetting(GlobalConfig.SettingItems.reader_font_path, s);
     }
 
     public String getCustomFontPath() {
@@ -89,6 +145,7 @@ public class WenkuReaderSettingV1 {
 
     public void setLineDistance(int l) {
         lineDistance = l;
+        GlobalConfig.setToAllSetting(GlobalConfig.SettingItems.reader_line_distance, Integer.toString(l));
     }
 
     public int getLineDistance() {
@@ -97,6 +154,7 @@ public class WenkuReaderSettingV1 {
 
     public void setParagraphDistance(int l) {
         paragraphDistance = l;
+        GlobalConfig.setToAllSetting(GlobalConfig.SettingItems.reader_paragraph_distance, Integer.toString(l));
     }
 
     public int getParagraphDistance() {
@@ -105,6 +163,7 @@ public class WenkuReaderSettingV1 {
 
     public void setParagraphEdgeDistance(int l) {
         paragraghEdgeDistance = l;
+        GlobalConfig.setToAllSetting(GlobalConfig.SettingItems.reader_paragraph_edge_distance, Integer.toString(l));
     }
 
     public int getParagraghEdgeDistance() {
@@ -120,6 +179,7 @@ public class WenkuReaderSettingV1 {
     }
 
     public void setPageBackgroundType(PAGE_BACKGROUND_TYPE t) {
+        if(t == PAGE_BACKGROUND_TYPE.SYSTEM_DEFAULT) setPageBackgroundCustomPath("0");
         pageBackgroundType = t;
     }
 
@@ -127,8 +187,11 @@ public class WenkuReaderSettingV1 {
         return pageBackgroundType;
     }
 
-    public void setPageBackgrounCustomPath(String s) {
+    public void setPageBackgroundCustomPath(String s) {
         pageBackgrounCustomPath = s;
+        if(s.equals("0")) pageBackgroundType = PAGE_BACKGROUND_TYPE.SYSTEM_DEFAULT;
+        else pageBackgroundType = PAGE_BACKGROUND_TYPE.CUSTOM;
+        GlobalConfig.setToAllSetting(GlobalConfig.SettingItems.reader_background_path, s);
     }
 
     public String getPageBackgrounCustomPath() {

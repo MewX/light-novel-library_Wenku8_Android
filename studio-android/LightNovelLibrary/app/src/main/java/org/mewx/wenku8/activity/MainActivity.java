@@ -58,13 +58,6 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.layout_main); // have 3 styles
 
-        // create save folder
-        LightCache.saveFile(GlobalConfig.getFirstStoragePath() + "imgs", ".nomedia", "".getBytes(), false);
-        GlobalConfig.setFirstStoragePathStatus(LightCache.testFileExist(GlobalConfig.getFirstStoragePath() + "imgs" + File.separator + ".nomedia")); // TODO: set status?
-        LightCache.saveFile(GlobalConfig.getSecondStoragePath() + "imgs", ".nomedia", "".getBytes(), false);
-        LightCache.saveFile(GlobalConfig.getFirstFullSaveFilePath() + "imgs", ".nomedia", "".getBytes(), false);
-        LightCache.saveFile(GlobalConfig.getSecondFullSaveFilePath() + "imgs", ".nomedia", "".getBytes(), false);
-
         // UIL setting
         if(ImageLoader.getInstance() == null || !ImageLoader.getInstance().isInited()) {
             GlobalConfig.initImageLoader(this);
@@ -185,41 +178,20 @@ public class MainActivity extends AppCompatActivity {
         // only when the navigation draw closed, I draw the menu bar.
         // the menu items will be drawn automatically
         if(!mNavigationDrawerFragment.isDrawerOpen()) {
-
             // change title of toolbar
             switch(status){
-
                 case LATEST:
-                    if(getSupportActionBar()!=null)
-                        getSupportActionBar().setTitle(getResources().getString(R.string.main_menu_latest));
+                    if(getSupportActionBar()!=null) getSupportActionBar().setTitle(getResources().getString(R.string.main_menu_latest));
                     getMenuInflater().inflate(R.menu.menu_latest, menu);
-
-                    // Associate searchable configuration with the SearchView
-//                    SearchManager searchManager =
-//                            (SearchManager) getSystemService(Context.SEARCH_SERVICE);
-//                    SearchView searchView =
-//                            (SearchView) menu.findItem(R.id.action_search).getActionView();
-//                    searchView.setSearchableInfo(
-//                            searchManager.getSearchableInfo(getComponentName()));
-
                     break;
-
                 case RKLIST:
-                    if(getSupportActionBar()!=null)
-                        getSupportActionBar().setTitle(getResources().getString(R.string.main_menu_rklist));
-
+                    if(getSupportActionBar()!=null) getSupportActionBar().setTitle(getResources().getString(R.string.main_menu_rklist));
                     break;
-
                 case FAV:
-                    if(getSupportActionBar()!=null)
-                        getSupportActionBar().setTitle(getResources().getString(R.string.main_menu_fav));
-
+                    if(getSupportActionBar()!=null) getSupportActionBar().setTitle(getResources().getString(R.string.main_menu_fav));
                     break;
-
                 case CONFIG:
-                    if(getSupportActionBar()!=null)
-                        getSupportActionBar().setTitle(getResources().getString(R.string.main_menu_config));
-
+                    if(getSupportActionBar()!=null) getSupportActionBar().setTitle(getResources().getString(R.string.main_menu_config));
                     break;
             }
         }

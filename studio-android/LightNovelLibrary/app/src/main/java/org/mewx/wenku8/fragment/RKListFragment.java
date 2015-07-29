@@ -11,11 +11,9 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 
-import com.astuetz.PagerSlidingTabStrip;
+import org.mewx.wenku8.component.PagerSlidingTabStrip;
 
 import org.mewx.wenku8.R;
-import org.mewx.wenku8.activity.MainActivity;
-import org.mewx.wenku8.global.GlobalConfig;
 import org.mewx.wenku8.global.api.Wenku8API;
 
 /**
@@ -23,10 +21,6 @@ import org.mewx.wenku8.global.api.Wenku8API;
  * All specific fragment is in PagerAdapter.
  */
 public class RKListFragment extends Fragment {
-
-    private MainActivity mainActivity = null;
-    private MyPagerAdapter adapter;
-
     public RKListFragment() {
         // Required empty public constructor
     }
@@ -34,20 +28,12 @@ public class RKListFragment extends Fragment {
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        if (getArguments() != null) {
-        }
-
-        // get main activity
-        while (mainActivity == null)
-            mainActivity = (MainActivity) getActivity();
     }
 
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
                              Bundle savedInstanceState) {
-        View rootView = inflater.inflate(R.layout.fragment_rklist, container, false);
-
-        return rootView;
+        return inflater.inflate(R.layout.fragment_rklist, container, false);
     }
 
     @Override
@@ -55,11 +41,11 @@ public class RKListFragment extends Fragment {
         super.onActivityCreated(savedInstanceState);
 
         // Initialize the ViewPager and set an adapter
-        ViewPager pager = (ViewPager) mainActivity.findViewById(R.id.rklist_pager);
+        ViewPager pager = (ViewPager) getActivity().findViewById(R.id.rklist_pager);
         pager.setAdapter(new MyPagerAdapter(getChildFragmentManager()));
 
         // Bind the tabs to the ViewPager
-        PagerSlidingTabStrip tabs = (PagerSlidingTabStrip) mainActivity.findViewById(R.id.rklist_tabs);
+        PagerSlidingTabStrip tabs = (PagerSlidingTabStrip) getActivity().findViewById(R.id.rklist_tabs);
         tabs.setViewPager(pager);
 
         // set page margin
@@ -68,10 +54,8 @@ public class RKListFragment extends Fragment {
         pager.setPageMargin(pageMargin);
 
         // set adapter
-        adapter = new MyPagerAdapter(getChildFragmentManager());
+        MyPagerAdapter adapter = new MyPagerAdapter(getChildFragmentManager());
         pager.setAdapter(adapter);
-
-        return;
     }
 
     @Override

@@ -114,7 +114,7 @@ public class SearchResultActivity extends AppCompatActivity {
     public void onBackPressed() {
         super.onBackPressed();
 
-        // leaving animation: left out
-        overridePendingTransition( R.anim.hold, android.R.anim.slide_out_right);
+        // leave animation: fade out
+        overridePendingTransition(0, R.anim.fade_out);
     }
 }

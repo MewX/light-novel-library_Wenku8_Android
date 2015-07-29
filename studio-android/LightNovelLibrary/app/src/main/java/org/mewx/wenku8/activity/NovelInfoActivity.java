@@ -153,7 +153,12 @@ public class NovelInfoActivity extends AppCompatActivity {
 
         // hide view and set colors
         tvNovelTitle.setText(title);
-        ImageLoader.getInstance().displayImage(Wenku8API.getCoverURL(aid), ivNovelCover); // move to onCreateView!
+        if(LightCache.testFileExist(GlobalConfig.getFirstStoragePath() + "imgs" + File.separator + aid + ".jpg"))
+            ImageLoader.getInstance().displayImage("file://" + GlobalConfig.getFirstStoragePath() + "imgs" + File.separator + aid + ".jpg", ivNovelCover);
+        else if(LightCache.testFileExist(GlobalConfig.getSecondStoragePath() + "imgs" + File.separator + aid + ".jpg"))
+            ImageLoader.getInstance().displayImage("file://" + GlobalConfig.getSecondStoragePath() + "imgs" + File.separator + aid + ".jpg", ivNovelCover);
+        else
+            ImageLoader.getInstance().displayImage(Wenku8API.getCoverURL(aid), ivNovelCover); // move to onCreateView!
         tvNovelShortIntro.setVisibility(TextView.GONE);
         ibNovelOption.setVisibility(ImageButton.INVISIBLE);
         fabFavorate.setColorFilter(getResources().getColor(R.color.default_white), PorterDuff.Mode.SRC_ATOP);
@@ -441,8 +446,48 @@ public class NovelInfoActivity extends AppCompatActivity {
                                         break;
 
                                     case 3:
-                                        // TODO: new activity to hold selectable items
-                                        Toast.makeText(NovelInfoActivity.this, getResources().getString(R.string.system_wait_for_next_version), Toast.LENGTH_SHORT).show();
+                                        // select volumes
+                                        String[] strings = new String[listVolume.size()];
+                                        for(int i = 0; i < listVolume.size(); i ++)
+                                            strings[i] = listVolume.get(i).volumeName;
+
+                                        new MaterialDialog.Builder(NovelInfoActivity.this)
+                                                .theme(Theme.LIGHT)
+                                                .title(R.string.dialog_option_select_and_update)
+                                                .items(strings)
+                                                .itemsCallbackMultiChoice(null, new MaterialDialog.ListCallbackMultiChoice() {
+                                                    @Override
+                                                    public boolean onSelection(MaterialDialog dialog, final Integer[] which, CharSequence[] text) {
+                                                        if(which == null || which.length == 0) return true;
+//                                                        final Integer[] vidList = new Integer[which.length];
+//                                                        for(int i = 0; i < which.length; i ++) vidList[i] = listVolume.get(which[i]).vid;
+
+                                                        // show verify dialog
+                                                        new MaterialDialog.Builder(NovelInfoActivity.this)
+                                                                .callback(new MaterialDialog.ButtonCallback() {
+                                                                    @Override
+                                                                    public void onPositive(MaterialDialog dialog) {
+                                                                        super.onPositive(dialog);
+                                                                        AsyncDownloadVolumes adv = new AsyncDownloadVolumes();
+                                                                        adv.execute(which);
+                                                                    }
+                                                                })
+                                                                .theme(Theme.LIGHT)
+                                                                .backgroundColorRes(R.color.dlgBackgroundColor)
+                                                                .contentColorRes(R.color.dlgContentColor)
+                                                                .positiveColorRes(R.color.dlgPositiveButtonColor)
+                                                                .negativeColorRes(R.color.dlgNegativeButtonColor)
+                                                                .content(R.string.dialog_content_verify_download)
+                                                                .contentGravity(GravityEnum.CENTER)
+                                                                .positiveText(R.string.dialog_positive_likethis)
+                                                                .negativeText(R.string.dialog_negative_preferno)
+                                                                .show();
+                                                        return true;
+                                                    }
+                                                })
+                                                .positiveText(R.string.dialog_positive_ok)
+                                                .show();
+
                                         break;
                                 }
 
@@ -472,6 +517,11 @@ public class NovelInfoActivity extends AppCompatActivity {
                 finishAfterTransition(); // end directly
         }
         else if (menuItem.getItemId() == R.id.action_continue_read_progress) {
+            if(isLoading) {
+                Toast.makeText(NovelInfoActivity.this, getResources().getString(R.string.system_loading_please_wait), Toast.LENGTH_SHORT).show();
+                return true;
+            }
+
             // show dialog, jump to last read position
             if (GlobalConfig.getReadSavesRecordV1(aid) != null) {
                 final GlobalConfig.ReadSavesV1 rs = GlobalConfig.getReadSavesRecordV1(aid);
@@ -560,7 +610,6 @@ public class NovelInfoActivity extends AppCompatActivity {
             else {
                 Toast.makeText(this, "未发现保存的进度，可能是未读或上次读完了某卷~ 那么，开始下一卷吧~", Toast.LENGTH_SHORT).show();
             }
-
         }
         return super.onOptionsItemSelected(menuItem);
     }
@@ -588,6 +637,20 @@ public class NovelInfoActivity extends AppCompatActivity {
             // transfer '1' to this task represent loading from local
             if(params != null && params.length == 1 && params[0] == 1)
                 fromLocal = true;
+
+            // save novel cover
+            try {
+                if(!fromLocal) {
+                    byte[] coverRaw = LightNetwork.LightHttpDownload(Wenku8API.getCoverURL(aid));
+                    if(coverRaw == null) return -1;
+                    if(!LightCache.saveFile(GlobalConfig.getFirstStoragePath() + "imgs" + File.separator + aid + ".jpg", coverRaw, true))
+                        LightCache.saveFile(GlobalConfig.getSecondStoragePath() + "imgs" + File.separator + aid + ".jpg", coverRaw, true);
+                }
+            }
+            catch (Exception e) {
+                e.printStackTrace();
+                return -2;
+            }
 
             // get novel full meta
             try {
@@ -758,7 +821,7 @@ public class NovelInfoActivity extends AppCompatActivity {
         protected Wenku8Error.ErrorCode doInBackground(Integer... params) {
             if(params == null || params.length < 2) return Wenku8Error.ErrorCode.PARAM_COUNT_NOT_MATCHED;
             int taskaid = params[0];
-            int operationType = params[1]; // type = 0, 1, 2
+            int operationType = params[1]; // type = 0, 1, 2, 3
 
             // get full range online, always
             try {
@@ -994,6 +1057,142 @@ public class NovelInfoActivity extends AppCompatActivity {
             }
             else
                 Toast.makeText(NovelInfoActivity.this, err.toString(), Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private class AsyncDownloadVolumes extends AsyncTask<Integer[], Integer, Wenku8Error.ErrorCode> {
+        private MaterialDialog md;
+        private boolean loading = false;
+        private int size_a;
+
+        @Override
+        protected void onPreExecute() {
+            super.onPreExecute();
+            loading = true;
+            md = new MaterialDialog.Builder(NovelInfoActivity.this)
+                    .theme(Theme.LIGHT)
+                    .content(R.string.dialog_content_downloading)
+                    .progress(false, 1, true)
+                    .cancelable(true)
+                    .cancelListener(new DialogInterface.OnCancelListener() {
+                        @Override
+                        public void onCancel(DialogInterface dialog) {
+                            loading = false;
+                        }
+                    })
+                    .show();
+            md.setProgress(0);
+            md.setMaxProgress(1);
+            size_a = 0;
+        }
+
+        @Override
+        protected Wenku8Error.ErrorCode doInBackground(Integer[]... params) {
+            // params[0] is the index list
+            int current = 0;
+            for(Integer idxVolume : params[0]) {
+                // calc size
+                size_a += listVolume.get(idxVolume).chapterList.size();
+
+                for (ChapterInfo tempCi : listVolume.get(idxVolume).chapterList) {
+                    try {
+                        List<NameValuePair> targVar = new ArrayList<NameValuePair>();
+                        targVar.add(Wenku8API.getNovelContent(aid, tempCi.cid, GlobalConfig.getCurrentLang()));
+
+                        // load from local first
+                        if (!loading) return Wenku8Error.ErrorCode.USER_CANCELLED_TASK; // calcel
+                        String xml = GlobalConfig.loadFullFileFromSaveFolder("novel", tempCi.cid + ".xml"); // prevent empty file
+                        if (xml == null || xml.length() == 0 ) {
+                            byte[] tempXml = LightNetwork.LightHttpPost(Wenku8API.getBaseURL(), targVar);
+                            if (tempXml == null) return Wenku8Error.ErrorCode.NETWORK_ERROR; // network error
+                            xml = new String(tempXml, "UTF-8");
+
+                            // save file (cid.xml), didn't format it future version may format it for better performance
+                            GlobalConfig.writeFullFileIntoSaveFolder("novel", tempCi.cid + ".xml", xml);
+                        }
+
+                        // cache image
+                        if (GlobalConfig.doCacheImage()) {
+                            List<OldNovelContentParser.NovelContent> nc = OldNovelContentParser.NovelContentParser_onlyImage(xml);
+                            if (nc == null) return Wenku8Error.ErrorCode.NETWORK_ERROR;
+
+                            for (int i = 0; i < nc.size(); i++) {
+                                if (nc.get(i).type == 'i') {
+                                    size_a ++;
+
+                                    // save this images, judge exist first
+                                    String imgFileName = GlobalConfig
+                                            .generateImageFileNameByURL(nc
+                                                    .get(i).content);
+                                    if (!LightCache.testFileExist(GlobalConfig.getFirstFullSaveFilePath()
+                                            + GlobalConfig.imgsSaveFolderName + File.separator + imgFileName)
+                                            && !LightCache.testFileExist(GlobalConfig.getSecondFullSaveFilePath()
+                                            + GlobalConfig.imgsSaveFolderName + File.separator + imgFileName)) {
+                                        // neither of the file exist
+                                        byte[] fileContent = LightNetwork.LightHttpDownload(nc.get(i).content);
+                                        if (fileContent == null) return Wenku8Error.ErrorCode.NETWORK_ERROR; // network error
+                                        if (!LightCache.saveFile(GlobalConfig.getFirstFullSaveFilePath()
+                                                        + GlobalConfig.imgsSaveFolderName + File.separator,
+                                                imgFileName, fileContent, true)) // fail
+                                            // to first path
+                                            LightCache.saveFile(GlobalConfig.getSecondFullSaveFilePath()
+                                                            + GlobalConfig.imgsSaveFolderName + File.separator,
+                                                    imgFileName, fileContent, true);
+                                    }
+
+                                    if (!loading) return Wenku8Error.ErrorCode.USER_CANCELLED_TASK;
+                                    publishProgress(++current); // update
+                                    // progress
+                                }
+                            }
+                        }
+                        publishProgress(++current); // update progress
+
+                    } catch (UnsupportedEncodingException e) {
+                        e.printStackTrace();
+                    }
+                }
+            }
+
+            return Wenku8Error.ErrorCode.SYSTEM_1_SUCCEEDED;
+        }
+
+        @Override
+        protected void onProgressUpdate(Integer... values) {
+            super.onProgressUpdate(values);
+            md.setMaxProgress(size_a);
+            md.setProgress(values[0]);
+        }
+
+        @Override
+        protected void onPostExecute(Wenku8Error.ErrorCode errorCode) {
+            super.onPostExecute(errorCode);
+            if (errorCode == Wenku8Error.ErrorCode.USER_CANCELLED_TASK) {
+                // user cancelled
+                Toast.makeText(NovelInfoActivity.this, "User cancelled!", Toast.LENGTH_LONG).show();
+                if (md != null) md.dismiss();
+                onResume();
+                loading = false;
+                return;
+            } else if (errorCode == Wenku8Error.ErrorCode.NETWORK_ERROR) {
+                Toast.makeText(NovelInfoActivity.this, getResources().getString(R.string.system_network_error), Toast.LENGTH_LONG).show();
+                if (md != null) md.dismiss();
+                onResume();
+                loading = false;
+                return;
+            } else if (errorCode == Wenku8Error.ErrorCode.XML_PARSE_FAILED) {
+                Toast.makeText(NovelInfoActivity.this, "Parse failed!", Toast.LENGTH_LONG).show();
+                if (md != null) md.dismiss();
+                onResume();
+                loading = false;
+                return;
+            }
+
+            // cache successfully
+            Toast.makeText(NovelInfoActivity.this, "OK", Toast.LENGTH_LONG).show();
+            loading = false;
+            if (md != null) md.dismiss();
+            refreshInfoFromLocal();
         }
     }
 

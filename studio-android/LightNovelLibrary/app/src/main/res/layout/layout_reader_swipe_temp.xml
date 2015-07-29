@@ -168,6 +168,185 @@
                 android:textColor="@color/default_white"
                 android:text="@string/reader_next_chapter"/>
         </RelativeLayout>
+
+        <RelativeLayout
+            android:id="@+id/reader_bot_settings"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:fitsSystemWindows="true"
+            android:background="@color/reader_default_bg_toolbar"
+            android:visibility="invisible"
+            android:clickable="true"
+            android:layout_above="@+id/reader_bot"
+            android:layout_alignParentLeft="true"
+            android:layout_alignParentStart="true"
+            android:gravity="center"
+            android:baselineAligned="false">
+
+            <RelativeLayout
+                android:id="@+id/layout_font_size"
+                android:layout_width="match_parent"
+                android:layout_height="48dp">
+
+                <TextView
+                    android:id="@+id/text_font_size"
+                    android:layout_width="80dp"
+                    android:layout_height="48dp"
+                    android:gravity="center"
+                    android:textSize="12sp"
+                    android:textColor="@color/default_white"
+                    android:text="@string/reader_font_size"/>
+
+                <org.adw.library.widgets.discreteseekbar.DiscreteSeekBar
+                    android:id="@+id/reader_font_size_seeker"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:paddingRight="16dp"
+                    android:layout_centerHorizontal="true"
+                    android:layout_toRightOf="@+id/text_font_size"
+                    android:layout_toEndOf="@+id/text_font_size"
+                    android:layout_centerVertical="true"
+                    app:dsb_indicatorColor="@color/myAccentColor"
+                    app:dsb_progressColor="@color/myPrimaryColor"
+                    app:dsb_trackColor="@color/default_white"
+                    app:dsb_indicatorElevation="4dp"
+                    app:dsb_min="8"
+                    app:dsb_max="32"/>
+            </RelativeLayout>
+
+            <RelativeLayout
+                android:id="@+id/layout_line_distance"
+                android:layout_below="@+id/layout_font_size"
+                android:layout_width="match_parent"
+                android:layout_height="48dp">
+
+                <TextView
+                    android:id="@+id/text_line_distance"
+                    android:layout_width="80dp"
+                    android:layout_height="48dp"
+                    android:gravity="center"
+                    android:textSize="12sp"
+                    android:layout_alignParentLeft="true"
+                    android:layout_alignParentStart="true"
+                    android:textColor="@color/default_white"
+                    android:text="@string/reader_line_distance"/>
+
+                <org.adw.library.widgets.discreteseekbar.DiscreteSeekBar
+                    android:id="@+id/reader_line_distance_seeker"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:paddingRight="16dp"
+                    android:layout_centerHorizontal="true"
+                    android:layout_toRightOf="@+id/text_line_distance"
+                    android:layout_toEndOf="@+id/text_line_distance"
+                    android:layout_centerVertical="true"
+                    app:dsb_indicatorColor="@color/myAccentColor"
+                    app:dsb_progressColor="@color/myPrimaryColor"
+                    app:dsb_trackColor="@color/default_white"
+                    app:dsb_indicatorElevation="4dp"
+                    app:dsb_min="0"
+                    app:dsb_max="32"/>
+            </RelativeLayout>
+
+            <RelativeLayout
+                android:id="@+id/layout_paragraph_distance"
+                android:layout_below="@+id/layout_line_distance"
+                android:layout_width="match_parent"
+                android:layout_height="48dp">
+
+                <TextView
+                    android:id="@+id/text_paragraph_distance"
+                    android:layout_width="80dp"
+                    android:layout_height="48dp"
+                    android:gravity="center"
+                    android:textSize="12sp"
+                    android:layout_alignParentLeft="true"
+                    android:layout_alignParentStart="true"
+                    android:textColor="@color/default_white"
+                    android:text="@string/reader_paragraph_distance"/>
+
+                <org.adw.library.widgets.discreteseekbar.DiscreteSeekBar
+                    android:id="@+id/reader_paragraph_distance_seeker"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:paddingRight="16dp"
+                    android:layout_centerHorizontal="true"
+                    android:layout_toRightOf="@+id/text_paragraph_distance"
+                    android:layout_toEndOf="@+id/text_paragraph_distance"
+                    android:layout_centerVertical="true"
+                    app:dsb_indicatorColor="@color/myAccentColor"
+                    app:dsb_progressColor="@color/myPrimaryColor"
+                    app:dsb_trackColor="@color/default_white"
+                    app:dsb_indicatorElevation="4dp"
+                    app:dsb_min="0"
+                    app:dsb_max="48"/>
+            </RelativeLayout>
+
+            <RelativeLayout
+                android:id="@+id/layout_paragraph_edge_distance"
+                android:layout_below="@+id/layout_paragraph_distance"
+                android:layout_width="match_parent"
+                android:layout_height="48dp">
+
+                <TextView
+                    android:id="@+id/text_paragraph_edge_distance"
+                    android:layout_width="80dp"
+                    android:layout_height="48dp"
+                    android:gravity="center"
+                    android:textSize="12sp"
+                    android:layout_alignParentLeft="true"
+                    android:layout_alignParentStart="true"
+                    android:textColor="@color/default_white"
+                    android:text="@string/reader_paragraph_edge_distance"/>
+
+                <org.adw.library.widgets.discreteseekbar.DiscreteSeekBar
+                    android:id="@+id/reader_paragraph_edge_distance_seeker"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:paddingRight="16dp"
+                    android:layout_centerHorizontal="true"
+                    android:layout_toRightOf="@+id/text_paragraph_edge_distance"
+                    android:layout_toEndOf="@+id/text_paragraph_edge_distance"
+                    android:layout_centerVertical="true"
+                    app:dsb_indicatorColor="@color/myAccentColor"
+                    app:dsb_progressColor="@color/myPrimaryColor"
+                    app:dsb_trackColor="@color/default_white"
+                    app:dsb_indicatorElevation="4dp"
+                    app:dsb_min="0"
+                    app:dsb_max="16"/>
+            </RelativeLayout>
+
+            <LinearLayout
+                android:id="@+id/layout_more_buttons"
+                android:layout_below="@+id/layout_paragraph_edge_distance"
+                android:layout_width="match_parent"
+                android:layout_height="48dp">
+
+                <TextView
+                    android:id="@+id/btn_custom_font"
+                    android:layout_width="wrap_content"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:gravity="center"
+                    android:textSize="12sp"
+                    android:clickable="true"
+                    android:background="@drawable/btn_menu_item"
+                    android:textColor="@color/default_white"
+                    android:text="@string/reader_custom_font"/>
+
+                <TextView
+                    android:id="@+id/btn_custom_background"
+                    android:layout_width="wrap_content"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:gravity="center"
+                    android:textSize="12sp"
+                    android:clickable="true"
+                    android:background="@drawable/btn_menu_item"
+                    android:textColor="@color/default_white"
+                    android:text="@string/reader_custom_background"/>
+            </LinearLayout>
+        </RelativeLayout>
     </RelativeLayout>
 
     <!--<org.mewx.wenku8.reader.slider.SlidingLayout-->

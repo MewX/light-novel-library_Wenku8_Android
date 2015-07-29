@@ -1,5 +1,6 @@
 package org.mewx.wenku8.global;
 
+import android.content.ContentValues;
 import android.content.Context;
 import android.graphics.Bitmap;
 import android.net.ConnectivityManager;
@@ -45,11 +46,12 @@ public class GlobalConfig {
     private static final boolean inAlphaBuild = true; // in alpha mode, no update function
     public static final String saveFolderName = "saves";
     public static final String imgsSaveFolderName = "imgs";
-    public static final String imgsSaveOutFolderName = "imgs_save";
+    public static final String customFolderName = "custom";
     private static final String saveSearchHistoryFileName = "search_history.wk8";
     private static final String saveReadSavesFileName = "read_saves.wk8";
     private static final String saveReadSavesV1FileName = "read_saves_v1.wk8";
     private static final String saveLocalBookshelfFileName = "bookshelf_local.wk8";
+    private static final String saveSetting = "settings.wk8";
     private static final String saveUserAccountFileName = "cert.wk8"; // certification file
     private static final String saveUserAvatarFileName = "avatar.jpg";
     private static int maxSearchHistory = 10; // default
@@ -65,6 +67,7 @@ public class GlobalConfig {
     private static ArrayList<ReadSaves> readSaves = null; // deprecated
     private static ArrayList<Integer> bookshelf = null;
     private static ArrayList<ReadSavesV1> readSavesV1 = null; // deprecated
+    private static ContentValues allSetting = null;
 
 
     /** Structures */
@@ -80,6 +83,18 @@ public class GlobalConfig {
         public int cid;
         public int lineId;
         public int wordId;
+    }
+
+    public enum SettingItems {
+        version, // (int) 1
+        menu_bg_id, // (int) 1-5 by system, 0 for user
+        menu_bg_path, // (String) for user custom
+        reader_font_path, // (String) path to ttf, "0" means default
+        reader_font_size, // (int) sp (8 - 32)
+        reader_line_distance, // (int) dp (0 - 32)
+        reader_paragraph_distance, // (int) dp (0 - 48)
+        reader_paragraph_edge_distance, // (int) dp (0 - 16)
+        reader_background_path, // (String) path to an image, day mode only, "0" means default
     }
 
 
@@ -705,6 +720,49 @@ public class GlobalConfig {
             if (readSavesV1.get(i).aid == aid) return readSavesV1.get(i);
         }
         return null;
+    }
+
+    /** All settings */
+    public static void loadAllSetting() {
+        allSetting = new ContentValues();
+        String h = loadFullSaveFileContent(saveSetting);
+
+        String[] sets = h.split("\\|\\|\\|\\|");
+        for(String set : sets) {
+            String[] temp = set.split("\\:\\:\\:\\:");
+            if(temp.length != 2 || temp[0] == null || temp[0].length() == 0 || temp[1] == null || temp[1].length() == 0) continue;
+
+            allSetting.put(temp[0], temp[1]);
+        }
+
+        if(getFromAllSetting(SettingItems.version) == null || getFromAllSetting(SettingItems.version).equals(""))
+            setToAllSetting(SettingItems.version, "1");
+    }
+
+    public static void saveAllSetting() {
+        if(allSetting == null) loadAllSetting();
+
+        String result = "";
+        for( String key : allSetting.keySet() ) {
+            if(!result.equals("")) result = result + "||||";
+            result = result + key + "::::" + allSetting.getAsString(key);
+        }
+        writeFullSaveFileContent(saveSetting, result);
+    }
+
+    @Nullable
+    public static String getFromAllSetting(SettingItems name) {
+        if(allSetting == null) loadAllSetting();
+        return allSetting.getAsString(name.toString());
+    }
+
+    public static void setToAllSetting(SettingItems name, String value) {
+        if(allSetting == null) loadAllSetting();
+        if(name != null && value != null) {
+            allSetting.remove(name.toString());
+            allSetting.put(name.toString(), value);
+            saveAllSetting();
+        }
     }
 
 

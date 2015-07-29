@@ -17,7 +17,9 @@ import org.mewx.wenku8.global.api.NovelItemInfo;
 import org.mewx.wenku8.global.api.Wenku8API;
 import org.mewx.wenku8.listener.MyItemClickListener;
 import org.mewx.wenku8.listener.MyItemLongClickListener;
+import org.mewx.wenku8.util.LightCache;
 
+import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -76,7 +78,12 @@ public class NovelItemAdapter extends RecyclerView.Adapter<NovelItemAdapter.View
             viewHolder.tvNovelIntro.setText(mDataset.get(i).getIntroShort());
 
         // need to solve flicking problem
-        ImageLoader.getInstance().displayImage(Wenku8API.getCoverURL(mDataset.get(i).getAid()), viewHolder.ivNovelCover);
+        if(LightCache.testFileExist(GlobalConfig.getFirstStoragePath() + "imgs" + File.separator + mDataset.get(i).getAid() + ".jpg"))
+            ImageLoader.getInstance().displayImage("file://" + GlobalConfig.getFirstStoragePath() + "imgs" + File.separator + mDataset.get(i).getAid() + ".jpg", viewHolder.ivNovelCover);
+        else if(LightCache.testFileExist(GlobalConfig.getSecondStoragePath() + "imgs" + File.separator + mDataset.get(i).getAid() + ".jpg"))
+            ImageLoader.getInstance().displayImage("file://" + GlobalConfig.getSecondStoragePath() + "imgs" + File.separator + mDataset.get(i).getAid() + ".jpg", viewHolder.ivNovelCover);
+        else
+            ImageLoader.getInstance().displayImage(Wenku8API.getCoverURL(mDataset.get(i).getAid()), viewHolder.ivNovelCover);
 
     }
 

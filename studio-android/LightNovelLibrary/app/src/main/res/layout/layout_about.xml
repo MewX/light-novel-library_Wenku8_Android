@@ -1,0 +1,328 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:card-view="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/myPrimaryColor"
+    android:fitsSystemWindows="true">
+
+    <include layout="@layout/toolbar_pure"/>
+
+    <ScrollView
+        android:layout_below="@+id/toolbar_actionbar"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@color/myWindowBackground">
+
+        <LinearLayout
+            android:orientation="vertical"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content">
+
+            <RelativeLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:paddingLeft="6dp"
+                android:paddingRight="6dp"
+                android:paddingTop="2dp">
+
+                <android.support.v7.widget.CardView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    card-view:cardBackgroundColor="@color/novel_item_white"
+                    card-view:cardElevation="2dp"
+                    card-view:cardUseCompatPadding="true"
+                    card-view:cardMaxElevation="2dp">
+
+                    <RelativeLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:background="@drawable/btn_menu_item"
+                        android:clickable="true"
+                        android:paddingLeft="16dp"
+                        android:paddingRight="16dp">
+
+                        <TextView
+                            android:id="@+id/app"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:gravity="center_vertical"
+                            android:textSize="18sp"
+                            android:paddingTop="12dp"
+                            android:paddingBottom="12dp"
+                            android:text="轻小说文库"
+                            android:singleLine="true"
+                            android:textColor="@color/menu_text_color"
+                            android:layout_alignParentTop="true"
+                            android:layout_centerHorizontal="true" />
+
+                        <View
+                            android:id="@+id/divider0"
+                            android:layout_width="match_parent"
+                            android:layout_height="1px"
+                            android:layout_below="@+id/app"
+                            android:background="@color/default_divider"/>
+
+                        <TextView
+                            android:id="@+id/app_version"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:gravity="center_vertical"
+                            android:textSize="14sp"
+                            android:paddingTop="12dp"
+                            android:paddingBottom="12dp"
+                            android:text="Version: 1.0"
+                            android:singleLine="true"
+                            android:textColor="@color/menu_text_color"
+                            android:layout_below="@+id/divider0"
+                            android:layout_centerHorizontal="true" />
+
+                        <TextView
+                            android:id="@+id/app_site"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:gravity="center_vertical"
+                            android:textSize="14sp"
+                            android:paddingTop="12dp"
+                            android:paddingBottom="12dp"
+                            android:text="Site: http://wenku8.cn"
+                            android:singleLine="true"
+                            android:textColor="@color/menu_text_color"
+                            android:layout_below="@+id/app_version"
+                            android:layout_centerHorizontal="true" />
+
+                        <TextView
+                            android:id="@+id/app_qqq"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:gravity="center_vertical"
+                            android:textSize="14sp"
+                            android:paddingTop="12dp"
+                            android:paddingBottom="12dp"
+                            android:text="测试群号: 427577610"
+                            android:singleLine="true"
+                            android:textColor="@color/menu_text_color"
+                            android:layout_below="@+id/app_site"
+                            android:layout_centerHorizontal="true" />
+                    </RelativeLayout>
+                </android.support.v7.widget.CardView>
+            </RelativeLayout>
+
+            <RelativeLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:paddingLeft="6dp"
+                android:paddingRight="6dp"
+                android:paddingTop="2dp">
+
+                <android.support.v7.widget.CardView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    card-view:cardBackgroundColor="@color/novel_item_white"
+                    card-view:cardElevation="2dp"
+                    card-view:cardUseCompatPadding="true"
+                    card-view:cardMaxElevation="2dp">
+
+                    <RelativeLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:background="@drawable/btn_menu_item"
+                        android:clickable="true"
+                        android:paddingLeft="16dp"
+                        android:paddingRight="16dp">
+
+                        <TextView
+                            android:id="@+id/architect"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:gravity="center_vertical"
+                            android:textSize="18sp"
+                            android:paddingTop="12dp"
+                            android:paddingBottom="12dp"
+                            android:text="软件架构"
+                            android:singleLine="true"
+                            android:textColor="@color/menu_text_color"
+                            android:layout_alignParentTop="true"
+                            android:layout_centerHorizontal="true" />
+
+                        <View
+                            android:id="@+id/divider1"
+                            android:layout_width="match_parent"
+                            android:layout_height="1px"
+                            android:layout_below="@+id/architect"
+                            android:background="@color/default_divider"/>
+
+                        <TextView
+                            android:id="@+id/mewx_name"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:gravity="center_vertical"
+                            android:textSize="14sp"
+                            android:paddingTop="12dp"
+                            android:paddingBottom="12dp"
+                            android:text="MewX\t&lt;imewx@qq.com&gt;"
+                            android:singleLine="true"
+                            android:textColor="@color/menu_text_color"
+                            android:layout_below="@+id/divider1"
+                            android:layout_centerHorizontal="true" />
+
+                        <TextView
+                            android:id="@+id/mewx_blog"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:gravity="center_vertical"
+                            android:textSize="14sp"
+                            android:paddingTop="12dp"
+                            android:paddingBottom="12dp"
+                            android:text="Blog: http://mewx.org"
+                            android:singleLine="true"
+                            android:textColor="@color/menu_text_color"
+                            android:layout_below="@+id/mewx_name"
+                            android:layout_centerHorizontal="true" />
+                    </RelativeLayout>
+                </android.support.v7.widget.CardView>
+            </RelativeLayout>
+
+            <RelativeLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:paddingLeft="6dp"
+                android:paddingRight="6dp"
+                android:paddingTop="2dp">
+
+                <android.support.v7.widget.CardView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    card-view:cardBackgroundColor="@color/novel_item_white"
+                    card-view:cardElevation="2dp"
+                    card-view:cardUseCompatPadding="true"
+                    card-view:cardMaxElevation="2dp">
+
+                    <RelativeLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:background="@drawable/btn_menu_item"
+                        android:clickable="true"
+                        android:paddingLeft="16dp"
+                        android:paddingRight="16dp">
+
+                        <TextView
+                            android:id="@+id/designer"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:gravity="center_vertical"
+                            android:textSize="18sp"
+                            android:paddingTop="12dp"
+                            android:paddingBottom="12dp"
+                            android:text="界面设计"
+                            android:singleLine="true"
+                            android:textColor="@color/menu_text_color"
+                            android:layout_alignParentTop="true"
+                            android:layout_centerHorizontal="true" />
+
+                        <View
+                            android:id="@+id/divider2"
+                            android:layout_width="match_parent"
+                            android:layout_height="1px"
+                            android:layout_below="@+id/designer"
+                            android:background="@color/default_divider"/>
+
+                        <TextView
+                            android:id="@+id/zero_name"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:gravity="center_vertical"
+                            android:textSize="14sp"
+                            android:paddingTop="12dp"
+                            android:paddingBottom="12dp"
+                            android:text="ZERO\t&lt;78283358@qq.com&gt;"
+                            android:singleLine="true"
+                            android:textColor="@color/menu_text_color"
+                            android:layout_below="@+id/divider2"
+                            android:layout_centerHorizontal="true" />
+
+                        <TextView
+                            android:id="@+id/zero_blog"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:gravity="center_vertical"
+                            android:textSize="14sp"
+                            android:paddingTop="12dp"
+                            android:paddingBottom="12dp"
+                            android:text="Blog: http://kurosaki.coding.io/"
+                            android:singleLine="true"
+                            android:textColor="@color/menu_text_color"
+                            android:layout_below="@+id/zero_name"
+                            android:layout_centerHorizontal="true" />
+                    </RelativeLayout>
+                </android.support.v7.widget.CardView>
+            </RelativeLayout>
+
+            <RelativeLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:paddingLeft="6dp"
+                android:paddingRight="6dp"
+                android:paddingTop="2dp">
+
+                <android.support.v7.widget.CardView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    card-view:cardBackgroundColor="@color/novel_item_white"
+                    card-view:cardElevation="2dp"
+                    card-view:cardUseCompatPadding="true"
+                    card-view:cardMaxElevation="2dp">
+
+                    <RelativeLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:background="@drawable/btn_menu_item"
+                        android:clickable="true"
+                        android:paddingLeft="16dp"
+                        android:paddingRight="16dp">
+
+                        <TextView
+                            android:id="@+id/assistant"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:gravity="center_vertical"
+                            android:textSize="18sp"
+                            android:paddingTop="12dp"
+                            android:paddingBottom="12dp"
+                            android:text="反馈整理"
+                            android:singleLine="true"
+                            android:textColor="@color/menu_text_color"
+                            android:layout_alignParentTop="true"
+                            android:layout_centerHorizontal="true" />
+
+                        <View
+                            android:id="@+id/divider3"
+                            android:layout_width="match_parent"
+                            android:layout_height="1px"
+                            android:layout_below="@+id/assistant"
+                            android:background="@color/default_divider"/>
+
+                        <TextView
+                            android:id="@+id/rab_name"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:gravity="center_vertical"
+                            android:textSize="14sp"
+                            android:paddingTop="12dp"
+                            android:paddingBottom="12dp"
+                            android:text="妻兔姬\t&lt;1270263248@qq.com&gt;"
+                            android:singleLine="true"
+                            android:textColor="@color/menu_text_color"
+                            android:layout_below="@+id/divider3"
+                            android:layout_centerHorizontal="true" />
+                    </RelativeLayout>
+                </android.support.v7.widget.CardView>
+            </RelativeLayout>
+
+        </LinearLayout>
+    </ScrollView>
+</RelativeLayout>

@@ -68,9 +68,7 @@ public class NovelChapterActivity extends AppCompatActivity {
         }
 
         // change status bar color tint, and this require SDK16
-        if (Build.VERSION.SDK_INT >= 16 ) { //&& Build.VERSION.SDK_INT <= 21) {
-            // Android API 22 has more effects on status bar, so ignore
-
+        if (Build.VERSION.SDK_INT >= 16 ) {
             // create our manager instance after the content view is set
             SystemBarTintManager tintManager = new SystemBarTintManager(this);
             // enable all tint

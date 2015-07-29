@@ -223,24 +223,40 @@ ADDED from AndroidManifest.xml:111:9
 		ADDED from AndroidManifest.xml:112:13
 	android:name
 		ADDED from AndroidManifest.xml:111:19
-activity#com.nononsenseapps.filepicker.FilePickerActivity
+activity#org.mewx.wenku8.activity.MenuBackgroundSelectorActivity
 ADDED from AndroidManifest.xml:117:9
-	android:label
+	android:screenOrientation
 		ADDED from AndroidManifest.xml:119:13
-	android:theme
-		ADDED from AndroidManifest.xml:120:13
-	android:name
+	android:label
 		ADDED from AndroidManifest.xml:118:13
+	android:name
+		ADDED from AndroidManifest.xml:117:19
+activity#org.mewx.wenku8.activity.AboutActivity
+ADDED from AndroidManifest.xml:123:9
+	android:screenOrientation
+		ADDED from AndroidManifest.xml:125:13
+	android:label
+		ADDED from AndroidManifest.xml:124:13
+	android:name
+		ADDED from AndroidManifest.xml:123:19
+activity#com.nononsenseapps.filepicker.FilePickerActivity
+ADDED from AndroidManifest.xml:129:9
+	android:label
+		ADDED from AndroidManifest.xml:131:13
+	android:theme
+		ADDED from AndroidManifest.xml:132:13
+	android:name
+		ADDED from AndroidManifest.xml:130:13
 intent-filter#android.intent.action.GET_CONTENT+android.intent.category.DEFAULT
-ADDED from AndroidManifest.xml:121:13
+ADDED from AndroidManifest.xml:133:13
 action#android.intent.action.GET_CONTENT
-ADDED from AndroidManifest.xml:122:17
+ADDED from AndroidManifest.xml:134:17
 	android:name
-		ADDED from AndroidManifest.xml:122:25
+		ADDED from AndroidManifest.xml:134:25
 category#android.intent.category.DEFAULT
-ADDED from AndroidManifest.xml:123:17
+ADDED from AndroidManifest.xml:135:17
 	android:name
-		ADDED from AndroidManifest.xml:123:27
+		ADDED from AndroidManifest.xml:135:27
 uses-sdk
 INJECTED from AndroidManifest.xml:0:0 reason: use-sdk injection requested
 MERGED from com.android.support:support-v4:22.2.0:20:5

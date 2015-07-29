@@ -4,10 +4,14 @@ import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
 import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.Paint;
 import android.graphics.Point;
+import android.graphics.Rect;
+import android.graphics.Shader;
 import android.graphics.Typeface;
+import android.graphics.drawable.BitmapDrawable;
 import android.media.Image;
 import android.net.wifi.WifiManager;
 import android.os.AsyncTask;
@@ -41,6 +45,7 @@ import org.mewx.wenku8.util.LightTool;
 import java.lang.annotation.ElementType;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Random;
 
 /**
  * Created by MewX on 2015/7/8.
@@ -78,15 +83,23 @@ public class WenkuReaderPageView extends View {
     List<BitmapInfo> bitmapInfoList;
 
     // core variables
+    static private boolean inDayMode = true;
     static private String sampleText = "轻";
     static private WenkuReaderLoader mLoader;
     static private WenkuReaderSettingV1 mSetting;
     static private int pxLineDistance, pxParagraphDistance, pxParagraphEdgeDistance, pxPageEdgeDistance, pxWidgetHeight;
-    private Point screenSize, textAreaSize;
+    static private Point screenSize;
+    private Point textAreaSize;
     static private Typeface typeface;
     static private TextPaint textPaint, widgetTextPaint;
     static private int fontHeight, widgetFontHeihgt;
     private int lineCount;
+
+    // background
+    static private Bitmap bmBackgroundYellow, bmTextureYellow[];
+    static private BitmapDrawable bmdBackground;
+    static private Random random = new Random();
+    static private boolean isBackgroundSet = false;
 
     // vars
     private int firstLineIndex;
@@ -113,12 +126,21 @@ public class WenkuReaderPageView extends View {
 //        Log.e("MewX", "-- view: construct 3");
 //    }
 
+    static public boolean getInDayMode() {
+        return inDayMode;
+    }
+
+    static public boolean switchDayMode() {
+        inDayMode = !inDayMode;
+        return inDayMode;
+    }
+
     /**
      * Set view static variables, before first onDraw()
      * @param wrl loader
      * @param wrs setting
      */
-    static public void setViewComponents(WenkuReaderLoader wrl, WenkuReaderSettingV1 wrs) {
+    static public void setViewComponents(WenkuReaderLoader wrl, WenkuReaderSettingV1 wrs, boolean forceMode) {
         mLoader = wrl;
         mSetting = wrs;
         pxLineDistance = LightTool.dip2px(MyApp.getContext(), mSetting.getLineDistance());
@@ -128,18 +150,55 @@ public class WenkuReaderPageView extends View {
         pxWidgetHeight = LightTool.dip2px(MyApp.getContext(), mSetting.widgetHeight);
 
         // calc general var
-        typeface = Typeface.createFromAsset(MyApp.getContext().getAssets(), "fonts/fzss-gbk.ttf"); // use font
+        try {
+            if(mSetting.getUseCustomFont()) typeface = Typeface.createFromFile(mSetting.getCustomFontPath()); // custom font
+            else typeface = Typeface.createFromAsset(MyApp.getContext().getAssets(), "fonts/fzss-gbk.ttf"); // use font
+        }
+        catch (Exception e) {
+            Toast.makeText(MyApp.getContext(), e.toString(), Toast.LENGTH_SHORT).show();
+        }
+        if(typeface == null) typeface = Typeface.createFromAsset(MyApp.getContext().getAssets(), "fonts/fzss-gbk.ttf"); // use font
         textPaint = new TextPaint();
-        textPaint.setColor(mSetting.inDayMode ? mSetting.fontColorDark : mSetting.fontColorLight);
+        textPaint.setColor(getInDayMode() ? mSetting.fontColorDark : mSetting.fontColorLight);
         textPaint.setTextSize(LightTool.sp2px(MyApp.getContext(), (float) mSetting.getFontSize()));
         textPaint.setTypeface(typeface);
         textPaint.setAntiAlias(true);
         fontHeight = (int) textPaint.measureText(sampleText); //(int) textPaint.getTextSize(); // in "px"
         widgetTextPaint = new TextPaint();
-        widgetTextPaint.setColor(mSetting.inDayMode ? mSetting.fontColorDark : mSetting.fontColorLight);
+        widgetTextPaint.setColor(getInDayMode() ? mSetting.fontColorDark : mSetting.fontColorLight);
         widgetTextPaint.setTextSize(LightTool.sp2px(MyApp.getContext(), (float) mSetting.widgetTextSize));
         widgetTextPaint.setAntiAlias(true);
         widgetFontHeihgt = (int) textPaint.measureText(sampleText);
+
+        // load bitmap
+        if(forceMode || !isBackgroundSet) {
+            screenSize = LightTool.getRealScreenSize(MyApp.getContext());
+            if(Build.VERSION.SDK_INT < 19) screenSize.y = screenSize.y - LightTool.getStatusBarHeightValue(MyApp.getContext());
+
+            if(mSetting.getPageBackgroundType() == WenkuReaderSettingV1.PAGE_BACKGROUND_TYPE.CUSTOM) {
+                try {
+                    // custom background
+                    bmBackgroundYellow = BitmapFactory.decodeFile(mSetting.getPageBackgrounCustomPath());
+                    bmdBackground = null;
+                }
+                catch (Exception e) {
+                    Toast.makeText(MyApp.getContext(), e.toString(), Toast.LENGTH_SHORT).show();
+                }
+            }
+            if(mSetting.getPageBackgroundType() == WenkuReaderSettingV1.PAGE_BACKGROUND_TYPE.SYSTEM_DEFAULT || bmBackgroundYellow == null) {
+                // use system default
+                bmBackgroundYellow = BitmapFactory.decodeResource(MyApp.getContext().getResources(), R.drawable.reader_bg_yellow_edge);
+                bmTextureYellow = new Bitmap[3];
+                bmTextureYellow[0] = BitmapFactory.decodeResource(MyApp.getContext().getResources(), R.drawable.reader_bg_yellow1);
+                bmTextureYellow[1] = BitmapFactory.decodeResource(MyApp.getContext().getResources(), R.drawable.reader_bg_yellow2);
+                bmTextureYellow[2] = BitmapFactory.decodeResource(MyApp.getContext().getResources(), R.drawable.reader_bg_yellow3);
+
+                bmdBackground = new BitmapDrawable(MyApp.getContext().getResources(), bmTextureYellow[random.nextInt(bmTextureYellow.length)]);
+                bmdBackground.setTileModeXY(Shader.TileMode.REPEAT, Shader.TileMode.REPEAT);
+                bmdBackground.setBounds(0, 0, screenSize.x, screenSize.y);
+            }
+            isBackgroundSet = true;
+        }
     }
 
     /**
@@ -147,8 +206,8 @@ public class WenkuReaderPageView extends View {
      * If textPaint is null, then do nothing.
      */
     static public void resetTextColor() {
-        textPaint.setColor(mSetting.inDayMode ? mSetting.fontColorDark : mSetting.fontColorLight);
-        widgetTextPaint.setColor(mSetting.inDayMode ? mSetting.fontColorDark : mSetting.fontColorLight);
+        textPaint.setColor(getInDayMode() ? mSetting.fontColorDark : mSetting.fontColorLight);
+        widgetTextPaint.setColor(getInDayMode() ? mSetting.fontColorDark : mSetting.fontColorLight);
     }
 
     /**
@@ -163,16 +222,11 @@ public class WenkuReaderPageView extends View {
     public WenkuReaderPageView(Context context, int lineIndex, int wordIndex, LOADING_DIRECTION directionForward) {
         super(context);
         Log.e("MewX", "-- view: construct my");
-        // TODO: split a setter, this function is useless, so set everything first before system's getView
-
         lineInfoList = new ArrayList<>();
         bitmapInfoList = new ArrayList<>();
         mLoader.setCurrentIndex(lineIndex);
 
-        // get environmental vars
-        // TODO: this should use actual layout size
-        screenSize = LightTool.getRealScreenSize(getContext());
-        if(Build.VERSION.SDK_INT < 19) screenSize.y = screenSize.y - LightTool.getStatusBarHeightValue(getContext());
+        // get environmental vars, use actual layout size
         textAreaSize = new Point(screenSize.x - 2 * (pxPageEdgeDistance + pxParagraphEdgeDistance),
                 screenSize.y - 2 * (pxPageEdgeDistance + pxWidgetHeight));
         if(Build.VERSION.SDK_INT < 19) textAreaSize.y = textAreaSize.y + pxWidgetHeight;
@@ -207,7 +261,7 @@ public class WenkuReaderPageView extends View {
                 break;
 
             case BACKWARDS:
-                // TODO: fit first and last
+                // fit first and last
                 if(wordIndex > 0) {
                     lastLineIndex = lineIndex;
                     lastWordIndex = wordIndex - 1;
@@ -217,7 +271,7 @@ public class WenkuReaderPageView extends View {
                     lastWordIndex = mLoader.getStringLength(lastLineIndex) - 1;
                 }
 
-                // TODO: firstLineIndex firstWordIndex; and last values changeable
+                // firstLineIndex firstWordIndex; and last values changeable
                 mLoader.setCurrentIndex(lastLineIndex);
                 calcFromLast();
                 break;
@@ -367,7 +421,7 @@ public class WenkuReaderPageView extends View {
             WenkuReaderLoader.ElementType curType = mLoader.getCurrentType();
             String curString = mLoader.getCurrentAsString();
 
-            // TODO: special to image
+            // special to image
             if(curType == WenkuReaderLoader.ElementType.IMAGE_DEPENDENT && lineInfoList.size() != 0) {
                 Log.e("MewX", "jump 1");
                 firstLineIndex = curLineIndex + 1;
@@ -484,18 +538,30 @@ public class WenkuReaderPageView extends View {
         Log.e("MewX", "onDraw()");
 
         // draw background
-        Paint paintBackground = new Paint();
-        paintBackground.setColor(mSetting.inDayMode ? mSetting.bgColorLight : mSetting.bgColorDark);
-        canvas.drawRect(0, 0, screenSize.x, screenSize.y, paintBackground);
-//        canvas.drawLine(pxParagraphEdgeDistance + pxPageEdgeDistance, pxPageEdgeDistance + pxWidgetHeight,
-//                textAreaSize.x + pxParagraphEdgeDistance + pxPageEdgeDistance,
-//                textAreaSize.y + pxPageEdgeDistance + pxWidgetHeight, new Paint()); // px
+        if(getInDayMode()) {
+            // day
+            if(bmdBackground != null)
+                bmdBackground.draw(canvas);
+            if(bmBackgroundYellow.getWidth() != screenSize.x || bmBackgroundYellow.getHeight() != screenSize.y)
+                bmBackgroundYellow = Bitmap.createScaledBitmap(bmBackgroundYellow, screenSize.x, screenSize.y, true);
+            canvas.drawBitmap(bmBackgroundYellow, 0, 0, null);
+
+        }
+        else {
+            // night
+            Paint paintBackground = new Paint();
+            paintBackground.setColor(mSetting.bgColorDark);
+            canvas.drawRect(0, 0, screenSize.x, screenSize.y, paintBackground);
+        }
+//        Paint paintBackground = new Paint();
+//        paintBackground.setColor(mSetting.inDayMode ? mSetting.bgColorLight : mSetting.bgColorDark);
+//        canvas.drawRect(0, 0, screenSize.x, screenSize.y, paintBackground);
 
         // draw divider
-        Paint paintDivider = new Paint();
-        paintDivider.setColor(getContext().getResources().getColor(mSetting.inDayMode ? R.color.dlgDividerColor : R.color.reader_default_text_light));
-        canvas.drawLine(1, 1, 1, screenSize.y - 1, paintDivider);
-        canvas.drawLine(screenSize.x - 1, 1, screenSize.x - 1, screenSize.y - 1, paintDivider);
+//        Paint paintDivider = new Paint();
+//        paintDivider.setColor(getContext().getResources().getColor(mSetting.inDayMode ? R.color.dlgDividerColor : R.color.reader_default_text_light));
+//        canvas.drawLine(1, 1, 1, screenSize.y - 1, paintDivider);
+//        canvas.drawLine(screenSize.x - 1, 1, screenSize.x - 1, screenSize.y - 1, paintDivider);
 
         // draw widgets
         canvas.drawText(mLoader.getChapterName(), pxPageEdgeDistance, screenSize.y - pxPageEdgeDistance, widgetTextPaint);
@@ -503,7 +569,7 @@ public class WenkuReaderPageView extends View {
         int tempWidth = (int) widgetTextPaint.measureText(percentage);
         canvas.drawText(percentage, screenSize.x - pxPageEdgeDistance - tempWidth, screenSize.y - pxPageEdgeDistance, widgetTextPaint);
 
-        // TODO: draw text on average in page and line
+        // draw text on average in page and line
         int heightSum = fontHeight + pxPageEdgeDistance + pxWidgetHeight;
         if(Build.VERSION.SDK_INT < 19) heightSum -= pxWidgetHeight;
         for(int i = 0; i < lineInfoList.size(); i ++) {
@@ -634,8 +700,8 @@ public class WenkuReaderPageView extends View {
     }
 
     public void watchImageDetailed(Activity activity) {
-        if(bitmapInfoList == null || bitmapInfoList.size() == 0) {
-            Toast.makeText(getContext(), "本页无图~", Toast.LENGTH_SHORT).show();
+        if(bitmapInfoList == null || bitmapInfoList.size() == 0 || bitmapInfoList.get(0).bm == null) {
+            Toast.makeText(getContext(), "请在有图的页面点击此按钮~", Toast.LENGTH_SHORT).show();
         }
         else {
             Intent intent = new Intent(activity, ViewImageDetailActivity.class);

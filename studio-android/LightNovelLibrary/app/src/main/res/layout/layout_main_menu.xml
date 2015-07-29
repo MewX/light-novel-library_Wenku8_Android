@@ -42,7 +42,7 @@
             android:layout_above="@+id/user_name"
             android:layout_alignLeft="@+id/user_name"
             android:layout_alignStart="@+id/user_name"
-            android:layout_marginBottom="16dp"
+            android:layout_marginBottom="8dp"
             android:clickable="true"/>
 
         <TextView
@@ -54,9 +54,9 @@
             android:textColor="@color/avatar_text"
             android:layout_alignParentLeft="true"
             android:layout_alignParentStart="true"
-            android:layout_marginLeft="32dp"
-            android:layout_marginStart="32dp"
-            android:layout_marginBottom="16dp"
+            android:layout_marginLeft="24dp"
+            android:layout_marginStart="24dp"
+            android:layout_marginBottom="12dp"
             android:layout_alignBottom="@+id/bg_img"
             android:shadowColor="#000"
             android:shadowDx="3.0"

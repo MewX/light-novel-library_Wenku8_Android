@@ -10,11 +10,18 @@ import android.os.Bundle;
 import android.os.CountDownTimer;
 import android.widget.TextView;
 
+import com.readystatesoftware.systembartint.SystemBarTintManager;
+
 import org.mewx.wenku8.R;
+import org.mewx.wenku8.global.GlobalConfig;
+import org.mewx.wenku8.util.LightCache;
 import org.mewx.wenku8.util.LightUserSession;
+
+import java.io.File;
 
 /**
  * Created by MewX on 2015/6/13.
+ * Welcome Activity.
  */
 public class WelcomeActivity extends Activity {
     @Override
@@ -31,18 +38,32 @@ public class WelcomeActivity extends Activity {
 
         // get version code
         PackageManager manager;
-        PackageInfo info = null;
+        PackageInfo info;
         manager = this.getPackageManager();
         try {
             info = manager.getPackageInfo(this.getPackageName(), 0);
+            ((TextView) findViewById(R.id.version_code)).setText("Ver: " + info.versionName + " (" + info.versionCode + ")");
         } catch (PackageManager.NameNotFoundException e) {
             e.printStackTrace();
         }
-        ((TextView) findViewById(R.id.version_code)).setText("Ver: " + info.versionName + " (" + info.versionCode + ")");
+
+        // tint
+        SystemBarTintManager tintManager = new SystemBarTintManager(this);
+        tintManager.setTintAlpha(0.0f);
 
         // execute background action
         LightUserSession.aiui = new LightUserSession.AsyncInitUserInfo();
         LightUserSession.aiui.execute();
+        GlobalConfig.loadAllSetting();
+
+        // create save folder
+        LightCache.saveFile(GlobalConfig.getFirstStoragePath() + "imgs", ".nomedia", "".getBytes(), false);
+        LightCache.saveFile(GlobalConfig.getSecondStoragePath() + "imgs", ".nomedia", "".getBytes(), false);
+        LightCache.saveFile(GlobalConfig.getFirstStoragePath() + GlobalConfig.customFolderName, ".nomedia", "".getBytes(), false);
+        LightCache.saveFile(GlobalConfig.getSecondStoragePath() + GlobalConfig.customFolderName, ".nomedia", "".getBytes(), false);
+        GlobalConfig.setFirstStoragePathStatus(LightCache.testFileExist(GlobalConfig.getFirstStoragePath() + "imgs" + File.separator + ".nomedia")); // TODO: set status?
+        LightCache.saveFile(GlobalConfig.getFirstFullSaveFilePath() + "imgs", ".nomedia", "".getBytes(), false);
+        LightCache.saveFile(GlobalConfig.getSecondFullSaveFilePath() + "imgs", ".nomedia", "".getBytes(), false);
 
         /* This is a delay template */
         new CountDownTimer(1500, 100) {

@@ -43,21 +43,19 @@ import org.mewx.wenku8.util.LightUserSession;
 public class NavigationDrawerFragment extends Fragment {
     private final String TAG = "NavigationDrawerFragment";
     private View mFragmentContainerView;
+    private ImageView bgImage;
     private MainActivity mainActivity = null;
     private DrawerLayout mDrawerLayout;
     private ActionBarDrawerToggle mActionBarDrawerToggle;
     private TextView tvUserName;
     private RoundedImageView rivUserAvatar;
-
+    private Bitmap bmMenuBackground;
     private boolean fakeDarkSwitcher = false;
 
     @Nullable
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
-        // get parent view
-        View view = inflater.inflate(R.layout.layout_main_menu, container, false);
-
-        return view;
+        return inflater.inflate(R.layout.layout_main_menu, container, false);
     }
 
     @Override
@@ -204,6 +202,40 @@ public class NavigationDrawerFragment extends Fragment {
             clearAllButtonColor();
             setHighLightButton(mainActivity.getCurrentFragment());
             mainActivity.changeFragment(new LatestFragment());
+        }
+
+        // set menu background
+        bgImage = (ImageView) getActivity().findViewById(R.id.bg_img);
+        if(GlobalConfig.getFromAllSetting(GlobalConfig.SettingItems.menu_bg_id) != null) {
+            switch (GlobalConfig.getFromAllSetting(GlobalConfig.SettingItems.menu_bg_id)) {
+                case "0":
+                    try {
+                        bmMenuBackground = BitmapFactory.decodeFile(GlobalConfig.getFromAllSetting(GlobalConfig.SettingItems.menu_bg_path));
+                        if(bmMenuBackground == null) throw new Exception("PictureLoadFailureException");
+                        bgImage.setImageBitmap(bmMenuBackground);
+                    }
+                    catch (Exception e) {
+                        e.printStackTrace();
+                        Toast.makeText(getActivity(), e.toString(), Toast.LENGTH_SHORT).show();
+                        bgImage.setImageDrawable(getResources().getDrawable(R.drawable.bg_avatar_04));
+                    }
+                    break;
+                case "1":
+                    bgImage.setImageDrawable(getResources().getDrawable(R.drawable.bg_avatar_01));
+                    break;
+                case "2":
+                    bgImage.setImageDrawable(getResources().getDrawable(R.drawable.bg_avatar_02));
+                    break;
+                case "3":
+                    bgImage.setImageDrawable(getResources().getDrawable(R.drawable.bg_avatar_03));
+                    break;
+                case "4":
+                    bgImage.setImageDrawable(getResources().getDrawable(R.drawable.bg_avatar_04));
+                    break;
+                case "5":
+                    bgImage.setImageDrawable(getResources().getDrawable(R.drawable.bg_avatar_05));
+                    break;
+            }
         }
     }
 
@@ -539,6 +571,39 @@ public class NavigationDrawerFragment extends Fragment {
         else if(!LightUserSession.isUserInfoSet()) {
             tvUserName.setText(getResources().getString(R.string.main_menu_not_login));
             rivUserAvatar.setImageDrawable(getResources().getDrawable(R.drawable.ic_noavatar));
+        }
+
+        // update menu background
+        if(GlobalConfig.getFromAllSetting(GlobalConfig.SettingItems.menu_bg_id) != null) {
+            switch (GlobalConfig.getFromAllSetting(GlobalConfig.SettingItems.menu_bg_id)) {
+                case "0":
+                    try {
+                        bmMenuBackground = BitmapFactory.decodeFile(GlobalConfig.getFromAllSetting(GlobalConfig.SettingItems.menu_bg_path));
+                        if(bmMenuBackground == null) throw new Exception("PictureLoadFailureException");
+                        bgImage.setImageBitmap(bmMenuBackground);
+                    }
+                    catch (Exception e) {
+                        e.printStackTrace();
+                        Toast.makeText(getActivity(), e.toString(), Toast.LENGTH_SHORT).show();
+                        bgImage.setImageDrawable(getResources().getDrawable(R.drawable.bg_avatar_04));
+                    }
+                    break;
+                case "1":
+                    bgImage.setImageDrawable(getResources().getDrawable(R.drawable.bg_avatar_01));
+                    break;
+                case "2":
+                    bgImage.setImageDrawable(getResources().getDrawable(R.drawable.bg_avatar_02));
+                    break;
+                case "3":
+                    bgImage.setImageDrawable(getResources().getDrawable(R.drawable.bg_avatar_03));
+                    break;
+                case "4":
+                    bgImage.setImageDrawable(getResources().getDrawable(R.drawable.bg_avatar_04));
+                    break;
+                case "5":
+                    bgImage.setImageDrawable(getResources().getDrawable(R.drawable.bg_avatar_05));
+                    break;
+            }
         }
     }
 

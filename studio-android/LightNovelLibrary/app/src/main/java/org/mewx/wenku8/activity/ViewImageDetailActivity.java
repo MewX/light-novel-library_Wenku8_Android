@@ -139,19 +139,13 @@ public class ViewImageDetailActivity extends AppCompatActivity {
         findViewById(R.id.btn_download).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                // This always works
                 Intent i = new Intent(ViewImageDetailActivity.this, FilePickerActivity.class);
-                // This works if you defined the intent filter
-                // Intent i = new Intent(Intent.ACTION_GET_CONTENT);
-
-                // Set these depending on your use case. These are the defaults.
                 i.putExtra(FilePickerActivity.EXTRA_ALLOW_MULTIPLE, false);
-                i.putExtra(FilePickerActivity.EXTRA_ALLOW_CREATE_DIR, false);
+                i.putExtra(FilePickerActivity.EXTRA_ALLOW_CREATE_DIR, true);
                 i.putExtra(FilePickerActivity.EXTRA_MODE, FilePickerActivity.MODE_DIR);
                 i.putExtra(FilePickerActivity.EXTRA_START_PATH,
                         GlobalConfig.pathPickedSave == null || GlobalConfig.pathPickedSave.length() == 0 ?
                                 Environment.getExternalStorageDirectory().getPath() : GlobalConfig.pathPickedSave);
-
                 startActivityForResult(i, 0);
             }
         });

@@ -11,4 +11,19 @@
         <item>@string/dialog_option_reader_engine_v1</item>
         <item>@string/dialog_option_reader_engine_old</item>
     </string-array>
+
+    <string-array name="reader_font_option">
+        <item>@string/dialog_option_reader_font_system</item>
+        <item>@string/dialog_option_reader_font_custom</item>
+    </string-array>
+
+    <string-array name="reader_background_option">
+        <item>@string/dialog_option_reader_background_system</item>
+        <item>@string/dialog_option_reader_background_custom</item>
+    </string-array>
+
+    <string-array name="wipe_cache_option">
+        <item>@string/dialog_option_wipe_cache_fast</item>
+        <item>@string/dialog_option_wipe_cache_slow</item>
+    </string-array>
 </resources>

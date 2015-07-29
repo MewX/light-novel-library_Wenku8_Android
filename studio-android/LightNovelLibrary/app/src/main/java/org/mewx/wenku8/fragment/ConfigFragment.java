@@ -1,9 +1,13 @@
 package org.mewx.wenku8.fragment;
 
+import android.content.DialogInterface;
+import android.content.Intent;
+import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.Handler;
 import android.support.v4.app.Fragment;
 import android.support.v4.app.FragmentActivity;
+import android.telephony.gsm.GsmCellLocation;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -20,9 +24,20 @@ import com.umeng.update.UpdateResponse;
 import com.umeng.update.UpdateStatus;
 
 import org.mewx.wenku8.R;
+import org.mewx.wenku8.activity.AboutActivity;
 import org.mewx.wenku8.activity.MainActivity;
+import org.mewx.wenku8.activity.MenuBackgroundSelectorActivity;
 import org.mewx.wenku8.global.GlobalConfig;
+import org.mewx.wenku8.global.api.OldNovelContentParser;
 import org.mewx.wenku8.global.api.Wenku8API;
+import org.mewx.wenku8.global.api.Wenku8Error;
+import org.mewx.wenku8.util.LightCache;
+import org.mewx.wenku8.util.LightTool;
+
+import java.io.File;
+import java.io.UnsupportedEncodingException;
+import java.util.ArrayList;
+import java.util.List;
 
 public class ConfigFragment extends Fragment {
 
@@ -61,28 +76,50 @@ public class ConfigFragment extends Fragment {
             tvNotice.setText("通知：\n" + Wenku8API.NoticeString);
 
         // set all on click listeners
-        getActivity().findViewById(R.id.btn_data_backup).setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                Toast.makeText(getActivity(), "这个按钮暂时没有用滴~", Toast.LENGTH_SHORT).show();
-            }
-        });
-        getActivity().findViewById(R.id.btn_data_restore).setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                Toast.makeText(getActivity(), "这个按钮暂时没有用滴~", Toast.LENGTH_SHORT).show();
-            }
-        });
+//        getActivity().findViewById(R.id.btn_data_backup).setOnClickListener(new View.OnClickListener() {
+//            @Override
+//            public void onClick(View v) {
+//                Toast.makeText(getActivity(), "这个按钮暂时没有用滴~", Toast.LENGTH_SHORT).show();
+//            }
+//        });
+//        getActivity().findViewById(R.id.btn_data_restore).setOnClickListener(new View.OnClickListener() {
+//            @Override
+//            public void onClick(View v) {
+//                Toast.makeText(getActivity(), "这个按钮暂时没有用滴~", Toast.LENGTH_SHORT).show();
+//            }
+//        });
         getActivity().findViewById(R.id.btn_clear_cache).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                Toast.makeText(getActivity(), "这个按钮暂时没有用滴~", Toast.LENGTH_SHORT).show();
+                new MaterialDialog.Builder(getActivity())
+                        .theme(Theme.LIGHT)
+                        .title(R.string.config_clear_cache)
+                        .items(R.array.wipe_cache_option)
+                        .itemsCallback(new MaterialDialog.ListCallback() {
+                            @Override
+                            public void onSelection(MaterialDialog dialog, View view, int which, CharSequence text) {
+                                switch (which) {
+                                    case 0:
+                                        // fast mode
+                                        AsyncDeleteFast adf = new AsyncDeleteFast();
+                                        adf.execute();
+                                        break;
+                                    case 1:
+                                        // slow mode
+                                        AsyncDeleteSlow ads = new AsyncDeleteSlow();
+                                        ads.execute();
+                                        break;
+                                }
+                            }
+                        })
+                        .show();
             }
         });
         getActivity().findViewById(R.id.btn_navigation_drawer_wallpaper).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                Toast.makeText(getActivity(), "这个按钮暂时没有用滴~", Toast.LENGTH_SHORT).show();
+                Intent intent = new Intent(getActivity(), MenuBackgroundSelectorActivity.class);
+                startActivity(intent);
             }
         });
         getActivity().findViewById(R.id.btn_check_update).setOnClickListener(new View.OnClickListener() {
@@ -154,7 +191,8 @@ public class ConfigFragment extends Fragment {
         getActivity().findViewById(R.id.btn_about).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                Toast.makeText(getActivity(), "这个按钮暂时没有用滴~", Toast.LENGTH_SHORT).show();
+                Intent intent = new Intent(getActivity(), AboutActivity.class);
+                startActivity(intent);
             }
         });
     }
@@ -174,5 +212,158 @@ public class ConfigFragment extends Fragment {
     public void onResume() {
         super.onResume();
         MobclickAgent.onPageStart("ConfigFragment");
+    }
+
+    private class AsyncDeleteFast extends AsyncTask<Integer, Integer, Wenku8Error.ErrorCode> {
+        private MaterialDialog md;
+        @Override
+        protected void onPreExecute() {
+            super.onPreExecute();
+            md = new MaterialDialog.Builder(getActivity())
+                    .theme(Theme.LIGHT)
+                    .title(R.string.config_clear_cache)
+                    .content(R.string.dialog_content_wipe_cache_fast)
+                    .progress(true, 0)
+                    .cancelable(false)
+                    .show();
+        }
+
+        @Override
+        protected Wenku8Error.ErrorCode doInBackground(Integer... params) {
+            // covers
+            File dir = new File(GlobalConfig.getFirstStoragePath() + "imgs");
+            if(dir == null || !dir.exists()) dir = new File(GlobalConfig.getSecondStoragePath() + "imgs");
+            File[] childFile = dir.listFiles();
+            if(childFile != null && childFile.length != 0) {
+                for (File f : childFile) {
+                    String[] temp = f.getAbsolutePath().split("\\/");
+                    if(temp != null && temp.length != 0) {
+                        String id = temp[temp.length - 1].split("\\.")[0];
+                        if(LightTool.isInteger(id) && !GlobalConfig.testInLocalBookshelf(Integer.parseInt(id)))
+                            f.delete(); // ignore ".nomedia"
+                    }
+                }
+            }
+
+            // cache
+            dir = new File(GlobalConfig.getFirstStoragePath() + "cache");
+            if(dir == null || !dir.exists()) dir = new File(GlobalConfig.getSecondStoragePath() + "cache");
+            childFile = dir.listFiles();
+            if(childFile != null && childFile.length != 0) {
+                for (File f : childFile) {
+                    f.delete();
+                }
+            }
+            return Wenku8Error.ErrorCode.SYSTEM_1_SUCCEEDED;
+        }
+
+        @Override
+        protected void onPostExecute(Wenku8Error.ErrorCode errorCode) {
+            super.onPostExecute(errorCode);
+            if(md != null) md.dismiss();
+            Toast.makeText(getActivity(), "OK", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private class AsyncDeleteSlow extends AsyncTask<Integer, Integer, Wenku8Error.ErrorCode> {
+        private MaterialDialog md;
+        private boolean isLoading = false;
+        @Override
+        protected void onPreExecute() {
+            super.onPreExecute();
+            md = new MaterialDialog.Builder(getActivity())
+                    .theme(Theme.LIGHT)
+                    .cancelListener(new DialogInterface.OnCancelListener() {
+                        @Override
+                        public void onCancel(DialogInterface dialog) {
+                            isLoading = false;
+                            AsyncDeleteSlow.this.cancel(true);
+                        }
+                    })
+                    .title(R.string.config_clear_cache)
+                    .content(R.string.dialog_content_wipe_cache_slow)
+                    .progress(true, 0)
+                    .cancelable(true)
+                    .show();
+            isLoading = true;
+        }
+
+        @Override
+        protected Wenku8Error.ErrorCode doInBackground(Integer... params) {
+            // covers
+            File dir = new File(GlobalConfig.getFirstStoragePath() + "imgs");
+            if(dir == null || !dir.exists()) dir = new File(GlobalConfig.getSecondStoragePath() + "imgs");
+            File[] childFile = dir.listFiles();
+            if(childFile != null && childFile.length != 0) {
+                for (File f : childFile) {
+                    String[] temp = f.getAbsolutePath().split("\\/");
+                    if(temp != null && temp.length != 0) {
+                        String id = temp[temp.length - 1].split("\\.")[0];
+                        if(LightTool.isInteger(id) && !GlobalConfig.testInLocalBookshelf(Integer.parseInt(id)))
+                            f.delete(); // ignore ".nomedia"
+                    }
+                }
+            }
+
+            // cache
+            dir = new File(GlobalConfig.getFirstStoragePath() + "cache");
+            if(dir == null || !dir.exists()) dir = new File(GlobalConfig.getSecondStoragePath() + "cache");
+            childFile = dir.listFiles();
+            if(childFile != null && childFile.length != 0) {
+                for (File f : childFile) {
+                    f.delete();
+                }
+            }
+            if(!isLoading) return Wenku8Error.ErrorCode.USER_CANCELLED_TASK;
+
+            // get saved picture filename list. Rec all /wenku8/saves/novel, get all picture name, then delete if not in list
+            List<String> listPicture = new ArrayList<>();
+            dir = new File(GlobalConfig.getFirstFullSaveFilePath() + "novel");
+            if(dir == null || !dir.exists()) dir = new File(GlobalConfig.getSecondFullSaveFilePath() + "novel");
+            childFile = dir.listFiles();
+            if(childFile != null && childFile.length != 0) {
+                for (File f : childFile) {
+                    if(!isLoading) return Wenku8Error.ErrorCode.USER_CANCELLED_TASK;
+                    byte[] temp = LightCache.loadFile(f.getAbsolutePath());
+                    if(temp == null) continue;
+                    try {
+                        List<OldNovelContentParser.NovelContent> list = OldNovelContentParser.NovelContentParser_onlyImage(new String(temp, "UTF-8"));
+                        for(OldNovelContentParser.NovelContent nv : list) listPicture.add(GlobalConfig.generateImageFileNameByURL(nv.content));
+                    } catch (UnsupportedEncodingException e) {
+                        e.printStackTrace();
+                    }
+                }
+            }
+
+            // loop for images
+            dir = new File(GlobalConfig.getFirstFullSaveFilePath() + "imgs");
+            if(dir == null || !dir.exists()) dir = new File(GlobalConfig.getSecondFullSaveFilePath() + "imgs");
+            childFile = dir.listFiles();
+            if(childFile != null && childFile.length != 0) {
+                for (File f : childFile) {
+                    if(!isLoading) return Wenku8Error.ErrorCode.USER_CANCELLED_TASK;
+                    String[] temp = f.getAbsolutePath().split("\\/");
+                    if(temp != null && temp.length != 0) {
+                        String name = temp[temp.length - 1];
+                        if(!listPicture.contains(name)) f.delete();
+                    }
+                }
+            }
+            return Wenku8Error.ErrorCode.SYSTEM_1_SUCCEEDED;
+        }
+
+        @Override
+        protected void onPostExecute(Wenku8Error.ErrorCode errorCode) {
+            super.onPostExecute(errorCode);
+            isLoading = false;
+            if(md != null) md.dismiss();
+
+            if(errorCode == Wenku8Error.ErrorCode.SYSTEM_1_SUCCEEDED) {
+                Toast.makeText(getActivity(), "OK", Toast.LENGTH_SHORT).show();
+            }
+            else {
+                Toast.makeText(getActivity(), errorCode.toString(), Toast.LENGTH_SHORT).show();
+            }
+        }
     }
 }

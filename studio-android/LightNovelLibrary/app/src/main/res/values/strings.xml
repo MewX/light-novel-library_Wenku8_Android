@@ -37,6 +37,9 @@
     <string name="action_user_info">账号信息</string>
     <string name="action_sign">签到</string>
     <string name="action_watch_image">查看本页大图</string>
+    <string name="action_menu_background_selector">选择一个背景图片</string>
+    <string name="action_custom_bg">选择自定义的图片（高度不得大于宽度，不支持外置SD卡，请自行裁剪好）</string>
+    <string name="action_about">关于轻小说文库APP</string>
     <string name="title_search">搜索：</string>
     <string name="main_menu_rklist">排行榜</string>
     <string name="main_menu_latest">最近更新</string>
@@ -67,8 +70,8 @@
     <string name="novel_item_cover">小说封面</string>
     <string name="list_loading">正在载入列表……</string>
     <string name="system_press_again_to_exit"><b>退出请再抚摸一下返回键哦～</b>\n&lt;(=～￣▽￣)→)￣▽￣=)>o </string>
-    <string name="system_network_error">连接服务器失败！\n\n可能的原因有：\n手机网络异常；\n运营商劫持（部分地区的10086）；\nWIFI切换到数据需等待域名解析缓存刷新（约10min）；\n服务器暂时无法响应请求；\n此时段请求服务器次数过多。</string>
-    <string name="system_parse_failed">数据解析失败！\n\n可能的原因有：\n　　程序内部错误，请反馈给开发者；\n　　你修改了存储的数据。</string>
+    <string name="system_network_error">连接服务器失败！\n\n可能的原因有：\n手机网络异常，试试浏览器访问；\n运营商劫持（部分地区的10086）；\nWIFI切换到数据需等待域名解析缓存刷新（约10min）；\n服务器暂时无法响应请求；\n此时段请求服务器次数过多。</string>
+    <string name="system_parse_failed">数据解析失败！\n\n可能的原因有：\n你修改了存储的数据；\n服务姬傲娇了，试试浏览器访问；\n程序内部错误，请反馈给开发者；</string>
     <string name="system_manually_cancelled">任务已被手动取消</string>
     <string name="system_loading_please_wait">加载中……请稍后再试</string>
     <string name="system_fav_it_first">请先收藏后再下载！</string>
@@ -77,7 +80,7 @@
     <string name="system_logging_in">正在勾搭服务姬……</string>
     <string name="system_logged">勾搭成功！</string>
     <string name="system_username_error">勾搭失败，服务姬说不认识你不约！（用户名不存在）</string>
-    <string name="system_password_error">勾搭失败，傲娇的安卓app的服务姬说蜀黍你不像个好人！（密码错误 / 密码中存在SQL注入的特殊字符，请修改密码）</string>
+    <string name="system_password_error">勾搭失败，傲娇的安卓app的服务姬说你是个坏蜀黍！（密码错误 / 密码中存在SQL注入的特殊字符，请修改密码）</string>
     <string name="system_log_info_outofdate">登录信息已经改变，登陆失败！</string>
     <string name="system_fetching">正在从服务器获取信息……</string>
     <string name="system_wait_for_next_version">请等待下一个版本~</string>
@@ -106,6 +109,8 @@
     <string name="dialog_content_novel_remove_from_cloud">正在从云端书架移除……</string>
     <string name="dialog_content_saved_path">已选择的路径：\n</string>
     <string name="dialog_content_force_write_file">确定要覆盖文件吗？</string>
+    <string name="dialog_content_wipe_cache_fast">正在快速清理缓存……</string>
+    <string name="dialog_content_wipe_cache_slow">正在仔细清理缓存……</string>
     <string name="dialog_sure_to_jump_chapter">确定要跳转章节？</string>
     <string name="dialog_positive_ok">OK</string>
     <string name="dialog_positive_want">要</string>
@@ -160,6 +165,12 @@
     <string name="dialog_option_select_and_update">分卷下载</string>
     <string name="dialog_option_reader_engine_v1">左右翻页引擎 V1</string>
     <string name="dialog_option_reader_engine_old">上下滑动引擎（旧）</string>
+    <string name="dialog_option_reader_font_system">默认：方正书宋</string>
+    <string name="dialog_option_reader_font_custom">自定义ttf/otf（建议手动拷贝至wenku8/custom目录下，不支持外置SD卡）</string>
+    <string name="dialog_option_reader_background_system">默认：模拟纸张</string>
+    <string name="dialog_option_reader_background_custom">自定义图片（建议手动拷贝至wenku8/custom目录下，不支持外置SD卡，图片不要太大）</string>
+    <string name="dialog_option_wipe_cache_fast">粗略清理（很快）</string>
+    <string name="dialog_option_wipe_cache_slow">严格清理（极慢）</string>
     <string name="reader_please_wait">请稍候……</string>
     <string name="reader_engine_v1_parsing">V1引擎正在获取并解析文本内容</string>
     <string name="reader_already_first_chapter">已是第一章</string>
@@ -174,4 +185,10 @@
     <string name="reader_jump_last">是否跳转到上次阅读记录？</string>
     <string name="reader_rotate">顺时针旋转90°</string>
     <string name="reader_download">保存图片</string>
+    <string name="reader_custom_background">自定义阅读背景</string>
+    <string name="reader_custom_font">自定义阅读字体</string>
+    <string name="reader_font_size">字体大小</string>
+    <string name="reader_line_distance">行间距离</string>
+    <string name="reader_paragraph_distance">段落间距</string>
+    <string name="reader_paragraph_edge_distance">段落边距</string>
 </resources>

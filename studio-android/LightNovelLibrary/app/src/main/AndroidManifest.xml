@@ -113,6 +113,18 @@
             android:screenOrientation="portrait">
         </activity>
 
+        <!-- Menu Background Selector Activity -->
+        <activity android:name=".activity.MenuBackgroundSelectorActivity"
+            android:label="@string/action_menu_background_selector"
+            android:screenOrientation="portrait">
+        </activity>
+
+        <!-- Menu Background Selector Activity -->
+        <activity android:name=".activity.AboutActivity"
+            android:label="@string/action_about"
+            android:screenOrientation="portrait">
+        </activity>
+
         <!-- Directory Picker Activity-->
         <activity
             android:name="com.nononsenseapps.filepicker.FilePickerActivity"
