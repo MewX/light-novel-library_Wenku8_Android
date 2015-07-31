@@ -42,7 +42,8 @@ public class WelcomeActivity extends Activity {
         manager = this.getPackageManager();
         try {
             info = manager.getPackageInfo(this.getPackageName(), 0);
-            ((TextView) findViewById(R.id.version_code)).setText("Ver: " + info.versionName + " (" + info.versionCode + ")");
+            ((TextView) findViewById(R.id.version_code)).setText("Ver: " + info.versionName + " (" + info.versionCode + ")"
+                    + (GlobalConfig.inAlphaBuild() ? " 内测版" : "正式版"));
         } catch (PackageManager.NameNotFoundException e) {
             e.printStackTrace();
         }
@@ -66,7 +67,7 @@ public class WelcomeActivity extends Activity {
         LightCache.saveFile(GlobalConfig.getSecondFullSaveFilePath() + "imgs", ".nomedia", "".getBytes(), false);
 
         /* This is a delay template */
-        new CountDownTimer(1500, 100) {
+        new CountDownTimer(2000, 100) {
             @Override
             public void onTick(long millisUntilFinished) {
                 // Animation can be here.

@@ -220,7 +220,7 @@ public class NavigationDrawerFragment extends Fragment {
                             if(bmMenuBackground == null) throw new Exception("PictureLoadFailureException");
                         } catch(Exception e) {
                             e.printStackTrace();
-                            Toast.makeText(getActivity(), "Exception: " + e.toString(), Toast.LENGTH_SHORT).show();
+                            Toast.makeText(getActivity(), "Exception: " + e.toString() + "\n可能的原因有：图片不在内置SD卡；图片格式不正确；图片像素尺寸太大，请使用小一点的图，谢谢，此功能为试验性功能；", Toast.LENGTH_SHORT).show();
                             bgImage.setImageDrawable(getResources().getDrawable(R.drawable.bg_avatar_04));
                             return;
                         }
@@ -592,7 +592,7 @@ public class NavigationDrawerFragment extends Fragment {
                             if(bmMenuBackground == null) throw new Exception("PictureLoadFailureException");
                         } catch(Exception e) {
                             e.printStackTrace();
-                            Toast.makeText(getActivity(), "Exception: " + e.toString(), Toast.LENGTH_SHORT).show();
+                            Toast.makeText(getActivity(), "Exception: " + e.toString() + "\n可能的原因有：图片不在内置SD卡；图片格式不正确；图片像素尺寸太大，请使用小一点的图，谢谢，此功能为试验性功能；", Toast.LENGTH_SHORT).show();
                             bgImage.setImageDrawable(getResources().getDrawable(R.drawable.bg_avatar_04));
                             return;
                         }

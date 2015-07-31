@@ -428,10 +428,13 @@ public class FavFragment extends Fragment implements MyItemClickListener, MyItem
             md.dismiss();
             if(errorCode != Wenku8Error.ErrorCode.SYSTEM_1_SUCCEEDED) {
                 Toast.makeText(MyApp.getContext(), errorCode.toString(), Toast.LENGTH_SHORT).show();
+                refreshList(timecount ++);
             }
+            else {
 
-            AsyncLoadAllLocal alal = new AsyncLoadAllLocal();
-            alal.execute();
+                AsyncLoadAllLocal alal = new AsyncLoadAllLocal();
+                alal.execute();
+            }
         }
     }
 

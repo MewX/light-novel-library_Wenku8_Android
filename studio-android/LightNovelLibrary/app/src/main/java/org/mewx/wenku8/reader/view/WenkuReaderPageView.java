@@ -155,7 +155,7 @@ public class WenkuReaderPageView extends View {
             else typeface = Typeface.createFromAsset(MyApp.getContext().getAssets(), "fonts/fzss-gbk.ttf"); // use font
         }
         catch (Exception e) {
-            Toast.makeText(MyApp.getContext(), e.toString(), Toast.LENGTH_SHORT).show();
+            Toast.makeText(MyApp.getContext(), e.toString() + "\n可能的原因有：字体文件不在内置SD卡；内存太小字体太大，请使用简体中文字体，而不是CJK或GBK，谢谢，此功能为试验性功能；", Toast.LENGTH_SHORT).show();
         }
         if(typeface == null) typeface = Typeface.createFromAsset(MyApp.getContext().getAssets(), "fonts/fzss-gbk.ttf"); // use font
         textPaint = new TextPaint();

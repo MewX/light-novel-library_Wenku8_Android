@@ -412,12 +412,11 @@ public class Wenku8ReaderActivityV1 extends AppCompatActivity {
         protected void onPreExecute() {
             super.onPreExecute();
             md = new MaterialDialog.Builder(Wenku8ReaderActivityV1.this)
-                    .theme(Theme.LIGHT)
+                    .theme(WenkuReaderPageView.getInDayMode() ? Theme.LIGHT : Theme.DARK)
                     .title(R.string.reader_please_wait)
                     .content(R.string.reader_engine_v1_parsing)
                     .progress(true, 0)
                     .cancelable(false)
-                    .titleColor(R.color.default_text_color_black)
                     .show();
         }
 
@@ -521,7 +520,8 @@ public class Wenku8ReaderActivityV1 extends AppCompatActivity {
                                     @Override
                                     public void onClick(View v) {
                                         // show jump dialog
-                                        if(findViewById(R.id.reader_bot_settings).getVisibility() == View.VISIBLE) {
+                                        if(findViewById(R.id.reader_bot_settings).getVisibility() == View.VISIBLE
+                                                || findViewById(R.id.reader_bot_seeker).getVisibility() == View.INVISIBLE) {
                                             isOpen = false;
                                             findViewById(R.id.reader_bot_settings).setVisibility(View.INVISIBLE);
                                         }
@@ -579,7 +579,8 @@ public class Wenku8ReaderActivityV1 extends AppCompatActivity {
                                     @Override
                                     public void onClick(View v) {
                                         // show jump dialog
-                                        if(findViewById(R.id.reader_bot_seeker).getVisibility() == View.VISIBLE) {
+                                        if(findViewById(R.id.reader_bot_seeker).getVisibility() == View.VISIBLE
+                                                || findViewById(R.id.reader_bot_settings).getVisibility() == View.INVISIBLE) {
                                             isOpen = false;
                                             findViewById(R.id.reader_bot_seeker).setVisibility(View.INVISIBLE);
                                         }
@@ -667,7 +668,7 @@ public class Wenku8ReaderActivityV1 extends AppCompatActivity {
                                             @Override
                                             public void onClick(View v) {
                                                 new MaterialDialog.Builder(Wenku8ReaderActivityV1.this)
-                                                        .theme(Theme.LIGHT)
+                                                        .theme(WenkuReaderPageView.getInDayMode() ? Theme.LIGHT : Theme.DARK)
                                                         .title(R.string.reader_custom_font)
                                                         .items(R.array.reader_font_option)
                                                         .itemsCallback(new MaterialDialog.ListCallback() {
@@ -703,7 +704,7 @@ public class Wenku8ReaderActivityV1 extends AppCompatActivity {
                                             @Override
                                             public void onClick(View v) {
                                                 new MaterialDialog.Builder(Wenku8ReaderActivityV1.this)
-                                                        .theme(Theme.LIGHT)
+                                                        .theme(WenkuReaderPageView.getInDayMode() ? Theme.LIGHT : Theme.DARK)
                                                         .title(R.string.reader_custom_background)
                                                         .items(R.array.reader_background_option)
                                                         .itemsCallback(new MaterialDialog.ListCallback() {
@@ -772,12 +773,7 @@ public class Wenku8ReaderActivityV1 extends AppCompatActivity {
                                                                     Wenku8ReaderActivityV1.this.finish();
                                                                 }
                                                             })
-                                                            .theme(Theme.LIGHT)
-                                                            .titleColorRes(R.color.dlgTitleColor)
-                                                            .backgroundColorRes(R.color.dlgBackgroundColor)
-                                                            .contentColorRes(R.color.dlgContentColor)
-                                                            .positiveColorRes(R.color.dlgPositiveButtonColor)
-                                                            .negativeColorRes(R.color.dlgNegativeButtonColor)
+                                                            .theme(WenkuReaderPageView.getInDayMode() ? Theme.LIGHT : Theme.DARK)
                                                             .title(R.string.dialog_sure_to_jump_chapter)
                                                             .content(volumeList.chapterList.get(i_bak - 1).chapterName)
                                                             .contentGravity(GravityEnum.CENTER)
@@ -819,12 +815,7 @@ public class Wenku8ReaderActivityV1 extends AppCompatActivity {
                                                                     Wenku8ReaderActivityV1.this.finish();
                                                                 }
                                                             })
-                                                            .theme(Theme.LIGHT)
-                                                            .titleColorRes(R.color.dlgTitleColor)
-                                                            .backgroundColorRes(R.color.dlgBackgroundColor)
-                                                            .contentColorRes(R.color.dlgContentColor)
-                                                            .positiveColorRes(R.color.dlgPositiveButtonColor)
-                                                            .negativeColorRes(R.color.dlgNegativeButtonColor)
+                                                            .theme(WenkuReaderPageView.getInDayMode() ? Theme.LIGHT : Theme.DARK)
                                                             .title(R.string.dialog_sure_to_jump_chapter)
                                                             .content(volumeList.chapterList.get(i_bak + 1).chapterName)
                                                             .contentGravity(GravityEnum.CENTER)
@@ -889,12 +880,7 @@ public class Wenku8ReaderActivityV1 extends AppCompatActivity {
                                         mSlidingPageAdapter.notifyDataSetChanged();
                                     }
                                 })
-                                .theme(Theme.LIGHT)
-                                .titleColor(R.color.default_text_color_black)
-                                .backgroundColorRes(R.color.dlgBackgroundColor)
-                                .contentColorRes(R.color.dlgContentColor)
-                                .positiveColorRes(R.color.dlgPositiveButtonColor)
-                                .negativeColorRes(R.color.dlgNegativeButtonColor)
+                                .theme(WenkuReaderPageView.getInDayMode() ? Theme.LIGHT : Theme.DARK)
                                 .title(R.string.reader_v1_notice)
                                 .content(R.string.reader_jump_last)
                                 .contentGravity(GravityEnum.CENTER)
@@ -934,12 +920,7 @@ public class Wenku8ReaderActivityV1 extends AppCompatActivity {
                                         Wenku8ReaderActivityV1.this.finish();
                                     }
                                 })
-                                .theme(Theme.LIGHT)
-                                .titleColorRes(R.color.dlgTitleColor)
-                                .backgroundColorRes(R.color.dlgBackgroundColor)
-                                .contentColorRes(R.color.dlgContentColor)
-                                .positiveColorRes(R.color.dlgPositiveButtonColor)
-                                .negativeColorRes(R.color.dlgNegativeButtonColor)
+                                .theme(WenkuReaderPageView.getInDayMode() ? Theme.LIGHT : Theme.DARK)
                                 .title(R.string.dialog_sure_to_jump_chapter)
                                 .content(volumeList.chapterList.get(i_bak + 1).chapterName)
                                 .contentGravity(GravityEnum.CENTER)
@@ -984,12 +965,7 @@ public class Wenku8ReaderActivityV1 extends AppCompatActivity {
                                         Wenku8ReaderActivityV1.this.finish();
                                     }
                                 })
-                                .theme(Theme.LIGHT)
-                                .titleColorRes(R.color.dlgTitleColor)
-                                .backgroundColorRes(R.color.dlgBackgroundColor)
-                                .contentColorRes(R.color.dlgContentColor)
-                                .positiveColorRes(R.color.dlgPositiveButtonColor)
-                                .negativeColorRes(R.color.dlgNegativeButtonColor)
+                                .theme(WenkuReaderPageView.getInDayMode() ? Theme.LIGHT : Theme.DARK)
                                 .title(R.string.dialog_sure_to_jump_chapter)
                                 .content(volumeList.chapterList.get(i_bak - 1).chapterName)
                                 .contentGravity(GravityEnum.CENTER)
@@ -1090,7 +1066,7 @@ public class Wenku8ReaderActivityV1 extends AppCompatActivity {
                 if(bitmap == null) throw new Exception("PictureDecodeFailedException");
             } catch(Exception e) {
                 e.printStackTrace();
-                Toast.makeText(this, "Exception: " + e.toString(), Toast.LENGTH_SHORT).show();
+                Toast.makeText(this, "Exception: " + e.toString() + "\n可能的原因有：图片不在内置SD卡；图片格式不正确；图片像素尺寸太大，请使用小一点的图，谢谢，此功能为试验性功能；", Toast.LENGTH_LONG).show();
                 return;
             }
         }

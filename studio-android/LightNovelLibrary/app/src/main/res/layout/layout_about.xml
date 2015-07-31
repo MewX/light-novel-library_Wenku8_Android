@@ -125,6 +125,7 @@
                     card-view:cardMaxElevation="2dp">
 
                     <RelativeLayout
+                        android:id="@+id/mewx_layout"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:orientation="horizontal"

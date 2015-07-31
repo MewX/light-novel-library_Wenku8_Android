@@ -64,6 +64,7 @@
     <string name="hello_blank_fragment">Hello blank fragment</string>
     <string name="novel_item_author_with_colon">小说作者：</string>
     <string name="na">N/A</string>
+    <string name="loading">loading...</string>
     <string name="novel_item_status_with_colon">连载状态：</string>
     <string name="novel_item_update_with_colon">更新时间：</string>
     <string name="novel_item_intro_with_colon">内容简介：</string>
@@ -95,6 +96,7 @@
     <string name="dialog_title_choose_download_option">选择执行的下载操作：</string>
     <string name="dialog_title_save_file_name">输入保存的文件名（不要加.jpg）</string>
     <string name="dialog_title_found_file">目标文件已存在</string>
+    <string name="dialog_content_search_author">要查找所有该作者的书吗？</string>
     <string name="dialog_content_delete_one_search_record">确定要删除该搜索历史吗？\n</string>
     <string name="dialog_content_load_from_cloud">该章节未缓存，是否立即联网阅读？</string>
     <string name="dialog_content_verify_download">确定要开始联网下载该书吗？\n（高清原图也会下载）</string>
@@ -165,10 +167,10 @@
     <string name="dialog_option_select_and_update">分卷下载</string>
     <string name="dialog_option_reader_engine_v1">左右翻页引擎 V1</string>
     <string name="dialog_option_reader_engine_old">上下滑动引擎（旧）</string>
-    <string name="dialog_option_reader_font_system">默认：方正书宋</string>
-    <string name="dialog_option_reader_font_custom">自定义ttf/otf（建议手动拷贝至wenku8/custom目录下，不支持外置SD卡）</string>
-    <string name="dialog_option_reader_background_system">默认：模拟纸张</string>
-    <string name="dialog_option_reader_background_custom">自定义图片（建议手动拷贝至wenku8/custom目录下，不支持外置SD卡，图片不要太大）</string>
+    <string name="dialog_option_reader_font_system">使用默认的方正书宋</string>
+    <string name="dialog_option_reader_font_custom">使用自定义ttf/otf（建议手动拷贝至wenku8/custom目录下，不支持外置SD卡）</string>
+    <string name="dialog_option_reader_background_system">使用默认的模拟纸张</string>
+    <string name="dialog_option_reader_background_custom">使用自定义图片（建议手动拷贝至wenku8/custom目录下，不支持外置SD卡，图片不要太大）</string>
     <string name="dialog_option_wipe_cache_fast">粗略清理（很快）</string>
     <string name="dialog_option_wipe_cache_slow">严格清理（极慢）</string>
     <string name="reader_please_wait">请稍候……</string>

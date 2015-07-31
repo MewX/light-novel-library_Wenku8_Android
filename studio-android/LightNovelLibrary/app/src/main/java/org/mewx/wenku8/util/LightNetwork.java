@@ -39,6 +39,9 @@ import android.content.ContentValues;
 import android.util.Log;
 
 public class LightNetwork {
+    final static private String fromEle = ".cn/";
+    final static private String toEle = ".com/";
+
 	/**
 	 * "Status" is an entry to monitor vars 0 - resting 1 -
 	 **/
@@ -88,6 +91,9 @@ public class LightNetwork {
 		// on server: request.getParameter("name")
 		// List<NameValuePair> params = new ArrayList<NameValuePair>();
 		// params.add(new BasicNameValuePair("name", "this is post"));
+
+		// a replacer
+		URL = URL.replace(fromEle, toEle);
 
 		HttpPost httpRequest = new HttpPost(URL);
         httpRequest.addHeader("Accept-Encoding", "gzip");
@@ -147,6 +153,9 @@ public class LightNetwork {
 	 * @return raw bytes or null!
 	 */
 	public static byte[] LightHttpPostConnection(String u, ContentValues values) {
+
+		// a replacer
+		u = u.replace(fromEle, toEle);
 
 		// new API, initial
 		URL url = null;
@@ -250,6 +259,9 @@ public class LightNetwork {
 //			return null;
 //		}
 
+		// a replacer
+		url = url.replace(fromEle, toEle);
+
 		InputStream inputStream = null;
 		try {
 			URL localURL = new URL(url);
@@ -283,6 +295,8 @@ public class LightNetwork {
 	 */
 	public static boolean LightHttpDownloadToFile(String url, String filepath) {
 
+		// a replacer
+		url = url.replace(fromEle, toEle);
 
 		return false;
 	}

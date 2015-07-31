@@ -163,6 +163,7 @@ public class LatestFragment extends Fragment implements MyItemClickListener, MyI
     @Override
     public void onItemLongClick(View view, int postion) {
         // empty
+        onItemClick(view, postion);
     }
 
 

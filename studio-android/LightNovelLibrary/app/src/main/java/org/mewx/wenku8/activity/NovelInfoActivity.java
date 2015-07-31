@@ -51,6 +51,7 @@ import org.mewx.wenku8.reader.activity.Wenku8ReaderActivityV1;
 import org.mewx.wenku8.util.LightCache;
 import org.mewx.wenku8.util.LightNetwork;
 import org.mewx.wenku8.util.LightTool;
+import org.w3c.dom.Text;
 
 import java.io.File;
 import java.io.UnsupportedEncodingException;
@@ -204,7 +205,10 @@ public class NovelInfoActivity extends AppCompatActivity {
                     famMenu.collapse();
             }
         });
-        if(Build.VERSION.SDK_INT >= 16) tvNovelTitle.setBackground(getResources().getDrawable(R.drawable.btn_menu_item));
+        if(Build.VERSION.SDK_INT >= 16) {
+            tvNovelTitle.setBackground(getResources().getDrawable(R.drawable.btn_menu_item));
+            tvNovelAuthor.setBackground(getResources().getDrawable(R.drawable.btn_menu_item));
+        }
         tvNovelTitle.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -226,6 +230,52 @@ public class NovelInfoActivity extends AppCompatActivity {
                         .contentGravity(GravityEnum.CENTER)
                         .positiveText(R.string.dialog_positive_known)
                         .show();
+            }
+        });
+        tvNovelAuthor.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if(isLoading) {
+                    Toast.makeText(NovelInfoActivity.this, getResources().getString(R.string.system_loading_please_wait), Toast.LENGTH_SHORT).show();
+                    return;
+                }
+
+                new MaterialDialog.Builder(NovelInfoActivity.this)
+                        .theme(Theme.LIGHT)
+                        .callback(new MaterialDialog.ButtonCallback() {
+                            @Override
+                            public void onPositive(MaterialDialog dialog) {
+                                super.onPositive(dialog);
+
+                                // search author name
+                                Intent intent = new Intent(NovelInfoActivity.this, SearchResultActivity.class);
+                                intent.putExtra("key", mNovelItemMeta.author);
+                                intent.addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT); // long-press will cause repetitions
+                                startActivity(intent);
+                                overridePendingTransition(R.anim.fade_in, R.anim.hold);
+                            }
+                        })
+                        .content(R.string.dialog_content_search_author)
+                        .positiveText(R.string.dialog_positive_ok)
+                        .negativeText(R.string.dialog_negative_biao)
+                        .show();
+            }
+        });
+        ivNovelCover.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if(isLoading) {
+                    Toast.makeText(NovelInfoActivity.this, getResources().getString(R.string.system_loading_please_wait), Toast.LENGTH_SHORT).show();
+                    return;
+                }
+
+                String path = GlobalConfig.getFirstStoragePath() + "imgs" + File.separator + aid + ".jpg";
+                if(!LightCache.testFileExist(path))
+                    path = GlobalConfig.getFirstStoragePath() + "imgs" + File.separator + aid + ".jpg";
+                Intent intent = new Intent(NovelInfoActivity.this, ViewImageDetailActivity.class);
+                intent.putExtra("path", path);
+                startActivity(intent);
+                overridePendingTransition(R.anim.fade_in, R.anim.hold); // fade in animation
             }
         });
         fabFavorate.setOnClickListener(new View.OnClickListener() {

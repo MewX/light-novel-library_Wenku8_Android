@@ -24,8 +24,9 @@ public class Wenku8API {
      */
 
     public static String NoticeString = "";
-    final public static String RegisterURL = "http://www.wenku8.cn/register.php";
-    final private static String BaseURL = "http://app.wenku8.cn/android.php";
+    final public static String RegisterURL = "http://www.wenku8.com/register.php";
+    private static String BaseURL = "http://app.wenku8.cn/android.php";
+    private static boolean hasEdited = false;
     final private static String NovelFinishedSC = "已完成", NovelFinishedTC = "已完成",
             NovelNotFinishedSC = "连载中", NovelNotFinishedTC = "連載中";
 
@@ -34,6 +35,17 @@ public class Wenku8API {
             NoticeString = MobclickAgent.getConfigParams(MyApp.getContext(), "wenku8_notice");
         }
         return BaseURL;
+    }
+
+    public static void replaceBaseURL(String str) {
+        // replace URL for backup
+
+
+        hasEdited = true;
+    }
+
+    public static boolean hasEdited() {
+        return hasEdited;
     }
 
     public static String getCoverURL(int aid) {

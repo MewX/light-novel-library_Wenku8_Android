@@ -24,6 +24,7 @@ import com.afollestad.materialdialogs.GravityEnum;
 import com.afollestad.materialdialogs.MaterialDialog;
 import com.afollestad.materialdialogs.Theme;
 import com.davemorrissey.labs.subscaleview.ImageSource;
+import com.davemorrissey.labs.subscaleview.ImageViewState;
 import com.davemorrissey.labs.subscaleview.SubsamplingScaleImageView;
 import com.nononsenseapps.filepicker.FilePickerActivity;
 import com.readystatesoftware.systembartint.SystemBarTintManager;
@@ -96,15 +97,19 @@ public class ViewImageDetailActivity extends AppCompatActivity {
                     hideNavigationBar();
                     findViewById(R.id.toolbar_actionbar).setVisibility(View.INVISIBLE);
                     findViewById(R.id.image_detail_bot).setVisibility(View.INVISIBLE);
-                    tintManager.setStatusBarAlpha(0.0f);
-                    tintManager.setNavigationBarAlpha(0.0f);
+                    if (Build.VERSION.SDK_INT >= 16 ) {
+                        tintManager.setStatusBarAlpha(0.0f);
+                        tintManager.setNavigationBarAlpha(0.0f);
+                    }
                 } else {
                     shown = true;
                     showNavigationBar();
                     findViewById(R.id.toolbar_actionbar).setVisibility(View.VISIBLE);
                     findViewById(R.id.image_detail_bot).setVisibility(View.VISIBLE);
-                    tintManager.setStatusBarAlpha(0.9f);
-                    tintManager.setNavigationBarAlpha(0.8f);
+                    if (Build.VERSION.SDK_INT >= 16 ) {
+                        tintManager.setStatusBarAlpha(0.9f);
+                        tintManager.setNavigationBarAlpha(0.8f);
+                    }
                 }
             }
         });

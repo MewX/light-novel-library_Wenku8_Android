@@ -7,8 +7,8 @@ android {
         applicationId "org.mewx.wenku8"
         minSdkVersion 15
         targetSdkVersion 22
-        versionCode 27
-        versionName "1.0.0.1dev"
+        versionCode 28
+        versionName "1.1.1dev"
     }
     buildTypes {
         debug {
@@ -29,53 +29,18 @@ android {
         }
 
         baidu {
-            // 百度助手
+            // 百度网盘分发
             manifestPlaceholders = [ UMENG_CHANNEL_NAME : "baidu"]
-        }
-
-        sogou {
-            // 搜狗手机助手
-            manifestPlaceholders = [ UMENG_CHANNEL_NAME : "sogou"]
-        }
-
-        qihoo360 {
-            // 360手机助手
-            manifestPlaceholders = [ UMENG_CHANNEL_NAME : "360"]
-        }
-
-        wandoujia {
-            // 豌豆荚
-            manifestPlaceholders = [ UMENG_CHANNEL_NAME : "wandoujia"]
-        }
-
-//        anzhi {
-//            // 安智市场 （发布失败）
-//            manifestPlaceholders = [ UMENG_CHANNEL_NAME : "anzhi"]
-//        }
-
-        zs91 {
-            // 91助手
-            manifestPlaceholders = [ UMENG_CHANNEL_NAME : "91"]
-        }
-
-        hiapk {
-            // 安卓市场
-            manifestPlaceholders = [ UMENG_CHANNEL_NAME : "hiapk"]
-        }
-
-//        huawei {
-//            // 华为手机市场 （发布失败）
-//            manifestPlaceholders = [ UMENG_CHANNEL_NAME : "huawei"]
-//        }
-
-        tencent {
-            // 腾讯手机助手
-            manifestPlaceholders = [ UMENG_CHANNEL_NAME : "tencent"]
         }
 
         coolapk {
             // 酷安
             manifestPlaceholders = [ UMENG_CHANNEL_NAME : "coolapk"]
+        }
+
+        mi {
+            // 小米市场
+            manifestPlaceholders = [ UMENG_CHANNEL_NAME : "mi"]
         }
     }
     packagingOptions {
