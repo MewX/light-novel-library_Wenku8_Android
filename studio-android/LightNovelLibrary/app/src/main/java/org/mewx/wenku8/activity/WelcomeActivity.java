@@ -4,10 +4,12 @@ import android.app.Activity;
 import android.content.Intent;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
+import android.content.res.Configuration;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.os.Bundle;
 import android.os.CountDownTimer;
+import android.widget.ImageView;
 import android.widget.TextView;
 
 import com.readystatesoftware.systembartint.SystemBarTintManager;
@@ -18,6 +20,7 @@ import org.mewx.wenku8.util.LightCache;
 import org.mewx.wenku8.util.LightUserSession;
 
 import java.io.File;
+import java.util.Locale;
 
 /**
  * Created by MewX on 2015/6/13.
@@ -35,6 +38,28 @@ public class WelcomeActivity extends Activity {
         ((TextView) findViewById(R.id.ui_designer)).setTypeface(typeface);
         findViewById(R.id.version_layout).setBackgroundColor(Color.argb(0x80, 0xFF, 0xFF, 0xFF));
         findViewById(R.id.copyright_layout).setBackgroundColor(Color.argb(0x80, 0xFF, 0xFF, 0xFF));
+
+        // load language
+        Locale locale;
+        switch (GlobalConfig.getCurrentLang()) {
+            case SC:
+                locale = Locale.SIMPLIFIED_CHINESE;
+                ((ImageView) findViewById(R.id.startbg)).setImageDrawable(getResources().getDrawable(R.drawable.startbg_default));
+                break;
+            case TC:
+                locale = Locale.TRADITIONAL_CHINESE;
+                ((ImageView) findViewById(R.id.startbg)).setImageDrawable(getResources().getDrawable(R.drawable.startbg_default_tc));
+                break;
+            default:
+                locale = Locale.SIMPLIFIED_CHINESE;
+                break;
+        }
+        android.content.res.Configuration config = new android.content.res.Configuration();
+        config.locale = locale;
+        Locale.setDefault(locale);
+        getBaseContext().getResources().updateConfiguration(config, getBaseContext().getResources().getDisplayMetrics());
+
+
 
         // get version code
         PackageManager manager;

@@ -25,14 +25,14 @@ public class Wenku8API {
 
     public static String NoticeString = "";
     final public static String RegisterURL = "http://www.wenku8.com/register.php";
-    private static String BaseURL = "http://app.wenku8.cn/android.php";
+    private static String BaseURL = "http://app.wenku8.com/android.php";
     private static boolean hasEdited = false;
     final private static String NovelFinishedSC = "已完成", NovelFinishedTC = "已完成",
             NovelNotFinishedSC = "连载中", NovelNotFinishedTC = "連載中";
 
     public static String getBaseURL() {
         if(NoticeString.equals("") || NoticeString.equals("http://weuku8.mewx.org")) {
-            NoticeString = MobclickAgent.getConfigParams(MyApp.getContext(), "wenku8_notice");
+            NoticeString = MobclickAgent.getConfigParams(MyApp.getContext(), GlobalConfig.getCurrentLang() != LANG.SC ? "wenku8_notice_tw" : "wenku8_notice");
         }
         return BaseURL;
     }
@@ -49,7 +49,7 @@ public class Wenku8API {
     }
 
     public static String getCoverURL(int aid) {
-        return "http://img.wenku8.cn/image/" + Integer.toString(aid / 1000)
+        return "http://img.wenku8.com/image/" + Integer.toString(aid / 1000)
                 + "/" + Integer.toString(aid) + "/" + Integer.toString(aid) + "s.jpg";
     }
 

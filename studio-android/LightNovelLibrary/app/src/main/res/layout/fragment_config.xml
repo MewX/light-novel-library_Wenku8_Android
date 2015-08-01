@@ -96,6 +96,31 @@
                 <!--android:text="@string/config_data_restore"/>-->
         <!--</RelativeLayout>-->
 
+        <!-- Layout Language -->
+        <RelativeLayout
+            android:id="@+id/btn_choose_language"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:clickable="true"
+            android:background="@drawable/btn_menu_item">
+            <ImageView
+                android:id="@+id/image_chooselanguage"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:paddingLeft="16dp"
+                android:layout_centerVertical="true"
+                android:src="@drawable/ic_config"/>
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginLeft="32dp"
+                android:textSize="16sp"
+                android:layout_centerVertical="true"
+                android:layout_toRightOf="@id/image_chooselanguage"
+                android:textColor="@color/dlgTitleColor"
+                android:text="@string/config_choose_language"/>
+        </RelativeLayout>
+
         <!-- Layout ClearCache -->
         <RelativeLayout
             android:id="@+id/btn_clear_cache"

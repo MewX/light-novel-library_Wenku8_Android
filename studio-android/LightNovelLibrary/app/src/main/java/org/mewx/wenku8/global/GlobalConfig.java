@@ -87,6 +87,7 @@ public class GlobalConfig {
 
     public enum SettingItems {
         version, // (int) 1
+        language,
         menu_bg_id, // (int) 1-5 by system, 0 for user
         menu_bg_path, // (String) for user custom
         reader_font_path, // (String) path to ttf, "0" means default
@@ -113,7 +114,24 @@ public class GlobalConfig {
     }
 
     // sets and gets
+    public static void setCurrentLang(Wenku8API.LANG l) {
+        currentLang = l;
+        setToAllSetting(SettingItems.language, currentLang.toString());
+    }
+
     public static Wenku8API.LANG getCurrentLang() {
+        String temp = getFromAllSetting(SettingItems.language);
+        if(temp == null) {
+            setToAllSetting(SettingItems.language, currentLang.toString());
+        }
+        else if(!temp.equals(currentLang.toString())) {
+            if(temp.equals(Wenku8API.LANG.SC.toString()))
+                currentLang = Wenku8API.LANG.SC;
+            else if(temp.equals(Wenku8API.LANG.TC.toString()))
+                currentLang = Wenku8API.LANG.TC;
+            else
+                currentLang = Wenku8API.LANG.SC;
+        }
         return currentLang;
     }
 
@@ -160,10 +178,6 @@ public class GlobalConfig {
     }
 
     // settings
-    public static void setCurrentLang(Wenku8API.LANG l) {
-        currentLang = l;
-    }
-
     public static String getOpensourceLicense() {
         InputStream is = MyApp.getContext().getResources().openRawResource(R.raw.license);
         BufferedReader reader = new BufferedReader(new InputStreamReader(is));

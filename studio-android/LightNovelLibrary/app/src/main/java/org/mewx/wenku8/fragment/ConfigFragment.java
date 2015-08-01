@@ -27,6 +27,7 @@ import org.mewx.wenku8.R;
 import org.mewx.wenku8.activity.AboutActivity;
 import org.mewx.wenku8.activity.MainActivity;
 import org.mewx.wenku8.activity.MenuBackgroundSelectorActivity;
+import org.mewx.wenku8.activity.WelcomeActivity;
 import org.mewx.wenku8.global.GlobalConfig;
 import org.mewx.wenku8.global.api.OldNovelContentParser;
 import org.mewx.wenku8.global.api.Wenku8API;
@@ -88,6 +89,50 @@ public class ConfigFragment extends Fragment {
 //                Toast.makeText(getActivity(), "这个按钮暂时没有用滴~", Toast.LENGTH_SHORT).show();
 //            }
 //        });
+        getActivity().findViewById(R.id.btn_choose_language).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                new MaterialDialog.Builder(getActivity())
+                        .theme(Theme.LIGHT)
+                        .title(R.string.config_choose_language)
+                        .content(R.string.dialog_content_language_tip)
+                        .items(R.array.choose_language_option)
+                        .itemsCallback(new MaterialDialog.ListCallback() {
+                            @Override
+                            public void onSelection(MaterialDialog dialog, View view, int which, CharSequence text) {
+                                switch (which) {
+                                    case 0:
+                                        // sc
+                                        if(GlobalConfig.getCurrentLang() != Wenku8API.LANG.SC) {
+                                            GlobalConfig.setCurrentLang(Wenku8API.LANG.SC);
+                                            Intent intent = new Intent();
+                                            intent.setClass(getActivity(), WelcomeActivity.class);
+                                            startActivity(intent);
+                                            getActivity().overridePendingTransition(R.anim.fade_in, R.anim.hold); // fade in animation
+                                            getActivity().finish(); // destroy itself
+                                        }
+                                        else
+                                            Toast.makeText(getActivity(), "Already in.", Toast.LENGTH_SHORT).show();
+                                        break;
+                                    case 1:
+                                        // tc
+                                        if(GlobalConfig.getCurrentLang() != Wenku8API.LANG.TC) {
+                                            GlobalConfig.setCurrentLang(Wenku8API.LANG.TC);
+                                            Intent intent = new Intent();
+                                            intent.setClass(getActivity(), WelcomeActivity.class);
+                                            startActivity(intent);
+                                            getActivity().overridePendingTransition(R.anim.fade_in, R.anim.hold); // fade in animation
+                                            getActivity().finish(); // destroy itself
+                                        }
+                                        else
+                                            Toast.makeText(getActivity(), "Already in.", Toast.LENGTH_SHORT).show();
+                                        break;
+                                }
+                            }
+                        })
+                        .show();
+            }
+        });
         getActivity().findViewById(R.id.btn_clear_cache).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {

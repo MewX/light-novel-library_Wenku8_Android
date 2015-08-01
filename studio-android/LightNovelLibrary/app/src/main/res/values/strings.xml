@@ -1,8 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-
     <string name="app_name">轻小说文库</string>
-    <string name="app_description">与轻小说文库(Wenku8.cn)合作的轻小说阅读app。</string>
+    <string name="app_description">与轻小说文库(Wenku8.com)合作的轻小说阅读app。</string>
     <string name="app_architect">MewX</string>
     <string name="app_ui_designer">ZERO</string>
     <string name="app_architect_text">Architect</string>
@@ -96,6 +95,7 @@
     <string name="dialog_title_choose_download_option">选择执行的下载操作：</string>
     <string name="dialog_title_save_file_name">输入保存的文件名（不要加.jpg）</string>
     <string name="dialog_title_found_file">目标文件已存在</string>
+    <string name="dialog_content_language_tip">缓存内容如何切换语言？\n书架可以下拉重新获取繁体内容；已缓存的内容可以通过覆盖下载获取当前语言内容；</string>
     <string name="dialog_content_search_author">要查找所有该作者的书吗？</string>
     <string name="dialog_content_delete_one_search_record">确定要删除该搜索历史吗？\n</string>
     <string name="dialog_content_load_from_cloud">该章节未缓存，是否立即联网阅读？</string>
@@ -132,6 +132,7 @@
     <string name="fab_refresh">刷新</string>
     <string name="config_data_backup">数据备份</string>
     <string name="config_data_restore">数据恢复</string>
+    <string name="config_choose_language">简繁切换</string>
     <string name="config_clear_cache">清除缓存</string>
     <string name="config_navigation_drawer_wallpaper">侧栏壁纸</string>
     <string name="config_check_update">检查更新</string>
@@ -173,6 +174,8 @@
     <string name="dialog_option_reader_background_custom">使用自定义图片（建议手动拷贝至wenku8/custom目录下，不支持外置SD卡，图片不要太大）</string>
     <string name="dialog_option_wipe_cache_fast">粗略清理（很快）</string>
     <string name="dialog_option_wipe_cache_slow">严格清理（极慢）</string>
+    <string name="dialog_option_choose_simpified_chinese">简体中文</string>
+    <string name="dialog_option_choose_traditional_chinese">繁体中文</string>
     <string name="reader_please_wait">请稍候……</string>
     <string name="reader_engine_v1_parsing">V1引擎正在获取并解析文本内容</string>
     <string name="reader_already_first_chapter">已是第一章</string>

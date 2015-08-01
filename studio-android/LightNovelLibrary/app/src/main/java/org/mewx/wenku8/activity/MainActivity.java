@@ -69,7 +69,7 @@ public class MainActivity extends AppCompatActivity {
         // UMeng settings
         MobclickAgent.updateOnlineConfig(this);
         UmengUpdateAgent.setUpdateCheckConfig(false); // disable res check
-        UmengUpdateAgent.setDeltaUpdate(true);
+        UmengUpdateAgent.setDeltaUpdate(false); // useless, same version code has two version
         UmengUpdateAgent.setUpdateOnlyWifi(false);
         if(!GlobalConfig.inAlphaBuild()) {
             // alpha version does not contains auto-update function

@@ -431,7 +431,6 @@ public class FavFragment extends Fragment implements MyItemClickListener, MyItem
                 refreshList(timecount ++);
             }
             else {
-
                 AsyncLoadAllLocal alal = new AsyncLoadAllLocal();
                 alal.execute();
             }

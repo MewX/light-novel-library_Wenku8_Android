@@ -5,6 +5,7 @@
     android:background="@color/default_white">
 
     <ImageView
+        android:id="@+id/startbg"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:scaleType="centerCrop"

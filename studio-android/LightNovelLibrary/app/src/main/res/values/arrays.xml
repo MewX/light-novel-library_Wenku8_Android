@@ -26,4 +26,9 @@
         <item>@string/dialog_option_wipe_cache_fast</item>
         <item>@string/dialog_option_wipe_cache_slow</item>
     </string-array>
+
+    <string-array name="choose_language_option">
+        <item>@string/dialog_option_choose_simpified_chinese</item>
+        <item>@string/dialog_option_choose_traditional_chinese</item>
+    </string-array>
 </resources>
