@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/novel_list_layout"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#fff"
+    android:orientation="vertical" >
+
+    <include layout="@layout/activity_titlebar" />
+
+    <ListView
+        android:id="@+id/novel_list"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_below="@+id/wholeTitle"
+        android:cacheColorHint="#00000000"
+        android:listSelector="@null" >
+    </ListView>
+
+    <TextView
+        android:id="@+id/novel_load_status"
+        android:layout_width="match_parent"
+        android:layout_height="30dp"
+        android:layout_below="@+id/novel_list"
+        android:gravity="center"
+        android:text="@+string/load_status"
+        android:textColor="#000" />
+
+</RelativeLayout><!-- From: file:/D:/MewX_Projects/Wenku8_Android/eclipse-android-old/LightNovelLibrary/res/layout/activity_novel_list.xml -->

@@ -52,6 +52,8 @@ import android.widget.LinearLayout;
 import android.widget.RelativeLayout;
 import android.widget.TextView;
 import android.widget.Toast;
+
+import com.umeng.analytics.MobclickAgent;
 import com.zcw.togglebutton.ToggleButton;
 
 @TargetApi(14)
@@ -286,7 +288,7 @@ public class SettingFragment extends Fragment {
 
 			final TextView textView = (TextView) parentActivity
 					.findViewById(R.id.text_head);
-			textView.setText("祝陈喜慧同学:\n　　圣诞快乐、新年快乐！\n　　啦啦啦～");
+			textView.setText("轻小说文库·典藏版");
 			String text = textView.getText().toString();
 
 			AnimatedColorSpan span = new AnimatedColorSpan(parentActivity);
@@ -312,8 +314,8 @@ public class SettingFragment extends Fragment {
 		} else {
 			textView_MewX = (TextView) parentActivity
 					.findViewById(R.id.text_head);
-			textView_MewX.setText("祝陈喜慧同学:\n　　圣诞快乐、新年快乐！\n　　啦啦啦～");
-			highlight_mewx("祝陈喜慧同学:\n　　圣诞快乐、新年快乐！\n　　啦啦啦～");
+			textView_MewX.setText("轻小说文库·典藏版");
+			highlight_mewx("轻小说文库·典藏版");
 		}
 	}
 
@@ -388,5 +390,17 @@ public class SettingFragment extends Fragment {
 			shader.setLocalMatrix(matrix);
 			paint.setShader(shader);
 		}
+	}
+
+	@Override
+	public void onResume() {
+		super.onResume();
+        MobclickAgent.onPageStart("Bookshelf");
+	}
+
+	@Override
+	public void onPause() {
+		super.onPause();
+        MobclickAgent.onPageEnd("Setting");
 	}
 }

@@ -27,6 +27,7 @@ import org.mewx.lightnovellibrary.util.LightCache;
 import org.mewx.lightnovellibrary.util.LightNetwork;
 
 import com.special.ResideMenu.ResideMenu;
+import com.umeng.analytics.MobclickAgent;
 
 import android.app.AlertDialog;
 import android.app.ProgressDialog;
@@ -258,9 +259,15 @@ public class BookshelfFragment extends Fragment {
 		// resideMenu.addIgnoredView(ignored_view);
 	}
 
+	public void onPause() {
+		super.onPause();
+		MobclickAgent.onPageEnd("Bookshelf");
+	}
+
 	@Override
 	public void onResume() {
 		super.onResume();
+		MobclickAgent.onPageStart("Bookshelf");
 
 		// fill list
 		al = GlobalConfig.getLocalBookshelfList();

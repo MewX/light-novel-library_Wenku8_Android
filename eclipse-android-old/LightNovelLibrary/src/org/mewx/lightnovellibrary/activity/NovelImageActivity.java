@@ -29,6 +29,8 @@ import com.davemorrissey.labs.subscaleview.SubsamplingScaleImageView;
 import com.nostra13.universalimageloader.core.ImageLoader;
 import com.nostra13.universalimageloader.core.assist.FailReason;
 import com.nostra13.universalimageloader.core.listener.ImageLoadingListener;
+import com.umeng.analytics.MobclickAgent;
+
 import uk.co.senab.photoview.PhotoView;
 
 public class NovelImageActivity extends SwipeBackActivity {
@@ -83,12 +85,6 @@ public class NovelImageActivity extends SwipeBackActivity {
 	}
 
 	@Override
-	protected void onResume() {
-		super.onResume();
-		return;
-	}
-
-	@Override
 	protected void onDestroy() {
 		// save memory
 		bm.recycle();
@@ -103,4 +99,14 @@ public class NovelImageActivity extends SwipeBackActivity {
 		scrollToFinishActivity();
 	}
 
+
+	public void onResume() {
+		super.onResume();
+		MobclickAgent.onResume(this);
+	}
+
+	public void onPause() {
+		super.onPause();
+		MobclickAgent.onPause(this);
+	}
 }

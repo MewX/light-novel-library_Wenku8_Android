@@ -23,6 +23,8 @@ import com.nostra13.universalimageloader.core.display.FadeInBitmapDisplayer;
 import com.nostra13.universalimageloader.utils.StorageUtils;
 import com.special.ResideMenu.ResideMenu;
 import com.special.ResideMenu.ResideMenuItem;
+import com.umeng.analytics.AnalyticsConfig;
+import com.umeng.analytics.MobclickAgent;
 
 import android.support.v4.app.Fragment;
 import android.support.v4.app.FragmentActivity;
@@ -67,9 +69,13 @@ public class MainActivity extends FragmentActivity implements
 		Log.v("MewX", "dir1: " + getCacheDir() + File.separator + "imgs");
 		Log.v("MewX", "dir2: " + getFilesDir() + File.separator + "imgs");
 		LightCache.saveFile(GlobalConfig.getFirstStoragePath() + "imgs",
-				".nomedia", "".getBytes(), false);
+                ".nomedia", "".getBytes(), false);
 		LightCache.saveFile(GlobalConfig.getSecondStoragePath() + "imgs",
 				".nomedia", "".getBytes(), false);
+
+        // umeng
+		MobclickAgent.updateOnlineConfig(this);
+        AnalyticsConfig.enableEncrypt(false);
 
 		// first: Environment.getExternalStorageDirectory(); then getCacheDir()
 		UnlimitedDiscCache localUnlimitedDiscCache = new UnlimitedDiscCache(
@@ -99,7 +105,7 @@ public class MainActivity extends FragmentActivity implements
 
 		// attach to current activity;
 		resideMenu = new ResideMenu(this);
-		resideMenu.setBackground(R.drawable.menu_bg_red);
+		resideMenu.setBackground(R.drawable.menu_bg);
 		resideMenu.attachToActivity(this);
 		// resideMenu.setMenuListener(menuListener);
 		resideMenu.setScaleValue(0.60f);
@@ -202,5 +208,15 @@ public class MainActivity extends FragmentActivity implements
 			// call fragments and end streams and services
 			System.exit(0);
 		}
+	}
+
+	public void onResume() {
+		super.onResume();
+		MobclickAgent.onResume(this);
+	}
+
+	public void onPause() {
+		super.onPause();
+		MobclickAgent.onPause(this);
 	}
 }

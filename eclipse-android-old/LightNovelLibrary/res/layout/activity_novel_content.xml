@@ -3,7 +3,7 @@
     android:id="@+id/novel_layout"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#eee" >
+    android:background="@color/reader_default_bg_yellow" >
 
     <ScrollView
         android:id="@+id/content_scrollview"

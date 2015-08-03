@@ -31,6 +31,8 @@ import android.widget.ListView;
 import android.widget.Spinner;
 import android.widget.Toast;
 
+import com.umeng.analytics.MobclickAgent;
+
 public class NovelSearchActivity extends SwipeBackActivity {
 
 	private Activity parentActivity = null;
@@ -158,6 +160,7 @@ public class NovelSearchActivity extends SwipeBackActivity {
 	@Override
 	protected void onResume() {
 		super.onResume();
+		MobclickAgent.onResume(this);
 
 		// update history list
 		ListView listView = (ListView) findViewById(R.id.list_history);
@@ -253,6 +256,11 @@ public class NovelSearchActivity extends SwipeBackActivity {
 		startActivity(intent);
 		parentActivity.overridePendingTransition(R.anim.in_from_right,
 				R.anim.keep);
+	}
+
+	public void onPause() {
+		super.onPause();
+		MobclickAgent.onPause(this);
 	}
 
 	@Override

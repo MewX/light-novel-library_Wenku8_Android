@@ -2,7 +2,7 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="120dp"
-    android:background="@color/btn_style_01_red"
+    android:background="@color/btn_style_01"
     android:orientation="horizontal" >
 
     <ImageView

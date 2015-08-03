@@ -27,6 +27,13 @@
   <color name="setting_pink">#ccffcccc</color>
   <color name="setting_red">#ccff0000</color>
 
+  <!-- Reader Color -->
+  <color name="reader_default_bg_toolbar">#CC000000</color>
+  <color name="reader_default_bg_yellow">#CFBEB6</color>
+  <color name="reader_default_bg_black">#090C13</color>
+  <color name="reader_default_text_light">#32414E</color>
+  <color name="reader_default_text_dark">#444444</color>
+
   <integer-array name="rainbow">
     <item>@color/rainbow_red</item>
     <item>@color/rainbow_yellow</item>

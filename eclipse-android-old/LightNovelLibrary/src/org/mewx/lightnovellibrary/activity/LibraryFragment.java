@@ -30,6 +30,7 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import com.special.ResideMenu.ResideMenu;
+import com.umeng.analytics.MobclickAgent;
 
 public class LibraryFragment extends Fragment {
 	private View parentView;
@@ -215,4 +216,15 @@ public class LibraryFragment extends Fragment {
 		return;
 	}
 
+
+	public void onPause() {
+		super.onPause();
+		MobclickAgent.onPageEnd("Library");
+	}
+
+	@Override
+	public void onResume() {
+		super.onResume();
+		MobclickAgent.onPageStart("Library");
+	}
 }

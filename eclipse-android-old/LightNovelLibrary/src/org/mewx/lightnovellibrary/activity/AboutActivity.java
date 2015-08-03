@@ -34,6 +34,8 @@ import android.view.animation.LinearInterpolator;
 import android.widget.ImageView;
 import android.widget.TextView;
 
+import com.umeng.analytics.MobclickAgent;
+
 @TargetApi(14)
 public class AboutActivity extends SwipeBackActivity {
 
@@ -231,6 +233,16 @@ public class AboutActivity extends SwipeBackActivity {
 			paint.setShader(shader);
 		}
 	}
+
+    public void onResume() {
+        super.onResume();
+        MobclickAgent.onResume(this);
+    }
+
+    public void onPause() {
+        super.onPause();
+        MobclickAgent.onPause(this);
+    }
 
 	@Override
 	public void onBackPressed() {

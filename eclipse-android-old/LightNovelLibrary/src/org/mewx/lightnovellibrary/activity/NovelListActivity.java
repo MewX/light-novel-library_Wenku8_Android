@@ -66,6 +66,8 @@ import android.widget.RelativeLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.umeng.analytics.MobclickAgent;
+
 public class NovelListActivity extends SwipeBackActivity {// implements
 															// OnTouchListener {
 	// get "code" and "plus"
@@ -516,6 +518,16 @@ public class NovelListActivity extends SwipeBackActivity {// implements
 			});
 			return;
 		}
+	}
+
+	public void onResume() {
+		super.onResume();
+		MobclickAgent.onResume(this);
+	}
+
+	public void onPause() {
+		super.onPause();
+		MobclickAgent.onPause(this);
 	}
 
 	@Override

@@ -16,7 +16,7 @@ import org.mewx.lightnovellibrary.util.LightBase64;
 import org.mewx.lightnovellibrary.util.LightNetwork;
 
 public class Wenku8Interface {
-	final public static String BaseURL = "http://app.wenku8.cn/android.php";
+	final public static String BaseURL = "http://app.wenku8.com/android.php";
 
 	// Here define the constance of language id
 
@@ -216,9 +216,9 @@ public class Wenku8Interface {
 		// --------------------------------------------------------
 		// 第一卷 告白于苍刻之夜 插图
 		// ...... ......
-		// <!--image-->http://pic.wenku8.cn/pictures/1/1305/41759/50471.jpg<!--image-->
-		// <!--image-->http://pic.wenku8.cn/pictures/1/1305/41759/50472.jpg<!--image-->
-		// <!--image-->http://pic.wenku8.cn/pictures/1/1305/41759/50473.jpg<!--image-->
+		// <!--image-->http://pic.wenku8.com/pictures/1/1305/41759/50471.jpg<!--image-->
+		// <!--image-->http://pic.wenku8.com/pictures/1/1305/41759/50472.jpg<!--image-->
+		// <!--image-->http://pic.wenku8.com/pictures/1/1305/41759/50473.jpg<!--image-->
 		// ...... ......
 		return getEncryptedNVP("action=book&do=text&aid=" + aid + "&cid=" + cid
 				+ "&t=" + getLANG(l));

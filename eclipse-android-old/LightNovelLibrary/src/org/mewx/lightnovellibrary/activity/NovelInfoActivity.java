@@ -18,6 +18,7 @@ import org.mewx.lightnovellibrary.util.LightCache;
 import org.mewx.lightnovellibrary.util.LightNetwork;
 
 import com.nostra13.universalimageloader.core.ImageLoader;
+import com.umeng.analytics.MobclickAgent;
 
 import android.app.Activity;
 import android.app.AlertDialog;
@@ -429,6 +430,16 @@ public class NovelInfoActivity extends SwipeBackActivity {
 			isLoading = false;
 			return;
 		}
+	}
+
+	public void onResume() {
+		super.onResume();
+		MobclickAgent.onResume(this);
+	}
+
+	public void onPause() {
+		super.onPause();
+		MobclickAgent.onPause(this);
 	}
 
 	private void viewChapter(int vid, int cid) {

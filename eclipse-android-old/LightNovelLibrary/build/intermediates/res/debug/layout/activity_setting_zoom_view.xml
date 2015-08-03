@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ImageView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/iv_view"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:src="@drawable/apple"
+    android:scaleType="centerCrop"
+    android:layout_gravity="center_horizontal" >
+    
+
+</ImageView>
+<!-- From: file:/D:/MewX_Projects/Wenku8_Android/eclipse-android-old/LightNovelLibrary/res/layout/activity_setting_zoom_view.xml -->

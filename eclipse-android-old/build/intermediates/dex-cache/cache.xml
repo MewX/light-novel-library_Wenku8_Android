@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<items version="2" >
+
+    <item
+        jar="D:\MewX_Projects\Wenku8_Android\eclipse-android-old\LightNovelLibrary\build\intermediates\exploded-aar\eclipse-android-old\appcompat_v7\unspecified\jars\libs\android-support-v7-appcompat.jar"
+        jumboMode="false"
+        revision="23.0.0 rc2"
+        sha1="aaa3ec7d7bfb3446a9190c5b1f601f1eb94745e7">
+        <dex dex="D:\MewX_Projects\Wenku8_Android\eclipse-android-old\LightNovelLibrary\build\intermediates\pre-dexed\release\android-support-v7-appcompat-9bb538cc3a3a92dbe05e9473f5e2edb32522844a.jar" />
+    </item>
+    <item
+        jar="D:\MewX_Projects\Wenku8_Android\eclipse-android-old\LightNovelLibrary\libs\umeng-analytics-v5.5.3.jar"
+        jumboMode="false"
+        revision="23.0.0 rc2"
+        sha1="5d503ec571e2e98d972209afa203f94d11882c15">
+        <dex dex="D:\MewX_Projects\Wenku8_Android\eclipse-android-old\LightNovelLibrary\build\intermediates\pre-dexed\release\umeng-analytics-v5.5.3-bfdd6f8415251659f893d93c3e6e5bc0cbf29699.jar" />
+    </item>
+    <item
+        jar="D:\MewX_Projects\Wenku8_Android\eclipse-android-old\LightNovelLibrary\libs\universal-image-loader-1.9.3.jar"
+        jumboMode="false"
+        revision="23.0.0 rc2"
+        sha1="a85588bec3e2c4584d593d3f15df1677321bca72">
+        <dex dex="D:\MewX_Projects\Wenku8_Android\eclipse-android-old\LightNovelLibrary\build\intermediates\pre-dexed\release\universal-image-loader-1.9.3-c8b1a84813e6c75f427481e0de0c1f958031e5af.jar" />
+    </item>
+    <item
+        jar="D:\MewX_Projects\Wenku8_Android\eclipse-android-old\LightNovelLibrary\build\intermediates\exploded-aar\eclipse-android-old\appcompat_v7\unspecified\jars\classes.jar"
+        jumboMode="false"
+        revision="23.0.0 rc2"
+        sha1="bc9266408731de7e9057f6a0559ae7a438b9d108">
+        <dex dex="D:\MewX_Projects\Wenku8_Android\eclipse-android-old\LightNovelLibrary\build\intermediates\pre-dexed\release\classes-424fc1e2d87bb253718c31c341678fb94d0e33b4.jar" />
+    </item>
+    <item
+        jar="D:\MewX_Projects\Wenku8_Android\eclipse-android-old\LightNovelLibrary\libs\nineoldandroids-library-2.4.0.jar"
+        jumboMode="false"
+        revision="23.0.0 rc2"
+        sha1="e9b63380f3a242dbdbf103a2355ad7e43bad17cb">
+        <dex dex="D:\MewX_Projects\Wenku8_Android\eclipse-android-old\LightNovelLibrary\build\intermediates\pre-dexed\release\nineoldandroids-library-2.4.0-4300ec01bc4c4a5e3000658d6578ee9e3e87a607.jar" />
+    </item>
+    <item
+        jar="D:\MewX_Projects\Wenku8_Android\eclipse-android-old\LightNovelLibrary\build\intermediates\exploded-aar\eclipse-android-old\appcompat_v7\unspecified\jars\libs\android-support-v4.jar"
+        jumboMode="false"
+        revision="23.0.0 rc2"
+        sha1="efec67655f6db90757faa37201efcee2a9ec3507">
+        <dex dex="D:\MewX_Projects\Wenku8_Android\eclipse-android-old\LightNovelLibrary\build\intermediates\pre-dexed\release\android-support-v4-b03d237837735f2e91194f099006f49633e92b16.jar" />
+    </item>
+
+</items>

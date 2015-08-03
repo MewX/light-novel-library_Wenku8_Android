@@ -2,10 +2,10 @@
 <resources>
 
     <string name="app_name">轻小说文库</string>
-    <string name="version">( v0.5.2.0000 pre-release )</string>
+    <string name="version">( v0.5.2.1 典藏版 )</string>
     <string name="tab_library">轻小说文库</string>
     <string name="tab_bookshelf">本地书架</string>
-    <string name="tab_wenku8">Wenku8.cn</string>
+    <string name="tab_wenku8">Wenku8.com</string>
     <string name="tab_setting">设置</string>
     <string name="press_twice_to_exit"><b>退出请再抚摸一下返回键哦～</b>\n&lt;(=～￣▽￣)→)￣▽￣=)>o </string>
     <string name="top_new">最新入库榜</string>
@@ -95,14 +95,14 @@
     <string name="network_error">连接服务器失败！\n\n可能的原因有：\n　　手机网络异常；\n　　服务器暂时无法响应请求；\n　　此时段请求服务器次数过多。</string>
     <string name="parse_failed">数据解析失败！\n\n可能的原因有：\n　　程序内部错误，请反馈给开发者；\n　　你修改了存储的数据。</string>
     <string name="in_building">建设中 orz</string>
-    <string name="setting_unavailable">设置页面暂时不可用\n（建设中）</string>
-    <string name="project_home">项目主页：\nhttp://L.mewx.org\n动态更新，欢迎反馈、\n本版本禁止发往应用商店！</string>
+    <string name="setting_unavailable">设置页面典藏版不可用</string>
+    <string name="project_home">项目主页：\nhttp://wenku8.mewx.org\n动态更新，欢迎反馈、\n本版本禁止发往应用商店！</string>
     <string name="about">关于</string>
     <string name="developer">开发者: MewX</string>
-    <string name="resource_provider">数据库: Wenku8.cn</string>
+    <string name="resource_provider">数据库: Wenku8.com</string>
     <string name="previous_chapter">上一章</string>
     <string name="next_chapter">下一章</string>
     <string name="user_cancelled">用户取消操作</string>
-    <string name="time_tight">时间紧迫，木有做</string>
+    <string name="time_tight">典藏就好啦</string>
 
 </resources>

@@ -1,0 +1,155 @@
+-- Merging decision tree log ---
+manifest
+ADDED from AndroidManifest.xml:2:1
+	xmlns:android
+		ADDED from AndroidManifest.xml:2:11
+	package
+		ADDED from AndroidManifest.xml:3:5
+	android:versionName
+		ADDED from AndroidManifest.xml:5:5
+	android:versionCode
+		ADDED from AndroidManifest.xml:4:5
+		INJECTED from AndroidManifest.xml:0:0
+		INJECTED from AndroidManifest.xml:0:0
+uses-sdk
+ADDED from AndroidManifest.xml:7:5
+MERGED from eclipse-android-old:appcompat_v7:unspecified:20:5
+	android:targetSdkVersion
+		ADDED from AndroidManifest.xml:9:9
+	android:minSdkVersion
+		ADDED from AndroidManifest.xml:8:9
+uses-permission#android.permission.CHANGE_NETWORK_STATE
+ADDED from AndroidManifest.xml:11:5
+	android:name
+		ADDED from AndroidManifest.xml:11:22
+uses-permission#android.permission.CHANGE_WIFI_STATE
+ADDED from AndroidManifest.xml:12:5
+	android:name
+		ADDED from AndroidManifest.xml:12:22
+uses-permission#android.permission.ACCESS_NETWORK_STATE
+ADDED from AndroidManifest.xml:13:5
+	android:name
+		ADDED from AndroidManifest.xml:13:22
+uses-permission#android.permission.ACCESS_WIFI_STATE
+ADDED from AndroidManifest.xml:14:5
+	android:name
+		ADDED from AndroidManifest.xml:14:22
+uses-permission#android.permission.INTERNET
+ADDED from AndroidManifest.xml:15:5
+	android:name
+		ADDED from AndroidManifest.xml:15:22
+uses-permission#android.permission.WAKE_LOCK
+ADDED from AndroidManifest.xml:16:5
+	android:name
+		ADDED from AndroidManifest.xml:16:22
+uses-permission#android.permission.WRITE_EXTERNAL_STORAGE
+ADDED from AndroidManifest.xml:17:5
+	android:name
+		ADDED from AndroidManifest.xml:17:22
+uses-permission#android.permission.WRITE_USER_DICTIONARY
+ADDED from AndroidManifest.xml:18:5
+	android:name
+		ADDED from AndroidManifest.xml:18:22
+uses-permission#android.permission.READ_PHONE_STATE
+ADDED from AndroidManifest.xml:19:5
+	android:name
+		ADDED from AndroidManifest.xml:19:22
+application
+ADDED from AndroidManifest.xml:21:5
+MERGED from eclipse-android-old:appcompat_v7:unspecified:22:5
+	android:label
+		ADDED from AndroidManifest.xml:25:9
+	android:allowBackup
+		ADDED from AndroidManifest.xml:23:9
+	android:icon
+		ADDED from AndroidManifest.xml:24:9
+	android:theme
+		ADDED from AndroidManifest.xml:26:9
+	android:name
+		ADDED from AndroidManifest.xml:22:9
+meta-data#UMENG_APPKEY
+ADDED from AndroidManifest.xml:28:9
+	android:name
+		ADDED from AndroidManifest.xml:28:61
+	android:value
+		ADDED from AndroidManifest.xml:28:20
+meta-data#UMENG_CHANNEL
+ADDED from AndroidManifest.xml:29:9
+	android:name
+		ADDED from AndroidManifest.xml:29:45
+	android:value
+		ADDED from AndroidManifest.xml:29:20
+activity#org.mewx.lightnovellibrary.activity.MainActivity
+ADDED from AndroidManifest.xml:32:9
+	android:label
+		ADDED from AndroidManifest.xml:34:13
+	android:name
+		ADDED from AndroidManifest.xml:33:13
+activity#org.mewx.lightnovellibrary.activity.StartActivity
+ADDED from AndroidManifest.xml:38:9
+	android:label
+		ADDED from AndroidManifest.xml:41:13
+	android:configChanges
+		ADDED from AndroidManifest.xml:40:13
+	android:theme
+		ADDED from AndroidManifest.xml:42:13
+	android:name
+		ADDED from AndroidManifest.xml:39:13
+intent-filter#android.intent.action.MAIN+android.intent.category.LAUNCHER
+ADDED from AndroidManifest.xml:43:13
+action#android.intent.action.MAIN
+ADDED from AndroidManifest.xml:44:17
+	android:name
+		ADDED from AndroidManifest.xml:44:25
+category#android.intent.category.LAUNCHER
+ADDED from AndroidManifest.xml:46:17
+	android:name
+		ADDED from AndroidManifest.xml:46:27
+activity#org.mewx.lightnovellibrary.activity.NovelListActivity
+ADDED from AndroidManifest.xml:51:9
+	android:label
+		ADDED from AndroidManifest.xml:53:13
+	android:theme
+		ADDED from AndroidManifest.xml:54:13
+	android:name
+		ADDED from AndroidManifest.xml:52:13
+activity#org.mewx.lightnovellibrary.activity.NovelInfoActivity
+ADDED from AndroidManifest.xml:56:9
+	android:label
+		ADDED from AndroidManifest.xml:58:13
+	android:theme
+		ADDED from AndroidManifest.xml:59:13
+	android:name
+		ADDED from AndroidManifest.xml:57:13
+activity#org.mewx.lightnovellibrary.activity.NovelReaderActivity
+ADDED from AndroidManifest.xml:61:9
+	android:label
+		ADDED from AndroidManifest.xml:63:13
+	android:theme
+		ADDED from AndroidManifest.xml:64:13
+	android:name
+		ADDED from AndroidManifest.xml:62:13
+activity#org.mewx.lightnovellibrary.activity.NovelSearchActivity
+ADDED from AndroidManifest.xml:66:9
+	android:label
+		ADDED from AndroidManifest.xml:68:13
+	android:theme
+		ADDED from AndroidManifest.xml:69:13
+	android:name
+		ADDED from AndroidManifest.xml:67:13
+activity#org.mewx.lightnovellibrary.activity.NovelImageActivity
+ADDED from AndroidManifest.xml:71:9
+	android:label
+		ADDED from AndroidManifest.xml:73:13
+	android:theme
+		ADDED from AndroidManifest.xml:74:13
+	android:name
+		ADDED from AndroidManifest.xml:72:13
+activity#org.mewx.lightnovellibrary.activity.AboutActivity
+ADDED from AndroidManifest.xml:76:9
+	android:label
+		ADDED from AndroidManifest.xml:78:13
+	android:theme
+		ADDED from AndroidManifest.xml:79:13
+	android:name
+		ADDED from AndroidManifest.xml:77:13

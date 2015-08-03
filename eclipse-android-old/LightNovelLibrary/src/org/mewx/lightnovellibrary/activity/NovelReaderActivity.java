@@ -16,6 +16,7 @@ import org.mewx.lightnovellibrary.component.XMLParser;
 import org.mewx.lightnovellibrary.util.LightNetwork;
 
 import com.nostra13.universalimageloader.core.ImageLoader;
+import com.umeng.analytics.MobclickAgent;
 
 import android.annotation.TargetApi;
 import android.app.Activity;
@@ -516,6 +517,7 @@ public class NovelReaderActivity extends SwipeBackActivity {
 	@Override
 	protected void onPause() {
 		super.onPause();
+		MobclickAgent.onPause(this);
 
 		saveRecord();
 		return;
@@ -544,17 +546,30 @@ public class NovelReaderActivity extends SwipeBackActivity {
 
 	@Override
 	public boolean onKeyDown(int keyCode, KeyEvent event) {
+		LinearLayout TextListLayout = ((LinearLayout) parentActivity.findViewById(R.id.novel_content_layout));
 		switch (keyCode) {
-		case KeyEvent.KEYCODE_VOLUME_DOWN:
-			((LinearLayout) parentActivity
-					.findViewById(R.id.novel_content_layout))
-					.setBackgroundColor(0xff666666);
-			return true;
-		case KeyEvent.KEYCODE_VOLUME_UP:
-			((LinearLayout) parentActivity
-					.findViewById(R.id.novel_content_layout))
-					.setBackgroundColor(0xffeeeeee);
-			return true;
+			case KeyEvent.KEYCODE_VOLUME_DOWN:
+				TextListLayout.setBackgroundColor(getResources().getColor(R.color.reader_default_bg_black));
+
+				// change text color
+				for(int i = 1; i < TextListLayout.getChildCount(); i ++) {
+					View view = TextListLayout.getChildAt(i);
+					if(view instanceof TextView)
+						((TextView)view).setTextColor(getResources().getColor(R.color.reader_default_text_light));
+				}
+
+				return true;
+			case KeyEvent.KEYCODE_VOLUME_UP:
+				TextListLayout.setBackgroundColor(getResources().getColor(R.color.reader_default_bg_yellow));
+
+				// change text color
+				for(int i = 1; i < TextListLayout.getChildCount(); i ++) {
+					View view = TextListLayout.getChildAt(i);
+					if(view instanceof TextView)
+						((TextView)view).setTextColor(getResources().getColor(R.color.reader_default_text_dark));
+				}
+
+				return true;
 		}
 		return super.onKeyDown(keyCode, event);
 	}
@@ -564,6 +579,11 @@ public class NovelReaderActivity extends SwipeBackActivity {
 			getWindow().getDecorView().setSystemUiVisibility(
 					View.SYSTEM_UI_FLAG_HIDE_NAVIGATION);
 		return;
+	}
+
+	public void onResume() {
+		super.onResume();
+		MobclickAgent.onResume(this);
 	}
 
 	@Override

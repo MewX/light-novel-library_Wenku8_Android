@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/wholeTitle"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal" >
+
+    <ImageView
+        android:id="@+id/bg"
+        android:layout_width="match_parent"
+        android:layout_height="42dp"
+        android:layout_gravity="fill"
+        android:scaleType="fitXY"
+        android:src="@drawable/titlebar_bg" />
+
+    <ImageView
+        android:id="@+id/btnMenu"
+        android:layout_width="42dp"
+        android:layout_height="42dp"
+        android:clickable="true"
+        android:padding="10dp"
+        android:src="@drawable/ic_menu" />
+
+    <TextView
+        android:id="@+id/textTitle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:layout_marginBottom="10dp"
+        android:layout_marginTop="10dp"
+        android:clickable="true"
+        android:ellipsize="end"
+        android:gravity="center"
+        android:maxEms="8"
+        android:singleLine="true"
+        android:text="@string/app_name"
+        android:textAppearance="?android:attr/textAppearanceMedium"
+        android:textColor="#fff"
+        android:textStyle="bold" />
+
+    <ImageView
+        android:id="@+id/btnEdit"
+        android:layout_width="42dp"
+        android:layout_height="42dp"
+        android:layout_gravity="end"
+        android:clickable="true"
+        android:gravity="end|center_vertical"
+        android:padding="10dp"
+        android:src="@drawable/ic_edit" />
+
+</FrameLayout><!-- From: file:/D:/MewX_Projects/Wenku8_Android/eclipse-android-old/LightNovelLibrary/res/layout/activity_titlebar.xml -->
