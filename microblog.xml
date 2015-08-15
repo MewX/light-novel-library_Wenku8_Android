@@ -2,6 +2,12 @@
 <microblog>
     <post>
         <author>MewX</author>
+        <date>2015-08-16 00:02</date>
+        <blog><![CDATA[<p><span style="color:#f00">app里面也写了，尽量把想长期看的书全本缓存一下。<br/>源码也将于月底全部开源！http://github.com/MewX</span></p>]]></blog>
+    </post>
+
+    <post>
+        <author>MewX</author>
         <date>2015-08-02 22:33</date>
         <blog>酷安大家接受程度还不错，大部分都认可MD设计风格。后来发现很有趣的现象，豌豆荚、安卓市场都从酷安转载了文库的app，当年可是拒绝过我的欸，乃们要矜持啊！！（收录当然是好事 _(:3」∠)_）我等会到博客上发点有趣的截图 :P 另一件事是由于网站搬迁至海外，多余并发请求的延迟高了很多，后期会着重加强缓存的设计、并且减少请求数、优化请求返回值~</blog>
     </post>
