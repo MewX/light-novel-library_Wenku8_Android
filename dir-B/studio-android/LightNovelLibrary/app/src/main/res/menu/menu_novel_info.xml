@@ -1,0 +1,10 @@
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    tools:context=".NovelInfoActivity">
+    <item
+    android:id="@+id/action_continue_read_progress"
+    android:title="@string/action_continue_read_progress"
+    android:icon="@drawable/ic_flag"
+    app:showAsAction="withText|ifRoom" />
+</menu>

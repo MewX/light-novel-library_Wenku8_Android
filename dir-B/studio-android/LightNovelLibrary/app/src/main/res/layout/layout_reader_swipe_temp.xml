@@ -1,0 +1,357 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/slider_holder"
+    android:background="@color/reader_default_bg_black"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+    <!--android:animateLayoutChanges="true"-->
+
+    <RelativeLayout
+        android:id="@+id/reader_top"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_alignParentTop="true"
+        android:visibility="invisible"
+        android:fitsSystemWindows="true"
+        android:clipToPadding="false">
+
+        <android.support.v7.widget.Toolbar
+            style="@style/ToolBarStyle"
+            android:id="@+id/toolbar_actionbar"
+            android:layout_width="match_parent"
+            android:layout_height="?attr/actionBarSize"
+            android:clickable="true"
+            android:background="@color/reader_default_bg_toolbar" />
+
+        <LinearLayout
+            android:id="@+id/reader_bot"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:fitsSystemWindows="true"
+            android:background="@color/reader_default_bg_toolbar"
+            android:orientation="horizontal"
+            android:visibility="invisible"
+            android:clickable="true"
+            android:layout_alignParentBottom="true"
+            android:layout_alignParentLeft="true"
+            android:layout_alignParentStart="true"
+            android:baselineAligned="false">
+
+            <LinearLayout
+                android:id="@+id/btn_daylight"
+                android:layout_width="wrap_content"
+                android:layout_height="match_parent"
+                android:clickable="true"
+                android:background="@drawable/btn_menu_item_boardless"
+                android:layout_weight="1"
+                android:gravity="center">
+
+                <ImageButton
+                    android:id="@+id/ic_daylight"
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
+                    android:scaleType="fitCenter"
+                    android:clickable="false"
+                    android:background="@android:color/transparent"
+                    android:src="@drawable/ic_reader_daynight"/>
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/btn_jump"
+                android:layout_width="wrap_content"
+                android:layout_height="match_parent"
+                android:clickable="true"
+                android:background="@drawable/btn_menu_item_boardless"
+                android:layout_weight="1"
+                android:gravity="center">
+
+                <ImageButton
+                    android:id="@+id/ic_jump"
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
+                    android:scaleType="fitCenter"
+                    android:clickable="false"
+                    android:background="@android:color/transparent"
+                    android:src="@drawable/ic_reader_jump"/>
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/btn_find"
+                android:layout_width="wrap_content"
+                android:layout_height="match_parent"
+                android:clickable="true"
+                android:background="@drawable/btn_menu_item_boardless"
+                android:layout_weight="1"
+                android:gravity="center">
+
+                <ImageButton
+                    android:id="@+id/ic_find"
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
+                    android:scaleType="fitCenter"
+                    android:clickable="false"
+                    android:background="@android:color/transparent"
+                    android:src="@drawable/ic_reader_find"/>
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/btn_config"
+                android:layout_width="wrap_content"
+                android:layout_height="match_parent"
+                android:clickable="true"
+                android:background="@drawable/btn_menu_item_boardless"
+                android:layout_weight="1"
+                android:gravity="center">
+
+                <ImageButton
+                    android:id="@+id/ic_config"
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
+                    android:scaleType="fitCenter"
+                    android:clickable="false"
+                    android:background="@android:color/transparent"
+                    android:src="@drawable/ic_reader_more"/>
+            </LinearLayout>
+        </LinearLayout>
+
+        <RelativeLayout
+            android:id="@+id/reader_bot_seeker"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:fitsSystemWindows="true"
+            android:background="@color/reader_default_bg_toolbar"
+            android:visibility="invisible"
+            android:clickable="true"
+            android:layout_above="@+id/reader_bot"
+            android:layout_alignParentLeft="true"
+            android:layout_alignParentStart="true"
+            android:gravity="center"
+            android:baselineAligned="false">
+
+            <TextView
+                android:id="@+id/text_previous"
+                android:layout_width="68dp"
+                android:layout_height="match_parent"
+                android:gravity="center"
+                android:textSize="12sp"
+                android:clickable="true"
+                android:layout_alignParentLeft="true"
+                android:layout_alignParentStart="true"
+                android:background="@drawable/btn_menu_item_boardless"
+                android:textColor="@color/default_white"
+                android:text="@string/reader_previous_chapter"/>
+
+            <org.adw.library.widgets.discreteseekbar.DiscreteSeekBar
+                android:id="@+id/reader_seekbar"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:paddingLeft="16dp"
+                android:paddingRight="16dp"
+                android:layout_toRightOf="@+id/text_previous"
+                android:layout_toLeftOf="@+id/text_next"
+                android:layout_centerVertical="true"
+                app:dsb_indicatorColor="@color/myAccentColor"
+                app:dsb_progressColor="@color/myPrimaryColor"
+                app:dsb_trackColor="@color/default_white"
+                app:dsb_indicatorElevation="4dp"/>
+
+            <TextView
+                android:id="@+id/text_next"
+                android:layout_width="68dp"
+                android:layout_height="match_parent"
+                android:gravity="center"
+                android:textSize="12sp"
+                android:clickable="true"
+                android:layout_alignParentRight="true"
+                android:layout_alignParentEnd="true"
+                android:background="@drawable/btn_menu_item_boardless"
+                android:textColor="@color/default_white"
+                android:text="@string/reader_next_chapter"/>
+        </RelativeLayout>
+
+        <RelativeLayout
+            android:id="@+id/reader_bot_settings"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:fitsSystemWindows="true"
+            android:background="@color/reader_default_bg_toolbar"
+            android:visibility="invisible"
+            android:clickable="true"
+            android:layout_above="@+id/reader_bot"
+            android:layout_alignParentLeft="true"
+            android:layout_alignParentStart="true"
+            android:gravity="center"
+            android:baselineAligned="false">
+
+            <RelativeLayout
+                android:id="@+id/layout_font_size"
+                android:layout_width="match_parent"
+                android:layout_height="48dp">
+
+                <TextView
+                    android:id="@+id/text_font_size"
+                    android:layout_width="80dp"
+                    android:layout_height="48dp"
+                    android:gravity="center"
+                    android:textSize="12sp"
+                    android:textColor="@color/default_white"
+                    android:text="@string/reader_font_size"/>
+
+                <org.adw.library.widgets.discreteseekbar.DiscreteSeekBar
+                    android:id="@+id/reader_font_size_seeker"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:paddingRight="16dp"
+                    android:layout_centerHorizontal="true"
+                    android:layout_toRightOf="@+id/text_font_size"
+                    android:layout_toEndOf="@+id/text_font_size"
+                    android:layout_centerVertical="true"
+                    app:dsb_indicatorColor="@color/myAccentColor"
+                    app:dsb_progressColor="@color/myPrimaryColor"
+                    app:dsb_trackColor="@color/default_white"
+                    app:dsb_indicatorElevation="4dp"
+                    app:dsb_min="8"
+                    app:dsb_max="32"/>
+            </RelativeLayout>
+
+            <RelativeLayout
+                android:id="@+id/layout_line_distance"
+                android:layout_below="@+id/layout_font_size"
+                android:layout_width="match_parent"
+                android:layout_height="48dp">
+
+                <TextView
+                    android:id="@+id/text_line_distance"
+                    android:layout_width="80dp"
+                    android:layout_height="48dp"
+                    android:gravity="center"
+                    android:textSize="12sp"
+                    android:layout_alignParentLeft="true"
+                    android:layout_alignParentStart="true"
+                    android:textColor="@color/default_white"
+                    android:text="@string/reader_line_distance"/>
+
+                <org.adw.library.widgets.discreteseekbar.DiscreteSeekBar
+                    android:id="@+id/reader_line_distance_seeker"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:paddingRight="16dp"
+                    android:layout_centerHorizontal="true"
+                    android:layout_toRightOf="@+id/text_line_distance"
+                    android:layout_toEndOf="@+id/text_line_distance"
+                    android:layout_centerVertical="true"
+                    app:dsb_indicatorColor="@color/myAccentColor"
+                    app:dsb_progressColor="@color/myPrimaryColor"
+                    app:dsb_trackColor="@color/default_white"
+                    app:dsb_indicatorElevation="4dp"
+                    app:dsb_min="0"
+                    app:dsb_max="32"/>
+            </RelativeLayout>
+
+            <RelativeLayout
+                android:id="@+id/layout_paragraph_distance"
+                android:layout_below="@+id/layout_line_distance"
+                android:layout_width="match_parent"
+                android:layout_height="48dp">
+
+                <TextView
+                    android:id="@+id/text_paragraph_distance"
+                    android:layout_width="80dp"
+                    android:layout_height="48dp"
+                    android:gravity="center"
+                    android:textSize="12sp"
+                    android:layout_alignParentLeft="true"
+                    android:layout_alignParentStart="true"
+                    android:textColor="@color/default_white"
+                    android:text="@string/reader_paragraph_distance"/>
+
+                <org.adw.library.widgets.discreteseekbar.DiscreteSeekBar
+                    android:id="@+id/reader_paragraph_distance_seeker"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:paddingRight="16dp"
+                    android:layout_centerHorizontal="true"
+                    android:layout_toRightOf="@+id/text_paragraph_distance"
+                    android:layout_toEndOf="@+id/text_paragraph_distance"
+                    android:layout_centerVertical="true"
+                    app:dsb_indicatorColor="@color/myAccentColor"
+                    app:dsb_progressColor="@color/myPrimaryColor"
+                    app:dsb_trackColor="@color/default_white"
+                    app:dsb_indicatorElevation="4dp"
+                    app:dsb_min="0"
+                    app:dsb_max="48"/>
+            </RelativeLayout>
+
+            <RelativeLayout
+                android:id="@+id/layout_paragraph_edge_distance"
+                android:layout_below="@+id/layout_paragraph_distance"
+                android:layout_width="match_parent"
+                android:layout_height="48dp">
+
+                <TextView
+                    android:id="@+id/text_paragraph_edge_distance"
+                    android:layout_width="80dp"
+                    android:layout_height="48dp"
+                    android:gravity="center"
+                    android:textSize="12sp"
+                    android:layout_alignParentLeft="true"
+                    android:layout_alignParentStart="true"
+                    android:textColor="@color/default_white"
+                    android:text="@string/reader_paragraph_edge_distance"/>
+
+                <org.adw.library.widgets.discreteseekbar.DiscreteSeekBar
+                    android:id="@+id/reader_paragraph_edge_distance_seeker"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:paddingRight="16dp"
+                    android:layout_centerHorizontal="true"
+                    android:layout_toRightOf="@+id/text_paragraph_edge_distance"
+                    android:layout_toEndOf="@+id/text_paragraph_edge_distance"
+                    android:layout_centerVertical="true"
+                    app:dsb_indicatorColor="@color/myAccentColor"
+                    app:dsb_progressColor="@color/myPrimaryColor"
+                    app:dsb_trackColor="@color/default_white"
+                    app:dsb_indicatorElevation="4dp"
+                    app:dsb_min="0"
+                    app:dsb_max="16"/>
+            </RelativeLayout>
+
+            <LinearLayout
+                android:id="@+id/layout_more_buttons"
+                android:layout_below="@+id/layout_paragraph_edge_distance"
+                android:layout_width="match_parent"
+                android:layout_height="48dp">
+
+                <TextView
+                    android:id="@+id/btn_custom_font"
+                    android:layout_width="wrap_content"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:gravity="center"
+                    android:textSize="12sp"
+                    android:clickable="true"
+                    android:background="@drawable/btn_menu_item"
+                    android:textColor="@color/default_white"
+                    android:text="@string/reader_custom_font"/>
+
+                <TextView
+                    android:id="@+id/btn_custom_background"
+                    android:layout_width="wrap_content"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:gravity="center"
+                    android:textSize="12sp"
+                    android:clickable="true"
+                    android:background="@drawable/btn_menu_item"
+                    android:textColor="@color/default_white"
+                    android:text="@string/reader_custom_background"/>
+            </LinearLayout>
+        </RelativeLayout>
+    </RelativeLayout>
+
+    <!--<org.mewx.wenku8.reader.slider.SlidingLayout-->
+        <!--android:id="@+id/sliding_layout"-->
+        <!--android:layout_height="match_parent"-->
+        <!--android:layout_width="match_parent" />-->
+</RelativeLayout>

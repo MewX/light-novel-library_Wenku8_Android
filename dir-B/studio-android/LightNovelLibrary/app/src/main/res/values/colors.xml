@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Default Color -->
+    <color name="default_white">#FFFFFF</color>
+    <color name="default_activity_background">#F5F5F5</color>
+    <color name="default_mask_background_white">#A0FFFFFF</color>
+    <color name="default_text_color_black">#444444</color>
+    <color name="default_divider">#DADADA</color>
+
+    <!-- UI Color -->
+    <color name="myPrimaryColor">#4284F5</color>
+    <color name="myPrimaryDarkColor">#3870d0</color>
+    <color name="myAccentColor">#fe5151</color>
+    <color name="myDrawerBackground">#F2F2F2</color>
+    <color name="myWindowBackground">#F5F5F5</color>
+    <color name="myTextPrimaryColor">#FFFFFF</color>
+    <color name="mySearchToggleColor">#7F7F7F</color>
+    <!-- Navigation Color is 30% black mask attack to primary color -->
+    <color name="myNavigationColor">#2E5CAB</color>
+    <color name="myNavigationColorWhite">#B2B2B2</color>
+
+    <!-- Material Dialog Color -->
+    <color name="dlgTitleColor">#4D4D4D</color>
+    <color name="dlgContentColor">#666666</color>
+    <color name="dlgBackgroundColor">#FAFAFA</color>
+    <color name="dlgPositiveButtonColor">#3870d0</color>
+    <color name="dlgNegativeButtonColor">#444444</color>
+    <color name="dlgDividerColor">#DADADA</color>
+
+    <!-- Floating Action Button Color-->
+    <color name="fabRed">#FF5252</color>
+    <color name="fabRedPressed">#E54949</color>
+    <color name="fabGreen">#00BE9C</color>
+    <color name="fabGreenPressed">#00A687</color>
+    <color name="fabYellow">#FF9100</color>
+    <color name="fabYellowPressed">#E58200</color>
+
+    <!-- Menu Item Color -->
+    <color name="menu_transparent">#00FFFFFF</color>
+    <color name="menu_item_blue">#3487f4</color>
+    <color name="menu_item_blue_dark">#2F79DB</color>
+    <color name="menu_item_grey">#ffdbdbdb</color>
+    <color name="menu_item_white">#FFFFFF</color>
+    <color name="menu_background">#FFFFFF</color>
+    <color name="menu_text_color">#444444</color>
+    <color name="menu_text_color_selected">#FFFFFF</color>
+    <color name="avatar_text">#FFFFFF</color>
+    <color name="avatar_background">#444444</color>
+
+    <!-- Novel Item Color -->
+    <color name="novel_item_white">#FFFFFF</color>
+    <color name="novel_item_grey">#EAEAEA</color>
+    <color name="novel_item_title">#F44336</color>
+    <color name="novel_item_text">#444444</color>
+
+    <!-- PagerSlidingTabStrip Color -->
+    <color name="pager_sliding_tab_strip_indicator">#FFFFFF</color>
+    <color name="pager_sliding_tab_strip_text">#EAEAEA</color>
+    <color name="pager_sliding_tab_strip_selected_text">#FFFFFF</color>
+    <color name="pager_sliding_tab_pressed">#1AFFFFFF</color>
+
+    <!-- Google Progress Bar Color -->
+    <color name="red">#FFC93437</color>
+    <color name="blue">#FF375BF1</color>
+    <color name="yellow">#FFF7D23E</color>
+    <color name="green">#FF34A350</color>
+
+    <!-- Smooth Progress Bar Color -->
+    <integer-array name="gplus_colors">
+        <item>@color/red</item>
+        <item>@color/blue</item>
+        <item>@color/yellow</item>
+        <item>@color/green</item>
+    </integer-array>
+
+    <!-- Login UI Color -->
+    <color name="login_hint_text">#999999</color>
+    <color name="login_input_text">#4D4D4D</color>
+    <color name="login_line">#DBDBDB</color>
+    <color name="login_line_focused">#2196F3</color>
+    <color name="login_btn_white">#FFFFFF</color>
+    <color name="login_btn_dark">#444444</color>
+
+    <!-- Reader Color -->
+    <color name="reader_default_bg_toolbar">#CC000000</color>
+    <color name="reader_default_bg_yellow">#CFBEB6</color>
+    <color name="reader_default_bg_black">#090C13</color>
+    <color name="reader_default_text_light">#32414E</color>
+    <color name="reader_default_text_dark">#444444</color>
+
+</resources>

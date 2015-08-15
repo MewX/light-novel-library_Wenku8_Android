@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:card-view="http://schemas.android.com/apk/res-auto"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:paddingLeft="6dp"
+    android:paddingRight="6dp"
+    android:paddingTop="2dp">wo
+
+    <android.support.v7.widget.CardView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        card-view:cardBackgroundColor="@color/novel_item_white"
+        card-view:cardElevation="2dp"
+        card-view:cardUseCompatPadding="true"
+        card-view:cardMaxElevation="2dp">
+
+        <LinearLayout
+            android:id="@+id/item_card"
+            android:clickable="true"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:background="@drawable/btn_menu_item"
+            android:orientation="horizontal">
+
+            <ImageButton
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:paddingTop="12dp"
+                android:paddingBottom="12dp"
+                android:paddingLeft="16dp"
+                android:paddingRight="16dp"
+                android:background="@android:color/transparent"
+                android:clickable="false"
+                android:focusable="false"
+                android:src="@drawable/ic_find"
+                android:textIsSelectable="false" />
+
+            <TextView
+                android:id="@+id/search_history_text"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textSize="16sp"
+                android:paddingTop="12dp"
+                android:paddingBottom="12dp"
+                android:paddingLeft="16dp"
+                android:paddingRight="16dp"
+                android:text="test"
+                android:singleLine="true"
+                android:textColor="@color/menu_text_color" />
+
+        </LinearLayout>
+    </android.support.v7.widget.CardView>
+</RelativeLayout>

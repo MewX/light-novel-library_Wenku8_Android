@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string-array name="download_option">
+        <item>@string/dialog_option_check_for_update</item>
+        <item>@string/dialog_option_update_uncached_volumes</item>
+        <item>@string/dialog_option_force_update_all</item>
+        <item>@string/dialog_option_select_and_update</item>
+    </string-array>
+
+    <string-array name="reader_engine_option">
+        <item>@string/dialog_option_reader_engine_v1</item>
+        <item>@string/dialog_option_reader_engine_old</item>
+    </string-array>
+
+    <string-array name="reader_font_option">
+        <item>@string/dialog_option_reader_font_system</item>
+        <item>@string/dialog_option_reader_font_custom</item>
+    </string-array>
+
+    <string-array name="reader_background_option">
+        <item>@string/dialog_option_reader_background_system</item>
+        <item>@string/dialog_option_reader_background_custom</item>
+    </string-array>
+
+    <string-array name="wipe_cache_option">
+        <item>@string/dialog_option_wipe_cache_fast</item>
+        <item>@string/dialog_option_wipe_cache_slow</item>
+    </string-array>
+
+    <string-array name="choose_language_option">
+        <item>@string/dialog_option_choose_simpified_chinese</item>
+        <item>@string/dialog_option_choose_traditional_chinese</item>
+    </string-array>
+</resources>

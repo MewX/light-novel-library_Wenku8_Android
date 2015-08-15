@@ -1,0 +1,19 @@
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/myWindowBackground" >
+
+    <android.support.v4.widget.SwipeRefreshLayout
+        android:id="@+id/swipe_refresh_layout"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+
+        <!-- Novel List -->
+        <android.support.v7.widget.RecyclerView
+            android:id="@+id/novel_item_list"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:scrollbars="vertical"
+            android:fastScrollEnabled="true"/>
+    </android.support.v4.widget.SwipeRefreshLayout>
+</FrameLayout>

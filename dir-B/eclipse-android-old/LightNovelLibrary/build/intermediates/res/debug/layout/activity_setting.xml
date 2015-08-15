@@ -1,0 +1,17 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:custom="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/master_ll"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical" >
+
+    <com.ecloud.pulltozoomview.PullToZoomScrollViewEx
+        android:id="@+id/scroll_view"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:overScrollMode="never"
+        custom:contentView="@layout/activity_setting_content_view"
+        custom:headerView="@layout/activity_setting_head_view"
+        custom:zoomView="@layout/activity_setting_zoom_view" />
+
+</LinearLayout><!-- From: file:/D:/MewX_Projects/Wenku8_Android/eclipse-android-old/LightNovelLibrary/res/layout/activity_setting.xml -->

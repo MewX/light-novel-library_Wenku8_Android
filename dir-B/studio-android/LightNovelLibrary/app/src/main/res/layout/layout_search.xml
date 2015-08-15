@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="horizontal"
+    android:fitsSystemWindows="true"
+    android:background="@color/default_white">
+
+    <include layout="@layout/toolbar_search" />
+
+    <View
+        android:id="@+id/divider"
+        android:layout_width="match_parent"
+        android:layout_below="@id/toolbar_actionbar"
+        android:layout_height="1px"
+        android:background="@color/mySearchToggleColor"/>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_below="@id/divider"
+        android:background="@color/myWindowBackground">
+
+        <!-- History List -->
+        <android.support.v7.widget.RecyclerView
+            android:id="@+id/search_history_list"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:scrollbars="vertical"
+            android:fastScrollEnabled="true"/>
+    </LinearLayout>
+</RelativeLayout>

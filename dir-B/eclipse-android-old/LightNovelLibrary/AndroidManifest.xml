@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="org.mewx.lightnovellibrary"
+    android:versionCode="9"
+    android:versionName="0.5.2.1" >
+
+    <uses-sdk
+        android:minSdkVersion="10"
+        android:targetSdkVersion="22" />
+
+    <uses-permission android:name="android.permission.CHANGE_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.WRITE_USER_DICTIONARY" />
+    <uses-permission android:name="android.permission.READ_PHONE_STATE"/>
+
+    <application
+        android:name="org.mewx.lightnovellibrary.component.MyApp"
+        android:allowBackup="true"
+        android:icon="@drawable/ic_launcher"
+        android:label="@string/app_name"
+        android:theme="@style/AppTheme" >
+
+        <meta-data android:value="55bf75dde0f55abe5600022e" android:name="UMENG_APPKEY"/>
+        <meta-data android:value="baidupan" android:name="UMENG_CHANNEL"/>
+
+        <!-- Main Activity -->
+        <activity
+            android:name=".activity.MainActivity"
+            android:label="@string/app_name" >
+        </activity>
+
+        <!-- Start page activity -->
+        <activity
+            android:name=".activity.StartActivity"
+            android:configChanges="keyboardHidden|orientation"
+            android:label="@string/app_name"
+            android:theme="@style/FullscreenTheme" >
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!-- Novel Related Activity -->
+        <activity
+            android:name=".activity.NovelListActivity"
+            android:label="@string/app_name"
+            android:theme="@style/AppTheme.Transparent" >
+        </activity>
+        <activity
+            android:name=".activity.NovelInfoActivity"
+            android:label="@string/app_name"
+            android:theme="@style/AppTheme.Transparent" >
+        </activity>
+        <activity
+            android:name=".activity.NovelReaderActivity"
+            android:label="@string/app_name"
+            android:theme="@style/AppTheme.Transparent" >
+        </activity>
+        <activity
+            android:name=".activity.NovelSearchActivity"
+            android:label="@string/app_name"
+            android:theme="@style/AppTheme.Transparent" >
+        </activity>
+        <activity
+            android:name=".activity.NovelImageActivity"
+            android:label="@string/app_name"
+            android:theme="@style/AppTheme.Transparent" >
+        </activity>
+        <activity
+            android:name=".activity.AboutActivity"
+            android:label="@string/app_name"
+            android:theme="@style/AppTheme.Transparent" >
+        </activity>
+    </application>
+
+</manifest>

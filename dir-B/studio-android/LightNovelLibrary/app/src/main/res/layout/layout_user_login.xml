@@ -1,0 +1,145 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/myPrimaryColor"
+    android:fitsSystemWindows="true">
+
+    <include layout="@layout/toolbar_pure" />
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_below="@id/toolbar_actionbar"
+        android:background="@color/myWindowBackground">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="vertical">
+
+            <!-- Logo -->
+            <ImageView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:src="@drawable/ic_wenku8_logo"
+                android:adjustViewBounds="true"/>
+
+            <!-- User name and password -->
+            <android.support.design.widget.TextInputLayout
+                android:id="@+id/edit_username_layout"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingTop="16dp"
+                android:paddingLeft="32dp"
+                android:paddingRight="32dp"
+                android:focusable="true"
+                android:focusableInTouchMode="true">
+
+                <EditText
+                    android:id="@+id/edit_username"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:hint="@string/login_username"
+                    android:textColor="@color/login_input_text"
+                    android:textColorHint="@color/login_hint_text"
+                    android:textColorHighlight="@color/myAccentColor"
+                    android:shadowColor="@color/myPrimaryColor"
+                    android:maxLength="30"
+                    android:singleLine="true"/>
+            </android.support.design.widget.TextInputLayout>
+
+            <android.support.design.widget.TextInputLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingTop="8dp"
+                android:paddingLeft="32dp"
+                android:paddingRight="32dp">
+
+                <EditText
+                    android:id="@+id/edit_password"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:hint="@string/login_password"
+                    android:textColor="@color/login_input_text"
+                    android:textColorHint="@color/login_hint_text"
+                    android:textColorHighlight="@color/myAccentColor"
+                    android:textColorLink="@color/myPrimaryColor"
+                    android:singleLine="true"
+                    android:password="true"
+                    android:maxLength="30"
+                    android:imeOptions="actionDone" />
+            </android.support.design.widget.TextInputLayout>
+
+            <!-- Two card buttons -->
+            <RelativeLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginLeft="64dp"
+                android:layout_marginRight="64dp"
+                android:layout_marginTop="32dp">
+
+                <android.support.v7.widget.CardView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    app:cardBackgroundColor="@color/novel_item_white"
+                    app:cardElevation="2dp"
+                    app:cardUseCompatPadding="true"
+                    app:cardMaxElevation="2dp">
+
+                    <TextView
+                        android:id="@+id/btn_login"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:gravity="center"
+                        android:textSize="16sp"
+                        android:paddingTop="12dp"
+                        android:paddingBottom="12dp"
+                        android:paddingLeft="16dp"
+                        android:paddingRight="16dp"
+                        android:background="@drawable/btn_menu_item_selected"
+                        android:text="@string/login_login"
+                        android:singleLine="true"
+                        android:clickable="true"
+                        android:textColor="@color/login_btn_white" />
+                </android.support.v7.widget.CardView>
+            </RelativeLayout>
+
+            <RelativeLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginLeft="64dp"
+                android:layout_marginRight="64dp"
+                android:layout_marginTop="8dp"
+                android:layout_marginBottom="16dp">
+
+                <android.support.v7.widget.CardView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    app:cardBackgroundColor="@color/novel_item_white"
+                    app:cardElevation="2dp"
+                    app:cardUseCompatPadding="true"
+                    app:cardMaxElevation="2dp">
+
+                    <TextView
+                        android:id="@+id/btn_register"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:gravity="center"
+                        android:textSize="16sp"
+                        android:paddingTop="12dp"
+                        android:paddingBottom="12dp"
+                        android:paddingLeft="16dp"
+                        android:paddingRight="16dp"
+                        android:background="@drawable/btn_menu_item"
+                        android:text="@string/login_register"
+                        android:singleLine="true"
+                        android:clickable="true"
+                        android:textColor="@color/login_btn_dark" />
+                </android.support.v7.widget.CardView>
+            </RelativeLayout>
+
+        </LinearLayout>
+    </ScrollView>
+</RelativeLayout>

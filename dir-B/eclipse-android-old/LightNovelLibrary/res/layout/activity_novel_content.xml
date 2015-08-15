@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/novel_layout"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/reader_default_bg_yellow" >
+
+    <ScrollView
+        android:id="@+id/content_scrollview"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:clickable="true"
+        android:fastScrollAlwaysVisible="true"
+        android:fillViewport="true"
+        android:fastScrollEnabled="true" >
+
+        <LinearLayout
+            android:id="@+id/novel_content_layout"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="vertical" >
+        </LinearLayout>
+    </ScrollView>
+
+    <!--
+    <ListView
+        android:id="@+id/content_list"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_weight="1"
+        android:clickable="false"
+        android:longClickable="false" >
+
+    </ListView>
+    -->
+
+    <RelativeLayout
+        android:id="@+id/floating_frame"
+        android:visibility="gone"
+        android:clickable="true"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" >
+
+        <Button
+            android:id="@+id/previous_chapter"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_alignParentLeft="true"
+            android:layout_centerVertical="true"
+            android:text="@+string/previous_chapter" />
+
+        <Button
+            android:id="@+id/next_chapter"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_alignParentRight="true"
+            android:layout_centerVertical="true"
+            android:text="@+string/next_chapter" />
+
+    </RelativeLayout>
+
+</FrameLayout>

@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="android.support.v7.appcompat.test">
+
+    <uses-sdk android:minSdkVersion="7" android:targetSdkVersion="7" />
+
+    <application>
+        <uses-library android:name="android.test.runner" />
+    </application>
+
+    <instrumentation android:name="android.test.InstrumentationTestRunner"
+                     android:targetPackage="android.support.v7.appcompat.test"
+                     android:handleProfiling="false"
+                     android:functionalTest="false"
+                     android:label="Tests for android.support.v7.appcompat.test"/>
+</manifest>

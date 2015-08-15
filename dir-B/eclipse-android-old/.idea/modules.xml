@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="ProjectModuleManager">
+    <modules>
+      <module fileurl="file://$PROJECT_DIR$/LightNovelLibrary/LightNovelLibrary.iml" filepath="$PROJECT_DIR$/LightNovelLibrary/LightNovelLibrary.iml" />
+      <module fileurl="file://$PROJECT_DIR$/appcompat_v7/appcompat_v7.iml" filepath="$PROJECT_DIR$/appcompat_v7/appcompat_v7.iml" />
+      <module fileurl="file://$PROJECT_DIR$/eclipse-android-old.iml" filepath="$PROJECT_DIR$/eclipse-android-old.iml" />
+    </modules>
+  </component>
+</project>

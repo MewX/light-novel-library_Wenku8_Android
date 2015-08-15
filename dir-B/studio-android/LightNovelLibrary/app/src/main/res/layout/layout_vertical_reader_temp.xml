@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/novel_layout"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/reader_default_bg_yellow" >
+
+    <org.mewx.wenku8.component.ScrollViewNoFling
+        android:id="@+id/content_scrollview"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@drawable/reader_bg_texture"
+        android:fillViewport="true" >
+        <!--android:fastScrollEnabled="true"-->
+        <!--android:fastScrollAlwaysVisible="true"-->
+        <!--android:fadeScrollbars="true"-->
+
+        <LinearLayout
+            android:id="@+id/novel_content_layout"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="vertical" >
+        </LinearLayout>
+    </org.mewx.wenku8.component.ScrollViewNoFling>
+
+    <!--
+    <ListView
+        android:id="@+id/content_list"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_weight="1"
+        android:clickable="false"
+        android:longClickable="false" >
+    </ListView>
+    -->
+
+</FrameLayout>

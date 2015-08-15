@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#eee" >
+
+    <include
+        android:id="@+id/ly"
+        layout="@layout/activity_titlebar" />
+
+    <Spinner
+        android:id="@+id/spinner"
+        android:layout_width="120dp"
+        android:layout_height="40dp"
+        android:layout_below="@+id/ly"
+        android:textAlignment="center" />
+
+    <EditText
+        android:id="@+id/editText"
+        android:layout_width="match_parent"
+        android:layout_height="40dp"
+        android:layout_below="@+id/ly"
+        android:layout_toRightOf="@+id/spinner"
+        android:ems="10"
+        android:singleLine="true" />
+
+    <Button
+        android:id="@+id/button_search"
+        style="?android:attr/buttonStyleSmall"
+        android:layout_width="match_parent"
+        android:layout_height="40dp"
+        android:layout_alignParentLeft="true"
+        android:layout_below="@+id/editText"
+        android:text="@string/search_novel" />
+
+    <ListView
+        android:id="@+id/list_history"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_alignParentLeft="true"
+        android:layout_below="@+id/button_search" >
+    </ListView>
+
+</RelativeLayout><!-- From: file:/D:/MewX_Projects/Wenku8_Android/eclipse-android-old/LightNovelLibrary/res/layout/activity_novel_search.xml -->

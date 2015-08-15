@@ -1,0 +1,58 @@
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    xmlns:gpb="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/myWindowBackground"
+    tools:context="org.mewx.wenku8.fragment.LatestFragment">
+
+    <!-- Novel List -->
+    <android.support.v7.widget.RecyclerView
+        android:id="@+id/novel_item_list"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:scrollbars="vertical"
+        android:fastScrollEnabled="true"/>
+    <!--android:paddingLeft="5dp"-->
+    <!--android:paddingRight="5dp"-->
+
+    <!-- Loading Frame -->
+    <LinearLayout
+        android:id="@+id/list_loading"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:gravity="center"
+        android:orientation="vertical"
+        android:visibility="visible"
+        android:clickable="true"
+        android:background="@color/myWindowBackground">
+
+        <com.jpardogo.android.googleprogressbar.library.GoogleProgressBar
+            android:id="@+id/google_progress"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            gpb:type="chrome_floating_circles"/>
+
+        <!-- If loading failed, update this loading-status info -->
+        <TextView
+            android:id="@+id/list_loading_status"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textColor="@color/default_text_color_black"
+            android:text="@string/list_loading"/>
+
+        <TextView
+            android:id="@+id/btn_loading"
+            android:layout_width="match_parent"
+            android:layout_height="60dp"
+            android:layout_marginTop="20dp"
+            android:clickable="true"
+            android:visibility="gone"
+            android:background="@drawable/btn_menu_item"
+            android:gravity="center"
+            android:textColor="@color/default_text_color_black"
+            android:text="@string/task_stop"/>
+
+    </LinearLayout>
+
+</FrameLayout>

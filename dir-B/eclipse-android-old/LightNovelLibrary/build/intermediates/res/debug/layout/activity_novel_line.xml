@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content" >
+
+    <TextView
+        android:id="@+id/novel_line_text"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@+string/zero"
+        android:visibility="visible" />
+
+    <ImageView
+        android:id="@+id/novel_line_image"
+        android:layout_width="match_parent"
+        android:layout_height="300dp"
+        android:src="@drawable/empty_cover"
+        android:scaleType="centerInside"
+        android:visibility="gone" />
+
+</FrameLayout><!-- From: file:/D:/MewX_Projects/Wenku8_Android/eclipse-android-old/LightNovelLibrary/res/layout/activity_novel_line.xml -->

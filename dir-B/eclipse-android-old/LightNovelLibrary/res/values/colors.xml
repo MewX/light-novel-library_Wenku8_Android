@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <color name="shadow">#7000</color>
+  <color name="bottom_bar">#eee</color>
+
+  <color name="lighter_green">#dcf58f</color>
+  <color name="light_green">#c1e25e</color>
+  <color name="green">#a3c639</color>
+  <color name="dark_green">#85a71d</color>
+  <color name="darker_green">#648306</color>
+
+  <color name="yellow">#ff0</color>
+  <color name="blue">#33b5e5</color>
+  <color name="purple">#60308c</color>
+
+  <color name="paper_background">#ffe3aa</color>
+  <color name="paper_line">#aa8539</color>
+
+  <color name="rainbow_red">#bf0c43</color>
+  <color name="rainbow_yellow">#f9ba15</color>
+  <color name="rainbow_green">#8eac00</color>
+  <color name="rainbow_blue">#127a97</color>
+  <color name="rainbow_purple">#452b72</color>
+  <color name="rainbow_white">#ffffff</color>
+  
+  <color name="setting_white">#ccffffff</color>
+  <color name="setting_pink">#ccffcccc</color>
+  <color name="setting_red">#ccff0000</color>
+
+  <!-- Reader Color -->
+  <color name="reader_default_bg_toolbar">#CC000000</color>
+  <color name="reader_default_bg_yellow">#CFBEB6</color>
+  <color name="reader_default_bg_black">#090C13</color>
+  <color name="reader_default_text_light">#32414E</color>
+  <color name="reader_default_text_dark">#444444</color>
+
+  <integer-array name="rainbow">
+    <item>@color/rainbow_red</item>
+    <item>@color/rainbow_yellow</item>
+    <item>@color/rainbow_green</item>
+    <item>@color/rainbow_blue</item>
+    <item>@color/rainbow_purple</item>
+  </integer-array>
+  
+  <integer-array name="rainbow_mewx">
+    <item>@color/rainbow_yellow</item>
+    <item>@color/rainbow_green</item>
+    <item>@color/rainbow_white</item>
+  </integer-array>
+</resources>

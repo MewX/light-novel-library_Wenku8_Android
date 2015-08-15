@@ -1,0 +1,284 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:background="@color/default_white"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:elevation="8dp"
+    android:clickable="true">
+
+    <ScrollView
+        android:id="@+id/main_menu_list_layout"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_alignParentLeft="true"
+        android:layout_alignParentStart="true"
+        android:layout_above="@+id/main_menu_bottom_layout"
+        android:gravity="center"
+        android:orientation="horizontal">
+
+        <RelativeLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent">
+
+            <!-- Top part -->
+            <RelativeLayout
+                android:id="@+id/top_background"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_alignParentTop="true"
+                android:layout_centerHorizontal="true"
+                android:gravity="bottom"
+                android:fitsSystemWindows="true"
+                android:orientation="horizontal">
+                <!--android:background="@drawable/bg_avatar_05"-->
+
+                <ImageView
+                    android:id="@+id/bg_img"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:scaleType="centerCrop"
+                    android:src="@drawable/bg_avatar_05"
+                    android:layout_alignParentTop="true"
+                    android:adjustViewBounds="true"/>
+
+                <com.makeramen.roundedimageview.RoundedImageView
+                    android:id="@+id/user_avatar"
+                    android:layout_height="48dp"
+                    android:layout_width="48dp"
+                    android:src="@drawable/ic_noavatar"
+                    android:scaleType="fitXY"
+                    app:riv_corner_radius="24dp"
+                    app:riv_border_width="2dp"
+                    app:riv_border_color="@color/default_white"
+                    app:riv_mutate_background="true"
+                    app:riv_oval="true"
+                    android:layout_above="@+id/user_name"
+                    android:layout_alignLeft="@+id/user_name"
+                    android:layout_alignStart="@+id/user_name"
+                    android:layout_marginBottom="8dp"
+                    android:clickable="true"/>
+
+                <TextView
+                    android:id="@+id/user_name"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/main_menu_not_login"
+                    android:textSize="16sp"
+                    android:textColor="@color/avatar_text"
+                    android:layout_alignParentLeft="true"
+                    android:layout_alignParentStart="true"
+                    android:layout_marginLeft="24dp"
+                    android:layout_marginStart="24dp"
+                    android:layout_marginBottom="12dp"
+                    android:layout_alignBottom="@+id/bg_img"
+                    android:shadowColor="#000"
+                    android:shadowDx="3.0"
+                    android:shadowDy="3.0"
+                    android:shadowRadius="2.0"
+                    android:clickable="true"/>
+            </RelativeLayout>
+
+            <RelativeLayout
+                android:id="@+id/bot_background"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:layout_below="@+id/top_background"
+                android:background="@color/menu_background"
+                android:layout_marginBottom="16dp"
+                android:fitsSystemWindows="true">
+
+                <TableLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:paddingTop="15dp">
+
+                    <TableRow
+                        android:id="@+id/main_menu_latest"
+                        android:layout_width="match_parent"
+                        android:layout_height="48dp"
+                        android:background="@drawable/btn_menu_item"
+                        android:clickable="true"
+                        android:gravity="center_vertical" >
+
+                        <ImageButton
+                            android:id="@+id/main_menu_ic_latest"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:paddingTop="12dp"
+                            android:paddingBottom="12dp"
+                            android:paddingLeft="16dp"
+                            android:paddingRight="16dp"
+                            android:background="@android:color/transparent"
+                            android:clickable="false"
+                            android:focusable="false"
+                            android:src="@drawable/ic_latest"
+                            android:textIsSelectable="false"
+                            android:contentDescription="@string/main_menu_latest"/>
+
+                        <TextView
+                            android:id="@+id/main_menu_text_latest"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:textSize="16sp"
+                            android:paddingTop="12dp"
+                            android:paddingBottom="12dp"
+                            android:paddingLeft="16dp"
+                            android:paddingRight="16dp"
+                            android:text="@string/main_menu_latest"
+                            android:textColor="@color/menu_text_color" />
+                    </TableRow>
+
+                    <TableRow
+                        android:id="@+id/main_menu_rklist"
+                        android:layout_width="match_parent"
+                        android:layout_height="48dp"
+                        android:background="@drawable/btn_menu_item"
+                        android:clickable="true"
+                        android:gravity="center_vertical" >
+
+                        <ImageButton
+                            android:id="@+id/main_menu_ic_rklist"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:paddingTop="12dp"
+                            android:paddingBottom="12dp"
+                            android:paddingLeft="16dp"
+                            android:paddingRight="16dp"
+                            android:background="@android:color/transparent"
+                            android:clickable="false"
+                            android:focusable="false"
+                            android:src="@drawable/ic_rklist"
+                            android:textIsSelectable="false" />
+
+                        <TextView
+                            android:id="@+id/main_menu_text_rklist"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:textSize="16sp"
+                            android:paddingTop="12dp"
+                            android:paddingBottom="12dp"
+                            android:paddingLeft="16dp"
+                            android:paddingRight="16dp"
+                            android:text="@string/main_menu_rklist"
+                            android:textColor="@color/menu_text_color" />
+                    </TableRow>
+
+                    <TableRow
+                        android:id="@+id/main_menu_fav"
+                        android:layout_width="match_parent"
+                        android:layout_height="48dp"
+                        android:background="@drawable/btn_menu_item"
+                        android:clickable="true"
+                        android:gravity="center_vertical" >
+
+                        <ImageButton
+                            android:id="@+id/main_menu_ic_fav"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:paddingTop="12dp"
+                            android:paddingBottom="12dp"
+                            android:paddingLeft="16dp"
+                            android:paddingRight="16dp"
+                            android:background="@android:color/transparent"
+                            android:clickable="false"
+                            android:focusable="false"
+                            android:src="@drawable/ic_fav"
+                            android:textIsSelectable="false" />
+
+                        <TextView
+                            android:id="@+id/main_menu_text_fav"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:textSize="16sp"
+                            android:paddingTop="12dp"
+                            android:paddingBottom="12dp"
+                            android:paddingLeft="16dp"
+                            android:paddingRight="16dp"
+                            android:text="@string/main_menu_fav"
+                            android:textColor="@color/menu_text_color" />
+                    </TableRow>
+
+                    <TableRow
+                        android:id="@+id/main_menu_config"
+                        android:layout_width="match_parent"
+                        android:layout_height="48dp"
+                        android:background="@drawable/btn_menu_item"
+                        android:clickable="true"
+                        android:gravity="center_vertical" >
+
+                        <ImageButton
+                            android:id="@+id/main_menu_ic_config"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:paddingTop="12dp"
+                            android:paddingBottom="12dp"
+                            android:paddingLeft="16dp"
+                            android:paddingRight="16dp"
+                            android:background="@android:color/transparent"
+                            android:clickable="false"
+                            android:focusable="false"
+                            android:src="@drawable/ic_config"
+                            android:textIsSelectable="false" />
+
+                        <TextView
+                            android:id="@+id/main_menu_text_config"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:textSize="16sp"
+                            android:paddingTop="12dp"
+                            android:paddingBottom="12dp"
+                            android:paddingLeft="16dp"
+                            android:paddingRight="16dp"
+                            android:text="@string/main_menu_config"
+                            android:textColor="@color/menu_text_color" />
+                    </TableRow>
+                </TableLayout>
+            </RelativeLayout>
+        </RelativeLayout>
+    </ScrollView>
+
+    <!-- Bottom Part -->
+    <LinearLayout
+        android:id="@+id/main_menu_bottom_layout"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center"
+        android:layout_alignParentBottom="true"
+        android:layout_alignParentLeft="true"
+        android:layout_alignParentStart="true"
+        android:background="@color/myPrimaryColor">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:gravity="center"
+            android:orientation="horizontal"
+            android:background="@color/default_white">
+
+            <TextView
+                android:id="@+id/main_menu_open_source"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:gravity="center"
+                android:layout_weight="1"
+                android:textAppearance="?android:attr/textAppearanceSmall"
+                android:text="@string/main_menu_statement"
+                android:textColor="@color/menu_text_color"
+                android:background="@drawable/btn_menu_item"
+                android:clickable="true"/>
+
+            <TextView
+                android:id="@+id/main_menu_dark_mode_switcher"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:gravity="center"
+                android:layout_weight="1"
+                android:textAppearance="?android:attr/textAppearanceSmall"
+                android:text="@string/main_menu_dark_mode_switcher"
+                android:textColor="@color/menu_text_color"
+                android:background="@drawable/btn_menu_item"
+                android:clickable="true" />
+        </LinearLayout>
+    </LinearLayout>
+</RelativeLayout>

@@ -1,0 +1,9 @@
+<component name="libraryTable">
+  <library name="universal-image-loader-1.9.3">
+    <CLASSES>
+      <root url="jar://$PROJECT_DIR$/LightNovelLibrary/libs/universal-image-loader-1.9.3.jar!/" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES />
+  </library>
+</component>

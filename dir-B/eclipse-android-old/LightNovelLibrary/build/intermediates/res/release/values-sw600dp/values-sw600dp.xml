@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- From: file:/D:/MewX_Projects/Wenku8_Android/eclipse-android-old/LightNovelLibrary/build/intermediates/exploded-aar/eclipse-android-old/appcompat_v7/unspecified/res/values-sw600dp/values-sw600dp.xml -->
+    <eat-comment/>
+    <dimen name="abc_action_bar_default_height">56dip</dimen>
+    <dimen name="abc_action_bar_icon_vertical_padding">4dip</dimen>
+    <dimen name="abc_action_bar_subtitle_bottom_margin">9dip</dimen>
+    <dimen name="abc_action_bar_subtitle_text_size">14dp</dimen>
+    <dimen name="abc_action_bar_subtitle_top_margin">-3dp</dimen>
+    <dimen name="abc_action_bar_title_text_size">18dp</dimen>
+    <dimen name="abc_config_prefDialogWidth">580dp</dimen>
+    <integer name="abc_max_action_buttons">5</integer>
+</resources>

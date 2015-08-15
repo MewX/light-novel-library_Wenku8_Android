@@ -1,0 +1,74 @@
+apply plugin: 'com.android.application'
+
+android {
+    compileSdkVersion 22
+    buildToolsVersion "22.0.1"
+    defaultConfig {
+        applicationId "org.mewx.wenku8"
+        minSdkVersion 15
+        targetSdkVersion 22
+        versionCode 29
+        versionName "1.2.0dev"
+    }
+    buildTypes {
+        debug {
+            debuggable true
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+        }
+        release {
+            debuggable false
+            minifyEnabled true
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+        }
+    }
+    productFlavors {
+        alpha {
+            // 内测渠道，群分发
+            manifestPlaceholders = [ UMENG_CHANNEL_NAME : "alpha"]
+        }
+
+        baidu {
+            // 百度网盘分发
+            manifestPlaceholders = [ UMENG_CHANNEL_NAME : "baidu"]
+        }
+
+        coolapk {
+            // 酷安
+            manifestPlaceholders = [ UMENG_CHANNEL_NAME : "coolapk"]
+        }
+
+        mi {
+            // 小米市场
+            manifestPlaceholders = [ UMENG_CHANNEL_NAME : "mi"]
+        }
+    }
+    packagingOptions {
+        exclude 'META-INF/LICENSE.txt'
+        exclude 'META-INF/NOTICE.txt'
+        exclude '.readme'
+    }
+}
+
+dependencies {
+    compile 'com.android.support:support-v4:22.2.0'
+    compile 'com.android.support:appcompat-v7:22.2.0'
+    compile 'com.android.support:cardview-v7:22.2.0'
+    compile 'com.android.support:recyclerview-v7:22.2.0'
+    compile 'com.android.support:design:22.2.0'
+
+    // external libraries
+    compile project(':umeng')
+    compile project(':volley')
+    compile 'com.readystatesoftware.systembartint:systembartint:1.0.3'
+    compile 'com.nostra13.universalimageloader:universal-image-loader:1.9.3'
+    compile 'com.afollestad:material-dialogs:0.7.6.0'
+    compile 'com.getbase:floatingactionbutton:1.9.0'
+    compile 'com.makeramen:roundedimageview:2.0.1'
+    compile 'com.davemorrissey.labs:subsampling-scale-image-view:3.1.3'
+    compile 'com.github.castorflex.smoothprogressbar:library:1.1.0'
+    compile 'com.jpardogo.googleprogressbar:library:1.2.0'
+    compile 'org.adw.library:discrete-seekbar:1.0.0'
+    compile 'com.davemorrissey.labs:subsampling-scale-image-view:3.1.4'
+    compile 'com.nononsenseapps:filepicker:2.2'
+}

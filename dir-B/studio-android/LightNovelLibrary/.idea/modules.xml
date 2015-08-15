@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="ProjectModuleManager">
+    <modules>
+      <module fileurl="file://$PROJECT_DIR$/LightNovelLibrary.iml" filepath="$PROJECT_DIR$/LightNovelLibrary.iml" />
+      <module fileurl="file://$PROJECT_DIR$/app/app.iml" filepath="$PROJECT_DIR$/app/app.iml" />
+      <module fileurl="file://$PROJECT_DIR$/systembartint-1.0.3/systembartint-1.0.3.iml" filepath="$PROJECT_DIR$/systembartint-1.0.3/systembartint-1.0.3.iml" />
+      <module fileurl="file://$PROJECT_DIR$/umeng/umeng.iml" filepath="$PROJECT_DIR$/umeng/umeng.iml" />
+      <module fileurl="file://$PROJECT_DIR$/volley/volley.iml" filepath="$PROJECT_DIR$/volley/volley.iml" />
+    </modules>
+  </component>
+</project>

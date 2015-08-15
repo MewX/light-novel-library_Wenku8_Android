@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- focused -->
+    <item android:drawable="@color/setting_white" android:state_focused="true"/>
+    <!-- focused and pressed -->
+    <item android:drawable="@color/setting_pink" android:state_focused="true" android:state_pressed="true"/>
+    <!-- pressed -->
+    <item android:drawable="@color/setting_pink" android:state_pressed="true"/>
+    <!-- default -->
+    <item android:drawable="@color/setting_white"/>
+
+</selector><!-- From: file:/D:/MewX_Projects/Wenku8_Android/eclipse-android-old/LightNovelLibrary/res/drawable/item_style_01_red.xml -->
