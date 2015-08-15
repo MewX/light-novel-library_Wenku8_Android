@@ -1,6 +1,5 @@
 package org.mewx.wenku8.global.api;
 
-import android.app.ProgressDialog;
 import android.util.Log;
 
 import com.afollestad.materialdialogs.MaterialDialog;
@@ -10,6 +9,7 @@ import java.util.List;
 
 /**
  * Created by MewX on 2015/6/6.
+ * Old Novel Content Parser.
  */
 public class OldNovelContentParser {
     public static class NovelContent {
@@ -19,11 +19,11 @@ public class OldNovelContentParser {
 
     public static List<NovelContent> parseNovelContent(String raw,
                                                        MaterialDialog pDialog) {
-        List<NovelContent> result = new ArrayList<NovelContent>();
+        List<NovelContent> result = new ArrayList<>();
 
         // use split
         String[] s = raw.split("\r\n");
-        int temp = 0;
+        int temp;
         for (String t : s) {
             // escape empty line
             boolean isEmpty = true;
@@ -88,11 +88,11 @@ public class OldNovelContentParser {
     }
 
     public static List<NovelContent> NovelContentParser_onlyImage(String raw) {
-        List<NovelContent> result = new ArrayList<NovelContent>();
+        List<NovelContent> result = new ArrayList<>();
 
         // use split
         String[] s = raw.split("\r\n");
-        int temp = 0;
+        int temp;
         for (String t : s) {
             // test
             temp = t.indexOf("<!--image-->", 0);

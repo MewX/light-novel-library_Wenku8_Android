@@ -1,6 +1,5 @@
 package org.mewx.wenku8.activity;
 
-import android.content.ContentValues;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.graphics.PorterDuff;
@@ -9,16 +8,12 @@ import android.os.AsyncTask;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
-import android.support.design.widget.Snackbar;
 import android.support.v7.app.AppCompatActivity;
-import android.support.v7.widget.CardView;
 import android.support.v7.widget.Toolbar;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuItem;
-import android.view.MotionEvent;
-import android.view.VelocityTracker;
 import android.view.View;
 import android.widget.ImageButton;
 import android.widget.ImageView;
@@ -51,7 +46,6 @@ import org.mewx.wenku8.reader.activity.Wenku8ReaderActivityV1;
 import org.mewx.wenku8.util.LightCache;
 import org.mewx.wenku8.util.LightNetwork;
 import org.mewx.wenku8.util.LightTool;
-import org.w3c.dom.Text;
 
 import java.io.File;
 import java.io.UnsupportedEncodingException;
@@ -62,6 +56,7 @@ import fr.castorflex.android.smoothprogressbar.SmoothProgressBar;
 
 /**
  * Created by MewX on 2015/5/13.
+ * Novel Info Activity.
  */
 public class NovelInfoActivity extends AppCompatActivity {
 
@@ -72,7 +67,6 @@ public class NovelInfoActivity extends AppCompatActivity {
     private int aid = 1;
     private String from = "", title = "";
     private boolean isLoading = true;
-    private Toolbar mToolbar = null;
     private RelativeLayout rlMask = null; // mask layout
     private LinearLayout mLinearLayout = null;
     private LinearLayout llCardLayout = null;
@@ -104,7 +98,7 @@ public class NovelInfoActivity extends AppCompatActivity {
         title = getIntent().getStringExtra("title");
 
         // set indicator enable
-        mToolbar = (Toolbar) findViewById(R.id.toolbar_actionbar);
+        Toolbar mToolbar = (Toolbar) findViewById(R.id.toolbar_actionbar);
         setSupportActionBar(mToolbar);
         final Drawable upArrow = getResources().getDrawable(R.drawable.abc_ic_ab_back_mtrl_am_alpha);
         if(getSupportActionBar() != null && upArrow != null) {
@@ -221,7 +215,7 @@ public class NovelInfoActivity extends AppCompatActivity {
                 // Snackbar.make(mLinearLayout, aid + ": " + mNovelItemMeta.title, Snackbar.LENGTH_SHORT).show();
                 new MaterialDialog.Builder(NovelInfoActivity.this)
                         .theme(Theme.LIGHT)
-                        .titleColor(R.color.dlgTitleColor)
+                        .titleColorRes(R.color.dlgTitleColor)
                         .backgroundColorRes(R.color.dlgBackgroundColor)
                         .contentColorRes(R.color.dlgContentColor)
                         .positiveColorRes(R.color.dlgPositiveButtonColor)
@@ -342,7 +336,7 @@ public class NovelInfoActivity extends AppCompatActivity {
                         .theme(Theme.LIGHT)
                         .title(R.string.dialog_title_choose_download_option)
                         .backgroundColorRes(R.color.dlgBackgroundColor)
-                        .titleColor(R.color.dlgTitleColor)
+                        .titleColorRes(R.color.dlgTitleColor)
                         .negativeText(R.string.dialog_negative_pass)
                         .negativeColorRes(R.color.dlgNegativeButtonColor)
                         .itemsGravity(GravityEnum.CENTER)
@@ -642,7 +636,7 @@ public class NovelInfoActivity extends AppCompatActivity {
                                     }
                                 })
                                 .theme(Theme.LIGHT)
-                                .titleColor(R.color.default_text_color_black)
+                                .titleColorRes(R.color.default_text_color_black)
                                 .backgroundColorRes(R.color.dlgBackgroundColor)
                                 .contentColorRes(R.color.dlgContentColor)
                                 .positiveColorRes(R.color.dlgPositiveButtonColor)
@@ -737,7 +731,7 @@ public class NovelInfoActivity extends AppCompatActivity {
                     novelFullIntro = new String(byteNovelFullInfo, "UTF-8"); // save
                 }
                 mNovelItemMeta.fullIntro = novelFullIntro;
-                if(mNovelItemMeta.fullIntro == null) return -1;
+                if(mNovelItemMeta.fullIntro.length() == 0) return -1;
             } catch (UnsupportedEncodingException e) {
                 e.printStackTrace();
                 return -2;
@@ -794,7 +788,8 @@ public class NovelInfoActivity extends AppCompatActivity {
                     tvNovelAuthor.setText(mNovelItemMeta.author);
                     tvNovelStatus.setText(mNovelItemMeta.bookStatus);
                     tvNovelUpdate.setText(mNovelItemMeta.lastUpdate);
-                    NovelInfoActivity.this.getSupportActionBar().setTitle(mNovelItemMeta.title); // set action bar title
+                    if(NovelInfoActivity.this.getSupportActionBar() != null)
+                        NovelInfoActivity.this.getSupportActionBar().setTitle(mNovelItemMeta.title); // set action bar title
                     break;
 
                 case 2:
@@ -863,7 +858,6 @@ public class NovelInfoActivity extends AppCompatActivity {
         // out: current loading
         String volumeXml, introXml;
         List<VolumeList> vl = null;
-        List<String> imageList = null; // add one and save once
         private NovelItemMeta ni;
         int size_a = 0, current = 0;
 
@@ -1256,6 +1250,15 @@ public class NovelInfoActivity extends AppCompatActivity {
     protected void onResume() {
         super.onResume();
         MobclickAgent.onResume(this);
+
+        // returen from search activity
+        final Drawable upArrow = getResources().getDrawable(R.drawable.abc_ic_ab_back_mtrl_am_alpha);
+        if(getSupportActionBar() != null && upArrow != null) {
+            getSupportActionBar().setHomeButtonEnabled(true);
+            getSupportActionBar().setDisplayHomeAsUpEnabled(true);
+            upArrow.setColorFilter(getResources().getColor(R.color.default_white), PorterDuff.Mode.SRC_ATOP);
+            getSupportActionBar().setHomeAsUpIndicator(upArrow);
+        }
     }
 
     private void refreshInfoFromLocal() {

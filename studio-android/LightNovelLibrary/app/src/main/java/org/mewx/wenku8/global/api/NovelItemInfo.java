@@ -7,12 +7,13 @@ import java.io.StringReader;
 
 /**
  * Created by MewX on 2015/1/20.
+ * Novel item info short.
  */
 public class NovelItemInfo {
 
     // Variables
     private boolean parseStatus; // default false
-    private boolean loadingStatus;
+//    private boolean loadingStatus;
 
     private int aid = 0;
     private String title = "";
@@ -21,9 +22,9 @@ public class NovelItemInfo {
     private String update = ""; // last update time
     private String intro_short = "";
 
-    private String intro_full = ""; // not necessary
+//    private String intro_full = ""; // not necessary
 
-    private boolean imageReady = false; // image
+//    private boolean imageReady = false; // image
 
     /**
      * Init the whole struct with the received XML string
@@ -32,42 +33,31 @@ public class NovelItemInfo {
      */
     public NovelItemInfo(String[] str) {
         setNovelItemInfo(str);
-        return;
     }
 
     public NovelItemInfo(int aid) {
         // set aid only, first loading event
         this.aid = aid;
         this.title = Integer.toString(aid); // use aid as title
-        return;
     }
 
-    public NovelItemInfo() {
-        return;
-    }
+    public NovelItemInfo() { }
 
     public boolean setNovelItemInfo(String[] str) {
         parseStatus = parseNovelItemIntro(str);
         return parseStatus;
     }
 
-    /**
-     * get parse status
-     *
-     * @return true - parsed, else failed.
-     */
-
-    public boolean getLoadingStatus(){
-        return loadingStatus;
-    }
-
-    public void setLoadingStatus(boolean b){
-        loadingStatus = b;
-        return;
-    }
+//    public boolean getLoadingStatus(){
+//        return loadingStatus;
+//    }
+//
+//    public void setLoadingStatus(boolean b){
+//        loadingStatus = b;
+//    }
 
     public boolean getParseStatus() {
-        return parseStatus;
+        return parseStatus; // true - parsed, else failed.
     }
 
     private boolean parseNovelItemIntro(String[] str) {
@@ -94,11 +84,10 @@ public class NovelItemInfo {
                             status = 0;
                             update = "";
                             intro_short = "";
-                            intro_full = "";
 
                         } else if ("data".equals(xmlPullParser.getName())) {
                             if ("Title".equals(xmlPullParser.getAttributeValue(0))) {
-                                aid = new Integer(
+                                aid = Integer.valueOf(
                                         xmlPullParser.getAttributeValue(1));
                                 title = xmlPullParser.nextText();
                             } else if ("Author".equals(xmlPullParser
@@ -106,7 +95,7 @@ public class NovelItemInfo {
                                 author = xmlPullParser.getAttributeValue(1);
                             } else if ("BookStatus".equals(xmlPullParser
                                     .getAttributeValue(0))) {
-                                        status = new Integer(
+                                status = Integer.valueOf(
                                         xmlPullParser.getAttributeValue(1));
                             } else if ("LastUpdate".equals(xmlPullParser
                                     .getAttributeValue(0))) {
@@ -154,12 +143,11 @@ public class NovelItemInfo {
         return intro_short;
     }
 
-    public String getIntroFull() {
-        return intro_full;
-    }
-
-    public void setIntroFull(String str) {
-        intro_full = str;
-        return;
-    }
+//    public String getIntroFull() {
+//        return intro_full;
+//    }
+//
+//    public void setIntroFull(String str) {
+//        intro_full = str;
+//    }
 }

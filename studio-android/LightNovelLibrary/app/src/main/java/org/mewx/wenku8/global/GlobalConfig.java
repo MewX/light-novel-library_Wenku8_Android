@@ -42,7 +42,6 @@ import java.util.ArrayList;
  */
 public class GlobalConfig {
 
-    private static final boolean inDebug = true; // true - in debug mode
     private static final boolean inAlphaBuild = true; // in alpha mode, no update function
     public static final String saveFolderName = "saves";
     public static final String imgsSaveFolderName = "imgs";
@@ -101,7 +100,7 @@ public class GlobalConfig {
 
     // debug info
     public static boolean inDebugMode() {
-        return inDebug; // set log out operation
+        return inAlphaBuild; // set log out operation
     }
 
     public static boolean inAlphaBuild() {
@@ -110,7 +109,7 @@ public class GlobalConfig {
 
     public static void wantDebugLog(String one, String two) {
         if(inDebugMode())
-            Log.d(one, two);
+            Log.e(one, two);
     }
 
     // sets and gets
@@ -222,6 +221,7 @@ public class GlobalConfig {
 
 
     public static boolean doCacheImage() {
+        // for non-image mode
         return true; // when cache, cache images
     }
 

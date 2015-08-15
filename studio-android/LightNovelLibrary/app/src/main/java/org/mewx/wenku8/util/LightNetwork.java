@@ -1,42 +1,33 @@
+package org.mewx.wenku8.util;
+
+import android.content.ContentValues;
+import android.util.Log;
+
+import org.apache.http.Header;
+import org.apache.http.HttpResponse;
+import org.apache.http.NameValuePair;
+import org.apache.http.client.entity.UrlEncodedFormEntity;
+import org.apache.http.client.methods.HttpPost;
+import org.apache.http.impl.client.DefaultHttpClient;
+import org.apache.http.protocol.HTTP;
+
+import java.io.BufferedInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.UnsupportedEncodingException;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.net.URLEncoder;
+import java.util.List;
+import java.util.zip.GZIPInputStream;
+
 /**
  *  Light Network
  **
  *  This class achieve the basic network protocol:
  *      HttpPost ...
  **/
-
-package org.mewx.wenku8.util;
-
-import java.io.BufferedInputStream;
-import java.io.BufferedReader;
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.io.UnsupportedEncodingException;
-import java.net.HttpURLConnection;
-import java.net.MalformedURLException;
-import java.net.URLConnection;
-import java.net.URLEncoder;
-import java.net.URL;
-import java.util.List;
-import java.util.zip.GZIPInputStream;
-
-import org.apache.http.Header;
-import org.apache.http.HttpResponse;
-import org.apache.http.HttpStatus;
-import org.apache.http.NameValuePair;
-import org.apache.http.client.HttpClient;
-import org.apache.http.client.entity.UrlEncodedFormEntity;
-import org.apache.http.client.methods.HttpGet;
-import org.apache.http.client.methods.HttpPost;
-import org.apache.http.impl.client.DefaultHttpClient;
-import org.apache.http.protocol.HTTP;
-import org.apache.http.util.EntityUtils;
-import org.mewx.wenku8.global.api.Wenku8API;
-
-import android.content.ContentValues;
-import android.util.Log;
 
 public class LightNetwork {
 //    final static private String fromEle = ".cn/";
@@ -49,7 +40,6 @@ public class LightNetwork {
 
 	LightNetwork() {
 		status = 0;
-		return;
 	}
 
 	/**
@@ -60,7 +50,7 @@ public class LightNetwork {
 	 * 
 	 * @param str
 	 *            : input string
-	 * @return: result encoded string or empty string
+	 * @return result encoded string or empty string
 	 */
 	public static String encodeToHttp(String str) {
 		String enc;
@@ -83,7 +73,7 @@ public class LightNetwork {
 	 *            : base url to post
 	 * @param params
 	 *            : post content NVP
-	 * @return: return correct bytes or null
+	 * @return return correct bytes or null
 	 */
 	@Deprecated
 	public static byte[] LightHttpPost(String URL, List<NameValuePair> params) {
@@ -158,8 +148,8 @@ public class LightNetwork {
 //		u = u.replace(fromEle, toEle);
 
 		// new API, initial
-		URL url = null;
-		HttpURLConnection http = null;
+		URL url;
+		HttpURLConnection http;
 		try {
 			url = new URL(u);
 			http = (HttpURLConnection) url.openConnection();
@@ -178,7 +168,7 @@ public class LightNetwork {
 		}
 
 		// make request args
-		StringBuffer params = new StringBuffer("");
+		StringBuilder params = new StringBuilder("");
 		for( String key : values.keySet() ) {
 			if( !(values.get(key) instanceof String)) continue;
 			params.append("&").append(key).append("=").append(values.get(key)); // now, like "&a=1&b=1&c=1"
@@ -192,7 +182,7 @@ public class LightNetwork {
 			InputStream inStream=http.getInputStream(); // input stream
 			ByteArrayOutputStream outStream = new ByteArrayOutputStream(); // output stream
 
-			if(http.getContentEncoding() != null && http.getContentEncoding().toLowerCase().indexOf("gzip") >= 0) {
+			if(http.getContentEncoding() != null && http.getContentEncoding().toLowerCase().contains("gzip")) {
 				// using 'gzip'
 				inStream = new GZIPInputStream(new BufferedInputStream(inStream));
 			}
@@ -206,7 +196,7 @@ public class LightNetwork {
 			}
 
 			byte[] buffer = new byte[1024];
-			int len = 0;
+			int len;
 			while( (len = inStream.read(buffer)) !=-1 )
 				outStream.write(buffer, 0, len); // read to outStream
 			byte[] data = outStream.toByteArray(); // copy to ByteArray
@@ -229,7 +219,7 @@ public class LightNetwork {
 	 * 
 	 * @param url
 	 *            : direct file url with extension
-	 * @return: return correct bytes or null
+	 * @return return correct bytes or null
 	 */
 	public static byte[] LightHttpDownload(String url) {
 //		// httpGet connection object
@@ -262,7 +252,7 @@ public class LightNetwork {
 		// a replacer
 //		url = url.replace(fromEle, toEle);
 
-		InputStream inputStream = null;
+		InputStream inputStream;
 		try {
 			URL localURL = new URL(url);
 			HttpURLConnection httpURLConnection = (HttpURLConnection)localURL.openConnection();
@@ -274,7 +264,7 @@ public class LightNetwork {
 
             byte[] b = new byte[1024];
             ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
-            int len = -1;
+            int len;
             while ((len = inputStream.read(b)) != -1) byteArrayOutputStream.write(b, 0, len);
             byteArrayOutputStream.close();
 
@@ -287,18 +277,18 @@ public class LightNetwork {
 		}
 	}
 
-	/**
-	 * Download to file, part by part, prevent OOM error.
-	 * @param url
-	 * @param filepath
-	 * @return
-	 */
-	public static boolean LightHttpDownloadToFile(String url, String filepath) {
-
-		// a replacer
-//		url = url.replace(fromEle, toEle);
-
-		return false;
-	}
+//	/**
+//	 * Download to file, part by part, prevent OOM error.
+//	 * @param url
+//	 * @param filepath
+//	 * @return
+//	 */
+//	public static boolean LightHttpDownloadToFile(String url, String filepath) {
+//
+//		// a replacer
+////		url = url.replace(fromEle, toEle);
+//
+//		return false;
+//	}
 
 }

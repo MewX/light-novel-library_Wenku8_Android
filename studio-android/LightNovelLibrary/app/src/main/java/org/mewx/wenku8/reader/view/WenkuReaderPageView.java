@@ -605,7 +605,7 @@ public class WenkuReaderPageView extends View {
 
                     if(foundIndex == -1) {
                         // not found, new load task
-                        canvas.drawText("Loading: " + li.text.substring(20, li.text.length()), (float) (pxPageEdgeDistance + pxParagraphEdgeDistance), (float) heightSum, textPaint);
+                        canvas.drawText("读取中: " + li.text.substring(21, li.text.length()), (float) (pxPageEdgeDistance + pxParagraphEdgeDistance), (float) heightSum, textPaint);
                         BitmapInfo bitmapInfo = new BitmapInfo();
                         bitmapInfo.idxLineInfo = i;
                         bitmapInfo.x_beg = pxPageEdgeDistance + pxParagraphEdgeDistance;
@@ -620,7 +620,7 @@ public class WenkuReaderPageView extends View {
                     }
                     else {
                         if(bitmapInfoList.get(foundIndex).bm == null) {
-                            canvas.drawText("Loading: " + li.text.substring(20, li.text.length()), (float) (pxPageEdgeDistance + pxParagraphEdgeDistance), (float) heightSum, textPaint);
+                            canvas.drawText("读取中: " + li.text.substring(21, li.text.length()), (float) (pxPageEdgeDistance + pxParagraphEdgeDistance), (float) heightSum, textPaint);
                         }
                         else {
 //                            canvas.drawText("Can you see image?", (float) (pxPageEdgeDistance + pxParagraphEdgeDistance), (float) heightSum, textPaint);
@@ -629,11 +629,11 @@ public class WenkuReaderPageView extends View {
                     }
                 }
                 else {
-                    canvas.drawText("Unexpected array: " + li.text.substring(20, li.text.length()), (float) (pxPageEdgeDistance + pxParagraphEdgeDistance), (float) heightSum, textPaint);
+                    canvas.drawText("Unexpected array: " + li.text.substring(21, li.text.length()), (float) (pxPageEdgeDistance + pxParagraphEdgeDistance), (float) heightSum, textPaint);
                 }
             }
             else {
-                canvas.drawText("（！请先用旧引擎浏览）图片" + li.text.substring(20, li.text.length()), (float) (pxPageEdgeDistance + pxParagraphEdgeDistance), (float) heightSum, textPaint);
+                canvas.drawText("（！请先用旧引擎浏览）图片" + li.text.substring(21, li.text.length()), (float) (pxPageEdgeDistance + pxParagraphEdgeDistance), (float) heightSum, textPaint);
             }
         }
     }

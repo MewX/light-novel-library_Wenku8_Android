@@ -15,7 +15,6 @@ import android.view.MenuItem;
 import android.view.View;
 import android.widget.EditText;
 import android.widget.ImageView;
-import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -35,17 +34,13 @@ import java.util.List;
 
 /**
  * Created by MewX on 2015/5/7.
+ * Search Activity.
  */
 public class SearchActivity extends AppCompatActivity implements MyItemClickListener, MyItemLongClickListener {
 
     // private vars
-    private LinearLayout searchContainer = null;
+//    private LinearLayout searchContainer = null;
     private EditText toolbarSearchView = null;
-    private View searchClearButton = null;
-    private ImageView searchClearIcon = null;
-    private Toolbar mToolbar = null;
-    private LinearLayoutManager mLayoutManager = null;
-    private RecyclerView mRecyclerView = null;
     private SearchHistoryAdapter adapter = null;
     private List<String> historyList = null;
 
@@ -55,9 +50,9 @@ public class SearchActivity extends AppCompatActivity implements MyItemClickList
         setContentView(R.layout.layout_search);
 
         // bind views
-        searchContainer = (LinearLayout)findViewById(R.id.search_container);
+//        searchContainer = (LinearLayout)findViewById(R.id.search_container);
         toolbarSearchView = (EditText) findViewById(R.id.search_view);
-        searchClearButton = findViewById(R.id.search_clear);
+        View searchClearButton = findViewById(R.id.search_clear);
 
         // Clear search text when clear button is tapped
         searchClearButton.setOnClickListener(new View.OnClickListener() {
@@ -68,7 +63,7 @@ public class SearchActivity extends AppCompatActivity implements MyItemClickList
         });
 
         // set indicator enable
-        mToolbar = (Toolbar) findViewById(R.id.toolbar_actionbar);
+        Toolbar mToolbar = (Toolbar) findViewById(R.id.toolbar_actionbar);
         setSupportActionBar(mToolbar);
         if(getSupportActionBar() != null) {
             getSupportActionBar().setDisplayHomeAsUpEnabled(true);
@@ -94,16 +89,14 @@ public class SearchActivity extends AppCompatActivity implements MyItemClickList
         }
 
         // set search clear icon color
-        searchClearIcon = (ImageView)findViewById(R.id.search_clear_icon);
+        ImageView searchClearIcon = (ImageView)findViewById(R.id.search_clear_icon);
         searchClearIcon.setColorFilter(getResources().getColor(R.color.mySearchToggleColor), PorterDuff.Mode.SRC_ATOP);
 
         // set history list
-        mLayoutManager = null;
-        mLayoutManager = new LinearLayoutManager(this);
+        LinearLayoutManager mLayoutManager = new LinearLayoutManager(this);
         mLayoutManager.setOrientation(LinearLayoutManager.VERTICAL);
 
-        mRecyclerView = null;
-        mRecyclerView = (RecyclerView) this.findViewById(R.id.search_history_list);
+        RecyclerView mRecyclerView = (RecyclerView) this.findViewById(R.id.search_history_list);
         mRecyclerView.setHasFixedSize(true); // set variable size
         mRecyclerView.setItemAnimator(new DefaultItemAnimator());
         mRecyclerView.setLayoutManager(mLayoutManager);
@@ -137,8 +130,6 @@ public class SearchActivity extends AppCompatActivity implements MyItemClickList
                 return false;
             }
         });
-
-        return;
     }
 
     @Override
@@ -148,12 +139,12 @@ public class SearchActivity extends AppCompatActivity implements MyItemClickList
 
         // set back arrow icon
         final Drawable upArrow = getResources().getDrawable(R.drawable.abc_ic_ab_back_mtrl_am_alpha);
-        upArrow.setColorFilter(getResources().getColor(R.color.mySearchToggleColor), PorterDuff.Mode.SRC_ATOP);
-        getSupportActionBar().setHomeAsUpIndicator(upArrow);
+        if(upArrow != null && getSupportActionBar() != null) {
+            upArrow.setColorFilter(getResources().getColor(R.color.mySearchToggleColor), PorterDuff.Mode.SRC_ATOP);
+            getSupportActionBar().setHomeAsUpIndicator(upArrow);
+        }
 
         refreshHistoryList();
-
-        return;
     }
 
     private void refreshHistoryList() {
@@ -161,8 +152,6 @@ public class SearchActivity extends AppCompatActivity implements MyItemClickList
         if(adapter != null) {
             adapter.notifyDataSetChanged(); // may be back from search list
         }
-
-        return;
     }
 
     @Override

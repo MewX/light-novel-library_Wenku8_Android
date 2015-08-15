@@ -8,10 +8,8 @@ public class MyApp extends Application {
 
     @Override
     public void onCreate() {
-        //获取Context
+        super.onCreate();
         context = getApplicationContext();
-
-        return;
     }
 
     public static Context getContext(){

@@ -8,8 +8,6 @@ import android.widget.ImageView;
 import android.widget.TextView;
 
 import com.nostra13.universalimageloader.core.ImageLoader;
-import com.nostra13.universalimageloader.core.imageaware.ImageAware;
-import com.nostra13.universalimageloader.core.imageaware.ImageViewAware;
 
 import org.mewx.wenku8.R;
 import org.mewx.wenku8.global.GlobalConfig;
@@ -25,6 +23,7 @@ import java.util.List;
 
 /**
  * Created by MewX on 2015/1/20.
+ * Olde Novel Item Adapter.
  */
 public class NovelItemAdapter extends RecyclerView.Adapter<NovelItemAdapter.ViewHolder> {
 
@@ -34,32 +33,23 @@ public class NovelItemAdapter extends RecyclerView.Adapter<NovelItemAdapter.View
 
     // empty list, then use append method to add list elements
     public NovelItemAdapter() {
-        mDataset = new ArrayList<NovelItemInfo>();
-
-        return;
+        mDataset = new ArrayList<>();
     }
 
     public NovelItemAdapter(List<NovelItemInfo> dataset) {
         super();
-        mDataset = dataset;
+        mDataset = dataset; // reference
     }
 
     public void RefreshDataset(List<NovelItemInfo> dataset) {
-        int origSize = mDataset.size();
-
         mDataset = dataset; // reference
-        int currSize = mDataset.size();
-
-        return;
     }
 
 
     @Override
     public ViewHolder onCreateViewHolder(ViewGroup viewGroup, int i) {
         View view = View.inflate(viewGroup.getContext(), R.layout.view_novel_item, null);
-
-        ViewHolder holder = new ViewHolder(view, mItemClickListener, mItemLongClickListener);
-        return holder;
+        return new ViewHolder(view, mItemClickListener, mItemLongClickListener);
     }
 
     @Override
@@ -139,8 +129,6 @@ public class NovelItemAdapter extends RecyclerView.Adapter<NovelItemAdapter.View
             // test current fragment
             if(!GlobalConfig.testInBookshelf())
                 ibNovelOption.setVisibility(View.INVISIBLE);
-
-            return;
         }
 
         @Override

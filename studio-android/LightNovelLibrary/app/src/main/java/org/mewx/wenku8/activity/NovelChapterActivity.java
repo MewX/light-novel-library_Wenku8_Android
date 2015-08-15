@@ -13,7 +13,6 @@ import android.view.View;
 import android.widget.LinearLayout;
 import android.widget.RelativeLayout;
 import android.widget.TextView;
-import android.widget.Toast;
 
 import com.afollestad.materialdialogs.GravityEnum;
 import com.afollestad.materialdialogs.MaterialDialog;
@@ -29,10 +28,10 @@ import org.mewx.wenku8.reader.activity.Wenku8ReaderActivityV1;
 import org.mewx.wenku8.util.LightCache;
 
 import java.io.File;
-import java.util.List;
 
 /**
  * Created by MewX on 2015/5/14.
+ * Novel Chapter Activity.
  */
 public class NovelChapterActivity extends AppCompatActivity {
 
@@ -42,8 +41,6 @@ public class NovelChapterActivity extends AppCompatActivity {
     // private vars
     private int aid = 1;
     private String from = "";
-    private LinearLayout mLinearLayout = null;
-    private Toolbar mToolbar = null;
     private VolumeList volumeList= null;
 
     @Override
@@ -57,7 +54,7 @@ public class NovelChapterActivity extends AppCompatActivity {
         volumeList = (VolumeList) getIntent().getSerializableExtra("volume");
 
         // set indicator enable
-        mToolbar = (Toolbar) findViewById(R.id.toolbar_actionbar);
+        Toolbar mToolbar = (Toolbar) findViewById(R.id.toolbar_actionbar);
         setSupportActionBar(mToolbar);
         final Drawable upArrow = getResources().getDrawable(R.drawable.abc_ic_ab_back_mtrl_am_alpha);
         if(getSupportActionBar() != null && upArrow != null) {
@@ -84,7 +81,7 @@ public class NovelChapterActivity extends AppCompatActivity {
         }
 
         // get views and set title
-        mLinearLayout = (LinearLayout) findViewById(R.id.novel_chapter_scroll);
+        LinearLayout mLinearLayout = (LinearLayout) findViewById(R.id.novel_chapter_scroll);
         getSupportActionBar().setTitle(volumeList.volumeName);
 
         for(final ChapterInfo ci : volumeList.chapterList) {

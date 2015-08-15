@@ -15,15 +15,12 @@ import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.ImageView;
-import android.widget.SimpleAdapter;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import com.umeng.analytics.MobclickAgent;
 
 import org.apache.http.NameValuePair;
-import org.mewx.wenku8.MyApp;
 import org.mewx.wenku8.R;
 import org.mewx.wenku8.activity.MainActivity;
 import org.mewx.wenku8.activity.NovelInfoActivity;
@@ -42,7 +39,7 @@ import java.util.List;
 
 public class LatestFragment extends Fragment implements MyItemClickListener, MyItemLongClickListener {
 
-    private String TAG = "LatestFragment";
+    static private final String TAG = "LatestFragment";
 
     // components
     private MainActivity mainActivity = null;

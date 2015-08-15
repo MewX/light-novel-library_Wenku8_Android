@@ -14,15 +14,13 @@ import java.util.List;
 
 /**
  * Created by MewX on 2015/5/10.
+ * Search History Adapter.
  */
 public class SearchHistoryAdapter extends RecyclerView.Adapter<SearchHistoryAdapter.ViewHolder> {
 
     private MyItemClickListener mItemClickListener;
     private MyItemLongClickListener mItemLongClickListener;
     private List<String> history = null;
-
-    // on click listener
-    private TextView searchText; // this is for set search text
 
     public SearchHistoryAdapter(List<String> h) {
         this.history = h;
@@ -47,8 +45,6 @@ public class SearchHistoryAdapter extends RecyclerView.Adapter<SearchHistoryAdap
     public void onBindViewHolder(ViewHolder viewHolder, int position) {
         if(viewHolder.mTextView != null)
             viewHolder.mTextView.setText(history.get(position));
-
-        return;
     }
 
     @Override

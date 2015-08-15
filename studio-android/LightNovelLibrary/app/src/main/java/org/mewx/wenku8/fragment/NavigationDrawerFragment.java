@@ -1,6 +1,5 @@
 package org.mewx.wenku8.fragment;
 
-import android.app.ActivityOptions;
 import android.app.Fragment;
 import android.content.Intent;
 import android.graphics.Bitmap;
@@ -10,8 +9,6 @@ import android.os.AsyncTask;
 import android.os.Build;
 import android.os.Bundle;
 import android.support.annotation.Nullable;
-import android.support.v4.app.ActivityOptionsCompat;
-import android.support.v4.util.Pair;
 import android.support.v4.widget.DrawerLayout;
 import android.support.v7.app.ActionBarDrawerToggle;
 import android.support.v7.widget.Toolbar;
@@ -21,7 +18,6 @@ import android.view.ViewGroup;
 import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
-import android.widget.RelativeLayout;
 import android.widget.TableRow;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -65,7 +61,7 @@ public class NavigationDrawerFragment extends Fragment {
 
         // set button clicked listener, mainly working on change fragment in MainActivity.
         try {
-            ((TableRow) mainActivity.findViewById(R.id.main_menu_rklist)).setOnClickListener(
+            mainActivity.findViewById(R.id.main_menu_rklist).setOnClickListener(
                     new View.OnClickListener() {
                         @Override
                         public void onClick(View v) {
@@ -80,7 +76,7 @@ public class NavigationDrawerFragment extends Fragment {
                     }
             );
 
-            ((TableRow) mainActivity.findViewById(R.id.main_menu_latest)).setOnClickListener(
+            mainActivity.findViewById(R.id.main_menu_latest).setOnClickListener(
                     new View.OnClickListener() {
                         @Override
                         public void onClick(View v) {
@@ -95,7 +91,7 @@ public class NavigationDrawerFragment extends Fragment {
                     }
             );
 
-            ((TableRow) mainActivity.findViewById(R.id.main_menu_fav)).setOnClickListener(
+            mainActivity.findViewById(R.id.main_menu_fav).setOnClickListener(
                     new View.OnClickListener() {
                         @Override
                         public void onClick(View v) {
@@ -110,7 +106,7 @@ public class NavigationDrawerFragment extends Fragment {
                     }
             );
 
-            ((TableRow) mainActivity.findViewById(R.id.main_menu_config)).setOnClickListener(
+            mainActivity.findViewById(R.id.main_menu_config).setOnClickListener(
                     new View.OnClickListener() {
                         @Override
                         public void onClick(View v) {
@@ -125,7 +121,7 @@ public class NavigationDrawerFragment extends Fragment {
                     }
             );
 
-            ((TextView) mainActivity.findViewById(R.id.main_menu_open_source)).setOnClickListener(
+            mainActivity.findViewById(R.id.main_menu_open_source).setOnClickListener(
                     new View.OnClickListener() {
                         @Override
                         public void onClick(View v) {
@@ -141,7 +137,7 @@ public class NavigationDrawerFragment extends Fragment {
                     }
             );
 
-            ((TextView) mainActivity.findViewById(R.id.main_menu_dark_mode_switcher)).setOnClickListener(
+            mainActivity.findViewById(R.id.main_menu_dark_mode_switcher).setOnClickListener(
                     new View.OnClickListener() {
                         @Override
                         public void onClick(View v) {
@@ -156,7 +152,7 @@ public class NavigationDrawerFragment extends Fragment {
         }
 
         // User Account
-        RelativeLayout rlBackground = (RelativeLayout)getActivity().findViewById(R.id.top_background);
+//        RelativeLayout rlBackground = (RelativeLayout)getActivity().findViewById(R.id.top_background);
         rivUserAvatar = (RoundedImageView)getActivity().findViewById(R.id.user_avatar);
         tvUserName = (TextView)getActivity().findViewById(R.id.user_name);
 
@@ -251,13 +247,13 @@ public class NavigationDrawerFragment extends Fragment {
         super.onCreate(savedInstanceState);
     }
 
-    public ActionBarDrawerToggle getActionBarDrawerToggle() {
-        return mActionBarDrawerToggle;
-    }
-
-    public void setActionBarDrawerToggle(ActionBarDrawerToggle actionBarDrawerToggle) {
-        mActionBarDrawerToggle = actionBarDrawerToggle;
-    }
+//    public ActionBarDrawerToggle getActionBarDrawerToggle() {
+//        return mActionBarDrawerToggle;
+//    }
+//
+//    public void setActionBarDrawerToggle(ActionBarDrawerToggle actionBarDrawerToggle) {
+//        mActionBarDrawerToggle = actionBarDrawerToggle;
+//    }
 
     public void setup(int fragmentId, DrawerLayout drawerLayout, Toolbar toolbar) {
         // get MainActivity
@@ -434,7 +430,7 @@ public class NavigationDrawerFragment extends Fragment {
             try {
                 switch (f) {
                     case RKLIST:
-                        ((TableRow) mainActivity.findViewById(R.id.main_menu_rklist)).setBackground(
+                        mainActivity.findViewById(R.id.main_menu_rklist).setBackground(
                                 getResources().getDrawable(R.drawable.btn_menu_item_selected)
                         );
                         ((TextView) mainActivity.findViewById(R.id.main_menu_text_rklist)).setTextColor(
@@ -446,7 +442,7 @@ public class NavigationDrawerFragment extends Fragment {
                         break;
 
                     case LATEST:
-                        ((TableRow) mainActivity.findViewById(R.id.main_menu_latest)).setBackground(
+                        mainActivity.findViewById(R.id.main_menu_latest).setBackground(
                                 getResources().getDrawable(R.drawable.btn_menu_item_selected)
                         );
                         ((TextView) mainActivity.findViewById(R.id.main_menu_text_latest)).setTextColor(
@@ -458,7 +454,7 @@ public class NavigationDrawerFragment extends Fragment {
                         break;
 
                     case FAV:
-                        ((TableRow) mainActivity.findViewById(R.id.main_menu_fav)).setBackground(
+                        mainActivity.findViewById(R.id.main_menu_fav).setBackground(
                                 getResources().getDrawable(R.drawable.btn_menu_item_selected)
                         );
                         ((TextView) mainActivity.findViewById(R.id.main_menu_text_fav)).setTextColor(
@@ -470,7 +466,7 @@ public class NavigationDrawerFragment extends Fragment {
                         break;
 
                     case CONFIG:
-                        ((TableRow) mainActivity.findViewById(R.id.main_menu_config)).setBackground(
+                        mainActivity.findViewById(R.id.main_menu_config).setBackground(
                                 getResources().getDrawable(R.drawable.btn_menu_item_selected)
                         );
                         ((TextView) mainActivity.findViewById(R.id.main_menu_text_config)).setTextColor(
@@ -518,7 +514,7 @@ public class NavigationDrawerFragment extends Fragment {
                     ((TextView) mainActivity.findViewById(R.id.main_menu_dark_mode_switcher)).setTextColor(
                             getResources().getColor(R.color.menu_text_color)
                     );
-                    ((TextView) mainActivity.findViewById(R.id.main_menu_dark_mode_switcher)).setBackground(
+                    mainActivity.findViewById(R.id.main_menu_dark_mode_switcher).setBackground(
                             getResources().getDrawable(R.drawable.btn_menu_item)
                     );
                 } else {
@@ -526,7 +522,7 @@ public class NavigationDrawerFragment extends Fragment {
                     ((TextView) mainActivity.findViewById(R.id.main_menu_dark_mode_switcher)).setTextColor(
                             getResources().getColor(R.color.menu_text_color_selected)
                     );
-                    ((TextView) mainActivity.findViewById(R.id.main_menu_dark_mode_switcher)).setBackground(
+                    mainActivity.findViewById(R.id.main_menu_dark_mode_switcher).setBackground(
                             getResources().getDrawable(R.drawable.btn_menu_item_selected)
                     );
                 }
@@ -638,14 +634,6 @@ public class NavigationDrawerFragment extends Fragment {
     @Override
     public void onSaveInstanceState(Bundle outState) {
         super.onSaveInstanceState(outState);
-    }
-
-    public DrawerLayout getDrawerLayout() {
-        return mDrawerLayout;
-    }
-
-    public void setDrawerLayout(DrawerLayout drawerLayout) {
-        mDrawerLayout = drawerLayout;
     }
 
     @Override

@@ -12,13 +12,8 @@ import java.io.UnsupportedEncodingException;
 import android.util.Base64;
 
 public class LightBase64 {
-	LightBase64( ) {
-		return;
-	}
-	
 	static public String EncodeBase64(byte[] b) {
-        String str = Base64.encodeToString( b, Base64.DEFAULT);
-        return str;
+		return Base64.encodeToString( b, Base64.DEFAULT);
 	}
 
 	static public String EncodeBase64( String s ) {
@@ -45,7 +40,7 @@ public class LightBase64 {
 	static public String DecodeBase64String(String s) {
 		try {
 			return new String( DecodeBase64(s), "UTF-8" );
-		} catch (UnsupportedEncodingException e) {
+		} catch (Exception e) {
 			e.printStackTrace();
 			return null;
 		}

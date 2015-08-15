@@ -1,9 +1,7 @@
 package org.mewx.wenku8.activity;
 
-import android.app.ProgressDialog;
 import android.content.DialogInterface;
 import android.content.Intent;
-import android.gesture.Gesture;
 import android.graphics.LinearGradient;
 import android.graphics.Shader;
 import android.graphics.Typeface;
@@ -11,8 +9,6 @@ import android.os.AsyncTask;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
-import android.support.v4.view.MotionEventCompat;
-import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
 import android.util.TypedValue;
@@ -47,29 +43,28 @@ import java.util.List;
 
 /**
  * Created by MewX on 2015/6/6.
+ * Old reader engine.
  */
 public class VerticalReaderActivity extends AppCompatActivity {
     // constant
-    private final String FromLocal = "fav";
+    static private final String FromLocal = "fav";
 
     // private vars
     private String from = "";
     private int aid, cid;
-    private VolumeList volumeList= null;
+    private VolumeList volumeList= null; // for extended function
     private MaterialDialog pDialog = null;
     private ScrollViewNoFling svTextListLayout = null;
     private LinearLayout TextListLayout = null;
     private List<OldNovelContentParser.NovelContent> nc = null;
     private Typeface typeface;
-    private boolean isScrolling = false;
 
     // Scroll runnable to last read position
     private Runnable runnableScroll = new Runnable() {
         @Override
         public void run() {
-            ((ScrollViewNoFling) VerticalReaderActivity.this.findViewById(R.id.content_scrollview))
-                    .scrollTo(0, GlobalConfig.getReadSavesRecord(cid,
-                            TextListLayout.getMeasuredHeight()));
+            VerticalReaderActivity.this.findViewById(R.id.content_scrollview)
+                    .scrollTo(0, GlobalConfig.getReadSavesRecord(cid, TextListLayout.getMeasuredHeight()));
         }
     };
 
@@ -182,7 +177,7 @@ public class VerticalReaderActivity extends AppCompatActivity {
     }
 
     private void getNovelContent() {
-        List<NameValuePair> targVar = new ArrayList<NameValuePair>();
+        List<NameValuePair> targVar = new ArrayList<>();
         targVar.add(Wenku8API.getNovelContent(aid, cid, GlobalConfig.getCurrentLang()));
 
         final asyncNovelContentTask ast = new asyncNovelContentTask();
@@ -202,14 +197,12 @@ public class VerticalReaderActivity extends AppCompatActivity {
                         pDialog = null;
                     }
                 })
-                .titleColor(R.color.default_text_color_black)
+                .titleColorRes(R.color.default_text_color_black)
                 .show();
 
         pDialog.setProgress(0);
         pDialog.setMaxProgress(1);
         pDialog.show();
-
-        return;
     }
 
     class asyncNovelContentTask extends AsyncTask<List<NameValuePair>, Integer, Integer> {
@@ -243,11 +236,6 @@ public class VerticalReaderActivity extends AppCompatActivity {
                 e.printStackTrace();
             }
             return -1;
-        }
-
-        @Override
-        protected void onProgressUpdate(Integer... values) {
-            return;
         }
 
         @Override
@@ -379,7 +367,7 @@ public class VerticalReaderActivity extends AppCompatActivity {
                             }
                         })
                         .theme(Theme.LIGHT)
-                        .titleColor(R.color.default_text_color_black)
+                        .titleColorRes(R.color.default_text_color_black)
                         .backgroundColorRes(R.color.dlgBackgroundColor)
                         .contentColorRes(R.color.dlgContentColor)
                         .positiveColorRes(R.color.dlgPositiveButtonColor)
@@ -404,7 +392,7 @@ public class VerticalReaderActivity extends AppCompatActivity {
 
     private void saveRecord() {
         // cannot get height easily, except sum one by one
-        GlobalConfig.addReadSavesRecord(cid, ((ScrollViewNoFling) VerticalReaderActivity.this.findViewById(R.id.content_scrollview)).getScrollY(),
+        GlobalConfig.addReadSavesRecord(cid, VerticalReaderActivity.this.findViewById(R.id.content_scrollview).getScrollY(),
                 TextListLayout.getMeasuredHeight());
     }
 

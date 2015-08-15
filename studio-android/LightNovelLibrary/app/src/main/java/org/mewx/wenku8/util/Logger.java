@@ -1,12 +1,8 @@
 package org.mewx.wenku8.util;
 
-import android.content.Context;
-
-import org.mewx.wenku8.MyApp;
 import org.mewx.wenku8.global.GlobalConfig;
 
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -42,8 +38,6 @@ public class Logger {
         } catch (IOException e) {
             e.printStackTrace();
         }
-
-        return;
     }
 
     /**

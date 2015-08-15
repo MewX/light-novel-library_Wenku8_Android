@@ -2,11 +2,8 @@ package org.mewx.wenku8.reader.loader;
 
 import android.graphics.Bitmap;
 
-import java.util.Objects;
-
 /**
  * Created by MewX on 2015/7/8.
- *
  * Parent of all loaders.
  */
 public abstract class WenkuReaderLoader {

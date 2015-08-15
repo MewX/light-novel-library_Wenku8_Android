@@ -1,21 +1,18 @@
 package org.mewx.wenku8.reader.activity;
 
-import android.app.ActionBar;
 import android.app.Activity;
 import android.content.ClipData;
-import android.content.DialogInterface;
 import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.PorterDuff;
-import android.graphics.Rect;
 import android.graphics.drawable.Drawable;
 import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
-import android.os.Handler;
+import android.support.annotation.NonNull;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
 import android.util.Log;
@@ -25,31 +22,22 @@ import android.view.MenuItem;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
-import android.view.ViewParent;
-import android.view.WindowManager;
-import android.widget.ImageButton;
 import android.widget.RelativeLayout;
-import android.widget.TextView;
 import android.widget.Toast;
 
 import com.afollestad.materialdialogs.GravityEnum;
 import com.afollestad.materialdialogs.MaterialDialog;
-
-import org.adw.library.widgets.discreteseekbar.DiscreteSeekBar;
-import org.mewx.wenku8.global.api.ChapterInfo;
-import org.mewx.wenku8.reader.slider.SlidingAdapter;
-import org.mewx.wenku8.reader.slider.SlidingLayout;
-import org.mewx.wenku8.reader.slider.base.OverlappedSlider;
-
 import com.afollestad.materialdialogs.Theme;
 import com.nononsenseapps.filepicker.FilePickerActivity;
 import com.nostra13.universalimageloader.core.ImageLoader;
 import com.readystatesoftware.systembartint.SystemBarTintManager;
 import com.umeng.analytics.MobclickAgent;
 
+import org.adw.library.widgets.discreteseekbar.DiscreteSeekBar;
 import org.apache.http.NameValuePair;
 import org.mewx.wenku8.R;
 import org.mewx.wenku8.global.GlobalConfig;
+import org.mewx.wenku8.global.api.ChapterInfo;
 import org.mewx.wenku8.global.api.OldNovelContentParser;
 import org.mewx.wenku8.global.api.VolumeList;
 import org.mewx.wenku8.global.api.Wenku8API;
@@ -57,13 +45,14 @@ import org.mewx.wenku8.global.api.Wenku8Error;
 import org.mewx.wenku8.reader.loader.WenkuReaderLoader;
 import org.mewx.wenku8.reader.loader.WenkuReaderLoaderXML;
 import org.mewx.wenku8.reader.setting.WenkuReaderSettingV1;
+import org.mewx.wenku8.reader.slider.SlidingAdapter;
+import org.mewx.wenku8.reader.slider.SlidingLayout;
+import org.mewx.wenku8.reader.slider.base.OverlappedSlider;
 import org.mewx.wenku8.reader.view.WenkuReaderPageView;
 import org.mewx.wenku8.util.LightNetwork;
-import org.mewx.wenku8.util.LightTool;
 
 import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
-import java.util.Calendar;
 import java.util.List;
 
 /**
@@ -72,7 +61,7 @@ import java.util.List;
  */
 public class Wenku8ReaderActivityV1 extends AppCompatActivity {
     // constant
-    private final String FromLocal = "fav";
+    static private final String FromLocal = "fav";
 
     // vars
     private String from = "";
@@ -82,10 +71,9 @@ public class Wenku8ReaderActivityV1 extends AppCompatActivity {
     private List<OldNovelContentParser.NovelContent> nc;
     private RelativeLayout mSliderHolder;
     private SlidingLayout sl;
-    private int tempNavBarHeight;
+//    private int tempNavBarHeight;
 
     // components
-    private Toolbar mToolbar;
     private SystemBarTintManager tintManager;
     private SlidingPageAdapter mSlidingPageAdapter;
     private WenkuReaderLoader loader;
@@ -104,17 +92,18 @@ public class Wenku8ReaderActivityV1 extends AppCompatActivity {
         from = getIntent().getStringExtra("from");
         forcejump = getIntent().getStringExtra("forcejump");
         if(forcejump == null || forcejump.length() == 0) forcejump = "no";
-        tempNavBarHeight = LightTool.getNavigationBarSize(this).y;
+//        tempNavBarHeight = LightTool.getNavigationBarSize(this).y;
 
         // set indicator enable
-        mToolbar = (Toolbar) findViewById(R.id.toolbar_actionbar);
+        Toolbar mToolbar = (Toolbar) findViewById(R.id.toolbar_actionbar);
         setSupportActionBar(mToolbar);
-        getSupportActionBar().setTitle(volumeList.volumeName);
-        final Drawable upArrow = getResources().getDrawable(R.drawable.abc_ic_ab_back_mtrl_am_alpha);
-        if(getSupportActionBar() != null && upArrow != null) {
+        if(getSupportActionBar() != null) {
+            getSupportActionBar().setTitle(volumeList.volumeName);
+            final Drawable upArrow = getResources().getDrawable(R.drawable.abc_ic_ab_back_mtrl_am_alpha);
+            if (upArrow != null)
+                upArrow.setColorFilter(getResources().getColor(R.color.default_white), PorterDuff.Mode.SRC_ATOP);
             getSupportActionBar().setDisplayHomeAsUpEnabled(true);
             getSupportActionBar().setHomeButtonEnabled(true);
-            upArrow.setColorFilter(getResources().getColor(R.color.default_white), PorterDuff.Mode.SRC_ATOP);
             getSupportActionBar().setHomeAsUpIndicator(upArrow);
         }
 
@@ -238,7 +227,7 @@ public class Wenku8ReaderActivityV1 extends AppCompatActivity {
     }
 
     @Override
-    public boolean dispatchKeyEvent(KeyEvent event) {
+    public boolean dispatchKeyEvent(@NonNull KeyEvent event) {
         switch(event.getKeyCode()) {
             case KeyEvent.KEYCODE_VOLUME_DOWN:
                 gotoNextPage();
@@ -260,7 +249,6 @@ public class Wenku8ReaderActivityV1 extends AppCompatActivity {
         WenkuReaderPageView previousPage;
         boolean isLoadingNext = false;
         boolean isLoadingPrevious = false;
-        private boolean longClickActive = false;
 
         public SlidingPageAdapter(int begLineIndex, int begWordIndex) {
             super();
@@ -995,7 +983,7 @@ public class Wenku8ReaderActivityV1 extends AppCompatActivity {
                         for (int i = 0; i < clip.getItemCount(); i++) {
                             Uri uri = clip.getItemAt(i).getUri();
                             // Do something with the URI
-                            runSaveCustomFontPath(uri.toString().replaceAll("file\\://", ""));
+                            runSaveCustomFontPath(uri.toString().replaceAll("file://", ""));
                         }
                     }
                     // For Ice Cream Sandwich
@@ -1005,14 +993,14 @@ public class Wenku8ReaderActivityV1 extends AppCompatActivity {
                         for (String path: paths) {
                             Uri uri = Uri.parse(path);
                             // Do something with the URI
-                            runSaveCustomFontPath(uri.toString().replaceAll("file\\://", ""));
+                            runSaveCustomFontPath(uri.toString().replaceAll("file://", ""));
                         }
                     }
                 }
             } else {
                 Uri uri = data.getData();
                 // Do something with the URI
-                runSaveCustomFontPath(uri.toString().replaceAll("file\\://", ""));
+                runSaveCustomFontPath(uri.toString().replaceAll("file://", ""));
             }
         }
         else if (requestCode == 1 && resultCode == Activity.RESULT_OK) {
@@ -1025,7 +1013,7 @@ public class Wenku8ReaderActivityV1 extends AppCompatActivity {
                         for (int i = 0; i < clip.getItemCount(); i++) {
                             Uri uri = clip.getItemAt(i).getUri();
                             // Do something with the URI
-                            runSaveCustomBackgroundPath(uri.toString().replaceAll("file\\://", ""));
+                            runSaveCustomBackgroundPath(uri.toString().replaceAll("file://", ""));
                         }
                     }
                     // For Ice Cream Sandwich
@@ -1035,14 +1023,14 @@ public class Wenku8ReaderActivityV1 extends AppCompatActivity {
                         for (String path: paths) {
                             Uri uri = Uri.parse(path);
                             // Do something with the URI
-                            runSaveCustomBackgroundPath(uri.toString().replaceAll("file\\://", ""));
+                            runSaveCustomBackgroundPath(uri.toString().replaceAll("file://", ""));
                         }
                     }
                 }
             } else {
                 Uri uri = data.getData();
                 // Do something with the URI
-                runSaveCustomBackgroundPath(uri.toString().replaceAll("file\\://", ""));
+                runSaveCustomBackgroundPath(uri.toString().replaceAll("file://", ""));
             }
 
         }
@@ -1083,7 +1071,7 @@ public class Wenku8ReaderActivityV1 extends AppCompatActivity {
                 onBackPressed();
                 break;
             case R.id.action_watch_image:
-                if(sl != null && sl.getAdapter().getCurrentView() != null && (WenkuReaderPageView) ((RelativeLayout) sl.getAdapter().getCurrentView()).getChildAt(0) instanceof WenkuReaderPageView)
+                if(sl != null && sl.getAdapter().getCurrentView() != null && ((RelativeLayout) sl.getAdapter().getCurrentView()).getChildAt(0) instanceof WenkuReaderPageView)
                     ((WenkuReaderPageView) ((RelativeLayout) sl.getAdapter().getCurrentView()).getChildAt(0)).watchImageDetailed(this);
                 break;
         }

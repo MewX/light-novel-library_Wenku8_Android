@@ -13,11 +13,12 @@ import java.util.List;
 
 /**
  * Created by MewX on 2015/4/21.
+ * Wenku8 parsers.
  */
 public class Wenku8Parser {
 
     public static List<Integer> parseNovelItemList(String str, int page) {
-        List<Integer> list = new ArrayList<Integer>();
+        List<Integer> list = new ArrayList<>();
 
         // <?xml version="1.0" encoding="utf-8"?>
         // <result>
@@ -40,7 +41,7 @@ public class Wenku8Parser {
         final char SEPERATOR = '\''; // seperator
 
         // get total page
-        int beg = 0, temp;
+        int beg, temp;
         beg = str.indexOf(SEPERATOR);
         temp = str.indexOf(SEPERATOR, beg + 1);
         if (beg == -1 || temp == -1) return null; // this is an exception
@@ -87,7 +88,7 @@ public class Wenku8Parser {
         try {
             XmlPullParserFactory factory = XmlPullParserFactory.newInstance();
             XmlPullParser xmlPullParser = factory.newPullParser();
-            NovelItemMeta nfi = null;
+            NovelItemMeta nfi = new NovelItemMeta();
             xmlPullParser.setInput(new StringReader(xml));
             int eventType = xmlPullParser.getEventType();
 
@@ -99,27 +100,26 @@ public class Wenku8Parser {
                     case XmlPullParser.START_TAG:
 
                         if ("metadata".equals(xmlPullParser.getName())) {
-                            nfi = new NovelItemMeta();
+                            break;
                         } else if ("data".equals(xmlPullParser.getName())) {
                             if ("Title".equals(xmlPullParser.getAttributeValue(0))) {
-                                nfi.aid = new Integer(
-                                        xmlPullParser.getAttributeValue(1));
+                                nfi.aid = Integer.valueOf(xmlPullParser.getAttributeValue(1));
                                 nfi.title = xmlPullParser.nextText();
                             } else if ("Author".equals(xmlPullParser
                                     .getAttributeValue(0))) {
                                 nfi.author = xmlPullParser.getAttributeValue(1);
                             } else if ("DayHitsCount".equals(xmlPullParser
                                     .getAttributeValue(0))) {
-                                nfi.dayHitsCount = new Integer(xmlPullParser.getAttributeValue(1));
+                                nfi.dayHitsCount = Integer.valueOf(xmlPullParser.getAttributeValue(1));
                             } else if ("TotalHitsCount".equals(xmlPullParser
                                     .getAttributeValue(0))) {
-                                nfi.totalHitsCount = new Integer(xmlPullParser.getAttributeValue(1));
+                                nfi.totalHitsCount = Integer.valueOf(xmlPullParser.getAttributeValue(1));
                             } else if ("PushCount".equals(xmlPullParser
                                     .getAttributeValue(0))) {
-                                nfi.pushCount = new Integer(xmlPullParser.getAttributeValue(1));
+                                nfi.pushCount = Integer.valueOf(xmlPullParser.getAttributeValue(1));
                             } else if ("FavCount".equals(xmlPullParser
                                     .getAttributeValue(0))) {
-                                nfi.favCount = new Integer(xmlPullParser.getAttributeValue(1));
+                                nfi.favCount = Integer.valueOf(xmlPullParser.getAttributeValue(1));
                             } else if ("PressId".equals(xmlPullParser
                                     .getAttributeValue(0))) {
                                 nfi.pressId = xmlPullParser.getAttributeValue(1);
@@ -128,14 +128,13 @@ public class Wenku8Parser {
                                 nfi.bookStatus = xmlPullParser.getAttributeValue(1);
                             } else if ("BookLength".equals(xmlPullParser
                                     .getAttributeValue(0))) {
-                                nfi.bookLength = new Integer(xmlPullParser.getAttributeValue(1));
+                                nfi.bookLength = Integer.valueOf(xmlPullParser.getAttributeValue(1));
                             } else if ("LastUpdate".equals(xmlPullParser
                                     .getAttributeValue(0))) {
                                 nfi.lastUpdate = xmlPullParser.getAttributeValue(1);
                             } else if ("LatestSection".equals(xmlPullParser
                                     .getAttributeValue(0))) {
-                                nfi.latestSectionCid = new Integer(
-                                        xmlPullParser.getAttributeValue(1));
+                                nfi.latestSectionCid = Integer.valueOf(xmlPullParser.getAttributeValue(1));
                                 nfi.latestSectionName=xmlPullParser.nextText();
                             }
                         }
@@ -155,35 +154,32 @@ public class Wenku8Parser {
         try {
             XmlPullParserFactory factory = XmlPullParserFactory.newInstance();
             XmlPullParser xmlPullParser = factory.newPullParser();
-            ArrayList<VolumeList> l = null;
+            ArrayList<VolumeList> l = new ArrayList<>();
             VolumeList vl = null;
-            ChapterInfo ci = null;
+            ChapterInfo ci;
             xmlPullParser.setInput(new StringReader(xml));
             int eventType = xmlPullParser.getEventType();
 
             while (eventType != XmlPullParser.END_DOCUMENT) {
                 switch (eventType) {
                     case XmlPullParser.START_DOCUMENT:
-                        l = new ArrayList<VolumeList>();
                         break;
 
                     case XmlPullParser.START_TAG:
-
                         if ("volume".equals(xmlPullParser.getName())) {
                             vl = new VolumeList();
-                            vl.chapterList = new ArrayList<ChapterInfo>();
-                            vl.vid = new Integer(xmlPullParser.getAttributeValue(0));
+                            vl.chapterList = new ArrayList<>();
+                            vl.vid = Integer.valueOf(xmlPullParser.getAttributeValue(0));
 
                             // Here the returned text has some format error
                             // And I will handle them then
                             Log.v("MewX-XML", "+ " + vl.vid + "; ");
                         } else if ("chapter".equals(xmlPullParser.getName())) {
                             ci = new ChapterInfo();
-                            ci.cid = new Integer(xmlPullParser.getAttributeValue(0));
+                            ci.cid = Integer.valueOf(xmlPullParser.getAttributeValue(0));
                             ci.chapterName = xmlPullParser.nextText();
                             Log.v("MewX-XML", ci.cid + "; " + ci.chapterName);
-                            vl.chapterList.add(ci);
-                            ci = null;
+                            if(vl != null) vl.chapterList.add(ci);
                         }
                         break;
 

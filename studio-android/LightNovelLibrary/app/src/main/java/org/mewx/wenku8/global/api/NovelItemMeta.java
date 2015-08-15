@@ -1,12 +1,8 @@
 package org.mewx.wenku8.global.api;
 
-import org.xmlpull.v1.XmlPullParser;
-import org.xmlpull.v1.XmlPullParserFactory;
-
-import java.io.StringReader;
-
 /**
  * Created by MewX on 2015/5/13.
+ * Novel Item Meta data.
  */
 public class NovelItemMeta {
     public int aid;
@@ -24,7 +20,7 @@ public class NovelItemMeta {
     public String latestSectionName;
     public String fullIntro; // fetch from another place
 
-    private final String Unknown = "Unknown";
+    static private final String Unknown = "Unknown";
     NovelItemMeta() {
         aid = 1;
         title = Integer.toString(aid);

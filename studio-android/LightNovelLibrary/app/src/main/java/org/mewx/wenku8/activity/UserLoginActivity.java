@@ -1,7 +1,5 @@
 package org.mewx.wenku8.activity;
 
-import android.content.Context;
-import android.content.DialogInterface;
 import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
@@ -12,13 +10,9 @@ import android.os.AsyncTask;
 import android.os.Build;
 import android.os.Bundle;
 import android.support.v7.app.AppCompatActivity;
-import android.support.v7.widget.CardView;
 import android.support.v7.widget.Toolbar;
-import android.view.KeyEvent;
 import android.view.MenuItem;
 import android.view.View;
-import android.view.inputmethod.EditorInfo;
-import android.view.inputmethod.InputMethodManager;
 import android.widget.EditText;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -39,20 +33,16 @@ import org.mewx.wenku8.util.LightNetwork;
 import org.mewx.wenku8.util.LightUserSession;
 
 import java.io.ByteArrayOutputStream;
-import java.io.UnsupportedEncodingException;
-import java.math.RoundingMode;
 
 /**
  * Created by MewX on 2015/6/12.
+ * User Login Activity.
  */
 public class UserLoginActivity extends AppCompatActivity {
 
     // private vars
-    private Toolbar mToolbar = null;
     private EditText etUserName = null;
     private EditText etPassword = null;
-    private TextView tvLogin = null;
-    private TextView tvRegister = null;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -60,13 +50,16 @@ public class UserLoginActivity extends AppCompatActivity {
         setContentView(R.layout.layout_user_login);
 
         // set indicator enable
-        mToolbar = (Toolbar) findViewById(R.id.toolbar_actionbar);
+        Toolbar mToolbar = (Toolbar) findViewById(R.id.toolbar_actionbar);
         setSupportActionBar(mToolbar);
-        getSupportActionBar().setDisplayHomeAsUpEnabled(true);
-        getSupportActionBar().setHomeButtonEnabled(true);
-        final Drawable upArrow = getResources().getDrawable(R.drawable.abc_ic_ab_back_mtrl_am_alpha);
-        upArrow.setColorFilter(getResources().getColor(R.color.default_white), PorterDuff.Mode.SRC_ATOP);
-        getSupportActionBar().setHomeAsUpIndicator(upArrow);
+        if(getSupportActionBar() != null) {
+            getSupportActionBar().setDisplayHomeAsUpEnabled(true);
+            getSupportActionBar().setHomeButtonEnabled(true);
+            final Drawable upArrow = getResources().getDrawable(R.drawable.abc_ic_ab_back_mtrl_am_alpha);
+            if(upArrow != null)
+                upArrow.setColorFilter(getResources().getColor(R.color.default_white), PorterDuff.Mode.SRC_ATOP);
+            getSupportActionBar().setHomeAsUpIndicator(upArrow);
+        }
 
         // change status bar color tint, and this require SDK16
         if (Build.VERSION.SDK_INT >= 16 ) { //&& Build.VERSION.SDK_INT <= 21) {
@@ -90,8 +83,8 @@ public class UserLoginActivity extends AppCompatActivity {
         // get views
         etUserName = (EditText)findViewById(R.id.edit_username);
         etPassword = (EditText)findViewById(R.id.edit_password);
-        tvLogin = (TextView)findViewById(R.id.btn_login);
-        tvRegister = (TextView)findViewById(R.id.btn_register);
+        TextView tvLogin = (TextView)findViewById(R.id.btn_login);
+        TextView tvRegister = (TextView)findViewById(R.id.btn_register);
 
         // listeners
         tvLogin.setOnClickListener(new View.OnClickListener() {

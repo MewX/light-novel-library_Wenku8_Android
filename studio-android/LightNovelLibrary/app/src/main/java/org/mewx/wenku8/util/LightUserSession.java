@@ -2,12 +2,10 @@ package org.mewx.wenku8.util;
 
 import android.content.Intent;
 import android.os.AsyncTask;
-import android.util.Log;
 import android.widget.Toast;
 
 import org.mewx.wenku8.MyApp;
 import org.mewx.wenku8.R;
-import org.mewx.wenku8.activity.MainActivity;
 import org.mewx.wenku8.global.GlobalConfig;
 import org.mewx.wenku8.global.api.Wenku8API;
 import org.mewx.wenku8.global.api.Wenku8Error;
@@ -66,7 +64,7 @@ public class LightUserSession {
         try {
             //Log.e("MewX", new String(bytes, "UTF-8"));
             decAndSetUserFile(new String(bytes, "UTF-8"));
-        } catch (UnsupportedEncodingException e) {
+        } catch (Exception e) {
             e.printStackTrace();
             return false; // exception
         }
@@ -99,10 +97,10 @@ public class LightUserSession {
                 return Wenku8Error.ErrorCode.RETURNED_VALUE_EXCEPTION;
             }
 
-            if(Wenku8Error.getSystemDefinedErrorCode(new Integer(result)) == Wenku8Error.ErrorCode.SYSTEM_1_SUCCEEDED)
+            if(Wenku8Error.getSystemDefinedErrorCode(Integer.valueOf(result)) == Wenku8Error.ErrorCode.SYSTEM_1_SUCCEEDED)
                 logStatus = true;
 
-            return Wenku8Error.getSystemDefinedErrorCode(new Integer(result)); // get excepted returned value
+            return Wenku8Error.getSystemDefinedErrorCode(Integer.valueOf(result)); // get excepted returned value
         } catch (UnsupportedEncodingException e) {
             e.printStackTrace();
             return Wenku8Error.ErrorCode.BYTE_TO_STRING_EXCEPTION;
@@ -121,7 +119,7 @@ public class LightUserSession {
                 return Wenku8Error.ErrorCode.RETURNED_VALUE_EXCEPTION;
             }
 
-            if(Wenku8Error.getSystemDefinedErrorCode(new Integer(result)) == Wenku8Error.ErrorCode.SYSTEM_1_SUCCEEDED) {
+            if(Wenku8Error.getSystemDefinedErrorCode(Integer.valueOf(result)) == Wenku8Error.ErrorCode.SYSTEM_1_SUCCEEDED) {
                 logStatus = true;
 
                 // save user info
@@ -133,7 +131,7 @@ public class LightUserSession {
 
             }
 
-            return Wenku8Error.getSystemDefinedErrorCode(new Integer(result)); // get excepted returned value
+            return Wenku8Error.getSystemDefinedErrorCode(Integer.valueOf(result)); // get excepted returned value
         } catch (UnsupportedEncodingException e) {
             e.printStackTrace();
             return Wenku8Error.ErrorCode.BYTE_TO_STRING_EXCEPTION;
@@ -181,7 +179,7 @@ public class LightUserSession {
     public static void decAndSetUserFile(String raw) {
         try {
             String[] a = raw.split("\\|"); // a[0]: username; a[1]: password;
-            if (a == null || a.length != 2 || a[0].length() == 0 || a[1].length() == 0) {
+            if (a.length != 2 || a[0].length() == 0 || a[1].length() == 0) {
                 username = "";
                 password = "";
                 return; // fetch error to return
@@ -219,16 +217,12 @@ public class LightUserSession {
                     temp_username[i] -= ('a' - 'A');
                 else if ('A' <= temp_username[i] && temp_username[i] <= 'Z')
                     temp_username[i] += ('a' - 'A');
-                else
-                    continue;
             }
             for (int i = 0; i < temp_password.length; i++) {
                 if ('a' <= temp_password[i] && temp_password[i] <= 'z')
                     temp_password[i] -= ('a' - 'A');
                 else if ('A' <= temp_password[i] && temp_password[i] <= 'Z')
                     temp_password[i] += ('a' - 'A');
-                else
-                    continue;
             }
 
             // dec three times
@@ -238,8 +232,6 @@ public class LightUserSession {
         catch (Exception e) {
             e.printStackTrace();
         }
-
-        return;
     }
 
     /**
@@ -263,16 +255,12 @@ public class LightUserSession {
                 temp_username[i] -= ('a' - 'A');
             else if('A' <= temp_username[i] && temp_username[i] <= 'Z')
                 temp_username[i] += ('a' - 'A');
-            else
-                continue;
         }
         for(int i = 0; i < temp_password.length; i ++) {
             if('a' <= temp_password[i] && temp_password[i] <= 'z' )
                 temp_password[i] -= ('a' - 'A');
             else if('A' <= temp_password[i] && temp_password[i] <= 'Z')
                 temp_password[i] += ('a' - 'A');
-            else
-                continue;
         }
 
         // twice base64, exchange char position, beg to end, end to beg

@@ -30,6 +30,7 @@ import java.util.Map;
 
 /**
  * Created by MewX on 2015/1/20.
+ * Updated version of Novel Item Adapter.
  */
 public class NovelItemAdapterUpdate extends RecyclerView.Adapter<NovelItemAdapterUpdate.ViewHolder> {
 
@@ -39,9 +40,7 @@ public class NovelItemAdapterUpdate extends RecyclerView.Adapter<NovelItemAdapte
 
     // empty list, then use append method to add list elements
     public NovelItemAdapterUpdate() {
-        mDataset = new ArrayList<NovelItemInfoUpdate>();
-
-        return;
+        mDataset = new ArrayList<>();
     }
 
     public NovelItemAdapterUpdate(List<NovelItemInfoUpdate> dataset) {
@@ -114,9 +113,7 @@ public class NovelItemAdapterUpdate extends RecyclerView.Adapter<NovelItemAdapte
                 }
             };
 
-            if(postRequest==null)
-                GlobalConfig.wantDebugLog("MewX", "NovelItemAdapterUpdate:onBindViewHolder: postRequest==null");
-            else if(GlobalConfig.volleyRequestQueue == null)
+            if(GlobalConfig.volleyRequestQueue == null)
                 GlobalConfig.wantDebugLog("MewX", "NovelItemAdapterUpdate:onBindViewHolder: volleyRequestQueue==null");
             else
                 GlobalConfig.volleyRequestQueue.add(postRequest); // meet errors
@@ -147,6 +144,7 @@ public class NovelItemAdapterUpdate extends RecyclerView.Adapter<NovelItemAdapte
     }
 
     public List<NovelItemInfoUpdate> getDataset() {
+        // reference
         return mDataset;
     }
 

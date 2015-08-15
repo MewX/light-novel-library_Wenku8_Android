@@ -24,7 +24,6 @@ import com.umeng.analytics.MobclickAgent;
 
 import org.mewx.wenku8.R;
 import org.mewx.wenku8.global.GlobalConfig;
-import org.mewx.wenku8.reader.view.WenkuReaderPageView;
 
 import java.util.ArrayList;
 
@@ -158,7 +157,7 @@ public class MenuBackgroundSelectorActivity extends AppCompatActivity {
                         for (int i = 0; i < clip.getItemCount(); i++) {
                             Uri uri = clip.getItemAt(i).getUri();
                             // Do something with the URI
-                            runSaveCustomMenuBackground(uri.toString().replaceAll("file\\://", ""));
+                            runSaveCustomMenuBackground(uri.toString().replaceAll("file://", ""));
                         }
                     }
                     // For Ice Cream Sandwich
@@ -168,14 +167,14 @@ public class MenuBackgroundSelectorActivity extends AppCompatActivity {
                         for (String path: paths) {
                             Uri uri = Uri.parse(path);
                             // Do something with the URI
-                            runSaveCustomMenuBackground(uri.toString().replaceAll("file\\://", ""));
+                            runSaveCustomMenuBackground(uri.toString().replaceAll("file://", ""));
                         }
                     }
                 }
             } else {
                 Uri uri = data.getData();
                 // Do something with the URI
-                runSaveCustomMenuBackground(uri.toString().replaceAll("file\\://", ""));
+                runSaveCustomMenuBackground(uri.toString().replaceAll("file://", ""));
             }
         }
     }
@@ -211,7 +210,6 @@ public class MenuBackgroundSelectorActivity extends AppCompatActivity {
         }
         catch (Exception e) {
             Toast.makeText(this, "Exception: " + e.toString(), Toast.LENGTH_SHORT).show();
-            return;
         }
     }
 }

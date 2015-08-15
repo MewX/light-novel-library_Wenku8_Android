@@ -3,7 +3,6 @@ package org.mewx.wenku8.activity;
 import android.app.Activity;
 import android.content.ClipData;
 import android.content.Intent;
-import android.graphics.Path;
 import android.graphics.PorterDuff;
 import android.graphics.drawable.Drawable;
 import android.net.Uri;
@@ -11,20 +10,16 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
 import android.support.v7.app.AppCompatActivity;
-import android.support.v7.internal.widget.TintManager;
 import android.support.v7.widget.Toolbar;
 import android.text.InputType;
-import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
-import android.widget.RelativeLayout;
 import android.widget.Toast;
 
 import com.afollestad.materialdialogs.GravityEnum;
 import com.afollestad.materialdialogs.MaterialDialog;
 import com.afollestad.materialdialogs.Theme;
 import com.davemorrissey.labs.subscaleview.ImageSource;
-import com.davemorrissey.labs.subscaleview.ImageViewState;
 import com.davemorrissey.labs.subscaleview.SubsamplingScaleImageView;
 import com.nononsenseapps.filepicker.FilePickerActivity;
 import com.readystatesoftware.systembartint.SystemBarTintManager;
@@ -32,7 +27,6 @@ import com.umeng.analytics.MobclickAgent;
 
 import org.mewx.wenku8.R;
 import org.mewx.wenku8.global.GlobalConfig;
-import org.mewx.wenku8.reader.view.WenkuReaderPageView;
 import org.mewx.wenku8.util.LightCache;
 
 import java.io.File;
@@ -44,7 +38,6 @@ import java.util.ArrayList;
  */
 public class ViewImageDetailActivity extends AppCompatActivity {
 
-    private Toolbar mToolbar;
     private SystemBarTintManager tintManager;
     private String path;
     private SubsamplingScaleImageView imageView;
@@ -58,7 +51,7 @@ public class ViewImageDetailActivity extends AppCompatActivity {
         path = getIntent().getStringExtra("path");
 
         // set indicator enable
-        mToolbar = (Toolbar) findViewById(R.id.toolbar_actionbar);
+        Toolbar mToolbar = (Toolbar) findViewById(R.id.toolbar_actionbar);
         setSupportActionBar(mToolbar);
         final Drawable upArrow = getResources().getDrawable(R.drawable.abc_ic_ab_back_mtrl_am_alpha);
         if(getSupportActionBar() != null && upArrow != null) {
@@ -197,7 +190,7 @@ public class ViewImageDetailActivity extends AppCompatActivity {
     }
 
     private void runSaveProcedure(String uri) {
-        final String newuri = uri.replaceAll("file\\://", "");
+        final String newuri = uri.replaceAll("file://", "");
         GlobalConfig.pathPickedSave = newuri;
         new MaterialDialog.Builder(this)
                 .theme(Theme.LIGHT)

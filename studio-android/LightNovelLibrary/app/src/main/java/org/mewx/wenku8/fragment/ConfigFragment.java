@@ -4,10 +4,7 @@ import android.content.DialogInterface;
 import android.content.Intent;
 import android.os.AsyncTask;
 import android.os.Bundle;
-import android.os.Handler;
 import android.support.v4.app.Fragment;
-import android.support.v4.app.FragmentActivity;
-import android.telephony.gsm.GsmCellLocation;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -25,7 +22,6 @@ import com.umeng.update.UpdateStatus;
 
 import org.mewx.wenku8.R;
 import org.mewx.wenku8.activity.AboutActivity;
-import org.mewx.wenku8.activity.MainActivity;
 import org.mewx.wenku8.activity.MenuBackgroundSelectorActivity;
 import org.mewx.wenku8.activity.WelcomeActivity;
 import org.mewx.wenku8.global.GlobalConfig;
@@ -41,9 +37,6 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class ConfigFragment extends Fragment {
-
-    // views
-    private TextView tvNotice;
 
     public static ConfigFragment newInstance() {
         return new ConfigFragment();
@@ -70,7 +63,7 @@ public class ConfigFragment extends Fragment {
         super.onActivityCreated(savedInstanceState);
 
         // get views
-        tvNotice = (TextView) getActivity().findViewById(R.id.notice);
+        TextView tvNotice = (TextView) getActivity().findViewById(R.id.notice);
         if(Wenku8API.NoticeString.equals(""))
             getActivity().findViewById(R.id.notice_layout).setVisibility(View.GONE);
         else
@@ -206,7 +199,7 @@ public class ConfigFragment extends Fragment {
                                         new MaterialDialog.Builder(getActivity())
                                                 .forceStacking(true)
                                                 .theme(Theme.LIGHT)
-                                                .titleColor(R.color.default_text_color_black)
+                                                .titleColorRes(R.color.default_text_color_black)
                                                 .backgroundColorRes(R.color.dlgBackgroundColor)
                                                 .contentColorRes(R.color.dlgContentColor)
                                                 .positiveColorRes(R.color.dlgPositiveButtonColor)
@@ -277,12 +270,12 @@ public class ConfigFragment extends Fragment {
         protected Wenku8Error.ErrorCode doInBackground(Integer... params) {
             // covers
             File dir = new File(GlobalConfig.getFirstStoragePath() + "imgs");
-            if(dir == null || !dir.exists()) dir = new File(GlobalConfig.getSecondStoragePath() + "imgs");
+            if(!dir.exists()) dir = new File(GlobalConfig.getSecondStoragePath() + "imgs");
             File[] childFile = dir.listFiles();
             if(childFile != null && childFile.length != 0) {
                 for (File f : childFile) {
                     String[] temp = f.getAbsolutePath().split("\\/");
-                    if(temp != null && temp.length != 0) {
+                    if(temp.length != 0) {
                         String id = temp[temp.length - 1].split("\\.")[0];
                         if(LightTool.isInteger(id) && !GlobalConfig.testInLocalBookshelf(Integer.parseInt(id)))
                             f.delete(); // ignore ".nomedia"
@@ -292,7 +285,7 @@ public class ConfigFragment extends Fragment {
 
             // cache
             dir = new File(GlobalConfig.getFirstStoragePath() + "cache");
-            if(dir == null || !dir.exists()) dir = new File(GlobalConfig.getSecondStoragePath() + "cache");
+            if(!dir.exists()) dir = new File(GlobalConfig.getSecondStoragePath() + "cache");
             childFile = dir.listFiles();
             if(childFile != null && childFile.length != 0) {
                 for (File f : childFile) {
@@ -337,12 +330,12 @@ public class ConfigFragment extends Fragment {
         protected Wenku8Error.ErrorCode doInBackground(Integer... params) {
             // covers
             File dir = new File(GlobalConfig.getFirstStoragePath() + "imgs");
-            if(dir == null || !dir.exists()) dir = new File(GlobalConfig.getSecondStoragePath() + "imgs");
+            if(!dir.exists()) dir = new File(GlobalConfig.getSecondStoragePath() + "imgs");
             File[] childFile = dir.listFiles();
             if(childFile != null && childFile.length != 0) {
                 for (File f : childFile) {
                     String[] temp = f.getAbsolutePath().split("\\/");
-                    if(temp != null && temp.length != 0) {
+                    if(temp.length != 0) {
                         String id = temp[temp.length - 1].split("\\.")[0];
                         if(LightTool.isInteger(id) && !GlobalConfig.testInLocalBookshelf(Integer.parseInt(id)))
                             f.delete(); // ignore ".nomedia"
@@ -352,19 +345,17 @@ public class ConfigFragment extends Fragment {
 
             // cache
             dir = new File(GlobalConfig.getFirstStoragePath() + "cache");
-            if(dir == null || !dir.exists()) dir = new File(GlobalConfig.getSecondStoragePath() + "cache");
+            if(!dir.exists()) dir = new File(GlobalConfig.getSecondStoragePath() + "cache");
             childFile = dir.listFiles();
             if(childFile != null && childFile.length != 0) {
-                for (File f : childFile) {
-                    f.delete();
-                }
+                for (File f : childFile) f.delete();
             }
             if(!isLoading) return Wenku8Error.ErrorCode.USER_CANCELLED_TASK;
 
             // get saved picture filename list. Rec all /wenku8/saves/novel, get all picture name, then delete if not in list
             List<String> listPicture = new ArrayList<>();
             dir = new File(GlobalConfig.getFirstFullSaveFilePath() + "novel");
-            if(dir == null || !dir.exists()) dir = new File(GlobalConfig.getSecondFullSaveFilePath() + "novel");
+            if(!dir.exists()) dir = new File(GlobalConfig.getSecondFullSaveFilePath() + "novel");
             childFile = dir.listFiles();
             if(childFile != null && childFile.length != 0) {
                 for (File f : childFile) {
@@ -382,13 +373,13 @@ public class ConfigFragment extends Fragment {
 
             // loop for images
             dir = new File(GlobalConfig.getFirstFullSaveFilePath() + "imgs");
-            if(dir == null || !dir.exists()) dir = new File(GlobalConfig.getSecondFullSaveFilePath() + "imgs");
+            if(!dir.exists()) dir = new File(GlobalConfig.getSecondFullSaveFilePath() + "imgs");
             childFile = dir.listFiles();
             if(childFile != null && childFile.length != 0) {
                 for (File f : childFile) {
                     if(!isLoading) return Wenku8Error.ErrorCode.USER_CANCELLED_TASK;
                     String[] temp = f.getAbsolutePath().split("\\/");
-                    if(temp != null && temp.length != 0) {
+                    if(temp.length != 0) {
                         String name = temp[temp.length - 1];
                         if(!listPicture.contains(name)) f.delete();
                     }

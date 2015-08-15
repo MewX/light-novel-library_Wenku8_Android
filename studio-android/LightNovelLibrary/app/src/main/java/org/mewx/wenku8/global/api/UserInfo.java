@@ -9,6 +9,7 @@ import java.io.StringReader;
 
 /**
  * Created by MewX on 2015/6/14.
+ * User Info.
  */
 public class UserInfo {
     /**
@@ -44,14 +45,15 @@ public class UserInfo {
                     case XmlPullParser.START_TAG:
                         if ("metadata".equals(xmlPullParser.getName())) {
                             // root tag
+                            break;
                         } else if ("item".equals(xmlPullParser.getName())) {
                             if("uname".equals(xmlPullParser.getAttributeValue(0))) {
                                 ui.username = xmlPullParser.nextText();
-                                Log.e("MewX", "uname:" + ui.username == null ? "" : ui.username);
+                                Log.e("MewX", ui.username.length() == 0 ? "unknown" : ui.username);
                             }
                             else if("nickname".equals(xmlPullParser.getAttributeValue(0))) {
                                 ui.nickyname = xmlPullParser.nextText();
-                                Log.e("MewX", "nickname:" + ui.nickyname == null ? "" : ui.nickyname);
+                                Log.e("MewX", ui.nickyname.length() == 0 ? "unknown" : ui.nickyname);
                             }
                             else if("score".equals(xmlPullParser.getAttributeValue(0))) {
                                 ui.score = new Integer(xmlPullParser.nextText());
@@ -63,7 +65,7 @@ public class UserInfo {
                             }
                             else if("rank".equals(xmlPullParser.getAttributeValue(0))) {
                                 ui.rank = xmlPullParser.nextText();
-                                Log.e("MewX", "rank:" + ui.rank == null ? "" : ui.rank);
+                                Log.e("MewX", ui.rank.length() == 0 ? "unknown" : ui.rank);
                             }
                         }
                         break;

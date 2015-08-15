@@ -1,12 +1,10 @@
 package org.mewx.wenku8.fragment;
 
-import android.content.ContentValues;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.os.AsyncTask;
 import android.os.Build;
 import android.os.Bundle;
-import android.renderscript.ScriptIntrinsicHistogram;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.app.ActivityOptionsCompat;
 import android.support.v4.app.Fragment;
@@ -24,7 +22,6 @@ import android.widget.Toast;
 
 import com.afollestad.materialdialogs.MaterialDialog;
 import com.afollestad.materialdialogs.Theme;
-import com.nostra13.universalimageloader.core.ImageLoader;
 import com.umeng.analytics.MobclickAgent;
 
 import org.apache.http.NameValuePair;
@@ -57,7 +54,6 @@ public class FavFragment extends Fragment implements MyItemClickListener, MyItem
 
     // local vars
     private SwipeRefreshLayout mSwipeRefreshLayout;
-    private LinearLayoutManager mLayoutManager = null;
     private RecyclerView mRecyclerView = null;
     private int timecount;
 
@@ -65,11 +61,9 @@ public class FavFragment extends Fragment implements MyItemClickListener, MyItem
     private List<Integer> listNovelItemAid = null; // aid list
     private List<NovelItemInfoUpdate> listNovelItemInfo = null; // novel info list
     private NovelItemAdapterUpdate mAdapter = null;
-    private List<Integer> localOnly; // local only
 
     public static FavFragment newInstance(String param1, String param2) {
-        FavFragment fragment = new FavFragment();
-        return fragment;
+        return new FavFragment();
     }
 
     public FavFragment() {
@@ -94,7 +88,7 @@ public class FavFragment extends Fragment implements MyItemClickListener, MyItem
         timecount = 0;
 
         // view setting
-        mLayoutManager = new LinearLayoutManager(getActivity());
+        LinearLayoutManager mLayoutManager = new LinearLayoutManager(getActivity());
         mLayoutManager.setOrientation(LinearLayoutManager.VERTICAL);
         mRecyclerView = (RecyclerView) rootView.findViewById(R.id.novel_item_list);
         mRecyclerView.setHasFixedSize(false); // set variable size
@@ -181,65 +175,53 @@ public class FavFragment extends Fragment implements MyItemClickListener, MyItem
             alac.execute();
         }
         else {
-            AsyncLoadAllLocal alal = new AsyncLoadAllLocal();
-            alal.execute();
+            loadAllLocal();
         }
     }
 
-    private class AsyncLoadAllLocal extends AsyncTask<Integer, Integer, Integer> {
-        @Override
-        protected void onPreExecute() {
-            super.onPreExecute();
-            listNovelItemAid = GlobalConfig.getLocalBookshelfList();
-            listNovelItemInfo = new ArrayList<>();
+    private void loadAllLocal() {
+        int retValue = 0;
+
+        // init
+        listNovelItemAid = GlobalConfig.getLocalBookshelfList();
+        listNovelItemInfo = new ArrayList<>();
+
+        // load all meta file
+        for(Integer aid : listNovelItemAid) {
+            String xml = GlobalConfig.loadFullFileFromSaveFolder("intro", aid + "-intro.xml");
+            NovelItemInfoUpdate niiu;
+
+            if (xml.equals("")) {
+                // the intro file was deleted
+                retValue = -2;
+                niiu = new NovelItemInfoUpdate(aid);
+            }
+            else {
+                niiu = NovelItemInfoUpdate.parse(xml);
+            }
+
+            if(niiu == null) {
+                retValue = -1;
+                continue;
+            }
+            listNovelItemInfo.add(niiu);
         }
 
-        @Override
-        protected Integer doInBackground(Integer... params) {
-            int retValue = -1;
-
-            // load all meta file
-            for(Integer aid : listNovelItemAid) {
-                String xml = GlobalConfig.loadFullFileFromSaveFolder("intro", aid + "-intro.xml");
-                NovelItemInfoUpdate niiu;
-
-                if (xml.equals("")) {
-                    // the intro file was deleted
-                    retValue = -2;
-                    niiu = new NovelItemInfoUpdate(aid);
-                }
-                else {
-                    niiu = NovelItemInfoUpdate.parse(xml);
-                }
-
-                if(niiu == null)
-                    return retValue;
-                listNovelItemInfo.add(niiu);
-            }
-
-            return 0;
+        // result
+        if(retValue != 0) {
+            Toast.makeText(getActivity(), "Error: Some intro load failed, please redownload.", Toast.LENGTH_SHORT).show();
+            return;
         }
 
-        @Override
-        protected void onPostExecute(Integer integer) {
-            super.onPostExecute(integer);
-
-            if(integer == -1) {
-                Toast.makeText(getActivity(), "Error: niiu == null", Toast.LENGTH_SHORT).show();
-                return;
-            }
-            else if(integer == -2) {
-                Toast.makeText(getActivity(), "Error: Some intro load failed, please redownload.", Toast.LENGTH_SHORT).show();
-                return;
-            }
-
+        if(mAdapter == null) {
             mAdapter = new NovelItemAdapterUpdate();
-            mAdapter.RefreshDataset(listNovelItemInfo);
-            mAdapter.setOnItemClickListener(FavFragment.this);
-            mAdapter.setOnItemLongClickListener(FavFragment.this);
             mRecyclerView.setAdapter(mAdapter);
-            mSwipeRefreshLayout.setRefreshing(false);
         }
+        mAdapter.RefreshDataset(listNovelItemInfo);
+        mAdapter.setOnItemClickListener(FavFragment.this);
+        mAdapter.setOnItemLongClickListener(FavFragment.this);
+        mAdapter.notifyDataSetChanged();
+        mSwipeRefreshLayout.setRefreshing(false);
     }
 
     private class AsyncLoadAllCloud extends AsyncTask<Integer, Integer, Wenku8Error.ErrorCode> {
@@ -251,6 +233,8 @@ public class FavFragment extends Fragment implements MyItemClickListener, MyItem
         protected void onPreExecute() {
             super.onPreExecute();
 
+            loadAllLocal();
+
             isLoading = true;
             md = new MaterialDialog.Builder(getActivity())
                     .theme(Theme.LIGHT)
@@ -261,7 +245,6 @@ public class FavFragment extends Fragment implements MyItemClickListener, MyItem
                         @Override
                         public void onCancel(DialogInterface dialog) {
                             isLoading = false;
-                            AsyncLoadAllCloud.this.onPostExecute(Wenku8Error.ErrorCode.USER_CANCELLED_TASK);
                             md.dismiss();
                         }
                     })
@@ -312,7 +295,7 @@ public class FavFragment extends Fragment implements MyItemClickListener, MyItem
             listAll.addAll(GlobalConfig.getLocalBookshelfList()); // make a copy
             listAll.addAll(listResultList);
 
-            localOnly = new ArrayList<>();
+            List<Integer> localOnly = new ArrayList<>();
             localOnly.addAll(listAll);
             localOnly.removeAll(listResultList); // local only
 
@@ -431,8 +414,7 @@ public class FavFragment extends Fragment implements MyItemClickListener, MyItem
                 refreshList(timecount ++);
             }
             else {
-                AsyncLoadAllLocal alal = new AsyncLoadAllLocal();
-                alal.execute();
+                loadAllLocal();
             }
         }
     }

@@ -1,10 +1,8 @@
 package org.mewx.wenku8.activity;
 
-import android.content.Intent;
 import android.graphics.PorterDuff;
 import android.graphics.drawable.Drawable;
 import android.os.Build;
-import android.support.v4.app.Fragment;
 import android.os.Bundle;
 import android.support.v4.app.FragmentTransaction;
 import android.support.v7.app.AppCompatActivity;
@@ -22,13 +20,9 @@ import org.mewx.wenku8.global.GlobalConfig;
 
 /**
  * Created by MewX on 2015/5/11.
+ * Search Result Activity.
  */
 public class SearchResultActivity extends AppCompatActivity {
-
-    // private vars
-    private String searchKey = null;
-    private Toolbar mToolbar = null;
-    private Fragment mFragment = null;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -36,13 +30,15 @@ public class SearchResultActivity extends AppCompatActivity {
         setContentView(R.layout.layout_search_result);
 
         // get arguments
-        searchKey = getIntent().getStringExtra("key");
+        String searchKey = getIntent().getStringExtra("key");
 
         // set indicator enable
-        mToolbar = (Toolbar) findViewById(R.id.toolbar_actionbar);
+        Toolbar mToolbar = (Toolbar) findViewById(R.id.toolbar_actionbar);
         setSupportActionBar(mToolbar);
-        getSupportActionBar().setDisplayHomeAsUpEnabled(true);
-        getSupportActionBar().setHomeButtonEnabled(true);
+        if(getSupportActionBar() != null ) {
+            getSupportActionBar().setDisplayHomeAsUpEnabled(true);
+            getSupportActionBar().setHomeButtonEnabled(true);
+        }
 
         // change status bar color tint, and this require SDK16
         if (Build.VERSION.SDK_INT >= 16 ) { //&& Build.VERSION.SDK_INT <= 21) {
@@ -98,8 +94,10 @@ public class SearchResultActivity extends AppCompatActivity {
 
         // set back arrow icon
         final Drawable upArrow = getResources().getDrawable(R.drawable.abc_ic_ab_back_mtrl_am_alpha);
-        upArrow.setColorFilter(getResources().getColor(R.color.mySearchToggleColor), PorterDuff.Mode.SRC_ATOP);
-        getSupportActionBar().setHomeAsUpIndicator(upArrow);
+        if(upArrow != null && getSupportActionBar() != null) {
+            upArrow.setColorFilter(getResources().getColor(R.color.mySearchToggleColor), PorterDuff.Mode.SRC_ATOP);
+            getSupportActionBar().setHomeAsUpIndicator(upArrow);
+        }
     }
 
     @Override

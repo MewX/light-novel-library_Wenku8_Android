@@ -1,7 +1,5 @@
 package org.mewx.wenku8.global.api;
 
-import android.util.Log;
-
 import org.xmlpull.v1.XmlPullParser;
 import org.xmlpull.v1.XmlPullParserFactory;
 
@@ -9,6 +7,7 @@ import java.io.StringReader;
 
 /**
  * Created by MewX on 2015/1/20.
+ * The updated version of novel item info.
  */
 public class NovelItemInfoUpdate {
     private final String LoadingString = "Loading...";
@@ -64,7 +63,7 @@ public class NovelItemInfoUpdate {
 
                         } else if ("data".equals(xmlPullParser.getName())) {
                             if ("Title".equals(xmlPullParser.getAttributeValue(0))) {
-                                niiu.aid = new Integer(
+                                niiu.aid = Integer.valueOf(
                                         xmlPullParser.getAttributeValue(1));
                                 niiu.title = xmlPullParser.nextText();
                             } else if ("Author".equals(xmlPullParser
@@ -96,8 +95,6 @@ public class NovelItemInfoUpdate {
     public NovelItemInfoUpdate(int aid) {
         this.aid = aid;
         this.title = Integer.toString(aid);
-
-        return;
     }
 
     /**
@@ -105,6 +102,5 @@ public class NovelItemInfoUpdate {
      */
     public void setIntroFull(String str) {
         intro_full = str;
-        return;
     }
 }

@@ -25,7 +25,7 @@ public class Wenku8API {
 
     public static String NoticeString = "";
     final public static String RegisterURL = "http://www.wenku8.com/register.php";
-    private static String BaseURL = "http://app.wenku8.com/android.php";
+    final private static String BaseURL = "http://app.wenku8.com/android.php";
     private static boolean hasEdited = false;
     final private static String NovelFinishedSC = "已完成", NovelFinishedTC = "已完成",
             NovelNotFinishedSC = "连载中", NovelNotFinishedTC = "連載中";
@@ -92,7 +92,7 @@ public class Wenku8API {
     }
 
     public static STATUS getSTATUSByString(String s) {
-        return s == NovelNotFinishedSC || s == NovelNotFinishedTC ? STATUS.NOTFINISHED : STATUS.FINISHED;
+        return s.equals(NovelNotFinishedSC) || s.equals(NovelNotFinishedTC) ? STATUS.NOTFINISHED : STATUS.FINISHED;
     }
 
     public static String getStatusBySTATUS(STATUS s) {
@@ -484,18 +484,15 @@ public class Wenku8API {
         // <result>
         // <page num='166'/>
         //
-        // <item aid='1143'>
-        // <data name='Title'><![CDATA[约会大作战(DATE A LIVE)]]></data>
-        // <data name='TotalHitsCount' value='2200395'/>
-        // <data name='PushCount' value='164396'/>
-        // <data name='FavCount' value='15114'/>
-        // </item>
-        //
         // <item aid='1034'>
         // <data name='Title'><![CDATA[恶魔高校DxD(High School DxD)]]></data>
         // <data name='TotalHitsCount' value='2316361'/>
         // <data name='PushCount' value='153422'/>
         // <data name='FavCount' value='14416'/>
+        // <data name='Author' value='xxx'/>
+        // <data name='BookStatus' value='xxx'/>
+        // <data name='LastUpdate' value='xxx'/>
+        // <data name='IntroPreview' value='xxx'/>
         // </item>
         // ...... ......
         // </result>

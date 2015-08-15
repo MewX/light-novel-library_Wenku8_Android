@@ -30,15 +30,12 @@ public class LightCache {
 			int fileSize = (int) file.length(); // get file size
 			try {
 				FileInputStream in = new FileInputStream(file);
-				if (in == null)
-					return null;
 				DataInputStream dis = new DataInputStream(in);
-				if (dis == null)
-					return null;
 
 				// read all
 				byte[] bs = new byte[fileSize];
-				dis.read(bs, 0, fileSize);
+				if(dis.read(bs, 0, fileSize) == -1)
+					return null;
 
 				dis.close();
 				in.close();
@@ -69,15 +66,7 @@ public class LightCache {
 				file.createNewFile(); // create file
 
 				FileOutputStream out = new FileOutputStream(file); // trunc
-				if (out == null) {
-					Log.v("MewX-File", "Write failed1");
-					return false;
-				}
 				DataOutputStream dos = new DataOutputStream(out);
-				if (dos == null) {
-					Log.v("MewX-File", "Write failed2");
-					return false;
-				}
 
 				// write all
 				dos.write(bs);

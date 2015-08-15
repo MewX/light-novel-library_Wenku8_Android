@@ -14,14 +14,14 @@ import java.util.TimerTask;
 
 /**
  * Created by MewX on 2015/5/17.
+ * Heartbeat Session Keeper. Useless.
  */
 public class HeartbeatSessionKeeper extends Service {
-    private int interval = 10 * 1000; //60 *
-    private Timer timer;
+    private int interval = 60 * 10 * 1000;
 
     /**
      * Set interval, must cancel it, then set & start.
-     * @param i
+     * @param i time count
      */
     public void setInterval(int i) {
         if(i > 0)
@@ -35,7 +35,7 @@ public class HeartbeatSessionKeeper extends Service {
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
-        timer = new Timer();
+        Timer timer = new Timer();
         timer.schedule(new TimerTask() {
             @Override
             public void run() {

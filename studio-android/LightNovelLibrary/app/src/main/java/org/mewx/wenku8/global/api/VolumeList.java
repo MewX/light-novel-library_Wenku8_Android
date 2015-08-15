@@ -5,6 +5,7 @@ import java.util.ArrayList;
 
 /**
  * Created by MewX on 2015/5/13.
+ * Volume List.
  */
 public class VolumeList implements Serializable {
     public String volumeName;

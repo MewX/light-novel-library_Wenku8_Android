@@ -10,6 +10,7 @@ import java.util.List;
 
 /**
  * Created by MewX on 2015/1/21.
+ * Novel Item List.
  */
 public class NovelItemList {
 
@@ -29,7 +30,6 @@ public class NovelItemList {
      */
     public NovelItemList(String[] str, int page) {
         setNovelItemList(str, page);
-        return;
     }
 
     public NovelItemList() {
@@ -37,12 +37,10 @@ public class NovelItemList {
         parseStatus = false;
         currentPage = 1;
         totalPage = 1;
-        return;
     }
 
     public void setNovelItemList(String[] str, int page) {
         parseStatus = parseNovelItemList(str, page);
-        return;
     }
 
     /**
@@ -66,12 +64,6 @@ public class NovelItemList {
         return l;
     }
 
-    /**
-     * Parse XML novel item list file
-     *
-     * @param str
-     * @return
-     */
     private boolean parseNovelItemList(String[] str, int page) {
         // <?xml version="1.0" encoding="utf-8"?>
         // <result>
@@ -100,7 +92,7 @@ public class NovelItemList {
         lastRecord = 0;
 
         // get total page
-        int beg = 0, temp;
+        int beg, temp;
         beg = str[0].indexOf(SEPERATOR);
         temp = str[0].indexOf(SEPERATOR, beg + 1);
         if (beg == -1 || temp == -1) return false; // this is an exception
@@ -112,7 +104,7 @@ public class NovelItemList {
 
         // init array
         if(l==null)
-            l = new ArrayList<Integer>();
+            l = new ArrayList<>();
         while (true) {
             beg = str[0].indexOf(SEPERATOR, beg);
             temp = str[0].indexOf(SEPERATOR, beg + 1);

@@ -7,9 +7,7 @@ import android.graphics.drawable.Drawable;
 import android.os.AsyncTask;
 import android.os.Build;
 import android.os.Bundle;
-import android.os.Handler;
 import android.support.v7.app.AppCompatActivity;
-import android.support.v7.widget.CardView;
 import android.support.v7.widget.Toolbar;
 import android.util.Log;
 import android.view.Menu;
@@ -39,11 +37,11 @@ import java.io.UnsupportedEncodingException;
 
 /**
  * Created by MewX on 2015/6/14.
+ * User Info Activity.
  */
 public class UserInfoActivity extends AppCompatActivity {
 
     // private vars
-    private Toolbar mToolbar = null;
     private RoundedImageView rivAvatar;
     private TextView tvUserName, tvNickyName, tvScore, tvExperience, tvRank;
     private TextView tvLogout;
@@ -57,13 +55,16 @@ public class UserInfoActivity extends AppCompatActivity {
         setContentView(R.layout.layout_account_info);
 
         // set indicator enable
-        mToolbar = (Toolbar) findViewById(R.id.toolbar_actionbar);
+        Toolbar mToolbar = (Toolbar) findViewById(R.id.toolbar_actionbar);
         setSupportActionBar(mToolbar);
-        getSupportActionBar().setDisplayHomeAsUpEnabled(true);
-        getSupportActionBar().setHomeButtonEnabled(true);
-        final Drawable upArrow = getResources().getDrawable(R.drawable.abc_ic_ab_back_mtrl_am_alpha);
-        upArrow.setColorFilter(getResources().getColor(R.color.default_white), PorterDuff.Mode.SRC_ATOP);
-        getSupportActionBar().setHomeAsUpIndicator(upArrow);
+        if(getSupportActionBar() != null) {
+            getSupportActionBar().setDisplayHomeAsUpEnabled(true);
+            getSupportActionBar().setHomeButtonEnabled(true);
+            final Drawable upArrow = getResources().getDrawable(R.drawable.abc_ic_ab_back_mtrl_am_alpha);
+            if(upArrow != null)
+                upArrow.setColorFilter(getResources().getColor(R.color.default_white), PorterDuff.Mode.SRC_ATOP);
+            getSupportActionBar().setHomeAsUpIndicator(upArrow);
+        }
 
         // change status bar color tint, and this require SDK16
         if (Build.VERSION.SDK_INT >= 16 ) { //&& Build.VERSION.SDK_INT <= 21) {
@@ -124,7 +125,7 @@ public class UserInfoActivity extends AppCompatActivity {
                 if(b == null) return Wenku8Error.ErrorCode.NETWORK_ERROR;
                 try {
                     if(!LightTool.isInteger(new String(b))) return Wenku8Error.ErrorCode.STRING_CONVERSION_ERROR;
-                    else if(Wenku8Error.getSystemDefinedErrorCode(new Integer(new String(b))) == Wenku8Error.ErrorCode.SYSTEM_9_SIGN_FAILED)
+                    else if(Wenku8Error.getSystemDefinedErrorCode(Integer.valueOf(new String(b))) == Wenku8Error.ErrorCode.SYSTEM_9_SIGN_FAILED)
                         return Wenku8Error.ErrorCode.SYSTEM_9_SIGN_FAILED;
                 } catch (Exception e) {
                     e.printStackTrace();
@@ -139,7 +140,7 @@ public class UserInfoActivity extends AppCompatActivity {
 
                 String xml = new String(b, "UTF-8");
                 if(LightTool.isInteger(xml)) {
-                    if(Wenku8Error.getSystemDefinedErrorCode(new Integer(xml)) == Wenku8Error.ErrorCode.SYSTEM_4_NOT_LOGGED_IN) {
+                    if(Wenku8Error.getSystemDefinedErrorCode(Integer.valueOf(xml)) == Wenku8Error.ErrorCode.SYSTEM_4_NOT_LOGGED_IN) {
                         // do log in
                         Wenku8Error.ErrorCode temp = LightUserSession.doLoginFromFile();
                         if(temp != Wenku8Error.ErrorCode.SYSTEM_1_SUCCEEDED) return temp; // return an error code
@@ -149,7 +150,7 @@ public class UserInfoActivity extends AppCompatActivity {
                         if(b == null) return Wenku8Error.ErrorCode.NETWORK_ERROR;
                         xml = new String(b, "UTF-8");
                     }
-                    else return Wenku8Error.getSystemDefinedErrorCode(new Integer(xml));
+                    else return Wenku8Error.getSystemDefinedErrorCode(Integer.valueOf(xml));
                 }
 
                 Log.e("MewX", xml);
@@ -209,7 +210,7 @@ public class UserInfoActivity extends AppCompatActivity {
                                     }
                                 })
                                 .theme(Theme.LIGHT)
-                                .titleColor(R.color.default_text_color_black)
+                                .titleColorRes(R.color.default_text_color_black)
                                 .backgroundColorRes(R.color.dlgBackgroundColor)
                                 .contentColorRes(R.color.dlgContentColor)
                                 .positiveColorRes(R.color.dlgPositiveButtonColor)

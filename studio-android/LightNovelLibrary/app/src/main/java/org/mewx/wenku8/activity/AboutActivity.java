@@ -1,13 +1,11 @@
 package org.mewx.wenku8.activity;
 
-import android.content.Intent;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.graphics.PorterDuff;
 import android.graphics.drawable.Drawable;
 import android.os.Build;
 import android.os.Bundle;
-import android.os.Environment;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
 import android.util.TypedValue;
@@ -19,7 +17,6 @@ import android.widget.TextView;
 
 import com.afollestad.materialdialogs.MaterialDialog;
 import com.afollestad.materialdialogs.Theme;
-import com.nononsenseapps.filepicker.FilePickerActivity;
 import com.readystatesoftware.systembartint.SystemBarTintManager;
 import com.umeng.analytics.MobclickAgent;
 
@@ -88,19 +85,6 @@ public class AboutActivity extends AppCompatActivity {
             public void onClick(View v) {
                 if(count == -10000) {
                     // add textview
-//                    <TextView
-//                    android:id="@+id/mewx_name"
-//                    android:layout_width="wrap_content"
-//                    android:layout_height="wrap_content"
-//                    android:gravity="center_vertical"
-//                    android:textSize="14sp"
-//                    android:paddingTop="12dp"
-//                    android:paddingBottom="12dp"
-//                    android:text="MewX\t&lt;imewx@qq.com&gt;"
-//                    android:singleLine="true"
-//                    android:textColor="@color/menu_text_color"
-//                    android:layout_below="@+id/divider1"
-//                    android:layout_centerHorizontal="true" />
                     tv.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
                     tv.setPadding(0, 12, 0, 12);
                     tv.setTextColor(getResources().getColor(R.color.menu_text_color));
@@ -117,7 +101,7 @@ public class AboutActivity extends AppCompatActivity {
                 else {
                     new MaterialDialog.Builder(AboutActivity.this)
                             .theme(Theme.LIGHT)
-                            .content("哇哦，有诚意的用户大人哦~\n攻城狮患有直男癌，偏好飞机场，已加入卫士道豪华套餐，找不到女盆友，注孤生！\n征婚热线：QQ307740614 :-)")
+                            .content("哇哦，有诚意的用户大人哦~\n攻城狮征婚热线：QQ307740614 :-)")
                             .positiveText(R.string.dialog_positive_ok)
                             .show();
                 }

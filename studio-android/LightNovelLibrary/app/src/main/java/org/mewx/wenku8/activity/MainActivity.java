@@ -26,9 +26,7 @@ import com.umeng.update.UpdateStatus;
 import org.mewx.wenku8.R;
 import org.mewx.wenku8.fragment.NavigationDrawerFragment;
 import org.mewx.wenku8.global.GlobalConfig;
-import org.mewx.wenku8.util.LightCache;
 
-import java.io.File;
 import java.util.Timer;
 import java.util.TimerTask;
 
@@ -89,6 +87,7 @@ public class MainActivity extends AppCompatActivity {
                                 break;
                             } else {
                                 new MaterialDialog.Builder(MainActivity.this)
+                                        .theme(Theme.LIGHT)
                                         .callback(new MaterialDialog.ButtonCallback() {
                                             @Override
                                             public void onNegative(MaterialDialog dialog) {
@@ -97,8 +96,7 @@ public class MainActivity extends AppCompatActivity {
                                             }
                                         })
                                         .forceStacking(true)
-                                        .theme(Theme.LIGHT)
-                                        .titleColor(R.color.default_text_color_black)
+                                        .titleColorRes(R.color.default_text_color_black)
                                         .backgroundColorRes(R.color.dlgBackgroundColor)
                                         .contentColorRes(R.color.dlgContentColor)
                                         .positiveColorRes(R.color.dlgPositiveButtonColor)
@@ -211,10 +209,12 @@ public class MainActivity extends AppCompatActivity {
      */
     public void changeFragment(Fragment targetFragment) {
         // temporarily set elevation to remove rank list toolbar shadow
-        if(status == FRAGMENT_LIST.RKLIST)
-            getSupportActionBar().setElevation(0);
-        else
-            getSupportActionBar().setElevation(getResources().getDimension(R.dimen.toolbar_elevation));
+        if(getSupportActionBar() != null) {
+            if (status == FRAGMENT_LIST.RKLIST)
+                getSupportActionBar().setElevation(0);
+            else
+                getSupportActionBar().setElevation(getResources().getDimension(R.dimen.toolbar_elevation));
+        }
 
         getSupportFragmentManager().beginTransaction()
                 .replace(R.id.container, targetFragment, "fragment")
@@ -228,8 +228,6 @@ public class MainActivity extends AppCompatActivity {
         super.onPause();
         MobclickAgent.onPageEnd("MainActivity");
         MobclickAgent.onPause(this);
-
-        return;
     }
 
     @Override
@@ -237,8 +235,6 @@ public class MainActivity extends AppCompatActivity {
         super.onResume();
         MobclickAgent.onPageStart("MainActivity");
         MobclickAgent.onResume(this);
-
-        return;
     }
 
     @Override
@@ -251,8 +247,8 @@ public class MainActivity extends AppCompatActivity {
 
     private void exitBy2Click() {
         // press twice to exit
-        Timer tExit = null;
-        if (isExit == false) {
+        Timer tExit;
+        if (!isExit) {
             isExit = true; // ready to exit
             Toast.makeText(
                     this,

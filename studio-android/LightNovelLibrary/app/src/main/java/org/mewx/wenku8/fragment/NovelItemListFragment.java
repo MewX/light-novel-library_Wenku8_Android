@@ -1,6 +1,5 @@
 package org.mewx.wenku8.fragment;
 
-import android.app.Notification;
 import android.content.Intent;
 import android.os.AsyncTask;
 import android.os.Build;
@@ -16,19 +15,15 @@ import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.DefaultItemAnimator;
 import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
-import android.support.v7.widget.Toolbar;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.view.animation.AccelerateInterpolator;
-import android.view.animation.DecelerateInterpolator;
-import android.widget.FrameLayout;
 import android.widget.TextView;
 import android.widget.Toast;
+
 import org.apache.http.NameValuePair;
 import org.mewx.wenku8.R;
-import org.mewx.wenku8.activity.MainActivity;
 import org.mewx.wenku8.activity.NovelInfoActivity;
 import org.mewx.wenku8.adapter.NovelItemAdapterUpdate;
 import org.mewx.wenku8.global.GlobalConfig;
@@ -38,23 +33,22 @@ import org.mewx.wenku8.global.api.Wenku8Parser;
 import org.mewx.wenku8.listener.MyItemClickListener;
 import org.mewx.wenku8.listener.MyItemLongClickListener;
 import org.mewx.wenku8.util.LightNetwork;
-import org.mewx.wenku8.util.LightTool;
 import org.mewx.wenku8.util.Logger;
+
 import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
 import fr.castorflex.android.smoothprogressbar.SmoothProgressBar;
 
 public class NovelItemListFragment extends Fragment implements MyItemClickListener, MyItemLongClickListener {
 
     // type def
     private final String searchType = "search";
-    private MainActivity mainActivity = null;
     private String type, key;
     private boolean isLoading = false; // judge network thread continue
-    private int pastVisiblesItems, visibleItemCount, totalItemCount;
 
     // members
     private ActionBar actionBar = null;
@@ -82,10 +76,7 @@ public class NovelItemListFragment extends Fragment implements MyItemClickListen
         super.onCreate(savedInstanceState);
         type = getArguments().getString("type");
         // judge if is 'search'
-        key = type.equals(searchType) ? getArguments().getString("key") : "";
-        // get main activity
-        if(getActivity() instanceof MainActivity)
-            mainActivity = (MainActivity) getActivity();
+        key = type != null && type.equals(searchType) ? getArguments().getString("key") : "";
 
         actionBar = ((AppCompatActivity) getActivity()).getSupportActionBar();
     }
@@ -244,6 +235,7 @@ public class NovelItemListFragment extends Fragment implements MyItemClickListen
         public void onScrolled(RecyclerView recyclerView, int dx, int dy) {
             super.onScrolled(recyclerView, dx, dy);
 
+            int pastVisiblesItems, visibleItemCount, totalItemCount;
             visibleItemCount = mLayoutManager.getChildCount();
             totalItemCount = mLayoutManager.getItemCount();
             pastVisiblesItems = mLayoutManager.findFirstVisibleItemPosition();
