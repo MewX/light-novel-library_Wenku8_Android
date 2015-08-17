@@ -40,7 +40,7 @@ Material Design风格的`轻小说文库`App**完全**开源了！想实践Mater
 
 **为什么App里面说要尽快缓存感兴趣的小说？为什么现在这么紧急地开放源代码？**
 
-请参阅文档末尾的`开发者的碎碎念`。
+请参阅文档末尾的[`开发者的碎碎念`](#mewx)。
 
 
 ----
@@ -466,6 +466,8 @@ Material Design风格的`轻小说文库`App**完全**开源了！想实践Mater
 <a id="saves"></a>App存档文件结构
 ==========
 
+存档文件示例可以到[`release`](https://github.com/MewX/light-novel-library_Wenku8_Android/releases/tag/save-sample-v1.2)区下载查看~
+
 ## <a id="saves-dir"></a>总览
 
     sdcard/wenku8
@@ -520,7 +522,7 @@ Material Design风格的`轻小说文库`App**完全**开源了！想实践Mater
 
 ## <a id="saves-tech"></a>技术细节
 
-存档文件示例可以到`[release](https://github.com/MewX/light-novel-library_Wenku8_Android/releases/tag/save-sample-v1.2)`区下载查看~
+主要是存档的实现和兼容存档的规范。
 
 ### saves/bookshelf_local.wk8
 
@@ -653,7 +655,7 @@ Material Design风格的`轻小说文库`App**完全**开源了！想实践Mater
 
 本App目前决定暂停维护了……
 
-原因一方面是开发者自己要准备年底的研究生考试；另一方面也是**最主要**的方面，鹅厂大规模购置轻小说版权，这边有一些暂时不能公开的原因，总之本三方app得告一段落了，具体可以阅读`开发者的碎碎念`。
+原因一方面是开发者自己要准备年底的研究生考试；另一方面也是**最主要**的方面，鹅厂大规模购置轻小说版权，这边有一些暂时不能公开的原因，总之本三方app得告一段落了，具体可以阅读[`开发者的碎碎念`](#mewx)。
 
 前几天我用HTTrack抓取了`lknovel.cn`的数据库，总共20G，太过于庞大，文件数20W，我的xp爬虫机已卡死。但是由于服务器在国内，速度还不错，用1~2天扒完。
 
