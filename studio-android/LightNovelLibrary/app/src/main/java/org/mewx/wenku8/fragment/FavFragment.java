@@ -59,7 +59,6 @@ public class FavFragment extends Fragment implements MyItemClickListener, MyItem
 
     // novel list info
     private List<Integer> listNovelItemAid = null; // aid list
-    private List<NovelItemInfoUpdate> listNovelItemInfo = null; // novel info list
     private NovelItemAdapterUpdate mAdapter = null;
 
     public static FavFragment newInstance(String param1, String param2) {
@@ -184,7 +183,7 @@ public class FavFragment extends Fragment implements MyItemClickListener, MyItem
 
         // init
         listNovelItemAid = GlobalConfig.getLocalBookshelfList();
-        listNovelItemInfo = new ArrayList<>();
+        List<NovelItemInfoUpdate> listNovelItemInfo = new ArrayList<>(); // novel info list
 
         // load all meta file
         for(Integer aid : listNovelItemAid) {
