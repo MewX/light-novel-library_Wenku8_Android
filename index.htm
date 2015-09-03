@@ -30,29 +30,6 @@
 	    position: relative;
         z-index:2;
     }
-    /*.a-line:before{
-        content: "123123";
-        position: relative;
-        line-height:50px;
-        padding-left:20px;
-        padding-right:20px;
-        height:0px;
-        width:100%;
-        background-color:#fff;
-        top:-20px;
-        opacity:0.0;filter:alpha(opacity=0);
-        z-index:6;
-        
-        transition: all 0.25s ease-in-out;
-        -moz-transition: all 0.25s ease-in-out;
-        -o-transition: all 0.25s ease-in-out;
-        -webkit-transition: all 0.25s ease-in-out;
-    }
-    .a-line:hover:before {
-        height:50px;
-        top:0px;
-        opacity:1.0;filter:alpha(opacity=100);
-    }*/
     </style> 
 </head>
 <body bgcolor="#DAEDEB">
@@ -63,10 +40,10 @@
         <div class="a-line"><img class="add-img" src="imgs/site/avatar_zero.jpg" /><div class="staff-info">界面设计：ZERO</div></div>
         <div class="a-line"><img class="add-img" src="imgs/site/avatar_rabbit.jpg" /><div class="staff-info">反馈协助：妻兔姬</div></div>
     </div>
-    <div id="MicroBlog" style="position:absolute;top:300px;left:50%;margin-left:-512px;height:auto;width:974px;padding:25px;background-color:#fff;background-size:100% 100%;text-align:left;font-size:14px;z-index:3;opacity:0.75;filter:alpha(opacity=75);-webkit-border-radius:0px 0px 10px 10px;-moz-border-radius:0px 0px 10px 10px;border-radius:0px 0px 10px 10px;text-shadow:0px 0px 10px #ffffff;">
+    <div id="MicroBlog" style="position:absolute;top:340px;min-height:600px;left:50%;margin-left:-512px;height:auto;width:974px;padding:25px;background-color:#fff;background-size:100% 100%;text-align:left;font-size:14px;z-index:3;opacity:0.75;filter:alpha(opacity=75);-webkit-border-radius:0px 0px 10px 10px;-moz-border-radius:0px 0px 10px 10px;border-radius:0px 0px 10px 10px;text-shadow:0px 0px 10px #ffffff;">
         <div id="blog" style="float:left;width:600px">
             <div id="img_thumb" style="width:auto; height:auto">
-            <p><span style="color:#f00">本app完全开源！https://github.com/MewX/light-novel-library_Wenku8_Android</span></p><br/><br/>
+            <p><span style="color:#f00">本app完全开源！<a href="https://github.com/MewX/light-novel-library_Wenku8_Android" target="_blank">https://github.com/MewX</a></span></p><br/><br/>
             - APP 预览图 -<br/>
                 <a href="imgs/app/android.01.png" target="_blank"><img src="imgs/app/android.thumb.01.jpg" style="width:100px;height:auto"/></a>
                 <a href="imgs/app/android.02.png" target="_blank"><img src="imgs/app/android.thumb.02.jpg" style="width:100px;height:auto"/></a>
@@ -100,16 +77,16 @@
     </div>
 
     <!-- It's said that this will improve loading speed. -->
-    <script src="http://www.mewx.org/js/jquery-1.11.0.min.js"></script>
+    <script src="http://libs.useso.com/js/jquery/1.11.0/jquery.min.js"></script>
     <script type="text/javascript">
     $($("#TopImage").hover(
-        function(){$("#MicroBlog").stop().animate({top:"975px",opacity:"0.25"},500);},
-        function(){$("#MicroBlog").stop().animate({top:"450px",opacity:"0.75"},500);}
+        function(){$("#MicroBlog").stop().animate({opacity:"0.25"},500);},
+        function(){$("#MicroBlog").stop().animate({opacity:"0.75"},500);}
     ));
 
     $($("#MicroBlog").hover(
         function(){$("#MicroBlog").stop().animate({opacity:"0.95"},500);},
-        function(){$("#MicroBlog").stop().animate({top:"450px",opacity:"0.75"},500);}
+        function(){$("#MicroBlog").stop().animate({opacity:"0.75"},500);}
     ));
 
     function StandardTaxRate()

@@ -2,8 +2,14 @@
 <microblog>
     <post>
         <author>MewX</author>
+        <date>2015-09-03 23:20</date>
+        <blog>好像新的app还没正式上线 =。= 不知道怎么回事，因为新版开发者并不是我喔。我今年考研，加上作为三方开发者被官方kick，所以暂时不会维护项目了。如果明年市场还有需求的话，我会把app改成聚合类的轻小说app，通过html解析的方式抓取各大轻小说站（轻国、轻文库、文库8、etc）的资源，继续开发此项目。不知道会不会有那么一天~真心感谢大家的关注和使用！</blog>
+    </post>
+    
+    <post>
+        <author>MewX</author>
         <date>2015-08-16 00:02</date>
-        <blog><![CDATA[<p><span style="color:#f00">app里面也写了，尽量把想长期看的书全本缓存一下。<br/>源码也将于月底全部开源！http://github.com/MewX</span></p>]]></blog>
+        <blog><![CDATA[<span style="color:#f00">app里面也写了，尽量把想长期看的书全本缓存一下。<br/>源码也将于月底全部开源！http://github.com/MewX</span>]]></blog>
     </post>
 
     <post>
