@@ -452,12 +452,18 @@ Material Design风格的`轻小说文库`App**完全**开源了！想实践Mater
 ----
 
 
-## <a id="umeng"></a>UMENG统计数据（2015/08/16残念）
+## <a id="umeng"></a>UMENG统计数据（2015/10/01残念）
 
-[![1.x-statistic](https://raw.githubusercontent.com/MewX/light-novel-library_Wenku8_Android/master/screenshots/1.x-statistic.thumb.jpg)](https://raw.githubusercontent.com/MewX/light-novel-library_Wenku8_Android/master/screenshots/1.x-statistic.jpg)
-[![0520-statistic](https://raw.githubusercontent.com/MewX/light-novel-library_Wenku8_Android/master/screenshots/0520-statistic.thumb.jpg)](https://raw.githubusercontent.com/MewX/light-novel-library_Wenku8_Android/master/screenshots/0520-statistic.jpg)
+[![1.x-statistic](https://raw.githubusercontent.com/MewX/light-novel-library_Wenku8_Android/master/screenshots/1.x-statistic-20151001.thumb.jpg)](https://raw.githubusercontent.com/MewX/light-novel-library_Wenku8_Android/master/screenshots/1.x-statistic-20151001.jpg)
+[![0520-statistic](https://raw.githubusercontent.com/MewX/light-novel-library_Wenku8_Android/master/screenshots/0520-statistic-20151001.thumb.jpg)](https://raw.githubusercontent.com/MewX/light-novel-library_Wenku8_Android/master/screenshots/0520-statistic-20151001.jpg)
 
 新版的app用户量10天增长到了1W用户量，全是托wenku8的福。照现在的增长速度速度估计用户量峰值是3W左右。
+
+还有几个有趣的统计图分享一下：
+
+[![1.x-statistic-entry](https://raw.githubusercontent.com/MewX/light-novel-library_Wenku8_Android/master/screenshots/1.x-statistic-entry.thumb.jpg)](https://raw.githubusercontent.com/MewX/light-novel-library_Wenku8_Android/master/screenshots/1.x-statistic-entry.jpg)
+
+![1.x-statistic-entry](https://raw.githubusercontent.com/MewX/light-novel-library_Wenku8_Android/master/screenshots/1.x-statistic-rank.jpg)
 
 
 ----
