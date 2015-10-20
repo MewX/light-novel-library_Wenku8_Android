@@ -18,6 +18,7 @@ import org.mewx.wenku8.R;
 import org.mewx.wenku8.global.GlobalConfig;
 import org.mewx.wenku8.global.api.NovelItemInfoUpdate;
 import org.mewx.wenku8.global.api.Wenku8API;
+import org.mewx.wenku8.listener.MyDeleteClickListener;
 import org.mewx.wenku8.listener.MyItemClickListener;
 import org.mewx.wenku8.listener.MyItemLongClickListener;
 import org.mewx.wenku8.util.LightCache;
@@ -35,6 +36,7 @@ import java.util.Map;
 public class NovelItemAdapterUpdate extends RecyclerView.Adapter<NovelItemAdapterUpdate.ViewHolder> {
 
     private MyItemClickListener mItemClickListener;
+    private MyDeleteClickListener mMyDeleteClickListener;
     private MyItemLongClickListener mItemLongClickListener;
     private List<NovelItemInfoUpdate> mDataset;
 
@@ -57,7 +59,7 @@ public class NovelItemAdapterUpdate extends RecyclerView.Adapter<NovelItemAdapte
     @Override
     public ViewHolder onCreateViewHolder(ViewGroup viewGroup, int i) {
         View view = View.inflate(viewGroup.getContext(), R.layout.view_novel_item, null);
-        return new ViewHolder(view, mItemClickListener, mItemLongClickListener);
+        return new ViewHolder(view, mItemClickListener, mMyDeleteClickListener, mItemLongClickListener);
     }
 
     @Override
@@ -152,6 +154,10 @@ public class NovelItemAdapterUpdate extends RecyclerView.Adapter<NovelItemAdapte
         this.mItemClickListener = listener;
     }
 
+    public void setOnDeleteClickListener(MyDeleteClickListener listener) {
+        this.mMyDeleteClickListener = listener;
+    }
+
     public void setOnItemLongClickListener(MyItemLongClickListener listener){
         this.mItemLongClickListener = listener;
     }
@@ -164,6 +170,7 @@ public class NovelItemAdapterUpdate extends RecyclerView.Adapter<NovelItemAdapte
     public static class ViewHolder extends RecyclerView.ViewHolder implements View.OnClickListener, View.OnLongClickListener {
 
         private MyItemClickListener mClickListener;
+        private MyDeleteClickListener mMyDeleteClickListener;
         private MyItemLongClickListener mLongClickListener;
         public int position;
         public boolean isLoading = false;
@@ -178,12 +185,14 @@ public class NovelItemAdapterUpdate extends RecyclerView.Adapter<NovelItemAdapte
         public TextView tvNovelUpdate;
         public TextView tvNovelIntro;
 
-        public ViewHolder(View itemView, MyItemClickListener clickListener, MyItemLongClickListener longClickListener) {
+        public ViewHolder(View itemView, MyItemClickListener clickListener, MyDeleteClickListener myDeleteClickListener, MyItemLongClickListener longClickListener) {
             super(itemView);
             this.mClickListener = clickListener;
+            this.mMyDeleteClickListener = myDeleteClickListener;
             this.mLongClickListener = longClickListener;
             itemView.findViewById(R.id.item_card).setOnClickListener(this);
             itemView.findViewById(R.id.item_card).setOnLongClickListener(this);
+            itemView.findViewById(R.id.novel_option).setOnClickListener(this);
 
             // get all views
             ibNovelOption = (ImageButton) itemView.findViewById(R.id.novel_option);
@@ -204,8 +213,17 @@ public class NovelItemAdapterUpdate extends RecyclerView.Adapter<NovelItemAdapte
 
         @Override
         public void onClick(View v) {
-            if(mClickListener != null){
-                mClickListener.onItemClick(v,getAdapterPosition());
+            switch (v.getId()){
+                case R.id.item_card:
+                    if(mClickListener != null){
+                        mClickListener.onItemClick(v,getAdapterPosition());
+                    }
+                    break;
+                case R.id.novel_option:
+                    if(mClickListener != null){
+                        mMyDeleteClickListener.onDeleteClick(v, getAdapterPosition());
+                    }
+                    break;
             }
         }
 

@@ -20,6 +20,7 @@ import com.umeng.update.UmengUpdateListener;
 import com.umeng.update.UpdateResponse;
 import com.umeng.update.UpdateStatus;
 
+import org.mewx.wenku8.MyApp;
 import org.mewx.wenku8.R;
 import org.mewx.wenku8.activity.AboutActivity;
 import org.mewx.wenku8.activity.MenuBackgroundSelectorActivity;
@@ -63,6 +64,8 @@ public class ConfigFragment extends Fragment {
         super.onActivityCreated(savedInstanceState);
 
         // get views
+        Wenku8API.NoticeString = MobclickAgent.getConfigParams(MyApp.getContext(),
+                GlobalConfig.getCurrentLang() != Wenku8API.LANG.SC ? "wenku8_notice_tw" : "wenku8_notice"); // get each time
         TextView tvNotice = (TextView) getActivity().findViewById(R.id.notice);
         if(Wenku8API.NoticeString.equals(""))
             getActivity().findViewById(R.id.notice_layout).setVisibility(View.GONE);

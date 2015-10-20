@@ -9,6 +9,9 @@ import org.apache.http.NameValuePair;
 import org.apache.http.client.entity.UrlEncodedFormEntity;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.impl.client.DefaultHttpClient;
+import org.apache.http.params.BasicHttpParams;
+import org.apache.http.params.HttpConnectionParams;
+import org.apache.http.params.HttpParams;
 import org.apache.http.protocol.HTTP;
 
 import java.io.BufferedInputStream;
@@ -84,6 +87,7 @@ public class LightNetwork {
 
 		// a replacer
 //		URL = URL.replace(fromEle, toEle);
+//        long start = System.currentTimeMillis();
 
 		HttpPost httpRequest = new HttpPost(URL);
         httpRequest.addHeader("Accept-Encoding", "gzip");
@@ -122,7 +126,8 @@ public class LightNetwork {
                 strResult = baos.toByteArray();
                 baos.close();
 
-                Log.v("MewX-Net", new String(strResult, "utf-8"));
+//                long elapsed = System.currentTimeMillis() - start;
+//                Log.e("MewX-Net", "page fetched in " + elapsed + "ms");
 
                 return strResult;
 			} else {
@@ -146,6 +151,7 @@ public class LightNetwork {
 
 		// a replacer
 //		u = u.replace(fromEle, toEle);
+//        long start = System.currentTimeMillis();
 
 		// new API, initial
 		URL url;
@@ -202,6 +208,9 @@ public class LightNetwork {
 			byte[] data = outStream.toByteArray(); // copy to ByteArray
 			outStream.close();
 			inStream.close();
+
+//            long elapsed = System.currentTimeMillis() - start;
+//            Log.e("MewX-Net", "page fetched in " + elapsed + "ms");
 
 			return data; // return value
 

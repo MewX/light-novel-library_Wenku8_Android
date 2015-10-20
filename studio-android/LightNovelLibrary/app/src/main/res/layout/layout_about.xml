@@ -100,7 +100,7 @@
                             android:textSize="14sp"
                             android:paddingTop="12dp"
                             android:paddingBottom="12dp"
-                            android:text="测试群号: 427577610"
+                            android:text="用户群号: 427577610"
                             android:singleLine="true"
                             android:textColor="@color/menu_text_color"
                             android:layout_below="@+id/app_site"

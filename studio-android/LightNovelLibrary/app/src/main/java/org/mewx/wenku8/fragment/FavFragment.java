@@ -20,28 +20,35 @@ import android.view.ViewGroup;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.afollestad.materialdialogs.GravityEnum;
 import com.afollestad.materialdialogs.MaterialDialog;
 import com.afollestad.materialdialogs.Theme;
+import com.android.volley.ParseError;
 import com.umeng.analytics.MobclickAgent;
 
 import org.apache.http.NameValuePair;
 import org.mewx.wenku8.MyApp;
 import org.mewx.wenku8.R;
+import org.mewx.wenku8.activity.MainActivity;
 import org.mewx.wenku8.activity.NovelInfoActivity;
 import org.mewx.wenku8.adapter.NovelItemAdapterUpdate;
 import org.mewx.wenku8.global.GlobalConfig;
+import org.mewx.wenku8.global.api.ChapterInfo;
 import org.mewx.wenku8.global.api.NovelItemInfoUpdate;
 import org.mewx.wenku8.global.api.NovelItemMeta;
 import org.mewx.wenku8.global.api.VolumeList;
 import org.mewx.wenku8.global.api.Wenku8API;
 import org.mewx.wenku8.global.api.Wenku8Error;
 import org.mewx.wenku8.global.api.Wenku8Parser;
+import org.mewx.wenku8.listener.MyDeleteClickListener;
 import org.mewx.wenku8.listener.MyItemClickListener;
 import org.mewx.wenku8.listener.MyItemLongClickListener;
+import org.mewx.wenku8.util.LightCache;
 import org.mewx.wenku8.util.LightNetwork;
 import org.mewx.wenku8.util.LightTool;
 import org.mewx.wenku8.util.LightUserSession;
 
+import java.io.File;
 import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -50,7 +57,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 
-public class FavFragment extends Fragment implements MyItemClickListener, MyItemLongClickListener {
+public class FavFragment extends Fragment implements MyItemClickListener, MyItemLongClickListener, MyDeleteClickListener {
 
     // local vars
     private SwipeRefreshLayout mSwipeRefreshLayout;
@@ -142,6 +149,29 @@ public class FavFragment extends Fragment implements MyItemClickListener, MyItem
     }
 
     @Override
+    public void onDeleteClick(View view, final int position) {
+        // popup to show delete
+        new MaterialDialog.Builder(getActivity())
+                .callback(new MaterialDialog.ButtonCallback() {
+                    @Override
+                    public void onPositive(MaterialDialog dialog) {
+                        super.onPositive(dialog);
+                        // delete operatio, delete from cloud first, if succeed then delete from local
+                        AsyncRemoveBookFromCloud arbfc = new AsyncRemoveBookFromCloud();
+                        arbfc.execute(listNovelItemAid.get(position));
+                        listNovelItemAid.remove(position);
+                        refreshList(timecount ++);
+                    }
+                })
+                .theme(Theme.LIGHT)
+                .content(R.string.dialog_content_want_to_delete)
+                .contentGravity(GravityEnum.CENTER)
+                .positiveText(R.string.dialog_positive_sure)
+                .negativeText(R.string.dialog_negative_preferno)
+                .show();
+    }
+
+    @Override
     public void onItemLongClick(View view, int position) {
         // Toast.makeText(getActivity(),"item long click detected", Toast.LENGTH_SHORT).show();
 
@@ -218,8 +248,10 @@ public class FavFragment extends Fragment implements MyItemClickListener, MyItem
         }
         mAdapter.RefreshDataset(listNovelItemInfo);
         mAdapter.setOnItemClickListener(FavFragment.this);
+        mAdapter.setOnDeleteClickListener(FavFragment.this);
         mAdapter.setOnItemLongClickListener(FavFragment.this);
         mAdapter.notifyDataSetChanged();
+//        for(NovelItem)
         mSwipeRefreshLayout.setRefreshing(false);
     }
 
@@ -415,6 +447,93 @@ public class FavFragment extends Fragment implements MyItemClickListener, MyItem
             else {
                 loadAllLocal();
             }
+        }
+    }
+
+    class AsyncRemoveBookFromCloud extends AsyncTask<Integer, Integer, Wenku8Error.ErrorCode> {
+        MaterialDialog md;
+        int aid;
+
+        @Override
+        protected void onPreExecute() {
+            super.onPreExecute();
+            md = new MaterialDialog.Builder(getActivity())
+                    .theme(Theme.LIGHT)
+                    .content(R.string.dialog_content_novel_remove_from_cloud)
+                    .contentColorRes(R.color.dlgContentColor)
+                    .progress(true, 0)
+                    .show();
+        }
+
+        @Override
+        protected Wenku8Error.ErrorCode doInBackground(Integer... params) {
+            // params: aid
+            aid = params[0];
+            byte[] bytes = LightNetwork.LightHttpPostConnection(Wenku8API.getBaseURL(), Wenku8API.getDelFromBookshelfParams(aid));
+            if(bytes == null) return Wenku8Error.ErrorCode.NETWORK_ERROR;
+
+            String result;
+            try {
+                result = new String(bytes, "UTF-8");
+                Log.e("MewX", result);
+                if (!LightTool.isInteger(result))
+                    return Wenku8Error.ErrorCode.RETURNED_VALUE_EXCEPTION;
+                if(Wenku8Error.getSystemDefinedErrorCode(Integer.parseInt(result)) != Wenku8Error.ErrorCode.SYSTEM_1_SUCCEEDED
+                        && Wenku8Error.getSystemDefinedErrorCode(Integer.parseInt(result)) != Wenku8Error.ErrorCode.SYSTEM_4_NOT_LOGGED_IN
+                        && Wenku8Error.getSystemDefinedErrorCode(Integer.parseInt(result)) != Wenku8Error.ErrorCode.SYSTEM_7_NOVEL_NOT_IN_BOOKSHELF) {
+                    return Wenku8Error.getSystemDefinedErrorCode(Integer.parseInt(result));
+                }
+                else {
+                    // load volume first
+                    // get novel chapter list
+                    List<VolumeList> listVolume;
+                    String novelFullVolume;
+                    novelFullVolume = GlobalConfig.loadFullFileFromSaveFolder("intro", aid + "-volume.xml");
+                    if(novelFullVolume == null || novelFullVolume.equals("")) return Wenku8Error.ErrorCode.ERROR_DEFAULT;
+                    listVolume = Wenku8Parser.getVolumeList(novelFullVolume);
+                    if(listVolume == null) return Wenku8Error.ErrorCode.XML_PARSE_FAILED;
+
+                    // remove from local bookshelf, already in bookshelf
+                    for (VolumeList tempVl : listVolume) {
+                        for (ChapterInfo tempCi : tempVl.chapterList) {
+                            LightCache.deleteFile(GlobalConfig.getFirstFullSaveFilePath(), "novel" + File.separator + tempCi.cid + ".xml");
+                            LightCache.deleteFile(GlobalConfig.getSecondFullSaveFilePath(), "novel" + File.separator + tempCi.cid + ".xml");
+                        }
+                    }
+
+                    // delete files
+                    LightCache.deleteFile(GlobalConfig.getFirstFullSaveFilePath(), "intro" + File.separator + aid + "-intro.xml");
+                    LightCache.deleteFile(GlobalConfig.getFirstFullSaveFilePath(), "intro" + File.separator + aid + "-introfull.xml");
+                    LightCache.deleteFile(GlobalConfig.getFirstFullSaveFilePath(), "intro" + File.separator + aid + "-volume.xml");
+                    LightCache.deleteFile(GlobalConfig.getSecondFullSaveFilePath(), "intro" + File.separator + aid + "-intro.xml");
+                    LightCache.deleteFile(GlobalConfig.getSecondFullSaveFilePath(), "intro" + File.separator + aid + "-introfull.xml");
+                    LightCache.deleteFile(GlobalConfig.getSecondFullSaveFilePath(), "intro" + File.separator + aid + "-volume.xml");
+
+                    // remove from bookshelf
+                    GlobalConfig.removeFromLocalBookshelf(aid);
+                    if (!GlobalConfig.testInLocalBookshelf(aid)) { // not in
+                        return Wenku8Error.ErrorCode.SYSTEM_1_SUCCEEDED;
+                    } else {
+                        return Wenku8Error.ErrorCode.LOCAL_BOOK_REMOVE_FAILED;
+                        //Toast.makeText(NovelInfoActivity.this, getResources().getString(R.string.bookshelf_error), Toast.LENGTH_SHORT).show();
+                    }
+                }
+            } catch (UnsupportedEncodingException e) {
+                e.printStackTrace();
+                return Wenku8Error.ErrorCode.BYTE_TO_STRING_EXCEPTION;
+            }
+        }
+
+        @Override
+        protected void onPostExecute(Wenku8Error.ErrorCode err) {
+            super.onPostExecute(err);
+
+            md.dismiss();
+            if(err == Wenku8Error.ErrorCode.SYSTEM_1_SUCCEEDED) {
+                Toast.makeText(getActivity(), getResources().getString(R.string.bookshelf_removed), Toast.LENGTH_SHORT).show();
+            }
+            else
+                Toast.makeText(getActivity(), err.toString(), Toast.LENGTH_SHORT).show();
         }
     }
 

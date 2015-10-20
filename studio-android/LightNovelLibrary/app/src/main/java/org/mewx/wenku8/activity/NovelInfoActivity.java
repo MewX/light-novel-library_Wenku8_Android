@@ -686,9 +686,10 @@ public class NovelInfoActivity extends AppCompatActivity {
             try {
                 if(!fromLocal) {
                     byte[] coverRaw = LightNetwork.LightHttpDownload(Wenku8API.getCoverURL(aid));
-                    if(coverRaw == null) return -1;
-                    if(!LightCache.saveFile(GlobalConfig.getFirstStoragePath() + "imgs" + File.separator + aid + ".jpg", coverRaw, true))
-                        LightCache.saveFile(GlobalConfig.getSecondStoragePath() + "imgs" + File.separator + aid + ".jpg", coverRaw, true);
+                    if(coverRaw != null) { // no image is okay
+                        if (!LightCache.saveFile(GlobalConfig.getFirstStoragePath() + "imgs" + File.separator + aid + ".jpg", coverRaw, true))
+                            LightCache.saveFile(GlobalConfig.getSecondStoragePath() + "imgs" + File.separator + aid + ".jpg", coverRaw, true);
+                    }
                 }
             }
             catch (Exception e) {

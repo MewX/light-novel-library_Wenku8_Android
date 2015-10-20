@@ -32,9 +32,6 @@ public class WelcomeActivity extends Activity {
         setContentView(R.layout.layout_welcome);
 
         // get views
-        Typeface typeface = Typeface.createFromAsset(getAssets(), "fonts/fzss-gbk.ttf");
-        ((TextView) findViewById(R.id.architect)).setTypeface(typeface);
-        ((TextView) findViewById(R.id.ui_designer)).setTypeface(typeface);
         findViewById(R.id.version_layout).setBackgroundColor(Color.argb(0x80, 0xFF, 0xFF, 0xFF));
         findViewById(R.id.copyright_layout).setBackgroundColor(Color.argb(0x80, 0xFF, 0xFF, 0xFF));
 
@@ -91,7 +88,7 @@ public class WelcomeActivity extends Activity {
         LightCache.saveFile(GlobalConfig.getSecondFullSaveFilePath() + "imgs", ".nomedia", "".getBytes(), false);
 
         /* This is a delay template */
-        new CountDownTimer(2000, 100) {
+        new CountDownTimer(1000, 100) {
             @Override
             public void onTick(long millisUntilFinished) {
                 // Animation can be here.

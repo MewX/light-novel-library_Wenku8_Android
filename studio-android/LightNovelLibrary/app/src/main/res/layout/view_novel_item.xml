@@ -67,6 +67,7 @@
                         android:layout_weight="1" >
 
                         <TextView
+                            android:id="@+id/novel_item_text_author"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:textSize="12sp"
@@ -84,6 +85,7 @@
                     </TableRow>
 
                     <TableRow
+                        android:id="@+id/novel_status_row"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_weight="1" >
@@ -111,6 +113,7 @@
                         android:layout_weight="1" >
 
                         <TextView
+                            android:id="@+id/novel_item_text_update"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:textSize="12sp"
@@ -134,6 +137,7 @@
                         android:layout_weight="1" >
 
                         <TextView
+                            android:id="@+id/novel_item_text_shortinfo"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:textSize="12sp"
@@ -175,8 +179,9 @@
                     android:id="@+id/novel_option"
                     android:layout_width="32dp"
                     android:layout_height="32dp"
-                    android:src="@drawable/ic_option"
+                    android:src="@drawable/ic_clearcache"
                     android:background="@drawable/btn_menu_item_boardless"
+                    android:clickable="true"
                     android:layout_alignParentTop="true"
                     android:layout_alignParentRight="true"
                     android:layout_alignParentEnd="true" />

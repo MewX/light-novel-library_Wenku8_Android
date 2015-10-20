@@ -42,7 +42,7 @@ import java.util.ArrayList;
  */
 public class GlobalConfig {
 
-    private static final boolean inAlphaBuild = true; // in alpha mode, no update function
+    private static final boolean inAlphaBuild = false; // in alpha mode, no update function
     public static final String saveFolderName = "saves";
     public static final String imgsSaveFolderName = "imgs";
     public static final String customFolderName = "custom";
@@ -57,6 +57,7 @@ public class GlobalConfig {
 
     // vars
     private static boolean isInBookshelf = false;
+    private static boolean isInLatest = false;
     private static boolean FirstStoragePathStatus = true;
     private static Wenku8API.LANG currentLang = Wenku8API.LANG.SC;
     public static String pathPickedSave; // dir picker save path
@@ -435,6 +436,17 @@ public class GlobalConfig {
 
     public static void LeaveBookshelf() {
         isInBookshelf = false;
+    }
+    public static boolean testInLatest() {
+        return isInLatest;
+    }
+
+    public static void EnterLatest() {
+        isInLatest = true;
+    }
+
+    public static void LeaveLatest() {
+        isInLatest = false;
     }
 
 

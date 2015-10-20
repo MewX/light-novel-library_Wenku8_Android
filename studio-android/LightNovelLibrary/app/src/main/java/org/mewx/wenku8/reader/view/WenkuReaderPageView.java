@@ -152,16 +152,14 @@ public class WenkuReaderPageView extends View {
         // calc general var
         try {
             if(mSetting.getUseCustomFont()) typeface = Typeface.createFromFile(mSetting.getCustomFontPath()); // custom font
-            else typeface = Typeface.createFromAsset(MyApp.getContext().getAssets(), "fonts/fzss-gbk.ttf"); // use font
         }
         catch (Exception e) {
             Toast.makeText(MyApp.getContext(), e.toString() + "\n可能的原因有：字体文件不在内置SD卡；内存太小字体太大，请使用简体中文字体，而不是CJK或GBK，谢谢，此功能为试验性功能；", Toast.LENGTH_SHORT).show();
         }
-        if(typeface == null) typeface = Typeface.createFromAsset(MyApp.getContext().getAssets(), "fonts/fzss-gbk.ttf"); // use font
         textPaint = new TextPaint();
         textPaint.setColor(getInDayMode() ? mSetting.fontColorDark : mSetting.fontColorLight);
         textPaint.setTextSize(LightTool.sp2px(MyApp.getContext(), (float) mSetting.getFontSize()));
-        textPaint.setTypeface(typeface);
+        if(typeface != null) textPaint.setTypeface(typeface);
         textPaint.setAntiAlias(true);
         fontHeight = (int) textPaint.measureText(sampleText); //(int) textPaint.getTextSize(); // in "px"
         widgetTextPaint = new TextPaint();
@@ -173,7 +171,10 @@ public class WenkuReaderPageView extends View {
         // load bitmap
         if(forceMode || !isBackgroundSet) {
             screenSize = LightTool.getRealScreenSize(MyApp.getContext());
-            if(Build.VERSION.SDK_INT < 19) screenSize.y = screenSize.y - LightTool.getStatusBarHeightValue(MyApp.getContext());
+            if(Build.VERSION.SDK_INT < 19) {
+                screenSize.y -= LightTool.getStatusBarHeightValue(MyApp.getContext());
+                screenSize.y -= LightTool.getNavigationBarHeightValue(MyApp.getContext());
+            }
 
             if(mSetting.getPageBackgroundType() == WenkuReaderSettingV1.PAGE_BACKGROUND_TYPE.CUSTOM) {
                 try {
@@ -605,7 +606,7 @@ public class WenkuReaderPageView extends View {
 
                     if(foundIndex == -1) {
                         // not found, new load task
-                        canvas.drawText("读取中: " + li.text.substring(21, li.text.length()), (float) (pxPageEdgeDistance + pxParagraphEdgeDistance), (float) heightSum, textPaint);
+                        canvas.drawText("正在加载图片：" + li.text.substring(21, li.text.length()), (float) (pxPageEdgeDistance + pxParagraphEdgeDistance), (float) heightSum, textPaint);
                         BitmapInfo bitmapInfo = new BitmapInfo();
                         bitmapInfo.idxLineInfo = i;
                         bitmapInfo.x_beg = pxPageEdgeDistance + pxParagraphEdgeDistance;
@@ -620,7 +621,7 @@ public class WenkuReaderPageView extends View {
                     }
                     else {
                         if(bitmapInfoList.get(foundIndex).bm == null) {
-                            canvas.drawText("读取中: " + li.text.substring(21, li.text.length()), (float) (pxPageEdgeDistance + pxParagraphEdgeDistance), (float) heightSum, textPaint);
+                            canvas.drawText("正在加载图片：" + li.text.substring(21, li.text.length()), (float) (pxPageEdgeDistance + pxParagraphEdgeDistance), (float) heightSum, textPaint);
                         }
                         else {
 //                            canvas.drawText("Can you see image?", (float) (pxPageEdgeDistance + pxParagraphEdgeDistance), (float) heightSum, textPaint);
@@ -706,7 +707,7 @@ public class WenkuReaderPageView extends View {
 
     public void watchImageDetailed(Activity activity) {
         if(bitmapInfoList == null || bitmapInfoList.size() == 0 || bitmapInfoList.get(0).bm == null) {
-            Toast.makeText(getContext(), "请在有图的页面点击此按钮~", Toast.LENGTH_SHORT).show();
+            Toast.makeText(getContext(), getResources().getString(R.string.reader_view_image_no_image), Toast.LENGTH_SHORT).show();
         }
         else {
             Intent intent = new Intent(activity, ViewImageDetailActivity.class);

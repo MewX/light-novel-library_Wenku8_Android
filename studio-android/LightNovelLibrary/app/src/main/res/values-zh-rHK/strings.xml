@@ -67,6 +67,9 @@
     <string name="novel_item_status_with_colon">連載狀態：</string>
     <string name="novel_item_update_with_colon">更新時間：</string>
     <string name="novel_item_intro_with_colon">內容簡介：</string>
+    <string name="novel_item_hit_with_colon">總點擊量：</string>
+    <string name="novel_item_push_with_colon">總推薦量：</string>
+    <string name="novel_item_fav_with_colon">總收藏量：</string>
     <string name="novel_item_cover">小說封面</string>
     <string name="list_loading">正在載入列表……</string>
     <string name="system_press_again_to_exit"><b>退出請再撫摸壹下返回鍵哦～</b>\n&lt;(=～￣▽￣)→)￣▽￣=)>o </string>
@@ -95,6 +98,7 @@
     <string name="dialog_title_choose_download_option">選擇執行的下載操作：</string>
     <string name="dialog_title_save_file_name">輸入保存的文件名（不要加.jpg）</string>
     <string name="dialog_title_found_file">目標文件已存在</string>
+    <string name="dialog_content_want_to_delete">要刪除這本書嗎？</string>
     <string name="dialog_content_language_tip">緩存內容如何切換語言？\n書架可以下拉重新獲取繁體內容；已緩存的內容可以通過覆蓋下載獲取當前語言內容；</string>
     <string name="dialog_content_search_author">要查找所有該作者的書嗎？</string>
     <string name="dialog_content_delete_one_search_record">確定要刪除該搜索歷史嗎？\n</string>
@@ -106,7 +110,7 @@
     <string name="dialog_content_downloading">正在緩存……</string>
     <string name="dialog_content_sure_to_unfav">確定要取消收藏？\n（緩存的小說內容也會刪除）</string>
     <string name="dialog_content_sure_to_logout">確定要解除契約嗎，魔法師？</string>
-    <string name="dialog_content_sync">正在同步書架（雙向）……</string>
+    <string name="dialog_content_sync">正在同步書架（雙向）……\n點擊其他區域可以取消~</string>
     <string name="dialog_content_novel_title">小說完整標題</string>
     <string name="dialog_content_novel_remove_from_cloud">正在從雲端書架移除……</string>
     <string name="dialog_content_saved_path">已選擇的路徑：\n</string>
@@ -168,7 +172,7 @@
     <string name="dialog_option_select_and_update">分卷下載</string>
     <string name="dialog_option_reader_engine_v1">左右翻頁引擎 V1</string>
     <string name="dialog_option_reader_engine_old">上下滑動引擎（舊）</string>
-    <string name="dialog_option_reader_font_system">使用默認的方正書宋</string>
+    <string name="dialog_option_reader_font_system">使用系統默認字體</string>
     <string name="dialog_option_reader_font_custom">使用自定義ttf/otf（建議手動拷貝至wenku8/custom目錄下，不支持外置SD卡）</string>
     <string name="dialog_option_reader_background_system">使用默認的模擬紙張</string>
     <string name="dialog_option_reader_background_custom">使用自定義圖片（建議手動拷貝至wenku8/custom目錄下，不支持外置SD卡，圖片不要太大）</string>
@@ -196,4 +200,5 @@
     <string name="reader_line_distance">行間距離</string>
     <string name="reader_paragraph_distance">段落間距</string>
     <string name="reader_paragraph_edge_distance">段落邊距</string>
+    <string name="reader_view_image_no_image">請在有圖的頁面點擊此按鈕看圖~</string>
 </resources>

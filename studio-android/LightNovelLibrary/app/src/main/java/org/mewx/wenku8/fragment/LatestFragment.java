@@ -15,12 +15,14 @@ import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.ListView;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import com.umeng.analytics.MobclickAgent;
 
 import org.apache.http.NameValuePair;
+import org.mewx.wenku8.MyApp;
 import org.mewx.wenku8.R;
 import org.mewx.wenku8.activity.MainActivity;
 import org.mewx.wenku8.activity.NovelInfoActivity;
@@ -28,12 +30,14 @@ import org.mewx.wenku8.adapter.NovelItemAdapter;
 import org.mewx.wenku8.global.GlobalConfig;
 import org.mewx.wenku8.global.api.NovelItemInfo;
 import org.mewx.wenku8.global.api.NovelItemList;
+import org.mewx.wenku8.global.api.NovelListWithInfoParser;
 import org.mewx.wenku8.global.api.Wenku8API;
 import org.mewx.wenku8.global.api.Wenku8Error;
 import org.mewx.wenku8.listener.MyItemClickListener;
 import org.mewx.wenku8.listener.MyItemLongClickListener;
 import org.mewx.wenku8.util.LightNetwork;
 
+import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -50,9 +54,10 @@ public class LatestFragment extends Fragment implements MyItemClickListener, MyI
 
     // Novel Item info
     private NovelItemList novelItemList;
-    private List<Integer> listNovelItem;
+    //private List<Integer> listNovelItem;
     private List<NovelItemInfo> listNovelItemInfo;
     private NovelItemAdapter mAdapter;
+    private int currentPage, totalPage; // currentP stores next reading page num
 
     // switcher
     private boolean isLoading;
@@ -114,36 +119,56 @@ public class LatestFragment extends Fragment implements MyItemClickListener, MyI
 
                 } else {
                     // need to reload novel list all
-                    AsyncGetNovelItem agni = new AsyncGetNovelItem();
-                    List<NameValuePair> list = new ArrayList<>();
-                    list.add(Wenku8API.getNovelList(Wenku8API.NOVELSORTBY.lastUpdate, 1));
-                    agni.execute(list);
+                    currentPage = 1;
+                    totalPage = 1;
+                    isLoading = false;
+                    loadNovelList(currentPage++);
                 }
 
             }
         });
 
         // Load novel list
-        AsyncGetNovelItem agni = new AsyncGetNovelItem();
-        List<NameValuePair> list = new ArrayList<>();
-        list.add(Wenku8API.getNovelList(Wenku8API.NOVELSORTBY.lastUpdate, 1));
-        agni.execute(list);
+//        AsyncGetNovelItem agni = new AsyncGetNovelItem();
+//        List<NameValuePair> list = new ArrayList<>();
+//        list.add(Wenku8API.getNovelList(Wenku8API.NOVELSORTBY.lastUpdate, 1));
+//        agni.execute(list);
+
+        // new load novel list
+        // fetch list
+        currentPage = 1;
+        totalPage = 1;
+        isLoading = false;
+        loadNovelList(currentPage++);
 
         return rootView;
+    }
+
+    private void loadNovelList(int page) {
+        // In fact, I don't need to know what it really is.
+        // I just need to get the NOVELSORTBY
+        isLoading = true; // set loading states
+
+        // fetch list
+        List<NameValuePair> targVarList = new ArrayList<NameValuePair>();
+        targVarList.add(Wenku8API.getNovelListWithInfo(Wenku8API.NOVELSORTBY.lastUpdate, page,
+                GlobalConfig.getCurrentLang()));
+        asyncTask ast = new asyncTask();
+        ast.execute(targVarList);
     }
 
     @Override
     public void onItemClick(View view, final int position) {
         //Toast.makeText(getActivity(),"item click detected", Toast.LENGTH_SHORT).show();
-        if(position < 0 || position >= listNovelItem.size()) {
+        if(position < 0 || position >= listNovelItemInfo.size()) {
             // ArrayIndexOutOfBoundsException
-            Toast.makeText(getActivity(), "ArrayIndexOutOfBoundsException: " + position + " in size " + listNovelItem.size(), Toast.LENGTH_SHORT).show();
+            Toast.makeText(getActivity(), "ArrayIndexOutOfBoundsException: " + position + " in size " + listNovelItemInfo.size(), Toast.LENGTH_SHORT).show();
             return;
         }
 
         // go to detail activity
         Intent intent = new Intent(getActivity(), NovelInfoActivity.class);
-        intent.putExtra("aid", listNovelItem.get(position));
+        intent.putExtra("aid", listNovelItemInfo.get(position).getAid());
         intent.putExtra("from", "latest");
         intent.putExtra("title", listNovelItemInfo.get(position).getTitle());
         if(Build.VERSION.SDK_INT < 21) {
@@ -170,66 +195,6 @@ public class LatestFragment extends Fragment implements MyItemClickListener, MyI
         super.onDetach();
     }
 
-    private class AsyncGetNovelItem extends AsyncTask<List<NameValuePair>, Integer, Wenku8Error.ErrorCode> {
-        private byte[] b;
-
-        @Override
-        protected Wenku8Error.ErrorCode doInBackground(List<NameValuePair>... params) {
-            b = LightNetwork.LightHttpPost(Wenku8API.getBaseURL(), params[0]);
-            if(b == null) return Wenku8Error.ErrorCode.NETWORK_ERROR;
-            return Wenku8Error.ErrorCode.SYSTEM_1_SUCCEEDED;
-        }
-
-        @Override
-        protected void onPostExecute(Wenku8Error.ErrorCode errorCode) {
-            super.onPostExecute(errorCode);
-            if(errorCode == Wenku8Error.ErrorCode.SYSTEM_1_SUCCEEDED) {
-                String[] s = new String[1];
-                try {
-                    // convert byte[] to String
-                    s[0] = new String(b, "UTF-8");
-                    if (GlobalConfig.inDebugMode())
-                        Log.i("MewX", "in AjaxGetNovelItemCallBack.");
-
-                    // add elements to RecylerView
-                    if (novelItemList == null)
-                        novelItemList = new NovelItemList(s, 1);
-                    else
-                        novelItemList.setNovelItemList(s, novelItemList.getCurrentPage() + 1);
-                    if (!novelItemList.getParseStatus())
-                        throw new Exception("MewX Exception: novelItemList failed to parse.");
-                    listNovelItem = novelItemList.getNovelItemList();
-                    if (listNovelItemInfo == null)
-                        listNovelItemInfo = new ArrayList<>();
-
-                    // asc task
-                    Integer[] li = listNovelItem.subList((listNovelItem.size() / 10) * 10 - 10, listNovelItem.size())
-                            .toArray(new Integer[listNovelItem.size() - ((listNovelItem.size() / 10) * 10 - 10)]);
-                    AsyncGetNovelItemList asc = new AsyncGetNovelItemList();
-                    hideRetryButton();
-                    isLoading = true;
-                    asc.execute(li);
-
-                    // release memory
-                    s[0] = null;
-                } catch (Exception e) {
-                    e.printStackTrace();
-                    if (isAdded() && mTextView != null)
-                        mTextView.setText(getResources().getString(R.string.system_parse_failed) + e.getMessage());
-                    showRetryButton();
-                    isLoading = false;
-                }
-            }
-            else if(errorCode == Wenku8Error.ErrorCode.NETWORK_ERROR) {
-                if(isAdded()) {
-                    mTextView.setText(getResources().getString(R.string.system_network_error));
-                    showRetryButton();
-                }
-                isLoading = false;
-            }
-        }
-    }
-
     private class MyOnScrollListener extends RecyclerView.OnScrollListener {
         @Override
         public void onScrolled(RecyclerView recyclerView, int dx, int dy) {
@@ -248,94 +213,88 @@ public class LatestFragment extends Fragment implements MyItemClickListener, MyI
 
                     // load more toast
                     Snackbar.make(mRecyclerView, getResources().getString(R.string.list_loading)
-                                    + "(" + Integer.toString(novelItemList.getCurrentPage() + 1) + "/" + novelItemList.getTotalPage() + ")",
+                                    + "(" + Integer.toString(currentPage) + "/" + totalPage + ")",
                             Snackbar.LENGTH_SHORT).show();
 
                     // load more thread
-                    AsyncGetNovelItem agni = new AsyncGetNovelItem();
-                    List<NameValuePair> list = new ArrayList<>();
-                    list.add(Wenku8API.getNovelList(Wenku8API.NOVELSORTBY.lastUpdate, novelItemList.getCurrentPage() + 1));
-                    agni.execute(list);
+//                    AsyncGetNovelItem agni = new AsyncGetNovelItem();
+//                    List<NameValuePair> list = new ArrayList<>();
+//                    list.add(Wenku8API.getNovelList(Wenku8API.NOVELSORTBY.lastUpdate, novelItemList.getCurrentPage() + 1));
+//                    agni.execute(list);
+                    if (currentPage <= totalPage) {
+                        loadNovelList(currentPage++);
+                    } else {
+                        Snackbar.make(mRecyclerView, "Every page is loaded!",
+                                Snackbar.LENGTH_SHORT).show();
+                    }
                 }
             }
         }
     }
 
-    private class AsyncGetNovelItemList extends AsyncTask<Integer, Integer, Integer> {
-        private int totalNumber;
-        private int baseNumber;
-
+    class asyncTask extends AsyncTask<List<NameValuePair>, Integer, Integer> {
+        // fail return -1
         @Override
-        protected Integer doInBackground(Integer... params) {
-
-            // init
-            listNovelItem = novelItemList.getNovelItemList();
-            //totalNumber = listNovelItem.size();
-            totalNumber = params.length;
-            baseNumber = (listNovelItem.size() / 10) * 10 - 10;
-
-            if (GlobalConfig.inDebugMode())
-                Log.i("MewX", "totalNumber: " + Integer.toString(totalNumber)
-                        + "baseNumber: " + Integer.toString(baseNumber));
+        protected Integer doInBackground(List<NameValuePair>... params) {
 
             try {
-                //for (int i = listNovelItemInfo.size(); i < listNovelItem.size(); i++) {
-                for (int i = 0; i < totalNumber; i++) {
-                    if (!isLoading)
-                        return -1;
-                    if (GlobalConfig.inDebugMode())
-                        Log.i("MewX", "Loading: " + Integer.toString(i + 1) + " / " + Integer.toString(totalNumber));
+                byte[] tempXml = LightNetwork.LightHttpPost(Wenku8API.getBaseURL(), params[0]);
+                if (tempXml == null)
+                    return -100;
+                String xml = new String(tempXml, "UTF-8");
+                totalPage = NovelListWithInfoParser.getNovelListWithInfoPageNum(xml);
+                List<NovelListWithInfoParser.NovelListWithInfo> l = NovelListWithInfoParser.getNovelListWithInfo(xml);
+                if (l == null)
+                    return -100; // network error
 
-                    listNovelItemInfo.add(new NovelItemInfo(params[i]));
+                if (listNovelItemInfo == null)
+                    listNovelItemInfo = new ArrayList<>();
+                for (int i = 0; i < l.size(); i++) {
+                    NovelListWithInfoParser.NovelListWithInfo nlwi = l.get(i);
 
-                    // generate list name value pair
-                    List<NameValuePair> list = new ArrayList<>();
-                    list.add(Wenku8API.getNovelShortInfo(listNovelItemInfo.get(baseNumber + i).getAid(), GlobalConfig.getCurrentLang()));
+                    // getImage
+                    // List<NameValuePair> imgP = new
+                    // ArrayList<NameValuePair>();
+                    // imgP.add(Wenku8Interface.getNovelCover(nlwi.aid));
+                    // byte[] img = LightNetwork.LightHttpPost(
+                    // Wenku8Interface.BaseURL, imgP);
 
-                    byte[] bytes = null;
-                    while (bytes == null) // SocketTimeoutException, ConnectTimeoutException
-                        bytes = LightNetwork.LightHttpPost(Wenku8API.getBaseURL(), list);
-                    String[] sin = new String[1];
-                    sin[0] = new String(bytes, "UTF-8");
-                    listNovelItemInfo.get(baseNumber + i).setNovelItemInfo(sin);
-
-                    // release memory
-                    sin[0] = null;
-
-                    // update progress
-                    publishProgress(i);
+                    NovelItemInfo ni = new NovelItemInfo();
+                    ni.setAid(nlwi.aid);
+                    ni.setTitle(nlwi.name);
+                    ni.setAuthor(nlwi.hit + ""); // hit
+                    ni.setUpdate(nlwi.push + ""); // push
+                    ni.setIntro_short(nlwi.fav + ""); // fav
+                    listNovelItemInfo.add(ni);
                 }
 
-                return 0;
-            } catch (Exception e) {
+                // onProgressUpdate(j);
+
+            } catch (UnsupportedEncodingException e) {
                 e.printStackTrace();
             }
-
             return -1;
         }
 
         @Override
         protected void onProgressUpdate(Integer... values) {
-            super.onProgressUpdate(values);
-            mTextView.setText("Loading ... " + "(" + Integer.toString(values[0]) + "/" + Integer.toString(totalNumber) + ")");
+            return;
         }
 
         @Override
         protected void onPostExecute(Integer result) {
-            super.onPostExecute(result);
-
-            // This means manually cancelled this task
-            if (result == -1) {
+            if (result == -100) {
                 if(!isAdded())
                     return; // detached
 
-                doReverseOperation();
                 mTextView.setText(getResources().getString(R.string.system_parse_failed));
                 showRetryButton();
                 isLoading = false;
                 return;
             }
 
+            // result:
+            // add imageView, only here can fetch the layout2 id!!!
             // hide loading layout
             if (mAdapter == null) {
                 mAdapter = new NovelItemAdapter(listNovelItemInfo);
@@ -350,17 +309,6 @@ public class LatestFragment extends Fragment implements MyItemClickListener, MyI
             hideRetryButton();
             isLoading = false;
         }
-
-
-    }
-
-    private void doReverseOperation() {
-        // reverse operation
-        novelItemList.requestForReverse();
-
-        listNovelItem = novelItemList.getNovelItemList();
-        for (int i = listNovelItem.size(); i < listNovelItemInfo.size(); i++)
-            listNovelItemInfo.remove(i);
     }
 
     private void showRetryButton() {
@@ -373,12 +321,14 @@ public class LatestFragment extends Fragment implements MyItemClickListener, MyI
     public void onPause() {
         super.onPause();
         MobclickAgent.onPageEnd(TAG);
+        GlobalConfig.LeaveLatest();
     }
 
     @Override
     public void onResume() {
         super.onResume();
         MobclickAgent.onPageStart(TAG);
+        GlobalConfig.EnterLatest();
     }
 
     /**

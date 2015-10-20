@@ -41,7 +41,10 @@ public class NovelItemInfo {
         this.title = Integer.toString(aid); // use aid as title
     }
 
-    public NovelItemInfo() { }
+    public NovelItemInfo() {
+        // this construct is for manually set all info
+        parseStatus = true;
+    }
 
     public boolean setNovelItemInfo(String[] str) {
         parseStatus = parseNovelItemIntro(str);
@@ -143,7 +146,31 @@ public class NovelItemInfo {
         return intro_short;
     }
 
-//    public String getIntroFull() {
+    public void setAid(int aid) {
+        this.aid = aid;
+    }
+
+    public void setTitle(String title) {
+        this.title = title;
+    }
+
+    public void setAuthor(String author) {
+        this.author = author;
+    }
+
+    public void setStatus(int status) {
+        this.status = status;
+    }
+
+    public void setUpdate(String update) {
+        this.update = update;
+    }
+
+    public void setIntro_short(String intro_short) {
+        this.intro_short = intro_short;
+    }
+
+    //    public String getIntroFull() {
 //        return intro_full;
 //    }
 //

@@ -28,9 +28,6 @@ import org.mewx.wenku8.global.GlobalConfig;
  * About activity.
  */
 public class AboutActivity extends AppCompatActivity {
-    private int count = -10000;
-    private RelativeLayout rlMewX;
-
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -74,39 +71,6 @@ public class AboutActivity extends AppCompatActivity {
         } catch (PackageManager.NameNotFoundException e) {
             e.printStackTrace();
         }
-
-        // game
-        rlMewX = (RelativeLayout) findViewById(R.id.mewx_layout);
-        rlMewX.setOnClickListener(new View.OnClickListener() {
-            TextView tv = new TextView(AboutActivity.this);
-            RelativeLayout.LayoutParams lp = new RelativeLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-
-            @Override
-            public void onClick(View v) {
-                if(count == -10000) {
-                    // add textview
-                    tv.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
-                    tv.setPadding(0, 12, 0, 12);
-                    tv.setTextColor(getResources().getColor(R.color.menu_text_color));
-                    tv.setText("再点击" + (-count) + "次可以查看工程师的秘密！ :P");
-                    lp.addRule(RelativeLayout.BELOW, R.id.mewx_blog);
-                    lp.addRule(RelativeLayout.CENTER_VERTICAL);
-                    rlMewX.addView(tv, lp);
-                    count ++;
-                }
-                else if(count < 0) {
-                    tv.setText("再点击" + (-count) + "次可以查看工程师的秘密 :)");
-                    count ++;
-                }
-                else {
-                    new MaterialDialog.Builder(AboutActivity.this)
-                            .theme(Theme.LIGHT)
-                            .content("哇哦，有诚意的用户大人哦~\n攻城狮征婚热线：QQ307740614 :-)")
-                            .positiveText(R.string.dialog_positive_ok)
-                            .show();
-                }
-            }
-        });
     }
 
     @Override
