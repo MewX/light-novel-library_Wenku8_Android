@@ -40,6 +40,7 @@ import java.util.ArrayList;
  *
  * 全局的设置类，负责所有设置的事务，以及全局的变量获取。
  */
+@SuppressWarnings({"UnusedDeclaration"})
 public class GlobalConfig {
 
     public static final String saveFolderName = "saves";
@@ -52,11 +53,12 @@ public class GlobalConfig {
     private static final String saveSetting = "settings.wk8";
     private static final String saveUserAccountFileName = "cert.wk8"; // certification file
     private static final String saveUserAvatarFileName = "avatar.jpg";
-    private static int maxSearchHistory = 10; // default
+    private static int maxSearchHistory = 20; // default
 
     // vars
     private static boolean isInBookshelf = false;
     private static boolean isInLatest = false;
+    private static boolean doLoadImage = true;
     private static boolean FirstStoragePathStatus = true;
     private static Wenku8API.LANG currentLang = Wenku8API.LANG.SC;
     public static String pathPickedSave; // dir picker save path
@@ -123,9 +125,6 @@ public class GlobalConfig {
     private static Cache volleyCache = null;
     private static Network volleyNetwork = null;
     public static RequestQueue volleyRequestQueue = null;
-    private static UnlimitedDiscCache localUnlimitedDiscCache;
-    private static DisplayImageOptions localDisplayImageOptions;
-    private static ImageLoaderConfiguration localImageLoaderConfiguration;
 
     // global configs, need to call first
     public static void initVolleyNetwork() {
@@ -143,17 +142,17 @@ public class GlobalConfig {
     }
 
     public static void initImageLoader(Context context) {
-        localUnlimitedDiscCache = new UnlimitedDiscCache(
+        UnlimitedDiscCache localUnlimitedDiscCache = new UnlimitedDiscCache(
                 new File(GlobalConfig.getFirstStoragePath() + "cache"),
                 new File(context.getCacheDir() + File.separator + "imgs"));
-        localDisplayImageOptions = new DisplayImageOptions.Builder()
+        DisplayImageOptions localDisplayImageOptions = new DisplayImageOptions.Builder()
                 .resetViewBeforeLoading(true)
                 .cacheOnDisk(true)
                 .cacheInMemory(true)
                 .bitmapConfig(Bitmap.Config.RGB_565)
                 .resetViewBeforeLoading(true)
                 .displayer(new FadeInBitmapDisplayer(250)).build();
-        localImageLoaderConfiguration = new ImageLoaderConfiguration.Builder(context)
+        ImageLoaderConfiguration localImageLoaderConfiguration = new ImageLoaderConfiguration.Builder(context)
                 .diskCache(localUnlimitedDiscCache)
                 .defaultDisplayImageOptions(localDisplayImageOptions).build();
         ImageLoader.getInstance().init(localImageLoaderConfiguration);
@@ -164,10 +163,10 @@ public class GlobalConfig {
         InputStream is = MyApp.getContext().getResources().openRawResource(R.raw.license);
         BufferedReader reader = new BufferedReader(new InputStreamReader(is));
         StringBuilder sb = new StringBuilder();
-        String line = null;
+        String line;
         try {
             while ((line = reader.readLine()) != null) {
-                sb.append(line + "\n");
+                sb.append(line).append("\n");
             }
         } catch (IOException e) {
             e.printStackTrace();
@@ -205,7 +204,7 @@ public class GlobalConfig {
 
     public static boolean doCacheImage() {
         // for non-image mode
-        return true; // when cache, cache images
+        return doLoadImage; // when cache, cache images
     }
 
     public static int getShowTextSize() {
@@ -301,29 +300,26 @@ public class GlobalConfig {
 
     private static boolean writeFullSaveFileContent(String FileName, String s) {
         // process path and filename
-        String tp = "", tf = FileName;
-        if (FileName.indexOf(File.separator) != -1) {
-            tp = FileName.substring(0, FileName.lastIndexOf(File.separator));
-            tf = FileName.substring(FileName.lastIndexOf(File.separator)
+        String path = "", fileName = FileName;
+        if (FileName.contains(File.separator)) {
+            path = FileName.substring(0, FileName.lastIndexOf(File.separator));
+            fileName = FileName.substring(FileName.lastIndexOf(File.separator)
                     + File.separator.length(), FileName.length());
         }
 
         // write save file in save path
-        if (false == LightCache.saveFile(getFirstStoragePath() + saveFolderName
-                + File.separator + tp, tf, s.getBytes(), true)) // if not exist
+        if (!LightCache.saveFile(getFirstStoragePath() + saveFolderName + File.separator + path, fileName, s.getBytes(), true)) // if not exist
             return LightCache.saveFile(getSecondStoragePath() + saveFolderName
-                    + File.separator + tp, tf, s.getBytes(), true);
+                    + File.separator + path, fileName, s.getBytes(), true);
         return true;
     }
 
-    public static String loadFullFileFromSaveFolder(String subFolderName,
-                                                    String fileName) {
+    public static String loadFullFileFromSaveFolder(String subFolderName, String fileName) {
         return loadFullSaveFileContent(subFolderName + File.separator
                 + fileName);
     }
 
-    public static boolean writeFullFileIntoSaveFolder(String subFolderName,
-                                                      String fileName, String s) {
+    public static boolean writeFullFileIntoSaveFolder(String subFolderName, String fileName, String s) {
         // input no separator
         return writeFullSaveFileContent(subFolderName + File.separator
                 + fileName, s);
@@ -334,14 +330,14 @@ public class GlobalConfig {
         // Format:
         // aid||aid||aid
         // the file just saves the aid list
-        bookshelf = new ArrayList<Integer>();
+        bookshelf = new ArrayList<>();
 
         String h = loadFullSaveFileContent(saveLocalBookshelfFileName);
         String[] p = h.split("\\|\\|"); // regular expression
         for (String t : p) {
             if (t.equals(""))
                 continue;
-            bookshelf.add(new Integer(t));
+            bookshelf.add(Integer.valueOf(t));
         }
     }
 
@@ -391,10 +387,7 @@ public class GlobalConfig {
         if (bookshelf == null)
             loadLocalBookShelf();
 
-        if (bookshelf.indexOf(aid) == -1)
-            return false;
-        else
-            return true;
+        return bookshelf.indexOf(aid) != -1;
     }
 
     public static void accessToLocalBookshelf(int aid) {
@@ -435,7 +428,7 @@ public class GlobalConfig {
     /** search history */
     public static void readSearchHistory() {
         // always initial empty
-        searchHistory = new ArrayList<String>();
+        searchHistory = new ArrayList<>();
 
         // read history from file, if not exist, create.
         String h = loadFullSaveFileContent(saveSearchHistoryFileName);
@@ -532,7 +525,7 @@ public class GlobalConfig {
     }
 
     public static void clearSearchHistory() {
-        searchHistory = new ArrayList<String>();
+        searchHistory = new ArrayList<>();
         writeSearchHistory(); // save history file
     }
 
@@ -551,7 +544,7 @@ public class GlobalConfig {
         // Format:
         // cid,,pos,,height||cid,,pos,,height
         // just use split function
-        readSaves = new ArrayList<ReadSaves>();
+        readSaves = new ArrayList<>();
 
         // read history from file, if not exist, create.
         String h = loadFullSaveFileContent(saveReadSavesFileName);
@@ -565,9 +558,9 @@ public class GlobalConfig {
                 continue;
 
             ReadSaves rs = new ReadSaves();
-            rs.cid = new Integer(parts[0]);
-            rs.pos = new Integer(parts[1]);
-            rs.height = new Integer(parts[2]);
+            rs.cid = Integer.valueOf(parts[0]);
+            rs.pos = Integer.valueOf(parts[1]);
+            rs.height = Integer.valueOf(parts[2]);
             readSaves.add(rs);
         }
     }
@@ -637,7 +630,7 @@ public class GlobalConfig {
         // Format:
         // cid,,pos,,height||cid,,pos,,height
         // just use split function
-        readSavesV1 = new ArrayList<ReadSavesV1>();
+        readSavesV1 = new ArrayList<>();
 
         // read history from file, if not exist, create.
         String h = loadFullSaveFileContent(saveReadSavesV1FileName);
@@ -647,7 +640,7 @@ public class GlobalConfig {
         OutLoop:
         for (String temp : p) {
             Log.v("MewX", temp);
-            String[] parts = temp.split("\\:");
+            String[] parts = temp.split(":"); // \\:
             if (parts.length != 5)
                 continue;
 
@@ -656,11 +649,11 @@ public class GlobalConfig {
 
             // add to list
             ReadSavesV1 rs = new ReadSavesV1();
-            rs.aid = new Integer(parts[0]);
-            rs.vid = new Integer(parts[1]);
-            rs.cid = new Integer(parts[2]);
-            rs.lineId = new Integer(parts[3]);
-            rs.wordId = new Integer(parts[4]);
+            rs.aid = Integer.valueOf(parts[0]);
+            rs.vid = Integer.valueOf(parts[1]);
+            rs.cid = Integer.valueOf(parts[2]);
+            rs.lineId = Integer.valueOf(parts[3]);
+            rs.wordId = Integer.valueOf(parts[4]);
             readSavesV1.add(rs);
         }
     }
@@ -737,7 +730,7 @@ public class GlobalConfig {
 
         String[] sets = h.split("\\|\\|\\|\\|");
         for(String set : sets) {
-            String[] temp = set.split("\\:\\:\\:\\:");
+            String[] temp = set.split("::::");
             if(temp.length != 2 || temp[0] == null || temp[0].length() == 0 || temp[1] == null || temp[1].length() == 0) continue;
 
             allSetting.put(temp[0], temp[1]);
@@ -844,8 +837,8 @@ public class GlobalConfig {
         if (cm != null) {
             NetworkInfo[] info = cm.getAllNetworkInfo();
             if (info != null) {
-                for (int i = 0; i < info.length; i++) {
-                    if (info[i].getState() == NetworkInfo.State.CONNECTED)
+                for(NetworkInfo ni : info) {
+                    if (ni.getState() == NetworkInfo.State.CONNECTED)
                         return true;
                 }
             }

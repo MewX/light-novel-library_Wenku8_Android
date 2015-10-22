@@ -67,7 +67,7 @@ public class Wenku8API {
      * Basic converter functions
      */
 
-    public static enum LANG {
+    public enum LANG {
         SC, // simplified Chinese
         TC // traditional Chinese
     }
@@ -118,7 +118,7 @@ public class Wenku8API {
         }
     }
 
-    public static enum NOVELSORTBY {
+    public enum NOVELSORTBY {
         // sort arguments:
         // allvisit 总排行榜; allvote 总推荐榜; monthvisit 月排行榜; monthvote 月推荐榜;
         // weekvisit 周排行榜; weekvote 周推荐榜; dayvisit 日排行榜; dayvote 日推荐榜;
@@ -282,12 +282,6 @@ public class Wenku8API {
         Map<String, String> params = new HashMap<>();
         params.put("request", LightBase64.EncodeBase64(str+"&timetoken="+System.currentTimeMillis()));
         return params;
-    }
-
-    @Deprecated
-    private static NameValuePair getEncryptedNVP(String str) {
-        // This funtion achieve the encryption and return the NVP
-        return new BasicNameValuePair("request", LightBase64.EncodeBase64(str+"&timetoken="+System.currentTimeMillis()));
     }
 
     private static ContentValues getEncryptedCV(String str) {

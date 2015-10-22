@@ -5,7 +5,6 @@ import android.content.DialogInterface;
 import android.content.Intent;
 import android.graphics.LinearGradient;
 import android.graphics.Shader;
-import android.graphics.Typeface;
 import android.os.AsyncTask;
 import android.os.Build;
 import android.os.Bundle;
@@ -29,7 +28,6 @@ import com.afollestad.materialdialogs.Theme;
 import com.nostra13.universalimageloader.core.ImageLoader;
 import com.umeng.analytics.MobclickAgent;
 
-import org.apache.http.NameValuePair;
 import org.mewx.wenku8.R;
 import org.mewx.wenku8.component.ScrollViewNoFling;
 import org.mewx.wenku8.global.GlobalConfig;
@@ -39,7 +37,6 @@ import org.mewx.wenku8.global.api.Wenku8API;
 import org.mewx.wenku8.util.LightNetwork;
 
 import java.io.UnsupportedEncodingException;
-import java.util.ArrayList;
 import java.util.List;
 
 /**

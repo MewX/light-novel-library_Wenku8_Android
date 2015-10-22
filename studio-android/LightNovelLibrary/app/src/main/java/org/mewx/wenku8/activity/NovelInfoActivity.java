@@ -33,7 +33,6 @@ import com.nostra13.universalimageloader.core.ImageLoader;
 import com.readystatesoftware.systembartint.SystemBarTintManager;
 import com.umeng.analytics.MobclickAgent;
 
-import org.apache.http.NameValuePair;
 import org.mewx.wenku8.R;
 import org.mewx.wenku8.global.GlobalConfig;
 import org.mewx.wenku8.global.api.ChapterInfo;
@@ -50,7 +49,6 @@ import org.mewx.wenku8.util.LightTool;
 
 import java.io.File;
 import java.io.UnsupportedEncodingException;
-import java.util.ArrayList;
 import java.util.List;
 
 import fr.castorflex.android.smoothprogressbar.SmoothProgressBar;
@@ -254,23 +252,6 @@ public class NovelInfoActivity extends AppCompatActivity {
                         .positiveText(R.string.dialog_positive_ok)
                         .negativeText(R.string.dialog_negative_biao)
                         .show();
-            }
-        });
-        ivNovelCover.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                if(isLoading) {
-                    Toast.makeText(NovelInfoActivity.this, getResources().getString(R.string.system_loading_please_wait), Toast.LENGTH_SHORT).show();
-                    return;
-                }
-
-                String path = GlobalConfig.getFirstStoragePath() + "imgs" + File.separator + aid + ".jpg";
-                if(!LightCache.testFileExist(path))
-                    path = GlobalConfig.getFirstStoragePath() + "imgs" + File.separator + aid + ".jpg";
-                Intent intent = new Intent(NovelInfoActivity.this, ViewImageDetailActivity.class);
-                intent.putExtra("path", path);
-                startActivity(intent);
-                overridePendingTransition(R.anim.fade_in, R.anim.hold); // fade in animation
             }
         });
         fabFavorate.setOnClickListener(new View.OnClickListener() {
@@ -682,21 +663,6 @@ public class NovelInfoActivity extends AppCompatActivity {
             // transfer '1' to this task represent loading from local
             if(params != null && params.length == 1 && params[0] == 1)
                 fromLocal = true;
-
-            // save novel cover
-            try {
-                if(!fromLocal) {
-                    byte[] coverRaw = LightNetwork.LightHttpDownload(Wenku8API.getCoverURL(aid));
-                    if(coverRaw != null) { // no image is okay
-                        if (!LightCache.saveFile(GlobalConfig.getFirstStoragePath() + "imgs" + File.separator + aid + ".jpg", coverRaw, true))
-                            LightCache.saveFile(GlobalConfig.getSecondStoragePath() + "imgs" + File.separator + aid + ".jpg", coverRaw, true);
-                    }
-                }
-            }
-            catch (Exception e) {
-                e.printStackTrace();
-                return -2;
-            }
 
             // get novel full meta
             try {

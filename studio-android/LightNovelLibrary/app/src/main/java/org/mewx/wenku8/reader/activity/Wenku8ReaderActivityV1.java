@@ -35,7 +35,6 @@ import com.readystatesoftware.systembartint.SystemBarTintManager;
 import com.umeng.analytics.MobclickAgent;
 
 import org.adw.library.widgets.discreteseekbar.DiscreteSeekBar;
-import org.apache.http.NameValuePair;
 import org.mewx.wenku8.R;
 import org.mewx.wenku8.global.GlobalConfig;
 import org.mewx.wenku8.global.api.ChapterInfo;
