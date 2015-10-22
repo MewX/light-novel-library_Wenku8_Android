@@ -173,7 +173,7 @@ public class WenkuReaderPageView extends View {
             screenSize = LightTool.getRealScreenSize(MyApp.getContext());
             if(Build.VERSION.SDK_INT < 19) {
                 screenSize.y -= LightTool.getStatusBarHeightValue(MyApp.getContext());
-                screenSize.y -= LightTool.getNavigationBarHeightValue(MyApp.getContext());
+                // nav bar under API 19 show strange
             }
 
             if(mSetting.getPageBackgroundType() == WenkuReaderSettingV1.PAGE_BACKGROUND_TYPE.CUSTOM) {

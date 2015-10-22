@@ -57,8 +57,7 @@ public class Wenku8Parser {
 
             if(LightTool.isInteger(str.substring(beg + 1, temp)))
                 list.add(Integer.parseInt(str.substring(beg + 1, temp)));
-            if (GlobalConfig.inDebugMode())
-                Log.v("MewX", "Add novel aid: " + list.get(list.size() - 1));
+            Log.v("MewX", "Add novel aid: " + list.get(list.size() - 1));
 
             beg = temp + 1; // prepare for next round
         }

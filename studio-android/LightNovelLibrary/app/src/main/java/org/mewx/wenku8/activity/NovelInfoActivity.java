@@ -1,5 +1,6 @@
 package org.mewx.wenku8.activity;
 
+import android.content.ContentValues;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.graphics.PorterDuff;
@@ -704,9 +705,8 @@ public class NovelInfoActivity extends AppCompatActivity {
                     if(novelFullMeta == null || novelFullMeta.equals("")) return -9;
                 }
                 else {
-                    List<NameValuePair> nvpMetaRequest = new ArrayList<NameValuePair>();
-                    nvpMetaRequest.add(Wenku8API.getNovelFullMeta(aid, GlobalConfig.getCurrentLang()));
-                    byte[] byteNovelFullMeta = LightNetwork.LightHttpPost(Wenku8API.getBaseURL(), nvpMetaRequest);
+                    ContentValues cv = Wenku8API.getNovelFullMeta(aid, GlobalConfig.getCurrentLang());
+                    byte[] byteNovelFullMeta = LightNetwork.LightHttpPostConnection(Wenku8API.getBaseURL(), cv);
                     if (byteNovelFullMeta == null) return -1;
                     novelFullMeta = new String(byteNovelFullMeta, "UTF-8"); // save
                 }
@@ -725,9 +725,8 @@ public class NovelInfoActivity extends AppCompatActivity {
                     if(novelFullIntro == null || novelFullIntro.equals("")) return -9;
                 }
                 else {
-                    List<NameValuePair> nvpFullIntroRequest = new ArrayList<NameValuePair>();
-                    nvpFullIntroRequest.add(Wenku8API.getNovelFullIntro(aid, GlobalConfig.getCurrentLang()));
-                    byte[] byteNovelFullInfo = LightNetwork.LightHttpPost(Wenku8API.getBaseURL(), nvpFullIntroRequest);
+                    ContentValues cvFullIntroRequest = Wenku8API.getNovelFullIntro(aid, GlobalConfig.getCurrentLang());
+                    byte[] byteNovelFullInfo = LightNetwork.LightHttpPostConnection(Wenku8API.getBaseURL(), cvFullIntroRequest);
                     if (byteNovelFullInfo == null) return -1;
                     novelFullIntro = new String(byteNovelFullInfo, "UTF-8"); // save
                 }
@@ -746,9 +745,8 @@ public class NovelInfoActivity extends AppCompatActivity {
                     if(novelFullVolume == null || novelFullVolume.equals("")) return -9;
                 }
                 else {
-                    List<NameValuePair> nvpChapterListRequest = new ArrayList<NameValuePair>();
-                    nvpChapterListRequest.add(Wenku8API.getNovelIndex(aid, GlobalConfig.getCurrentLang()));
-                    byte[] byteNovelChapterList = LightNetwork.LightHttpPost(Wenku8API.getBaseURL(), nvpChapterListRequest);
+                    ContentValues cv = Wenku8API.getNovelIndex(aid, GlobalConfig.getCurrentLang());
+                    byte[] byteNovelChapterList = LightNetwork.LightHttpPostConnection(Wenku8API.getBaseURL(), cv);
                     if (byteNovelChapterList == null) return -1;
                     novelFullVolume = new String(byteNovelChapterList, "UTF-8"); // save
                 }
@@ -873,17 +871,15 @@ public class NovelInfoActivity extends AppCompatActivity {
                 // fetch intro
                 if (!isLoading)
                     return Wenku8Error.ErrorCode.USER_CANCELLED_TASK; // cancel
-                List<NameValuePair> targVarListVolume = new ArrayList<NameValuePair>();
-                targVarListVolume.add(Wenku8API.getNovelIndex(taskaid, GlobalConfig.getCurrentLang()));
-                byte[] tempVolumeXml = LightNetwork.LightHttpPost(Wenku8API.getBaseURL(), targVarListVolume);
+                ContentValues cv = Wenku8API.getNovelIndex(taskaid, GlobalConfig.getCurrentLang());
+                byte[] tempVolumeXml = LightNetwork.LightHttpPostConnection(Wenku8API.getBaseURL(), cv);
                 if (tempVolumeXml == null) return Wenku8Error.ErrorCode.NETWORK_ERROR; // network error
                 volumeXml = new String(tempVolumeXml, "UTF-8");
 
                 if (!isLoading)
                     return Wenku8Error.ErrorCode.USER_CANCELLED_TASK; // cancel
-                List<NameValuePair> targVarList = new ArrayList<NameValuePair>();
-                targVarList.add(Wenku8API.getNovelFullMeta(taskaid, GlobalConfig.getCurrentLang()));
-                byte[] tempIntroXml = LightNetwork.LightHttpPost(Wenku8API.getBaseURL(), targVarList);
+                cv = Wenku8API.getNovelFullMeta(taskaid, GlobalConfig.getCurrentLang());
+                byte[] tempIntroXml = LightNetwork.LightHttpPostConnection(Wenku8API.getBaseURL(), cv);
                 if (tempIntroXml == null) return Wenku8Error.ErrorCode.NETWORK_ERROR; // network error
                 introXml = new String(tempIntroXml, "UTF-8");
 
@@ -894,9 +890,8 @@ public class NovelInfoActivity extends AppCompatActivity {
 
                 if (!isLoading)
                     return Wenku8Error.ErrorCode.USER_CANCELLED_TASK; // calcel
-                List<NameValuePair> targIntro = new ArrayList<NameValuePair>();
-                targIntro.add(Wenku8API.getNovelFullIntro(ni.aid, GlobalConfig.getCurrentLang()));
-                byte[] tempFullIntro = LightNetwork.LightHttpPost(Wenku8API.getBaseURL(), targIntro);
+                cv = Wenku8API.getNovelFullIntro(ni.aid, GlobalConfig.getCurrentLang());
+                byte[] tempFullIntro = LightNetwork.LightHttpPostConnection(Wenku8API.getBaseURL(), cv);
                 if (tempFullIntro == null) return Wenku8Error.ErrorCode.NETWORK_ERROR; // network error
                 ni.fullIntro = new String(tempFullIntro, "UTF-8");
 
@@ -921,14 +916,13 @@ public class NovelInfoActivity extends AppCompatActivity {
             for (VolumeList tempVl : vl) {
                 for (ChapterInfo tempCi : tempVl.chapterList) {
                     try {
-                        List<NameValuePair> targVar = new ArrayList<NameValuePair>();
-                        targVar.add(Wenku8API.getNovelContent(ni.aid, tempCi.cid, GlobalConfig.getCurrentLang()));
+                        ContentValues cv = Wenku8API.getNovelContent(ni.aid, tempCi.cid, GlobalConfig.getCurrentLang());
 
                         // load from local first
                         if (!isLoading) return Wenku8Error.ErrorCode.USER_CANCELLED_TASK; // calcel
                         String xml = GlobalConfig.loadFullFileFromSaveFolder("novel", tempCi.cid + ".xml"); // prevent empty file
                         if (xml == null || xml.length() == 0 || operationType == 2) {
-                            byte[] tempXml = LightNetwork.LightHttpPost(Wenku8API.getBaseURL(), targVar);
+                            byte[] tempXml = LightNetwork.LightHttpPostConnection(Wenku8API.getBaseURL(), cv);
                             if (tempXml == null) return Wenku8Error.ErrorCode.NETWORK_ERROR; // network error
                             xml = new String(tempXml, "UTF-8");
 
@@ -1141,14 +1135,13 @@ public class NovelInfoActivity extends AppCompatActivity {
 
                 for (ChapterInfo tempCi : listVolume.get(idxVolume).chapterList) {
                     try {
-                        List<NameValuePair> targVar = new ArrayList<NameValuePair>();
-                        targVar.add(Wenku8API.getNovelContent(aid, tempCi.cid, GlobalConfig.getCurrentLang()));
+                        ContentValues cv = Wenku8API.getNovelContent(aid, tempCi.cid, GlobalConfig.getCurrentLang());
 
                         // load from local first
                         if (!loading) return Wenku8Error.ErrorCode.USER_CANCELLED_TASK; // calcel
                         String xml = GlobalConfig.loadFullFileFromSaveFolder("novel", tempCi.cid + ".xml"); // prevent empty file
                         if (xml == null || xml.length() == 0 ) {
-                            byte[] tempXml = LightNetwork.LightHttpPost(Wenku8API.getBaseURL(), targVar);
+                            byte[] tempXml = LightNetwork.LightHttpPostConnection(Wenku8API.getBaseURL(), cv);
                             if (tempXml == null) return Wenku8Error.ErrorCode.NETWORK_ERROR; // network error
                             xml = new String(tempXml, "UTF-8");
 

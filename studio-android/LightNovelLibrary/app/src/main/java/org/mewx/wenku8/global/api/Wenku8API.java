@@ -17,6 +17,7 @@ import java.io.Serializable;
 import java.util.HashMap;
 import java.util.Map;
 
+@SuppressWarnings({"UnusedDeclaration"})
 public class Wenku8API {
 
     /**
@@ -278,11 +279,12 @@ public class Wenku8API {
      * It's not efficient enough, and maybe bug-hidden.
      */
     private static Map<String,String> getEncryptedMAP(String str) {
-        Map<String, String> params = new HashMap<String, String>();
+        Map<String, String> params = new HashMap<>();
         params.put("request", LightBase64.EncodeBase64(str+"&timetoken="+System.currentTimeMillis()));
         return params;
     }
 
+    @Deprecated
     private static NameValuePair getEncryptedNVP(String str) {
         // This funtion achieve the encryption and return the NVP
         return new BasicNameValuePair("request", LightBase64.EncodeBase64(str+"&timetoken="+System.currentTimeMillis()));
@@ -295,14 +297,12 @@ public class Wenku8API {
         return cv;
     }
 
-    @Deprecated
-    public static NameValuePair getNovelCover(int aid) {
+    public static ContentValues getNovelCover(int aid) {
         // get the aid, and return a "jpg" file or other, in binary
-        return getEncryptedNVP("action=book&do=cover&aid=" + aid);
+        return getEncryptedCV("action=book&do=cover&aid=" + aid);
     }
 
-    @Deprecated
-    public static NameValuePair getNovelShortInfo(int aid, LANG l) {
+    public static ContentValues getNovelShortInfo(int aid, LANG l) {
         // get short XML info of a novel, here is an example:
         // --------------------------------------------------
         // <?xml version="1.0" encoding="utf-8"?>
@@ -314,8 +314,7 @@ public class Wenku8API {
         // <data
         // name="IntroPreview"><![CDATA[　　「焰牙」——那是藉由超化之后的精神力将自身灵...]]></data>
         // </metadata>
-        return getEncryptedNVP("action=book&do=info&aid=" + aid + "&t="
-                + getLANG(l));
+        return getEncryptedCV("action=book&do=info&aid=" + aid + "&t=" + getLANG(l));
     }
 
     public static Map<String,String> getNovelShortInfoUpdate(int aid, LANG l) {
@@ -334,7 +333,7 @@ public class Wenku8API {
         return getEncryptedCV("action=book&do=bookinfo&aid=" + aid + "&t=" + getLANG(l));
     }
 
-    public static NameValuePair getNovelFullIntro(int aid, LANG l) {
+    public static ContentValues getNovelFullIntro(int aid, LANG l) {
         // get full XML intro of a novel, here is an example:
         // --------------------------------------------------
         // 　　在劍與魔法作為一股強大力量的世界裡，克雷歐過著只有繪畫是唯一生存意義的孤獨生活。
@@ -344,11 +343,11 @@ public class Wenku8API {
         // 　　兩人從此展開不可思議的同居時光，這樣的生活令他感到很安心。
         // 　　但平靜的日子沒有持續太久……
         // 　　描繪人與魔物的戀情，溫暖人心的奇幻故事。
-        return getEncryptedNVP("action=book&do=intro&aid=" + aid + "&t="
+        return getEncryptedCV("action=book&do=intro&aid=" + aid + "&t="
                 + getLANG(l));
     }
 
-    public static NameValuePair getNovelFullMeta(int aid, LANG l) {
+    public static ContentValues getNovelFullMeta(int aid, LANG l) {
         // get full XML metadata of a novel, here is an example:
         // -----------------------------------------------------
         // <?xml version="1.0" encoding="utf-8"?>
@@ -366,11 +365,11 @@ public class Wenku8API {
         // <data name="LastUpdate" value="2012-11-02"/>
         // <data name="LatestSection" cid="41897"><![CDATA[第一卷 插图]]></data>
         // </metadata>
-        return getEncryptedNVP("action=book&do=meta&aid=" + aid + "&t="
+        return getEncryptedCV("action=book&do=meta&aid=" + aid + "&t="
                 + getLANG(l));
     }
 
-    public static NameValuePair getNovelIndex(int aid, LANG l) {
+    public static ContentValues getNovelIndex(int aid, LANG l) {
         // get full XML index of a novel, here is an example:
         // --------------------------------------------------
         // <?xml version="1.0" encoding="utf-8"?>
@@ -403,11 +402,11 @@ public class Wenku8API {
         // </volume>
         // ...... ......
         // </package>
-        return getEncryptedNVP("action=book&do=list&aid=" + aid + "&t="
+        return getEncryptedCV("action=book&do=list&aid=" + aid + "&t="
                 + getLANG(l));
     }
 
-    public static NameValuePair getNovelContent(int aid, int cid, LANG l) {
+    public static ContentValues getNovelContent(int aid, int cid, LANG l) {
         // get full content of an article of a novel,
         // the images should be processed then, here is an example:
         // --------------------------------------------------------
@@ -417,7 +416,7 @@ public class Wenku8API {
         // <!--image-->http://pic.wenku8.cn/pictures/1/1305/41759/50472.jpg<!--image-->
         // <!--image-->http://pic.wenku8.cn/pictures/1/1305/41759/50473.jpg<!--image-->
         // ...... ......
-        return getEncryptedNVP("action=book&do=text&aid=" + aid + "&cid=" + cid
+        return getEncryptedCV("action=book&do=text&aid=" + aid + "&cid=" + cid
                 + "&t=" + getLANG(l));
     }
 
@@ -427,7 +426,7 @@ public class Wenku8API {
     // ##########
     // ReqTest07 = ''
     // #return getResult( ReqTest07, True );
-    public static NameValuePair searchNovelByNovelName(String novelName, LANG l) {
+    public static ContentValues searchNovelByNovelName(String novelName, LANG l) {
         // get a list of search results, here is an example:
         // Note: there are extra line-break.
         // -------------------------------------------------
@@ -443,19 +442,19 @@ public class Wenku8API {
         // <item aid='499'/>
         // <item aid='826'/>
         // </result>
-        return getEncryptedNVP("action=search&searchtype=articlename&searchkey="
+        return getEncryptedCV("action=search&searchtype=articlename&searchkey="
                 + LightNetwork.encodeToHttp(novelName) + "&t=" + getLANG(l));
     }
 
-    public static NameValuePair searchNovelByAuthorName(String authorName,
+    public static ContentValues searchNovelByAuthorName(String authorName,
                                                         LANG l) {
         // get a list of search results.
         // Note: there are extra line-break.
-        return getEncryptedNVP("action=search&searchtype=author&searchkey="
+        return getEncryptedCV("action=search&searchtype=author&searchkey="
                 + LightNetwork.encodeToHttp(authorName) + "&t=" + getLANG(l));
     }
 
-    public static NameValuePair getNovelList(NOVELSORTBY n, int page) {
+    public static ContentValues getNovelList(NOVELSORTBY n, int page) {
         // here get a specific list of novels, sorted by NOVELSORTBY
         // ---------------------------------------------------------
         // <?xml version="1.0" encoding="utf-8"?>
@@ -472,11 +471,11 @@ public class Wenku8API {
         // <item aid='7'/>
         // <item aid='374'/>
         // </result>
-        return getEncryptedNVP("action=articlelist&sort=" + getNOVELSORTBY(n)
+        return getEncryptedCV("action=articlelist&sort=" + getNOVELSORTBY(n)
                 + "&page=" + page);
     }
 
-    public static NameValuePair getNovelListWithInfo(NOVELSORTBY n, int page,
+    public static ContentValues getNovelListWithInfo(NOVELSORTBY n, int page,
                                                      LANG l) {
         // get novel list with info digest
         // -------------------------------
@@ -496,11 +495,11 @@ public class Wenku8API {
         // </item>
         // ...... ......
         // </result>
-        return getEncryptedNVP("action=novellist&sort=" + getNOVELSORTBY(n)
+        return getEncryptedCV("action=novellist&sort=" + getNOVELSORTBY(n)
                 + "&page=" + page + "&t=" + getLANG(l));
     }
 
-    public static NameValuePair getLibraryList() {
+    public static ContentValues getLibraryList() {
         // return an XML file, once get the "sort id",
         // call getNovelListByLibrary
         // --------------------------
@@ -521,19 +520,19 @@ public class Wenku8API {
         // <item sort="13">其他文库</item>
         // <item sort="14">游戏剧本</item>
         // </metadata> '''; # action=xml&item=sort&t=0
-        return getEncryptedNVP("action=xml&item=sort&t=0");
+        return getEncryptedCV("action=xml&item=sort&t=0");
     }
 
-    public static NameValuePair getNovelListByLibrary(int sortId, int page) {
+    public static ContentValues getNovelListByLibrary(int sortId, int page) {
         // sortId is from "getLibraryList"
-        return getEncryptedNVP("action=articlelist&sort=" + sortId + "&page="
+        return getEncryptedCV("action=articlelist&sort=" + sortId + "&page="
                 + page);
     }
 
-    public static NameValuePair getNovelListByLibraryWithInfo(int sortId,
+    public static ContentValues getNovelListByLibraryWithInfo(int sortId,
                                                               int page, LANG l) {
         // sortId is from "getLibraryList"
-        return getEncryptedNVP("action=novellist&sort=" + sortId + "&page="
+        return getEncryptedCV("action=novellist&sort=" + sortId + "&page="
                 + page + "&t=" + getLANG(l));
     }
 

@@ -2,6 +2,7 @@ package org.mewx.wenku8.reader.activity;
 
 import android.app.Activity;
 import android.content.ClipData;
+import android.content.ContentValues;
 import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
@@ -130,10 +131,9 @@ public class Wenku8ReaderActivityV1 extends AppCompatActivity {
         }
 
         // async tasks
-        List<NameValuePair> targVar = new ArrayList<NameValuePair>();
-        targVar.add(Wenku8API.getNovelContent(aid, cid, GlobalConfig.getCurrentLang()));
+        ContentValues cv = Wenku8API.getNovelContent(aid, cid, GlobalConfig.getCurrentLang());
         AsyncNovelContentTask ast = new AsyncNovelContentTask();
-        ast.execute(targVar);
+        ast.execute(cv);
     }
 
     @Override
@@ -393,7 +393,7 @@ public class Wenku8ReaderActivityV1 extends AppCompatActivity {
     }
 
 
-    class AsyncNovelContentTask extends AsyncTask<List<NameValuePair>, Integer, Wenku8Error.ErrorCode> {
+    class AsyncNovelContentTask extends AsyncTask<ContentValues, Integer, Wenku8Error.ErrorCode> {
         private MaterialDialog md;
 
         @Override
@@ -409,13 +409,13 @@ public class Wenku8ReaderActivityV1 extends AppCompatActivity {
         }
 
         @Override
-        protected Wenku8Error.ErrorCode doInBackground(List<NameValuePair>... params) {
+        protected Wenku8Error.ErrorCode doInBackground(ContentValues... params) {
             try {
                 String xml;
                 if (from.equals(FromLocal)) // or exist
                     xml = GlobalConfig.loadFullFileFromSaveFolder("novel", cid + ".xml");
                 else {
-                    byte[] tempXml = LightNetwork.LightHttpPost(Wenku8API.getBaseURL(), params[0]);
+                    byte[] tempXml = LightNetwork.LightHttpPostConnection(Wenku8API.getBaseURL(), params[0]);
                     if (tempXml == null) return Wenku8Error.ErrorCode.NETWORK_ERROR;
                     xml = new String(tempXml, "UTF-8");
                 }

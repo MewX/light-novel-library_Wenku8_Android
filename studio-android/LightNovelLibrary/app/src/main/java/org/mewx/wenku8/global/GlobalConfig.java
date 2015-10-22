@@ -42,7 +42,6 @@ import java.util.ArrayList;
  */
 public class GlobalConfig {
 
-    private static final boolean inAlphaBuild = false; // in alpha mode, no update function
     public static final String saveFolderName = "saves";
     public static final String imgsSaveFolderName = "imgs";
     public static final String customFolderName = "custom";
@@ -98,21 +97,6 @@ public class GlobalConfig {
         reader_background_path, // (String) path to an image, day mode only, "0" means default
     }
 
-
-    // debug info
-    public static boolean inDebugMode() {
-        return inAlphaBuild; // set log out operation
-    }
-
-    public static boolean inAlphaBuild() {
-        return inAlphaBuild;
-    }
-
-    public static void wantDebugLog(String one, String two) {
-        if(inDebugMode())
-            Log.e(one, two);
-    }
-
     // sets and gets
     public static void setCurrentLang(Wenku8API.LANG l) {
         currentLang = l;
@@ -154,9 +138,7 @@ public class GlobalConfig {
         volleyRequestQueue = Volley.newRequestQueue(MyApp.getContext());
 
         if(volleyRequestQueue == null) {
-            if(inDebugMode()) {
-                Log.e("MewX", "GlobalConfig:initVolleyNetwork volleyRequestQueue is NULL");
-            }
+            Log.e("MewX", "GlobalConfig:initVolleyNetwork volleyRequestQueue is NULL");
         }
     }
 

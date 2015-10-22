@@ -159,13 +159,13 @@ public class LightNetwork {
 		try {
 			url = new URL(u);
 			http = (HttpURLConnection) url.openConnection();
-			http.setRequestMethod("POST");
+            http.setRequestMethod("POST");
 			http.setRequestProperty("Accept-Encoding", "gzip"); // set gzip
 			if(LightUserSession.getSession().length() != 0) {
 				http.setRequestProperty("Cookie", "PHPSESSID=" + LightUserSession.getSession());
 			}
-			http.setConnectTimeout(5000);
-			http.setReadTimeout(5000);
+			http.setConnectTimeout(2000);
+			http.setReadTimeout(4000);
 			http.setDoOutput(true); // has input name value pair
 			http.setInstanceFollowRedirects(true); // enable redirects
 		} catch (Exception e) {
@@ -265,6 +265,8 @@ public class LightNetwork {
 		try {
 			URL localURL = new URL(url);
 			HttpURLConnection httpURLConnection = (HttpURLConnection)localURL.openConnection();
+            httpURLConnection.setConnectTimeout(2000);
+            httpURLConnection.setReadTimeout(8000);
 
 			if (httpURLConnection.getResponseCode() != HttpURLConnection.HTTP_OK)
 				throw new Exception("HTTP Request is not success, Response code is " + httpURLConnection.getResponseCode());

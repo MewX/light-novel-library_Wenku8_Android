@@ -5,7 +5,6 @@ import android.content.Intent;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
-import android.graphics.Typeface;
 import android.os.Bundle;
 import android.os.CountDownTimer;
 import android.widget.ImageView;
@@ -63,8 +62,7 @@ public class WelcomeActivity extends Activity {
         manager = this.getPackageManager();
         try {
             info = manager.getPackageInfo(this.getPackageName(), 0);
-            ((TextView) findViewById(R.id.version_code)).setText("Ver: " + info.versionName + " (" + info.versionCode + ")"
-                    + (GlobalConfig.inAlphaBuild() ? " 内测版" : "正式版"));
+            ((TextView) findViewById(R.id.version_code)).setText("Ver: " + info.versionName + " (" + info.versionCode + ")");
         } catch (PackageManager.NameNotFoundException e) {
             e.printStackTrace();
         }

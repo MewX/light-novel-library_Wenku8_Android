@@ -1,5 +1,6 @@
 package org.mewx.wenku8.fragment;
 
+import android.content.ContentValues;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.os.AsyncTask;
@@ -318,7 +319,6 @@ public class FavFragment extends Fragment implements MyItemClickListener, MyItem
                     listResultList.add(Integer.valueOf(m.group(1)));
             } catch (UnsupportedEncodingException e) {
                 e.printStackTrace();
-                GlobalConfig.wantDebugLog("MewX", e.toString());
             }
 
             // calc difference
@@ -359,9 +359,8 @@ public class FavFragment extends Fragment implements MyItemClickListener, MyItem
                 NovelItemMeta ni;
                 try {
                     // fetch volumes
-                    List<NameValuePair> targVarListVolume = new ArrayList<>();
-                    targVarListVolume.add(Wenku8API.getNovelIndex(aid, GlobalConfig.getCurrentLang()));
-                    byte[] tempVolumeXml = LightNetwork.LightHttpPost(Wenku8API.getBaseURL(), targVarListVolume);
+                    ContentValues cv = Wenku8API.getNovelIndex(aid, GlobalConfig.getCurrentLang());
+                    byte[] tempVolumeXml = LightNetwork.LightHttpPostConnection(Wenku8API.getBaseURL(), cv);
                     if(!isLoading) return Wenku8Error.ErrorCode.USER_CANCELLED_TASK;
                     if(tempVolumeXml == null) return Wenku8Error.ErrorCode.NETWORK_ERROR;
                     volumeXml = new String(tempVolumeXml, "UTF-8");
@@ -383,9 +382,8 @@ public class FavFragment extends Fragment implements MyItemClickListener, MyItem
                     if (vl == null || ni == null) return Wenku8Error.ErrorCode.XML_PARSE_FAILED;
 
                     if(!isLoading) return Wenku8Error.ErrorCode.USER_CANCELLED_TASK;
-                    List<NameValuePair> targIntro = new ArrayList<>();
-                    targIntro.add(Wenku8API.getNovelFullIntro(ni.aid, GlobalConfig.getCurrentLang()));
-                    byte[] tempFullIntro = LightNetwork.LightHttpPost(Wenku8API.getBaseURL(), targIntro);
+                    cv = Wenku8API.getNovelFullIntro(ni.aid, GlobalConfig.getCurrentLang());
+                    byte[] tempFullIntro = LightNetwork.LightHttpPostConnection(Wenku8API.getBaseURL(), cv);
                     if (tempFullIntro == null) return Wenku8Error.ErrorCode.NETWORK_ERROR;
                     ni.fullIntro = new String(tempFullIntro, "UTF-8");
 

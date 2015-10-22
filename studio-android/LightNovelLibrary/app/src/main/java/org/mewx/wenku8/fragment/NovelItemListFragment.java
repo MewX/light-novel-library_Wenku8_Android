@@ -1,5 +1,6 @@
 package org.mewx.wenku8.fragment;
 
+import android.content.ContentValues;
 import android.content.Intent;
 import android.os.AsyncTask;
 import android.os.Build;
@@ -243,8 +244,6 @@ public class NovelItemListFragment extends Fragment implements MyItemClickListen
             if (!isLoading) {
                 // 滚动到一半的时候加载，即：剩余2个元素的时候就加载
                 if (visibleItemCount + pastVisiblesItems + 2 >= totalItemCount && (totalPage==0 || currentPage < totalPage)) {
-                    GlobalConfig.wantDebugLog("MewX", "Loading more...");
-
                     // load more toast
                     Snackbar.make(mRecyclerView, getResources().getString(R.string.list_loading)
                                     + "(" + Integer.toString(currentPage + 1) + "/" + Integer.toString(totalPage) + ")",
@@ -268,24 +267,19 @@ public class NovelItemListFragment extends Fragment implements MyItemClickListen
             currentPage = params[0];
 
             // params[0] is current page number
-            if (GlobalConfig.inDebugMode())
-                Log.v("MewX", "background starts");
-            List<NameValuePair> l = new ArrayList<>();
-            l.add(Wenku8API.getNovelList(Wenku8API.getNOVELSORTBY(type), currentPage));
-            byte[] temp = LightNetwork.LightHttpPost( Wenku8API.getBaseURL(), l );
+            ContentValues cv = Wenku8API.getNovelList(Wenku8API.getNOVELSORTBY(type), currentPage);
+            byte[] temp = LightNetwork.LightHttpPostConnection( Wenku8API.getBaseURL(), cv);
             if(temp == null) return -1;
             try {
                 tempNovelList = Wenku8Parser.parseNovelItemList(new String(temp, "UTF-8"), currentPage);
             }
             catch (UnsupportedEncodingException e) {
                 e.printStackTrace();
-                GlobalConfig.wantDebugLog("MewX", e.toString());
             }
 
             // judge result
             if( tempNovelList == null || tempNovelList.size() == 0 ) {
                 String error = "in AsyncGetNovelItemList: doInBackground: tempNovelList == null || tempNovelList.size() == 0";
-                GlobalConfig.wantDebugLog("MewX", error);
                 Logger.writeLogger(error);
             }
             else {
@@ -300,12 +294,10 @@ public class NovelItemListFragment extends Fragment implements MyItemClickListen
         protected void onPostExecute(Integer integer) {
             if(integer == -1) {
                 // network error
-                GlobalConfig.wantDebugLog("MewX", "AsyncGetNovelItemList:onPostExecute network error");
                 return;
             }
             if(tempNovelList != null && tempNovelList.size()==0) {
                 String error = "in AsyncGetNovelItemList: doInBackground: tempNovelList == null || tempNovelList.size() == 0";
-                GlobalConfig.wantDebugLog("MewX", error);
                 Logger.writeLogger(error);
                 return;
             }
@@ -321,7 +313,6 @@ public class NovelItemListFragment extends Fragment implements MyItemClickListen
             //((View) mainActivity.findViewById(R.id.list_loading)).setVisibility(View.GONE);
 
             refreshIdList();
-            GlobalConfig.wantDebugLog("MewX", "refresh over");
             isLoading = false;
             super.onPostExecute(integer);
         }
@@ -331,13 +322,10 @@ public class NovelItemListFragment extends Fragment implements MyItemClickListen
 
         @Override
         protected Integer doInBackground(String... params) {
-            if (GlobalConfig.inDebugMode())
-                Log.v("MewX", "background search starts");
 
             // get search result by novel title
-            List<NameValuePair> l1 = new ArrayList<>();
-            l1.add(Wenku8API.searchNovelByNovelName(params[0],GlobalConfig.getCurrentLang()));
-            byte[] tempListTitle = LightNetwork.LightHttpPost(Wenku8API.getBaseURL(),l1);
+            ContentValues cv = Wenku8API.searchNovelByNovelName(params[0], GlobalConfig.getCurrentLang());
+            byte[] tempListTitle = LightNetwork.LightHttpPostConnection(Wenku8API.getBaseURL(), cv);
             if(tempListTitle == null) return -1;
 
             // purify returned data
@@ -350,13 +338,11 @@ public class NovelItemListFragment extends Fragment implements MyItemClickListen
                     listResultList.add(Integer.valueOf(m.group(1)));
             } catch (UnsupportedEncodingException e) {
                 e.printStackTrace();
-                GlobalConfig.wantDebugLog("MewX", e.toString());
             }
 
             // get search result by author name
-            List<NameValuePair> l2 = new ArrayList<NameValuePair>();
-            l2.add(Wenku8API.searchNovelByAuthorName(params[0], GlobalConfig.getCurrentLang()));
-            byte[] tempListName = LightNetwork.LightHttpPost(Wenku8API.getBaseURL(),l2);
+            cv = Wenku8API.searchNovelByAuthorName(params[0], GlobalConfig.getCurrentLang());
+            byte[] tempListName = LightNetwork.LightHttpPostConnection(Wenku8API.getBaseURL(), cv);
             if(tempListName == null) return -1;
 
             // purify returned data
@@ -371,7 +357,6 @@ public class NovelItemListFragment extends Fragment implements MyItemClickListen
                 }
             } catch (UnsupportedEncodingException e) {
                 e.printStackTrace();
-                GlobalConfig.wantDebugLog("MewX", e.toString());
             }
 
             // set migrate
@@ -386,21 +371,17 @@ public class NovelItemListFragment extends Fragment implements MyItemClickListen
         protected void onPostExecute(Integer integer) {
             super.onPostExecute(integer);
 
+            spb.progressiveStop();
             if(integer == -1) {
-                // network error
-                GlobalConfig.wantDebugLog("MewX", "AsyncGetSearchResultList:onPostExecute network error");
-                // show redo button
+                Toast.makeText(getActivity(), getResources().getString(R.string.system_network_error),Toast.LENGTH_LONG).show();
                 return;
             }
             if(listNovelItemAid == null || listNovelItemAid.size() == 0) {
                 Toast.makeText(getActivity(), getResources().getString(R.string.task_null),Toast.LENGTH_LONG).show();
-                spb.setVisibility(View.GONE);
                 return;
             }
             // show all items
             refreshIdList();
-            GlobalConfig.wantDebugLog("MewX", "refresh over");
-            spb.progressiveStop();
         }
     }
 

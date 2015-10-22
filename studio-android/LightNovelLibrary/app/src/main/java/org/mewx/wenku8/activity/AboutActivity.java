@@ -66,8 +66,7 @@ public class AboutActivity extends AppCompatActivity {
         manager = this.getPackageManager();
         try {
             info = manager.getPackageInfo(this.getPackageName(), 0);
-            ((TextView) findViewById(R.id.app_version)).setText("Version: " + info.versionName + " (" + info.versionCode + ")"
-                    + (GlobalConfig.inAlphaBuild() ? " 内测版" : "正式版"));
+            ((TextView) findViewById(R.id.app_version)).setText("Version: " + info.versionName + " (" + info.versionCode + ")");
         } catch (PackageManager.NameNotFoundException e) {
             e.printStackTrace();
         }

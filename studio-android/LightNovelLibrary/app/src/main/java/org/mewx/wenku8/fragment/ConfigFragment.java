@@ -166,67 +166,27 @@ public class ConfigFragment extends Fragment {
         getActivity().findViewById(R.id.btn_check_update).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                if(!GlobalConfig.inAlphaBuild()) {
-                    // alpha version does not contains auto-update function
-                    // check for update
-                    UmengUpdateAgent.setUpdateListener(new UmengUpdateListener() {
-                        @Override
-                        public void onUpdateReturned(int updateStatus, UpdateResponse updateInfo) {
-                            switch (updateStatus) {
-                                case UpdateStatus.Yes: // has update
-                                    break;
-                                case UpdateStatus.No: // has no update
-                                    Toast.makeText(getActivity(), getResources().getString(R.string.system_update_latest_version), Toast.LENGTH_SHORT).show();
-                                    break;
-                                case UpdateStatus.NoneWifi: // none wifi
-                                    Toast.makeText(getActivity(), getResources().getString(R.string.system_update_nonewifi), Toast.LENGTH_SHORT).show();
-                                    break;
-                                case UpdateStatus.Timeout: // time out
-                                    Toast.makeText(getActivity(), getResources().getString(R.string.system_update_timeout), Toast.LENGTH_SHORT).show();
-                                    break;
-                            }
+                // alpha version does not contains auto-update function
+                // check for update
+                UmengUpdateAgent.setUpdateListener(new UmengUpdateListener() {
+                    @Override
+                    public void onUpdateReturned(int updateStatus, UpdateResponse updateInfo) {
+                        switch (updateStatus) {
+                            case UpdateStatus.Yes: // has update
+                                break;
+                            case UpdateStatus.No: // has no update
+                                Toast.makeText(getActivity(), getResources().getString(R.string.system_update_latest_version), Toast.LENGTH_SHORT).show();
+                                break;
+                            case UpdateStatus.NoneWifi: // none wifi
+                                Toast.makeText(getActivity(), getResources().getString(R.string.system_update_nonewifi), Toast.LENGTH_SHORT).show();
+                                break;
+                            case UpdateStatus.Timeout: // time out
+                                Toast.makeText(getActivity(), getResources().getString(R.string.system_update_timeout), Toast.LENGTH_SHORT).show();
+                                break;
                         }
-                    });
-                    UmengUpdateAgent.forceUpdate(getActivity());
-                }
-                else {
-                    UmengUpdateAgent.setUpdateAutoPopup(false);
-                    UmengUpdateAgent.setUpdateListener(new UmengUpdateListener() {
-                        @Override
-                        public void onUpdateReturned(int updateStatus, UpdateResponse updateInfo) {
-                            switch (updateStatus) {
-                                case UpdateStatus.Yes: // has update
-//                                    if (UmengUpdateAgent.isIgnore(getActivity(), updateInfo)) {
-//                                        Toast.makeText(getActivity(), getResources().getString(R.string.system_update_ignored), Toast.LENGTH_SHORT).show();
-//                                    } else {
-                                        new MaterialDialog.Builder(getActivity())
-                                                .forceStacking(true)
-                                                .theme(Theme.LIGHT)
-                                                .titleColorRes(R.color.default_text_color_black)
-                                                .backgroundColorRes(R.color.dlgBackgroundColor)
-                                                .contentColorRes(R.color.dlgContentColor)
-                                                .positiveColorRes(R.color.dlgPositiveButtonColor)
-                                                .title("New: " + updateInfo.version)
-                                                .content(updateInfo.updateLog)
-                                                .titleGravity(GravityEnum.CENTER)
-                                                .positiveText(R.string.dialog_positive_gotit)
-                                                .show();
-//                                    }
-                                    break;
-                                case UpdateStatus.No: // has no update
-                                    Toast.makeText(getActivity(), getResources().getString(R.string.system_update_latest_version), Toast.LENGTH_SHORT).show();
-                                    break;
-                                case UpdateStatus.NoneWifi: // none wifi
-                                    Toast.makeText(getActivity(), getResources().getString(R.string.system_update_nonewifi), Toast.LENGTH_SHORT).show();
-                                    break;
-                                case UpdateStatus.Timeout: // time out
-                                    Toast.makeText(getActivity(), getResources().getString(R.string.system_update_timeout), Toast.LENGTH_SHORT).show();
-                                    break;
-                            }
-                        }
-                    });
-                    UmengUpdateAgent.update(getActivity());
-                }
+                    }
+                });
+                UmengUpdateAgent.forceUpdate(getActivity());
             }
         });
         getActivity().findViewById(R.id.btn_about).setOnClickListener(new View.OnClickListener() {

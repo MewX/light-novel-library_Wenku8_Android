@@ -97,7 +97,6 @@ public class NovelItemAdapterUpdate extends RecyclerView.Adapter<NovelItemAdapte
                         @Override
                         public void onErrorResponse(VolleyError error) {
                             // error
-                            GlobalConfig.wantDebugLog("VolleyResponse.Error", error.toString());
                             viewHolder.isLoading = false;
                         }
                     }
@@ -109,9 +108,7 @@ public class NovelItemAdapterUpdate extends RecyclerView.Adapter<NovelItemAdapte
                 }
             };
 
-            if(GlobalConfig.volleyRequestQueue == null)
-                GlobalConfig.wantDebugLog("MewX", "NovelItemAdapterUpdate:onBindViewHolder: volleyRequestQueue==null");
-            else
+            if(GlobalConfig.volleyRequestQueue != null)
                 GlobalConfig.volleyRequestQueue.add(postRequest); // meet errors
         }
 

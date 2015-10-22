@@ -1,5 +1,6 @@
 package org.mewx.wenku8.activity;
 
+import android.content.ContentValues;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.graphics.LinearGradient;
@@ -57,7 +58,6 @@ public class VerticalReaderActivity extends AppCompatActivity {
     private ScrollViewNoFling svTextListLayout = null;
     private LinearLayout TextListLayout = null;
     private List<OldNovelContentParser.NovelContent> nc = null;
-    private Typeface typeface;
 
     // Scroll runnable to last read position
     private Runnable runnableScroll = new Runnable() {
@@ -86,7 +86,6 @@ public class VerticalReaderActivity extends AppCompatActivity {
         }
 
         // get Novel Content
-        typeface = Typeface.createFromAsset(getAssets(), "fonts/fzss-gbk.ttf");
         getNovelContent();
 
         // get view
@@ -177,11 +176,10 @@ public class VerticalReaderActivity extends AppCompatActivity {
     }
 
     private void getNovelContent() {
-        List<NameValuePair> targVar = new ArrayList<>();
-        targVar.add(Wenku8API.getNovelContent(aid, cid, GlobalConfig.getCurrentLang()));
+        ContentValues cv = Wenku8API.getNovelContent(aid, cid, GlobalConfig.getCurrentLang());
 
         final asyncNovelContentTask ast = new asyncNovelContentTask();
-        ast.execute(targVar);
+        ast.execute(cv);
 
         pDialog = new MaterialDialog.Builder(this)
                 .theme(Theme.LIGHT)
@@ -205,17 +203,17 @@ public class VerticalReaderActivity extends AppCompatActivity {
         pDialog.show();
     }
 
-    class asyncNovelContentTask extends AsyncTask<List<NameValuePair>, Integer, Integer> {
+    class asyncNovelContentTask extends AsyncTask<ContentValues, Integer, Integer> {
         // fail return -1
         @Override
-        protected Integer doInBackground(List<NameValuePair>... params) {
+        protected Integer doInBackground(ContentValues... params) {
 
             try {
                 String xml;
                 if (from.equals(FromLocal))
                     xml = GlobalConfig.loadFullFileFromSaveFolder("novel", cid + ".xml");
                 else {
-                    byte[] tempXml = LightNetwork.LightHttpPost(
+                    byte[] tempXml = LightNetwork.LightHttpPostConnection(
                             Wenku8API.getBaseURL(), params[0]);
                     if (tempXml == null)
                         return -100;
@@ -270,7 +268,6 @@ public class VerticalReaderActivity extends AppCompatActivity {
                         }
                         tempTV.setText(nc.get(i).content);
                         tempTV.setLineSpacing(GlobalConfig.getShowTextSize() * 1.0f, 1.0f); // set line space
-                        tempTV.setTypeface(typeface);
                         tempTV.setTextColor(getResources().getColor(R.color.reader_default_text_dark));
                         tempTV.setPadding(GlobalConfig.getShowTextPaddingLeft(),
                                 GlobalConfig.getShowTextPaddingTop(),

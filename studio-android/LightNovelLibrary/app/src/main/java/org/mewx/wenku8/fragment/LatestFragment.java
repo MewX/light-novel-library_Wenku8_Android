@@ -1,5 +1,6 @@
 package org.mewx.wenku8.fragment;
 
+import android.content.ContentValues;
 import android.content.Intent;
 import android.os.AsyncTask;
 import android.os.Build;
@@ -11,18 +12,14 @@ import android.support.v4.app.Fragment;
 import android.support.v4.util.Pair;
 import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
-import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.ListView;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import com.umeng.analytics.MobclickAgent;
 
-import org.apache.http.NameValuePair;
-import org.mewx.wenku8.MyApp;
 import org.mewx.wenku8.R;
 import org.mewx.wenku8.activity.MainActivity;
 import org.mewx.wenku8.activity.NovelInfoActivity;
@@ -32,7 +29,6 @@ import org.mewx.wenku8.global.api.NovelItemInfo;
 import org.mewx.wenku8.global.api.NovelItemList;
 import org.mewx.wenku8.global.api.NovelListWithInfoParser;
 import org.mewx.wenku8.global.api.Wenku8API;
-import org.mewx.wenku8.global.api.Wenku8Error;
 import org.mewx.wenku8.listener.MyItemClickListener;
 import org.mewx.wenku8.listener.MyItemLongClickListener;
 import org.mewx.wenku8.util.LightNetwork;
@@ -47,17 +43,15 @@ public class LatestFragment extends Fragment implements MyItemClickListener, MyI
 
     // components
     private MainActivity mainActivity = null;
-    //private RecyclerView.LayoutManager mLayoutManager;
     private LinearLayoutManager mLayoutManager;
     private RecyclerView mRecyclerView;
     private TextView mTextView;
 
     // Novel Item info
     private NovelItemList novelItemList;
-    //private List<Integer> listNovelItem;
     private List<NovelItemInfo> listNovelItemInfo;
     private NovelItemAdapter mAdapter;
-    private int currentPage, totalPage; // currentP stores next reading page num
+    private int currentPage, totalPage; // currentP stores next reading page num, TODO: fix wrong number
 
     // switcher
     private boolean isLoading;
@@ -122,7 +116,7 @@ public class LatestFragment extends Fragment implements MyItemClickListener, MyI
                     currentPage = 1;
                     totalPage = 1;
                     isLoading = false;
-                    loadNovelList(currentPage++);
+                    loadNovelList(currentPage);
                 }
 
             }
@@ -139,7 +133,7 @@ public class LatestFragment extends Fragment implements MyItemClickListener, MyI
         currentPage = 1;
         totalPage = 1;
         isLoading = false;
-        loadNovelList(currentPage++);
+        loadNovelList(currentPage);
 
         return rootView;
     }
@@ -148,13 +142,12 @@ public class LatestFragment extends Fragment implements MyItemClickListener, MyI
         // In fact, I don't need to know what it really is.
         // I just need to get the NOVELSORTBY
         isLoading = true; // set loading states
+        hideRetryButton();
 
         // fetch list
-        List<NameValuePair> targVarList = new ArrayList<NameValuePair>();
-        targVarList.add(Wenku8API.getNovelListWithInfo(Wenku8API.NOVELSORTBY.lastUpdate, page,
+        AsyncLoadLastestList ast = new AsyncLoadLastestList();
+        ast.execute(Wenku8API.getNovelListWithInfo(Wenku8API.NOVELSORTBY.lastUpdate, page,
                 GlobalConfig.getCurrentLang()));
-        asyncTask ast = new asyncTask();
-        ast.execute(targVarList);
     }
 
     @Override
@@ -208,8 +201,6 @@ public class LatestFragment extends Fragment implements MyItemClickListener, MyI
                 // 滚动到一半的时候加载，即：剩余3个元素的时候就加载
                 if (visibleItemCount + pastVisiblesItems + 3 >= totalItemCount) {
                     isLoading = true;
-                    if (GlobalConfig.inDebugMode())
-                        Log.i("MewX", "Loading more...");
 
                     // load more toast
                     Snackbar.make(mRecyclerView, getResources().getString(R.string.list_loading)
@@ -222,7 +213,7 @@ public class LatestFragment extends Fragment implements MyItemClickListener, MyI
 //                    list.add(Wenku8API.getNovelList(Wenku8API.NOVELSORTBY.lastUpdate, novelItemList.getCurrentPage() + 1));
 //                    agni.execute(list);
                     if (currentPage <= totalPage) {
-                        loadNovelList(currentPage++);
+                        loadNovelList(currentPage);
                     } else {
                         Snackbar.make(mRecyclerView, "Every page is loaded!",
                                 Snackbar.LENGTH_SHORT).show();
@@ -232,13 +223,13 @@ public class LatestFragment extends Fragment implements MyItemClickListener, MyI
         }
     }
 
-    class asyncTask extends AsyncTask<List<NameValuePair>, Integer, Integer> {
+    class AsyncLoadLastestList extends AsyncTask<ContentValues, Integer, Integer> {
         // fail return -1
         @Override
-        protected Integer doInBackground(List<NameValuePair>... params) {
+        protected Integer doInBackground(ContentValues... params) {
 
             try {
-                byte[] tempXml = LightNetwork.LightHttpPost(Wenku8API.getBaseURL(), params[0]);
+                byte[] tempXml = LightNetwork.LightHttpPostConnection(Wenku8API.getBaseURL(), params[0]);
                 if (tempXml == null)
                     return -100;
                 String xml = new String(tempXml, "UTF-8");
@@ -306,7 +297,7 @@ public class LatestFragment extends Fragment implements MyItemClickListener, MyI
                 mainActivity.findViewById(R.id.list_loading).setVisibility(View.GONE);
             mAdapter.notifyDataSetChanged();
 
-            hideRetryButton();
+            currentPage ++; // add when loaded
             isLoading = false;
         }
     }

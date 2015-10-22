@@ -85,8 +85,7 @@ public class NovelItemList {
         currentPage = page;
         if(l!=null) {
             lastRecord = l.size()==0?0:l.size()/10*10; // save last size
-            if(GlobalConfig.inDebugMode())
-                Log.i("MewX","set lastRecord: "+Integer.toString(lastRecord));
+            Log.i("MewX","set lastRecord: "+Integer.toString(lastRecord));
         }
         else
         lastRecord = 0;
@@ -98,8 +97,7 @@ public class NovelItemList {
         if (beg == -1 || temp == -1) return false; // this is an exception
         if(LightTool.isInteger(str[0].substring(beg + 1, temp)))
             totalPage = Integer.parseInt(str[0].substring(beg + 1, temp));
-        if (GlobalConfig.inDebugMode())
-            Log.v("MewX", "TotalPage = " + totalPage + "; CurrentPage = " + currentPage + ".");
+        Log.v("MewX", "TotalPage = " + totalPage + "; CurrentPage = " + currentPage + ".");
         beg = temp + 1; // prepare for loop
 
         // init array
@@ -112,8 +110,7 @@ public class NovelItemList {
 
             if(LightTool.isInteger(str[0].substring(beg + 1, temp)))
                 l.add(Integer.parseInt(str[0].substring(beg + 1, temp)));
-            if (GlobalConfig.inDebugMode())
-                Log.v("MewX", "Add novel aid: " + l.get(l.size() - 1));
+            Log.v("MewX", "Add novel aid: " + l.get(l.size() - 1));
 
             beg = temp + 1; // prepare for next round
         }
