@@ -71,7 +71,7 @@ public class LightNetwork {
 			if(LightUserSession.getSession().length() != 0) {
 				http.setRequestProperty("Cookie", "PHPSESSID=" + LightUserSession.getSession());
 			}
-			http.setConnectTimeout(1000);
+			http.setConnectTimeout(3000);
 			http.setReadTimeout(3000);
 			http.setDoOutput(true); // has input name value pair
 			http.setInstanceFollowRedirects(true); // enable redirects
@@ -144,7 +144,7 @@ public class LightNetwork {
 		try {
 			URL localURL = new URL(url);
 			HttpURLConnection httpURLConnection = (HttpURLConnection)localURL.openConnection();
-            httpURLConnection.setConnectTimeout(1000);
+            httpURLConnection.setConnectTimeout(3000);
             httpURLConnection.setReadTimeout(8000);
 
 			if (httpURLConnection.getResponseCode() != HttpURLConnection.HTTP_OK)

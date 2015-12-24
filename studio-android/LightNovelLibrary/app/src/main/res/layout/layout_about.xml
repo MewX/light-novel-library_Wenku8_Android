@@ -100,8 +100,7 @@
                             android:textSize="14sp"
                             android:paddingTop="12dp"
                             android:paddingBottom="12dp"
-                            android:text="用户群号: 427577610"
-                            android:singleLine="true"
+                            android:text="所有数据来自于互联网，开发者、设计师、客服均与网站无任何关系，而且本项目完全免费，完整源代码均开放，纯凭兴趣做的app，仅供大家学习安卓应用程序制作之法，如有侵犯您的权益，请务必邮件联系，保证12小时内回复，app内会做屏蔽。"
                             android:textColor="@color/menu_text_color"
                             android:layout_below="@+id/app_site"
                             android:layout_centerHorizontal="true" />

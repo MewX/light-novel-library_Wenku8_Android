@@ -434,6 +434,7 @@ public class Wenku8ReaderActivityV1 extends AppCompatActivity {
             if (result != Wenku8Error.ErrorCode.SYSTEM_1_SUCCEEDED) {
                 Toast.makeText(Wenku8ReaderActivityV1.this, result.toString(), Toast.LENGTH_LONG).show();
                 if (md != null) md.dismiss();
+                Wenku8ReaderActivityV1.this.finish(); // return friendly
                 return;
             }
             Log.e("MewX", "-- 小说获取完成");
