@@ -543,6 +543,8 @@ public class NavigationDrawerFragment extends Fragment {
         LinearLayout ll = (LinearLayout)mainActivity.findViewById(R.id.main_menu_bottom_layout);
         if(navBar.y == 0)
             ll.setPadding(0, 0, 0, 0); // hide
+        else if(navBar.y < 10 || navBar.y >= LightTool.getAppUsableScreenSize(getActivity()).y)
+            ll.setPadding(0, 0, 0, LightTool.getAppUsableScreenSize(getActivity()).y / 10);
         else
             ll.setPadding(0, 0, 0, navBar.y); // show
     }

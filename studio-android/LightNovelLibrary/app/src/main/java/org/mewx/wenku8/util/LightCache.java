@@ -7,11 +7,14 @@
 
 package org.mewx.wenku8.util;
 
+import java.io.BufferedReader;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
+import java.io.FileReader;
 import java.io.IOException;
 
 import android.util.Log;
@@ -19,7 +22,13 @@ import android.util.Log;
 public class LightCache {
 	public static boolean testFileExist(String path) {
 		File file = new File(path);
-		return file.exists();
+        if(file.exists()) {
+            if(file.length() == 0)
+                deleteFile(path); // delete empty file
+            else
+                return true;
+        }
+        return false;
 	}
 
 	public static byte[] loadFile(String path) {

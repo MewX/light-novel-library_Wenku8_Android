@@ -1,8 +1,11 @@
 package org.mewx.wenku8.global.api;
 
 import android.util.Log;
+import android.widget.Toast;
 
 import com.afollestad.materialdialogs.MaterialDialog;
+
+import org.mewx.wenku8.MyApp;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -17,8 +20,7 @@ public class OldNovelContentParser {
         public String content = "";
     }
 
-    public static List<NovelContent> parseNovelContent(String raw,
-                                                       MaterialDialog pDialog) {
+    public static List<NovelContent> parseNovelContent(String raw, MaterialDialog pDialog) {
         List<NovelContent> result = new ArrayList<>();
 
         // use split

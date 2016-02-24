@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">轻小说文库</string>
-    <string name="app_description">与轻小说文库(Wenku8.com)合作的轻小说阅读app。</string>
+    <string name="app_description" translatable="false">MewX与轻小说文库(Wenku8.com)合作的轻小说阅读app。</string>
     <string name="app_architect">MewX</string>
     <string name="app_ui_designer">ZERO</string>
     <string name="app_architect_text">Architect</string>
@@ -63,7 +63,7 @@
     <string name="hello_blank_fragment">Hello blank fragment</string>
     <string name="novel_item_author_with_colon">小说作者：</string>
     <string name="na">N/A</string>
-    <string name="loading">loading...</string>
+    <string name="loading">loading…</string>
     <string name="novel_item_status_with_colon">连载状态：</string>
     <string name="novel_item_update_with_colon">更新时间：</string>
     <string name="novel_item_intro_with_colon">内容简介：</string>
@@ -93,7 +93,7 @@
     <string name="system_update_ignored">已忽略</string>
     <string name="system_choose_reader_engine">选择一个阅读界面引擎</string>
     <string name="task_stop">停止加载</string>
-    <string name="task_retry">重新加载</string>
+    <string name="task_retry">点击重新加载</string>
     <string name="task_null">没有结果</string>
     <string name="dialog_title_choose_download_option">选择执行的下载操作：</string>
     <string name="dialog_title_save_file_name">输入保存的文件名（不要加.jpg）</string>

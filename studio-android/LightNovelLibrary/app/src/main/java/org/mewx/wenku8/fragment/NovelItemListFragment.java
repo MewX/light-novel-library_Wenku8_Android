@@ -228,7 +228,8 @@ public class NovelItemListFragment extends Fragment implements MyItemClickListen
     private void appendToIdList(List<Integer> l) {
         if(listNovelItemAid==null)
             listNovelItemAid = new ArrayList<>();
-        listNovelItemAid.addAll(l);
+        if(l!=null)
+            listNovelItemAid.addAll(l);
     }
 
     private class MyOnScrollListener extends RecyclerView.OnScrollListener {

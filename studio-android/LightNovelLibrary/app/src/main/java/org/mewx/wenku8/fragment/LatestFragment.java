@@ -18,6 +18,7 @@ import android.view.ViewGroup;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.jpardogo.android.googleprogressbar.library.GoogleProgressBar;
 import com.umeng.analytics.MobclickAgent;
 
 import org.mewx.wenku8.R;
@@ -302,12 +303,6 @@ public class LatestFragment extends Fragment implements MyItemClickListener, MyI
         }
     }
 
-    private void showRetryButton() {
-        if (mainActivity.findViewById(R.id.btn_loading) == null || !isAdded()) return;
-        ((TextView) mainActivity.findViewById(R.id.btn_loading)).setText(getResources().getString(R.string.task_retry));
-        mainActivity.findViewById(R.id.btn_loading).setVisibility(TextView.VISIBLE);
-    }
-
     @Override
     public void onPause() {
         super.onPause();
@@ -322,13 +317,21 @@ public class LatestFragment extends Fragment implements MyItemClickListener, MyI
         GlobalConfig.EnterLatest();
     }
 
+    private void showRetryButton() {
+        if (mainActivity.findViewById(R.id.btn_loading) == null || !isAdded()) return;
+        ((TextView) mainActivity.findViewById(R.id.btn_loading)).setText(getResources().getString(R.string.task_retry));
+        mainActivity.findViewById(R.id.google_progress).setVisibility(View.GONE);
+        mainActivity.findViewById(R.id.btn_loading).setVisibility(View.VISIBLE);
+    }
+
     /**
      * After button pressed, should hide the "retry" button
      */
     private void hideRetryButton() {
         if (mainActivity.findViewById(R.id.btn_loading) == null) return;
-
-        mainActivity.findViewById(R.id.btn_loading).setVisibility(TextView.GONE);
+        mTextView.setText(getResources().getString(R.string.list_loading));
+        mainActivity.findViewById(R.id.google_progress).setVisibility(View.VISIBLE);
+        mainActivity.findViewById(R.id.btn_loading).setVisibility(View.GONE);
     }
 
 

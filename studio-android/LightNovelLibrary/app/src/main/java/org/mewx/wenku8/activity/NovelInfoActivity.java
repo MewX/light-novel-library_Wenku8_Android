@@ -891,8 +891,7 @@ public class NovelInfoActivity extends AppCompatActivity {
                             byte[] tempXml = LightNetwork.LightHttpPostConnection(Wenku8API.getBaseURL(), cv);
                             if (tempXml == null) return Wenku8Error.ErrorCode.NETWORK_ERROR; // network error
                             xml = new String(tempXml, "UTF-8");
-
-                            // save file (cid.xml), didn't format it future version may format it for better performance
+                            if(xml.trim().length() == 0) return Wenku8Error.ErrorCode.SERVER_RETURN_NOTHING;
                             GlobalConfig.writeFullFileIntoSaveFolder("novel", tempCi.cid + ".xml", xml);
                         }
 
@@ -967,8 +966,9 @@ public class NovelInfoActivity extends AppCompatActivity {
                 onResume();
                 isLoading = false;
                 return;
-            } else if (result == Wenku8Error.ErrorCode.XML_PARSE_FAILED) {
-                Toast.makeText(NovelInfoActivity.this, "Parse failed!", Toast.LENGTH_LONG).show();
+            } else if (result == Wenku8Error.ErrorCode.XML_PARSE_FAILED
+                    || result == Wenku8Error.ErrorCode.SERVER_RETURN_NOTHING) {
+                Toast.makeText(NovelInfoActivity.this, "Server returned strange data! (copyright reason?)", Toast.LENGTH_LONG).show();
                 if (pDialog != null)
                     pDialog.dismiss();
                 onResume();
@@ -1110,8 +1110,7 @@ public class NovelInfoActivity extends AppCompatActivity {
                             byte[] tempXml = LightNetwork.LightHttpPostConnection(Wenku8API.getBaseURL(), cv);
                             if (tempXml == null) return Wenku8Error.ErrorCode.NETWORK_ERROR; // network error
                             xml = new String(tempXml, "UTF-8");
-
-                            // save file (cid.xml), didn't format it future version may format it for better performance
+                            if(xml.trim().length() == 0) return Wenku8Error.ErrorCode.SERVER_RETURN_NOTHING;
                             GlobalConfig.writeFullFileIntoSaveFolder("novel", tempCi.cid + ".xml", xml);
                         }
 
@@ -1184,8 +1183,9 @@ public class NovelInfoActivity extends AppCompatActivity {
                 onResume();
                 loading = false;
                 return;
-            } else if (errorCode == Wenku8Error.ErrorCode.XML_PARSE_FAILED) {
-                Toast.makeText(NovelInfoActivity.this, "Parse failed!", Toast.LENGTH_LONG).show();
+            } else if (errorCode == Wenku8Error.ErrorCode.XML_PARSE_FAILED
+                    || errorCode == Wenku8Error.ErrorCode.SERVER_RETURN_NOTHING) {
+                Toast.makeText(NovelInfoActivity.this, "Server returned strange data! (copyright reason?)", Toast.LENGTH_LONG).show();
                 if (md != null) md.dismiss();
                 onResume();
                 loading = false;

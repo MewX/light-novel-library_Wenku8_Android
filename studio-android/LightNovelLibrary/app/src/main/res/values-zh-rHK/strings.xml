@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">輕小說文庫</string>
-    <string name="app_description">與輕小說文庫(Wenku8.com)合作的輕小說閱讀app。</string>
     <string name="app_architect">MewX</string>
     <string name="app_ui_designer">ZERO</string>
     <string name="app_architect_text">Architect</string>
@@ -63,7 +62,7 @@
     <string name="hello_blank_fragment">Hello blank fragment</string>
     <string name="novel_item_author_with_colon">小說作者：</string>
     <string name="na">N/A</string>
-    <string name="loading">loading...</string>
+    <string name="loading">loading…</string>
     <string name="novel_item_status_with_colon">連載狀態：</string>
     <string name="novel_item_update_with_colon">更新時間：</string>
     <string name="novel_item_intro_with_colon">內容簡介：</string>
@@ -93,7 +92,7 @@
     <string name="system_update_ignored">已忽略</string>
     <string name="system_choose_reader_engine">選擇壹個閱讀界面引擎</string>
     <string name="task_stop">停止加載</string>
-    <string name="task_retry">重新加載</string>
+    <string name="task_retry">點擊重新加載</string>
     <string name="task_null">沒有結果</string>
     <string name="dialog_title_choose_download_option">選擇執行的下載操作：</string>
     <string name="dialog_title_save_file_name">輸入保存的文件名（不要加.jpg）</string>

@@ -23,8 +23,8 @@ import com.umeng.update.UpdateStatus;
 import org.mewx.wenku8.MyApp;
 import org.mewx.wenku8.R;
 import org.mewx.wenku8.activity.AboutActivity;
+import org.mewx.wenku8.activity.MainActivity;
 import org.mewx.wenku8.activity.MenuBackgroundSelectorActivity;
-import org.mewx.wenku8.activity.WelcomeActivity;
 import org.mewx.wenku8.global.GlobalConfig;
 import org.mewx.wenku8.global.api.OldNovelContentParser;
 import org.mewx.wenku8.global.api.Wenku8API;
@@ -72,19 +72,6 @@ public class ConfigFragment extends Fragment {
         else
             tvNotice.setText("通知：\n" + Wenku8API.NoticeString);
 
-        // set all on click listeners
-//        getActivity().findViewById(R.id.btn_data_backup).setOnClickListener(new View.OnClickListener() {
-//            @Override
-//            public void onClick(View v) {
-//                Toast.makeText(getActivity(), "这个按钮暂时没有用滴~", Toast.LENGTH_SHORT).show();
-//            }
-//        });
-//        getActivity().findViewById(R.id.btn_data_restore).setOnClickListener(new View.OnClickListener() {
-//            @Override
-//            public void onClick(View v) {
-//                Toast.makeText(getActivity(), "这个按钮暂时没有用滴~", Toast.LENGTH_SHORT).show();
-//            }
-//        });
         getActivity().findViewById(R.id.btn_choose_language).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -102,7 +89,7 @@ public class ConfigFragment extends Fragment {
                                         if(GlobalConfig.getCurrentLang() != Wenku8API.LANG.SC) {
                                             GlobalConfig.setCurrentLang(Wenku8API.LANG.SC);
                                             Intent intent = new Intent();
-                                            intent.setClass(getActivity(), WelcomeActivity.class);
+                                            intent.setClass(getActivity(), MainActivity.class);
                                             startActivity(intent);
                                             getActivity().overridePendingTransition(R.anim.fade_in, R.anim.hold); // fade in animation
                                             getActivity().finish(); // destroy itself
@@ -115,7 +102,7 @@ public class ConfigFragment extends Fragment {
                                         if(GlobalConfig.getCurrentLang() != Wenku8API.LANG.TC) {
                                             GlobalConfig.setCurrentLang(Wenku8API.LANG.TC);
                                             Intent intent = new Intent();
-                                            intent.setClass(getActivity(), WelcomeActivity.class);
+                                            intent.setClass(getActivity(), MainActivity.class);
                                             startActivity(intent);
                                             getActivity().overridePendingTransition(R.anim.fade_in, R.anim.hold); // fade in animation
                                             getActivity().finish(); // destroy itself

@@ -420,7 +420,8 @@ public class Wenku8ReaderActivityV1 extends AppCompatActivity {
                 }
 
                 nc = OldNovelContentParser.parseNovelContent(xml, null);
-                if (nc == null || nc.size() == 0) return Wenku8Error.ErrorCode.XML_PARSE_FAILED;
+                if (nc == null || nc.size() == 0)
+                    return xml.length() == 0 ? Wenku8Error.ErrorCode.SERVER_RETURN_NOTHING : Wenku8Error.ErrorCode.XML_PARSE_FAILED;
 
                 return Wenku8Error.ErrorCode.SYSTEM_1_SUCCEEDED;
             } catch (UnsupportedEncodingException e) {
@@ -479,7 +480,7 @@ public class Wenku8ReaderActivityV1 extends AppCompatActivity {
 
                             if (Build.VERSION.SDK_INT >= 16 ) {
                                 tintManager.setStatusBarAlpha(0.90f);
-                                tintManager.setNavigationBarAlpha(0.80f);
+                                tintManager.setNavigationBarAlpha(0.80f); // TODO: fix bug
                             }
                             barStatus = true;
 
