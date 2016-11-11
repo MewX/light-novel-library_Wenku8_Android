@@ -303,8 +303,6 @@ public class MainActivity extends AppCompatActivity {
 
         } else {
             finish();
-            // call fragments and end streams and services
-            System.exit(0);
         }
     }
 }

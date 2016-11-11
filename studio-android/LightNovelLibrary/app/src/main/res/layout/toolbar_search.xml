@@ -73,7 +73,7 @@
                 android:layout_height="wrap_content"
                 android:layout_centerHorizontal="true"
                 android:layout_centerVertical="true"
-                android:src="@drawable/abc_ic_clear_mtrl_alpha"/>
+                android:src="@drawable/abc_ic_clear_material"/>
         </RelativeLayout>
     </LinearLayout>
 </android.support.v7.widget.Toolbar>

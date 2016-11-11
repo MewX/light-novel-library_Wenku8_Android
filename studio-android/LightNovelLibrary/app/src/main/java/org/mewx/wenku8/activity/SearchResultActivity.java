@@ -93,7 +93,7 @@ public class SearchResultActivity extends AppCompatActivity {
         MobclickAgent.onResume(this);
 
         // set back arrow icon
-        final Drawable upArrow = getResources().getDrawable(R.drawable.abc_ic_ab_back_mtrl_am_alpha);
+        final Drawable upArrow = getResources().getDrawable(R.drawable.abc_ic_ab_back_material);
         if(upArrow != null && getSupportActionBar() != null) {
             upArrow.setColorFilter(getResources().getColor(R.color.mySearchToggleColor), PorterDuff.Mode.SRC_ATOP);
             getSupportActionBar().setHomeAsUpIndicator(upArrow);

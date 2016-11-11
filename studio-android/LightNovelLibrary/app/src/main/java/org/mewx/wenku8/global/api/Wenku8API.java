@@ -5,19 +5,16 @@ import android.util.Log;
 
 import com.umeng.analytics.MobclickAgent;
 
-import org.apache.http.NameValuePair;
-import org.apache.http.message.BasicNameValuePair;
 import org.mewx.wenku8.MyApp;
 import org.mewx.wenku8.global.GlobalConfig;
 import org.mewx.wenku8.util.LightBase64;
 import org.mewx.wenku8.util.LightNetwork;
 import org.mewx.wenku8.R;
 
-import java.io.Serializable;
 import java.util.HashMap;
 import java.util.Map;
 
-@SuppressWarnings({"UnusedDeclaration"})
+@SuppressWarnings("unused")
 public class Wenku8API {
 
     /**
@@ -518,14 +515,14 @@ public class Wenku8API {
     }
 
     public static ContentValues getNovelListByLibrary(int sortId, int page) {
-        // sortId is from "getLibraryList"
+        // sortId is from "getLibraryList" above
         return getEncryptedCV("action=articlelist&sort=" + sortId + "&page="
                 + page);
     }
 
     public static ContentValues getNovelListByLibraryWithInfo(int sortId,
                                                               int page, LANG l) {
-        // sortId is from "getLibraryList"
+        // sortId is from "getLibraryList" above
         return getEncryptedCV("action=novellist&sort=" + sortId + "&page="
                 + page + "&t=" + getLANG(l));
     }
