@@ -4,6 +4,7 @@ import android.content.ContentValues;
 import android.util.Log;
 
 import com.umeng.analytics.MobclickAgent;
+import com.umeng.onlineconfig.OnlineConfigAgent;
 
 import org.mewx.wenku8.MyApp;
 import org.mewx.wenku8.global.GlobalConfig;
@@ -30,7 +31,7 @@ public class Wenku8API {
 
     public static String getBaseURL() {
         if(NoticeString.equals("") || NoticeString.equals("http://weuku8.mewx.org")) {
-            NoticeString = MobclickAgent.getConfigParams(MyApp.getContext(), GlobalConfig.getCurrentLang() != LANG.SC ? "wenku8_notice_tw" : "wenku8_notice");
+            NoticeString = OnlineConfigAgent.getInstance().getConfigParams(MyApp.getContext(), GlobalConfig.getCurrentLang() != LANG.SC ? "wenku8_notice_tw" : "wenku8_notice");
         }
         return BaseURL;
     }

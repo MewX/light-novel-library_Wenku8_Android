@@ -18,6 +18,7 @@ import android.widget.Toast;
 import com.afollestad.materialdialogs.MaterialDialog;
 import com.afollestad.materialdialogs.Theme;
 import com.umeng.analytics.MobclickAgent;
+import com.umeng.onlineconfig.OnlineConfigAgent;
 
 import org.mewx.wenku8.MyApp;
 import org.mewx.wenku8.R;
@@ -64,7 +65,7 @@ public class ConfigFragment extends Fragment {
         super.onActivityCreated(savedInstanceState);
 
         // get views
-        Wenku8API.NoticeString = MobclickAgent.getConfigParams(MyApp.getContext(),
+        Wenku8API.NoticeString = OnlineConfigAgent.getInstance().getConfigParams(MyApp.getContext(),
                 GlobalConfig.getCurrentLang() != Wenku8API.LANG.SC ? "wenku8_notice_tw" : "wenku8_notice"); // get each time
         TextView tvNotice = (TextView) getActivity().findViewById(R.id.notice);
         if(Wenku8API.NoticeString.equals(""))

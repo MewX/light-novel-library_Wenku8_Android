@@ -15,6 +15,7 @@ import android.widget.Toast;
 import com.nostra13.universalimageloader.core.ImageLoader;
 import com.readystatesoftware.systembartint.SystemBarTintManager;
 import com.umeng.analytics.MobclickAgent;
+import com.umeng.onlineconfig.OnlineConfigAgent;
 
 import org.mewx.wenku8.R;
 import org.mewx.wenku8.fragment.NavigationDrawerFragment;
@@ -101,7 +102,7 @@ public class MainActivity extends AppCompatActivity {
         GlobalConfig.initVolleyNetwork();
 
         // UMeng settings
-        MobclickAgent.updateOnlineConfig(this);
+        OnlineConfigAgent.getInstance().updateOnlineConfig(this);
 
         // Update old save files ----------------
 
