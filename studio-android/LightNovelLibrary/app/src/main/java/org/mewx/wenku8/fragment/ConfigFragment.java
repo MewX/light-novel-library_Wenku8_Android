@@ -2,23 +2,22 @@ package org.mewx.wenku8.fragment;
 
 import android.content.DialogInterface;
 import android.content.Intent;
+import android.content.pm.PackageManager;
+import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.support.v4.app.Fragment;
+import android.text.TextUtils;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import com.afollestad.materialdialogs.GravityEnum;
 import com.afollestad.materialdialogs.MaterialDialog;
 import com.afollestad.materialdialogs.Theme;
 import com.umeng.analytics.MobclickAgent;
-import com.umeng.update.UmengUpdateAgent;
-import com.umeng.update.UmengUpdateListener;
-import com.umeng.update.UpdateResponse;
-import com.umeng.update.UpdateStatus;
 
 import org.mewx.wenku8.MyApp;
 import org.mewx.wenku8.R;
@@ -30,6 +29,7 @@ import org.mewx.wenku8.global.api.OldNovelContentParser;
 import org.mewx.wenku8.global.api.Wenku8API;
 import org.mewx.wenku8.global.api.Wenku8Error;
 import org.mewx.wenku8.util.LightCache;
+import org.mewx.wenku8.util.LightNetwork;
 import org.mewx.wenku8.util.LightTool;
 
 import java.io.File;
@@ -155,25 +155,53 @@ public class ConfigFragment extends Fragment {
             public void onClick(View v) {
                 // alpha version does not contains auto-update function
                 // check for update
-                UmengUpdateAgent.setUpdateListener(new UmengUpdateListener() {
+                new AsyncTask<String, Integer, Integer>() {
                     @Override
-                    public void onUpdateReturned(int updateStatus, UpdateResponse updateInfo) {
-                        switch (updateStatus) {
-                            case UpdateStatus.Yes: // has update
-                                break;
-                            case UpdateStatus.No: // has no update
+                    protected Integer doInBackground(String... strings) {
+                        // return version code
+                        byte[] codeByte = LightNetwork.LightHttpDownload(strings[0]);
+                        if (codeByte == null) return -1;
+                        String code = new String(codeByte);
+                        Log.d("MewX", "version code: " + code);
+                        if (code.trim().isEmpty() || !TextUtils.isDigitsOnly(code.trim())) return -1;
+                        else return Integer.parseInt(code);
+                    }
+
+                    @Override
+                    protected void onPostExecute(Integer code) {
+                        super.onPostExecute(code);
+                        if (code == -1)
+                            Toast.makeText(getActivity(), getResources().getString(R.string.system_update_timeout), Toast.LENGTH_SHORT).show();
+                        try {
+                            int current = getContext().getPackageManager().getPackageInfo(getContext().getPackageName(), 0).versionCode;
+                            Log.d("MewX", "current version code: " + current);
+                            if (current >= code) {
                                 Toast.makeText(getActivity(), getResources().getString(R.string.system_update_latest_version), Toast.LENGTH_SHORT).show();
-                                break;
-                            case UpdateStatus.NoneWifi: // none wifi
-                                Toast.makeText(getActivity(), getResources().getString(R.string.system_update_nonewifi), Toast.LENGTH_SHORT).show();
-                                break;
-                            case UpdateStatus.Timeout: // time out
-                                Toast.makeText(getActivity(), getResources().getString(R.string.system_update_timeout), Toast.LENGTH_SHORT).show();
-                                break;
+                            }
+                            else {
+                                // update to new version
+                                new MaterialDialog.Builder(getContext())
+                                        .theme(Theme.LIGHT)
+                                        .title(R.string.system_update_found_new)
+                                        .content(R.string.system_update_jump_to_page)
+                                        .positiveText(R.string.dialog_positive_sure)
+                                        .negativeText(R.string.dialog_negative_biao)
+                                        .callback(new MaterialDialog.ButtonCallback() {
+                                            @Override
+                                            public void onPositive(MaterialDialog dialog) {
+                                                super.onPositive(dialog);
+                                                Intent browserIntent = new Intent(Intent.ACTION_VIEW, Uri.parse("http://wenku8.mewx.org/"));
+                                                startActivity(browserIntent);
+                                            }
+                                        })
+                                        .show();
+
+                            }
+                        } catch (PackageManager.NameNotFoundException e) {
+                            e.printStackTrace();
                         }
                     }
-                });
-                UmengUpdateAgent.forceUpdate(getActivity());
+                }.execute("http://wenku8.mewx.org/version");
             }
         });
         getActivity().findViewById(R.id.btn_about).setOnClickListener(new View.OnClickListener() {

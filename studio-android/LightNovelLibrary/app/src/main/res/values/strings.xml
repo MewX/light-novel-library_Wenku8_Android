@@ -88,6 +88,8 @@
     <string name="system_fetching">正在从服务器获取信息……</string>
     <string name="system_wait_for_next_version">请等待下一个版本~</string>
     <string name="system_update_latest_version">已是最新版本~</string>
+    <string name="system_update_found_new">发现新版本</string>
+    <string name="system_update_jump_to_page">是否去下载页面下载？</string>
     <string name="system_update_timeout">连接服务器超时</string>
     <string name="system_update_nonewifi">没有Wi-Fi，臣妾不敢轻举妄动</string>
     <string name="system_update_ignored">已忽略</string>

@@ -1104,7 +1104,7 @@ public class NovelInfoActivity extends AppCompatActivity {
                         ContentValues cv = Wenku8API.getNovelContent(aid, tempCi.cid, GlobalConfig.getCurrentLang());
 
                         // load from local first
-                        if (!loading) return Wenku8Error.ErrorCode.USER_CANCELLED_TASK; // calcel
+                        if (!loading) return Wenku8Error.ErrorCode.USER_CANCELLED_TASK; // cancel
                         String xml = GlobalConfig.loadFullFileFromSaveFolder("novel", tempCi.cid + ".xml"); // prevent empty file
                         if (xml == null || xml.length() == 0 ) {
                             byte[] tempXml = LightNetwork.LightHttpPostConnection(Wenku8API.getBaseURL(), cv);
@@ -1211,7 +1211,7 @@ public class NovelInfoActivity extends AppCompatActivity {
         super.onResume();
         MobclickAgent.onResume(this);
 
-        // returen from search activity
+        // return from search activity
         final Drawable upArrow = getResources().getDrawable(R.drawable.abc_ic_ab_back_material);
         if(getSupportActionBar() != null && upArrow != null) {
             getSupportActionBar().setHomeButtonEnabled(true);
