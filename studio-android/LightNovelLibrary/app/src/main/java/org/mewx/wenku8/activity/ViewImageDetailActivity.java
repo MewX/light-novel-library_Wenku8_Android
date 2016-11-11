@@ -79,6 +79,7 @@ public class ViewImageDetailActivity extends AppCompatActivity {
         // set image
         imageView = (SubsamplingScaleImageView) findViewById(R.id.image_scalable);
         imageView.setImage(ImageSource.uri(path));
+        imageView.setMaxScale(4.0f);
         imageView.setOnClickListener(new View.OnClickListener() {
             private boolean shown = true;
 
