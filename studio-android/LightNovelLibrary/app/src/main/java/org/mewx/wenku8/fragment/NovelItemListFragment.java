@@ -23,7 +23,6 @@ import android.view.ViewGroup;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import org.apache.http.NameValuePair;
 import org.mewx.wenku8.R;
 import org.mewx.wenku8.activity.NovelInfoActivity;
 import org.mewx.wenku8.adapter.NovelItemAdapterUpdate;
@@ -34,7 +33,6 @@ import org.mewx.wenku8.global.api.Wenku8Parser;
 import org.mewx.wenku8.listener.MyItemClickListener;
 import org.mewx.wenku8.listener.MyItemLongClickListener;
 import org.mewx.wenku8.util.LightNetwork;
-import org.mewx.wenku8.util.Logger;
 
 import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
@@ -281,7 +279,6 @@ public class NovelItemListFragment extends Fragment implements MyItemClickListen
             // judge result
             if( tempNovelList == null || tempNovelList.size() == 0 ) {
                 String error = "in AsyncGetNovelItemList: doInBackground: tempNovelList == null || tempNovelList.size() == 0";
-                Logger.writeLogger(error);
             }
             else {
                 totalPage = tempNovelList.get(0);
@@ -299,7 +296,6 @@ public class NovelItemListFragment extends Fragment implements MyItemClickListen
             }
             if(tempNovelList != null && tempNovelList.size()==0) {
                 String error = "in AsyncGetNovelItemList: doInBackground: tempNovelList == null || tempNovelList.size() == 0";
-                Logger.writeLogger(error);
                 return;
             }
 

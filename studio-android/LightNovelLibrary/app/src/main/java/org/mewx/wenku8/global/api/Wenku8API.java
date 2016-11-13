@@ -541,7 +541,7 @@ public class Wenku8API {
      */
     public static ContentValues getUserLoginParams(String username, String password) {
         // 使用session方式判断是否已登录
-        Log.e("MewX", "Uname: " + username + "\nPwd: " + password + " (" + LightNetwork.encodeToHttp(password) + ")");
+//        Log.e("MewX", "Uname: " + username + "\nPwd: " + password + " (" + LightNetwork.encodeToHttp(password) + ")");
         String temp = "action=login&username=" + LightNetwork.encodeToHttp(username) + "&password=" + LightNetwork.encodeToHttp(password);
         return getEncryptedCV(temp);
     }

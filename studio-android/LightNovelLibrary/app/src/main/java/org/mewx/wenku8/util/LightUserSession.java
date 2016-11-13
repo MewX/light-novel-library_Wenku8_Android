@@ -2,6 +2,8 @@ package org.mewx.wenku8.util;
 
 import android.content.Intent;
 import android.os.AsyncTask;
+import android.speech.tts.TextToSpeech;
+import android.text.TextUtils;
 import android.widget.Toast;
 
 import org.mewx.wenku8.MyApp;
@@ -314,7 +316,7 @@ public class LightUserSession {
                 return;
             }
 
-            if(LightUserSession.logStatus == true) {
+            if(LightUserSession.logStatus) {
                 // heart beat service
                 // Toast.makeText(MyApp.getContext(), e.toString(), Toast.LENGTH_SHORT).show();
                 Intent intent = new Intent(MyApp.getContext(),HeartbeatSessionKeeper.class);
