@@ -43,6 +43,10 @@ android {
         exclude 'META-INF/NOTICE.txt'
         exclude '.readme'
     }
+
+    aaptOptions {
+        cruncherEnabled = false
+    }
 }
 
 dependencies {

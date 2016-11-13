@@ -180,6 +180,8 @@ public class GlobalConfig {
         return sb.toString();
     }
 
+
+
     /**
      * 设置第一存储路径的合法性（）第一路径可以只有设置
      * @param a true-合法可以使用; false-不能使用，只能只用第二路径
