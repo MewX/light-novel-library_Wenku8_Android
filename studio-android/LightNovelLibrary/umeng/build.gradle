@@ -1,3 +1,0 @@
-configurations.create("default")
-artifacts.add("default", file('umeng-analytics-v6.0.4.jar'))
-artifacts.add("default", file('umeng-onlineconfig_v1.0.0.jar'))
