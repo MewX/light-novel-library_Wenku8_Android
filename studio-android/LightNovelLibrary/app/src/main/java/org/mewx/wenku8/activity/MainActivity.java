@@ -1,8 +1,12 @@
 package org.mewx.wenku8.activity;
 
 import android.Manifest;
+import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.content.res.Configuration;
+import android.net.Uri;
+import android.os.AsyncTask;
 import android.os.Build;
 import android.os.Bundle;
 import android.support.annotation.NonNull;
@@ -10,31 +14,43 @@ import android.support.v4.app.ActivityCompat;
 import android.support.v4.app.Fragment;
 import android.support.v4.app.FragmentTransaction;
 import android.support.v4.content.ContextCompat;
-import android.support.v4.widget.DrawerLayout;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
+import android.text.TextUtils;
+import android.util.Log;
 import android.view.Menu;
-import android.view.MenuItem;
 import android.widget.Toast;
 
+import com.afollestad.materialdialogs.MaterialDialog;
+import com.afollestad.materialdialogs.Theme;
 import com.nostra13.universalimageloader.core.ImageLoader;
 import com.readystatesoftware.systembartint.SystemBarTintManager;
 import com.umeng.analytics.MobclickAgent;
-import com.umeng.onlineconfig.OnlineConfigAgent;
+import com.umeng.commonsdk.UMConfigure;
 
+import org.mewx.wenku8.MyApp;
 import org.mewx.wenku8.R;
 import org.mewx.wenku8.fragment.NavigationDrawerFragment;
 import org.mewx.wenku8.global.GlobalConfig;
+import org.mewx.wenku8.global.api.Wenku8API;
 import org.mewx.wenku8.util.LightCache;
+import org.mewx.wenku8.util.LightNetwork;
 import org.mewx.wenku8.util.LightUserSession;
 
 import java.io.File;
+import java.lang.ref.WeakReference;
 import java.util.Locale;
 import java.util.Timer;
 import java.util.TimerTask;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 
 public class MainActivity extends AppCompatActivity {
+    private static final int REQUEST_WRITE_EXTERNAL = 100;
+    private static final int REQUEST_READ_EXTERNAL = 101;
+
+    private static final AtomicBoolean NEW_VERSION_CHECKED = new AtomicBoolean(false);
+
     // This is for fragment switch
     public enum FRAGMENT_LIST {
         RKLIST, LATEST, FAV, CONFIG
@@ -67,7 +83,7 @@ public class MainActivity extends AppCompatActivity {
                 locale = Locale.SIMPLIFIED_CHINESE;
                 break;
         }
-        android.content.res.Configuration config = new android.content.res.Configuration();
+        Configuration config = new Configuration();
         config.locale = locale;
         Locale.setDefault(locale);
         getBaseContext().getResources().updateConfiguration(config, getBaseContext().getResources().getDisplayMetrics());
@@ -81,13 +97,26 @@ public class MainActivity extends AppCompatActivity {
                 Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED);
         if (!hasPermission) {
             ActivityCompat.requestPermissions(this,
-                    new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE}, 112);
+                    new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE}, REQUEST_WRITE_EXTERNAL);
+        }
+
+        // request read permission
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
+            hasPermission = (ContextCompat.checkSelfPermission(this,
+                    Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED);
+            if (!hasPermission) {
+                ActivityCompat.requestPermissions(this,
+                        new String[]{Manifest.permission.READ_EXTERNAL_STORAGE}, REQUEST_READ_EXTERNAL);
+            }
         }
 
         // execute background action
         LightUserSession.aiui = new LightUserSession.AsyncInitUserInfo();
         LightUserSession.aiui.execute();
         GlobalConfig.loadAllSetting();
+
+        // check new version and load notice text
+        Wenku8API.NoticeString = GlobalConfig.loadSavedNotice();
 
         // create save folder
         LightCache.saveFile(GlobalConfig.getFirstStoragePath() + "imgs", ".nomedia", "".getBytes(), false);
@@ -107,45 +136,42 @@ public class MainActivity extends AppCompatActivity {
         initialApp();
 
         // UIL setting
-        if(ImageLoader.getInstance() == null || !ImageLoader.getInstance().isInited()) {
+        if (ImageLoader.getInstance() == null || !ImageLoader.getInstance().isInited()) {
             GlobalConfig.initImageLoader(this);
         }
 
         // global settings
         GlobalConfig.initVolleyNetwork();
 
-        // UMeng settings
-        OnlineConfigAgent.getInstance().updateOnlineConfig(this);
+        // UMeng initialization
+        UMConfigure.init(MyApp.getContext(), UMConfigure.DEVICE_TYPE_PHONE, null);
 
         // Update old save files ----------------
 
 
         // set Toolbar
-        Toolbar mToolbar = (Toolbar) findViewById(R.id.toolbar_actionbar);
+        Toolbar mToolbar = findViewById(R.id.toolbar_actionbar);
         setSupportActionBar(mToolbar);
         // getSupportActionBar().setDisplayShowHomeEnabled(true);
 
         // set Tool button
         mNavigationDrawerFragment = (NavigationDrawerFragment) getFragmentManager().findFragmentById(R.id.fragment_drawer);
-        mNavigationDrawerFragment.setup(R.id.fragment_drawer, (DrawerLayout) findViewById(R.id.drawer), mToolbar);
+        mNavigationDrawerFragment.setup(R.id.fragment_drawer, findViewById(R.id.drawer), mToolbar);
 
         // find search box
-        mToolbar.setOnMenuItemClickListener(new Toolbar.OnMenuItemClickListener() {
-            @Override
-            public boolean onMenuItemClick(MenuItem item) {
-                //Toast.makeText(MyApp.getContext(),"called button",Toast.LENGTH_SHORT).show();
-                if (item.getItemId() == R.id.action_search) {
-                    // start search activity
-                    startActivity(new Intent(MainActivity.this, SearchActivity.class));
-                    overridePendingTransition(R.anim.fade_in, R.anim.hold); // fade in animation
+        mToolbar.setOnMenuItemClickListener(item -> {
+            //Toast.makeText(MyApp.getContext(),"called button",Toast.LENGTH_SHORT).show();
+            if (item.getItemId() == R.id.action_search) {
+                // start search activity
+                startActivity(new Intent(MainActivity.this, SearchActivity.class));
+                overridePendingTransition(R.anim.fade_in, R.anim.hold); // fade in animation
 
-                }
-                return true;
             }
+            return true;
         });
 
         // change status bar color tint, and this require SDK16
-        if (Build.VERSION.SDK_INT >= 16 ) { //&& Build.VERSION.SDK_INT <= 21) {
+        if (Build.VERSION.SDK_INT >= 16) { //&& Build.VERSION.SDK_INT <= 21) {
             // Android API 22 has more effects on status bar, so ignore
 
             // create our manager instance after the content view is set
@@ -158,7 +184,7 @@ public class MainActivity extends AppCompatActivity {
             // set all color
             tintManager.setTintColor(getResources().getColor(android.R.color.black));
             // set Navigation bar color
-            if(Build.VERSION.SDK_INT >= 21)
+            if (Build.VERSION.SDK_INT >= 21)
                 getWindow().setNavigationBarColor(getResources().getColor(R.color.myNavigationColor));
         }
     }
@@ -176,26 +202,29 @@ public class MainActivity extends AppCompatActivity {
     public boolean onCreateOptionsMenu(Menu menu) {
         // only when the navigation draw closed, I draw the menu bar.
         // the menu items will be drawn automatically
-        if(!mNavigationDrawerFragment.isDrawerOpen()) {
+        if (!mNavigationDrawerFragment.isDrawerOpen()) {
             // change title of toolbar
-            switch(status){
+            switch (status) {
                 case LATEST:
-                    if(getSupportActionBar()!=null) getSupportActionBar().setTitle(getResources().getString(R.string.main_menu_latest));
+                    if (getSupportActionBar() != null)
+                        getSupportActionBar().setTitle(getResources().getString(R.string.main_menu_latest));
                     getMenuInflater().inflate(R.menu.menu_latest, menu);
                     break;
                 case RKLIST:
-                    if(getSupportActionBar()!=null) getSupportActionBar().setTitle(getResources().getString(R.string.main_menu_rklist));
+                    if (getSupportActionBar() != null)
+                        getSupportActionBar().setTitle(getResources().getString(R.string.main_menu_rklist));
                     break;
                 case FAV:
-                    if(getSupportActionBar()!=null) getSupportActionBar().setTitle(getResources().getString(R.string.main_menu_fav));
+                    if (getSupportActionBar() != null)
+                        getSupportActionBar().setTitle(getResources().getString(R.string.main_menu_fav));
                     break;
                 case CONFIG:
-                    if(getSupportActionBar()!=null) getSupportActionBar().setTitle(getResources().getString(R.string.main_menu_config));
+                    if (getSupportActionBar() != null)
+                        getSupportActionBar().setTitle(getResources().getString(R.string.main_menu_config));
                     break;
             }
-        }
-        else {
-            if(getSupportActionBar()!=null)
+        } else {
+            if (getSupportActionBar() != null)
                 getSupportActionBar().setTitle(getResources().getString(R.string.app_name));
         }
 
@@ -210,7 +239,7 @@ public class MainActivity extends AppCompatActivity {
      */
     public void changeFragment(Fragment targetFragment) {
         // temporarily set elevation to remove rank list toolbar shadow
-        if(getSupportActionBar() != null) {
+        if (getSupportActionBar() != null) {
             if (status == FRAGMENT_LIST.RKLIST)
                 getSupportActionBar().setElevation(0);
             else
@@ -236,20 +265,29 @@ public class MainActivity extends AppCompatActivity {
         super.onResume();
         MobclickAgent.onPageStart("MainActivity");
         MobclickAgent.onResume(this);
+
+        // load only the first time this activity is created
+        if (!NEW_VERSION_CHECKED.get()) {
+            NEW_VERSION_CHECKED.set(true);
+            new ArgsInitializer(MainActivity.this).execute();
+        }
     }
 
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
         switch (requestCode) {
-            case 112: {
+            case REQUEST_WRITE_EXTERNAL:
+            case REQUEST_READ_EXTERNAL: {
                 if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                     //reload my activity with permission granted or use the features what required the permission
-                    Intent i = getBaseContext().getPackageManager().getLaunchIntentForPackage( getBaseContext().getPackageName() );
-                    i.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
-                    startActivity(i);
+                    Intent i = getBaseContext().getPackageManager().getLaunchIntentForPackage(getBaseContext().getPackageName());
+                    if (i != null) {
+                        i.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
+                        startActivity(i);
+                    }
                 } else {
-                    Toast.makeText(this, "The app was not allowed to write to your storage. Hence, it cannot function properly. Please consider granting it this permission", Toast.LENGTH_LONG).show();
+                    Toast.makeText(this, getResources().getText(R.string.missing_permission), Toast.LENGTH_LONG).show();
                 }
             }
         }
@@ -283,6 +321,89 @@ public class MainActivity extends AppCompatActivity {
 
         } else {
             finish();
+        }
+    }
+
+    /**
+     * this class is used for checking new versions and new notice text,
+     * only when the app is loaded at the beginning
+     */
+    private static class ArgsInitializer extends AsyncTask<Void, Void, Void> {
+        private final WeakReference<Context> contextReference;
+        private int newVersionCode = 0;
+
+        ArgsInitializer(Context c) {
+            contextReference = new WeakReference<>(c);
+        }
+
+        @Override
+        protected void onPreExecute() {
+            super.onPreExecute();
+        }
+
+        @Override
+        protected Void doInBackground(Void... voids) {
+            // load new version
+            byte[] codeByte = LightNetwork.LightHttpDownload(GlobalConfig.versionCheckUrl);
+            if (codeByte != null) {
+                String code = new String(codeByte);
+                Log.d("MewX", "version code: " + code);
+                if (!code.trim().isEmpty() && TextUtils.isDigitsOnly(code.trim())) {
+                    newVersionCode = Integer.parseInt(code);
+                }
+            }
+
+            // load parameters
+            codeByte = LightNetwork.LightHttpDownload(
+                    GlobalConfig.getCurrentLang() != Wenku8API.LANG.SC ?
+                            GlobalConfig.noticeCheckTc : GlobalConfig.noticeCheckSc
+            );
+            if (codeByte != null) {
+                String notice = new String(codeByte);
+                Log.d("MewX", "notice text: " + notice);
+                if (!notice.trim().isEmpty()) {
+                    // update the latest string
+                    Wenku8API.NoticeString = notice;
+                    // save to local file
+                    GlobalConfig.writeTheNotice(notice);
+                }
+            }
+
+            return null;
+        }
+
+        @Override
+        protected void onPostExecute(Void v) {
+            Context context = contextReference.get();
+            if (context == null) return;
+
+            // check whether there's new version
+            try {
+                int current = context.getPackageManager().getPackageInfo(context.getPackageName(), 0).versionCode;
+                Log.d("MewX", "current version code: " + current);
+                if (current < newVersionCode) {
+                    // update to new version
+                    new MaterialDialog.Builder(context)
+                            .theme(Theme.LIGHT)
+                            .title(R.string.system_update_found_new)
+                            .content(R.string.system_update_jump_to_page)
+                            .positiveText(R.string.dialog_positive_sure)
+                            .negativeText(R.string.dialog_negative_no)
+                            .negativeColorRes(R.color.menu_text_color)
+                            .callback(new MaterialDialog.ButtonCallback() {
+                                @Override
+                                public void onPositive(MaterialDialog dialog) {
+                                    super.onPositive(dialog);
+                                    Intent browserIntent = new Intent(Intent.ACTION_VIEW, Uri.parse(GlobalConfig.blogPageUrl));
+                                    context.startActivity(browserIntent);
+                                }
+                            })
+                            .show();
+
+                }
+            } catch (PackageManager.NameNotFoundException e) {
+                e.printStackTrace();
+            }
         }
     }
 }

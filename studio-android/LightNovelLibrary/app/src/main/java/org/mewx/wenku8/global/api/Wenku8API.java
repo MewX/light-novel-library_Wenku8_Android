@@ -1,12 +1,7 @@
 package org.mewx.wenku8.global.api;
 
 import android.content.ContentValues;
-import android.util.Log;
 
-import com.umeng.analytics.MobclickAgent;
-import com.umeng.onlineconfig.OnlineConfigAgent;
-
-import org.mewx.wenku8.MyApp;
 import org.mewx.wenku8.global.GlobalConfig;
 import org.mewx.wenku8.util.LightBase64;
 import org.mewx.wenku8.util.LightNetwork;
@@ -30,9 +25,6 @@ public class Wenku8API {
             NovelNotFinishedSC = "连载中", NovelNotFinishedTC = "連載中";
 
     public static String getBaseURL() {
-        if(NoticeString.equals("") || NoticeString.equals("http://weuku8.mewx.org")) {
-            NoticeString = OnlineConfigAgent.getInstance().getConfigParams(MyApp.getContext(), GlobalConfig.getCurrentLang() != LANG.SC ? "wenku8_notice_tw" : "wenku8_notice");
-        }
         return BaseURL;
     }
 

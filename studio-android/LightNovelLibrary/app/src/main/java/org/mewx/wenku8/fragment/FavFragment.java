@@ -24,13 +24,10 @@ import android.widget.Toast;
 import com.afollestad.materialdialogs.GravityEnum;
 import com.afollestad.materialdialogs.MaterialDialog;
 import com.afollestad.materialdialogs.Theme;
-import com.android.volley.ParseError;
 import com.umeng.analytics.MobclickAgent;
 
-import org.apache.http.NameValuePair;
 import org.mewx.wenku8.MyApp;
 import org.mewx.wenku8.R;
-import org.mewx.wenku8.activity.MainActivity;
 import org.mewx.wenku8.activity.NovelInfoActivity;
 import org.mewx.wenku8.adapter.NovelItemAdapterUpdate;
 import org.mewx.wenku8.global.GlobalConfig;

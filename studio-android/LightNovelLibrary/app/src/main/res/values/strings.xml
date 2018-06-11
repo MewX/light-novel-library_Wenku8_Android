@@ -94,6 +94,7 @@
     <string name="system_update_nonewifi">没有Wi-Fi，臣妾不敢轻举妄动</string>
     <string name="system_update_ignored">已忽略</string>
     <string name="system_choose_reader_engine">选择一个阅读界面引擎</string>
+    <string name="missing_permission">由于历史原因，缺少必要的权限时，app可能无法正常工作，请考虑授予相应权限</string>
     <string name="task_stop">停止加载</string>
     <string name="task_retry">点击重新加载</string>
     <string name="task_null">没有结果</string>
