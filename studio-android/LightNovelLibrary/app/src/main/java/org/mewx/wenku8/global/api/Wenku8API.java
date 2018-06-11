@@ -40,7 +40,7 @@ public class Wenku8API {
     }
 
     public static String getCoverURL(int aid) {
-        return "http://img.wenku8.com/image/" + Integer.toString(aid / 1000)
+        return "http://img.wkcdn.com/image/" + Integer.toString(aid / 1000)
                 + "/" + Integer.toString(aid) + "/" + Integer.toString(aid) + "s.jpg";
     }
 
@@ -283,6 +283,7 @@ public class Wenku8API {
 
     public static ContentValues getNovelCover(int aid) {
         // get the aid, and return a "jpg" file or other, in binary
+        // not using this because UIL does not support post to get image
         return getEncryptedCV("action=book&do=cover&aid=" + aid);
     }
 
