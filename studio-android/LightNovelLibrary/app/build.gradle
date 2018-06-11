@@ -64,7 +64,7 @@ dependencies {
     implementation 'com.android.support:recyclerview-v7:27.1.1'
     implementation 'com.android.support:design:27.1.1'
     // external libraries
-    implementation project(':volley')
+    implementation project(':volley') // DO NOT CHANGE THIS, MODIFIED VERSION
     implementation 'com.readystatesoftware.systembartint:systembartint:1.0.3'
     implementation 'com.nostra13.universalimageloader:universal-image-loader:1.9.3'
     implementation 'com.afollestad.material-dialogs:core:0.9.6.0'
