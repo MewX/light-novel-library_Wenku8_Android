@@ -9,6 +9,7 @@ import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
+import android.support.annotation.NonNull;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
 import android.text.InputType;
@@ -51,9 +52,9 @@ public class ViewImageDetailActivity extends AppCompatActivity {
         path = getIntent().getStringExtra("path");
 
         // set indicator enable
-        Toolbar mToolbar = (Toolbar) findViewById(R.id.toolbar_actionbar);
+        Toolbar mToolbar = findViewById(R.id.toolbar_actionbar);
         setSupportActionBar(mToolbar);
-        final Drawable upArrow = getResources().getDrawable(R.drawable.abc_ic_ab_back_material);
+        final Drawable upArrow = getResources().getDrawable(R.drawable.ic_svg_back);
         if(getSupportActionBar() != null && upArrow != null) {
             getSupportActionBar().setDisplayHomeAsUpEnabled(true);
             getSupportActionBar().setHomeButtonEnabled(true);
@@ -77,7 +78,7 @@ public class ViewImageDetailActivity extends AppCompatActivity {
         }
 
         // set image
-        imageView = (SubsamplingScaleImageView) findViewById(R.id.image_scalable);
+        imageView = findViewById(R.id.image_scalable);
         imageView.setImage(ImageSource.uri(path));
         imageView.setMaxScale(4.0f);
         imageView.setOnClickListener(new View.OnClickListener() {
@@ -109,51 +110,39 @@ public class ViewImageDetailActivity extends AppCompatActivity {
         });
 
         // set on click listeners
-        findViewById(R.id.btn_rotate).setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                switch (imageView.getOrientation()) {
-                    case SubsamplingScaleImageView.ORIENTATION_0:
-                        imageView.setOrientation(SubsamplingScaleImageView.ORIENTATION_90);
-                        break;
-                    case SubsamplingScaleImageView.ORIENTATION_90:
-                        imageView.setOrientation(SubsamplingScaleImageView.ORIENTATION_180);
-                        break;
-                    case SubsamplingScaleImageView.ORIENTATION_180:
-                        imageView.setOrientation(SubsamplingScaleImageView.ORIENTATION_270);
-                        break;
-                    case SubsamplingScaleImageView.ORIENTATION_270:
-                        imageView.setOrientation(SubsamplingScaleImageView.ORIENTATION_0);
-                        break;
-                }
+        findViewById(R.id.btn_rotate).setOnClickListener(v -> {
+            switch (imageView.getOrientation()) {
+                case SubsamplingScaleImageView.ORIENTATION_0:
+                    imageView.setOrientation(SubsamplingScaleImageView.ORIENTATION_90);
+                    break;
+                case SubsamplingScaleImageView.ORIENTATION_90:
+                    imageView.setOrientation(SubsamplingScaleImageView.ORIENTATION_180);
+                    break;
+                case SubsamplingScaleImageView.ORIENTATION_180:
+                    imageView.setOrientation(SubsamplingScaleImageView.ORIENTATION_270);
+                    break;
+                case SubsamplingScaleImageView.ORIENTATION_270:
+                    imageView.setOrientation(SubsamplingScaleImageView.ORIENTATION_0);
+                    break;
             }
         });
-        findViewById(R.id.btn_rotate).setOnLongClickListener(new View.OnLongClickListener() {
-            @Override
-            public boolean onLongClick(View v) {
-                Toast.makeText(ViewImageDetailActivity.this, getResources().getString(R.string.reader_rotate), Toast.LENGTH_SHORT).show();
-                return true;
-            }
+        findViewById(R.id.btn_rotate).setOnLongClickListener(v -> {
+            Toast.makeText(ViewImageDetailActivity.this, getResources().getString(R.string.reader_rotate), Toast.LENGTH_SHORT).show();
+            return true;
         });
-        findViewById(R.id.btn_download).setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                Intent i = new Intent(ViewImageDetailActivity.this, FilePickerActivity.class);
-                i.putExtra(FilePickerActivity.EXTRA_ALLOW_MULTIPLE, false);
-                i.putExtra(FilePickerActivity.EXTRA_ALLOW_CREATE_DIR, true);
-                i.putExtra(FilePickerActivity.EXTRA_MODE, FilePickerActivity.MODE_DIR);
-                i.putExtra(FilePickerActivity.EXTRA_START_PATH,
-                        GlobalConfig.pathPickedSave == null || GlobalConfig.pathPickedSave.length() == 0 ?
-                                Environment.getExternalStorageDirectory().getPath() : GlobalConfig.pathPickedSave);
-                startActivityForResult(i, 0);
-            }
+        findViewById(R.id.btn_download).setOnClickListener(v -> {
+            Intent i = new Intent(ViewImageDetailActivity.this, FilePickerActivity.class);
+            i.putExtra(FilePickerActivity.EXTRA_ALLOW_MULTIPLE, false);
+            i.putExtra(FilePickerActivity.EXTRA_ALLOW_CREATE_DIR, true);
+            i.putExtra(FilePickerActivity.EXTRA_MODE, FilePickerActivity.MODE_DIR);
+            i.putExtra(FilePickerActivity.EXTRA_START_PATH,
+                    GlobalConfig.pathPickedSave == null || GlobalConfig.pathPickedSave.length() == 0 ?
+                            Environment.getExternalStorageDirectory().getPath() : GlobalConfig.pathPickedSave);
+            startActivityForResult(i, 0);
         });
-        findViewById(R.id.btn_download).setOnLongClickListener(new View.OnLongClickListener() {
-            @Override
-            public boolean onLongClick(View v) {
-                Toast.makeText(ViewImageDetailActivity.this, getResources().getString(R.string.reader_download), Toast.LENGTH_SHORT).show();
-                return true;
-            }
+        findViewById(R.id.btn_download).setOnLongClickListener(v -> {
+            Toast.makeText(ViewImageDetailActivity.this, getResources().getString(R.string.reader_download), Toast.LENGTH_SHORT).show();
+            return true;
         });
     }
 
@@ -185,7 +174,9 @@ public class ViewImageDetailActivity extends AppCompatActivity {
             } else {
                 Uri uri = data.getData();
                 // Do something with the URI
-                runSaveProcedure(uri.toString());
+                if (uri != null) {
+                    runSaveProcedure(uri.toString());
+                }
             }
         }
     }
@@ -200,7 +191,7 @@ public class ViewImageDetailActivity extends AppCompatActivity {
                 .inputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS)
                 .input( "", "", false, new MaterialDialog.InputCallback() {
                     @Override
-                    public void onInput(MaterialDialog dialog, final CharSequence input) {
+                    public void onInput(@NonNull MaterialDialog dialog, final CharSequence input) {
                         if(LightCache.testFileExist(newuri + File.separator + input + ".jpg")) {
                             // judge force write
                             new MaterialDialog.Builder(ViewImageDetailActivity.this)
@@ -249,51 +240,45 @@ public class ViewImageDetailActivity extends AppCompatActivity {
     }
 
     private void hideNavigationBar() {
-        // set navigation bar status, remember to disable "setNavigationBarTintEnabled"
-        final int flags = View.SYSTEM_UI_FLAG_LAYOUT_STABLE
-                | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
-                | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
-                | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
-                | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY;
         // This work only for android 4.4+
         if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
+            // set navigation bar status, remember to disable "setNavigationBarTintEnabled"
+            final int flags = View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                    | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+                    | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+                    | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                    | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY;
             getWindow().getDecorView().setSystemUiVisibility(flags);
 
             // Code below is to handle presses of Volume up or Volume down.
             // Without this, after pressing volume buttons, the navigation bar will
             // show up and won't hide
             final View decorView = getWindow().getDecorView();
-            decorView.setOnSystemUiVisibilityChangeListener(new View.OnSystemUiVisibilityChangeListener() {
-                @Override
-                public void onSystemUiVisibilityChange(int visibility) {
-                    if((visibility & View.SYSTEM_UI_FLAG_FULLSCREEN) == 0) {
-                        decorView.setSystemUiVisibility(flags);
-                    }
+            decorView.setOnSystemUiVisibilityChangeListener(visibility -> {
+                if((visibility & View.SYSTEM_UI_FLAG_FULLSCREEN) == 0) {
+                    decorView.setSystemUiVisibility(flags);
                 }
             });
         }
     }
 
     private void showNavigationBar() {
-        // set navigation bar status, remember to disable "setNavigationBarTintEnabled"
-        final int flags = View.SYSTEM_UI_FLAG_LAYOUT_STABLE
-                | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
-                | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
-                | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY;
         // This work only for android 4.4+
         if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
+            // set navigation bar status, remember to disable "setNavigationBarTintEnabled"
+            final int flags = View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                    | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+                    | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+                    | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY;
             getWindow().getDecorView().setSystemUiVisibility(flags);
 
             // Code below is to handle presses of Volume up or Volume down.
             // Without this, after pressing volume buttons, the navigation bar will
             // show up and won't hide
             final View decorView = getWindow().getDecorView();
-            decorView.setOnSystemUiVisibilityChangeListener(new View.OnSystemUiVisibilityChangeListener() {
-                @Override
-                public void onSystemUiVisibilityChange(int visibility) {
-                    if((visibility & View.SYSTEM_UI_FLAG_FULLSCREEN) == 0) {
-                        decorView.setSystemUiVisibility(flags);
-                    }
+            decorView.setOnSystemUiVisibilityChangeListener(visibility -> {
+                if((visibility & View.SYSTEM_UI_FLAG_FULLSCREEN) == 0) {
+                    decorView.setSystemUiVisibility(flags);
                 }
             });
         }

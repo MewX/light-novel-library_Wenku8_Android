@@ -268,7 +268,7 @@ public class Wenku8API {
      * This part are the old API writing ways.
      * It's not efficient enough, and maybe bug-hidden.
      */
-    private static Map<String,String> getEncryptedMAP(String str) {
+    static Map<String,String> getEncryptedMAP(String str) {
         Map<String, String> params = new HashMap<>();
         params.put("request", LightBase64.EncodeBase64(str+"&timetoken="+System.currentTimeMillis()));
         return params;
@@ -276,8 +276,11 @@ public class Wenku8API {
 
     private static ContentValues getEncryptedCV(String str) {
         ContentValues cv = new ContentValues();
-        cv.put("request",LightBase64.EncodeBase64(str+"&timetoken="+System.currentTimeMillis()));
-//        Log.e("MewX", "request = " + LightBase64.EncodeBase64(str+"&timetoken="+System.currentTimeMillis()));
+        Map<String, String> map = getEncryptedMAP(str);
+        for (String key : map.keySet()) {
+            // better than running encryption again
+            cv.put(key, map.get(key));
+        }
         return cv;
     }
 

@@ -99,7 +99,7 @@ public class NovelInfoActivity extends AppCompatActivity {
         // set indicator enable
         Toolbar mToolbar = (Toolbar) findViewById(R.id.toolbar_actionbar);
         setSupportActionBar(mToolbar);
-        final Drawable upArrow = getResources().getDrawable(R.drawable.abc_ic_ab_back_material);
+        final Drawable upArrow = getResources().getDrawable(R.drawable.ic_svg_back);
         if(getSupportActionBar() != null && upArrow != null) {
             getSupportActionBar().setHomeButtonEnabled(true);
             getSupportActionBar().setDisplayHomeAsUpEnabled(true);
@@ -1212,7 +1212,7 @@ public class NovelInfoActivity extends AppCompatActivity {
         MobclickAgent.onResume(this);
 
         // return from search activity
-        final Drawable upArrow = getResources().getDrawable(R.drawable.abc_ic_ab_back_material);
+        final Drawable upArrow = getResources().getDrawable(R.drawable.ic_svg_back);
         if(getSupportActionBar() != null && upArrow != null) {
             getSupportActionBar().setHomeButtonEnabled(true);
             getSupportActionBar().setDisplayHomeAsUpEnabled(true);

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">轻小说文库</string>
-    <string name="app_description" translatable="false">MewX与轻小说文库(Wenku8.com)合作的轻小说阅读app。</string>
+    <string name="app_description">MewX与轻小说文库(Wenku8.com)合作的轻小说阅读app。</string>
     <string name="app_architect">MewX</string>
     <string name="app_ui_designer">ZERO</string>
     <string name="app_architect_text">Architect</string>
