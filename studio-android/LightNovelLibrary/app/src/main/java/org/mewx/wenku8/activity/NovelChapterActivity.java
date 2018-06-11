@@ -54,7 +54,7 @@ public class NovelChapterActivity extends AppCompatActivity {
         volumeList = (VolumeList) getIntent().getSerializableExtra("volume");
 
         // set indicator enable
-        Toolbar mToolbar = (Toolbar) findViewById(R.id.toolbar_actionbar);
+        Toolbar mToolbar = findViewById(R.id.toolbar_actionbar);
         setSupportActionBar(mToolbar);
         final Drawable upArrow = getResources().getDrawable(R.drawable.ic_svg_back);
         if(getSupportActionBar() != null && upArrow != null) {
@@ -81,14 +81,14 @@ public class NovelChapterActivity extends AppCompatActivity {
         }
 
         // get views and set title
-        LinearLayout mLinearLayout = (LinearLayout) findViewById(R.id.novel_chapter_scroll);
+        LinearLayout mLinearLayout = findViewById(R.id.novel_chapter_scroll);
         getSupportActionBar().setTitle(volumeList.volumeName);
 
         for(final ChapterInfo ci : volumeList.chapterList) {
             // get view
             RelativeLayout rl = (RelativeLayout) LayoutInflater.from(NovelChapterActivity.this).inflate(R.layout.view_novel_chapter_item, null);
 
-            TextView tv = (TextView) rl.findViewById(R.id.chapter_title);
+            TextView tv = rl.findViewById(R.id.chapter_title);
             tv.setText(ci.chapterName);
             rl.findViewById(R.id.chapter_btn).setOnClickListener(new View.OnClickListener() {
                 @Override

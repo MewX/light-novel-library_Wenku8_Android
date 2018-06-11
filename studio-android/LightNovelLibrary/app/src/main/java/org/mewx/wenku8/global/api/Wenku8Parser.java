@@ -224,4 +224,11 @@ public class Wenku8Parser {
             return null;
         }
     }
+
+    static public ReviewList parseReviewList(String xml) {
+        ReviewList reviewList = new ReviewList();
+        // TODO:
+
+        return reviewList;
+    }
 }

@@ -325,6 +325,7 @@ public class GlobalConfig {
         return true;
     }
 
+    @NonNull
     public static String loadFullFileFromSaveFolder(String subFolderName, String fileName) {
         return loadFullSaveFileContent(subFolderName + File.separator
                 + fileName);

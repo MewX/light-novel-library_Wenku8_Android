@@ -1,7 +1,6 @@
 package org.mewx.wenku8.activity;
 
 import android.content.ContentValues;
-import android.content.DialogInterface;
 import android.content.Intent;
 import android.graphics.PorterDuff;
 import android.graphics.drawable.Drawable;
@@ -97,7 +96,7 @@ public class NovelInfoActivity extends AppCompatActivity {
         title = getIntent().getStringExtra("title");
 
         // set indicator enable
-        Toolbar mToolbar = (Toolbar) findViewById(R.id.toolbar_actionbar);
+        Toolbar mToolbar = findViewById(R.id.toolbar_actionbar);
         setSupportActionBar(mToolbar);
         final Drawable upArrow = getResources().getDrawable(R.drawable.ic_svg_back);
         if(getSupportActionBar() != null && upArrow != null) {
@@ -129,21 +128,21 @@ public class NovelInfoActivity extends AppCompatActivity {
         }
 
         // get views
-        rlMask = (RelativeLayout) findViewById(R.id.white_mask);
-        mLinearLayout = (LinearLayout) findViewById(R.id.novel_info_scroll);
-        llCardLayout = (LinearLayout) findViewById(R.id.item_card);
-        ivNovelCover = (ImageView) findViewById(R.id.novel_cover);
-        tvNovelTitle = (TextView) findViewById(R.id.novel_title);
-        tvNovelAuthor = (TextView) findViewById(R.id.novel_author);
-        tvNovelStatus = (TextView) findViewById(R.id.novel_status);
-        tvNovelUpdate = (TextView) findViewById(R.id.novel_update);
-        tvNovelShortIntro = (TableRow) findViewById(R.id.novel_intro_row);
-        tvNovelFullIntro = (TextView) findViewById(R.id.novel_intro_full);
-        ibNovelOption = (ImageButton) findViewById(R.id.novel_option);
-        fabFavorate = (FloatingActionButton) findViewById(R.id.fab_favorate);
-        fabDownload = (FloatingActionButton) findViewById(R.id.fab_download);
-        famMenu = (FloatingActionsMenu) findViewById(R.id.multiple_actions);
-        spb = (SmoothProgressBar) findViewById(R.id.spb);
+        rlMask = findViewById(R.id.white_mask);
+        mLinearLayout = findViewById(R.id.novel_info_scroll);
+        llCardLayout = findViewById(R.id.item_card);
+        ivNovelCover = findViewById(R.id.novel_cover);
+        tvNovelTitle = findViewById(R.id.novel_title);
+        tvNovelAuthor = findViewById(R.id.novel_author);
+        tvNovelStatus = findViewById(R.id.novel_status);
+        tvNovelUpdate = findViewById(R.id.novel_update);
+        tvNovelShortIntro = findViewById(R.id.novel_intro_row);
+        tvNovelFullIntro = findViewById(R.id.novel_intro_full);
+        ibNovelOption = findViewById(R.id.novel_option);
+        fabFavorate = findViewById(R.id.fab_favorate);
+        fabDownload = findViewById(R.id.fab_download);
+        famMenu = findViewById(R.id.multiple_actions);
+        spb = findViewById(R.id.spb);
 
         // hide view and set colors
         tvNovelTitle.setText(title);
@@ -166,15 +165,12 @@ public class NovelInfoActivity extends AppCompatActivity {
         getSupportActionBar().setTitle(R.string.action_novel_info);
         spb.setVisibility(View.INVISIBLE); // wait for runnable
         Handler handler = new Handler();
-        handler.postDelayed(new Runnable() {
-            @Override
-            public void run() {
-                spb.setVisibility(View.VISIBLE);
-                if (from.equals(FromLocal))
-                    refreshInfoFromLocal();
-                else
-                    refreshInfoFromCloud();
-            }
+        handler.postDelayed(() -> {
+            spb.setVisibility(View.VISIBLE);
+            if (from.equals(FromLocal))
+                refreshInfoFromLocal();
+            else
+                refreshInfoFromCloud();
         }, 500);
 
 
@@ -190,40 +186,34 @@ public class NovelInfoActivity extends AppCompatActivity {
                 rlMask.setVisibility(View.INVISIBLE);
             }
         });
-        rlMask.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                // Collapse the fam
-                if (famMenu.isExpanded())
-                    famMenu.collapse();
-            }
+        rlMask.setOnClickListener(v -> {
+            // Collapse the fam
+            if (famMenu.isExpanded())
+                famMenu.collapse();
         });
         if(Build.VERSION.SDK_INT >= 16) {
             tvNovelTitle.setBackground(getResources().getDrawable(R.drawable.btn_menu_item));
             tvNovelAuthor.setBackground(getResources().getDrawable(R.drawable.btn_menu_item));
         }
-        tvNovelTitle.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                if(isLoading) {
-                    Toast.makeText(NovelInfoActivity.this, getResources().getString(R.string.system_loading_please_wait), Toast.LENGTH_SHORT).show();
-                    return;
-                }
-
-                // show aid: title
-                // Snackbar.make(mLinearLayout, aid + ": " + mNovelItemMeta.title, Snackbar.LENGTH_SHORT).show();
-                new MaterialDialog.Builder(NovelInfoActivity.this)
-                        .theme(Theme.LIGHT)
-                        .titleColorRes(R.color.dlgTitleColor)
-                        .backgroundColorRes(R.color.dlgBackgroundColor)
-                        .contentColorRes(R.color.dlgContentColor)
-                        .positiveColorRes(R.color.dlgPositiveButtonColor)
-                        .title(R.string.dialog_content_novel_title)
-                        .content(aid + ": " + mNovelItemMeta.title)
-                        .contentGravity(GravityEnum.CENTER)
-                        .positiveText(R.string.dialog_positive_known)
-                        .show();
+        tvNovelTitle.setOnClickListener(v -> {
+            if(isLoading) {
+                Toast.makeText(NovelInfoActivity.this, getResources().getString(R.string.system_loading_please_wait), Toast.LENGTH_SHORT).show();
+                return;
             }
+
+            // show aid: title
+            // Snackbar.make(mLinearLayout, aid + ": " + mNovelItemMeta.title, Snackbar.LENGTH_SHORT).show();
+            new MaterialDialog.Builder(NovelInfoActivity.this)
+                    .theme(Theme.LIGHT)
+                    .titleColorRes(R.color.dlgTitleColor)
+                    .backgroundColorRes(R.color.dlgBackgroundColor)
+                    .contentColorRes(R.color.dlgContentColor)
+                    .positiveColorRes(R.color.dlgPositiveButtonColor)
+                    .title(R.string.dialog_content_novel_title)
+                    .content(aid + ": " + mNovelItemMeta.title)
+                    .contentGravity(GravityEnum.CENTER)
+                    .positiveText(R.string.dialog_positive_known)
+                    .show();
         });
         tvNovelAuthor.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -326,7 +316,7 @@ public class NovelInfoActivity extends AppCompatActivity {
                         .itemsCallback(new MaterialDialog.ListCallback() {
                             @Override
                             public void onSelection(MaterialDialog dialog, View view, int which, CharSequence text) {
-                                /**
+                                /*
                                  * 0 <string name="dialog_option_check_for_update">检查更新</string>
                                  * 1 <string name="dialog_option_update_uncached_volumes">更新下载</string>
                                  * 2 <string name="dialog_option_force_update_all">覆盖下载</string>
@@ -351,14 +341,11 @@ public class NovelInfoActivity extends AppCompatActivity {
                                                                 .content(R.string.dialog_content_downloading)
                                                                 .progress(false, 1, true)
                                                                 .cancelable(true)
-                                                                .cancelListener(new DialogInterface.OnCancelListener() {
-                                                                    @Override
-                                                                    public void onCancel(DialogInterface dialog) {
-                                                                        isLoading = false;
-                                                                        auct.cancel(true);
-                                                                        pDialog.dismiss();
-                                                                        pDialog = null;
-                                                                    }
+                                                                .cancelListener(dialog12 -> {
+                                                                    isLoading = false;
+                                                                    auct.cancel(true);
+                                                                    pDialog.dismiss();
+                                                                    pDialog = null;
                                                                 })
                                                                 .show();
 
@@ -397,14 +384,11 @@ public class NovelInfoActivity extends AppCompatActivity {
                                                                 .content(R.string.dialog_content_downloading)
                                                                 .progress(false, 1, true)
                                                                 .cancelable(true)
-                                                                .cancelListener(new DialogInterface.OnCancelListener() {
-                                                                    @Override
-                                                                    public void onCancel(DialogInterface dialog) {
-                                                                        isLoading = false;
-                                                                        auct.cancel(true);
-                                                                        pDialog.dismiss();
-                                                                        pDialog = null;
-                                                                    }
+                                                                .cancelListener(dialog1 -> {
+                                                                    isLoading = false;
+                                                                    auct.cancel(true);
+                                                                    pDialog.dismiss();
+                                                                    pDialog = null;
                                                                 })
                                                                 .show();
 
@@ -443,14 +427,11 @@ public class NovelInfoActivity extends AppCompatActivity {
                                                                 .content(R.string.dialog_content_downloading)
                                                                 .progress(false, 1, true)
                                                                 .cancelable(true)
-                                                                .cancelListener(new DialogInterface.OnCancelListener() {
-                                                                    @Override
-                                                                    public void onCancel(DialogInterface dialog) {
-                                                                        isLoading = false;
-                                                                        auct.cancel(true);
-                                                                        pDialog.dismiss();
-                                                                        pDialog = null;
-                                                                    }
+                                                                .cancelListener(dialog13 -> {
+                                                                    isLoading = false;
+                                                                    auct.cancel(true);
+                                                                    pDialog.dismiss();
+                                                                    pDialog = null;
                                                                 })
                                                                 .show();
 
@@ -636,6 +617,9 @@ public class NovelInfoActivity extends AppCompatActivity {
             else {
                 Toast.makeText(this, "未发现保存的进度，可能是未读或上次读完了某卷~ 那么，开始下一卷吧~", Toast.LENGTH_SHORT).show();
             }
+        } else if (menuItem.getItemId() == R.id.action_go_to_forum) {
+            // TODO:
+            Toast.makeText(this, "test", Toast.LENGTH_SHORT).show();
         }
         return super.onOptionsItemSelected(menuItem);
     }
@@ -668,7 +652,7 @@ public class NovelInfoActivity extends AppCompatActivity {
             try {
                 if(fromLocal) {
                     novelFullMeta = GlobalConfig.loadFullFileFromSaveFolder("intro", aid + "-intro.xml");
-                    if(novelFullMeta == null || novelFullMeta.equals("")) return -9;
+                    if(novelFullMeta.equals("")) return -9;
                 }
                 else {
                     ContentValues cv = Wenku8API.getNovelFullMeta(aid, GlobalConfig.getCurrentLang());
@@ -688,7 +672,7 @@ public class NovelInfoActivity extends AppCompatActivity {
             try {
                 if(fromLocal) {
                     novelFullIntro = GlobalConfig.loadFullFileFromSaveFolder("intro", aid + "-introfull.xml");
-                    if(novelFullIntro == null || novelFullIntro.equals("")) return -9;
+                    if(novelFullIntro.equals("")) return -9;
                 }
                 else {
                     ContentValues cvFullIntroRequest = Wenku8API.getNovelFullIntro(aid, GlobalConfig.getCurrentLang());
@@ -708,7 +692,7 @@ public class NovelInfoActivity extends AppCompatActivity {
             try {
                 if(fromLocal) {
                     novelFullVolume = GlobalConfig.loadFullFileFromSaveFolder("intro", aid + "-volume.xml");
-                    if(novelFullVolume == null || novelFullVolume.equals("")) return -9;
+                    if(novelFullVolume.equals("")) return -9;
                 }
                 else {
                     ContentValues cv = Wenku8API.getNovelIndex(aid, GlobalConfig.getCurrentLang());
@@ -792,20 +776,17 @@ public class NovelInfoActivity extends AppCompatActivity {
                 RelativeLayout rl = (RelativeLayout) LayoutInflater.from(NovelInfoActivity.this).inflate(R.layout.view_novel_chapter_item, null);
 
                 // set text and listeners
-                TextView tv = (TextView) rl.findViewById(R.id.chapter_title);
+                TextView tv = rl.findViewById(R.id.chapter_title);
                 tv.setText(vl.volumeName);
                 if(vl.inLocal)
                     ((TextView) rl.findViewById(R.id.chapter_status)).setText(getResources().getString(R.string.bookshelf_inlocal));
-                rl.findViewById(R.id.chapter_btn).setOnClickListener(new View.OnClickListener() {
-                    @Override
-                    public void onClick(View v) {
-                        // jump to chapter select activity
-                        Intent intent = new Intent(NovelInfoActivity.this, NovelChapterActivity.class);
-                        intent.putExtra("aid", aid);
-                        intent.putExtra("volume", vl);
-                        intent.putExtra("from", from);
-                        startActivity(intent);
-                    }
+                rl.findViewById(R.id.chapter_btn).setOnClickListener(v -> {
+                    // jump to chapter select activity
+                    Intent intent = new Intent(NovelInfoActivity.this, NovelChapterActivity.class);
+                    intent.putExtra("aid", aid);
+                    intent.putExtra("volume", vl);
+                    intent.putExtra("from", from);
+                    startActivity(intent);
                 });
 
                 // add to scroll view
@@ -1079,12 +1060,7 @@ public class NovelInfoActivity extends AppCompatActivity {
                     .content(R.string.dialog_content_downloading)
                     .progress(false, 1, true)
                     .cancelable(true)
-                    .cancelListener(new DialogInterface.OnCancelListener() {
-                        @Override
-                        public void onCancel(DialogInterface dialog) {
-                            loading = false;
-                        }
-                    })
+                    .cancelListener(dialog -> loading = false)
                     .show();
             md.setProgress(0);
             md.setMaxProgress(1);
@@ -1106,7 +1082,7 @@ public class NovelInfoActivity extends AppCompatActivity {
                         // load from local first
                         if (!loading) return Wenku8Error.ErrorCode.USER_CANCELLED_TASK; // cancel
                         String xml = GlobalConfig.loadFullFileFromSaveFolder("novel", tempCi.cid + ".xml"); // prevent empty file
-                        if (xml == null || xml.length() == 0 ) {
+                        if (xml.length() == 0) {
                             byte[] tempXml = LightNetwork.LightHttpPostConnection(Wenku8API.getBaseURL(), cv);
                             if (tempXml == null) return Wenku8Error.ErrorCode.NETWORK_ERROR; // network error
                             xml = new String(tempXml, "UTF-8");

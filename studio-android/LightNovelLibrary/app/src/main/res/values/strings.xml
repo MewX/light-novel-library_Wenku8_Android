@@ -204,4 +204,5 @@
     <string name="reader_paragraph_distance">段落间距</string>
     <string name="reader_paragraph_edge_distance">段落边距</string>
     <string name="reader_view_image_no_image">请在有图的页面点击此按钮看图~</string>
+    <string name="action_go_to_forum">进入评论区</string>
 </resources>
