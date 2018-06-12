@@ -23,6 +23,7 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import com.afollestad.materialdialogs.MaterialDialog;
+import com.afollestad.materialdialogs.StackingBehavior;
 import com.afollestad.materialdialogs.Theme;
 import com.makeramen.roundedimageview.RoundedImageView;
 import com.umeng.analytics.MobclickAgent;
@@ -36,7 +37,6 @@ import org.mewx.wenku8.util.LightCache;
 import org.mewx.wenku8.util.LightTool;
 import org.mewx.wenku8.util.LightUserSession;
 
-//@TargetApi(16)
 public class NavigationDrawerFragment extends Fragment {
     private final String TAG = "NavigationDrawerFragment";
     private View mFragmentContainerView;
@@ -129,7 +129,7 @@ public class NavigationDrawerFragment extends Fragment {
                                     .theme(Theme.LIGHT)
                                     .title(R.string.main_menu_statement)
                                     .content(GlobalConfig.getOpensourceLicense())
-                                    .forceStacking(true)
+                                    .stackingBehavior(StackingBehavior.ALWAYS)
                                     .positiveColorRes(R.color.dlgPositiveButtonColor)
                                     .positiveText(R.string.dialog_positive_known)
                                     .show();

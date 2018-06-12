@@ -17,7 +17,7 @@
 #}
 
 # general
--target 1.7
+-target 1.8
 -optimizationpasses 5
 #-dontoptimize
 -dontusemixedcaseclassnames
@@ -89,16 +89,15 @@
 -keepclassmembers class * implements java.io.Serializable { *; }
 
 # umeng self
--dontwarn com.umeng.**
--keep public class * extends com.umeng.**
--keep class com.umeng.** { *; }
--keep class com.alimama.** { *; }
--keep public class com.umeng.fb.ui.ThreadView { }
-
-# umeng reflection
+-keep class com.umeng.** {*;}
 -keepclassmembers class * {
-    public <init>(org.json.JSONObject);
+   public <init> (org.json.JSONObject);
 }
+-keepclassmembers enum * {
+    public static **[] values();
+    public static ** valueOf(java.lang.String);
+}
+
 -keep public class org.mewx.wenku8.R$* {
     public static final int *;
 }

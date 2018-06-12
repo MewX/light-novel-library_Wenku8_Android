@@ -55,7 +55,7 @@ public class UserLoginActivity extends AppCompatActivity {
         if(getSupportActionBar() != null) {
             getSupportActionBar().setDisplayHomeAsUpEnabled(true);
             getSupportActionBar().setHomeButtonEnabled(true);
-            final Drawable upArrow = getResources().getDrawable(R.drawable.abc_ic_ab_back_material);
+            final Drawable upArrow = getResources().getDrawable(R.drawable.ic_svg_back);
             if(upArrow != null)
                 upArrow.setColorFilter(getResources().getColor(R.color.default_white), PorterDuff.Mode.SRC_ATOP);
             getSupportActionBar().setHomeAsUpIndicator(upArrow);

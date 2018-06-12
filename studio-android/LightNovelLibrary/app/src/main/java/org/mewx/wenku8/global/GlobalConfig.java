@@ -6,8 +6,8 @@ import android.graphics.Bitmap;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
 import android.os.Environment;
+import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
-import android.support.v4.app.Fragment;
 import android.util.Log;
 
 import com.android.volley.Cache;
@@ -43,6 +43,13 @@ import java.util.ArrayList;
 @SuppressWarnings({"UnusedDeclaration"})
 public class GlobalConfig {
 
+    // online arguments
+    public static final String blogPageUrl = "https://wenku8.mewx.org/";
+    public static final String versionCheckUrl = "https://wenku8.mewx.org/version";
+    public static final String noticeCheckSc = "https://wenku8.mewx.org/args/notice_sc";
+    public static final String noticeCheckTc = "https://wenku8.mewx.org/args/notice_tc";
+
+    // constants
     public static final String saveFolderName = "saves";
     public static final String imgsSaveFolderName = "imgs";
     public static final String customFolderName = "custom";
@@ -53,6 +60,7 @@ public class GlobalConfig {
     private static final String saveSetting = "settings.wk8";
     private static final String saveUserAccountFileName = "cert.wk8"; // certification file
     private static final String saveUserAvatarFileName = "avatar.jpg";
+    private static final String saveNoticeString = "notice.wk8"; // the notice cache from online
     private static int maxSearchHistory = 20; // default
 
     // vars
@@ -264,18 +272,19 @@ public class GlobalConfig {
      */
     public static String generateImageFileNameByURL(String url) {
         String[] s = url.split("/");
-        String result = "";
+        StringBuilder result = new StringBuilder();
         boolean canStart = false;
         for (String temp : s) {
             if (!canStart && temp.contains("."))
                 canStart = true; // judge canStart first
             else if (canStart)
-                result += temp;
+                result.append(temp);
         }
-        return result;
+        return result.toString();
     }
 
-    private static String loadFullSaveFileContent(String FileName) {
+    @NonNull
+    private static String loadFullSaveFileContent(@NonNull String FileName) {
         // get full file in file save path
         String h = "";
         if (LightCache.testFileExist(getFirstStoragePath() + saveFolderName + File.separator + FileName)) {
@@ -300,7 +309,7 @@ public class GlobalConfig {
         return h;
     }
 
-    private static boolean writeFullSaveFileContent(String FileName, String s) {
+    private static boolean writeFullSaveFileContent(String FileName, @NonNull String s) {
         // process path and filename
         String path = "", fileName = FileName;
         if (FileName.contains(File.separator)) {
@@ -316,6 +325,7 @@ public class GlobalConfig {
         return true;
     }
 
+    @NonNull
     public static String loadFullFileFromSaveFolder(String subFolderName, String fileName) {
         return loadFullSaveFileContent(subFolderName + File.separator
                 + fileName);
@@ -846,5 +856,15 @@ public class GlobalConfig {
             }
         }
         return false;
+    }
+
+    /* notice */
+    @NonNull
+    public static String loadSavedNotice() {
+        return loadFullSaveFileContent(saveNoticeString);
+    }
+
+    public static void writeTheNotice(@NonNull String noticeStr) {
+        writeFullSaveFileContent(saveNoticeString, noticeStr);
     }
 }

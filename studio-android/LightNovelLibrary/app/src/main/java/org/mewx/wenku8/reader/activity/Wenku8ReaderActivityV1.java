@@ -95,11 +95,11 @@ public class Wenku8ReaderActivityV1 extends AppCompatActivity {
 //        tempNavBarHeight = LightTool.getNavigationBarSize(this).y;
 
         // set indicator enable
-        Toolbar mToolbar = (Toolbar) findViewById(R.id.toolbar_actionbar);
+        Toolbar mToolbar = findViewById(R.id.toolbar_actionbar);
         setSupportActionBar(mToolbar);
         if(getSupportActionBar() != null) {
             getSupportActionBar().setTitle(volumeList.volumeName);
-            final Drawable upArrow = getResources().getDrawable(R.drawable.abc_ic_ab_back_material);
+            final Drawable upArrow = getResources().getDrawable(R.drawable.ic_back);
             if (upArrow != null)
                 upArrow.setColorFilter(getResources().getColor(R.color.default_white), PorterDuff.Mode.SRC_ATOP);
             getSupportActionBar().setDisplayHomeAsUpEnabled(true);
@@ -121,8 +121,7 @@ public class Wenku8ReaderActivityV1 extends AppCompatActivity {
         }
 
         // find views
-        mSliderHolder = (RelativeLayout) findViewById(R.id.slider_holder);
-//        mSlidingLayout = (SlidingLayout) findViewById(R.id.sliding_layout);
+        mSliderHolder = findViewById(R.id.slider_holder);
 
         // UIL setting
         if(ImageLoader.getInstance() == null || !ImageLoader.getInstance().isInited()) {
@@ -160,14 +159,14 @@ public class Wenku8ReaderActivityV1 extends AppCompatActivity {
     }
 
     private void hideNavigationBar() {
-        // set navigation bar status, remember to disable "setNavigationBarTintEnabled"
-        final int flags = View.SYSTEM_UI_FLAG_LAYOUT_STABLE
-                | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
-                | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
-                | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
-                | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY;
         // This work only for android 4.4+
         if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
+            // set navigation bar status, remember to disable "setNavigationBarTintEnabled"
+            final int flags = View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                    | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+                    | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+                    | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                    | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY;
             getWindow().getDecorView().setSystemUiVisibility(flags);
 
             // Code below is to handle presses of Volume up or Volume down.
@@ -273,7 +272,7 @@ public class Wenku8ReaderActivityV1 extends AppCompatActivity {
                 contentView = getLayoutInflater().inflate(R.layout.layout_reader_swipe_page, null);
 
             // prevent memory leak
-            final RelativeLayout rl = (RelativeLayout) contentView.findViewById(R.id.page_holder);
+            final RelativeLayout rl = contentView.findViewById(R.id.page_holder);
             rl.removeAllViews();
             ViewGroup.LayoutParams lp = new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
             rl.addView(pageView, lp);
@@ -520,7 +519,7 @@ public class Wenku8ReaderActivityV1 extends AppCompatActivity {
                                             findViewById(R.id.reader_bot_seeker).setVisibility(View.INVISIBLE);
                                         isOpen = !isOpen;
 
-                                        DiscreteSeekBar seeker = (DiscreteSeekBar) findViewById(R.id.reader_seekbar);
+                                        DiscreteSeekBar seeker = findViewById(R.id.reader_seekbar);
                                         seeker.setMin(1);
                                         seeker.setProgress(mSlidingPageAdapter.getCurrentFirstLineIndex() + 1); // bug here
                                         seeker.setMax(loader.getElementCount());
@@ -580,10 +579,10 @@ public class Wenku8ReaderActivityV1 extends AppCompatActivity {
                                         isOpen = !isOpen;
 
                                         // set all listeners
-                                        DiscreteSeekBar seekerFontSize = (DiscreteSeekBar) findViewById(R.id.reader_font_size_seeker),
-                                                seekerLineDistance = (DiscreteSeekBar) findViewById(R.id.reader_line_distance_seeker),
-                                                seekerParagraphDistance = (DiscreteSeekBar) findViewById(R.id.reader_paragraph_distance_seeker),
-                                                seekerParagraphEdgeDistance = (DiscreteSeekBar) findViewById(R.id.reader_paragraph_edge_distance_seeker);
+                                        DiscreteSeekBar seekerFontSize = findViewById(R.id.reader_font_size_seeker),
+                                                seekerLineDistance = findViewById(R.id.reader_line_distance_seeker),
+                                                seekerParagraphDistance = findViewById(R.id.reader_paragraph_distance_seeker),
+                                                seekerParagraphEdgeDistance = findViewById(R.id.reader_paragraph_edge_distance_seeker);
 
                                         seekerFontSize.setProgress(setting.getFontSize());
                                         seekerFontSize.setOnProgressChangeListener(new DiscreteSeekBar.OnProgressChangeListener() {

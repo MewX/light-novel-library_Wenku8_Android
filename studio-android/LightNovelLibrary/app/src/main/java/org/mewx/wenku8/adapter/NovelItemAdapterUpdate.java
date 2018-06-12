@@ -73,32 +73,24 @@ public class NovelItemAdapterUpdate extends RecyclerView.Adapter<NovelItemAdapte
             final int tempAid = i;
 
             StringRequest postRequest = new StringRequest(Request.Method.POST, Wenku8API.getBaseURL(),
-                    new Response.Listener<String>()
-                    {
-                        @Override
-                        public void onResponse(String response) {
-                            // response
-                            try {
-                                response = new String(response.getBytes(), "UTF-8");
-                            } catch (UnsupportedEncodingException e) {
-                                e.printStackTrace();
-                            }
-                            //GlobalConfig.wantDebugLog("VolleyResponse", response);
+                    response -> {
+                        // response
+                        try {
+                            response = new String(response.getBytes(), "UTF-8");
+                        } catch (UnsupportedEncodingException e) {
+                            e.printStackTrace();
+                        }
+                        //GlobalConfig.wantDebugLog("VolleyResponse", response);
 
-                            // update info
-                            //NovelItemInfoUpdate nuui = new NovelItemInfoUpdate(tempAid);
-                            mDataset.set(tempAid,NovelItemInfoUpdate.parse(response));
-                            refreshAllContent(viewHolder, tempAid);
-                            viewHolder.isLoading = false;
-                        }
+                        // update info
+                        //NovelItemInfoUpdate nuui = new NovelItemInfoUpdate(tempAid);
+                        mDataset.set(tempAid,NovelItemInfoUpdate.parse(response));
+                        refreshAllContent(viewHolder, tempAid);
+                        viewHolder.isLoading = false;
                     },
-                    new Response.ErrorListener()
-                    {
-                        @Override
-                        public void onErrorResponse(VolleyError error) {
-                            // error
-                            viewHolder.isLoading = false;
-                        }
+                    error -> {
+                        // error
+                        viewHolder.isLoading = false;
                     }
             ) {
                 @Override

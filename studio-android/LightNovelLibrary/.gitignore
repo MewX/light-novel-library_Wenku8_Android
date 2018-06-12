@@ -3,3 +3,8 @@
 .idea/
 .DS_Store
 /build
+
+# distributions
+baidu/
+coolapk/
+alpha/

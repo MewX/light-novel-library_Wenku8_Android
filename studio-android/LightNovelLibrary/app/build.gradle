@@ -9,16 +9,19 @@ android {
         targetSdkVersion 27
         versionCode 35
         versionName "1.4"
+        testInstrumentationRunner 'android.support.test.runner.AndroidJUnitRunner'
     }
     buildTypes {
         debug {
             debuggable true
             minifyEnabled true
+            testProguardFile 'proguard-rules-tests.pro'
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
         release {
             debuggable false
             minifyEnabled true
+            testProguardFile 'proguard-rules-tests.pro'
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
     }
@@ -64,7 +67,7 @@ dependencies {
     implementation 'com.android.support:recyclerview-v7:27.1.1'
     implementation 'com.android.support:design:27.1.1'
     // external libraries
-    implementation project(':volley')
+    implementation project(':volley') // DO NOT CHANGE THIS, MODIFIED VERSION
     implementation 'com.readystatesoftware.systembartint:systembartint:1.0.3'
     implementation 'com.nostra13.universalimageloader:universal-image-loader:1.9.3'
     implementation 'com.afollestad.material-dialogs:core:0.9.6.0'
@@ -77,4 +80,14 @@ dependencies {
     implementation 'com.nononsenseapps:filepicker:2.2'
     implementation 'com.umeng.sdk:common:1.5.0'
     implementation 'com.umeng.sdk:analytics:7.5.0'
+
+    androidTestImplementation 'com.android.support:support-annotations:27.1.1'
+    androidTestImplementation 'com.android.support.test:runner:1.0.2'
+    androidTestImplementation 'com.android.support.test:rules:1.0.2'
+    androidTestImplementation 'junit:junit:4.12'
+
+    testImplementation 'junit:junit:4.12'
+    testImplementation 'org.mockito:mockito-all:1.10.19'
+    testImplementation 'org.powermock:powermock-module-junit4:1.7.4'
+    testImplementation 'org.powermock:powermock-api-mockito:1.7.4'
 }

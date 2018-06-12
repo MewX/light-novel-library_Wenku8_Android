@@ -1,12 +1,7 @@
 package org.mewx.wenku8.global.api;
 
 import android.content.ContentValues;
-import android.util.Log;
 
-import com.umeng.analytics.MobclickAgent;
-import com.umeng.onlineconfig.OnlineConfigAgent;
-
-import org.mewx.wenku8.MyApp;
 import org.mewx.wenku8.global.GlobalConfig;
 import org.mewx.wenku8.util.LightBase64;
 import org.mewx.wenku8.util.LightNetwork;
@@ -30,9 +25,6 @@ public class Wenku8API {
             NovelNotFinishedSC = "连载中", NovelNotFinishedTC = "連載中";
 
     public static String getBaseURL() {
-        if(NoticeString.equals("") || NoticeString.equals("http://weuku8.mewx.org")) {
-            NoticeString = OnlineConfigAgent.getInstance().getConfigParams(MyApp.getContext(), GlobalConfig.getCurrentLang() != LANG.SC ? "wenku8_notice_tw" : "wenku8_notice");
-        }
         return BaseURL;
     }
 
@@ -48,7 +40,7 @@ public class Wenku8API {
     }
 
     public static String getCoverURL(int aid) {
-        return "http://img.wenku8.com/image/" + Integer.toString(aid / 1000)
+        return "http://img.wkcdn.com/image/" + Integer.toString(aid / 1000)
                 + "/" + Integer.toString(aid) + "/" + Integer.toString(aid) + "s.jpg";
     }
 
@@ -276,7 +268,7 @@ public class Wenku8API {
      * This part are the old API writing ways.
      * It's not efficient enough, and maybe bug-hidden.
      */
-    private static Map<String,String> getEncryptedMAP(String str) {
+    static Map<String,String> getEncryptedMAP(String str) {
         Map<String, String> params = new HashMap<>();
         params.put("request", LightBase64.EncodeBase64(str+"&timetoken="+System.currentTimeMillis()));
         return params;
@@ -284,13 +276,17 @@ public class Wenku8API {
 
     private static ContentValues getEncryptedCV(String str) {
         ContentValues cv = new ContentValues();
-        cv.put("request",LightBase64.EncodeBase64(str+"&timetoken="+System.currentTimeMillis()));
-//        Log.e("MewX", "request = " + LightBase64.EncodeBase64(str+"&timetoken="+System.currentTimeMillis()));
+        Map<String, String> map = getEncryptedMAP(str);
+        for (String key : map.keySet()) {
+            // better than running encryption again
+            cv.put(key, map.get(key));
+        }
         return cv;
     }
 
     public static ContentValues getNovelCover(int aid) {
         // get the aid, and return a "jpg" file or other, in binary
+        // not using this because UIL does not support post to get image
         return getEncryptedCV("action=book&do=cover&aid=" + aid);
     }
 

@@ -10,12 +10,10 @@ import android.support.v7.widget.DefaultItemAnimator;
 import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
 import android.support.v7.widget.Toolbar;
-import android.view.KeyEvent;
 import android.view.MenuItem;
 import android.view.View;
 import android.widget.EditText;
 import android.widget.ImageView;
-import android.widget.TextView;
 import android.widget.Toast;
 
 import com.afollestad.materialdialogs.GravityEnum;
@@ -51,19 +49,14 @@ public class SearchActivity extends AppCompatActivity implements MyItemClickList
 
         // bind views
 //        searchContainer = (LinearLayout)findViewById(R.id.search_container);
-        toolbarSearchView = (EditText) findViewById(R.id.search_view);
+        toolbarSearchView = findViewById(R.id.search_view);
         View searchClearButton = findViewById(R.id.search_clear);
 
         // Clear search text when clear button is tapped
-        searchClearButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                toolbarSearchView.setText("");
-            }
-        });
+        searchClearButton.setOnClickListener(v -> toolbarSearchView.setText(""));
 
         // set indicator enable
-        Toolbar mToolbar = (Toolbar) findViewById(R.id.toolbar_actionbar);
+        Toolbar mToolbar = findViewById(R.id.toolbar_actionbar);
         setSupportActionBar(mToolbar);
         if(getSupportActionBar() != null) {
             getSupportActionBar().setDisplayHomeAsUpEnabled(true);
@@ -89,14 +82,14 @@ public class SearchActivity extends AppCompatActivity implements MyItemClickList
         }
 
         // set search clear icon color
-        ImageView searchClearIcon = (ImageView)findViewById(R.id.search_clear_icon);
+        ImageView searchClearIcon = findViewById(R.id.search_clear_icon);
         searchClearIcon.setColorFilter(getResources().getColor(R.color.mySearchToggleColor), PorterDuff.Mode.SRC_ATOP);
 
         // set history list
         LinearLayoutManager mLayoutManager = new LinearLayoutManager(this);
         mLayoutManager.setOrientation(LinearLayoutManager.VERTICAL);
 
-        RecyclerView mRecyclerView = (RecyclerView) this.findViewById(R.id.search_history_list);
+        RecyclerView mRecyclerView = this.findViewById(R.id.search_history_list);
         mRecyclerView.setHasFixedSize(true); // set variable size
         mRecyclerView.setItemAnimator(new DefaultItemAnimator());
         mRecyclerView.setLayoutManager(mLayoutManager);
@@ -108,27 +101,24 @@ public class SearchActivity extends AppCompatActivity implements MyItemClickList
         mRecyclerView.setAdapter(adapter);
 
         // set search action
-        toolbarSearchView.setOnEditorActionListener(new TextView.OnEditorActionListener() {
-            @Override
-            public boolean onEditorAction(TextView v, int actionId, KeyEvent event) {
-                // purify
-                String temp = toolbarSearchView.getText().toString().trim();
-                if(temp.length()==0) return false;
+        toolbarSearchView.setOnEditorActionListener((v, actionId, event) -> {
+            // purify
+            String temp = toolbarSearchView.getText().toString().trim();
+            if(temp.length()==0) return false;
 
-                // real action
-                //Toast.makeText(MyApp.getContext(), temp, Toast.LENGTH_SHORT).show();
-                GlobalConfig.addSearchHistory(temp);
-                refreshHistoryList();
+            // real action
+            //Toast.makeText(MyApp.getContext(), temp, Toast.LENGTH_SHORT).show();
+            GlobalConfig.addSearchHistory(temp);
+            refreshHistoryList();
 
-                // jump to search
-                Intent intent = new Intent(SearchActivity.this, SearchResultActivity.class);
-                intent.putExtra("key", temp);
-                intent.addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT); // long-press will cause repetitions
-                startActivity(intent);
-                overridePendingTransition( R.anim.fade_in, R.anim.hold);
+            // jump to search
+            Intent intent = new Intent(SearchActivity.this, SearchResultActivity.class);
+            intent.putExtra("key", temp);
+            intent.addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT); // long-press will cause repetitions
+            startActivity(intent);
+            overridePendingTransition( R.anim.fade_in, R.anim.hold);
 
-                return false;
-            }
+            return false;
         });
     }
 
@@ -138,7 +128,7 @@ public class SearchActivity extends AppCompatActivity implements MyItemClickList
         MobclickAgent.onResume(this);
 
         // set back arrow icon
-        final Drawable upArrow = getResources().getDrawable(R.drawable.abc_ic_ab_back_material);
+        final Drawable upArrow = getResources().getDrawable(R.drawable.ic_svg_back);
         if(upArrow != null && getSupportActionBar() != null) {
             upArrow.setColorFilter(getResources().getColor(R.color.mySearchToggleColor), PorterDuff.Mode.SRC_ATOP);
             getSupportActionBar().setHomeAsUpIndicator(upArrow);

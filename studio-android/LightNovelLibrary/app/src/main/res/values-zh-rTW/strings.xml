@@ -202,4 +202,7 @@
     <string name="reader_paragraph_distance">段落間距</string>
     <string name="reader_paragraph_edge_distance">段落邊距</string>
     <string name="reader_view_image_no_image">請在有圖的頁面點擊此按鈕看圖~</string>
+    <string name="app_description">MewX與輕小說文庫(Wenku8.com)合作的輕小說閱讀app。</string>
+    <string name="missing_permission">由於歷史原因，缺少必要的權限時，app可能無法正常工作，請考慮授予相應權限</string>
+    <string name="action_go_to_forum">進入評論區</string>
 </resources>
