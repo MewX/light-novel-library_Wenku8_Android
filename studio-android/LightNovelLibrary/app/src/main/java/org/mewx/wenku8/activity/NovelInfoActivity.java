@@ -619,7 +619,7 @@ public class NovelInfoActivity extends AppCompatActivity {
             }
         } else if (menuItem.getItemId() == R.id.action_go_to_forum) {
             // TODO:
-            Toast.makeText(this, "test", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, "下个版本这里就能点进评论区啦", Toast.LENGTH_SHORT).show();
         }
         return super.onOptionsItemSelected(menuItem);
     }
