@@ -267,9 +267,8 @@ public class MainActivity extends AppCompatActivity {
         MobclickAgent.onResume(this);
 
         // load only the first time this activity is created
-        if (!NEW_VERSION_CHECKED.get()) {
-            NEW_VERSION_CHECKED.set(true);
-            new ArgsInitializer(MainActivity.this).execute();
+        if (!NEW_VERSION_CHECKED.getAndSet(true)) {
+            if (!NEW_VERSION_CHECKED.get()) new ArgsInitializer(MainActivity.this).execute();
         }
     }
 

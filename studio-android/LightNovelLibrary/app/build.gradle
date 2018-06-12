@@ -7,8 +7,8 @@ android {
         applicationId "org.mewx.wenku8"
         minSdkVersion 15
         targetSdkVersion 27
-        versionCode 35
-        versionName "1.4"
+        versionCode 36
+        versionName "1.5"
         testInstrumentationRunner 'android.support.test.runner.AndroidJUnitRunner'
     }
     buildTypes {
