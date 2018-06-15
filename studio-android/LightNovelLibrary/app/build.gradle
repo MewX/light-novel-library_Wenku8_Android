@@ -1,12 +1,12 @@
 apply plugin: 'com.android.application'
 
 android {
-    compileSdkVersion 27
-    buildToolsVersion '27.0.3'
+    compileSdkVersion rootProject.targetSdkVersion
+    buildToolsVersion rootProject.buildToolsVersion
     defaultConfig {
         applicationId "org.mewx.wenku8"
         minSdkVersion 15
-        targetSdkVersion 27
+        targetSdkVersion rootProject.targetSdkVersion
         versionCode 36
         versionName "1.5"
         testInstrumentationRunner 'android.support.test.runner.AndroidJUnitRunner'
@@ -14,14 +14,13 @@ android {
     buildTypes {
         debug {
             debuggable true
-            minifyEnabled true
-            testProguardFile 'proguard-rules-tests.pro'
+            minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
         release {
             debuggable false
             minifyEnabled true
-            testProguardFile 'proguard-rules-tests.pro'
+            testProguardFile 'proguard-rules-tests.pro' // FIXME - the rule does not work
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
     }
@@ -61,11 +60,11 @@ android {
 }
 
 dependencies {
-    implementation 'com.android.support:support-v4:27.1.1'
-    implementation 'com.android.support:appcompat-v7:27.1.1'
-    implementation 'com.android.support:cardview-v7:27.1.1'
-    implementation 'com.android.support:recyclerview-v7:27.1.1'
-    implementation 'com.android.support:design:27.1.1'
+    implementation 'com.android.support:support-v4:' + rootProject.supportLibVersion
+    implementation 'com.android.support:appcompat-v7:' + rootProject.supportLibVersion
+    implementation 'com.android.support:cardview-v7:' + rootProject.supportLibVersion
+    implementation 'com.android.support:recyclerview-v7:' + rootProject.supportLibVersion
+    implementation 'com.android.support:design:' + rootProject.supportLibVersion
     // external libraries
     implementation project(':volley') // DO NOT CHANGE THIS, MODIFIED VERSION
     implementation 'com.readystatesoftware.systembartint:systembartint:1.0.3'
@@ -81,7 +80,7 @@ dependencies {
     implementation 'com.umeng.sdk:common:1.5.0'
     implementation 'com.umeng.sdk:analytics:7.5.0'
 
-    androidTestImplementation 'com.android.support:support-annotations:27.1.1'
+    androidTestImplementation 'com.android.support:support-annotations:' + rootProject.supportLibVersion
     androidTestImplementation 'com.android.support.test:runner:1.0.2'
     androidTestImplementation 'com.android.support.test:rules:1.0.2'
     androidTestImplementation 'junit:junit:4.12'

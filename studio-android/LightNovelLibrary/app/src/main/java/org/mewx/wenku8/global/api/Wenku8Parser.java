@@ -2,7 +2,6 @@ package org.mewx.wenku8.global.api;
 
 import android.util.Log;
 
-import org.mewx.wenku8.global.GlobalConfig;
 import org.mewx.wenku8.util.LightTool;
 import org.xmlpull.v1.XmlPullParser;
 import org.xmlpull.v1.XmlPullParserFactory;
@@ -262,21 +261,21 @@ public class Wenku8Parser {
                             noReplies = Integer.valueOf(xmlPullParser.getAttributeValue(null, "replies"));
                             String postTimeStr = xmlPullParser.getAttributeValue(null, "posttime");
                             postTime = new GregorianCalendar(
-                                    Integer.valueOf(postTimeStr.substring(0, 2), 10),
-                                    Integer.valueOf(postTimeStr.substring(2, 4), 10),
+                                    Integer.valueOf(postTimeStr.substring(0, 4), 10),
                                     Integer.valueOf(postTimeStr.substring(4, 6), 10),
                                     Integer.valueOf(postTimeStr.substring(6, 8), 10),
                                     Integer.valueOf(postTimeStr.substring(8, 10), 10),
-                                    Integer.valueOf(postTimeStr.substring(10), 10)
+                                    Integer.valueOf(postTimeStr.substring(10, 12), 10),
+                                    Integer.valueOf(postTimeStr.substring(12), 10)
                             ).getTime();
                             String replyTimeStr = xmlPullParser.getAttributeValue(null, "replytime");
                             lastReplyTime = new GregorianCalendar(
-                                    Integer.valueOf(replyTimeStr.substring(0, 2), 10),
-                                    Integer.valueOf(replyTimeStr.substring(2, 4), 10),
+                                    Integer.valueOf(replyTimeStr.substring(0, 4), 10),
                                     Integer.valueOf(replyTimeStr.substring(4, 6), 10),
                                     Integer.valueOf(replyTimeStr.substring(6, 8), 10),
                                     Integer.valueOf(replyTimeStr.substring(8, 10), 10),
-                                    Integer.valueOf(replyTimeStr.substring(10), 10)
+                                    Integer.valueOf(replyTimeStr.substring(10, 12), 10),
+                                    Integer.valueOf(replyTimeStr.substring(12), 10)
                             ).getTime();
                         } else if ("user".equals(xmlPullParser.getName())) {
                             uid = Integer.valueOf(xmlPullParser.getAttributeValue(null, "uid"));
