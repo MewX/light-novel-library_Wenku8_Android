@@ -780,6 +780,23 @@ public class NovelInfoActivity extends AppCompatActivity {
                 tv.setText(vl.volumeName);
                 if(vl.inLocal)
                     ((TextView) rl.findViewById(R.id.chapter_status)).setText(getResources().getString(R.string.bookshelf_inlocal));
+                rl.findViewById(R.id.chapter_btn).setOnLongClickListener(v -> {
+                   new MaterialDialog.Builder(NovelInfoActivity.this)
+                      .theme(Theme.LIGHT)
+                      .callback(new MaterialDialog.ButtonCallback() {
+                         @Override
+                         public void onPositive(MaterialDialog dialog) {
+                            super.onPositive(dialog);
+                            vl.cleanLocalCache();
+                            ((TextView) rl.findViewById(R.id.chapter_status)).setText("");
+                         }
+                      })
+                   .content(R.string.dialog_sure_to_clear_cache)
+                      .positiveText(R.string.dialog_positive_want)
+                      .negativeText(R.string.dialog_negative_biao)
+                      .show();
+                   return true;
+                });
                 rl.findViewById(R.id.chapter_btn).setOnClickListener(v -> {
                     // jump to chapter select activity
                     Intent intent = new Intent(NovelInfoActivity.this, NovelChapterActivity.class);
