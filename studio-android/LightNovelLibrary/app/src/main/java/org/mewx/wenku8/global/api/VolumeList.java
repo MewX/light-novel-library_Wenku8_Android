@@ -1,7 +1,14 @@
 package org.mewx.wenku8.global.api;
 
+import org.mewx.wenku8.global.GlobalConfig;
+import org.mewx.wenku8.util.LightCache;
+import org.mewx.wenku8.util.LightNetwork;
+
+import java.io.File;
 import java.io.Serializable;
+import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Created by MewX on 2015/5/13.
@@ -12,4 +19,27 @@ public class VolumeList implements Serializable {
     public int vid;
     public boolean inLocal = false;
     public ArrayList<ChapterInfo> chapterList;
+    public void cleanLocalCache() {
+        for (ChapterInfo tempCi : this.chapterList) {
+            String xml = GlobalConfig.loadFullFileFromSaveFolder("novel", tempCi.cid + ".xml");
+            if (xml == null || xml.length() == 0) {
+                return;
+            }
+            List<OldNovelContentParser.NovelContent> nc = OldNovelContentParser.NovelContentParser_onlyImage(xml);
+            if (nc == null) return;
+            for (int i = 0; i < nc.size(); i++) {
+                if (nc.get(i).type == 'i'){
+                    String imgFileName = GlobalConfig.generateImageFileNameByURL(nc.get(i).content);
+                    LightCache.deleteFile(
+                            GlobalConfig.getFirstFullSaveFilePath()+
+                                    GlobalConfig.imgsSaveFolderName + File.separator + imgFileName);
+                    LightCache.deleteFile(
+                            GlobalConfig.getSecondFullSaveFilePath()+
+                                    GlobalConfig.imgsSaveFolderName + File.separator + imgFileName);
+                }
+            }
+            LightCache.deleteFile(GlobalConfig.getFirstFullSaveFilePath(), "novel" + File.separator + tempCi.cid + ".xml");
+            LightCache.deleteFile(GlobalConfig.getSecondFullSaveFilePath(), "novel" + File.separator + tempCi.cid + ".xml");
+        }
+    }
 }

@@ -171,8 +171,34 @@ public class FavFragment extends Fragment implements MyItemClickListener, MyItem
 
     @Override
     public void onItemLongClick(View view, int position) {
-        // Toast.makeText(getActivity(),"item long click detected", Toast.LENGTH_SHORT).show();
+       new MaterialDialog.Builder(getActivity())
+          .callback(new MaterialDialog.ButtonCallback() {
+             @Override
+             public void onPositive(MaterialDialog dialog) {
+                super.onPositive(dialog);
+                int aid = listNovelItemAid.get(position);
+                List<VolumeList> listVolume;
+                String novelFullVolume;
+                novelFullVolume = GlobalConfig.loadFullFileFromSaveFolder("intro", aid + "-volume.xml");
+                if(novelFullVolume == null || novelFullVolume.equals("")) return;
+                listVolume = Wenku8Parser.getVolumeList(novelFullVolume);
+                if(listVolume == null) return;
+                cleanVolumesCache(listVolume, aid);
+             }
+          })
+       .theme(Theme.LIGHT)
+          .content(R.string.dialog_sure_to_clear_cache)
+          .contentGravity(GravityEnum.CENTER)
+          .positiveText(R.string.dialog_positive_sure)
+          .negativeText(R.string.dialog_negative_preferno)
+          .show();
+    }
 
+    private void cleanVolumesCache(List<VolumeList> listVolume, int aid) {
+        // remove from local bookshelf, already in bookshelf
+        for (VolumeList vl : listVolume) {
+            vl.cleanLocalCache();
+        }
     }
 
     private void refreshList(int time) {
@@ -488,14 +514,7 @@ public class FavFragment extends Fragment implements MyItemClickListener, MyItem
                     listVolume = Wenku8Parser.getVolumeList(novelFullVolume);
                     if(listVolume == null) return Wenku8Error.ErrorCode.XML_PARSE_FAILED;
 
-                    // remove from local bookshelf, already in bookshelf
-                    for (VolumeList tempVl : listVolume) {
-                        for (ChapterInfo tempCi : tempVl.chapterList) {
-                            LightCache.deleteFile(GlobalConfig.getFirstFullSaveFilePath(), "novel" + File.separator + tempCi.cid + ".xml");
-                            LightCache.deleteFile(GlobalConfig.getSecondFullSaveFilePath(), "novel" + File.separator + tempCi.cid + ".xml");
-                        }
-                    }
-
+                    cleanVolumesCache(listVolume, aid);
                     // delete files
                     LightCache.deleteFile(GlobalConfig.getFirstFullSaveFilePath(), "intro" + File.separator + aid + "-intro.xml");
                     LightCache.deleteFile(GlobalConfig.getFirstFullSaveFilePath(), "intro" + File.separator + aid + "-introfull.xml");
@@ -503,7 +522,6 @@ public class FavFragment extends Fragment implements MyItemClickListener, MyItem
                     LightCache.deleteFile(GlobalConfig.getSecondFullSaveFilePath(), "intro" + File.separator + aid + "-intro.xml");
                     LightCache.deleteFile(GlobalConfig.getSecondFullSaveFilePath(), "intro" + File.separator + aid + "-introfull.xml");
                     LightCache.deleteFile(GlobalConfig.getSecondFullSaveFilePath(), "intro" + File.separator + aid + "-volume.xml");
-
                     // remove from bookshelf
                     GlobalConfig.removeFromLocalBookshelf(aid);
                     if (!GlobalConfig.testInLocalBookshelf(aid)) { // not in

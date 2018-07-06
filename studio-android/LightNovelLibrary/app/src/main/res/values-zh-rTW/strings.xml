@@ -119,6 +119,7 @@
     <string name="dialog_content_wipe_cache_fast">正在快速清理緩存……</string>
     <string name="dialog_content_wipe_cache_slow">正在仔細清理緩存……</string>
     <string name="dialog_sure_to_jump_chapter">確定要跳轉章節？</string>
+    <string name="dialog_sure_to_clear_cache">要清除緩存嗎？</string>
     <string name="dialog_positive_ok">OK</string>
     <string name="dialog_positive_want">要</string>
     <string name="dialog_positive_sure">好滴~</string>
