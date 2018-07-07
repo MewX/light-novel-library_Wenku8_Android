@@ -470,7 +470,7 @@ public class Wenku8ReaderActivityV1 extends AppCompatActivity {
                     int x = (int) event.getX();
                     int y = (int) event.getY();
 
-                    if(x > screenWidth / 3 && x < screenWidth * 2 / 3 && y > screenHeight / 3 && y < screenHeight * 2 / 3) {
+                    if(x > screenWidth / 3 && x < screenWidth * 2 / 3) {
                         // first init
                         if(!barStatus) {
                             showNavigationBar();
@@ -834,9 +834,9 @@ public class Wenku8ReaderActivityV1 extends AppCompatActivity {
                         return;
                     }
 
-                    if (x > screenWidth / 2) {
+                    if (x > screenWidth * 2 / 3) {
                         gotoNextPage();
-                    } else if (x <= screenWidth / 2) {
+                    } else if (x <= screenWidth / 3) {
                         gotoPreviousPage();
                     }
                 }
