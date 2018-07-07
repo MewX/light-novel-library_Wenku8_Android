@@ -7,6 +7,11 @@
         <item>@string/dialog_option_select_and_update</item>
     </string-array>
 
+    <string-array name="cleanup_option">
+        <item>@string/config_clear_cache</item>
+        <item>@string/dialog_delete_book</item>
+    </string-array>
+
     <string-array name="reader_engine_option">
         <item>@string/dialog_option_reader_engine_v1</item>
         <item>@string/dialog_option_reader_engine_old</item>
