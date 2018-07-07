@@ -41,5 +41,6 @@ public class VolumeList implements Serializable {
             LightCache.deleteFile(GlobalConfig.getFirstFullSaveFilePath(), "novel" + File.separator + tempCi.cid + ".xml");
             LightCache.deleteFile(GlobalConfig.getSecondFullSaveFilePath(), "novel" + File.separator + tempCi.cid + ".xml");
         }
+        this.inLocal = false;
     }
 }

@@ -788,14 +788,13 @@ public class NovelInfoActivity extends AppCompatActivity {
                          public void onPositive(MaterialDialog dialog) {
                             super.onPositive(dialog);
                             vl.cleanLocalCache();
+                            ((TextView) rl.findViewById(R.id.chapter_status)).setText("");
                          }
                       })
                    .content(R.string.dialog_sure_to_clear_cache)
                       .positiveText(R.string.dialog_positive_want)
                       .negativeText(R.string.dialog_negative_biao)
                       .show();
-                   vl.inLocal = false;
-                   ((TextView) rl.findViewById(R.id.chapter_status)).setText("");
                    return true;
                 });
                 rl.findViewById(R.id.chapter_btn).setOnClickListener(v -> {
