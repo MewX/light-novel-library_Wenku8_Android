@@ -19,6 +19,7 @@ public class VolumeList implements Serializable {
     public int vid;
     public boolean inLocal = false;
     public ArrayList<ChapterInfo> chapterList;
+
     public void cleanLocalCache() {
         for (ChapterInfo tempCi : this.chapterList) {
             String xml = GlobalConfig.loadFullFileFromSaveFolder("novel", tempCi.cid + ".xml");

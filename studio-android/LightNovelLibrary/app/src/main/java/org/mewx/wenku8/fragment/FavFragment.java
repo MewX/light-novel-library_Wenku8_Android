@@ -18,6 +18,7 @@ import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.ImageButton;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -148,53 +149,78 @@ public class FavFragment extends Fragment implements MyItemClickListener, MyItem
 
     @Override
     public void onDeleteClick(View view, final int position) {
-        // popup to show delete
-        new MaterialDialog.Builder(getActivity())
-                .callback(new MaterialDialog.ButtonCallback() {
-                    @Override
-                    public void onPositive(MaterialDialog dialog) {
-                        super.onPositive(dialog);
-                        // delete operatio, delete from cloud first, if succeed then delete from local
-                        AsyncRemoveBookFromCloud arbfc = new AsyncRemoveBookFromCloud();
-                        arbfc.execute(listNovelItemAid.get(position));
-                        listNovelItemAid.remove(position);
-                        refreshList(timecount ++);
-                    }
-                })
-                .theme(Theme.LIGHT)
-                .content(R.string.dialog_content_want_to_delete)
-                .contentGravity(GravityEnum.CENTER)
-                .positiveText(R.string.dialog_positive_sure)
-                .negativeText(R.string.dialog_negative_preferno)
-                .show();
+
     }
 
     @Override
     public void onItemLongClick(View view, int position) {
-       new MaterialDialog.Builder(getActivity())
-          .callback(new MaterialDialog.ButtonCallback() {
-             @Override
-             public void onPositive(MaterialDialog dialog) {
-                super.onPositive(dialog);
-                int aid = listNovelItemAid.get(position);
-                List<VolumeList> listVolume;
-                String novelFullVolume;
-                novelFullVolume = GlobalConfig.loadFullFileFromSaveFolder("intro", aid + "-volume.xml");
-                if(novelFullVolume == null || novelFullVolume.equals("")) return;
-                listVolume = Wenku8Parser.getVolumeList(novelFullVolume);
-                if(listVolume == null) return;
-                cleanVolumesCache(listVolume, aid);
-             }
-          })
-       .theme(Theme.LIGHT)
-          .content(R.string.dialog_sure_to_clear_cache)
-          .contentGravity(GravityEnum.CENTER)
-          .positiveText(R.string.dialog_positive_sure)
-          .negativeText(R.string.dialog_negative_preferno)
-          .show();
+        new MaterialDialog.Builder(getActivity())
+            .theme(Theme.LIGHT)
+            .title(R.string.dialog_title_choose_download_option)
+            .backgroundColorRes(R.color.dlgBackgroundColor)
+            .titleColorRes(R.color.dlgTitleColor)
+            .negativeText(R.string.dialog_negative_pass)
+            .negativeColorRes(R.color.dlgNegativeButtonColor)
+            .itemsGravity(GravityEnum.CENTER)
+            .items(R.array.cleanup_option)
+            .itemsCallback(new MaterialDialog.ListCallback() {
+                @Override
+                public void onSelection(MaterialDialog dialog, View view, int which, CharSequence text) {
+                    /*
+                     * 0 <string name="dialog_clear_cache">清除缓存</string>
+                     * 1 <string name="dialog_delete_book">删除这本书</string>
+                     */
+                    switch (which) {
+                        case 0:
+                            new MaterialDialog.Builder(getActivity())
+                                    .callback(new MaterialDialog.ButtonCallback() {
+                                        @Override
+                                        public void onPositive(MaterialDialog dialog) {
+                                            super.onPositive(dialog);
+                                            int aid = listNovelItemAid.get(position);
+                                            List<VolumeList> listVolume;
+                                            String novelFullVolume;
+                                            novelFullVolume = GlobalConfig.loadFullFileFromSaveFolder("intro", aid + "-volume.xml");
+                                            if(novelFullVolume == null || novelFullVolume.equals("")) return;
+                                            listVolume = Wenku8Parser.getVolumeList(novelFullVolume);
+                                            if(listVolume == null) return;
+                                            cleanVolumesCache(listVolume);
+                                        }
+                                    })
+                                    .theme(Theme.LIGHT)
+                                    .content(R.string.dialog_sure_to_clear_cache)
+                                    .contentGravity(GravityEnum.CENTER)
+                                    .positiveText(R.string.dialog_positive_sure)
+                                    .negativeText(R.string.dialog_negative_preferno)
+                                    .show();
+                            break;
+                        case 1:
+                            new MaterialDialog.Builder(getActivity())
+                                    .callback(new MaterialDialog.ButtonCallback() {
+                                        @Override
+                                        public void onPositive(MaterialDialog dialog) {
+                                            super.onPositive(dialog);
+                                            // delete operatio, delete from cloud first, if succeed then delete from local
+                                            AsyncRemoveBookFromCloud arbfc = new AsyncRemoveBookFromCloud();
+                                            arbfc.execute(listNovelItemAid.get(position));
+                                            listNovelItemAid.remove(position);
+                                            refreshList(timecount ++);
+                                        }
+                                    })
+                                    .theme(Theme.LIGHT)
+                                    .content(R.string.dialog_content_want_to_delete)
+                                    .contentGravity(GravityEnum.CENTER)
+                                    .positiveText(R.string.dialog_positive_sure)
+                                    .negativeText(R.string.dialog_negative_preferno)
+                                    .show();
+                            break;
+                    }
+                }
+            })
+            .show();
     }
 
-    private void cleanVolumesCache(List<VolumeList> listVolume, int aid) {
+    private void cleanVolumesCache(List<VolumeList> listVolume) {
         // remove from local bookshelf, already in bookshelf
         for (VolumeList vl : listVolume) {
             vl.cleanLocalCache();
@@ -514,7 +540,7 @@ public class FavFragment extends Fragment implements MyItemClickListener, MyItem
                     listVolume = Wenku8Parser.getVolumeList(novelFullVolume);
                     if(listVolume == null) return Wenku8Error.ErrorCode.XML_PARSE_FAILED;
 
-                    cleanVolumesCache(listVolume, aid);
+                    cleanVolumesCache(listVolume);
                     // delete files
                     LightCache.deleteFile(GlobalConfig.getFirstFullSaveFilePath(), "intro" + File.separator + aid + "-intro.xml");
                     LightCache.deleteFile(GlobalConfig.getFirstFullSaveFilePath(), "intro" + File.separator + aid + "-introfull.xml");

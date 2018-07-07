@@ -99,7 +99,7 @@
     <string name="dialog_title_choose_download_option">選擇執行的下載操作：</string>
     <string name="dialog_title_save_file_name">輸入保存的文件名（不要加.jpg）</string>
     <string name="dialog_title_found_file">目標文件已存在</string>
-    <string name="dialog_content_want_to_delete">要刪除這本書嗎？</string>
+    <string name="dialog_content_want_to_delete">要刪除這本書嗎？（緩存的小說內容也會刪除）</string>
     <string name="dialog_content_language_tip">緩存內容如何切換語言？\n書架可以下拉重新獲取繁體內容；已緩存的內容可以通過覆蓋下載獲取當前語言內容；</string>
     <string name="dialog_content_search_author">要查找所有該作者的書嗎？</string>
     <string name="dialog_content_delete_one_search_record">確定要刪除該搜索歷史嗎？\n</string>
@@ -120,6 +120,7 @@
     <string name="dialog_content_wipe_cache_slow">正在仔細清理緩存……</string>
     <string name="dialog_sure_to_jump_chapter">確定要跳轉章節？</string>
     <string name="dialog_sure_to_clear_cache">要清除緩存嗎？</string>
+    <string name="dialog_delete_book">刪除這本書</string>
     <string name="dialog_positive_ok">OK</string>
     <string name="dialog_positive_want">要</string>
     <string name="dialog_positive_sure">好滴~</string>
