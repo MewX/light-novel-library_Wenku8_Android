@@ -99,6 +99,7 @@
     <string name="task_retry">点击重新加载</string>
     <string name="task_null">没有结果</string>
     <string name="dialog_title_choose_download_option">选择执行的下载操作：</string>
+    <string name="dialog_title_choose_delete_option">选择执行的删除操作：</string>
     <string name="dialog_title_save_file_name">输入保存的文件名（不要加.jpg）</string>
     <string name="dialog_title_found_file">目标文件已存在</string>
     <string name="dialog_content_want_to_delete">要删除这本书吗？（缓存的小说内容也会删除）</string>

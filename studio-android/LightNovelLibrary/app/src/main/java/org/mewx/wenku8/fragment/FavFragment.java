@@ -156,7 +156,7 @@ public class FavFragment extends Fragment implements MyItemClickListener, MyItem
     public void onItemLongClick(View view, int position) {
         new MaterialDialog.Builder(getActivity())
             .theme(Theme.LIGHT)
-            .title(R.string.dialog_title_choose_download_option)
+            .title(R.string.dialog_title_choose_delete_option)
             .backgroundColorRes(R.color.dlgBackgroundColor)
             .titleColorRes(R.color.dlgTitleColor)
             .negativeText(R.string.dialog_negative_pass)
