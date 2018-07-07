@@ -780,7 +780,7 @@ public class NovelInfoActivity extends AppCompatActivity {
                 tv.setText(vl.volumeName);
                 if(vl.inLocal)
                     ((TextView) rl.findViewById(R.id.chapter_status)).setText(getResources().getString(R.string.bookshelf_inlocal));
-                tv.setOnLongClickListener(v -> {
+                rl.findViewById(R.id.chapter_btn).setOnLongClickListener(v -> {
                    new MaterialDialog.Builder(NovelInfoActivity.this)
                       .theme(Theme.LIGHT)
                       .callback(new MaterialDialog.ButtonCallback() {
