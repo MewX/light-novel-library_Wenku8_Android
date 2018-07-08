@@ -1,11 +1,11 @@
 package org.mewx.wenku8.fragment;
 
 import android.content.ContentValues;
-import android.content.DialogInterface;
 import android.content.Intent;
 import android.os.AsyncTask;
 import android.os.Build;
 import android.os.Bundle;
+import android.support.annotation.NonNull;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.app.ActivityOptionsCompat;
 import android.support.v4.app.Fragment;
@@ -18,7 +18,6 @@ import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.ImageButton;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -32,7 +31,6 @@ import org.mewx.wenku8.R;
 import org.mewx.wenku8.activity.NovelInfoActivity;
 import org.mewx.wenku8.adapter.NovelItemAdapterUpdate;
 import org.mewx.wenku8.global.GlobalConfig;
-import org.mewx.wenku8.global.api.ChapterInfo;
 import org.mewx.wenku8.global.api.NovelItemInfoUpdate;
 import org.mewx.wenku8.global.api.NovelItemMeta;
 import org.mewx.wenku8.global.api.VolumeList;
@@ -67,7 +65,7 @@ public class FavFragment extends Fragment implements MyItemClickListener, MyItem
     private List<Integer> listNovelItemAid = null; // aid list
     private NovelItemAdapterUpdate mAdapter = null;
 
-    public static FavFragment newInstance(String param1, String param2) {
+    public static FavFragment newInstance() {
         return new FavFragment();
     }
 
@@ -81,13 +79,13 @@ public class FavFragment extends Fragment implements MyItemClickListener, MyItem
     }
 
     @Override
-    public View onCreateView(LayoutInflater inflater, ViewGroup container,
+    public View onCreateView(@NonNull LayoutInflater inflater, ViewGroup container,
                              Bundle savedInstanceState) {
         // Inflate the layout for this fragment
         View rootView = inflater.inflate(R.layout.fragment_fav, container, false);
 
         // find view
-        mSwipeRefreshLayout = (SwipeRefreshLayout) rootView.findViewById(R.id.swipe_refresh_layout);
+        mSwipeRefreshLayout = rootView.findViewById(R.id.swipe_refresh_layout);
 
         // init values
         timecount = 0;
@@ -95,34 +93,13 @@ public class FavFragment extends Fragment implements MyItemClickListener, MyItem
         // view setting
         LinearLayoutManager mLayoutManager = new LinearLayoutManager(getActivity());
         mLayoutManager.setOrientation(LinearLayoutManager.VERTICAL);
-        mRecyclerView = (RecyclerView) rootView.findViewById(R.id.novel_item_list);
+        mRecyclerView = rootView.findViewById(R.id.novel_item_list);
         mRecyclerView.setHasFixedSize(false); // set variable size
         mRecyclerView.setItemAnimator(new DefaultItemAnimator());
         mRecyclerView.setLayoutManager(mLayoutManager);
-        mRecyclerView.setAdapter(new RecyclerView.Adapter() {
-            @Override
-            public RecyclerView.ViewHolder onCreateViewHolder(ViewGroup parent, int viewType) {
-                return null;
-            }
-
-            @Override
-            public void onBindViewHolder(RecyclerView.ViewHolder holder, int position) {
-            }
-
-            @Override
-            public int getItemCount() {
-                return 0;
-            }
-        }); // an empty one?
 
         mSwipeRefreshLayout.setColorSchemeColors(getResources().getColor(R.color.myAccentColor));
-        mSwipeRefreshLayout.setOnRefreshListener(new SwipeRefreshLayout.OnRefreshListener() {
-            @Override
-            public void onRefresh() {
-                AsyncLoadAllCloud alac = new AsyncLoadAllCloud();
-                alac.execute(1);
-            }
-        });
+        mSwipeRefreshLayout.setOnRefreshListener(() -> new AsyncLoadAllCloud().execute(1));
 
         return rootView;
     }
@@ -148,76 +125,75 @@ public class FavFragment extends Fragment implements MyItemClickListener, MyItem
     }
 
     @Override
-    public void onDeleteClick(View view, final int position) {
-
+    public void onOptionButtonClick(View view, final int position) {
+        new MaterialDialog.Builder(getActivity())
+                .theme(Theme.LIGHT)
+                .title(R.string.dialog_title_choose_delete_option)
+                .backgroundColorRes(R.color.dlgBackgroundColor)
+                .titleColorRes(R.color.dlgTitleColor)
+                .negativeText(R.string.dialog_negative_pass)
+                .negativeColorRes(R.color.dlgNegativeButtonColor)
+                .itemsGravity(GravityEnum.CENTER)
+                .items(R.array.cleanup_option)
+                .itemsCallback(new MaterialDialog.ListCallback() {
+                    @Override
+                    public void onSelection(MaterialDialog dialog, View view, int which, CharSequence text) {
+                        /*
+                         * 0 <string name="dialog_clear_cache">清除缓存</string>
+                         * 1 <string name="dialog_delete_book">删除这本书</string>
+                         */
+                        switch (which) {
+                            case 0:
+                                new MaterialDialog.Builder(getActivity())
+                                        .callback(new MaterialDialog.ButtonCallback() {
+                                            @Override
+                                            public void onPositive(MaterialDialog dialog) {
+                                                super.onPositive(dialog);
+                                                int aid = listNovelItemAid.get(position);
+                                                List<VolumeList> listVolume;
+                                                String novelFullVolume;
+                                                novelFullVolume = GlobalConfig.loadFullFileFromSaveFolder("intro", aid + "-volume.xml");
+                                                if(novelFullVolume.isEmpty()) return;
+                                                listVolume = Wenku8Parser.getVolumeList(novelFullVolume);
+                                                if(listVolume == null) return;
+                                                cleanVolumesCache(listVolume);
+                                            }
+                                        })
+                                        .theme(Theme.LIGHT)
+                                        .content(R.string.dialog_sure_to_clear_cache)
+                                        .contentGravity(GravityEnum.CENTER)
+                                        .positiveText(R.string.dialog_positive_sure)
+                                        .negativeText(R.string.dialog_negative_preferno)
+                                        .show();
+                                break;
+                            case 1:
+                                new MaterialDialog.Builder(getActivity())
+                                        .callback(new MaterialDialog.ButtonCallback() {
+                                            @Override
+                                            public void onPositive(MaterialDialog dialog) {
+                                                super.onPositive(dialog);
+                                                // delete operation, delete from cloud first, if succeed then delete from local
+                                                AsyncRemoveBookFromCloud arbfc = new AsyncRemoveBookFromCloud();
+                                                arbfc.execute(listNovelItemAid.get(position));
+                                                listNovelItemAid.remove(position);
+                                                refreshList(timecount ++);
+                                            }
+                                        })
+                                        .theme(Theme.LIGHT)
+                                        .content(R.string.dialog_content_want_to_delete)
+                                        .contentGravity(GravityEnum.CENTER)
+                                        .positiveText(R.string.dialog_positive_sure)
+                                        .negativeText(R.string.dialog_negative_preferno)
+                                        .show();
+                                break;
+                        }
+                    }
+                })
+                .show();
     }
 
     @Override
     public void onItemLongClick(View view, int position) {
-        new MaterialDialog.Builder(getActivity())
-            .theme(Theme.LIGHT)
-            .title(R.string.dialog_title_choose_delete_option)
-            .backgroundColorRes(R.color.dlgBackgroundColor)
-            .titleColorRes(R.color.dlgTitleColor)
-            .negativeText(R.string.dialog_negative_pass)
-            .negativeColorRes(R.color.dlgNegativeButtonColor)
-            .itemsGravity(GravityEnum.CENTER)
-            .items(R.array.cleanup_option)
-            .itemsCallback(new MaterialDialog.ListCallback() {
-                @Override
-                public void onSelection(MaterialDialog dialog, View view, int which, CharSequence text) {
-                    /*
-                     * 0 <string name="dialog_clear_cache">清除缓存</string>
-                     * 1 <string name="dialog_delete_book">删除这本书</string>
-                     */
-                    switch (which) {
-                        case 0:
-                            new MaterialDialog.Builder(getActivity())
-                                    .callback(new MaterialDialog.ButtonCallback() {
-                                        @Override
-                                        public void onPositive(MaterialDialog dialog) {
-                                            super.onPositive(dialog);
-                                            int aid = listNovelItemAid.get(position);
-                                            List<VolumeList> listVolume;
-                                            String novelFullVolume;
-                                            novelFullVolume = GlobalConfig.loadFullFileFromSaveFolder("intro", aid + "-volume.xml");
-                                            if(novelFullVolume == null || novelFullVolume.equals("")) return;
-                                            listVolume = Wenku8Parser.getVolumeList(novelFullVolume);
-                                            if(listVolume == null) return;
-                                            cleanVolumesCache(listVolume);
-                                        }
-                                    })
-                                    .theme(Theme.LIGHT)
-                                    .content(R.string.dialog_sure_to_clear_cache)
-                                    .contentGravity(GravityEnum.CENTER)
-                                    .positiveText(R.string.dialog_positive_sure)
-                                    .negativeText(R.string.dialog_negative_preferno)
-                                    .show();
-                            break;
-                        case 1:
-                            new MaterialDialog.Builder(getActivity())
-                                    .callback(new MaterialDialog.ButtonCallback() {
-                                        @Override
-                                        public void onPositive(MaterialDialog dialog) {
-                                            super.onPositive(dialog);
-                                            // delete operatio, delete from cloud first, if succeed then delete from local
-                                            AsyncRemoveBookFromCloud arbfc = new AsyncRemoveBookFromCloud();
-                                            arbfc.execute(listNovelItemAid.get(position));
-                                            listNovelItemAid.remove(position);
-                                            refreshList(timecount ++);
-                                        }
-                                    })
-                                    .theme(Theme.LIGHT)
-                                    .content(R.string.dialog_content_want_to_delete)
-                                    .contentGravity(GravityEnum.CENTER)
-                                    .positiveText(R.string.dialog_positive_sure)
-                                    .negativeText(R.string.dialog_negative_preferno)
-                                    .show();
-                            break;
-                    }
-                }
-            })
-            .show();
     }
 
     private void cleanVolumesCache(List<VolumeList> listVolume) {
@@ -228,26 +204,6 @@ public class FavFragment extends Fragment implements MyItemClickListener, MyItem
     }
 
     private void refreshList(int time) {
-//        listNovelItemAid = GlobalConfig.getLocalBookshelfList(); // reget
-//        List<NovelItemInfoUpdate> resort = new ArrayList<NovelItemInfoUpdate>();
-//        for(Integer aid : listNovelItemAid) {
-//            for(int i = 0; i < listNovelItemInfo.size(); i ++) {
-//                if(listNovelItemInfo.get(i).aid == aid) {
-//                    resort.add(listNovelItemInfo.get(i));
-//                    listNovelItemInfo.remove(i);
-//                    break;
-//                }
-//            }
-//        }
-//        listNovelItemInfo = resort;
-
-        // awful way
-//        if(alal == null || alal.getStatus() != AsyncTask.Status.RUNNING) {
-//            listNovelItemAid = GlobalConfig.getLocalBookshelfList();
-//            listNovelItemInfo = new ArrayList<NovelItemInfoUpdate>();
-//            alal = new AsyncLoadAllLocal();
-//            alal.execute();
-//        }
         if(time == 0) {
             mSwipeRefreshLayout.setRefreshing(true);
             AsyncLoadAllCloud alac = new AsyncLoadAllCloud();
@@ -301,7 +257,6 @@ public class FavFragment extends Fragment implements MyItemClickListener, MyItem
         mAdapter.setOnDeleteClickListener(FavFragment.this);
         mAdapter.setOnItemLongClickListener(FavFragment.this);
         mAdapter.notifyDataSetChanged();
-//        for(NovelItem)
         mSwipeRefreshLayout.setRefreshing(false);
     }
 
@@ -322,12 +277,9 @@ public class FavFragment extends Fragment implements MyItemClickListener, MyItem
                     .content(R.string.dialog_content_sync)
                     .progress(false, 1, true)
                     .cancelable(true)
-                    .cancelListener(new DialogInterface.OnCancelListener() {
-                        @Override
-                        public void onCancel(DialogInterface dialog) {
-                            isLoading = false;
-                            md.dismiss();
-                        }
+                    .cancelListener(dialog -> {
+                        isLoading = false;
+                        md.dismiss();
                     })
                     .show();
             md.setProgress(0);
@@ -416,9 +368,7 @@ public class FavFragment extends Fragment implements MyItemClickListener, MyItem
 
                     // fetch intro
                     if(!isLoading) return Wenku8Error.ErrorCode.USER_CANCELLED_TASK;
-//                    List<NameValuePair> targVarList = new ArrayList<>();
-//                    targVarList.add(Wenku8API.getNovelFullMeta(aid, GlobalConfig.getCurrentLang()));
-//                    byte[] tempIntroXml = LightNetwork.LightHttpPost(Wenku8API.getBaseURL(), targVarList);
+
                     // use short intro
                     byte[] tempIntroXml = LightNetwork.LightHttpPostConnection(Wenku8API.getBaseURL(),
                             Wenku8API.getNovelShortInfoUpdate_CV(aid, GlobalConfig.getCurrentLang()));
@@ -451,8 +401,7 @@ public class FavFragment extends Fragment implements MyItemClickListener, MyItem
             }
 
             // sync local bookshelf, and set ribbon, sync one, delete one
-            List<Integer> copy = new ArrayList<>();
-            copy.addAll(localOnly); // make a copy
+            List<Integer> copy = new ArrayList<>(localOnly); // make a copy
             for(Integer aid : copy) {
                 b = LightNetwork.LightHttpPostConnection(Wenku8API.getBaseURL(), Wenku8API.getAddToBookshelfParams(aid));
                 if(b == null) return Wenku8Error.ErrorCode.NETWORK_ERROR;
@@ -536,7 +485,7 @@ public class FavFragment extends Fragment implements MyItemClickListener, MyItem
                     List<VolumeList> listVolume;
                     String novelFullVolume;
                     novelFullVolume = GlobalConfig.loadFullFileFromSaveFolder("intro", aid + "-volume.xml");
-                    if(novelFullVolume == null || novelFullVolume.equals("")) return Wenku8Error.ErrorCode.ERROR_DEFAULT;
+                    if(novelFullVolume.isEmpty()) return Wenku8Error.ErrorCode.ERROR_DEFAULT;
                     listVolume = Wenku8Parser.getVolumeList(novelFullVolume);
                     if(listVolume == null) return Wenku8Error.ErrorCode.XML_PARSE_FAILED;
 

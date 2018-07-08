@@ -1,6 +1,7 @@
 package org.mewx.wenku8.fragment;
 
 import android.os.Bundle;
+import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.support.v4.app.Fragment;
 import android.support.v4.app.FragmentManager;
@@ -31,7 +32,7 @@ public class RKListFragment extends Fragment {
     }
 
     @Override
-    public View onCreateView(LayoutInflater inflater, ViewGroup container,
+    public View onCreateView(@NonNull LayoutInflater inflater, ViewGroup container,
                              Bundle savedInstanceState) {
         return inflater.inflate(R.layout.fragment_rklist, container, false);
     }
@@ -41,11 +42,11 @@ public class RKListFragment extends Fragment {
         super.onActivityCreated(savedInstanceState);
 
         // Initialize the ViewPager and set an adapter
-        ViewPager pager = (ViewPager) getActivity().findViewById(R.id.rklist_pager);
+        ViewPager pager = getActivity().findViewById(R.id.rklist_pager);
         pager.setAdapter(new MyPagerAdapter(getChildFragmentManager()));
 
         // Bind the tabs to the ViewPager
-        PagerSlidingTabStrip tabs = (PagerSlidingTabStrip) getActivity().findViewById(R.id.rklist_tabs);
+        PagerSlidingTabStrip tabs = getActivity().findViewById(R.id.rklist_tabs);
         tabs.setViewPager(pager);
 
         // set page margin

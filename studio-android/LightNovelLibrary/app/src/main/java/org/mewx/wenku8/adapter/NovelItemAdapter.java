@@ -1,5 +1,6 @@
 package org.mewx.wenku8.adapter;
 
+import android.support.annotation.NonNull;
 import android.support.v7.widget.RecyclerView;
 import android.view.View;
 import android.view.ViewGroup;
@@ -7,9 +8,6 @@ import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.TextView;
 
-import com.afollestad.materialdialogs.GravityEnum;
-import com.afollestad.materialdialogs.MaterialDialog;
-import com.afollestad.materialdialogs.Theme;
 import com.nostra13.universalimageloader.core.ImageLoader;
 
 import org.mewx.wenku8.MyApp;
@@ -20,7 +18,6 @@ import org.mewx.wenku8.global.api.Wenku8API;
 import org.mewx.wenku8.listener.MyDeleteClickListener;
 import org.mewx.wenku8.listener.MyItemClickListener;
 import org.mewx.wenku8.listener.MyItemLongClickListener;
-import org.mewx.wenku8.reader.view.WenkuReaderPageView;
 import org.mewx.wenku8.util.LightCache;
 
 import java.io.File;
@@ -54,13 +51,14 @@ public class NovelItemAdapter extends RecyclerView.Adapter<NovelItemAdapter.View
 
 
     @Override
-    public ViewHolder onCreateViewHolder(ViewGroup viewGroup, int i) {
+    @NonNull
+    public ViewHolder onCreateViewHolder(@NonNull ViewGroup viewGroup, int i) {
         View view = View.inflate(viewGroup.getContext(), R.layout.view_novel_item, null);
         return new ViewHolder(view, mItemClickListener, mMyDeleteClickListener, mItemLongClickListener);
     }
 
     @Override
-    public void onBindViewHolder(final ViewHolder viewHolder, int i) {
+    public void onBindViewHolder(@NonNull final ViewHolder viewHolder, int i) {
 
         // set text
         if(viewHolder.tvNovelTitle != null)
@@ -132,13 +130,13 @@ public class NovelItemAdapter extends RecyclerView.Adapter<NovelItemAdapter.View
             itemView.findViewById(R.id.novel_option).setOnClickListener(this);
 
             // get all views
-            ibNovelOption = (ImageButton) itemView.findViewById(R.id.novel_option);
-            ivNovelCover = (ImageView) itemView.findViewById(R.id.novel_cover);
-            tvNovelTitle = (TextView) itemView.findViewById(R.id.novel_title);
-            tvNovelAuthor = (TextView) itemView.findViewById(R.id.novel_author);
-            tvNovelStatus = (TextView) itemView.findViewById(R.id.novel_status);
-            tvNovelUpdate = (TextView) itemView.findViewById(R.id.novel_update);
-            tvNovelIntro = (TextView) itemView.findViewById(R.id.novel_intro);
+            ibNovelOption = itemView.findViewById(R.id.novel_option);
+            ivNovelCover = itemView.findViewById(R.id.novel_cover);
+            tvNovelTitle = itemView.findViewById(R.id.novel_title);
+            tvNovelAuthor = itemView.findViewById(R.id.novel_author);
+            tvNovelStatus = itemView.findViewById(R.id.novel_status);
+            tvNovelUpdate = itemView.findViewById(R.id.novel_update);
+            tvNovelIntro = itemView.findViewById(R.id.novel_intro);
 
             // test current fragment
             if(!GlobalConfig.testInBookshelf()) {
@@ -162,7 +160,7 @@ public class NovelItemAdapter extends RecyclerView.Adapter<NovelItemAdapter.View
                     break;
                 case R.id.novel_option:
                     if(mClickListener != null){
-                        mMyDeleteClickListener.onDeleteClick(v, getAdapterPosition());
+                        mMyDeleteClickListener.onOptionButtonClick(v, getAdapterPosition());
                     }
                     break;
             }

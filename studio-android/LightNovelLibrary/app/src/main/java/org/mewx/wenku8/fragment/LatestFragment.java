@@ -5,6 +5,7 @@ import android.content.Intent;
 import android.os.AsyncTask;
 import android.os.Build;
 import android.os.Bundle;
+import android.support.annotation.NonNull;
 import android.support.design.widget.Snackbar;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.app.ActivityOptionsCompat;
@@ -18,7 +19,6 @@ import android.view.ViewGroup;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import com.jpardogo.android.googleprogressbar.library.GoogleProgressBar;
 import com.umeng.analytics.MobclickAgent;
 
 import org.mewx.wenku8.R;
@@ -86,21 +86,13 @@ public class LatestFragment extends Fragment implements MyItemClickListener, MyI
         View rootView = inflater.inflate(R.layout.fragment_latest, container, false);
 
         // get views
-        mRecyclerView = (RecyclerView) rootView.findViewById(R.id.novel_item_list);
-        mTextView = (TextView) rootView.findViewById(R.id.list_loading_status);
+        mRecyclerView = rootView.findViewById(R.id.novel_item_list);
+        mTextView = rootView.findViewById(R.id.list_loading_status);
 
         mRecyclerView.setHasFixedSize(true);
         // use a linear layout manager
         mLayoutManager = new LinearLayoutManager(getActivity());
         mRecyclerView.setLayoutManager(mLayoutManager);
-        mRecyclerView.setAdapter(new RecyclerView.Adapter() {
-            @Override
-            public RecyclerView.ViewHolder onCreateViewHolder(ViewGroup parent, int viewType) { return null; }
-            @Override
-            public void onBindViewHolder(RecyclerView.ViewHolder holder, int position) { }
-            @Override
-            public int getItemCount() { return 0; }
-        });
 
         // Listener
         mRecyclerView.addOnScrollListener(new MyOnScrollListener());
@@ -177,9 +169,9 @@ public class LatestFragment extends Fragment implements MyItemClickListener, MyI
     }
 
     @Override
-    public void onItemLongClick(View view, int postion) {
+    public void onItemLongClick(View view, int position) {
         // empty
-        onItemClick(view, postion);
+        onItemClick(view, position);
     }
 
 
@@ -191,7 +183,7 @@ public class LatestFragment extends Fragment implements MyItemClickListener, MyI
 
     private class MyOnScrollListener extends RecyclerView.OnScrollListener {
         @Override
-        public void onScrolled(RecyclerView recyclerView, int dx, int dy) {
+        public void onScrolled(@NonNull RecyclerView recyclerView, int dx, int dy) {
             super.onScrolled(recyclerView, dx, dy);
 
             visibleItemCount = mLayoutManager.getChildCount();

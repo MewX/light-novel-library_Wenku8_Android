@@ -7,5 +7,5 @@ import android.view.View;
  * Created by MewX on 2015/10/21.
  */
 public interface MyDeleteClickListener {
-    void onDeleteClick(View view,int postion);
+    void onOptionButtonClick(View view, int position);
 }
