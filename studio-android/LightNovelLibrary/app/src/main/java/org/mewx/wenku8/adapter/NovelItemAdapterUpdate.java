@@ -194,10 +194,7 @@ public class NovelItemAdapterUpdate extends RecyclerView.Adapter<NovelItemAdapte
             tvNovelIntro = (TextView) itemView.findViewById(R.id.novel_intro);
 
             // test current fragment
-            if(!GlobalConfig.testInBookshelf())
-                ibNovelOption.setVisibility(View.INVISIBLE);
-            else
-                trNovelIntro.setVisibility(View.GONE);
+            ibNovelOption.setVisibility(View.INVISIBLE);
         }
 
         @Override

@@ -99,9 +99,10 @@
     <string name="task_retry">点击重新加载</string>
     <string name="task_null">没有结果</string>
     <string name="dialog_title_choose_download_option">选择执行的下载操作：</string>
+    <string name="dialog_title_choose_delete_option">选择执行的删除操作：</string>
     <string name="dialog_title_save_file_name">输入保存的文件名（不要加.jpg）</string>
     <string name="dialog_title_found_file">目标文件已存在</string>
-    <string name="dialog_content_want_to_delete">要删除这本书吗？</string>
+    <string name="dialog_content_want_to_delete">要删除这本书吗？（缓存的小说内容也会删除）</string>
     <string name="dialog_content_language_tip">缓存内容如何切换语言？\n书架可以下拉重新获取繁体内容；已缓存的内容可以通过覆盖下载获取当前语言内容；</string>
     <string name="dialog_content_search_author">要查找所有该作者的书吗？</string>
     <string name="dialog_content_delete_one_search_record">确定要删除该搜索历史吗？\n</string>
@@ -121,6 +122,8 @@
     <string name="dialog_content_wipe_cache_fast">正在快速清理缓存……</string>
     <string name="dialog_content_wipe_cache_slow">正在仔细清理缓存……</string>
     <string name="dialog_sure_to_jump_chapter">确定要跳转章节？</string>
+    <string name="dialog_sure_to_clear_cache">要清除缓存吗？</string>
+    <string name="dialog_delete_book">删除这本书</string>
     <string name="dialog_positive_ok">OK</string>
     <string name="dialog_positive_want">要</string>
     <string name="dialog_positive_sure">好滴~</string>
