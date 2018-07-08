@@ -1,5 +1,6 @@
 package org.mewx.wenku8.adapter;
 
+import android.support.annotation.NonNull;
 import android.support.v7.widget.RecyclerView;
 import android.view.View;
 import android.view.ViewGroup;
@@ -9,8 +10,6 @@ import android.widget.TableRow;
 import android.widget.TextView;
 
 import com.android.volley.Request;
-import com.android.volley.Response;
-import com.android.volley.VolleyError;
 import com.android.volley.toolbox.StringRequest;
 import com.nostra13.universalimageloader.core.ImageLoader;
 
@@ -57,13 +56,14 @@ public class NovelItemAdapterUpdate extends RecyclerView.Adapter<NovelItemAdapte
 
 
     @Override
-    public ViewHolder onCreateViewHolder(ViewGroup viewGroup, int i) {
+    @NonNull
+    public ViewHolder onCreateViewHolder(@NonNull ViewGroup viewGroup, int i) {
         View view = View.inflate(viewGroup.getContext(), R.layout.view_novel_item, null);
         return new ViewHolder(view, mItemClickListener, mMyDeleteClickListener, mItemLongClickListener);
     }
 
     @Override
-    public void onBindViewHolder(final ViewHolder viewHolder, int i) {
+    public void onBindViewHolder(@NonNull final ViewHolder viewHolder, int i) {
 
         // judge if empty
         if(Integer.toString(mDataset.get(i).aid).equals(mDataset.get(i).title) && !viewHolder.isLoading) {
@@ -80,10 +80,8 @@ public class NovelItemAdapterUpdate extends RecyclerView.Adapter<NovelItemAdapte
                         } catch (UnsupportedEncodingException e) {
                             e.printStackTrace();
                         }
-                        //GlobalConfig.wantDebugLog("VolleyResponse", response);
 
                         // update info
-                        //NovelItemInfoUpdate nuui = new NovelItemInfoUpdate(tempAid);
                         mDataset.set(tempAid,NovelItemInfoUpdate.parse(response));
                         refreshAllContent(viewHolder, tempAid);
                         viewHolder.isLoading = false;
@@ -184,17 +182,18 @@ public class NovelItemAdapterUpdate extends RecyclerView.Adapter<NovelItemAdapte
             itemView.findViewById(R.id.novel_option).setOnClickListener(this);
 
             // get all views
-            ibNovelOption = (ImageButton) itemView.findViewById(R.id.novel_option);
-            trNovelIntro = (TableRow) itemView.findViewById(R.id.novel_intro_row);
-            ivNovelCover = (ImageView) itemView.findViewById(R.id.novel_cover);
-            tvNovelTitle = (TextView) itemView.findViewById(R.id.novel_title);
-            tvNovelAuthor = (TextView) itemView.findViewById(R.id.novel_author);
-            tvNovelStatus = (TextView) itemView.findViewById(R.id.novel_status);
-            tvNovelUpdate = (TextView) itemView.findViewById(R.id.novel_update);
-            tvNovelIntro = (TextView) itemView.findViewById(R.id.novel_intro);
+            ibNovelOption = itemView.findViewById(R.id.novel_option);
+            trNovelIntro = itemView.findViewById(R.id.novel_intro_row);
+            ivNovelCover = itemView.findViewById(R.id.novel_cover);
+            tvNovelTitle = itemView.findViewById(R.id.novel_title);
+            tvNovelAuthor = itemView.findViewById(R.id.novel_author);
+            tvNovelStatus = itemView.findViewById(R.id.novel_status);
+            tvNovelUpdate = itemView.findViewById(R.id.novel_update);
+            tvNovelIntro = itemView.findViewById(R.id.novel_intro);
 
             // test current fragment
-            ibNovelOption.setVisibility(View.INVISIBLE);
+            if(!GlobalConfig.testInBookshelf())
+                ibNovelOption.setVisibility(View.INVISIBLE);
         }
 
         @Override
@@ -207,7 +206,7 @@ public class NovelItemAdapterUpdate extends RecyclerView.Adapter<NovelItemAdapte
                     break;
                 case R.id.novel_option:
                     if(mClickListener != null){
-                        mMyDeleteClickListener.onDeleteClick(v, getAdapterPosition());
+                        mMyDeleteClickListener.onOptionButtonClick(v, getAdapterPosition());
                     }
                     break;
             }
