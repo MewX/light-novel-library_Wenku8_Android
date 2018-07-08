@@ -1,6 +1,5 @@
 package org.mewx.wenku8.fragment;
 
-import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.net.Uri;
