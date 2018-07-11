@@ -1,5 +1,6 @@
 language: android
-sudo: false
+sudo: required
+dist: precise
 jdk: oraclejdk8
 
 env:
@@ -14,8 +15,8 @@ android:
   - platform-tools
   - android-$TARGET_SDK_VERSION
   - build-tools-$BUILD_TOOLS_VERSION
-  - android-15
-  - sys-img-armeabi-v7a-android-15
+  - android-16
+  - sys-img-armeabi-v7a-android-16
 
 before_cache:
   - rm -f  $HOME/.gradle/caches/modules-2/modules-2.lock
