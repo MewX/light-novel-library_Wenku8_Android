@@ -361,6 +361,9 @@ public class NovelItemListFragment extends Fragment implements MyItemClickListen
             listNovelItemAid.addAll(listResultList);
             listNovelItemAid.removeAll(listResultList2);
             listNovelItemAid.addAll(listResultList2);
+            if(GlobalConfig.searchType == GlobalConfig.SearchType.bookshelf) {
+                listNovelItemAid.retainAll(GlobalConfig.getLocalBookshelfList());
+            }
             return 0;
         }
 

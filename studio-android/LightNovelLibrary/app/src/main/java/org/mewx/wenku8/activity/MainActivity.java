@@ -163,6 +163,13 @@ public class MainActivity extends AppCompatActivity {
             //Toast.makeText(MyApp.getContext(),"called button",Toast.LENGTH_SHORT).show();
             if (item.getItemId() == R.id.action_search) {
                 // start search activity
+                GlobalConfig.searchType = GlobalConfig.SearchType.web;
+                startActivity(new Intent(MainActivity.this, SearchActivity.class));
+                overridePendingTransition(R.anim.fade_in, R.anim.hold); // fade in animation
+
+            } else if (item.getItemId() == R.id.action_search_fav) {
+                // start search activity
+                GlobalConfig.searchType = GlobalConfig.SearchType.bookshelf;
                 startActivity(new Intent(MainActivity.this, SearchActivity.class));
                 overridePendingTransition(R.anim.fade_in, R.anim.hold); // fade in animation
 
@@ -217,6 +224,7 @@ public class MainActivity extends AppCompatActivity {
                 case FAV:
                     if (getSupportActionBar() != null)
                         getSupportActionBar().setTitle(getResources().getString(R.string.main_menu_fav));
+                    getMenuInflater().inflate(R.menu.menu_fav, menu);
                     break;
                 case CONFIG:
                     if (getSupportActionBar() != null)
