@@ -14,7 +14,7 @@ android:
   - platform-tools
   - android-$TARGET_SDK_VERSION
   - build-tools-$BUILD_TOOLS_VERSION
-  - sys-img-armeabi-v7a-android-15
+  - sys-img-armeabi-v7a-android-28
 
 before_cache:
   - rm -f  $HOME/.gradle/caches/modules-2/modules-2.lock
@@ -27,6 +27,7 @@ cache:
   - $HOME/.android/build-cache
 
 before_install:
+  - yes | sdkmanager "platforms;android-$TARGET_SDK_VERSION"
   - cd studio-android/LightNovelLibrary
   - echo no | android create avd --force -n test -t android-$TARGET_SDK_VERSION --abi armeabi-v7a
   - emulator -avd test -no-skin -no-audio -no-window &
