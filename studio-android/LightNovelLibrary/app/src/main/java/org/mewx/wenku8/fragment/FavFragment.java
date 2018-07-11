@@ -50,6 +50,7 @@ import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -226,13 +227,13 @@ public class FavFragment extends Fragment implements MyItemClickListener, MyItem
             String xml = GlobalConfig.loadFullFileFromSaveFolder("intro", aid + "-intro.xml");
             NovelItemInfoUpdate niiu;
 
-            if (xml.equals("")) {
+            if (xml.isEmpty()) {
                 // the intro file was deleted
                 retValue = -2;
                 niiu = new NovelItemInfoUpdate(aid);
             }
             else {
-                niiu = NovelItemInfoUpdate.parse(xml);
+                niiu = NovelItemInfoUpdate.convertFromMeta(Objects.requireNonNull(Wenku8Parser.parseNovelFullMeta(xml)));
             }
 
             if(niiu == null) {
@@ -303,7 +304,7 @@ public class FavFragment extends Fragment implements MyItemClickListener, MyItem
                     Wenku8Error.ErrorCode temp = LightUserSession.doLoginFromFile();
                     if(temp != Wenku8Error.ErrorCode.SYSTEM_1_SUCCEEDED) return temp; // return an error code
 
-                    // rquest again
+                    // request again
                     b = LightNetwork.LightHttpPostConnection(Wenku8API.getBaseURL(), Wenku8API.getBookshelfListAid(GlobalConfig.getCurrentLang()));
                     if(b == null) return Wenku8Error.ErrorCode.NETWORK_ERROR;
                 }
@@ -312,7 +313,7 @@ public class FavFragment extends Fragment implements MyItemClickListener, MyItem
             // purify returned data
             List<Integer> listResultList = new ArrayList<>(); // result list
             try {
-                Log.e("MewX", new String(b, "UTF-8"));
+                Log.d("MewX", new String(b, "UTF-8"));
 
                 Pattern p = Pattern.compile("aid=\"(.*)\""); // match content between "aid=\"" and "\""
                 Matcher m = p.matcher(new String(b, "UTF-8"));
@@ -371,13 +372,13 @@ public class FavFragment extends Fragment implements MyItemClickListener, MyItem
 
                     // use short intro
                     byte[] tempIntroXml = LightNetwork.LightHttpPostConnection(Wenku8API.getBaseURL(),
-                            Wenku8API.getNovelShortInfoUpdate_CV(aid, GlobalConfig.getCurrentLang()));
+                            Wenku8API.getNovelFullMeta(aid, GlobalConfig.getCurrentLang()));
                     if (tempIntroXml == null) return Wenku8Error.ErrorCode.NETWORK_ERROR;
                     introXml = new String(tempIntroXml, "UTF-8");
 
                     // parse into structures
                     vl = Wenku8Parser.getVolumeList(volumeXml);
-                    ni = Wenku8Parser.parsetNovelFullMeta(introXml);
+                    ni = Wenku8Parser.parseNovelFullMeta(introXml);
                     if (vl == null || ni == null) return Wenku8Error.ErrorCode.XML_PARSE_FAILED;
 
                     if(!isLoading) return Wenku8Error.ErrorCode.USER_CANCELLED_TASK;

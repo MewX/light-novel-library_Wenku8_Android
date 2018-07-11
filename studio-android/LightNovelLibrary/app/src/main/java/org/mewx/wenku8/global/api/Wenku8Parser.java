@@ -18,7 +18,7 @@ import java.util.List;
  */
 public class Wenku8Parser {
 
-    public static List<Integer> parseNovelItemList(String str, int page) {
+    public static List<Integer> parseNovelItemList(String str) {
         List<Integer> list = new ArrayList<>();
 
         // <?xml version="1.0" encoding="utf-8"?>
@@ -67,7 +67,7 @@ public class Wenku8Parser {
     }
 
 
-    static public NovelItemMeta parsetNovelFullMeta(String xml) {
+    static public NovelItemMeta parseNovelFullMeta(String xml) {
         // get full XML metadata of a novel, here is an example:
         // -----------------------------------------------------
         // <?xml version="1.0" encoding="utf-8"?>
@@ -84,6 +84,7 @@ public class Wenku8Parser {
         // <data name="LastUpdate" value="2012-11-02"/>
         // <data name="LatestSection" cid="41897"><![CDATA[第一卷 插图]]></data>
         // </metadata>
+        Log.d(Wenku8Parser.class.getSimpleName(), xml);
 
         try {
             XmlPullParserFactory factory = XmlPullParserFactory.newInstance();
@@ -193,7 +194,7 @@ public class Wenku8Parser {
                 eventType = xmlPullParser.next();
             }
 
-            /** Handle the rest problem */
+            /* Handle the rest problem */
             // Problem like this:
             // <volume vid="41748"><![CDATA[第一卷 告白于苍刻之夜]]>
             // <chapter cid="41749"><![CDATA[序章]]></chapter>

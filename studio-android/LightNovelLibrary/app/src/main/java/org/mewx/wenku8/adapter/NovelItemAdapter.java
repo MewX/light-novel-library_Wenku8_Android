@@ -107,7 +107,7 @@ public class NovelItemAdapter extends RecyclerView.Adapter<NovelItemAdapter.View
     public static class ViewHolder extends RecyclerView.ViewHolder implements View.OnClickListener, View.OnLongClickListener {
 
         private MyItemClickListener mClickListener;
-        private MyDeleteClickListener mMyDeleteClickListener;
+        private MyDeleteClickListener mMyOptionClickListener;
         private MyItemLongClickListener mLongClickListener;
         public int position;
         public boolean isLoading = false;
@@ -120,10 +120,10 @@ public class NovelItemAdapter extends RecyclerView.Adapter<NovelItemAdapter.View
         public TextView tvNovelUpdate;
         public TextView tvNovelIntro;
 
-        public ViewHolder(View itemView, MyItemClickListener clickListener, MyDeleteClickListener myDeleteClickListener, MyItemLongClickListener longClickListener) {
+        public ViewHolder(View itemView, MyItemClickListener clickListener, MyDeleteClickListener myOptionClickListener, MyItemLongClickListener longClickListener) {
             super(itemView);
             this.mClickListener = clickListener;
-            this.mMyDeleteClickListener = myDeleteClickListener;
+            this.mMyOptionClickListener = myOptionClickListener;
             this.mLongClickListener = longClickListener;
             itemView.findViewById(R.id.item_card).setOnClickListener(this);
             itemView.findViewById(R.id.item_card).setOnLongClickListener(this);
@@ -160,7 +160,7 @@ public class NovelItemAdapter extends RecyclerView.Adapter<NovelItemAdapter.View
                     break;
                 case R.id.novel_option:
                     if(mClickListener != null){
-                        mMyDeleteClickListener.onOptionButtonClick(v, getAdapterPosition());
+                        mMyOptionClickListener.onOptionButtonClick(v, getAdapterPosition());
                     }
                     break;
             }

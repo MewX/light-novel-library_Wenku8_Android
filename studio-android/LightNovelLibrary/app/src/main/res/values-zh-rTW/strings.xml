@@ -150,7 +150,7 @@
     <string name="login_login">登錄</string>
     <string name="login_register">註冊</string>
     <string name="login_logout">登出賬號</string>
-    <string name="press_twice_to_exit"><b>退出請再戳壹下返回鍵哦～</b>\n&lt;(=～￣▽￣)→)￣▽￣=)>o </string>
+    <string name="press_twice_to_exit">"<b>退出請再戳壹下返回鍵哦～</b> &lt;(=～￣▽￣)→)￣▽￣=)>o "</string>
     <string name="sorry">客官妳不要心急啊，妳急臣妾也做不到呀，現在代碼量已經比之前版本大很多了~請體諒。而且主框架搭的差不多了，後面邏輯快很多，壹有時間就好辦！</string>
     <string name="sorry_old_engine_no_image_preview">舊的引擎暫不可查看大圖</string>
     <string name="sorry_old_engine_preprocess">舊的引擎正在預處理</string>
@@ -208,4 +208,5 @@
     <string name="app_description">MewX與輕小說文庫(Wenku8.com)合作的輕小說閱讀app。</string>
     <string name="missing_permission">由於歷史原因，缺少必要的權限時，app可能無法正常工作，請考慮授予相應權限</string>
     <string name="action_go_to_forum">進入評論區</string>
+    <string name="novel_item_latest_chapter">最新章節：</string>
 </resources>

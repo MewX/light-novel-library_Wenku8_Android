@@ -116,7 +116,16 @@ public class NovelItemAdapterUpdate extends RecyclerView.Adapter<NovelItemAdapte
         viewHolder.tvNovelStatus.setText(mDataset.get(i).status);
         viewHolder.tvNovelUpdate.setText(mDataset.get(i).update);
         if(!GlobalConfig.testInBookshelf())
+            // show short intro
             viewHolder.tvNovelIntro.setText(mDataset.get(i).intro_short);
+        else if (mDataset.get(i).latest_chapter.isEmpty()){
+            // latest chapter not set, hide it
+            viewHolder.tvNovelIntro.setVisibility(View.GONE);
+        } else {
+            // latest chapter is set, show it
+            viewHolder.tvLatestChapterNameText.setText(viewHolder.tvLatestChapterNameText.getResources().getText(R.string.novel_item_latest_chapter));
+            viewHolder.tvNovelIntro.setText(mDataset.get(i).latest_chapter);
+        }
 
         if(LightCache.testFileExist(GlobalConfig.getFirstStoragePath() + "imgs" + File.separator + mDataset.get(i).aid + ".jpg"))
             ImageLoader.getInstance().displayImage("file://" + GlobalConfig.getFirstStoragePath() + "imgs" + File.separator + mDataset.get(i).aid + ".jpg", viewHolder.ivNovelCover);
@@ -157,7 +166,7 @@ public class NovelItemAdapterUpdate extends RecyclerView.Adapter<NovelItemAdapte
     public static class ViewHolder extends RecyclerView.ViewHolder implements View.OnClickListener, View.OnLongClickListener {
 
         private MyItemClickListener mClickListener;
-        private MyDeleteClickListener mMyDeleteClickListener;
+        private MyDeleteClickListener mMyOptionClickListener;
         private MyItemLongClickListener mLongClickListener;
         public int position;
         public boolean isLoading = false;
@@ -171,11 +180,12 @@ public class NovelItemAdapterUpdate extends RecyclerView.Adapter<NovelItemAdapte
         public TextView tvNovelAuthor;
         public TextView tvNovelUpdate;
         public TextView tvNovelIntro;
+        public TextView tvLatestChapterNameText;
 
-        public ViewHolder(View itemView, MyItemClickListener clickListener, MyDeleteClickListener myDeleteClickListener, MyItemLongClickListener longClickListener) {
+        public ViewHolder(View itemView, MyItemClickListener clickListener, MyDeleteClickListener myOptionClickListener, MyItemLongClickListener longClickListener) {
             super(itemView);
             this.mClickListener = clickListener;
-            this.mMyDeleteClickListener = myDeleteClickListener;
+            this.mMyOptionClickListener = myOptionClickListener;
             this.mLongClickListener = longClickListener;
             itemView.findViewById(R.id.item_card).setOnClickListener(this);
             itemView.findViewById(R.id.item_card).setOnLongClickListener(this);
@@ -190,6 +200,7 @@ public class NovelItemAdapterUpdate extends RecyclerView.Adapter<NovelItemAdapte
             tvNovelStatus = itemView.findViewById(R.id.novel_status);
             tvNovelUpdate = itemView.findViewById(R.id.novel_update);
             tvNovelIntro = itemView.findViewById(R.id.novel_intro);
+            tvLatestChapterNameText = itemView.findViewById(R.id.novel_item_text_shortinfo);
 
             // test current fragment
             if(!GlobalConfig.testInBookshelf())
@@ -206,7 +217,7 @@ public class NovelItemAdapterUpdate extends RecyclerView.Adapter<NovelItemAdapte
                     break;
                 case R.id.novel_option:
                     if(mClickListener != null){
-                        mMyDeleteClickListener.onOptionButtonClick(v, getAdapterPosition());
+                        mMyOptionClickListener.onOptionButtonClick(v, getAdapterPosition());
                     }
                     break;
             }

@@ -63,6 +63,9 @@ public class GlobalConfig {
     private static final String saveNoticeString = "notice.wk8"; // the notice cache from online
     private static int maxSearchHistory = 20; // default
 
+    // reserved constants
+    public static final String UNKNOWN = "Unknown";
+
     // vars
     private static boolean isInBookshelf = false;
     private static boolean isInLatest = false;

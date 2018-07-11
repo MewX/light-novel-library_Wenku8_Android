@@ -19,6 +19,7 @@ public class NovelItemInfoUpdate {
     public String status = LoadingString;
     public String update = LoadingString; // last update time
     public String intro_short = LoadingString;
+    public String latest_chapter = LoadingString; // only used in bookshelf
     public boolean isLoading = false;
 
     public String intro_full = ""; // not necessary
@@ -27,11 +28,13 @@ public class NovelItemInfoUpdate {
     // static function
     public static NovelItemInfoUpdate convertFromMeta(NovelItemMeta nim) {
         NovelItemInfoUpdate niiu = new NovelItemInfoUpdate(0);
+        niiu.title = nim.title;
         niiu.aid = nim.aid;
         niiu.title = nim.title;
         niiu.author = nim.author;
         niiu.status = nim.bookStatus;
         niiu.update = nim.lastUpdate;
+        niiu.latest_chapter = nim.latestSectionName;
 
         return niiu;
     }
@@ -60,6 +63,7 @@ public class NovelItemInfoUpdate {
                             niiu.update = "";
                             niiu.intro_short = "";
                             niiu.intro_full = "";
+                            niiu.latest_chapter = "";
 
                         } else if ("data".equals(xmlPullParser.getName())) {
                             if ("Title".equals(xmlPullParser.getAttributeValue(0))) {

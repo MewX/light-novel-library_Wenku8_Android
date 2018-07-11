@@ -5,7 +5,6 @@ import android.util.Log;
 import org.xmlpull.v1.XmlPullParser;
 import org.xmlpull.v1.XmlPullParserFactory;
 
-import java.io.Serializable;
 import java.io.StringReader;
 import java.util.ArrayList;
 
@@ -51,42 +50,26 @@ public class NovelListWithInfoParser {
         try {
             XmlPullParserFactory factory = XmlPullParserFactory.newInstance();
             XmlPullParser xmlPullParser = factory.newPullParser();
-            ArrayList<NovelListWithInfo> l = null;
-            NovelListWithInfo n = null;
+            ArrayList<NovelListWithInfo> l = new ArrayList<>();
+            NovelListWithInfo n = new NovelListWithInfo();
             xmlPullParser.setInput(new StringReader(xml));
             int eventType = xmlPullParser.getEventType();
 
             while (eventType != XmlPullParser.END_DOCUMENT) {
                 switch (eventType) {
-                    case XmlPullParser.START_DOCUMENT:
-                        l = new ArrayList<NovelListWithInfo>();
-                        break;
-
                     case XmlPullParser.START_TAG:
-
                         if ("item".equals(xmlPullParser.getName())) {
                             n = new NovelListWithInfo();
                             n.aid = Integer.valueOf(xmlPullParser.getAttributeValue(0));
-                            // Log.v("MewX-XML", "aid=" + n.aid);
                         } else if ("data".equals(xmlPullParser.getName())) {
                             if ("Title".equals(xmlPullParser.getAttributeValue(0))) {
                                 n.name = xmlPullParser.nextText();
-                                // Log.v("MewX-XML", n.name);
-                            } else if ("TotalHitsCount".equals(xmlPullParser
-                                    .getAttributeValue(0))) {
-                                n.hit = Integer.valueOf(
-                                        xmlPullParser.getAttributeValue(1));
-                                // Log.v("MewX-XML", "hit=" + n.hit);
-                            } else if ("PushCount".equals(xmlPullParser
-                                    .getAttributeValue(0))) {
-                                n.push = Integer.valueOf(
-                                        xmlPullParser.getAttributeValue(1));
-                                // Log.v("MewX-XML", "push=" + n.push);
-                            } else if ("FavCount".equals(xmlPullParser
-                                    .getAttributeValue(0))) {
-                                n.fav = Integer.valueOf(
-                                        xmlPullParser.getAttributeValue(1));
-                                // Log.v("MewX-XML", "fav=" + n.fav);
+                            } else if ("TotalHitsCount".equals(xmlPullParser.getAttributeValue(0))) {
+                                n.hit = Integer.valueOf(xmlPullParser.getAttributeValue(1));
+                            } else if ("PushCount".equals(xmlPullParser.getAttributeValue(0))) {
+                                n.push = Integer.valueOf(xmlPullParser.getAttributeValue(1));
+                            } else if ("FavCount".equals(xmlPullParser.getAttributeValue(0))) {
+                                n.fav = Integer.valueOf(xmlPullParser.getAttributeValue(1));
                             }
                         }
                         break;
@@ -96,7 +79,6 @@ public class NovelListWithInfoParser {
                             Log.v("MewX-XML", n.aid + ";" + n.name + ";" + n.hit
                                     + ";" + n.push + ";" + n.fav);
                             l.add(n);
-                            n = null;
                         }
                         break;
                 }
