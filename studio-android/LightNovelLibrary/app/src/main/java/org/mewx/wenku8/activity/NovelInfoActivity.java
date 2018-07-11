@@ -550,42 +550,21 @@ public class NovelInfoActivity extends AppCompatActivity {
 
         new MaterialDialog.Builder(this)
                 .onPositive((ignored1, ignored2) -> {
-                    // test does file exist
-                    if (from.equals(FromLocal)
-                            && !LightCache.testFileExist(GlobalConfig.getFirstStoragePath() + GlobalConfig.saveFolderName + File.separator + "novel" + File.separator + cid + ".xml")
-                            && !LightCache.testFileExist(GlobalConfig.getSecondStoragePath() + GlobalConfig.saveFolderName + File.separator + "novel" + File.separator + cid + ".xml")) {
-                        // local file not download, ask to download an read or cancel
-                        new MaterialDialog.Builder(NovelInfoActivity.this)
-                                .onPositive((ignored3, ignored4) -> {
-                                    // jump to reader activity
-                                    Intent intent = new Intent(NovelInfoActivity.this, Wenku8ReaderActivityV1.class);
-                                    intent.putExtra("aid", aid);
-                                    intent.putExtra("volume", volumeList_bak);
-                                    intent.putExtra("cid", cid);
-                                    intent.putExtra("from", "cloud"); // from cloud
-                                    intent.putExtra("forcejump", "yes");
-                                    startActivity(intent);
-                                    overridePendingTransition(R.anim.fade_in, R.anim.hold); // fade in animation
-                                })
-                                .theme(Theme.LIGHT)
-                                .backgroundColorRes(R.color.dlgBackgroundColor)
-                                .contentColorRes(R.color.dlgContentColor)
-                                .positiveColorRes(R.color.dlgPositiveButtonColor)
-                                .negativeColorRes(R.color.dlgNegativeButtonColor)
-                                .content(getResources().getString(R.string.dialog_content_load_from_cloud))
-                                .contentGravity(GravityEnum.CENTER)
-                                .positiveText(R.string.dialog_positive_likethis)
-                                .negativeText(R.string.dialog_negative_preferno)
-                                .show();
-                        return;
-                    }
-
                     // jump to reader activity
                     Intent intent = new Intent(NovelInfoActivity.this, Wenku8ReaderActivityV1.class);
                     intent.putExtra("aid", aid);
                     intent.putExtra("volume", volumeList_bak);
                     intent.putExtra("cid", cid);
-                    intent.putExtra("from", from); // from "fav"
+
+                    // test does file exist
+                    if (from.equals(FromLocal)
+                            && !LightCache.testFileExist(GlobalConfig.getFirstStoragePath() + GlobalConfig.saveFolderName + File.separator + "novel" + File.separator + cid + ".xml")
+                            && !LightCache.testFileExist(GlobalConfig.getSecondStoragePath() + GlobalConfig.saveFolderName + File.separator + "novel" + File.separator + cid + ".xml")) {
+                        intent.putExtra("from", "cloud"); // from cloud
+                    } else {
+                        intent.putExtra("from", from); // from "fav"
+                    }
+
                     intent.putExtra("forcejump", "yes");
                     startActivity(intent);
                     overridePendingTransition(R.anim.fade_in, R.anim.hold); // fade in animation
@@ -714,12 +693,13 @@ public class NovelInfoActivity extends AppCompatActivity {
                 case 1:
                     // update general info
                     tvNovelAuthor.setPaintFlags(tvNovelAuthor.getPaintFlags() | Paint.UNDERLINE_TEXT_FLAG); // with hyperlink
+                    tvLatestChapter.setPaintFlags(tvLatestChapter.getPaintFlags() | Paint.UNDERLINE_TEXT_FLAG); // with hyperlink
 
                     tvNovelTitle.setText(mNovelItemMeta.title);
                     tvNovelAuthor.setText(mNovelItemMeta.author);
                     tvNovelStatus.setText(mNovelItemMeta.bookStatus);
                     tvNovelUpdate.setText(mNovelItemMeta.lastUpdate);
-                    tvLatestChapter.setText(mNovelItemMeta.latestSectionName); // TODO: use latestSectionCid to jump to reader page directly, some are 'unknown"
+                    tvLatestChapter.setText(mNovelItemMeta.latestSectionName);
                     if(NovelInfoActivity.this.getSupportActionBar() != null)
                         NovelInfoActivity.this.getSupportActionBar().setTitle(mNovelItemMeta.title); // set action bar title
                     break;
