@@ -15,8 +15,6 @@ android:
   - extra-android-m2repository
   - android-$TARGET_SDK_VERSION
   - build-tools-$BUILD_TOOLS_VERSION
-  - android-16
-  - sys-img-armeabi-v7a-android-16
 
 before_cache:
   - rm -f  $HOME/.gradle/caches/modules-2/modules-2.lock
@@ -30,7 +28,7 @@ cache:
 
 before_install:
   - cd studio-android/LightNovelLibrary
-  - echo no | android create avd --force -n test -t android-16 --abi armeabi-v7a
+  - echo no | android create avd --force -n test -t "android-$ANDROID_SDK_VERSION" --abi arm64-v8a
   - emulator -avd test -no-window &
   - android-wait-for-emulator
   - adb shell input keyevent 82 &
