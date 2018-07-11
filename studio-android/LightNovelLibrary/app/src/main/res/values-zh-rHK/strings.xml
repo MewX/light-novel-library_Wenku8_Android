@@ -195,7 +195,7 @@
     <string name="reader_find">查找內容</string>
     <string name="reader_config">閱讀器設置</string>
     <string name="reader_v1_notice">V1 引擎提示</string>
-    <string name="reader_jump_last">是否跳轉到上次閱讀記錄？</string>
+    <string name="reader_jump_last">是否跳轉到該章節？</string>
     <string name="reader_rotate">順時針旋轉90°</string>
     <string name="reader_download">保存圖片</string>
     <string name="reader_custom_background">自定義閱讀背景</string>
@@ -205,6 +205,9 @@
     <string name="reader_paragraph_distance">段落間距</string>
     <string name="reader_paragraph_edge_distance">段落邊距</string>
     <string name="reader_view_image_no_image">請在有圖的頁面點擊此按鈕看圖~</string>
+    <string name="reader_msg_no_saved_reading_progress">未發現保存的進度，可能是未讀或上次讀完了某卷~ 那麽，開始下一卷吧~</string>
+    <string name="reader_msg_no_available_chapter">內部錯誤！無法找到該章節！</string>
+    <string name="reader_msg_please_refresh_and_retry">請更新小說信息後再嘗試</string>
     <string name="app_description">MewX與輕小說文庫(Wenku8.com)合作的輕小說閱讀app。</string>
     <string name="missing_permission">由於歷史原因，缺少必要的權限時，app可能無法正常工作，請考慮授予相應權限</string>
     <string name="action_go_to_forum">進入評論區</string>
