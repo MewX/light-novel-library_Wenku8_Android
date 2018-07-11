@@ -22,6 +22,7 @@ import com.android.volley.mock.MockRequest;
 import com.android.volley.mock.ShadowSystemClock;
 import com.android.volley.toolbox.NoCache;
 import com.android.volley.utils.ImmediateResponseDelivery;
+
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -31,14 +32,11 @@ import org.mockito.stubbing.Answer;
 import org.robolectric.RobolectricTestRunner;
 import org.robolectric.annotation.Config;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Random;
-import java.util.concurrent.Semaphore;
-import java.util.concurrent.TimeUnit;
-
-import static org.junit.Assert.*;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.timeout;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
+import static org.mockito.Mockito.when;
 import static org.mockito.MockitoAnnotations.initMocks;
 
 
@@ -49,6 +47,7 @@ import static org.mockito.MockitoAnnotations.initMocks;
 @RunWith(RobolectricTestRunner.class)
 @Config(shadows = {ShadowSystemClock.class})
 public class RequestQueueIntegrationTest {
+    private static long TIMEOUT = 1000;
 
     private ResponseDelivery mDelivery;
     @Mock private Network mMockNetwork;
@@ -91,16 +90,16 @@ public class RequestQueueIntegrationTest {
         // as an alternative, first verify no requests have finished, while higherPriorityReq should be processing
         verifyNoMoreInteractions(listener);
         // verify higherPriorityReq goes through first
-        verify(listener, timeout(100)).onRequestFinished(higherPriorityReq);
+        verify(listener, timeout(TIMEOUT)).onRequestFinished(higherPriorityReq);
         // verify lowerPriorityReq goes last
-        verify(listener, timeout(10)).onRequestFinished(lowerPriorityReq);
+        verify(listener, timeout(TIMEOUT)).onRequestFinished(lowerPriorityReq);
         queue.stop();
     }
 
     /**
      * Asserts that requests with same cache key are processed in order.
      *
-     * Needs to be an integration test because relies on complex interations between various queues
+     * Needs to be an integration test because relies on complex interactions between various queues
      */
     @Test public void add_dedupeByCacheKey() throws Exception {
         // Enqueue 2 requests with the same cache key. The first request takes 20ms. Assert that the
@@ -128,8 +127,8 @@ public class RequestQueueIntegrationTest {
         // you cannot do strict order verification with mockito 1.9.5 :(
         // as an alternative, first verify no requests have finished, then verify req1 goes through
         verifyNoMoreInteractions(listener);
-        verify(listener, timeout(100)).onRequestFinished(req1);
-        verify(listener, timeout(10)).onRequestFinished(req2);
+        verify(listener, timeout(TIMEOUT)).onRequestFinished(req1);
+        verify(listener, timeout(TIMEOUT)).onRequestFinished(req2);
         queue.stop();
     }
 
@@ -178,8 +177,8 @@ public class RequestQueueIntegrationTest {
         queue.start();
         queue.add(request);
 
-        verify(listener, timeout(100)).onRequestFinished(request);
-        verify(listener2, timeout(100)).onRequestFinished(request);
+        verify(listener, timeout(TIMEOUT)).onRequestFinished(request);
+        verify(listener2, timeout(TIMEOUT)).onRequestFinished(request);
 
         queue.stop();
     }
@@ -200,7 +199,7 @@ public class RequestQueueIntegrationTest {
         queue.start();
         queue.add(request);
 
-        verify(listener, timeout(100)).onRequestFinished(request);
+        verify(listener, timeout(TIMEOUT)).onRequestFinished(request);
         queue.stop();
     }
 
