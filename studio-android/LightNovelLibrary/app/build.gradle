@@ -10,6 +10,9 @@ android {
         versionCode 36
         versionName "1.5"
         testInstrumentationRunner 'android.support.test.runner.AndroidJUnitRunner'
+
+        // this one has to be added due to the intermediate outputs for debug
+        multiDexEnabled true
     }
     buildTypes {
         debug {
