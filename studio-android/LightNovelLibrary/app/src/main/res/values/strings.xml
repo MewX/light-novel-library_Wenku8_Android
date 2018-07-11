@@ -70,6 +70,7 @@
     <string name="novel_item_hit_with_colon">总点击量：</string>
     <string name="novel_item_push_with_colon">总推荐量：</string>
     <string name="novel_item_fav_with_colon">总收藏量：</string>
+    <string name="novel_item_latest_chapter">最新章节：</string>
     <string name="novel_item_cover">小说封面</string>
     <string name="list_loading">正在载入列表……</string>
     <string name="system_press_again_to_exit"><b>退出请再抚摸一下返回键哦～</b>\n&lt;(=～￣▽￣)→)￣▽￣=)>o </string>
@@ -152,7 +153,7 @@
     <string name="login_login">登录</string>
     <string name="login_register">注册</string>
     <string name="login_logout">登出账号</string>
-    <string name="press_twice_to_exit"><b>退出请再戳一下返回键哦～</b>\n&lt;(=～￣▽￣)→)￣▽￣=)>o </string>
+    <string name="press_twice_to_exit">"<b>退出请再戳一下返回键哦～</b> &lt;(=～￣▽￣)→)￣▽￣=)>o "</string>
     <string name="sorry">客官你不要心急啊，你急臣妾也做不到呀，现在代码量已经比之前版本大很多了~请体谅。而且主框架搭的差不多了，后面逻辑快很多，一有时间就好办！</string>
     <string name="sorry_old_engine_no_image_preview">旧的引擎暂不可查看大图</string>
     <string name="sorry_old_engine_preprocess">旧的引擎正在预处理</string>
@@ -197,7 +198,7 @@
     <string name="reader_find">查找内容</string>
     <string name="reader_config">阅读器设置</string>
     <string name="reader_v1_notice">V1 引擎提示</string>
-    <string name="reader_jump_last">是否跳转到上次阅读记录？</string>
+    <string name="reader_jump_last">是否跳转到该章节？</string>
     <string name="reader_rotate">顺时针旋转90°</string>
     <string name="reader_download">保存图片</string>
     <string name="reader_custom_background">自定义阅读背景</string>
@@ -207,5 +208,8 @@
     <string name="reader_paragraph_distance">段落间距</string>
     <string name="reader_paragraph_edge_distance">段落边距</string>
     <string name="reader_view_image_no_image">请在有图的页面点击此按钮看图~</string>
+    <string name="reader_msg_no_saved_reading_progress">未发现保存的进度，可能是未读或上次读完了某卷~ 那么，开始下一卷吧~</string>
+    <string name="reader_msg_no_available_chapter">内部错误！无法找到该章节！</string>
+    <string name="reader_msg_please_refresh_and_retry">请更新小说信息后再尝试</string>
     <string name="action_go_to_forum">进入评论区</string>
 </resources>

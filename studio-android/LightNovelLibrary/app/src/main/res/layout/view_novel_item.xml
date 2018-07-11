@@ -66,6 +66,7 @@
                         android:layout_height="wrap_content"
                         android:layout_weight="1" >
 
+                        <!--Use as short_intro or latest_chapter-->
                         <TextView
                             android:id="@+id/novel_item_text_author"
                             android:layout_width="wrap_content"

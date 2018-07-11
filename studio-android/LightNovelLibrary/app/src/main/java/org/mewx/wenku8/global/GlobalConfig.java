@@ -63,6 +63,9 @@ public class GlobalConfig {
     private static final String saveNoticeString = "notice.wk8"; // the notice cache from online
     private static int maxSearchHistory = 20; // default
 
+    // reserved constants
+    public static final String UNKNOWN = "Unknown";
+
     // vars
     private static boolean isInBookshelf = false;
     private static boolean isInLatest = false;
@@ -470,13 +473,13 @@ public class GlobalConfig {
 
     public static void writeSearchHistory() {
         // [0what][1what]...
-        String temp = "";
+        StringBuilder temp = new StringBuilder();
         for (int i = 0; i < searchHistory.size(); i++) {
-            temp += "[" + searchHistory.get(i) + "]";
+            temp.append("[").append(searchHistory.get(i)).append("]");
         }
 
         // write file
-        writeFullSaveFileContent(saveSearchHistoryFileName, temp);
+        writeFullSaveFileContent(saveSearchHistoryFileName, temp.toString());
     }
 
     public static ArrayList<String> getSearchHistory() {
@@ -587,15 +590,16 @@ public class GlobalConfig {
         if (readSaves == null)
             loadReadSaves();
 
-        String t = "";
+        StringBuilder t = new StringBuilder();
         for (int i = 0; i < readSaves.size(); i++) {
             if (i != 0)
-                t += "||";
-            t += readSaves.get(i).cid + ",," + readSaves.get(i).pos + ",,"
-                    + readSaves.get(i).height;
+                t.append("||");
+            t.append(readSaves.get(i).cid).append(",,")
+                    .append(readSaves.get(i).pos).append(",,")
+                    .append(readSaves.get(i).height);
         }
 
-        writeFullSaveFileContent(saveReadSavesFileName, t);
+        writeFullSaveFileContent(saveReadSavesFileName, t.toString());
     }
 
     public static void addReadSavesRecord(int c, int p, int h) {
@@ -680,14 +684,17 @@ public class GlobalConfig {
         if (readSavesV1 == null)
             loadReadSavesV1();
 
-        String t = "";
+        StringBuilder t = new StringBuilder();
         for (int i = 0; i < readSavesV1.size(); i++) {
             if (i != 0)
-                t += "||";
-            t += readSavesV1.get(i).aid + ":" + readSavesV1.get(i).vid + ":" + readSavesV1.get(i).cid + ":"
-                    + readSavesV1.get(i).lineId + ":" + readSavesV1.get(i).wordId;
+                t.append("||");
+            t.append(readSavesV1.get(i).aid).append(":")
+                    .append(readSavesV1.get(i).vid).append(":")
+                    .append(readSavesV1.get(i).cid).append(":")
+                    .append(readSavesV1.get(i).lineId).append(":")
+                    .append(readSavesV1.get(i).wordId);
         }
-        writeFullSaveFileContent(saveReadSavesV1FileName, t);
+        writeFullSaveFileContent(saveReadSavesV1FileName, t.toString());
     }
 
     public static void addReadSavesRecordV1(int aid, int vid, int cid, int lineId, int wordId) {
@@ -761,12 +768,12 @@ public class GlobalConfig {
     public static void saveAllSetting() {
         if(allSetting == null) loadAllSetting();
 
-        String result = "";
+        StringBuilder result = new StringBuilder();
         for( String key : allSetting.keySet() ) {
-            if(!result.equals("")) result = result + "||||";
-            result = result + key + "::::" + allSetting.getAsString(key);
+            if(!result.toString().equals("")) result.append("||||");
+            result.append(key).append("::::").append(allSetting.getAsString(key));
         }
-        writeFullSaveFileContent(saveSetting, result);
+        writeFullSaveFileContent(saveSetting, result.toString());
     }
 
     @Nullable
@@ -785,7 +792,7 @@ public class GlobalConfig {
     }
 
 
-    /** Novel content */
+    /* Novel content */
     /**
      * saveNovelContentImage:
      *
@@ -850,18 +857,13 @@ public class GlobalConfig {
 
 
     public static boolean isNetworkAvailable(Context context) {
-        ConnectivityManager cm = (ConnectivityManager) context
-                .getSystemService(Context.CONNECTIVITY_SERVICE);
+        ConnectivityManager cm = (ConnectivityManager) context.getSystemService(Context.CONNECTIVITY_SERVICE);
         if (cm != null) {
-            NetworkInfo[] info = cm.getAllNetworkInfo();
-            if (info != null) {
-                for(NetworkInfo ni : info) {
-                    if (ni.getState() == NetworkInfo.State.CONNECTED)
-                        return true;
-                }
-            }
+            // connected
+            NetworkInfo activeNetwork = cm.getActiveNetworkInfo();
+            return activeNetwork != null;
         }
-        return false;
+        return false; // not connected
     }
 
     /* notice */

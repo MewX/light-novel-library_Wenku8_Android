@@ -2,6 +2,7 @@ package org.mewx.wenku8.global.api;
 
 import android.util.Log;
 
+import org.mewx.wenku8.global.GlobalConfig;
 import org.xmlpull.v1.XmlPullParser;
 import org.xmlpull.v1.XmlPullParserFactory;
 
@@ -49,23 +50,23 @@ public class UserInfo {
                         } else if ("item".equals(xmlPullParser.getName())) {
                             if("uname".equals(xmlPullParser.getAttributeValue(0))) {
                                 ui.username = xmlPullParser.nextText();
-                                Log.e("MewX", ui.username.length() == 0 ? "unknown" : ui.username);
+                                Log.e("MewX", ui.username.length() == 0 ? GlobalConfig.UNKNOWN : ui.username);
                             }
                             else if("nickname".equals(xmlPullParser.getAttributeValue(0))) {
                                 ui.nickyname = xmlPullParser.nextText();
-                                Log.e("MewX", ui.nickyname.length() == 0 ? "unknown" : ui.nickyname);
+                                Log.e("MewX", ui.nickyname.length() == 0 ? GlobalConfig.UNKNOWN : ui.nickyname);
                             }
                             else if("score".equals(xmlPullParser.getAttributeValue(0))) {
-                                ui.score = new Integer(xmlPullParser.nextText());
+                                ui.score = Integer.valueOf(xmlPullParser.nextText());
                                 Log.e("MewX", "score:" + ui.score);
                             }
                             else if("experience".equals(xmlPullParser.getAttributeValue(0))) {
-                                ui.experience = new Integer(xmlPullParser.nextText());
+                                ui.experience = Integer.valueOf(xmlPullParser.nextText());
                                 Log.e("MewX", "experience:" + ui.experience);
                             }
                             else if("rank".equals(xmlPullParser.getAttributeValue(0))) {
                                 ui.rank = xmlPullParser.nextText();
-                                Log.e("MewX", ui.rank.length() == 0 ? "unknown" : ui.rank);
+                                Log.e("MewX", ui.rank.length() == 0 ? GlobalConfig.UNKNOWN : ui.rank);
                             }
                         }
                         break;
