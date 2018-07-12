@@ -76,12 +76,10 @@ public class LightUserSession {
 
     public static boolean saveUserInfoSet() {
         LightCache.saveFile(GlobalConfig.getFirstFullUserAccountSaveFilePath(), encUserFile().getBytes(), true);
-        if(!LightCache.testFileExist(GlobalConfig.getFirstFullUserAccountSaveFilePath())) {
+        if (!LightCache.testFileExist(GlobalConfig.getFirstFullUserAccountSaveFilePath())) {
             LightCache.saveFile(GlobalConfig.getSecondFullUserAccountSaveFilePath(), encUserFile().getBytes(), true);
-            if(!LightCache.testFileExist(GlobalConfig.getSecondFullUserAccountSaveFilePath()))
-                return false;
+            return LightCache.testFileExist(GlobalConfig.getSecondFullUserAccountSaveFilePath());
         }
-
         return true;
     }
 
@@ -168,10 +166,7 @@ public class LightUserSession {
      * @return true is okay.
      */
     public static boolean isUserInfoSet() {
-        if(username == null || password == null || username.length() == 0 || password.length() == 0)
-            return false;
-        else
-            return true;
+        return username != null && password != null && username.length() != 0 && password.length() != 0;
     }
 
     /**
@@ -245,8 +240,6 @@ public class LightUserSession {
         if(!isUserInfoSet())
             return ""; // empty, not null
 
-        String result = "";
-
         // username, password enc to base64
         char[] temp_username = LightBase64.EncodeBase64(username).toCharArray();
         char[] temp_password = LightBase64.EncodeBase64(password).toCharArray();
@@ -268,7 +261,7 @@ public class LightUserSession {
         // twice base64, exchange char position, beg to end, end to beg
         int equal_pos;
         temp_username = LightBase64.EncodeBase64(new String(temp_username)).toCharArray();
-        result = new String(temp_username);
+        String result = new String(temp_username);
         equal_pos = result.indexOf('=');
         for(int i = 0, j = equal_pos == -1 ? temp_username.length - 1 : equal_pos - 1; i < j; i ++, j --) {
             char temp = temp_username[i];
@@ -318,12 +311,8 @@ public class LightUserSession {
 
             if(LightUserSession.logStatus) {
                 // heart beat service
-                // Toast.makeText(MyApp.getContext(), e.toString(), Toast.LENGTH_SHORT).show();
                 Intent intent = new Intent(MyApp.getContext(),HeartbeatSessionKeeper.class);
                 MyApp.getContext().startService(intent);
-            }
-            else {
-//                 Toast.makeText(MyApp.getContext(), e.toString(), Toast.LENGTH_SHORT).show();
             }
         }
     }
