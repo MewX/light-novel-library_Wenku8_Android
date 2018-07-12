@@ -29,6 +29,7 @@ import org.mewx.wenku8.activity.NovelInfoActivity;
 import org.mewx.wenku8.adapter.NovelItemAdapterUpdate;
 import org.mewx.wenku8.global.GlobalConfig;
 import org.mewx.wenku8.global.api.NovelItemInfoUpdate;
+import org.mewx.wenku8.global.api.NovelItemList;
 import org.mewx.wenku8.global.api.Wenku8API;
 import org.mewx.wenku8.global.api.Wenku8Parser;
 import org.mewx.wenku8.listener.MyItemClickListener;
@@ -38,6 +39,7 @@ import org.mewx.wenku8.util.LightNetwork;
 import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -300,50 +302,71 @@ public class NovelItemListFragment extends Fragment implements MyItemClickListen
         @Override
         protected Integer doInBackground(String... params) {
 
-            // get search result by novel title
-            ContentValues cv = Wenku8API.searchNovelByNovelName(params[0], GlobalConfig.getCurrentLang());
-            byte[] tempListTitle = LightNetwork.LightHttpPostConnection(Wenku8API.getBaseURL(), cv);
-            if(tempListTitle == null) return -1;
-
-            // purify returned data
             List<Integer> listResultList = new ArrayList<>(); // result list
-            try {
-                //Log.i("MewX", new String(tempListTitle, "UTF-8"));
-                Pattern p = Pattern.compile("aid=\'(.*)\'"); // match content between "aid=\'" and "\'"
-                Matcher m = p.matcher(new String(tempListTitle, "UTF-8"));
-                while (m.find())
-                    listResultList.add(Integer.valueOf(m.group(1)));
-            } catch (UnsupportedEncodingException e) {
-                e.printStackTrace();
-            }
-
-            // get search result by author name
-            cv = Wenku8API.searchNovelByAuthorName(params[0], GlobalConfig.getCurrentLang());
-            byte[] tempListName = LightNetwork.LightHttpPostConnection(Wenku8API.getBaseURL(), cv);
-            if(tempListName == null) return -1;
-
-            // purify returned data
             List<Integer> listResultList2 = new ArrayList<>(); // result list
-            try {
-                Log.i("MewX", new String(tempListName, "UTF-8"));
-                Pattern p = Pattern.compile("aid=\'(.*)\'"); // match content between "aid=\'" and "\'"
-                Matcher m = p.matcher(new String(tempListName, "UTF-8"));
-                while (m.find()) {
-                    listResultList2.add(Integer.valueOf(m.group(1)));
-                    Log.e("MewX", listResultList2.get(listResultList2.size()-1).toString());
-                }
-            } catch (UnsupportedEncodingException e) {
-                e.printStackTrace();
+
+            switch(GlobalConfig.searchType) {
+                case web:
+                    // get search result by novel title
+                    ContentValues cv = Wenku8API.searchNovelByNovelName(params[0], GlobalConfig.getCurrentLang());
+                    byte[] tempListTitle = LightNetwork.LightHttpPostConnection(Wenku8API.getBaseURL(), cv);
+                    if(tempListTitle == null) return -1;
+
+                    // purify returned data
+                    try {
+                        //Log.i("MewX", new String(tempListTitle, "UTF-8"));
+                        Pattern p = Pattern.compile("aid=\'(.*)\'"); // match content between "aid=\'" and "\'"
+                        Matcher m = p.matcher(new String(tempListTitle, "UTF-8"));
+                        while (m.find())
+                            listResultList.add(Integer.valueOf(m.group(1)));
+                    } catch (UnsupportedEncodingException e) {
+                        e.printStackTrace();
+                    }
+
+                    // get search result by author name
+                    cv = Wenku8API.searchNovelByAuthorName(params[0], GlobalConfig.getCurrentLang());
+                    byte[] tempListName = LightNetwork.LightHttpPostConnection(Wenku8API.getBaseURL(), cv);
+                    if(tempListName == null) return -1;
+
+                    // purify returned data
+                    try {
+                        Log.i("MewX", new String(tempListName, "UTF-8"));
+                        Pattern p = Pattern.compile("aid=\'(.*)\'"); // match content between "aid=\'" and "\'"
+                        Matcher m = p.matcher(new String(tempListName, "UTF-8"));
+                        while (m.find()) {
+                            listResultList2.add(Integer.valueOf(m.group(1)));
+                            Log.e("MewX", listResultList2.get(listResultList2.size()-1).toString());
+                        }
+                    } catch (UnsupportedEncodingException e) {
+                        e.printStackTrace();
+                    }
+                    break;
+                case bookshelf:
+                    List<NovelItemInfoUpdate> listNovelItemInfo = new ArrayList<>();
+                    for(int aid : GlobalConfig.getLocalBookshelfList()) {
+                        String xml = GlobalConfig.loadFullFileFromSaveFolder("intro", aid + "-intro.xml");
+                        if (!xml.isEmpty()) {
+                            NovelItemInfoUpdate niiu = NovelItemInfoUpdate.convertFromMeta(
+                                    Objects.requireNonNull(Wenku8Parser.parseNovelFullMeta(xml)));
+                            if(niiu != null) {
+                                listNovelItemInfo.add(niiu);
+                            }
+                        }
+                    }
+                    for(NovelItemInfoUpdate info : listNovelItemInfo) {
+                        if(info.author.contains(params[0]) || info.title.contains(params[0])) {
+                            listResultList.add(info.aid);
+                        }
+                    }
+                    break;
             }
+
 
             // set migrate
             listNovelItemAid = new ArrayList<>();
             listNovelItemAid.addAll(listResultList);
             listNovelItemAid.removeAll(listResultList2);
             listNovelItemAid.addAll(listResultList2);
-            if(GlobalConfig.searchType == GlobalConfig.SearchType.bookshelf) {
-                listNovelItemAid.retainAll(GlobalConfig.getLocalBookshelfList());
-            }
             return 0;
         }
 
