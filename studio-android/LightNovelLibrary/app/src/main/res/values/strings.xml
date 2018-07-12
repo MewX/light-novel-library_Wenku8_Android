@@ -30,6 +30,7 @@
     <string name="action_novel_info">小说信息</string>
     <string name="action_continue_read_progress">继续上次阅读进度</string>
     <string name="action_chapter_list">章节列表</string>
+    <string name="action_review_list">评论区</string>
     <string name="action_old_vertical_reader">旧引擎阅读界面</string>
     <string name="action_horizontal_reader_v1">V1阅读引擎</string>
     <string name="action_user_login">Wenku8账号登录</string>
@@ -64,6 +65,7 @@
     <string name="novel_item_author_with_colon">小说作者：</string>
     <string name="na">N/A</string>
     <string name="loading">loading…</string>
+    <string name="loading_done">全部加载完毕</string>
     <string name="novel_item_status_with_colon">连载状态：</string>
     <string name="novel_item_update_with_colon">更新时间：</string>
     <string name="novel_item_intro_with_colon">内容简介：</string>
@@ -73,7 +75,7 @@
     <string name="novel_item_latest_chapter">最新章节：</string>
     <string name="novel_item_cover">小说封面</string>
     <string name="list_loading">正在载入列表……</string>
-    <string name="system_press_again_to_exit"><b>退出请再抚摸一下返回键哦～</b>\n&lt;(=～￣▽￣)→)￣▽￣=)>o </string>
+    <string name="system_press_again_to_exit">退出请再抚摸一下返回键哦～\n&lt;(=～￣▽￣)→)￣▽￣=)>o</string>
     <string name="system_network_error">连接服务器失败！\n\n可能的原因有：\n手机网络异常，试试浏览器访问；\n运营商劫持（部分地区的10086）；\nWIFI切换到数据需等待域名解析缓存刷新（约10min）；\n服务器暂时无法响应请求；\n此时段请求服务器次数过多。</string>
     <string name="system_parse_failed">数据解析失败！\n\n可能的原因有：\n你修改了存储的数据；\n服务姬傲娇了，试试浏览器访问；\n程序内部错误，请反馈给开发者；</string>
     <string name="system_manually_cancelled">任务已被手动取消</string>

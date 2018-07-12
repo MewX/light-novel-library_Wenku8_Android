@@ -1,20 +1,27 @@
-<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:gpb="http://schemas.android.com/apk/res-auto"
-    xmlns:tools="http://schemas.android.com/tools"
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/myWindowBackground"
-    tools:context="org.mewx.wenku8.fragment.LatestFragment">
+    android:background="@color/myPrimaryColor"
+    android:fitsSystemWindows="true">
 
-    <!-- Novel List -->
-    <android.support.v7.widget.RecyclerView
-        android:id="@+id/novel_item_list"
+    <include layout="@layout/toolbar_pure" />
+
+    <android.support.v4.widget.SwipeRefreshLayout
+        android:id="@+id/swipe_refresh_layout"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:fastScrollEnabled="true"
-        android:scrollbars="vertical" />
-    <!--android:paddingLeft="5dp"-->
-    <!--android:paddingRight="5dp"-->
+        android:layout_below="@id/toolbar_actionbar"
+        android:background="@color/myWindowBackground">
+
+        <!-- Review List -->
+        <android.support.v7.widget.RecyclerView
+            android:id="@+id/review_item_list"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:fastScrollEnabled="true"
+            android:scrollbars="vertical" />
+    </android.support.v4.widget.SwipeRefreshLayout>
 
     <!-- Loading Frame -->
     <LinearLayout
@@ -27,12 +34,6 @@
         android:gravity="center"
         android:orientation="vertical"
         android:visibility="visible">
-
-        <com.jpardogo.android.googleprogressbar.library.GoogleProgressBar
-            android:id="@+id/google_progress"
-            android:layout_width="48dp"
-            android:layout_height="48dp"
-            gpb:type="chrome_floating_circles" />
 
         <!-- If loading failed, update this loading-status info -->
         <TextView
@@ -51,10 +52,9 @@
             android:clickable="true"
             android:focusable="true"
             android:gravity="center"
-            android:text="@string/task_stop"
+            android:text="@string/task_retry"
             android:textColor="@color/default_text_color_black"
             android:visibility="gone" />
 
     </LinearLayout>
-
-</FrameLayout>
+</RelativeLayout>

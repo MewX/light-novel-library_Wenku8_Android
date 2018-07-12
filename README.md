@@ -1,3 +1,6 @@
+[![Build Status](https://travis-ci.com/MewX/light-novel-library_Wenku8_Android.svg?branch=master)](https://travis-ci.com/MewX/light-novel-library_Wenku8_Android)
+[![Coverage Status](https://coveralls.io/repos/github/MewX/light-novel-library_Wenku8_Android/badge.svg)](https://coveralls.io/github/MewX/light-novel-library_Wenku8_Android)
+
 文档目录
 ==========
 

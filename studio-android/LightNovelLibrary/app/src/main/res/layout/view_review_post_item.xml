@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:card-view="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:paddingLeft="6dp"
+    android:paddingRight="6dp"
+    android:paddingTop="2dp">
+
+    <android.support.v7.widget.CardView
+        android:id="@+id/novel_card"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        card-view:cardBackgroundColor="@color/novel_item_white"
+        card-view:cardElevation="2dp"
+        card-view:cardMaxElevation="2dp"
+        card-view:cardPreventCornerOverlap="true"
+        card-view:cardUseCompatPadding="true">
+
+        <RelativeLayout
+            android:id="@+id/item_card"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:padding="8dp"
+            android:adjustViewBounds="true"
+            android:background="@drawable/btn_menu_item"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center_horizontal"
+            android:minHeight="36dp">
+
+            <TextView
+                android:id="@+id/review_title"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_alignParentLeft="true"
+                android:layout_alignParentStart="true"
+                android:singleLine="false"
+                android:text="@string/loading"
+                android:textColor="@color/novel_item_title"
+                android:textSize="16sp" />
+
+            <View
+                android:id="@+id/divider"
+                android:layout_width="match_parent"
+                android:layout_height="1px"
+                android:layout_below="@+id/review_title"
+                android:background="@color/default_divider" />
+
+            <RelativeLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_below="@id/divider"
+                android:paddingTop="4dp">
+
+                <TextView
+                    android:id="@+id/review_item_post_time"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_alignParentLeft="true"
+                    android:layout_alignParentStart="true"
+                    android:layout_marginEnd="16dp"
+                    android:layout_marginRight="16dp"
+                    android:text="@string/loading"
+                    android:textColor="@color/novel_item_text"
+                    android:textSize="12sp"
+                    tools:ignore="RelativeOverlap" />
+
+                <TextView
+                    android:id="@+id/review_item_author"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_toEndOf="@id/number_of_reply_icon"
+                    android:layout_toLeftOf="@id/number_of_reply_icon"
+                    android:layout_toRightOf="@id/review_item_post_time"
+                    android:layout_toStartOf="@id/review_item_post_time"
+                    android:text="@string/loading"
+                    android:textColor="@color/novel_item_text"
+                    android:textSize="12sp" />
+
+                <ImageView
+                    android:id="@+id/number_of_reply_icon"
+                    android:layout_width="16dp"
+                    android:layout_height="16dp"
+                    android:layout_marginLeft="16dp"
+                    android:layout_marginStart="16dp"
+                    android:layout_toLeftOf="@id/review_item_number_of_posts"
+                    android:layout_toStartOf="@id/review_item_number_of_posts"
+                    android:src="@drawable/ic_svg_forum_grey" />
+
+                <TextView
+                    android:id="@+id/review_item_number_of_posts"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_alignParentEnd="true"
+                    android:layout_alignParentRight="true"
+                    android:layout_marginLeft="8dp"
+                    android:layout_marginStart="8dp"
+                    android:singleLine="true"
+                    android:text="@string/loading"
+                    android:textColor="@color/novel_item_text"
+                    android:textSize="12sp" />
+            </RelativeLayout>
+
+        </RelativeLayout>
+    </android.support.v7.widget.CardView>
+</RelativeLayout>

@@ -522,8 +522,9 @@ public class NovelInfoActivity extends AppCompatActivity {
             // not found
             Toast.makeText(this, getResources().getText(R.string.reader_msg_no_saved_reading_progress), Toast.LENGTH_SHORT).show();
         } else if (menuItem.getItemId() == R.id.action_go_to_forum) {
-            // TODO:
-            Toast.makeText(this, "下个版本这里就能点进评论区啦", Toast.LENGTH_SHORT).show();
+            Intent intent = new Intent(NovelInfoActivity.this, NovelReviewListActivity.class);
+            intent.putExtra("aid", aid);
+            startActivity(intent);
         }
         return super.onOptionsItemSelected(menuItem);
     }
@@ -550,42 +551,21 @@ public class NovelInfoActivity extends AppCompatActivity {
 
         new MaterialDialog.Builder(this)
                 .onPositive((ignored1, ignored2) -> {
-                    // test does file exist
-                    if (from.equals(FromLocal)
-                            && !LightCache.testFileExist(GlobalConfig.getFirstStoragePath() + GlobalConfig.saveFolderName + File.separator + "novel" + File.separator + cid + ".xml")
-                            && !LightCache.testFileExist(GlobalConfig.getSecondStoragePath() + GlobalConfig.saveFolderName + File.separator + "novel" + File.separator + cid + ".xml")) {
-                        // local file not download, ask to download an read or cancel
-                        new MaterialDialog.Builder(NovelInfoActivity.this)
-                                .onPositive((ignored3, ignored4) -> {
-                                    // jump to reader activity
-                                    Intent intent = new Intent(NovelInfoActivity.this, Wenku8ReaderActivityV1.class);
-                                    intent.putExtra("aid", aid);
-                                    intent.putExtra("volume", volumeList_bak);
-                                    intent.putExtra("cid", cid);
-                                    intent.putExtra("from", "cloud"); // from cloud
-                                    intent.putExtra("forcejump", "yes");
-                                    startActivity(intent);
-                                    overridePendingTransition(R.anim.fade_in, R.anim.hold); // fade in animation
-                                })
-                                .theme(Theme.LIGHT)
-                                .backgroundColorRes(R.color.dlgBackgroundColor)
-                                .contentColorRes(R.color.dlgContentColor)
-                                .positiveColorRes(R.color.dlgPositiveButtonColor)
-                                .negativeColorRes(R.color.dlgNegativeButtonColor)
-                                .content(getResources().getString(R.string.dialog_content_load_from_cloud))
-                                .contentGravity(GravityEnum.CENTER)
-                                .positiveText(R.string.dialog_positive_likethis)
-                                .negativeText(R.string.dialog_negative_preferno)
-                                .show();
-                        return;
-                    }
-
                     // jump to reader activity
                     Intent intent = new Intent(NovelInfoActivity.this, Wenku8ReaderActivityV1.class);
                     intent.putExtra("aid", aid);
                     intent.putExtra("volume", volumeList_bak);
                     intent.putExtra("cid", cid);
-                    intent.putExtra("from", from); // from "fav"
+
+                    // test does file exist
+                    if (from.equals(FromLocal)
+                            && !LightCache.testFileExist(GlobalConfig.getFirstStoragePath() + GlobalConfig.saveFolderName + File.separator + "novel" + File.separator + cid + ".xml")
+                            && !LightCache.testFileExist(GlobalConfig.getSecondStoragePath() + GlobalConfig.saveFolderName + File.separator + "novel" + File.separator + cid + ".xml")) {
+                        intent.putExtra("from", "cloud"); // from cloud
+                    } else {
+                        intent.putExtra("from", from); // from "fav"
+                    }
+
                     intent.putExtra("forcejump", "yes");
                     startActivity(intent);
                     overridePendingTransition(R.anim.fade_in, R.anim.hold); // fade in animation
@@ -636,7 +616,7 @@ public class NovelInfoActivity extends AppCompatActivity {
                 }
                 else {
                     ContentValues cv = Wenku8API.getNovelFullMeta(aid, GlobalConfig.getCurrentLang());
-                    byte[] byteNovelFullMeta = LightNetwork.LightHttpPostConnection(Wenku8API.getBaseURL(), cv);
+                    byte[] byteNovelFullMeta = LightNetwork.LightHttpPostConnection(Wenku8API.BASE_URL, cv);
                     if (byteNovelFullMeta == null) return -1;
                     novelFullMeta = new String(byteNovelFullMeta, "UTF-8"); // save
                 }
@@ -656,7 +636,7 @@ public class NovelInfoActivity extends AppCompatActivity {
                 }
                 else {
                     ContentValues cvFullIntroRequest = Wenku8API.getNovelFullIntro(aid, GlobalConfig.getCurrentLang());
-                    byte[] byteNovelFullInfo = LightNetwork.LightHttpPostConnection(Wenku8API.getBaseURL(), cvFullIntroRequest);
+                    byte[] byteNovelFullInfo = LightNetwork.LightHttpPostConnection(Wenku8API.BASE_URL, cvFullIntroRequest);
                     if (byteNovelFullInfo == null) return -1;
                     novelFullIntro = new String(byteNovelFullInfo, "UTF-8"); // save
                 }
@@ -676,7 +656,7 @@ public class NovelInfoActivity extends AppCompatActivity {
                 }
                 else {
                     ContentValues cv = Wenku8API.getNovelIndex(aid, GlobalConfig.getCurrentLang());
-                    byte[] byteNovelChapterList = LightNetwork.LightHttpPostConnection(Wenku8API.getBaseURL(), cv);
+                    byte[] byteNovelChapterList = LightNetwork.LightHttpPostConnection(Wenku8API.BASE_URL, cv);
                     if (byteNovelChapterList == null) return -1;
                     novelFullVolume = new String(byteNovelChapterList, "UTF-8"); // save
                 }
@@ -714,12 +694,13 @@ public class NovelInfoActivity extends AppCompatActivity {
                 case 1:
                     // update general info
                     tvNovelAuthor.setPaintFlags(tvNovelAuthor.getPaintFlags() | Paint.UNDERLINE_TEXT_FLAG); // with hyperlink
+                    tvLatestChapter.setPaintFlags(tvLatestChapter.getPaintFlags() | Paint.UNDERLINE_TEXT_FLAG); // with hyperlink
 
                     tvNovelTitle.setText(mNovelItemMeta.title);
                     tvNovelAuthor.setText(mNovelItemMeta.author);
                     tvNovelStatus.setText(mNovelItemMeta.bookStatus);
                     tvNovelUpdate.setText(mNovelItemMeta.lastUpdate);
-                    tvLatestChapter.setText(mNovelItemMeta.latestSectionName); // TODO: use latestSectionCid to jump to reader page directly, some are 'unknown"
+                    tvLatestChapter.setText(mNovelItemMeta.latestSectionName);
                     if(NovelInfoActivity.this.getSupportActionBar() != null)
                         NovelInfoActivity.this.getSupportActionBar().setTitle(mNovelItemMeta.title); // set action bar title
                     break;
@@ -813,14 +794,14 @@ public class NovelInfoActivity extends AppCompatActivity {
                 if (!isLoading)
                     return Wenku8Error.ErrorCode.USER_CANCELLED_TASK; // cancel
                 ContentValues cv = Wenku8API.getNovelIndex(taskaid, GlobalConfig.getCurrentLang());
-                byte[] tempVolumeXml = LightNetwork.LightHttpPostConnection(Wenku8API.getBaseURL(), cv);
+                byte[] tempVolumeXml = LightNetwork.LightHttpPostConnection(Wenku8API.BASE_URL, cv);
                 if (tempVolumeXml == null) return Wenku8Error.ErrorCode.NETWORK_ERROR; // network error
                 volumeXml = new String(tempVolumeXml, "UTF-8");
 
                 if (!isLoading)
                     return Wenku8Error.ErrorCode.USER_CANCELLED_TASK; // cancel
                 cv = Wenku8API.getNovelFullMeta(taskaid, GlobalConfig.getCurrentLang());
-                byte[] tempIntroXml = LightNetwork.LightHttpPostConnection(Wenku8API.getBaseURL(), cv);
+                byte[] tempIntroXml = LightNetwork.LightHttpPostConnection(Wenku8API.BASE_URL, cv);
                 if (tempIntroXml == null) return Wenku8Error.ErrorCode.NETWORK_ERROR; // network error
                 introXml = new String(tempIntroXml, "UTF-8");
 
@@ -832,7 +813,7 @@ public class NovelInfoActivity extends AppCompatActivity {
                 if (!isLoading)
                     return Wenku8Error.ErrorCode.USER_CANCELLED_TASK; // calcel
                 cv = Wenku8API.getNovelFullIntro(ni.aid, GlobalConfig.getCurrentLang());
-                byte[] tempFullIntro = LightNetwork.LightHttpPostConnection(Wenku8API.getBaseURL(), cv);
+                byte[] tempFullIntro = LightNetwork.LightHttpPostConnection(Wenku8API.BASE_URL, cv);
                 if (tempFullIntro == null) return Wenku8Error.ErrorCode.NETWORK_ERROR; // network error
                 ni.fullIntro = new String(tempFullIntro, "UTF-8");
 
@@ -863,7 +844,7 @@ public class NovelInfoActivity extends AppCompatActivity {
                         if (!isLoading) return Wenku8Error.ErrorCode.USER_CANCELLED_TASK; // calcel
                         String xml = GlobalConfig.loadFullFileFromSaveFolder("novel", tempCi.cid + ".xml"); // prevent empty file
                         if (xml.length() == 0 || operationType == 2) {
-                            byte[] tempXml = LightNetwork.LightHttpPostConnection(Wenku8API.getBaseURL(), cv);
+                            byte[] tempXml = LightNetwork.LightHttpPostConnection(Wenku8API.BASE_URL, cv);
                             if (tempXml == null) return Wenku8Error.ErrorCode.NETWORK_ERROR; // network error
                             xml = new String(tempXml, "UTF-8");
                             if(xml.trim().length() == 0) return Wenku8Error.ErrorCode.SERVER_RETURN_NOTHING;
@@ -978,7 +959,7 @@ public class NovelInfoActivity extends AppCompatActivity {
         @Override
         protected Wenku8Error.ErrorCode doInBackground(Integer... params) {
             // params: aid
-            byte[] bytes = LightNetwork.LightHttpPostConnection(Wenku8API.getBaseURL(), Wenku8API.getDelFromBookshelfParams(params[0]));
+            byte[] bytes = LightNetwork.LightHttpPostConnection(Wenku8API.BASE_URL, Wenku8API.getDelFromBookshelfParams(params[0]));
             if(bytes == null) return Wenku8Error.ErrorCode.NETWORK_ERROR;
 
             String result;
@@ -1077,7 +1058,7 @@ public class NovelInfoActivity extends AppCompatActivity {
                         if (!loading) return Wenku8Error.ErrorCode.USER_CANCELLED_TASK; // cancel
                         String xml = GlobalConfig.loadFullFileFromSaveFolder("novel", tempCi.cid + ".xml"); // prevent empty file
                         if (xml.length() == 0) {
-                            byte[] tempXml = LightNetwork.LightHttpPostConnection(Wenku8API.getBaseURL(), cv);
+                            byte[] tempXml = LightNetwork.LightHttpPostConnection(Wenku8API.BASE_URL, cv);
                             if (tempXml == null) return Wenku8Error.ErrorCode.NETWORK_ERROR; // network error
                             xml = new String(tempXml, "UTF-8");
                             if(xml.trim().length() == 0) return Wenku8Error.ErrorCode.SERVER_RETURN_NOTHING;

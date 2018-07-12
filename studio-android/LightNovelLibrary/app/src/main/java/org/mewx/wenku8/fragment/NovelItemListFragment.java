@@ -157,7 +157,7 @@ public class NovelItemListFragment extends Fragment implements MyItemClickListen
     }
 
     @Override
-    public void onItemLongClick(View view, int postion) {
+    public void onItemLongClick(View view, int position) {
         // empty
     }
 
@@ -255,7 +255,7 @@ public class NovelItemListFragment extends Fragment implements MyItemClickListen
 
             // params[0] is current page number
             ContentValues cv = Wenku8API.getNovelList(Wenku8API.getNOVELSORTBY(type), currentPage);
-            byte[] temp = LightNetwork.LightHttpPostConnection( Wenku8API.getBaseURL(), cv);
+            byte[] temp = LightNetwork.LightHttpPostConnection( Wenku8API.BASE_URL, cv);
             if(temp == null) return -1;
             try {
                 tempNovelList = Wenku8Parser.parseNovelItemList(new String(temp, "UTF-8"));

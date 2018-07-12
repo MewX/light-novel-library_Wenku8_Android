@@ -13,38 +13,21 @@ import java.util.Map;
 @SuppressWarnings("unused")
 public class Wenku8API {
 
-    /**
+    /*
      * Basic definitions
      */
-
     public static String NoticeString = "";
-    final public static String RegisterURL = "http://www.wenku8.com/register.php";
-    final private static String BaseURL = "http://app.wenku8.com/android.php";
-    private static boolean hasEdited = false;
-    final private static String NovelFinishedSC = "已完成", NovelFinishedTC = "已完成",
+    public static final String REGISTER_URL = "http://www.wenku8.com/register.php";
+    public static final String BASE_URL = "http://app.wenku8.com/android.php";
+    private static final String NovelFinishedSC = "已完成", NovelFinishedTC = "已完成",
             NovelNotFinishedSC = "连载中", NovelNotFinishedTC = "連載中";
-
-    public static String getBaseURL() {
-        return BaseURL;
-    }
-
-    public static void replaceBaseURL(String str) {
-        // replace URL for backup
-
-
-        hasEdited = true;
-    }
-
-    public static boolean hasEdited() {
-        return hasEdited;
-    }
 
     public static String getCoverURL(int aid) {
         return "http://img.wkcdn.com/image/" + Integer.toString(aid / 1000)
                 + "/" + Integer.toString(aid) + "/" + Integer.toString(aid) + "s.jpg";
     }
 
-    public static String[] badWords = {
+    public static final String[] badWords = {
             "共产党", "政府",  "毛泽东",  "邓小平",  "江泽民",  "胡锦涛",  "温家宝",  "习近平",
             "李克强", "台独",  "藏独", "反日", "反共", "反中", "达赖", "刘晓波", "毛主席", "愤青",
             "反华", "右翼", "游行", "示威", "静坐", "公安", "李洪志", "法轮功", "刷分", "路过路过",
@@ -53,10 +36,9 @@ public class Wenku8API {
     };
 
 
-    /**
+    /*
      * Basic converter functions
      */
-
     public enum LANG {
         SC, // simplified Chinese
         TC // traditional Chinese
@@ -75,32 +57,28 @@ public class Wenku8API {
 
     public enum STATUS {
         FINISHED, // novel's publishing finished
-        NOTFINISHED // novel's publishing not finished
+        NOT_FINISHED // novel's publishing not finished
     }
 
     public static STATUS getSTATUSByInt(int i) {
-        return i == 0 ? STATUS.NOTFINISHED : STATUS.FINISHED;
+        return i == 0 ? STATUS.NOT_FINISHED : STATUS.FINISHED;
     }
 
     public static STATUS getSTATUSByString(String s) {
-        return s.equals(NovelNotFinishedSC) || s.equals(NovelNotFinishedTC) ? STATUS.NOTFINISHED : STATUS.FINISHED;
+        return s.equals(NovelNotFinishedSC) || s.equals(NovelNotFinishedTC) ? STATUS.NOT_FINISHED : STATUS.FINISHED;
     }
 
     public static String getStatusBySTATUS(STATUS s) {
         switch (GlobalConfig.getCurrentLang()) {
-            case SC:
-                if (s == STATUS.FINISHED)
-                    return NovelFinishedSC;
-                else
-                    return NovelNotFinishedSC;
-
             case TC:
                 if (s == STATUS.FINISHED)
                     return NovelFinishedTC;
                 else
                     return NovelNotFinishedTC;
 
+            case SC:
             default:
+                // the default one
                 if (s == STATUS.FINISHED)
                     return NovelFinishedSC;
                 else
@@ -463,8 +441,7 @@ public class Wenku8API {
                 + "&page=" + page);
     }
 
-    public static ContentValues getNovelListWithInfo(NOVELSORTBY n, int page,
-                                                     LANG l) {
+    public static ContentValues getNovelListWithInfo(NOVELSORTBY n, int page, LANG l) {
         // get novel list with info digest
         // -------------------------------
         // <?xml version="1.0" encoding="utf-8"?>
@@ -525,7 +502,7 @@ public class Wenku8API {
     }
 
 
-    /**
+    /*
      * I rewrite part of the APIs to get the best performance.
      * The old APIs are above, and use HttpRequest.
      * This part uses AFinal and that's more efficient.
@@ -552,7 +529,7 @@ public class Wenku8API {
     }
 
     public static ContentValues getUserInfoParams( ) {
-        /**
+        /*
          * <?xml version="1.0" encoding="utf-8"?>
          * <metadata>
          * <item name="uname"><![CDATA[apptest]]></item>
@@ -566,7 +543,7 @@ public class Wenku8API {
     }
 
     public static ContentValues getUserSignParams( ) {
-        /**
+        /*
          * _cb({"ret":0});
          */
         return getEncryptedCV("action=block&do=sign"); // 增加一个积分/天
@@ -580,7 +557,7 @@ public class Wenku8API {
     public static ContentValues getBookshelfListAid(LANG l) {
         // 查询书架列表，只含有aid
 
-        /**
+        /*
          * <?xml version="1.0" encoding="utf-8"?>
          * <metadata>
          *     <book aid="1499" />
@@ -599,7 +576,7 @@ public class Wenku8API {
         // 查询书架列表
 
         // find "aid", find first \" to second \"
-        /**
+        /*
          * <?xml version="1.0" encoding="utf-8"?>
          * <metadata>
          *
@@ -650,21 +627,19 @@ public class Wenku8API {
     }
 
     public static ContentValues getCommentListParams(int aid, int page) {
-        // 书评列表 aid为文章ID  page不得为空（从1开始）
-
-        // Return:
-        //
-
-        return getEncryptedCV("action=review&do=list&aid=" + aid + "&page=" + page);
+        // 书评列表, aid为文章ID, page不得为空（从1开始）
+        if (page < 1) page = 1;
+        return getEncryptedCV("action=review&do=list&aid=" + aid + "&page=" + page + "&t=" + getLANG(GlobalConfig.getCurrentLang()));
     }
 
     public static ContentValues getCommentContentParams(int rid, int page) {
-        // 书评内容 rid为主题ID（不是aid）  page不得为空
+        // 书评内容, rid为主题ID（不是aid）, page不得为空
+        if (page < 1) page = 1;
 
         // Return:
         //
 
-        return getEncryptedCV("action=review&do=show&rid=" + rid + "&page=" + page);
+        return getEncryptedCV("action=review&do=show&rid=" + rid + "&page=" + page + "&t=" + getLANG(GlobalConfig.getCurrentLang()));
     }
 
     public static ContentValues getCommentNewThreadParams(int aid, String title, String content) {

@@ -8,8 +8,8 @@ import android.widget.ImageView.ScaleType;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.robolectric.Robolectric;
 import org.robolectric.RobolectricTestRunner;
+import org.robolectric.RuntimeEnvironment;
 
 import static org.junit.Assert.*;
 
@@ -20,7 +20,7 @@ public class NetworkImageViewTest {
 
     @Before public void setUp() throws Exception {
         mMockImageLoader = new MockImageLoader();
-        mNIV = new NetworkImageView(Robolectric.application);
+        mNIV = new NetworkImageView(RuntimeEnvironment.application);
     }
 
     @Test public void setImageUrl_requestsImage() {

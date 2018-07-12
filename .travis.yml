@@ -1,0 +1,39 @@
+language: android
+jdk: oraclejdk8
+
+env:
+  global:
+  - TARGET_SDK_VERSION=28
+  - BUILD_TOOLS_VERSION=28.0.1
+  - SUPPORT_LIB_VERSION=28.0.0-alpha3
+
+android:
+  components:
+  - tools
+  - platform-tools
+  - extra-google-m2repository
+  - extra-android-m2repository
+  - android-$TARGET_SDK_VERSION
+  - build-tools-$BUILD_TOOLS_VERSION
+  - android-21
+  - sys-img-armeabi-v7a-android-21
+
+before_cache:
+  - rm -f  $HOME/.gradle/caches/modules-2/modules-2.lock
+  - rm -fr $HOME/.gradle/caches/*/plugin-resolution/
+
+cache:
+  directories:
+  - $HOME/.gradle/caches/
+  - $HOME/.gradle/wrapper/
+  - $HOME/.android/build-cache
+
+before_install:
+  - cd studio-android/LightNovelLibrary
+  - echo no | android create avd --force -n test -t android-21 --abi armeabi-v7a
+  - emulator -avd test -no-audio -no-window &
+  - android-wait-for-emulator
+  - adb shell input keyevent 82 &
+
+script: ./gradlew build connectedCheck coveralls
+

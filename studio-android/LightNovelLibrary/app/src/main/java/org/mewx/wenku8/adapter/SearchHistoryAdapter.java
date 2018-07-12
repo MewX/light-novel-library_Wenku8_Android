@@ -1,5 +1,6 @@
 package org.mewx.wenku8.adapter;
 
+import android.support.annotation.NonNull;
 import android.support.v7.widget.RecyclerView;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -20,14 +21,15 @@ public class SearchHistoryAdapter extends RecyclerView.Adapter<SearchHistoryAdap
 
     private MyItemClickListener mItemClickListener;
     private MyItemLongClickListener mItemLongClickListener;
-    private List<String> history = null;
+    private List<String> history;
 
     public SearchHistoryAdapter(List<String> h) {
         this.history = h;
     }
 
     @Override
-    public ViewHolder onCreateViewHolder(ViewGroup viewGroup, int viewType) {
+    @NonNull
+    public ViewHolder onCreateViewHolder(@NonNull ViewGroup viewGroup, int viewType) {
         View view = LayoutInflater.from(viewGroup.getContext()).inflate(R.layout.view_search_history_item,viewGroup,false);
         return new ViewHolder(view, mItemClickListener, mItemLongClickListener);
     }
@@ -42,7 +44,7 @@ public class SearchHistoryAdapter extends RecyclerView.Adapter<SearchHistoryAdap
 
 
     @Override
-    public void onBindViewHolder(ViewHolder viewHolder, int position) {
+    public void onBindViewHolder(@NonNull ViewHolder viewHolder, int position) {
         if(viewHolder.mTextView != null)
             viewHolder.mTextView.setText(history.get(position));
     }
@@ -65,7 +67,7 @@ public class SearchHistoryAdapter extends RecyclerView.Adapter<SearchHistoryAdap
             view.findViewById(R.id.item_card).setOnLongClickListener(this);
 
             // real content
-            mTextView = (TextView) view.findViewById(R.id.search_history_text);
+            mTextView = view.findViewById(R.id.search_history_text);
         }
 
         @Override
