@@ -37,7 +37,7 @@ import org.mewx.wenku8.global.api.VolumeList;
 import org.mewx.wenku8.global.api.Wenku8API;
 import org.mewx.wenku8.global.api.Wenku8Error;
 import org.mewx.wenku8.global.api.Wenku8Parser;
-import org.mewx.wenku8.listener.MyDeleteClickListener;
+import org.mewx.wenku8.listener.MyOptionClickListener;
 import org.mewx.wenku8.listener.MyItemClickListener;
 import org.mewx.wenku8.listener.MyItemLongClickListener;
 import org.mewx.wenku8.util.LightCache;
@@ -55,7 +55,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 
-public class FavFragment extends Fragment implements MyItemClickListener, MyItemLongClickListener, MyDeleteClickListener {
+public class FavFragment extends Fragment implements MyItemClickListener, MyItemLongClickListener, MyOptionClickListener {
 
     // local vars
     private SwipeRefreshLayout mSwipeRefreshLayout;
@@ -295,7 +295,7 @@ public class FavFragment extends Fragment implements MyItemClickListener, MyItem
 
             // ! any network problem will interrupt this procedure
             // load bookshelf list, don't save
-            byte[] b = LightNetwork.LightHttpPostConnection(Wenku8API.getBaseURL(), Wenku8API.getBookshelfListAid(GlobalConfig.getCurrentLang()));
+            byte[] b = LightNetwork.LightHttpPostConnection(Wenku8API.BASE_URL, Wenku8API.getBookshelfListAid(GlobalConfig.getCurrentLang()));
             if(b == null) return Wenku8Error.ErrorCode.NETWORK_ERROR;
 
             if(LightTool.isInteger(new String(b))) {
@@ -305,7 +305,7 @@ public class FavFragment extends Fragment implements MyItemClickListener, MyItem
                     if(temp != Wenku8Error.ErrorCode.SYSTEM_1_SUCCEEDED) return temp; // return an error code
 
                     // request again
-                    b = LightNetwork.LightHttpPostConnection(Wenku8API.getBaseURL(), Wenku8API.getBookshelfListAid(GlobalConfig.getCurrentLang()));
+                    b = LightNetwork.LightHttpPostConnection(Wenku8API.BASE_URL, Wenku8API.getBookshelfListAid(GlobalConfig.getCurrentLang()));
                     if(b == null) return Wenku8Error.ErrorCode.NETWORK_ERROR;
                 }
             }
@@ -362,7 +362,7 @@ public class FavFragment extends Fragment implements MyItemClickListener, MyItem
                 try {
                     // fetch volumes
                     ContentValues cv = Wenku8API.getNovelIndex(aid, GlobalConfig.getCurrentLang());
-                    byte[] tempVolumeXml = LightNetwork.LightHttpPostConnection(Wenku8API.getBaseURL(), cv);
+                    byte[] tempVolumeXml = LightNetwork.LightHttpPostConnection(Wenku8API.BASE_URL, cv);
                     if(!isLoading) return Wenku8Error.ErrorCode.USER_CANCELLED_TASK;
                     if(tempVolumeXml == null) return Wenku8Error.ErrorCode.NETWORK_ERROR;
                     volumeXml = new String(tempVolumeXml, "UTF-8");
@@ -371,7 +371,7 @@ public class FavFragment extends Fragment implements MyItemClickListener, MyItem
                     if(!isLoading) return Wenku8Error.ErrorCode.USER_CANCELLED_TASK;
 
                     // use short intro
-                    byte[] tempIntroXml = LightNetwork.LightHttpPostConnection(Wenku8API.getBaseURL(),
+                    byte[] tempIntroXml = LightNetwork.LightHttpPostConnection(Wenku8API.BASE_URL,
                             Wenku8API.getNovelFullMeta(aid, GlobalConfig.getCurrentLang()));
                     if (tempIntroXml == null) return Wenku8Error.ErrorCode.NETWORK_ERROR;
                     introXml = new String(tempIntroXml, "UTF-8");
@@ -383,7 +383,7 @@ public class FavFragment extends Fragment implements MyItemClickListener, MyItem
 
                     if(!isLoading) return Wenku8Error.ErrorCode.USER_CANCELLED_TASK;
                     cv = Wenku8API.getNovelFullIntro(ni.aid, GlobalConfig.getCurrentLang());
-                    byte[] tempFullIntro = LightNetwork.LightHttpPostConnection(Wenku8API.getBaseURL(), cv);
+                    byte[] tempFullIntro = LightNetwork.LightHttpPostConnection(Wenku8API.BASE_URL, cv);
                     if (tempFullIntro == null) return Wenku8Error.ErrorCode.NETWORK_ERROR;
                     ni.fullIntro = new String(tempFullIntro, "UTF-8");
 
@@ -404,7 +404,7 @@ public class FavFragment extends Fragment implements MyItemClickListener, MyItem
             // sync local bookshelf, and set ribbon, sync one, delete one
             List<Integer> copy = new ArrayList<>(localOnly); // make a copy
             for(Integer aid : copy) {
-                b = LightNetwork.LightHttpPostConnection(Wenku8API.getBaseURL(), Wenku8API.getAddToBookshelfParams(aid));
+                b = LightNetwork.LightHttpPostConnection(Wenku8API.BASE_URL, Wenku8API.getAddToBookshelfParams(aid));
                 if(b == null) return Wenku8Error.ErrorCode.NETWORK_ERROR;
 
                 try {
@@ -466,7 +466,7 @@ public class FavFragment extends Fragment implements MyItemClickListener, MyItem
         protected Wenku8Error.ErrorCode doInBackground(Integer... params) {
             // params: aid
             aid = params[0];
-            byte[] bytes = LightNetwork.LightHttpPostConnection(Wenku8API.getBaseURL(), Wenku8API.getDelFromBookshelfParams(aid));
+            byte[] bytes = LightNetwork.LightHttpPostConnection(Wenku8API.BASE_URL, Wenku8API.getDelFromBookshelfParams(aid));
             if(bytes == null) return Wenku8Error.ErrorCode.NETWORK_ERROR;
 
             String result;

@@ -157,7 +157,7 @@ public class NovelItemListFragment extends Fragment implements MyItemClickListen
     }
 
     @Override
-    public void onItemLongClick(View view, int postion) {
+    public void onItemLongClick(View view, int position) {
         // empty
     }
 
@@ -255,7 +255,7 @@ public class NovelItemListFragment extends Fragment implements MyItemClickListen
 
             // params[0] is current page number
             ContentValues cv = Wenku8API.getNovelList(Wenku8API.getNOVELSORTBY(type), currentPage);
-            byte[] temp = LightNetwork.LightHttpPostConnection( Wenku8API.getBaseURL(), cv);
+            byte[] temp = LightNetwork.LightHttpPostConnection( Wenku8API.BASE_URL, cv);
             if(temp == null) return -1;
             try {
                 tempNovelList = Wenku8Parser.parseNovelItemList(new String(temp, "UTF-8"));
@@ -309,7 +309,7 @@ public class NovelItemListFragment extends Fragment implements MyItemClickListen
                 case web:
                     // get search result by novel title
                     ContentValues cv = Wenku8API.searchNovelByNovelName(params[0], GlobalConfig.getCurrentLang());
-                    byte[] tempListTitle = LightNetwork.LightHttpPostConnection(Wenku8API.getBaseURL(), cv);
+                    byte[] tempListTitle = LightNetwork.LightHttpPostConnection(Wenku8API.BASE_URL, cv);
                     if(tempListTitle == null) return -1;
 
                     // purify returned data
@@ -325,21 +325,9 @@ public class NovelItemListFragment extends Fragment implements MyItemClickListen
 
                     // get search result by author name
                     cv = Wenku8API.searchNovelByAuthorName(params[0], GlobalConfig.getCurrentLang());
-                    byte[] tempListName = LightNetwork.LightHttpPostConnection(Wenku8API.getBaseURL(), cv);
+                    byte[] tempListName = LightNetwork.LightHttpPostConnection(Wenku8API.BASE_URL, cv);
                     if(tempListName == null) return -1;
 
-                    // purify returned data
-                    try {
-                        Log.i("MewX", new String(tempListName, "UTF-8"));
-                        Pattern p = Pattern.compile("aid=\'(.*)\'"); // match content between "aid=\'" and "\'"
-                        Matcher m = p.matcher(new String(tempListName, "UTF-8"));
-                        while (m.find()) {
-                            listResultList2.add(Integer.valueOf(m.group(1)));
-                            Log.e("MewX", listResultList2.get(listResultList2.size()-1).toString());
-                        }
-                    } catch (UnsupportedEncodingException e) {
-                        e.printStackTrace();
-                    }
                     break;
                 case bookshelf:
                     List<NovelItemInfoUpdate> listNovelItemInfo = new ArrayList<>();
@@ -354,7 +342,8 @@ public class NovelItemListFragment extends Fragment implements MyItemClickListen
                         }
                     }
                     for(NovelItemInfoUpdate info : listNovelItemInfo) {
-                        if(info.author.contains(params[0]) || info.title.contains(params[0])) {
+                        if(info.author.toLowerCase().contains(params[0].toLowerCase()) ||
+                                info.title.toLowerCase().contains(params[0].toLowerCase())) {
                             listResultList.add(info.aid);
                         }
                     }

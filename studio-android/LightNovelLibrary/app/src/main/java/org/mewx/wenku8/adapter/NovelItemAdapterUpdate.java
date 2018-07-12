@@ -17,7 +17,7 @@ import org.mewx.wenku8.R;
 import org.mewx.wenku8.global.GlobalConfig;
 import org.mewx.wenku8.global.api.NovelItemInfoUpdate;
 import org.mewx.wenku8.global.api.Wenku8API;
-import org.mewx.wenku8.listener.MyDeleteClickListener;
+import org.mewx.wenku8.listener.MyOptionClickListener;
 import org.mewx.wenku8.listener.MyItemClickListener;
 import org.mewx.wenku8.listener.MyItemLongClickListener;
 import org.mewx.wenku8.util.LightCache;
@@ -35,7 +35,7 @@ import java.util.Map;
 public class NovelItemAdapterUpdate extends RecyclerView.Adapter<NovelItemAdapterUpdate.ViewHolder> {
 
     private MyItemClickListener mItemClickListener;
-    private MyDeleteClickListener mMyDeleteClickListener;
+    private MyOptionClickListener mMyOptionClickListener;
     private MyItemLongClickListener mItemLongClickListener;
     private List<NovelItemInfoUpdate> mDataset;
 
@@ -59,7 +59,7 @@ public class NovelItemAdapterUpdate extends RecyclerView.Adapter<NovelItemAdapte
     @NonNull
     public ViewHolder onCreateViewHolder(@NonNull ViewGroup viewGroup, int i) {
         View view = View.inflate(viewGroup.getContext(), R.layout.view_novel_item, null);
-        return new ViewHolder(view, mItemClickListener, mMyDeleteClickListener, mItemLongClickListener);
+        return new ViewHolder(view, mItemClickListener, mMyOptionClickListener, mItemLongClickListener);
     }
 
     @Override
@@ -72,7 +72,7 @@ public class NovelItemAdapterUpdate extends RecyclerView.Adapter<NovelItemAdapte
             viewHolder.isLoading = true;
             final int tempAid = i;
 
-            StringRequest postRequest = new StringRequest(Request.Method.POST, Wenku8API.getBaseURL(),
+            StringRequest postRequest = new StringRequest(Request.Method.POST, Wenku8API.BASE_URL,
                     response -> {
                         // response
                         try {
@@ -150,8 +150,8 @@ public class NovelItemAdapterUpdate extends RecyclerView.Adapter<NovelItemAdapte
         this.mItemClickListener = listener;
     }
 
-    public void setOnDeleteClickListener(MyDeleteClickListener listener) {
-        this.mMyDeleteClickListener = listener;
+    public void setOnDeleteClickListener(MyOptionClickListener listener) {
+        this.mMyOptionClickListener = listener;
     }
 
     public void setOnItemLongClickListener(MyItemLongClickListener listener){
@@ -166,7 +166,7 @@ public class NovelItemAdapterUpdate extends RecyclerView.Adapter<NovelItemAdapte
     public static class ViewHolder extends RecyclerView.ViewHolder implements View.OnClickListener, View.OnLongClickListener {
 
         private MyItemClickListener mClickListener;
-        private MyDeleteClickListener mMyOptionClickListener;
+        private MyOptionClickListener mMyOptionClickListener;
         private MyItemLongClickListener mLongClickListener;
         public int position;
         public boolean isLoading = false;
@@ -180,9 +180,9 @@ public class NovelItemAdapterUpdate extends RecyclerView.Adapter<NovelItemAdapte
         public TextView tvNovelAuthor;
         public TextView tvNovelUpdate;
         public TextView tvNovelIntro;
-        public TextView tvLatestChapterNameText;
+        TextView tvLatestChapterNameText;
 
-        public ViewHolder(View itemView, MyItemClickListener clickListener, MyDeleteClickListener myOptionClickListener, MyItemLongClickListener longClickListener) {
+        public ViewHolder(View itemView, MyItemClickListener clickListener, MyOptionClickListener myOptionClickListener, MyItemLongClickListener longClickListener) {
             super(itemView);
             this.mClickListener = clickListener;
             this.mMyOptionClickListener = myOptionClickListener;

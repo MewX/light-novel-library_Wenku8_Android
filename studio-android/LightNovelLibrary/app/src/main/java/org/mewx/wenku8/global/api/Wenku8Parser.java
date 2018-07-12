@@ -263,7 +263,7 @@ public class Wenku8Parser {
                             String postTimeStr = xmlPullParser.getAttributeValue(null, "posttime");
                             postTime = new GregorianCalendar(
                                     Integer.valueOf(postTimeStr.substring(0, 4), 10),
-                                    Integer.valueOf(postTimeStr.substring(4, 6), 10),
+                                    Integer.valueOf(postTimeStr.substring(4, 6), 10) - 1, // start from 0 - Calendar.JANUARY
                                     Integer.valueOf(postTimeStr.substring(6, 8), 10),
                                     Integer.valueOf(postTimeStr.substring(8, 10), 10),
                                     Integer.valueOf(postTimeStr.substring(10, 12), 10),
@@ -272,7 +272,7 @@ public class Wenku8Parser {
                             String replyTimeStr = xmlPullParser.getAttributeValue(null, "replytime");
                             lastReplyTime = new GregorianCalendar(
                                     Integer.valueOf(replyTimeStr.substring(0, 4), 10),
-                                    Integer.valueOf(replyTimeStr.substring(4, 6), 10),
+                                    Integer.valueOf(replyTimeStr.substring(4, 6), 10) - 1,
                                     Integer.valueOf(replyTimeStr.substring(6, 8), 10),
                                     Integer.valueOf(replyTimeStr.substring(8, 10), 10),
                                     Integer.valueOf(replyTimeStr.substring(10, 12), 10),
