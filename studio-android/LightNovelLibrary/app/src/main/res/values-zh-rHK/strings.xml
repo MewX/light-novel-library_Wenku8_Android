@@ -72,7 +72,7 @@
     <string name="novel_item_fav_with_colon">總收藏量：</string>
     <string name="novel_item_cover">小說封面</string>
     <string name="list_loading">正在載入列表……</string>
-    <string name="system_press_again_to_exit"><b>退出請再撫摸壹下返回鍵哦～</b>\n&lt;(=～￣▽￣)→)￣▽￣=)>o </string>
+    <string name="system_press_again_to_exit">退出請再撫摸壹下返回鍵哦～\n&lt;(=～￣▽￣)→)￣▽￣=)>o</string>
     <string name="system_network_error">連接服務器失敗！\n\n可能的原因有：\n手機網絡異常，試試瀏覽器訪問；\n運營商劫持（部分地區的10086）；\nWIFI切換到數據需等待域名解析緩存刷新（約10min）；\n服務器暫時無法響應請求；\n此時段請求服務器次數過多。</string>
     <string name="system_parse_failed">數據解析失敗！\n\n可能的原因有：\n妳修改了存儲的數據；\n服務姬傲嬌了，試試瀏覽器訪問；\n程序內部錯誤，請反饋給開發者；</string>
     <string name="system_manually_cancelled">任務已被手動取消</string>
@@ -213,4 +213,5 @@
     <string name="missing_permission">由於歷史原因，缺少必要的權限時，app可能無法正常工作，請考慮授予相應權限</string>
     <string name="action_go_to_forum">進入評論區</string>
     <string name="novel_item_latest_chapter">最新章節：</string>
+    <string name="action_review_list">評論區</string>
 </resources>

@@ -155,7 +155,7 @@ public class NovelItemListFragment extends Fragment implements MyItemClickListen
     }
 
     @Override
-    public void onItemLongClick(View view, int postion) {
+    public void onItemLongClick(View view, int position) {
         // empty
     }
 

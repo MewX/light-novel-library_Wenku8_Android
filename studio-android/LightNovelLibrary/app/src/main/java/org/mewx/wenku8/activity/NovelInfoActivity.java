@@ -522,8 +522,9 @@ public class NovelInfoActivity extends AppCompatActivity {
             // not found
             Toast.makeText(this, getResources().getText(R.string.reader_msg_no_saved_reading_progress), Toast.LENGTH_SHORT).show();
         } else if (menuItem.getItemId() == R.id.action_go_to_forum) {
-            // TODO:
-            Toast.makeText(this, "下个版本这里就能点进评论区啦", Toast.LENGTH_SHORT).show();
+            Intent intent = new Intent(NovelInfoActivity.this, NovelReviewListActivity.class);
+            intent.putExtra("aid", aid);
+            startActivity(intent);
         }
         return super.onOptionsItemSelected(menuItem);
     }

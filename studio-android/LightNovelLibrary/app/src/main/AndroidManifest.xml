@@ -73,7 +73,7 @@
 
         <!-- Novel Review List Activity -->
         <activity android:name=".activity.NovelReviewListActivity"
-            android:label="@string/action_chapter_list"
+            android:label="@string/action_review_list"
             android:screenOrientation="unspecified">
         </activity>
 

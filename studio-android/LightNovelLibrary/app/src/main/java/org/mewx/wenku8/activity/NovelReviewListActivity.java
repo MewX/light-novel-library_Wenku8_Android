@@ -17,14 +17,17 @@ import android.view.MenuItem;
 import android.view.View;
 import android.widget.LinearLayout;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import com.readystatesoftware.systembartint.SystemBarTintManager;
 import com.umeng.analytics.MobclickAgent;
 
 import org.mewx.wenku8.R;
+import org.mewx.wenku8.adapter.ReviewItemAdapter;
 import org.mewx.wenku8.global.api.ReviewList;
 import org.mewx.wenku8.global.api.Wenku8API;
 import org.mewx.wenku8.global.api.Wenku8Parser;
+import org.mewx.wenku8.listener.MyItemClickListener;
 import org.mewx.wenku8.util.LightNetwork;
 
 import java.lang.ref.WeakReference;
@@ -32,10 +35,10 @@ import java.nio.charset.Charset;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
- * Created by MewX on 2015/5/14.
- * Novel Chapter Activity.
+ * Created by MewX on 2018/7/12.
+ * Novel Review Activity.
  */
-public class NovelReviewListActivity extends AppCompatActivity {
+public class NovelReviewListActivity extends AppCompatActivity implements MyItemClickListener {
     // private vars
     private int aid = 1;
 
@@ -48,6 +51,7 @@ public class NovelReviewListActivity extends AppCompatActivity {
     private TextView mLoadingButton;
 
     // switcher
+    private ReviewItemAdapter mAdapter;
     private ReviewList reviewList = new ReviewList();
     private static AtomicBoolean isLoading = new AtomicBoolean(false);
     int pastVisibleItems, visibleItemCount, totalItemCount;
@@ -95,7 +99,7 @@ public class NovelReviewListActivity extends AppCompatActivity {
         mLoadingStatusTextView = findViewById(R.id.list_loading_status);
         mLoadingButton = findViewById(R.id.btn_loading);
 
-        mRecyclerView.setHasFixedSize(true);
+        mRecyclerView.setHasFixedSize(false);
         // use a linear layout manager
         mLayoutManager = new LinearLayoutManager(this);
         mRecyclerView.setLayoutManager(mLayoutManager);
@@ -104,17 +108,18 @@ public class NovelReviewListActivity extends AppCompatActivity {
         mRecyclerView.addOnScrollListener(new MyOnScrollListener());
 
         // set click event for retry and cancel loading
-        mLoadingButton.setOnClickListener(v -> new AsyncReviewListLoader(this, mSwipeRefreshLayout, aid, reviewList)); // retry loading
+        mLoadingButton.setOnClickListener(v -> new AsyncReviewListLoader(this, mSwipeRefreshLayout, aid, reviewList).execute()); // retry loading
 
         mSwipeRefreshLayout.setColorSchemeColors(getResources().getColor(R.color.myAccentColor));
         mSwipeRefreshLayout.setOnRefreshListener(() -> {
             // reload all
             reviewList = new ReviewList();
+            mAdapter = null;
             new AsyncReviewListLoader(this, mSwipeRefreshLayout, aid, reviewList).execute();
         });
 
         // load initial content
-        new AsyncReviewListLoader(this, mSwipeRefreshLayout, aid, reviewList);
+        new AsyncReviewListLoader(this, mSwipeRefreshLayout, aid, reviewList).execute();
     }
 
     @Override
@@ -137,6 +142,18 @@ public class NovelReviewListActivity extends AppCompatActivity {
         return super.onOptionsItemSelected(menuItem);
     }
 
+    ReviewItemAdapter getAdapter() {
+        return mAdapter;
+    }
+
+    void setAdapter(ReviewItemAdapter adapter) {
+        this.mAdapter = adapter;
+    }
+
+    RecyclerView getRecyclerView() {
+        return mRecyclerView;
+    }
+
     void showRetryButton() {
         mLoadingStatusTextView.setText(getResources().getString(R.string.system_parse_failed));
         mLoadingButton.setVisibility(View.VISIBLE);
@@ -152,6 +169,12 @@ public class NovelReviewListActivity extends AppCompatActivity {
         mLoadingLayout.setVisibility(View.GONE);
     }
 
+    @Override
+    public void onItemClick(View view, int position) {
+        // TODO
+        Toast.makeText(NovelReviewListActivity.this, "Clicked " + position, Toast.LENGTH_SHORT).show();
+    }
+
     private class MyOnScrollListener extends RecyclerView.OnScrollListener {
         @Override
         public void onScrolled(@NonNull RecyclerView recyclerView, int dx, int dy) {
@@ -162,10 +185,10 @@ public class NovelReviewListActivity extends AppCompatActivity {
             pastVisibleItems = mLayoutManager.findFirstVisibleItemPosition();
 
             // 剩余3个元素的时候就加载
-            if (visibleItemCount + pastVisibleItems + 3 >= totalItemCount) {
+            if (!isLoading.get() && visibleItemCount + pastVisibleItems >= totalItemCount) { // can be +1/2/3 >= total
                 // load more toast
                 Snackbar.make(mRecyclerView, getResources().getString(R.string.list_loading)
-                                + "(" + Integer.toString(reviewList.getCurrentPage()) + "/" + reviewList.getTotalPage() + ")",
+                                + "(" + Integer.toString(reviewList.getCurrentPage() + 1) + "/" + reviewList.getTotalPage() + ")",
                         Snackbar.LENGTH_SHORT).show();
 
                 // load more thread
@@ -230,27 +253,28 @@ public class NovelReviewListActivity extends AppCompatActivity {
             // refresh everything when required
             if (!runOrNot) return;
 
-            // met net work issue, show retry button
             NovelReviewListActivity tempActivity = novelReviewListActivityWeakReference.get();
             if (metNetworkIssue) {
+                // met net work issue, show retry button
                 if (tempActivity != null) tempActivity.showRetryButton();
-                return;
+            } else {
+                // all good, update list
+                if (tempActivity.getAdapter() == null) {
+                    ReviewItemAdapter reviewItemAdapter = new ReviewItemAdapter(reviewList);
+                    tempActivity.setAdapter(reviewItemAdapter);
+                    reviewItemAdapter.setOnItemClickListener(tempActivity);
+                    tempActivity.getRecyclerView().setAdapter(reviewItemAdapter);
+                }
+                tempActivity.getAdapter().notifyDataSetChanged();
+
+                tempActivity.hideListLoading();
             }
 
-            // all good, update list
-            // TODO: for each item, set the the new action
-            // todo:
-//            if (mAdapter == null) {
-//                mAdapter = new NovelItemAdapter(listNovelItemInfo);
-//                mAdapter.setOnItemClickListener(LatestFragment.this);
-//                mAdapter.setOnItemLongClickListener(LatestFragment.this);
-//                mRecyclerView.setAdapter(mAdapter);
-//            }
-//            mAdapter.notifyDataSetChanged();
-
-            tempActivity.hideListLoading();
+            // stop spinning
             SwipeRefreshLayout tempSwipeLayout = swipeRefreshLayoutWeakReference.get();
             if (tempSwipeLayout != null) tempSwipeLayout.setRefreshing(false);
+
+            // reset loading status
             isLoading.set(false);
         }
     }

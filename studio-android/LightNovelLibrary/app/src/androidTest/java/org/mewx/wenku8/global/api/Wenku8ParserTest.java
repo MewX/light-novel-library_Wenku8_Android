@@ -5,6 +5,7 @@ import android.support.test.filters.SmallTest;
 import org.junit.Assert;
 import org.junit.Test;
 
+import java.util.Calendar;
 import java.util.GregorianCalendar;
 
 @SmallTest
@@ -38,10 +39,10 @@ public class Wenku8ParserTest {
         ReviewList.Review review = reviewList.getList().get(0);
         Assert.assertEquals(review.getRid(), 79800);
         Assert.assertEquals(review.getPostTime().getTime(),
-                new GregorianCalendar(2013, 5, 25, 17, 16, 31).getTime().getTime());
+                new GregorianCalendar(2013, Calendar.MAY, 25, 17, 16, 31).getTime().getTime());
         Assert.assertEquals(review.getNoReplies(), 1);
         Assert.assertEquals(review.getLastReplyTime().getTime(),
-                new GregorianCalendar(2013, 5, 28, 18, 49, 16).getTime().getTime());
+                new GregorianCalendar(2013, Calendar.MAY, 28, 18, 49, 16).getTime().getTime());
         Assert.assertEquals(review.getUid(), 81669);
         Assert.assertEquals(review.getUserName(), "老衲0轻音");
         Assert.assertEquals(review.getTitle(), "前排……");
@@ -49,10 +50,10 @@ public class Wenku8ParserTest {
         review = reviewList.getList().get(1);
         Assert.assertEquals(review.getRid(), 79826);
         Assert.assertEquals(review.getPostTime().getTime(),
-                new GregorianCalendar(2013, 5, 25, 23, 20, 2).getTime().getTime());
+                new GregorianCalendar(2013, Calendar.MAY, 25, 23, 20, 2).getTime().getTime());
         Assert.assertEquals(review.getNoReplies(), 4);
         Assert.assertEquals(review.getLastReplyTime().getTime(),
-                new GregorianCalendar(2013, 5, 27, 23, 42, 59).getTime().getTime());
+                new GregorianCalendar(2013, Calendar.MAY, 27, 23, 42, 59).getTime().getTime());
         Assert.assertEquals(review.getUid(), 34924);
         Assert.assertEquals(review.getUserName(), "冒险奏鸣");
         Assert.assertEquals(review.getTitle(), "有种神曲奏界的既视感");
@@ -88,10 +89,10 @@ public class Wenku8ParserTest {
         ReviewList.Review review = reviewList.getList().get(0);
         Assert.assertEquals(review.getRid(), 79800);
         Assert.assertEquals(review.getPostTime().getTime(),
-                new GregorianCalendar(2013, 5, 25, 17, 16, 31).getTime().getTime());
+                new GregorianCalendar(2013, Calendar.MAY, 25, 17, 16, 31).getTime().getTime());
         Assert.assertEquals(review.getNoReplies(), 1);
         Assert.assertEquals(review.getLastReplyTime().getTime(),
-                new GregorianCalendar(2013, 5, 28, 18, 49, 16).getTime().getTime());
+                new GregorianCalendar(2013, Calendar.MAY, 28, 18, 49, 16).getTime().getTime());
         Assert.assertEquals(review.getUid(), 81669);
         Assert.assertEquals(review.getUserName(), "老衲0轻音");
         Assert.assertEquals(review.getTitle(), "前排……");
@@ -99,10 +100,10 @@ public class Wenku8ParserTest {
         review = reviewList.getList().get(1);
         Assert.assertEquals(review.getRid(), 79826);
         Assert.assertEquals(review.getPostTime().getTime(),
-                new GregorianCalendar(2013, 5, 25, 23, 20, 2).getTime().getTime());
+                new GregorianCalendar(2013, Calendar.MAY, 25, 23, 20, 2).getTime().getTime());
         Assert.assertEquals(review.getNoReplies(), 4);
         Assert.assertEquals(review.getLastReplyTime().getTime(),
-                new GregorianCalendar(2013, 5, 27, 23, 42, 59).getTime().getTime());
+                new GregorianCalendar(2013, Calendar.MAY, 27, 23, 42, 59).getTime().getTime());
         Assert.assertEquals(review.getUid(), 34924);
         Assert.assertEquals(review.getUserName(), "冒险奏鸣");
         Assert.assertEquals(review.getTitle(), "有种神曲奏界的既视感");
@@ -110,10 +111,10 @@ public class Wenku8ParserTest {
         review = reviewList.getList().get(2);
         Assert.assertEquals(review.getRid(), 79801);
         Assert.assertEquals(review.getPostTime().getTime(),
-                new GregorianCalendar(2013, 5, 25, 17, 16, 31).getTime().getTime());
+                new GregorianCalendar(2013, Calendar.MAY, 25, 17, 16, 31).getTime().getTime());
         Assert.assertEquals(review.getNoReplies(), 1);
         Assert.assertEquals(review.getLastReplyTime().getTime(),
-                new GregorianCalendar(2013, 5, 28, 18, 49, 16).getTime().getTime());
+                new GregorianCalendar(2013, Calendar.MAY, 28, 18, 49, 16).getTime().getTime());
         Assert.assertEquals(review.getUid(), 81670);
         Assert.assertEquals(review.getUserName(), "老衲0轻音");
         Assert.assertEquals(review.getTitle(), "前排……");
@@ -121,10 +122,10 @@ public class Wenku8ParserTest {
         review = reviewList.getList().get(3);
         Assert.assertEquals(review.getRid(), 79827);
         Assert.assertEquals(review.getPostTime().getTime(),
-                new GregorianCalendar(2013, 5, 25, 23, 20, 2).getTime().getTime());
+                new GregorianCalendar(2013, Calendar.MAY, 25, 23, 20, 2).getTime().getTime());
         Assert.assertEquals(review.getNoReplies(), 4);
         Assert.assertEquals(review.getLastReplyTime().getTime(),
-                new GregorianCalendar(2013, 5, 27, 23, 42, 59).getTime().getTime());
+                new GregorianCalendar(2013, Calendar.MAY, 27, 23, 42, 59).getTime().getTime());
         Assert.assertEquals(review.getUid(), 34925);
         Assert.assertEquals(review.getUserName(), "冒险奏鸣");
         Assert.assertEquals(review.getTitle(), "有种神曲奏界的既视感");
