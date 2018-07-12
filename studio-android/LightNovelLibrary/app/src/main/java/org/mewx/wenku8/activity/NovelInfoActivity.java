@@ -615,7 +615,7 @@ public class NovelInfoActivity extends AppCompatActivity {
                 }
                 else {
                     ContentValues cv = Wenku8API.getNovelFullMeta(aid, GlobalConfig.getCurrentLang());
-                    byte[] byteNovelFullMeta = LightNetwork.LightHttpPostConnection(Wenku8API.getBaseURL(), cv);
+                    byte[] byteNovelFullMeta = LightNetwork.LightHttpPostConnection(Wenku8API.BASE_URL, cv);
                     if (byteNovelFullMeta == null) return -1;
                     novelFullMeta = new String(byteNovelFullMeta, "UTF-8"); // save
                 }
@@ -635,7 +635,7 @@ public class NovelInfoActivity extends AppCompatActivity {
                 }
                 else {
                     ContentValues cvFullIntroRequest = Wenku8API.getNovelFullIntro(aid, GlobalConfig.getCurrentLang());
-                    byte[] byteNovelFullInfo = LightNetwork.LightHttpPostConnection(Wenku8API.getBaseURL(), cvFullIntroRequest);
+                    byte[] byteNovelFullInfo = LightNetwork.LightHttpPostConnection(Wenku8API.BASE_URL, cvFullIntroRequest);
                     if (byteNovelFullInfo == null) return -1;
                     novelFullIntro = new String(byteNovelFullInfo, "UTF-8"); // save
                 }
@@ -655,7 +655,7 @@ public class NovelInfoActivity extends AppCompatActivity {
                 }
                 else {
                     ContentValues cv = Wenku8API.getNovelIndex(aid, GlobalConfig.getCurrentLang());
-                    byte[] byteNovelChapterList = LightNetwork.LightHttpPostConnection(Wenku8API.getBaseURL(), cv);
+                    byte[] byteNovelChapterList = LightNetwork.LightHttpPostConnection(Wenku8API.BASE_URL, cv);
                     if (byteNovelChapterList == null) return -1;
                     novelFullVolume = new String(byteNovelChapterList, "UTF-8"); // save
                 }
@@ -793,14 +793,14 @@ public class NovelInfoActivity extends AppCompatActivity {
                 if (!isLoading)
                     return Wenku8Error.ErrorCode.USER_CANCELLED_TASK; // cancel
                 ContentValues cv = Wenku8API.getNovelIndex(taskaid, GlobalConfig.getCurrentLang());
-                byte[] tempVolumeXml = LightNetwork.LightHttpPostConnection(Wenku8API.getBaseURL(), cv);
+                byte[] tempVolumeXml = LightNetwork.LightHttpPostConnection(Wenku8API.BASE_URL, cv);
                 if (tempVolumeXml == null) return Wenku8Error.ErrorCode.NETWORK_ERROR; // network error
                 volumeXml = new String(tempVolumeXml, "UTF-8");
 
                 if (!isLoading)
                     return Wenku8Error.ErrorCode.USER_CANCELLED_TASK; // cancel
                 cv = Wenku8API.getNovelFullMeta(taskaid, GlobalConfig.getCurrentLang());
-                byte[] tempIntroXml = LightNetwork.LightHttpPostConnection(Wenku8API.getBaseURL(), cv);
+                byte[] tempIntroXml = LightNetwork.LightHttpPostConnection(Wenku8API.BASE_URL, cv);
                 if (tempIntroXml == null) return Wenku8Error.ErrorCode.NETWORK_ERROR; // network error
                 introXml = new String(tempIntroXml, "UTF-8");
 
@@ -812,7 +812,7 @@ public class NovelInfoActivity extends AppCompatActivity {
                 if (!isLoading)
                     return Wenku8Error.ErrorCode.USER_CANCELLED_TASK; // calcel
                 cv = Wenku8API.getNovelFullIntro(ni.aid, GlobalConfig.getCurrentLang());
-                byte[] tempFullIntro = LightNetwork.LightHttpPostConnection(Wenku8API.getBaseURL(), cv);
+                byte[] tempFullIntro = LightNetwork.LightHttpPostConnection(Wenku8API.BASE_URL, cv);
                 if (tempFullIntro == null) return Wenku8Error.ErrorCode.NETWORK_ERROR; // network error
                 ni.fullIntro = new String(tempFullIntro, "UTF-8");
 
@@ -843,7 +843,7 @@ public class NovelInfoActivity extends AppCompatActivity {
                         if (!isLoading) return Wenku8Error.ErrorCode.USER_CANCELLED_TASK; // calcel
                         String xml = GlobalConfig.loadFullFileFromSaveFolder("novel", tempCi.cid + ".xml"); // prevent empty file
                         if (xml.length() == 0 || operationType == 2) {
-                            byte[] tempXml = LightNetwork.LightHttpPostConnection(Wenku8API.getBaseURL(), cv);
+                            byte[] tempXml = LightNetwork.LightHttpPostConnection(Wenku8API.BASE_URL, cv);
                             if (tempXml == null) return Wenku8Error.ErrorCode.NETWORK_ERROR; // network error
                             xml = new String(tempXml, "UTF-8");
                             if(xml.trim().length() == 0) return Wenku8Error.ErrorCode.SERVER_RETURN_NOTHING;
@@ -958,7 +958,7 @@ public class NovelInfoActivity extends AppCompatActivity {
         @Override
         protected Wenku8Error.ErrorCode doInBackground(Integer... params) {
             // params: aid
-            byte[] bytes = LightNetwork.LightHttpPostConnection(Wenku8API.getBaseURL(), Wenku8API.getDelFromBookshelfParams(params[0]));
+            byte[] bytes = LightNetwork.LightHttpPostConnection(Wenku8API.BASE_URL, Wenku8API.getDelFromBookshelfParams(params[0]));
             if(bytes == null) return Wenku8Error.ErrorCode.NETWORK_ERROR;
 
             String result;
@@ -1057,7 +1057,7 @@ public class NovelInfoActivity extends AppCompatActivity {
                         if (!loading) return Wenku8Error.ErrorCode.USER_CANCELLED_TASK; // cancel
                         String xml = GlobalConfig.loadFullFileFromSaveFolder("novel", tempCi.cid + ".xml"); // prevent empty file
                         if (xml.length() == 0) {
-                            byte[] tempXml = LightNetwork.LightHttpPostConnection(Wenku8API.getBaseURL(), cv);
+                            byte[] tempXml = LightNetwork.LightHttpPostConnection(Wenku8API.BASE_URL, cv);
                             if (tempXml == null) return Wenku8Error.ErrorCode.NETWORK_ERROR; // network error
                             xml = new String(tempXml, "UTF-8");
                             if(xml.trim().length() == 0) return Wenku8Error.ErrorCode.SERVER_RETURN_NOTHING;

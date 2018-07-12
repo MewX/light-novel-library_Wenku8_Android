@@ -203,7 +203,7 @@ public class VerticalReaderActivity extends AppCompatActivity {
                     xml = GlobalConfig.loadFullFileFromSaveFolder("novel", cid + ".xml");
                 else {
                     byte[] tempXml = LightNetwork.LightHttpPostConnection(
-                            Wenku8API.getBaseURL(), params[0]);
+                            Wenku8API.BASE_URL, params[0]);
                     if (tempXml == null)
                         return -100;
                     xml = new String(tempXml, "UTF-8");

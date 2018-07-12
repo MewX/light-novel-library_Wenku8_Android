@@ -71,6 +71,12 @@
             android:screenOrientation="unspecified">
         </activity>
 
+        <!-- Novel Review List Activity -->
+        <activity android:name=".activity.NovelReviewListActivity"
+            android:label="@string/action_chapter_list"
+            android:screenOrientation="unspecified">
+        </activity>
+
         <!-- Novel Content Activity (Vertical Old Engine) -->
         <activity android:name=".activity.VerticalReaderActivity"
             android:label="@string/action_old_vertical_reader"

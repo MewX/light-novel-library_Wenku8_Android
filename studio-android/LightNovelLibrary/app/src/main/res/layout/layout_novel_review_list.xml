@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/myPrimaryColor"
+    android:fitsSystemWindows="true">
+
+    <include layout="@layout/toolbar_pure" />
+
+    <android.support.v4.widget.SwipeRefreshLayout
+        android:id="@+id/swipe_refresh_layout"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+
+        <!-- Review List -->
+        <android.support.v7.widget.RecyclerView
+            android:id="@+id/review_item_list"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:fastScrollEnabled="true"
+            android:scrollbars="vertical" />
+    </android.support.v4.widget.SwipeRefreshLayout>
+
+    <!-- Loading Frame -->
+    <LinearLayout
+        android:id="@+id/list_loading"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:gravity="center"
+        android:orientation="vertical"
+        android:visibility="visible"
+        android:clickable="true"
+        android:background="@color/myWindowBackground"
+        android:focusable="true">
+
+        <!-- If loading failed, update this loading-status info -->
+        <TextView
+            android:id="@+id/list_loading_status"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textColor="@color/default_text_color_black"
+            android:text="@string/list_loading"/>
+
+        <TextView
+            android:id="@+id/btn_loading"
+            android:layout_width="match_parent"
+            android:layout_height="60dp"
+            android:layout_marginTop="20dp"
+            android:clickable="true"
+            android:visibility="gone"
+            android:background="@drawable/btn_menu_item"
+            android:gravity="center"
+            android:textColor="@color/default_text_color_black"
+            android:text="@string/task_retry"
+            android:focusable="true" />
+
+    </LinearLayout>
+</RelativeLayout>

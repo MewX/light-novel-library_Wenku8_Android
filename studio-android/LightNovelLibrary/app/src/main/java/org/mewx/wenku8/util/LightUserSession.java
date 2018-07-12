@@ -2,8 +2,6 @@ package org.mewx.wenku8.util;
 
 import android.content.Intent;
 import android.os.AsyncTask;
-import android.speech.tts.TextToSpeech;
-import android.text.TextUtils;
 import android.widget.Toast;
 
 import org.mewx.wenku8.MyApp;
@@ -89,7 +87,7 @@ public class LightUserSession {
         if(!isUserInfoSet()) loadUserInfoSet();
         if(!isUserInfoSet()) return Wenku8Error.ErrorCode.USER_INFO_EMPTY;
 
-        byte[] b = LightNetwork.LightHttpPostConnection(Wenku8API.getBaseURL(), Wenku8API.getUserLoginParams(username, password));
+        byte[] b = LightNetwork.LightHttpPostConnection(Wenku8API.BASE_URL, Wenku8API.getUserLoginParams(username, password));
         if(b == null) return Wenku8Error.ErrorCode.NETWORK_ERROR;
         try {
             String result = new String(b, "UTF-8");
@@ -111,7 +109,7 @@ public class LightUserSession {
     public static Wenku8Error.ErrorCode doLoginFromGiven(String name, String pwd) {
         // This function will test given name:pwd, if pass(receive '1'), save file, else return false
 
-        byte[] b = LightNetwork.LightHttpPostConnection(Wenku8API.getBaseURL(), Wenku8API.getUserLoginParams(name, pwd));
+        byte[] b = LightNetwork.LightHttpPostConnection(Wenku8API.BASE_URL, Wenku8API.getUserLoginParams(name, pwd));
         if(b == null) return Wenku8Error.ErrorCode.NETWORK_ERROR;
         try {
             String result = new String(b, "UTF-8");

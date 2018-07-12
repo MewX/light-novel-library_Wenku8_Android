@@ -253,7 +253,7 @@ public class NovelItemListFragment extends Fragment implements MyItemClickListen
 
             // params[0] is current page number
             ContentValues cv = Wenku8API.getNovelList(Wenku8API.getNOVELSORTBY(type), currentPage);
-            byte[] temp = LightNetwork.LightHttpPostConnection( Wenku8API.getBaseURL(), cv);
+            byte[] temp = LightNetwork.LightHttpPostConnection( Wenku8API.BASE_URL, cv);
             if(temp == null) return -1;
             try {
                 tempNovelList = Wenku8Parser.parseNovelItemList(new String(temp, "UTF-8"));
@@ -302,7 +302,7 @@ public class NovelItemListFragment extends Fragment implements MyItemClickListen
 
             // get search result by novel title
             ContentValues cv = Wenku8API.searchNovelByNovelName(params[0], GlobalConfig.getCurrentLang());
-            byte[] tempListTitle = LightNetwork.LightHttpPostConnection(Wenku8API.getBaseURL(), cv);
+            byte[] tempListTitle = LightNetwork.LightHttpPostConnection(Wenku8API.BASE_URL, cv);
             if(tempListTitle == null) return -1;
 
             // purify returned data
@@ -319,7 +319,7 @@ public class NovelItemListFragment extends Fragment implements MyItemClickListen
 
             // get search result by author name
             cv = Wenku8API.searchNovelByAuthorName(params[0], GlobalConfig.getCurrentLang());
-            byte[] tempListName = LightNetwork.LightHttpPostConnection(Wenku8API.getBaseURL(), cv);
+            byte[] tempListName = LightNetwork.LightHttpPostConnection(Wenku8API.BASE_URL, cv);
             if(tempListName == null) return -1;
 
             // purify returned data

@@ -410,7 +410,7 @@ public class Wenku8ReaderActivityV1 extends AppCompatActivity {
                 if (from.equals(FromLocal)) // or exist
                     xml = GlobalConfig.loadFullFileFromSaveFolder("novel", cid + ".xml");
                 else {
-                    byte[] tempXml = LightNetwork.LightHttpPostConnection(Wenku8API.getBaseURL(), params[0]);
+                    byte[] tempXml = LightNetwork.LightHttpPostConnection(Wenku8API.BASE_URL, params[0]);
                     if (tempXml == null) return Wenku8Error.ErrorCode.NETWORK_ERROR;
                     xml = new String(tempXml, "UTF-8");
                 }

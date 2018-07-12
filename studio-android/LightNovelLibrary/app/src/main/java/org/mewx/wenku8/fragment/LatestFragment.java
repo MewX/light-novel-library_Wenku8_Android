@@ -27,7 +27,6 @@ import org.mewx.wenku8.activity.NovelInfoActivity;
 import org.mewx.wenku8.adapter.NovelItemAdapter;
 import org.mewx.wenku8.global.GlobalConfig;
 import org.mewx.wenku8.global.api.NovelItemInfo;
-import org.mewx.wenku8.global.api.NovelItemList;
 import org.mewx.wenku8.global.api.NovelListWithInfoParser;
 import org.mewx.wenku8.global.api.Wenku8API;
 import org.mewx.wenku8.listener.MyItemClickListener;
@@ -49,14 +48,13 @@ public class LatestFragment extends Fragment implements MyItemClickListener, MyI
     private TextView mTextView;
 
     // Novel Item info
-    private NovelItemList novelItemList;
     private List<NovelItemInfo> listNovelItemInfo;
     private NovelItemAdapter mAdapter;
     private int currentPage, totalPage; // currentP stores next reading page num, TODO: fix wrong number
 
     // switcher
     private boolean isLoading;
-    int pastVisiblesItems, visibleItemCount, totalItemCount;
+    int pastVisibleItems, visibleItemCount, totalItemCount;
 
     public LatestFragment() {
         // Required empty public constructor
@@ -80,7 +78,7 @@ public class LatestFragment extends Fragment implements MyItemClickListener, MyI
     }
 
     @Override
-    public View onCreateView(LayoutInflater inflater, ViewGroup container,
+    public View onCreateView(@NonNull LayoutInflater inflater, ViewGroup container,
                              Bundle savedInstanceState) {
         // Inflate the layout for this fragment
         View rootView = inflater.inflate(R.layout.fragment_latest, container, false);
@@ -98,31 +96,19 @@ public class LatestFragment extends Fragment implements MyItemClickListener, MyI
         mRecyclerView.addOnScrollListener(new MyOnScrollListener());
 
         // set click event
-        rootView.findViewById(R.id.btn_loading).setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                if (isLoading) {
-                    isLoading = false; // set this false as a terminator signal
-
-                } else {
-                    // need to reload novel list all
-                    currentPage = 1;
-                    totalPage = 1;
-                    isLoading = false;
-                    loadNovelList(currentPage);
-                }
-
+        rootView.findViewById(R.id.btn_loading).setOnClickListener(v -> {
+            if (isLoading) {
+                isLoading = false; // set this false as a terminator signal
+            } else {
+                // need to reload novel list all
+                currentPage = 1;
+                totalPage = 1;
+                isLoading = false;
+                loadNovelList(currentPage);
             }
         });
 
-        // Load novel list
-//        AsyncGetNovelItem agni = new AsyncGetNovelItem();
-//        List<NameValuePair> list = new ArrayList<>();
-//        list.add(Wenku8API.getNovelList(Wenku8API.NOVELSORTBY.lastUpdate, 1));
-//        agni.execute(list);
-
-        // new load novel list
-        // fetch list
+        // fetch novel list
         currentPage = 1;
         totalPage = 1;
         isLoading = false;
@@ -138,7 +124,7 @@ public class LatestFragment extends Fragment implements MyItemClickListener, MyI
         hideRetryButton();
 
         // fetch list
-        AsyncLoadLastestList ast = new AsyncLoadLastestList();
+        AsyncLoadLatestList ast = new AsyncLoadLatestList();
         ast.execute(Wenku8API.getNovelListWithInfo(Wenku8API.NOVELSORTBY.lastUpdate, page,
                 GlobalConfig.getCurrentLang()));
     }
@@ -188,11 +174,11 @@ public class LatestFragment extends Fragment implements MyItemClickListener, MyI
 
             visibleItemCount = mLayoutManager.getChildCount();
             totalItemCount = mLayoutManager.getItemCount();
-            pastVisiblesItems = mLayoutManager.findFirstVisibleItemPosition();
+            pastVisibleItems = mLayoutManager.findFirstVisibleItemPosition();
 
             if (!isLoading) {
                 // 滚动到一半的时候加载，即：剩余3个元素的时候就加载
-                if (visibleItemCount + pastVisiblesItems + 3 >= totalItemCount) {
+                if (visibleItemCount + pastVisibleItems + 3 >= totalItemCount) {
                     isLoading = true;
 
                     // load more toast
@@ -201,28 +187,23 @@ public class LatestFragment extends Fragment implements MyItemClickListener, MyI
                             Snackbar.LENGTH_SHORT).show();
 
                     // load more thread
-//                    AsyncGetNovelItem agni = new AsyncGetNovelItem();
-//                    List<NameValuePair> list = new ArrayList<>();
-//                    list.add(Wenku8API.getNovelList(Wenku8API.NOVELSORTBY.lastUpdate, novelItemList.getCurrentPage() + 1));
-//                    agni.execute(list);
                     if (currentPage <= totalPage) {
                         loadNovelList(currentPage);
                     } else {
-                        Snackbar.make(mRecyclerView, "Every page is loaded!",
-                                Snackbar.LENGTH_SHORT).show();
+                        Snackbar.make(mRecyclerView, getResources().getText(R.string.loading_done), Snackbar.LENGTH_SHORT).show();
                     }
                 }
             }
         }
     }
 
-    class AsyncLoadLastestList extends AsyncTask<ContentValues, Integer, Integer> {
+    class AsyncLoadLatestList extends AsyncTask<ContentValues, Integer, Integer> {
         // fail return -1
         @Override
         protected Integer doInBackground(ContentValues... params) {
 
             try {
-                byte[] tempXml = LightNetwork.LightHttpPostConnection(Wenku8API.getBaseURL(), params[0]);
+                byte[] tempXml = LightNetwork.LightHttpPostConnection(Wenku8API.BASE_URL, params[0]);
                 if (tempXml == null)
                     return -100;
                 String xml = new String(tempXml, "UTF-8");
@@ -258,11 +239,6 @@ public class LatestFragment extends Fragment implements MyItemClickListener, MyI
                 e.printStackTrace();
             }
             return -1;
-        }
-
-        @Override
-        protected void onProgressUpdate(Integer... values) {
-            return;
         }
 
         @Override

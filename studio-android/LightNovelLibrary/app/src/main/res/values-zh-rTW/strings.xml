@@ -63,6 +63,7 @@
     <string name="novel_item_author_with_colon">小說作者：</string>
     <string name="na">N/A</string>
     <string name="loading">loading…</string>
+    <string name="loading_done">全部加載完畢</string>
     <string name="novel_item_status_with_colon">連載狀態：</string>
     <string name="novel_item_update_with_colon">更新時間：</string>
     <string name="novel_item_intro_with_colon">內容簡介：</string>
