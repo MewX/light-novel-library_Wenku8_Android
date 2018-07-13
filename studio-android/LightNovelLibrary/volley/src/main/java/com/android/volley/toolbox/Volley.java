@@ -17,8 +17,6 @@
 package com.android.volley.toolbox;
 
 import android.content.Context;
-import android.content.pm.PackageInfo;
-import android.content.pm.PackageManager.NameNotFoundException;
 
 import com.android.volley.Network;
 import com.android.volley.RequestQueue;
@@ -41,14 +39,6 @@ public class Volley {
      */
     public static RequestQueue newRequestQueue(Context context, HttpStack stack, int maxDiskCacheBytes) {
         File cacheDir = new File(context.getCacheDir(), DEFAULT_CACHE_DIR);
-
-        String userAgent = "volley/0";
-        try {
-            String packageName = context.getPackageName();
-            PackageInfo info = context.getPackageManager().getPackageInfo(packageName, 0);
-            userAgent = packageName + "/" + info.versionCode;
-        } catch (NameNotFoundException e) {
-        }
 
         if (stack == null) {
             stack = new HurlStack();

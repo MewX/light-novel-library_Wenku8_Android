@@ -6,18 +6,18 @@
     android:background="@color/myPrimaryColor"
     android:fitsSystemWindows="true">
 
-    <include layout="@layout/toolbar_pure"/>
+    <include layout="@layout/toolbar_pure" />
 
     <ScrollView
-        android:layout_below="@+id/toolbar_actionbar"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
+        android:layout_below="@+id/toolbar_actionbar"
         android:background="@color/myWindowBackground">
 
         <LinearLayout
-            android:orientation="vertical"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content">
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
 
             <RelativeLayout
                 android:layout_width="wrap_content"
@@ -31,15 +31,16 @@
                     android:layout_height="wrap_content"
                     card-view:cardBackgroundColor="@color/novel_item_white"
                     card-view:cardElevation="2dp"
-                    card-view:cardUseCompatPadding="true"
-                    card-view:cardMaxElevation="2dp">
+                    card-view:cardMaxElevation="2dp"
+                    card-view:cardUseCompatPadding="true">
 
                     <RelativeLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:orientation="horizontal"
                         android:background="@drawable/btn_menu_item"
                         android:clickable="true"
+                        android:focusable="true"
+                        android:orientation="horizontal"
                         android:paddingLeft="16dp"
                         android:paddingRight="16dp">
 
@@ -47,63 +48,63 @@
                             android:id="@+id/app"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:gravity="center_vertical"
-                            android:textSize="18sp"
-                            android:paddingTop="12dp"
-                            android:paddingBottom="12dp"
-                            android:text="轻小说文库 (Wenku8.com)"
-                            android:singleLine="true"
-                            android:textColor="@color/menu_text_color"
                             android:layout_alignParentTop="true"
-                            android:layout_centerHorizontal="true" />
+                            android:layout_centerHorizontal="true"
+                            android:gravity="center_vertical"
+                            android:paddingBottom="12dp"
+                            android:paddingTop="12dp"
+                            android:singleLine="true"
+                            android:text="@string/about_wenku8_com"
+                            android:textColor="@color/menu_text_color"
+                            android:textSize="18sp" />
 
                         <View
                             android:id="@+id/divider0"
                             android:layout_width="match_parent"
                             android:layout_height="1px"
                             android:layout_below="@+id/app"
-                            android:background="@color/default_divider"/>
+                            android:background="@color/default_divider" />
 
                         <TextView
                             android:id="@+id/app_version"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:gravity="center_vertical"
-                            android:textSize="14sp"
-                            android:paddingTop="12dp"
-                            android:paddingBottom="12dp"
-                            android:text="Version: 1.0"
-                            android:singleLine="true"
-                            android:textColor="@color/menu_text_color"
                             android:layout_below="@+id/divider0"
-                            android:layout_centerHorizontal="true" />
+                            android:layout_centerHorizontal="true"
+                            android:gravity="center_vertical"
+                            android:paddingBottom="12dp"
+                            android:paddingTop="12dp"
+                            android:singleLine="true"
+                            android:text="@string/loading"
+                            android:textColor="@color/menu_text_color"
+                            android:textSize="14sp" />
 
                         <TextView
                             android:id="@+id/app_site"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:gravity="center_vertical"
-                            android:textSize="14sp"
-                            android:paddingTop="12dp"
-                            android:paddingBottom="12dp"
-                            android:text="项目主页: https://wenku8.mewx.org"
-                            android:singleLine="true"
-                            android:textColor="@color/menu_text_color"
                             android:layout_below="@+id/app_version"
-                            android:layout_centerHorizontal="true" />
+                            android:layout_centerHorizontal="true"
+                            android:gravity="center_vertical"
+                            android:paddingBottom="12dp"
+                            android:paddingTop="12dp"
+                            android:singleLine="true"
+                            android:text="@string/about_project_homepage"
+                            android:textColor="@color/menu_text_color"
+                            android:textSize="14sp" />
 
                         <TextView
                             android:id="@+id/app_qqq"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:gravity="center_vertical"
-                            android:textSize="14sp"
-                            android:paddingTop="12dp"
-                            android:paddingBottom="12dp"
-                            android:text="所有数据来自于互联网，开发者、设计师、客服均与网站无任何关系，而且本项目完全免费，完整源代码均开放，纯凭兴趣做的app，仅供大家学习安卓应用程序制作之法，如有侵犯您的权益，请务必邮件联系，保证12小时内回复，app内会做屏蔽。"
-                            android:textColor="@color/menu_text_color"
                             android:layout_below="@+id/app_site"
-                            android:layout_centerHorizontal="true" />
+                            android:layout_centerHorizontal="true"
+                            android:gravity="center_vertical"
+                            android:paddingBottom="12dp"
+                            android:paddingTop="12dp"
+                            android:text="@string/about_no_duty"
+                            android:textColor="@color/menu_text_color"
+                            android:textSize="14sp" />
                     </RelativeLayout>
                 </android.support.v7.widget.CardView>
             </RelativeLayout>
@@ -120,16 +121,17 @@
                     android:layout_height="wrap_content"
                     card-view:cardBackgroundColor="@color/novel_item_white"
                     card-view:cardElevation="2dp"
-                    card-view:cardUseCompatPadding="true"
-                    card-view:cardMaxElevation="2dp">
+                    card-view:cardMaxElevation="2dp"
+                    card-view:cardUseCompatPadding="true">
 
                     <RelativeLayout
                         android:id="@+id/mewx_layout"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:orientation="horizontal"
                         android:background="@drawable/btn_menu_item"
                         android:clickable="true"
+                        android:focusable="true"
+                        android:orientation="horizontal"
                         android:paddingLeft="16dp"
                         android:paddingRight="16dp">
 
@@ -137,36 +139,36 @@
                             android:id="@+id/architect"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:gravity="center_vertical"
-                            android:textSize="18sp"
-                            android:paddingTop="12dp"
-                            android:paddingBottom="12dp"
-                            android:text="软件架构"
-                            android:singleLine="true"
-                            android:textColor="@color/menu_text_color"
                             android:layout_alignParentTop="true"
-                            android:layout_centerHorizontal="true" />
+                            android:layout_centerHorizontal="true"
+                            android:gravity="center_vertical"
+                            android:paddingBottom="12dp"
+                            android:paddingTop="12dp"
+                            android:singleLine="true"
+                            android:text="@string/about_software_arch"
+                            android:textColor="@color/menu_text_color"
+                            android:textSize="18sp" />
 
                         <View
                             android:id="@+id/divider1"
                             android:layout_width="match_parent"
                             android:layout_height="1px"
                             android:layout_below="@+id/architect"
-                            android:background="@color/default_divider"/>
+                            android:background="@color/default_divider" />
 
                         <TextView
                             android:id="@+id/mewx_name"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:gravity="center_vertical"
-                            android:textSize="14sp"
-                            android:paddingTop="12dp"
-                            android:paddingBottom="12dp"
-                            android:text="MewX &lt;https://mewx.org&gt;"
-                            android:singleLine="true"
-                            android:textColor="@color/menu_text_color"
                             android:layout_below="@+id/divider1"
-                            android:layout_centerHorizontal="true" />
+                            android:layout_centerHorizontal="true"
+                            android:gravity="center_vertical"
+                            android:paddingBottom="12dp"
+                            android:paddingTop="12dp"
+                            android:singleLine="true"
+                            android:text="@string/about_mewx"
+                            android:textColor="@color/menu_text_color"
+                            android:textSize="14sp" />
 
                     </RelativeLayout>
                 </android.support.v7.widget.CardView>
@@ -184,15 +186,16 @@
                     android:layout_height="wrap_content"
                     card-view:cardBackgroundColor="@color/novel_item_white"
                     card-view:cardElevation="2dp"
-                    card-view:cardUseCompatPadding="true"
-                    card-view:cardMaxElevation="2dp">
+                    card-view:cardMaxElevation="2dp"
+                    card-view:cardUseCompatPadding="true">
 
                     <RelativeLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:orientation="horizontal"
                         android:background="@drawable/btn_menu_item"
                         android:clickable="true"
+                        android:focusable="true"
+                        android:orientation="horizontal"
                         android:paddingLeft="16dp"
                         android:paddingRight="16dp">
 
@@ -200,36 +203,36 @@
                             android:id="@+id/designer"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:gravity="center_vertical"
-                            android:textSize="18sp"
-                            android:paddingTop="12dp"
-                            android:paddingBottom="12dp"
-                            android:text="界面设计"
-                            android:singleLine="true"
-                            android:textColor="@color/menu_text_color"
                             android:layout_alignParentTop="true"
-                            android:layout_centerHorizontal="true" />
+                            android:layout_centerHorizontal="true"
+                            android:gravity="center_vertical"
+                            android:paddingBottom="12dp"
+                            android:paddingTop="12dp"
+                            android:singleLine="true"
+                            android:text="@string/about_screen_design"
+                            android:textColor="@color/menu_text_color"
+                            android:textSize="18sp" />
 
                         <View
                             android:id="@+id/divider2"
                             android:layout_width="match_parent"
                             android:layout_height="1px"
                             android:layout_below="@+id/designer"
-                            android:background="@color/default_divider"/>
+                            android:background="@color/default_divider" />
 
                         <TextView
                             android:id="@+id/zero_name"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:gravity="center_vertical"
-                            android:textSize="14sp"
-                            android:paddingTop="12dp"
-                            android:paddingBottom="12dp"
-                            android:text="ZERO &lt;78283358@qq.com&gt;"
-                            android:singleLine="true"
-                            android:textColor="@color/menu_text_color"
                             android:layout_below="@+id/divider2"
-                            android:layout_centerHorizontal="true" />
+                            android:layout_centerHorizontal="true"
+                            android:gravity="center_vertical"
+                            android:paddingBottom="12dp"
+                            android:paddingTop="12dp"
+                            android:singleLine="true"
+                            android:text="@string/about_zero"
+                            android:textColor="@color/menu_text_color"
+                            android:textSize="14sp" />
 
                     </RelativeLayout>
                 </android.support.v7.widget.CardView>
@@ -247,15 +250,16 @@
                     android:layout_height="wrap_content"
                     card-view:cardBackgroundColor="@color/novel_item_white"
                     card-view:cardElevation="2dp"
-                    card-view:cardUseCompatPadding="true"
-                    card-view:cardMaxElevation="2dp">
+                    card-view:cardMaxElevation="2dp"
+                    card-view:cardUseCompatPadding="true">
 
                     <RelativeLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:orientation="horizontal"
                         android:background="@drawable/btn_menu_item"
                         android:clickable="true"
+                        android:focusable="true"
+                        android:orientation="horizontal"
                         android:paddingLeft="16dp"
                         android:paddingRight="16dp">
 
@@ -263,36 +267,36 @@
                             android:id="@+id/assistant"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:gravity="center_vertical"
-                            android:textSize="18sp"
-                            android:paddingTop="12dp"
-                            android:paddingBottom="12dp"
-                            android:text="致谢"
-                            android:singleLine="true"
-                            android:textColor="@color/menu_text_color"
                             android:layout_alignParentTop="true"
-                            android:layout_centerHorizontal="true" />
+                            android:layout_centerHorizontal="true"
+                            android:gravity="center_vertical"
+                            android:paddingBottom="12dp"
+                            android:paddingTop="12dp"
+                            android:singleLine="true"
+                            android:text="@string/about_acknowledgement"
+                            android:textColor="@color/menu_text_color"
+                            android:textSize="18sp" />
 
                         <View
                             android:id="@+id/divider3"
                             android:layout_width="match_parent"
                             android:layout_height="1px"
                             android:layout_below="@+id/assistant"
-                            android:background="@color/default_divider"/>
+                            android:background="@color/default_divider" />
 
                         <TextView
                             android:id="@+id/rab_name"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:gravity="center_vertical"
-                            android:textSize="14sp"
-                            android:paddingTop="12dp"
-                            android:paddingBottom="12dp"
-                            android:text="SeraphRoy &lt;https://www.gaeblogx.com&gt;"
-                            android:singleLine="true"
-                            android:textColor="@color/menu_text_color"
                             android:layout_below="@+id/divider3"
-                            android:layout_centerHorizontal="true" />
+                            android:layout_centerHorizontal="true"
+                            android:gravity="center_vertical"
+                            android:paddingBottom="12dp"
+                            android:paddingTop="12dp"
+                            android:singleLine="true"
+                            android:text="@string/about_seraphroy"
+                            android:textColor="@color/menu_text_color"
+                            android:textSize="14sp" />
                     </RelativeLayout>
                 </android.support.v7.widget.CardView>
             </RelativeLayout>

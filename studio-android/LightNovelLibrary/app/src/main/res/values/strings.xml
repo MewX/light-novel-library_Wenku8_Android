@@ -76,7 +76,7 @@
     <string name="novel_item_cover">小说封面</string>
     <string name="list_loading">正在载入列表……</string>
     <string name="system_press_again_to_exit">退出请再抚摸一下返回键哦～\n&lt;(=～￣▽￣)→)￣▽￣=)>o</string>
-    <string name="system_network_error">连接服务器失败！\n\n可能的原因有：\n手机网络异常，试试浏览器访问；\n运营商劫持（部分地区的10086）；\nWIFI切换到数据需等待域名解析缓存刷新（约10min）；\n服务器暂时无法响应请求；\n此时段请求服务器次数过多。</string>
+    <string name="system_network_error">连接服务器失败！\n\n可能的原因有：\n登录过期，请重新登录；\n手机网络异常，试试浏览器访问；\n运营商劫持（部分地区的10086）；\nWIFI切换到数据需等待域名解析缓存刷新（约10min）；\n服务器暂时无法响应请求；\n此时段请求服务器次数过多。</string>
     <string name="system_parse_failed">数据解析失败！\n\n可能的原因有：\n你修改了存储的数据；\n服务姬傲娇了，试试浏览器访问；\n程序内部错误，请反馈给开发者；</string>
     <string name="system_manually_cancelled">任务已被手动取消</string>
     <string name="system_loading_please_wait">加载中……请稍后再试</string>
@@ -214,4 +214,14 @@
     <string name="reader_msg_no_available_chapter">内部错误！无法找到该章节！</string>
     <string name="reader_msg_please_refresh_and_retry">请更新小说信息后再尝试</string>
     <string name="action_go_to_forum">进入评论区</string>
+    <string name="about_wenku8_com">轻小说文库 (Wenku8.com)</string>
+    <string name="about_version_template">版本：%s (%d)</string>
+    <string name="about_project_homepage">项目主页: https://wenku8.mewx.org</string>
+    <string name="about_no_duty">所有数据来自于互联网，开发者、设计师、客服均与网站无任何关系，而且本项目完全免费，完整源代码均开放，纯凭兴趣做的app，仅供大家学习安卓应用程序制作之法，如有侵犯您的权益，请务必邮件联系，保证12小时内回复，app内会做屏蔽。</string>
+    <string name="about_software_arch">软件架构</string>
+    <string name="about_mewx"><![CDATA[MewX <https://mewx.org>]]></string>
+    <string name="about_screen_design">界面设计</string>
+    <string name="about_zero"><![CDATA[ZERO <78283358@qq.com>]]></string>
+    <string name="about_acknowledgement">致谢</string>
+    <string name="about_seraphroy"><![CDATA[SeraphRoy <https://www.gaeblogx.com>]]></string>
 </resources>

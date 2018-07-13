@@ -1,6 +1,5 @@
 package org.mewx.wenku8.fragment;
 
-import android.app.Fragment;
 import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
@@ -8,7 +7,10 @@ import android.graphics.Point;
 import android.os.AsyncTask;
 import android.os.Build;
 import android.os.Bundle;
+import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
+import android.support.v4.app.Fragment;
+import android.support.v4.app.FragmentActivity;
 import android.support.v4.widget.DrawerLayout;
 import android.support.v7.app.ActionBarDrawerToggle;
 import android.support.v7.widget.Toolbar;
@@ -38,7 +40,8 @@ import org.mewx.wenku8.util.LightTool;
 import org.mewx.wenku8.util.LightUserSession;
 
 public class NavigationDrawerFragment extends Fragment {
-    private final String TAG = "NavigationDrawerFragment";
+    private static final String TAG = NavigationDrawerFragment.class.getSimpleName();
+
     private View mFragmentContainerView;
     private ImageView bgImage;
     private MainActivity mainActivity = null;
@@ -46,12 +49,11 @@ public class NavigationDrawerFragment extends Fragment {
     private ActionBarDrawerToggle mActionBarDrawerToggle;
     private TextView tvUserName;
     private RoundedImageView rivUserAvatar;
-    private Bitmap bmMenuBackground;
     private boolean fakeDarkSwitcher = false;
 
     @Nullable
     @Override
-    public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
+    public View onCreateView(@NonNull LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
         return inflater.inflate(R.layout.layout_main_menu, container, false);
     }
 
@@ -61,90 +63,65 @@ public class NavigationDrawerFragment extends Fragment {
 
         // set button clicked listener, mainly working on change fragment in MainActivity.
         try {
-            mainActivity.findViewById(R.id.main_menu_rklist).setOnClickListener(
-                    new View.OnClickListener() {
-                        @Override
-                        public void onClick(View v) {
-                            if (mainActivity.getCurrentFragment() == MainActivity.FRAGMENT_LIST.RKLIST)
-                                return; // selected button, so just ignore.
-                            clearAllButtonColor();
-                            setHighLightButton(MainActivity.FRAGMENT_LIST.RKLIST);
-                            mainActivity.setCurrentFragment(MainActivity.FRAGMENT_LIST.RKLIST);
-                            mainActivity.changeFragment(new RKListFragment());
-                            closeDrawer();
-                        }
+            mainActivity.findViewById(R.id.main_menu_rklist).setOnClickListener(v -> {
+                        if (mainActivity.getCurrentFragment() == MainActivity.FRAGMENT_LIST.RKLIST)
+                            return; // selected button, so just ignore.
+                        clearAllButtonColor();
+                        setHighLightButton(MainActivity.FRAGMENT_LIST.RKLIST);
+                        mainActivity.setCurrentFragment(MainActivity.FRAGMENT_LIST.RKLIST);
+                        mainActivity.changeFragment(new RKListFragment());
+                        closeDrawer();
                     }
             );
 
-            mainActivity.findViewById(R.id.main_menu_latest).setOnClickListener(
-                    new View.OnClickListener() {
-                        @Override
-                        public void onClick(View v) {
-                            if (mainActivity.getCurrentFragment() == MainActivity.FRAGMENT_LIST.LATEST)
-                                return; // selected button, so just ignore.
-                            clearAllButtonColor();
-                            setHighLightButton(MainActivity.FRAGMENT_LIST.LATEST);
-                            mainActivity.setCurrentFragment(MainActivity.FRAGMENT_LIST.LATEST);
-                            mainActivity.changeFragment(new LatestFragment());
-                            closeDrawer();
-                        }
+            mainActivity.findViewById(R.id.main_menu_latest).setOnClickListener(v -> {
+                        if (mainActivity.getCurrentFragment() == MainActivity.FRAGMENT_LIST.LATEST)
+                            return; // selected button, so just ignore.
+                        clearAllButtonColor();
+                        setHighLightButton(MainActivity.FRAGMENT_LIST.LATEST);
+                        mainActivity.setCurrentFragment(MainActivity.FRAGMENT_LIST.LATEST);
+                        mainActivity.changeFragment(new LatestFragment());
+                        closeDrawer();
                     }
             );
 
-            mainActivity.findViewById(R.id.main_menu_fav).setOnClickListener(
-                    new View.OnClickListener() {
-                        @Override
-                        public void onClick(View v) {
-                            if (mainActivity.getCurrentFragment() == MainActivity.FRAGMENT_LIST.FAV)
-                                return; // selected button, so just ignore.
-                            clearAllButtonColor();
-                            setHighLightButton(MainActivity.FRAGMENT_LIST.FAV);
-                            mainActivity.setCurrentFragment(MainActivity.FRAGMENT_LIST.FAV);
-                            mainActivity.changeFragment(new FavFragment());
-                            closeDrawer();
-                        }
+            mainActivity.findViewById(R.id.main_menu_fav).setOnClickListener(v -> {
+                        if (mainActivity.getCurrentFragment() == MainActivity.FRAGMENT_LIST.FAV)
+                            return; // selected button, so just ignore.
+                        clearAllButtonColor();
+                        setHighLightButton(MainActivity.FRAGMENT_LIST.FAV);
+                        mainActivity.setCurrentFragment(MainActivity.FRAGMENT_LIST.FAV);
+                        mainActivity.changeFragment(new FavFragment());
+                        closeDrawer();
                     }
             );
 
-            mainActivity.findViewById(R.id.main_menu_config).setOnClickListener(
-                    new View.OnClickListener() {
-                        @Override
-                        public void onClick(View v) {
-                            if (mainActivity.getCurrentFragment() == MainActivity.FRAGMENT_LIST.CONFIG)
-                                return; // selected button, so just ignore.
-                            clearAllButtonColor();
-                            setHighLightButton(MainActivity.FRAGMENT_LIST.CONFIG);
-                            mainActivity.setCurrentFragment(MainActivity.FRAGMENT_LIST.CONFIG);
-                            mainActivity.changeFragment(new ConfigFragment());
-                            closeDrawer();
-                        }
+            mainActivity.findViewById(R.id.main_menu_config).setOnClickListener(v -> {
+                        if (mainActivity.getCurrentFragment() == MainActivity.FRAGMENT_LIST.CONFIG)
+                            return; // selected button, so just ignore.
+                        clearAllButtonColor();
+                        setHighLightButton(MainActivity.FRAGMENT_LIST.CONFIG);
+                        mainActivity.setCurrentFragment(MainActivity.FRAGMENT_LIST.CONFIG);
+                        mainActivity.changeFragment(new ConfigFragment());
+                        closeDrawer();
                     }
             );
 
-            mainActivity.findViewById(R.id.main_menu_open_source).setOnClickListener(
-                    new View.OnClickListener() {
-                        @Override
-                        public void onClick(View v) {
-                            new MaterialDialog.Builder(getActivity())
-                                    .theme(Theme.LIGHT)
-                                    .title(R.string.main_menu_statement)
-                                    .content(GlobalConfig.getOpensourceLicense())
-                                    .stackingBehavior(StackingBehavior.ALWAYS)
-                                    .positiveColorRes(R.color.dlgPositiveButtonColor)
-                                    .positiveText(R.string.dialog_positive_known)
-                                    .show();
-                        }
+            mainActivity.findViewById(R.id.main_menu_open_source).setOnClickListener(v -> {
+                        FragmentActivity fragmentActivity = getActivity();
+                        if (fragmentActivity == null) return;
+                        new MaterialDialog.Builder(fragmentActivity)
+                                .theme(Theme.LIGHT)
+                                .title(R.string.main_menu_statement)
+                                .content(GlobalConfig.getOpensourceLicense())
+                                .stackingBehavior(StackingBehavior.ALWAYS)
+                                .positiveColorRes(R.color.dlgPositiveButtonColor)
+                                .positiveText(R.string.dialog_positive_known)
+                                .show();
                     }
             );
 
-            mainActivity.findViewById(R.id.main_menu_dark_mode_switcher).setOnClickListener(
-                    new View.OnClickListener() {
-                        @Override
-                        public void onClick(View v) {
-                            openOrCloseDarkMode();
-                        }
-                    }
-            );
+            mainActivity.findViewById(R.id.main_menu_dark_mode_switcher).setOnClickListener(v -> openOrCloseDarkMode());
 
         } catch (NullPointerException e) {
             Toast.makeText(mainActivity, "NullPointerException in onActivityCreated();", Toast.LENGTH_SHORT).show();
@@ -152,36 +129,35 @@ public class NavigationDrawerFragment extends Fragment {
         }
 
         // User Account
-//        RelativeLayout rlBackground = (RelativeLayout)getActivity().findViewById(R.id.top_background);
-        rivUserAvatar = (RoundedImageView)getActivity().findViewById(R.id.user_avatar);
-        tvUserName = (TextView)getActivity().findViewById(R.id.user_name);
+        FragmentActivity activity = getActivity();
+        if (activity != null) {
+            rivUserAvatar = activity.findViewById(R.id.user_avatar);
+            tvUserName = activity.findViewById(R.id.user_name);
+        }
 
-        View.OnClickListener ocl = new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                if(!LightUserSession.getLogStatus() && GlobalConfig.isNetworkAvailable(getActivity())) {
-                    if(!LightUserSession.isUserInfoSet()) {
-                        Intent intent = new Intent(getActivity(), UserLoginActivity.class);
-                        startActivity(intent);
-                    }
-                    else {
-                        // show dialog to login, error to jump to login activity
-                        if(LightUserSession.aiui.getStatus() == AsyncTask.Status.FINISHED) {
-                            Toast.makeText(getActivity(), "Relogged.", Toast.LENGTH_SHORT).show();
-                            LightUserSession.aiui = new LightUserSession.AsyncInitUserInfo();
-                            LightUserSession.aiui.execute();
-                        }
-                    }
-                }
-                else if(!GlobalConfig.isNetworkAvailable(getActivity())) {
-                    // no network, no log in
-                    Toast.makeText(getActivity(), getResources().getString(R.string.system_network_error), Toast.LENGTH_SHORT).show();
-                }
-                else {
-                    // Logged, click to info page
-                    Intent intent = new Intent(getActivity(), UserInfoActivity.class);
+        View.OnClickListener ocl = v -> {
+            if(!LightUserSession.getLogStatus() && GlobalConfig.isNetworkAvailable(getActivity())) {
+                if(!LightUserSession.isUserInfoSet()) {
+                    Intent intent = new Intent(getActivity(), UserLoginActivity.class);
                     startActivity(intent);
                 }
+                else {
+                    // show dialog to login, error to jump to login activity
+                    if(LightUserSession.aiui.getStatus() == AsyncTask.Status.FINISHED) {
+                        Toast.makeText(getActivity(), "Relogged.", Toast.LENGTH_SHORT).show();
+                        LightUserSession.aiui = new LightUserSession.AsyncInitUserInfo();
+                        LightUserSession.aiui.execute();
+                    }
+                }
+            }
+            else if(!GlobalConfig.isNetworkAvailable(getActivity())) {
+                // no network, no log in
+                Toast.makeText(getActivity(), getResources().getString(R.string.system_network_error), Toast.LENGTH_SHORT).show();
+            }
+            else {
+                // Logged, click to info page
+                Intent intent = new Intent(getActivity(), UserInfoActivity.class);
+                startActivity(intent);
             }
         };
         rivUserAvatar.setOnClickListener(ocl);
@@ -189,7 +165,7 @@ public class NavigationDrawerFragment extends Fragment {
 
         // Initial: set color states here ...
         // get net work status, no net -> FAV
-        if(!GlobalConfig.isNetworkAvailable(getActivity())) {
+        if(activity != null && !GlobalConfig.isNetworkAvailable(activity)) {
             clearAllButtonColor();
             setHighLightButton(MainActivity.FRAGMENT_LIST.FAV);
             mainActivity.setCurrentFragment(MainActivity.FRAGMENT_LIST.FAV);
@@ -202,43 +178,9 @@ public class NavigationDrawerFragment extends Fragment {
         }
 
         // set menu background
-        bgImage = (ImageView) getActivity().findViewById(R.id.bg_img);
-        if(GlobalConfig.getFromAllSetting(GlobalConfig.SettingItems.menu_bg_id) != null) {
-            switch (GlobalConfig.getFromAllSetting(GlobalConfig.SettingItems.menu_bg_id)) {
-                case "0":
-                    try {
-                        bmMenuBackground = BitmapFactory.decodeFile(GlobalConfig.getFromAllSetting(GlobalConfig.SettingItems.menu_bg_path));
-                    } catch (OutOfMemoryError oome) {
-                        try {
-                            BitmapFactory.Options options = new BitmapFactory.Options();
-                            options.inSampleSize = 2;
-                            bmMenuBackground = BitmapFactory.decodeFile(GlobalConfig.getFromAllSetting(GlobalConfig.SettingItems.menu_bg_path), options);
-                            if(bmMenuBackground == null) throw new Exception("PictureLoadFailureException");
-                        } catch(Exception e) {
-                            e.printStackTrace();
-                            Toast.makeText(getActivity(), "Exception: " + e.toString() + "\n可能的原因有：图片不在内置SD卡；图片格式不正确；图片像素尺寸太大，请使用小一点的图，谢谢，此功能为试验性功能；", Toast.LENGTH_SHORT).show();
-                            bgImage.setImageDrawable(getResources().getDrawable(R.drawable.bg_avatar_04));
-                            return;
-                        }
-                    }
-                    bgImage.setImageBitmap(bmMenuBackground);
-                    break;
-                case "1":
-                    bgImage.setImageDrawable(getResources().getDrawable(R.drawable.bg_avatar_01));
-                    break;
-                case "2":
-                    bgImage.setImageDrawable(getResources().getDrawable(R.drawable.bg_avatar_02));
-                    break;
-                case "3":
-                    bgImage.setImageDrawable(getResources().getDrawable(R.drawable.bg_avatar_03));
-                    break;
-                case "4":
-                    bgImage.setImageDrawable(getResources().getDrawable(R.drawable.bg_avatar_04));
-                    break;
-                case "5":
-                    bgImage.setImageDrawable(getResources().getDrawable(R.drawable.bg_avatar_05));
-                    break;
-            }
+        if (activity != null) {
+            bgImage = activity.findViewById(R.id.bg_img);
+            updateMenuBackground();
         }
     }
 
@@ -246,14 +188,6 @@ public class NavigationDrawerFragment extends Fragment {
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
     }
-
-//    public ActionBarDrawerToggle getActionBarDrawerToggle() {
-//        return mActionBarDrawerToggle;
-//    }
-//
-//    public void setActionBarDrawerToggle(ActionBarDrawerToggle actionBarDrawerToggle) {
-//        mActionBarDrawerToggle = actionBarDrawerToggle;
-//    }
 
     public void setup(int fragmentId, DrawerLayout drawerLayout, Toolbar toolbar) {
         // get MainActivity
@@ -282,13 +216,8 @@ public class NavigationDrawerFragment extends Fragment {
             }
         };
 
-        mDrawerLayout.post(new Runnable() {
-            @Override
-            public void run() {
-                mActionBarDrawerToggle.syncState();
-            }
-        });
-        mDrawerLayout.setDrawerListener(mActionBarDrawerToggle);
+        mDrawerLayout.post(() -> mActionBarDrawerToggle.syncState());
+        mDrawerLayout.addDrawerListener(mActionBarDrawerToggle);
         updateNavigationBar();
     }
 
@@ -305,24 +234,24 @@ public class NavigationDrawerFragment extends Fragment {
             try {
                 // Clear icon color
                 ImageButton imageButton;
-                imageButton = (ImageButton) mainActivity.findViewById(R.id.main_menu_ic_rklist);
+                imageButton = mainActivity.findViewById(R.id.main_menu_ic_rklist);
                 imageButton.setColorFilter(getResources().getColor(R.color.menu_text_color));
-                imageButton = (ImageButton) mainActivity.findViewById(R.id.main_menu_ic_latest);
+                imageButton = mainActivity.findViewById(R.id.main_menu_ic_latest);
                 imageButton.setColorFilter(getResources().getColor(R.color.menu_text_color));
-                imageButton = (ImageButton) mainActivity.findViewById(R.id.main_menu_ic_fav);
+                imageButton = mainActivity.findViewById(R.id.main_menu_ic_fav);
                 imageButton.setColorFilter(getResources().getColor(R.color.menu_text_color));
-                imageButton = (ImageButton) mainActivity.findViewById(R.id.main_menu_ic_config);
+                imageButton = mainActivity.findViewById(R.id.main_menu_ic_config);
                 imageButton.setColorFilter(getResources().getColor(R.color.menu_text_color));
 
                 // Clear icon color effects
                 TextView textView;
-                textView = (TextView) mainActivity.findViewById(R.id.main_menu_text_rklist);
+                textView = mainActivity.findViewById(R.id.main_menu_text_rklist);
                 textView.setTextColor(getResources().getColor(R.color.menu_text_color));
-                textView = (TextView) mainActivity.findViewById(R.id.main_menu_text_latest);
+                textView = mainActivity.findViewById(R.id.main_menu_text_latest);
                 textView.setTextColor(getResources().getColor(R.color.menu_text_color));
-                textView = (TextView) mainActivity.findViewById(R.id.main_menu_text_fav);
+                textView = mainActivity.findViewById(R.id.main_menu_text_fav);
                 textView.setTextColor(getResources().getColor(R.color.menu_text_color));
-                textView = (TextView) mainActivity.findViewById(R.id.main_menu_text_config);
+                textView = mainActivity.findViewById(R.id.main_menu_text_config);
                 textView.setTextColor(getResources().getColor(R.color.menu_text_color));
             } catch (NullPointerException e) {
                 Toast.makeText(mainActivity, "NullPointerException in clearAllButtonColor(); sdk16-", Toast.LENGTH_SHORT).show();
@@ -332,35 +261,35 @@ public class NavigationDrawerFragment extends Fragment {
             try {
                 // Clear the background effects on "main buttons"
                 TableRow tableRow;
-                tableRow = (TableRow) mainActivity.findViewById(R.id.main_menu_rklist);
+                tableRow = mainActivity.findViewById(R.id.main_menu_rklist);
                 tableRow.setBackground(getResources().getDrawable(R.drawable.btn_menu_item));
-                tableRow = (TableRow) mainActivity.findViewById(R.id.main_menu_latest);
+                tableRow = mainActivity.findViewById(R.id.main_menu_latest);
                 tableRow.setBackground(getResources().getDrawable(R.drawable.btn_menu_item));
-                tableRow = (TableRow) mainActivity.findViewById(R.id.main_menu_fav);
+                tableRow = mainActivity.findViewById(R.id.main_menu_fav);
                 tableRow.setBackground(getResources().getDrawable(R.drawable.btn_menu_item));
-                tableRow = (TableRow) mainActivity.findViewById(R.id.main_menu_config);
+                tableRow = mainActivity.findViewById(R.id.main_menu_config);
                 tableRow.setBackground(getResources().getDrawable(R.drawable.btn_menu_item));
 
                 // Clear icon color effects
                 TextView textView;
-                textView = (TextView) mainActivity.findViewById(R.id.main_menu_text_rklist);
+                textView = mainActivity.findViewById(R.id.main_menu_text_rklist);
                 textView.setTextColor(getResources().getColor(R.color.menu_text_color));
-                textView = (TextView) mainActivity.findViewById(R.id.main_menu_text_latest);
+                textView = mainActivity.findViewById(R.id.main_menu_text_latest);
                 textView.setTextColor(getResources().getColor(R.color.menu_text_color));
-                textView = (TextView) mainActivity.findViewById(R.id.main_menu_text_fav);
+                textView = mainActivity.findViewById(R.id.main_menu_text_fav);
                 textView.setTextColor(getResources().getColor(R.color.menu_text_color));
-                textView = (TextView) mainActivity.findViewById(R.id.main_menu_text_config);
+                textView = mainActivity.findViewById(R.id.main_menu_text_config);
                 textView.setTextColor(getResources().getColor(R.color.menu_text_color));
 
                 // Clear icon color
                 ImageButton imageButton;
-                imageButton = (ImageButton) mainActivity.findViewById(R.id.main_menu_ic_rklist);
+                imageButton = mainActivity.findViewById(R.id.main_menu_ic_rklist);
                 imageButton.setColorFilter(getResources().getColor(R.color.menu_text_color));
-                imageButton = (ImageButton) mainActivity.findViewById(R.id.main_menu_ic_latest);
+                imageButton = mainActivity.findViewById(R.id.main_menu_ic_latest);
                 imageButton.setColorFilter(getResources().getColor(R.color.menu_text_color));
-                imageButton = (ImageButton) mainActivity.findViewById(R.id.main_menu_ic_fav);
+                imageButton = mainActivity.findViewById(R.id.main_menu_ic_fav);
                 imageButton.setColorFilter(getResources().getColor(R.color.menu_text_color));
-                imageButton = (ImageButton) mainActivity.findViewById(R.id.main_menu_ic_config);
+                imageButton = mainActivity.findViewById(R.id.main_menu_ic_config);
                 imageButton.setColorFilter(getResources().getColor(R.color.menu_text_color));
 
                 // Clear the dark and light switcher button effect
@@ -538,13 +467,14 @@ public class NavigationDrawerFragment extends Fragment {
 
     private void updateNavigationBar() {
         // test navigation bar exist
+        FragmentActivity activity = getActivity();
         Point navBar = LightTool.getNavigationBarSize(getActivity());
-//                Toast.makeText(getActivity(), "width = " + navBar.x + "; height = " + navBar.y, Toast.LENGTH_SHORT).show();
-        LinearLayout ll = (LinearLayout)mainActivity.findViewById(R.id.main_menu_bottom_layout);
-        if(navBar.y == 0)
+
+        LinearLayout ll = mainActivity.findViewById(R.id.main_menu_bottom_layout);
+        if (activity != null && navBar.y == 0)
             ll.setPadding(0, 0, 0, 0); // hide
-        else if(navBar.y < 10 || navBar.y >= LightTool.getAppUsableScreenSize(getActivity()).y)
-            ll.setPadding(0, 0, 0, LightTool.getAppUsableScreenSize(getActivity()).y / 10);
+        else if (activity != null && (navBar.y < 10 || navBar.y >= LightTool.getAppUsableScreenSize(activity).y))
+            ll.setPadding(0, 0, 0, LightTool.getAppUsableScreenSize(activity).y / 10);
         else
             ll.setPadding(0, 0, 0, navBar.y); // show
     }
@@ -577,9 +507,15 @@ public class NavigationDrawerFragment extends Fragment {
         }
 
         // update menu background
-        if(GlobalConfig.getFromAllSetting(GlobalConfig.SettingItems.menu_bg_id) != null) {
-            switch (GlobalConfig.getFromAllSetting(GlobalConfig.SettingItems.menu_bg_id)) {
+        updateMenuBackground();
+    }
+
+    private void updateMenuBackground() {
+        String settingMenuBgId = GlobalConfig.getFromAllSetting(GlobalConfig.SettingItems.menu_bg_id);
+        if(settingMenuBgId != null) {
+            switch (settingMenuBgId) {
                 case "0":
+                    Bitmap bmMenuBackground;
                     try {
                         bmMenuBackground = BitmapFactory.decodeFile(GlobalConfig.getFromAllSetting(GlobalConfig.SettingItems.menu_bg_path));
                     } catch (OutOfMemoryError oome) {
@@ -634,7 +570,7 @@ public class NavigationDrawerFragment extends Fragment {
     }
 
     @Override
-    public void onSaveInstanceState(Bundle outState) {
+    public void onSaveInstanceState(@NonNull Bundle outState) {
         super.onSaveInstanceState(outState);
     }
 

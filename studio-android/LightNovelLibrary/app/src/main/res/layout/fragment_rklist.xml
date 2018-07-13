@@ -10,9 +10,9 @@
     <org.mewx.wenku8.component.PagerSlidingTabStrip
         android:id="@+id/rklist_tabs"
         android:layout_width="match_parent"
-        android:layout_height="?attr/actionBarSize"
+        android:layout_height="?android:attr/actionBarSize"
         android:elevation="4dp"
-        android:background="?attr/colorPrimary"
+        android:background="@color/myPrimaryColor"
         app:pstsTabBackground="@drawable/btn_menu_item_boardless"/>
 
     <android.support.v4.view.ViewPager
