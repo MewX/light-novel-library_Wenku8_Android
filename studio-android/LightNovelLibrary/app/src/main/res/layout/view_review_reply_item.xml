@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:minHeight="36dp"
+    android:orientation="vertical"
+    android:padding="16dp">
+
+    <RelativeLayout
+        android:id="@+id/info_row"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:adjustViewBounds="true"
+        android:background="@drawable/btn_menu_item"
+        android:clickable="true"
+        android:focusable="true"
+        android:gravity="center_horizontal">
+
+        <TextView
+            android:id="@+id/review_reply_item_user"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_alignParentLeft="true"
+            android:layout_alignParentStart="true"
+            android:layout_marginEnd="16dp"
+            android:layout_marginRight="16dp"
+            android:layout_toLeftOf="@id/review_reply_item_time"
+            android:layout_toStartOf="@id/review_reply_item_time"
+            android:text="@string/loading"
+            android:textColor="@color/novel_item_title"
+            android:textSize="12sp"
+            tools:ignore="RelativeOverlap" />
+
+        <TextView
+            android:id="@+id/review_reply_item_time"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_toLeftOf="@id/hash"
+            android:layout_toStartOf="@id/hash"
+            android:text="@string/loading"
+            android:textColor="@color/novel_item_text"
+            android:textSize="12sp" />
+
+        <TextView
+            android:id="@+id/hash"
+            android:layout_width="16dp"
+            android:layout_height="16dp"
+            android:layout_marginLeft="16dp"
+            android:layout_marginStart="16dp"
+            android:layout_toLeftOf="@id/review_reply_item_numbered_id"
+            android:layout_toStartOf="@id/review_reply_item_numbered_id"
+            android:text="#" />
+
+        <TextView
+            android:id="@+id/review_reply_item_numbered_id"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_alignParentEnd="true"
+            android:layout_alignParentRight="true"
+            android:singleLine="true"
+            android:text="@string/loading"
+            android:textColor="@color/novel_item_text"
+            android:textSize="12sp" />
+    </RelativeLayout>
+
+    <View
+        android:id="@+id/divider"
+        android:layout_width="match_parent"
+        android:layout_height="1px"
+        android:background="@color/default_divider" />
+
+    <TextView
+        android:id="@+id/review_reply_content"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:minLines="1"
+        android:paddingTop="4dp"
+        android:text="@string/loading" />
+</LinearLayout>
