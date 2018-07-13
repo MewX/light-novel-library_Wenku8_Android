@@ -73,6 +73,7 @@ public class GlobalConfig {
     private static boolean FirstStoragePathStatus = true;
     private static Wenku8API.LANG currentLang = Wenku8API.LANG.SC;
     public static String pathPickedSave; // dir picker save path
+    public static SearchType searchType;
 
     // static variables
     private static ArrayList<String> searchHistory = null;
@@ -95,6 +96,11 @@ public class GlobalConfig {
         public int cid;
         public int lineId;
         public int wordId;
+    }
+
+    public enum SearchType {
+        web,
+        bookshelf,
     }
 
     public enum SettingItems {
