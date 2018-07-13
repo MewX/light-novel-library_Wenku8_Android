@@ -87,7 +87,7 @@
                     android:layout_marginStart="16dp"
                     android:layout_toLeftOf="@id/review_item_number_of_posts"
                     android:layout_toStartOf="@id/review_item_number_of_posts"
-                    android:src="@drawable/ic_svg_forum_grey" />
+                    android:src="@drawable/ic_svg_forum" />
 
                 <TextView
                     android:id="@+id/review_item_number_of_posts"

@@ -224,4 +224,6 @@
     <string name="about_zero"><![CDATA[ZERO <78283358@qq.com>]]></string>
     <string name="about_acknowledgement">致谢</string>
     <string name="about_seraphroy"><![CDATA[SeraphRoy <https://www.gaeblogx.com>]]></string>
+    <string name="action_create_new_review">发布评论</string>
+    <string name="action_create_new_review_reply">发表回复</string>
 </resources>

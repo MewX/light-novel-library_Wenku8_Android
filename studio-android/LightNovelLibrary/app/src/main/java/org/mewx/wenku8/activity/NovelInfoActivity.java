@@ -496,6 +496,14 @@ public class NovelInfoActivity extends AppCompatActivity {
             getSupportActionBar().setTitle(getResources().getString(R.string.action_novel_info));
         getMenuInflater().inflate(R.menu.menu_novel_info, menu);
 
+        // fill the icon to white color
+        for (int i = 0; i < menu.size(); i ++) {
+            Drawable drawable = menu.getItem(i).getIcon();
+            if (drawable != null) {
+                drawable.mutate();
+                drawable.setColorFilter(getResources().getColor(R.color.default_white), PorterDuff.Mode.SRC_ATOP);
+            }
+        }
         return true;
     }
 

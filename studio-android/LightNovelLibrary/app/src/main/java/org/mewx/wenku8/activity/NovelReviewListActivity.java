@@ -13,6 +13,7 @@ import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
 import android.support.v7.widget.Toolbar;
 import android.util.Log;
+import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
 import android.widget.LinearLayout;
@@ -123,6 +124,27 @@ public class NovelReviewListActivity extends AppCompatActivity implements MyItem
     }
 
     @Override
+    public boolean onCreateOptionsMenu(Menu menu) {
+        if(getSupportActionBar()!=null)
+            getSupportActionBar().setTitle(getResources().getString(R.string.action_create_new_review));
+        getMenuInflater().inflate(R.menu.menu_review_list, menu);
+
+        return true;
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(MenuItem menuItem) {
+        if (menuItem.getItemId() == android.R.id.home) {
+            onBackPressed();
+        }
+        else if (menuItem.getItemId() == R.id.action_new) {
+            // TODO: new reply activity
+            Toast.makeText(getApplication(), "new", Toast.LENGTH_SHORT).show();
+        }
+        return super.onOptionsItemSelected(menuItem);
+    }
+
+    @Override
     protected void onPause() {
         super.onPause();
         MobclickAgent.onPause(this);
@@ -132,14 +154,6 @@ public class NovelReviewListActivity extends AppCompatActivity implements MyItem
     protected void onResume() {
         super.onResume();
         MobclickAgent.onResume(this);
-    }
-
-    @Override
-    public boolean onOptionsItemSelected(MenuItem menuItem) {
-        if (menuItem.getItemId() == android.R.id.home) {
-            onBackPressed();
-        }
-        return super.onOptionsItemSelected(menuItem);
     }
 
     ReviewItemAdapter getAdapter() {
