@@ -136,7 +136,7 @@ public class NovelReviewListActivity extends AppCompatActivity implements MyItem
             onBackPressed();
         }
         else if (menuItem.getItemId() == R.id.action_new) {
-            // TODO: new reply activity
+            // FIXME: new reply activity
             Toast.makeText(getApplication(), getResources().getString(R.string.system_api_error), Toast.LENGTH_SHORT).show();
         }
         return super.onOptionsItemSelected(menuItem);
