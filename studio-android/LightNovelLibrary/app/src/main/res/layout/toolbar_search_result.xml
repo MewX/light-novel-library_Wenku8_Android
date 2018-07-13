@@ -1,13 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
-<android.support.v7.widget.Toolbar
-    xmlns:android="http://schemas.android.com/apk/res/android"
-    style="@style/ToolBarStyle"
+<android.support.v7.widget.Toolbar xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/toolbar_actionbar"
+    style="@style/ToolBarStyle"
     android:layout_width="match_parent"
-    android:layout_height="?attr/actionBarSize"
-    android:fitsSystemWindows="true"
+    android:layout_height="?android:attr/actionBarSize"
+    android:background="@color/default_white"
     android:elevation="@dimen/toolbar_elevation"
-    android:background="@color/default_white" >
+    android:fitsSystemWindows="true">
 
     <LinearLayout
         android:id="@+id/search_container"
@@ -20,11 +19,11 @@
             android:id="@+id/search_result_title"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:paddingRight="16dp"
             android:gravity="center_vertical"
-            android:textColor="#000000"
+            android:paddingRight="16dp"
             android:singleLine="true"
-            android:textSize="@dimen/abc_text_size_medium_material"/>
+            android:textColor="#000000"
+            android:textSize="18sp" />
 
     </LinearLayout>
 

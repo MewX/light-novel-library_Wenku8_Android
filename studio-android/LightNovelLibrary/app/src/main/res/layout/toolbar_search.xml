@@ -1,31 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
-<android.support.v7.widget.Toolbar
-    xmlns:android="http://schemas.android.com/apk/res/android"
+<android.support.v7.widget.Toolbar xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/toolbar_actionbar"
+    style="@style/ToolBarStyle"
     android:layout_width="match_parent"
-    android:layout_height="?attr/actionBarSize"
+    android:layout_height="?android:attr/actionBarSize"
     android:background="@color/default_white"
-    android:fitsSystemWindows="true"
     android:elevation="4dp"
-    style="@style/ToolBarStyle" >
-    <!--xmlns:app="http://schemas.android.com/apk/res-auto"-->
-    <!--app:contentInsetLeft="72dp"-->
-    <!--app:contentInsetStart="72dp"-->
-    <!--app:popupTheme="@style/ActionBarPopupThemeOverlay"-->
-    <!--app:theme="@style/ActionBarThemeOverlay">-->
-
-    <!--<RelativeLayout-->
-        <!--android:layout_width="?attr/actionBarSize"-->
-        <!--android:layout_height="?attr/actionBarSize"-->
-        <!--android:clickable="true"-->
-        <!--android:background="@drawable/btn_menu_item">-->
-        <!--<ImageView-->
-            <!--android:layout_width="wrap_content"-->
-            <!--android:layout_height="wrap_content"-->
-            <!--android:layout_centerHorizontal="true"-->
-            <!--android:layout_centerVertical="true"-->
-            <!--android:src="@drawable/ic_back"/>-->
-    <!--</RelativeLayout>-->
+    android:fitsSystemWindows="true">
 
     <LinearLayout
         android:id="@+id/search_container"
@@ -37,7 +18,7 @@
         <EditText
             android:id="@+id/search_view"
             android:layout_width="0dp"
-            android:layout_height="?attr/actionBarSize"
+            android:layout_height="?android:attr/actionBarSize"
             android:layout_weight="1"
             android:background="@android:color/transparent"
             android:gravity="center_vertical"
@@ -48,24 +29,16 @@
             android:paddingLeft="2dp"
             android:singleLine="true"
             android:textColor="#000000"
-            android:textCursorDrawable="@null"
-            android:textColorHint="#999999" />
-
-        <!--<ImageView-->
-            <!--android:id="@+id/search_clear"-->
-            <!--android:layout_width="wrap_content"-->
-            <!--android:layout_height="wrap_content"-->
-            <!--android:layout_gravity="center"-->
-            <!--android:paddingLeft="16dp"-->
-            <!--android:paddingRight="16dp"-->
-            <!--android:src="@drawable/ic_clearcache" />-->
+            android:textColorHint="#999999"
+            android:textCursorDrawable="@null" />
 
         <RelativeLayout
-            android:layout_width="?attr/actionBarSize"
-            android:layout_height="?attr/actionBarSize"
             android:id="@+id/search_clear"
+            android:layout_width="?android:attr/actionBarSize"
+            android:layout_height="?android:attr/actionBarSize"
+            android:background="@drawable/btn_menu_item_boardless"
             android:clickable="true"
-            android:background="@drawable/btn_menu_item_boardless">
+            android:focusable="true">
 
             <ImageView
                 android:id="@+id/search_clear_icon"
@@ -73,7 +46,7 @@
                 android:layout_height="wrap_content"
                 android:layout_centerHorizontal="true"
                 android:layout_centerVertical="true"
-                android:src="@drawable/ic_svg_clear"/>
+                android:src="@drawable/ic_svg_clear" />
         </RelativeLayout>
     </LinearLayout>
 </android.support.v7.widget.Toolbar>

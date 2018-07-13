@@ -1,5 +1,7 @@
 package org.mewx.wenku8.global.api;
 
+import org.mewx.wenku8.global.GlobalConfig;
+
 /**
  * Created by MewX on 2015/5/13.
  * Novel Item Meta data.
@@ -20,21 +22,20 @@ public class NovelItemMeta {
     public String latestSectionName;
     public String fullIntro; // fetch from another place
 
-    static private final String Unknown = "Unknown";
     NovelItemMeta() {
         aid = 1;
         title = Integer.toString(aid);
-        author = Unknown;
+        author = GlobalConfig.UNKNOWN;
         dayHitsCount = 0;
         totalHitsCount = 0;
         pushCount = 0;
         favCount = 0;
-        pressId = Unknown;
-        bookStatus = Unknown;
+        pressId = GlobalConfig.UNKNOWN;
+        bookStatus = GlobalConfig.UNKNOWN;
         bookLength = 0;
-        lastUpdate = Unknown;
+        lastUpdate = GlobalConfig.UNKNOWN;
         latestSectionCid = 0;
-        latestSectionName = Unknown;
-        fullIntro = Unknown;
+        latestSectionName = GlobalConfig.UNKNOWN;
+        fullIntro = GlobalConfig.UNKNOWN;
     }
 }

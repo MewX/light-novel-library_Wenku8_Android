@@ -11,11 +11,13 @@
     <uses-permission android:name="android.permission.READ_PHONE_STATE" />
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
-    <uses-permission android:name="android.permission.WRITE_SETTINGS" />
+    <uses-permission android:name="android.permission.WRITE_SETTINGS"
+        tools:ignore="ProtectedPermissions" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.WRITE_USER_DICTIONARY" />
-    <uses-permission android:name="android.permission.MOUNT_UNMOUNT_FILESYSTEMS"/>
+    <uses-permission android:name="android.permission.MOUNT_UNMOUNT_FILESYSTEMS"
+        tools:ignore="ProtectedPermissions" />
     <!-- For root device -->
     <!--<uses-permission android:name="android.permission.WRITE_MEDIA_STORAGE"/>-->
 
@@ -66,6 +68,18 @@
         <!-- Novel Chapter List Activity -->
         <activity android:name=".activity.NovelChapterActivity"
             android:label="@string/action_chapter_list"
+            android:screenOrientation="unspecified">
+        </activity>
+
+        <!-- Novel Review List Activity -->
+        <activity android:name=".activity.NovelReviewListActivity"
+            android:label="@string/action_review_list"
+            android:screenOrientation="unspecified">
+        </activity>
+
+        <!-- Novel Review Reply List Activity -->
+        <activity android:name=".activity.NovelReviewReplyListActivity"
+            android:label="@string/action_review_reply_list"
             android:screenOrientation="unspecified">
         </activity>
 

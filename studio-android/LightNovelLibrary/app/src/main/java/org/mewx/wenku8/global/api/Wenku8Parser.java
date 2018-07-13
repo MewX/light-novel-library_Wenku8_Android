@@ -2,7 +2,6 @@ package org.mewx.wenku8.global.api;
 
 import android.util.Log;
 
-import org.mewx.wenku8.global.GlobalConfig;
 import org.mewx.wenku8.util.LightTool;
 import org.xmlpull.v1.XmlPullParser;
 import org.xmlpull.v1.XmlPullParserFactory;
@@ -19,7 +18,7 @@ import java.util.List;
  */
 public class Wenku8Parser {
 
-    public static List<Integer> parseNovelItemList(String str, int page) {
+    public static List<Integer> parseNovelItemList(String str) {
         List<Integer> list = new ArrayList<>();
 
         // <?xml version="1.0" encoding="utf-8"?>
@@ -68,7 +67,7 @@ public class Wenku8Parser {
     }
 
 
-    static public NovelItemMeta parsetNovelFullMeta(String xml) {
+    static public NovelItemMeta parseNovelFullMeta(String xml) {
         // get full XML metadata of a novel, here is an example:
         // -----------------------------------------------------
         // <?xml version="1.0" encoding="utf-8"?>
@@ -85,6 +84,7 @@ public class Wenku8Parser {
         // <data name="LastUpdate" value="2012-11-02"/>
         // <data name="LatestSection" cid="41897"><![CDATA[第一卷 插图]]></data>
         // </metadata>
+        Log.d(Wenku8Parser.class.getSimpleName(), xml);
 
         try {
             XmlPullParserFactory factory = XmlPullParserFactory.newInstance();
@@ -194,7 +194,7 @@ public class Wenku8Parser {
                 eventType = xmlPullParser.next();
             }
 
-            /** Handle the rest problem */
+            /* Handle the rest problem */
             // Problem like this:
             // <volume vid="41748"><![CDATA[第一卷 告白于苍刻之夜]]>
             // <chapter cid="41749"><![CDATA[序章]]></chapter>
@@ -262,27 +262,27 @@ public class Wenku8Parser {
                             noReplies = Integer.valueOf(xmlPullParser.getAttributeValue(null, "replies"));
                             String postTimeStr = xmlPullParser.getAttributeValue(null, "posttime");
                             postTime = new GregorianCalendar(
-                                    Integer.valueOf(postTimeStr.substring(0, 2), 10),
-                                    Integer.valueOf(postTimeStr.substring(2, 4), 10),
-                                    Integer.valueOf(postTimeStr.substring(4, 6), 10),
+                                    Integer.valueOf(postTimeStr.substring(0, 4), 10),
+                                    Integer.valueOf(postTimeStr.substring(4, 6), 10) - 1, // start from 0 - Calendar.JANUARY
                                     Integer.valueOf(postTimeStr.substring(6, 8), 10),
                                     Integer.valueOf(postTimeStr.substring(8, 10), 10),
-                                    Integer.valueOf(postTimeStr.substring(10), 10)
+                                    Integer.valueOf(postTimeStr.substring(10, 12), 10),
+                                    Integer.valueOf(postTimeStr.substring(12), 10)
                             ).getTime();
                             String replyTimeStr = xmlPullParser.getAttributeValue(null, "replytime");
                             lastReplyTime = new GregorianCalendar(
-                                    Integer.valueOf(replyTimeStr.substring(0, 2), 10),
-                                    Integer.valueOf(replyTimeStr.substring(2, 4), 10),
-                                    Integer.valueOf(replyTimeStr.substring(4, 6), 10),
+                                    Integer.valueOf(replyTimeStr.substring(0, 4), 10),
+                                    Integer.valueOf(replyTimeStr.substring(4, 6), 10) - 1,
                                     Integer.valueOf(replyTimeStr.substring(6, 8), 10),
                                     Integer.valueOf(replyTimeStr.substring(8, 10), 10),
-                                    Integer.valueOf(replyTimeStr.substring(10), 10)
+                                    Integer.valueOf(replyTimeStr.substring(10, 12), 10),
+                                    Integer.valueOf(replyTimeStr.substring(12), 10)
                             ).getTime();
                         } else if ("user".equals(xmlPullParser.getName())) {
                             uid = Integer.valueOf(xmlPullParser.getAttributeValue(null, "uid"));
                             userName = xmlPullParser.nextText();
                         } else if ("content".equals(xmlPullParser.getName())) {
-                            title = xmlPullParser.nextText();
+                            title = xmlPullParser.nextText().trim();
                         }
                         break;
 
@@ -290,6 +290,65 @@ public class Wenku8Parser {
                         if ("item".equals(xmlPullParser.getName())) {
                             reviewList.getList().add(
                                     new ReviewList.Review(rid, postTime, noReplies, lastReplyTime, userName, uid, title));
+                        }
+                        break;
+                }
+                eventType = xmlPullParser.next();
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    /**
+     * save the new xsl into an existing review reply list
+     * @param reviewReplyList the existing review reply list object
+     * @param xml the fetched xml
+     */
+    static public void parseReviewReplyList(ReviewReplyList reviewReplyList, String xml) {
+        reviewReplyList.setCurrentPage(reviewReplyList.getCurrentPage() + 1);
+
+        try {
+            XmlPullParserFactory factory = XmlPullParserFactory.newInstance();
+            XmlPullParser xmlPullParser = factory.newPullParser();
+            xmlPullParser.setInput(new StringReader(xml));
+            int eventType = xmlPullParser.getEventType();
+
+            Date replyTime = new Date();
+            String userName = "";
+            int uid = 0; // post user
+            String content = "";
+
+            while (eventType != XmlPullParser.END_DOCUMENT) {
+                switch (eventType) {
+                    case XmlPullParser.START_DOCUMENT:
+                        break;
+
+                    case XmlPullParser.START_TAG:
+                        if ("page".equals(xmlPullParser.getName())) {
+                            reviewReplyList.setTotalPage(Integer.valueOf(xmlPullParser.getAttributeValue(null, "num")));
+                        } else if ("item".equals(xmlPullParser.getName())) {
+                            String replyTimeStr = xmlPullParser.getAttributeValue(null, "timestamp");
+                            replyTime = new GregorianCalendar(
+                                    Integer.valueOf(replyTimeStr.substring(0, 4), 10),
+                                    Integer.valueOf(replyTimeStr.substring(4, 6), 10) - 1, // start from 0 - Calendar.JANUARY
+                                    Integer.valueOf(replyTimeStr.substring(6, 8), 10),
+                                    Integer.valueOf(replyTimeStr.substring(8, 10), 10),
+                                    Integer.valueOf(replyTimeStr.substring(10, 12), 10),
+                                    Integer.valueOf(replyTimeStr.substring(12), 10)
+                            ).getTime();
+                        } else if ("user".equals(xmlPullParser.getName())) {
+                            uid = Integer.valueOf(xmlPullParser.getAttributeValue(null, "uid"));
+                            userName = xmlPullParser.nextText();
+                        } else if ("content".equals(xmlPullParser.getName())) {
+                            content = xmlPullParser.nextText().trim();
+                        }
+                        break;
+
+                    case XmlPullParser.END_TAG:
+                        if ("item".equals(xmlPullParser.getName())) {
+                            reviewReplyList.getList().add(
+                                    new ReviewReplyList.ReviewReply(replyTime, userName, uid, content));
                         }
                         break;
                 }

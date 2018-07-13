@@ -63,6 +63,7 @@
     <string name="novel_item_author_with_colon">小說作者：</string>
     <string name="na">N/A</string>
     <string name="loading">loading…</string>
+    <string name="loading_done">全部加載完畢</string>
     <string name="novel_item_status_with_colon">連載狀態：</string>
     <string name="novel_item_update_with_colon">更新時間：</string>
     <string name="novel_item_intro_with_colon">內容簡介：</string>
@@ -71,8 +72,8 @@
     <string name="novel_item_fav_with_colon">總收藏量：</string>
     <string name="novel_item_cover">小說封面</string>
     <string name="list_loading">正在載入列表……</string>
-    <string name="system_press_again_to_exit"><b>退出請再撫摸壹下返回鍵哦～</b>\n&lt;(=～￣▽￣)→)￣▽￣=)>o </string>
-    <string name="system_network_error">連接服務器失敗！\n\n可能的原因有：\n手機網絡異常，試試瀏覽器訪問；\n運營商劫持（部分地區的10086）；\nWIFI切換到數據需等待域名解析緩存刷新（約10min）；\n服務器暫時無法響應請求；\n此時段請求服務器次數過多。</string>
+    <string name="system_press_again_to_exit">退出請再撫摸壹下返回鍵哦～\n&lt;(=～￣▽￣)→)￣▽￣=)>o</string>
+    <string name="system_network_error">連接服務器失敗！\n\n可能的原因有：\n登錄過期，請重新登錄；\n手機網絡異常，試試瀏覽器訪問；\n運營商劫持（部分地區的10086）；\nWIFI切換到數據需等待域名解析緩存刷新（約10min）；\n服務器暫時無法響應請求；\n此時段請求服務器次數過多。</string>
     <string name="system_parse_failed">數據解析失敗！\n\n可能的原因有：\n妳修改了存儲的數據；\n服務姬傲嬌了，試試瀏覽器訪問；\n程序內部錯誤，請反饋給開發者；</string>
     <string name="system_manually_cancelled">任務已被手動取消</string>
     <string name="system_loading_please_wait">加載中……請稍後再試</string>
@@ -97,9 +98,10 @@
     <string name="task_retry">點擊重新加載</string>
     <string name="task_null">沒有結果</string>
     <string name="dialog_title_choose_download_option">選擇執行的下載操作：</string>
+    <string name="dialog_title_choose_delete_option">選擇執行的刪除操作：</string>
     <string name="dialog_title_save_file_name">輸入保存的文件名（不要加.jpg）</string>
     <string name="dialog_title_found_file">目標文件已存在</string>
-    <string name="dialog_content_want_to_delete">要刪除這本書嗎？</string>
+    <string name="dialog_content_want_to_delete">要刪除這本書嗎？（緩存的小說內容也會刪除）</string>
     <string name="dialog_content_language_tip">緩存內容如何切換語言？\n書架可以下拉重新獲取繁體內容；已緩存的內容可以通過覆蓋下載獲取當前語言內容；</string>
     <string name="dialog_content_search_author">要查找所有該作者的書嗎？</string>
     <string name="dialog_content_delete_one_search_record">確定要刪除該搜索歷史嗎？\n</string>
@@ -119,6 +121,8 @@
     <string name="dialog_content_wipe_cache_fast">正在快速清理緩存……</string>
     <string name="dialog_content_wipe_cache_slow">正在仔細清理緩存……</string>
     <string name="dialog_sure_to_jump_chapter">確定要跳轉章節？</string>
+    <string name="dialog_sure_to_clear_cache">要清除緩存嗎？</string>
+    <string name="dialog_delete_book">刪除這本書</string>
     <string name="dialog_positive_ok">OK</string>
     <string name="dialog_positive_want">要</string>
     <string name="dialog_positive_sure">好滴~</string>
@@ -147,7 +151,7 @@
     <string name="login_login">登錄</string>
     <string name="login_register">註冊</string>
     <string name="login_logout">登出賬號</string>
-    <string name="press_twice_to_exit"><b>退出請再戳壹下返回鍵哦～</b>\n&lt;(=～￣▽￣)→)￣▽￣=)>o </string>
+    <string name="press_twice_to_exit">"<b>退出請再戳壹下返回鍵哦～</b> &lt;(=～￣▽￣)→)￣▽￣=)>o "</string>
     <string name="sorry">客官妳不要心急啊，妳急臣妾也做不到呀，現在代碼量已經比之前版本大很多了~請體諒。而且主框架搭的差不多了，後面邏輯快很多，壹有時間就好辦！</string>
     <string name="sorry_old_engine_no_image_preview">舊的引擎暫不可查看大圖</string>
     <string name="sorry_old_engine_preprocess">舊的引擎正在預處理</string>
@@ -192,7 +196,7 @@
     <string name="reader_find">查找內容</string>
     <string name="reader_config">閱讀器設置</string>
     <string name="reader_v1_notice">V1 引擎提示</string>
-    <string name="reader_jump_last">是否跳轉到上次閱讀記錄？</string>
+    <string name="reader_jump_last">是否跳轉到該章節？</string>
     <string name="reader_rotate">順時針旋轉90°</string>
     <string name="reader_download">保存圖片</string>
     <string name="reader_custom_background">自定義閱讀背景</string>
@@ -202,7 +206,31 @@
     <string name="reader_paragraph_distance">段落間距</string>
     <string name="reader_paragraph_edge_distance">段落邊距</string>
     <string name="reader_view_image_no_image">請在有圖的頁面點擊此按鈕看圖~</string>
+    <string name="reader_msg_no_saved_reading_progress">未發現保存的進度，可能是未讀或上次讀完了某卷~ 那麽，開始下一卷吧~</string>
+    <string name="reader_msg_no_available_chapter">內部錯誤！無法找到該章節！</string>
+    <string name="reader_msg_please_refresh_and_retry">請更新小說信息後再嘗試</string>
     <string name="app_description">MewX與輕小說文庫(Wenku8.com)合作的輕小說閱讀app。</string>
     <string name="missing_permission">由於歷史原因，缺少必要的權限時，app可能無法正常工作，請考慮授予相應權限</string>
     <string name="action_go_to_forum">進入評論區</string>
+    <string name="novel_item_latest_chapter">最新章節：</string>
+    <string name="action_review_list">評論區</string>
+    <string name="about_wenku8_com">輕小說文庫 (Wenku8.com)</string>
+    <string name="about_version_template">版本：%s (%d)</string>
+    <string name="about_project_homepage">項目主頁: https://wenku8.mewx.org</string>
+    <string name="about_no_duty">所有數據來自於互聯網，開發者、設計師、客服均與網站無任何關系，而且本項目完全免費，完整源代碼均開放，純憑興趣做的app，僅供大家學習安卓應用程序制作之法，如有侵犯您的權益，請務必郵件聯系，保證12小時內回復，app內會做屏蔽。</string>
+    <string name="about_software_arch">軟體架構</string>
+    <string name="about_mewx"><![CDATA[MewX <https://mewx.org>]]></string>
+    <string name="about_screen_design">界面設計</string>
+    <string name="about_zero"><![CDATA[ZERO <78283358@qq.com>]]></string>
+    <string name="about_acknowledgement">致謝</string>
+    <string name="about_seraphroy"><![CDATA[SeraphRoy <https://www.gaeblogx.com>]]></string>
+    <string name="action_create_new_review">發布評論</string>
+    <string name="action_create_new_review_reply">發表回復</string>
+    <string name="action_review_reply_list">評論回復區</string>
+    <string name="system_copied_to_clipboard">已復制：%s</string>
+    <string name="action_review_reply">回復</string>
+    <string name="system_containing_bad_word">包含敏感詞“%s”，請修改後重試！</string>
+    <string name="system_review_too_short">評論太短，請修改後重試！</string>
+    <string name="system_post_locked">帖子太久遠，無法回復</string>
+    <string name="system_api_error">接口出現問題，暫時無法開發也無法使用，需要等待站長修復</string>
 </resources>

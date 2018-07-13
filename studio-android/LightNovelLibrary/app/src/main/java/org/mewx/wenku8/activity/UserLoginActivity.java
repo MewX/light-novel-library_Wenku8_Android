@@ -112,13 +112,13 @@ public class UserLoginActivity extends AppCompatActivity {
                                 super.onPositive(dialog);
 
                                 // use default browser
-//                                Uri uri = Uri.parse(Wenku8API.RegisterURL);
+//                                Uri uri = Uri.parse(Wenku8API.REGISTER_URL);
 //                                Intent intent = new Intent(Intent.ACTION_VIEW, uri);
 //                                startActivity(intent);
 
                                 // show browser list
                                 Intent intent = new Intent(Intent.ACTION_VIEW);
-                                intent.setData(Uri.parse(Wenku8API.RegisterURL));
+                                intent.setData(Uri.parse(Wenku8API.REGISTER_URL));
                                 String title = getResources().getString(R.string.system_choose_browser);
                                 Intent chooser = Intent.createChooser(intent, title);
                                 startActivity(chooser);
@@ -165,7 +165,7 @@ public class UserLoginActivity extends AppCompatActivity {
             we = LightUserSession.doLoginFromGiven(params[0], params[1]);
             if(we == Wenku8Error.ErrorCode.SYSTEM_1_SUCCEEDED) {
                 // fetch avatar
-                byte[] b = LightNetwork.LightHttpPostConnection(Wenku8API.getBaseURL(), Wenku8API.getUserAvatar());
+                byte[] b = LightNetwork.LightHttpPostConnection(Wenku8API.BASE_URL, Wenku8API.getUserAvatar());
                 if(b == null) {
                     Bitmap bmp = BitmapFactory.decodeResource(getResources(), R.drawable.ic_noavatar);
                     ByteArrayOutputStream baos = new ByteArrayOutputStream();

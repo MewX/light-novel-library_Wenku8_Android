@@ -30,6 +30,9 @@
     <string name="action_novel_info">小说信息</string>
     <string name="action_continue_read_progress">继续上次阅读进度</string>
     <string name="action_chapter_list">章节列表</string>
+    <string name="action_review_list">评论区</string>
+    <string name="action_review_reply_list">评论回复区</string>
+    <string name="action_review_reply">回复</string>
     <string name="action_old_vertical_reader">旧引擎阅读界面</string>
     <string name="action_horizontal_reader_v1">V1阅读引擎</string>
     <string name="action_user_login">Wenku8账号登录</string>
@@ -64,16 +67,18 @@
     <string name="novel_item_author_with_colon">小说作者：</string>
     <string name="na">N/A</string>
     <string name="loading">loading…</string>
+    <string name="loading_done">全部加载完毕</string>
     <string name="novel_item_status_with_colon">连载状态：</string>
     <string name="novel_item_update_with_colon">更新时间：</string>
     <string name="novel_item_intro_with_colon">内容简介：</string>
     <string name="novel_item_hit_with_colon">总点击量：</string>
     <string name="novel_item_push_with_colon">总推荐量：</string>
     <string name="novel_item_fav_with_colon">总收藏量：</string>
+    <string name="novel_item_latest_chapter">最新章节：</string>
     <string name="novel_item_cover">小说封面</string>
     <string name="list_loading">正在载入列表……</string>
-    <string name="system_press_again_to_exit"><b>退出请再抚摸一下返回键哦～</b>\n&lt;(=～￣▽￣)→)￣▽￣=)>o </string>
-    <string name="system_network_error">连接服务器失败！\n\n可能的原因有：\n手机网络异常，试试浏览器访问；\n运营商劫持（部分地区的10086）；\nWIFI切换到数据需等待域名解析缓存刷新（约10min）；\n服务器暂时无法响应请求；\n此时段请求服务器次数过多。</string>
+    <string name="system_press_again_to_exit">退出请再抚摸一下返回键哦～\n&lt;(=～￣▽￣)→)￣▽￣=)>o</string>
+    <string name="system_network_error">连接服务器失败！\n\n可能的原因有：\n登录过期，请重新登录；\n手机网络异常，试试浏览器访问；\n运营商劫持（部分地区的10086）；\nWIFI切换到数据需等待域名解析缓存刷新（约10min）；\n服务器暂时无法响应请求；\n此时段请求服务器次数过多。</string>
     <string name="system_parse_failed">数据解析失败！\n\n可能的原因有：\n你修改了存储的数据；\n服务姬傲娇了，试试浏览器访问；\n程序内部错误，请反馈给开发者；</string>
     <string name="system_manually_cancelled">任务已被手动取消</string>
     <string name="system_loading_please_wait">加载中……请稍后再试</string>
@@ -94,14 +99,18 @@
     <string name="system_update_nonewifi">没有Wi-Fi，臣妾不敢轻举妄动</string>
     <string name="system_update_ignored">已忽略</string>
     <string name="system_choose_reader_engine">选择一个阅读界面引擎</string>
+    <string name="system_copied_to_clipboard">已复制：%s</string>
+    <string name="system_containing_bad_word">包含敏感词“%s”，请修改后重试！</string>
+    <string name="system_review_too_short">评论太短，请修改后重试！</string>
     <string name="missing_permission">由于历史原因，缺少必要的权限时，app可能无法正常工作，请考虑授予相应权限</string>
     <string name="task_stop">停止加载</string>
     <string name="task_retry">点击重新加载</string>
     <string name="task_null">没有结果</string>
     <string name="dialog_title_choose_download_option">选择执行的下载操作：</string>
+    <string name="dialog_title_choose_delete_option">选择执行的删除操作：</string>
     <string name="dialog_title_save_file_name">输入保存的文件名（不要加.jpg）</string>
     <string name="dialog_title_found_file">目标文件已存在</string>
-    <string name="dialog_content_want_to_delete">要删除这本书吗？</string>
+    <string name="dialog_content_want_to_delete">要删除这本书吗？（缓存的小说内容也会删除）</string>
     <string name="dialog_content_language_tip">缓存内容如何切换语言？\n书架可以下拉重新获取繁体内容；已缓存的内容可以通过覆盖下载获取当前语言内容；</string>
     <string name="dialog_content_search_author">要查找所有该作者的书吗？</string>
     <string name="dialog_content_delete_one_search_record">确定要删除该搜索历史吗？\n</string>
@@ -121,6 +130,8 @@
     <string name="dialog_content_wipe_cache_fast">正在快速清理缓存……</string>
     <string name="dialog_content_wipe_cache_slow">正在仔细清理缓存……</string>
     <string name="dialog_sure_to_jump_chapter">确定要跳转章节？</string>
+    <string name="dialog_sure_to_clear_cache">要清除缓存吗？</string>
+    <string name="dialog_delete_book">删除这本书</string>
     <string name="dialog_positive_ok">OK</string>
     <string name="dialog_positive_want">要</string>
     <string name="dialog_positive_sure">好滴~</string>
@@ -149,7 +160,7 @@
     <string name="login_login">登录</string>
     <string name="login_register">注册</string>
     <string name="login_logout">登出账号</string>
-    <string name="press_twice_to_exit"><b>退出请再戳一下返回键哦～</b>\n&lt;(=～￣▽￣)→)￣▽￣=)>o </string>
+    <string name="press_twice_to_exit">"<b>退出请再戳一下返回键哦～</b> &lt;(=～￣▽￣)→)￣▽￣=)>o "</string>
     <string name="sorry">客官你不要心急啊，你急臣妾也做不到呀，现在代码量已经比之前版本大很多了~请体谅。而且主框架搭的差不多了，后面逻辑快很多，一有时间就好办！</string>
     <string name="sorry_old_engine_no_image_preview">旧的引擎暂不可查看大图</string>
     <string name="sorry_old_engine_preprocess">旧的引擎正在预处理</string>
@@ -194,7 +205,7 @@
     <string name="reader_find">查找内容</string>
     <string name="reader_config">阅读器设置</string>
     <string name="reader_v1_notice">V1 引擎提示</string>
-    <string name="reader_jump_last">是否跳转到上次阅读记录？</string>
+    <string name="reader_jump_last">是否跳转到该章节？</string>
     <string name="reader_rotate">顺时针旋转90°</string>
     <string name="reader_download">保存图片</string>
     <string name="reader_custom_background">自定义阅读背景</string>
@@ -204,5 +215,22 @@
     <string name="reader_paragraph_distance">段落间距</string>
     <string name="reader_paragraph_edge_distance">段落边距</string>
     <string name="reader_view_image_no_image">请在有图的页面点击此按钮看图~</string>
+    <string name="reader_msg_no_saved_reading_progress">未发现保存的进度，可能是未读或上次读完了某卷~ 那么，开始下一卷吧~</string>
+    <string name="reader_msg_no_available_chapter">内部错误！无法找到该章节！</string>
+    <string name="reader_msg_please_refresh_and_retry">请更新小说信息后再尝试</string>
     <string name="action_go_to_forum">进入评论区</string>
+    <string name="about_wenku8_com">轻小说文库 (Wenku8.com)</string>
+    <string name="about_version_template">版本：%s (%d)</string>
+    <string name="about_project_homepage">项目主页: https://wenku8.mewx.org</string>
+    <string name="about_no_duty">所有数据来自于互联网，开发者、设计师、客服均与网站无任何关系，而且本项目完全免费，完整源代码均开放，纯凭兴趣做的app，仅供大家学习安卓应用程序制作之法，如有侵犯您的权益，请务必邮件联系，保证12小时内回复，app内会做屏蔽。</string>
+    <string name="about_software_arch">软件架构</string>
+    <string name="about_mewx"><![CDATA[MewX <https://mewx.org>]]></string>
+    <string name="about_screen_design">界面设计</string>
+    <string name="about_zero"><![CDATA[ZERO <78283358@qq.com>]]></string>
+    <string name="about_acknowledgement">致谢</string>
+    <string name="about_seraphroy"><![CDATA[SeraphRoy <https://www.gaeblogx.com>]]></string>
+    <string name="action_create_new_review">发布评论</string>
+    <string name="action_create_new_review_reply">发表回复</string>
+    <string name="system_post_locked">帖子太久远，无法回复</string>
+    <string name="system_api_error">接口出现问题，暂时无法开发也无法使用，需要等待站长修复</string>
 </resources>

@@ -15,7 +15,6 @@ import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
 import android.view.Menu;
 import android.view.MenuItem;
-import android.view.View;
 import android.widget.Toast;
 
 import com.nononsenseapps.filepicker.FilePickerActivity;
@@ -39,7 +38,7 @@ public class MenuBackgroundSelectorActivity extends AppCompatActivity {
         setContentView(R.layout.layout_menu_background_selector);
 
         // set indicator enable
-        Toolbar mToolbar = (Toolbar) findViewById(R.id.toolbar_actionbar);
+        Toolbar mToolbar = findViewById(R.id.toolbar_actionbar);
         setSupportActionBar(mToolbar);
         final Drawable upArrow = getResources().getDrawable(R.drawable.ic_svg_back);
         if(getSupportActionBar() != null && upArrow != null) {
@@ -66,40 +65,25 @@ public class MenuBackgroundSelectorActivity extends AppCompatActivity {
         }
 
         // listeners
-        findViewById(R.id.bg01).setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                GlobalConfig.setToAllSetting(GlobalConfig.SettingItems.menu_bg_id, "1");
-                MenuBackgroundSelectorActivity.this.finish();
-            }
+        findViewById(R.id.bg01).setOnClickListener(v -> {
+            GlobalConfig.setToAllSetting(GlobalConfig.SettingItems.menu_bg_id, "1");
+            MenuBackgroundSelectorActivity.this.finish();
         });
-        findViewById(R.id.bg02).setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                GlobalConfig.setToAllSetting(GlobalConfig.SettingItems.menu_bg_id, "2");
-                MenuBackgroundSelectorActivity.this.finish();
-            }
+        findViewById(R.id.bg02).setOnClickListener(v -> {
+            GlobalConfig.setToAllSetting(GlobalConfig.SettingItems.menu_bg_id, "2");
+            MenuBackgroundSelectorActivity.this.finish();
         });
-        findViewById(R.id.bg03).setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                GlobalConfig.setToAllSetting(GlobalConfig.SettingItems.menu_bg_id, "3");
-                MenuBackgroundSelectorActivity.this.finish();
-            }
+        findViewById(R.id.bg03).setOnClickListener(v -> {
+            GlobalConfig.setToAllSetting(GlobalConfig.SettingItems.menu_bg_id, "3");
+            MenuBackgroundSelectorActivity.this.finish();
         });
-        findViewById(R.id.bg04).setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                GlobalConfig.setToAllSetting(GlobalConfig.SettingItems.menu_bg_id, "4");
-                MenuBackgroundSelectorActivity.this.finish();
-            }
+        findViewById(R.id.bg04).setOnClickListener(v -> {
+            GlobalConfig.setToAllSetting(GlobalConfig.SettingItems.menu_bg_id, "4");
+            MenuBackgroundSelectorActivity.this.finish();
         });
-        findViewById(R.id.bg05).setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                GlobalConfig.setToAllSetting(GlobalConfig.SettingItems.menu_bg_id, "5");
-                MenuBackgroundSelectorActivity.this.finish();
-            }
+        findViewById(R.id.bg05).setOnClickListener(v -> {
+            GlobalConfig.setToAllSetting(GlobalConfig.SettingItems.menu_bg_id, "5");
+            MenuBackgroundSelectorActivity.this.finish();
         });
     }
 
@@ -174,7 +158,9 @@ public class MenuBackgroundSelectorActivity extends AppCompatActivity {
             } else {
                 Uri uri = data.getData();
                 // Do something with the URI
-                runSaveCustomMenuBackground(uri.toString().replaceAll("file://", ""));
+                if (uri != null) {
+                    runSaveCustomMenuBackground(uri.toString().replaceAll("file://", ""));
+                }
             }
         }
     }
@@ -182,7 +168,7 @@ public class MenuBackgroundSelectorActivity extends AppCompatActivity {
     private void runSaveCustomMenuBackground(String path) {
         BitmapFactory.Options options;
         try {
-            Bitmap bitmap = BitmapFactory.decodeFile(path);
+            BitmapFactory.decodeFile(path);
         } catch (OutOfMemoryError oome) {
             try {
                 options = new BitmapFactory.Options();

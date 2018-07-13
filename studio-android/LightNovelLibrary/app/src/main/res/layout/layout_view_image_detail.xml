@@ -18,7 +18,7 @@
             style="@style/ToolBarStyle"
             android:id="@+id/toolbar_actionbar"
             android:layout_width="match_parent"
-            android:layout_height="?attr/actionBarSize"
+            android:layout_height="?android:attr/actionBarSize"
             android:clickable="true"
             android:layout_alignParentTop="true"
             android:background="@color/reader_default_bg_toolbar" />

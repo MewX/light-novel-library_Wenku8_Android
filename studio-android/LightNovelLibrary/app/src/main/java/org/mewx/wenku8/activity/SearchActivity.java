@@ -37,7 +37,6 @@ import java.util.List;
 public class SearchActivity extends AppCompatActivity implements MyItemClickListener, MyItemLongClickListener {
 
     // private vars
-//    private LinearLayout searchContainer = null;
     private EditText toolbarSearchView = null;
     private SearchHistoryAdapter adapter = null;
     private List<String> historyList = null;
@@ -48,7 +47,6 @@ public class SearchActivity extends AppCompatActivity implements MyItemClickList
         setContentView(R.layout.layout_search);
 
         // bind views
-//        searchContainer = (LinearLayout)findViewById(R.id.search_container);
         toolbarSearchView = findViewById(R.id.search_view);
         View searchClearButton = findViewById(R.id.search_clear);
 
@@ -146,7 +144,6 @@ public class SearchActivity extends AppCompatActivity implements MyItemClickList
 
     @Override
     public void onItemClick(View view, final int position) {
-        //Toast.makeText(this,postion+"",Toast.LENGTH_SHORT).show();
         if(position < 0 || position >= historyList.size()) {
             // ArrayIndexOutOfBoundsException
             Toast.makeText(this, "ArrayIndexOutOfBoundsException: " + position + " in size " + historyList.size(), Toast.LENGTH_SHORT).show();
@@ -158,16 +155,11 @@ public class SearchActivity extends AppCompatActivity implements MyItemClickList
     }
 
     @Override
-    public void onItemLongClick(View view, final int postion) {
-        //Toast.makeText(this, postion + ": Long Click Detected", Toast.LENGTH_SHORT).show();
+    public void onItemLongClick(View view, final int position) {
         new MaterialDialog.Builder(this)
-                .callback(new MaterialDialog.ButtonCallback() {
-                    @Override
-                    public void onPositive(MaterialDialog dialog) {
-                        super.onPositive(dialog);
-                        GlobalConfig.deleteSearchHistory(historyList.get(postion));
-                        refreshHistoryList();
-                    }
+                .onPositive((ignored1, ignored2) -> {
+                    GlobalConfig.deleteSearchHistory(historyList.get(position));
+                    refreshHistoryList();
                 })
                 .theme(Theme.LIGHT)
                 .backgroundColorRes(R.color.dlgBackgroundColor)
@@ -175,7 +167,7 @@ public class SearchActivity extends AppCompatActivity implements MyItemClickList
                 .positiveColorRes(R.color.dlgPositiveButtonColor)
                 .negativeColorRes(R.color.dlgNegativeButtonColor)
                 .title(getResources().getString(R.string.dialog_content_delete_one_search_record))
-                .content(historyList.get(postion))
+                .content(historyList.get(position))
                 .contentGravity(GravityEnum.CENTER)
                 .positiveText(R.string.dialog_positive_likethis)
                 .negativeText(R.string.dialog_negative_preferno)

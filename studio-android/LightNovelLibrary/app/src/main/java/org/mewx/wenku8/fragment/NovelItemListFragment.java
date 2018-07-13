@@ -5,6 +5,7 @@ import android.content.Intent;
 import android.os.AsyncTask;
 import android.os.Build;
 import android.os.Bundle;
+import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.support.design.widget.Snackbar;
 import android.support.v4.app.ActivityCompat;
@@ -81,8 +82,7 @@ public class NovelItemListFragment extends Fragment implements MyItemClickListen
     }
 
     @Override
-    public View onCreateView(LayoutInflater inflater, ViewGroup container,
-                             Bundle savedInstanceState) {
+    public View onCreateView(@NonNull LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
         View rootView = inflater.inflate(R.layout.fragment_novel_item_list,container,false);
         rootView.setTag(type); // set TAG
 
@@ -96,28 +96,15 @@ public class NovelItemListFragment extends Fragment implements MyItemClickListen
         mLayoutManager = new LinearLayoutManager(getActivity());
         mLayoutManager.setOrientation(LinearLayoutManager.VERTICAL);
         mRecyclerView = null;
-        mRecyclerView = (RecyclerView) rootView.findViewById(R.id.novel_item_list);
+        mRecyclerView = rootView.findViewById(R.id.novel_item_list);
         mRecyclerView.setHasFixedSize(false); // set variable size
         mRecyclerView.setItemAnimator(new DefaultItemAnimator());
         mRecyclerView.setLayoutManager(mLayoutManager);
-        mRecyclerView.setAdapter(new RecyclerView.Adapter() {
-            @Override
-            public RecyclerView.ViewHolder onCreateViewHolder(ViewGroup parent, int viewType) {
-                return null;
-            }
-            @Override
-            public void onBindViewHolder(RecyclerView.ViewHolder holder, int position) {
-            }
-            @Override
-            public int getItemCount() {
-                return 0;
-            }
-        });
 
         // List request
         if(type.equals(searchType)) {
             // update UI
-            spb = (SmoothProgressBar) getActivity().findViewById(R.id.spb);
+            spb = getActivity().findViewById(R.id.spb);
             spb.progressiveStart();
 
             // excute task
@@ -168,7 +155,7 @@ public class NovelItemListFragment extends Fragment implements MyItemClickListen
     }
 
     @Override
-    public void onItemLongClick(View view, int postion) {
+    public void onItemLongClick(View view, int position) {
         // empty
     }
 
@@ -176,7 +163,7 @@ public class NovelItemListFragment extends Fragment implements MyItemClickListen
         int toolbarMarginOffset = 0;
 
         @Override
-        public void onScrolled(RecyclerView recyclerView, int dx, int dy) {
+        public void onScrolled(@NonNull RecyclerView recyclerView, int dx, int dy) {
             super.onScrolled(recyclerView, dx, dy);
 
             toolbarMarginOffset += dy;
@@ -214,7 +201,6 @@ public class NovelItemListFragment extends Fragment implements MyItemClickListen
             mAdapter.setOnItemLongClickListener(this);
         }
         mAdapter.RefreshDataset(listNovelItemInfo);
-        //mAdapter = new NovelItemAdapterUpdate(listNovelItemInfo);
 
         if(currentPage == 1 && mRecyclerView != null) {
             mRecyclerView.setAdapter(mAdapter);
@@ -232,7 +218,7 @@ public class NovelItemListFragment extends Fragment implements MyItemClickListen
 
     private class MyOnScrollListener extends RecyclerView.OnScrollListener {
         @Override
-        public void onScrolled(RecyclerView recyclerView, int dx, int dy) {
+        public void onScrolled(@NonNull RecyclerView recyclerView, int dx, int dy) {
             super.onScrolled(recyclerView, dx, dy);
 
             int pastVisiblesItems, visibleItemCount, totalItemCount;
@@ -267,10 +253,10 @@ public class NovelItemListFragment extends Fragment implements MyItemClickListen
 
             // params[0] is current page number
             ContentValues cv = Wenku8API.getNovelList(Wenku8API.getNOVELSORTBY(type), currentPage);
-            byte[] temp = LightNetwork.LightHttpPostConnection( Wenku8API.getBaseURL(), cv);
+            byte[] temp = LightNetwork.LightHttpPostConnection( Wenku8API.BASE_URL, cv);
             if(temp == null) return -1;
             try {
-                tempNovelList = Wenku8Parser.parseNovelItemList(new String(temp, "UTF-8"), currentPage);
+                tempNovelList = Wenku8Parser.parseNovelItemList(new String(temp, "UTF-8"));
             }
             catch (UnsupportedEncodingException e) {
                 e.printStackTrace();
@@ -303,12 +289,6 @@ public class NovelItemListFragment extends Fragment implements MyItemClickListen
             appendToIdList(tempNovelList);
             tempNovelList = null;
 
-//            if(listNovelItemAid==null)
-//                listNovelItemAid = new ArrayList<>();
-//            listNovelItemAid.addAll(tempNovelList);
-            // refresh listif ((View) mainActivity.findViewById(R.id.list_loading) != null)
-            //((View) mainActivity.findViewById(R.id.list_loading)).setVisibility(View.GONE);
-
             refreshIdList();
             isLoading = false;
             super.onPostExecute(integer);
@@ -322,7 +302,7 @@ public class NovelItemListFragment extends Fragment implements MyItemClickListen
 
             // get search result by novel title
             ContentValues cv = Wenku8API.searchNovelByNovelName(params[0], GlobalConfig.getCurrentLang());
-            byte[] tempListTitle = LightNetwork.LightHttpPostConnection(Wenku8API.getBaseURL(), cv);
+            byte[] tempListTitle = LightNetwork.LightHttpPostConnection(Wenku8API.BASE_URL, cv);
             if(tempListTitle == null) return -1;
 
             // purify returned data
@@ -339,7 +319,7 @@ public class NovelItemListFragment extends Fragment implements MyItemClickListen
 
             // get search result by author name
             cv = Wenku8API.searchNovelByAuthorName(params[0], GlobalConfig.getCurrentLang());
-            byte[] tempListName = LightNetwork.LightHttpPostConnection(Wenku8API.getBaseURL(), cv);
+            byte[] tempListName = LightNetwork.LightHttpPostConnection(Wenku8API.BASE_URL, cv);
             if(tempListName == null) return -1;
 
             // purify returned data

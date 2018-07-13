@@ -1,7 +1,5 @@
 package org.mewx.wenku8.activity;
 
-import android.content.pm.PackageInfo;
-import android.content.pm.PackageManager;
 import android.graphics.PorterDuff;
 import android.graphics.drawable.Drawable;
 import android.os.Build;
@@ -14,6 +12,7 @@ import android.widget.TextView;
 import com.readystatesoftware.systembartint.SystemBarTintManager;
 import com.umeng.analytics.MobclickAgent;
 
+import org.mewx.wenku8.BuildConfig;
 import org.mewx.wenku8.R;
 
 /**
@@ -27,7 +26,7 @@ public class AboutActivity extends AppCompatActivity {
         setContentView(R.layout.layout_about);
 
         // set indicator enable
-        Toolbar mToolbar = (Toolbar) findViewById(R.id.toolbar_actionbar);
+        Toolbar mToolbar = findViewById(R.id.toolbar_actionbar);
         setSupportActionBar(mToolbar);
         final Drawable upArrow = getResources().getDrawable(R.drawable.ic_svg_back);
         if(getSupportActionBar() != null && upArrow != null) {
@@ -54,15 +53,8 @@ public class AboutActivity extends AppCompatActivity {
         }
 
         // get version code
-        PackageManager manager;
-        PackageInfo info;
-        manager = this.getPackageManager();
-        try {
-            info = manager.getPackageInfo(this.getPackageName(), 0);
-            ((TextView) findViewById(R.id.app_version)).setText("Version: " + info.versionName + " (" + info.versionCode + ")");
-        } catch (PackageManager.NameNotFoundException e) {
-            e.printStackTrace();
-        }
+        TextView tvVersion = findViewById(R.id.app_version);
+        tvVersion.setText(String.format(getResources().getString(R.string.about_version_template), BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE));
     }
 
     @Override

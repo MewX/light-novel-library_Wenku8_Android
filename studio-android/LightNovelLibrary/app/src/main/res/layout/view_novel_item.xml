@@ -16,9 +16,6 @@
         card-view:cardPreventCornerOverlap="true"
         card-view:cardUseCompatPadding="true"
         card-view:cardMaxElevation="2dp">
-        <!-- This part write in code, not here -->
-        <!--android:foreground="@drawable/ribbon_local_only"-->
-        <!--android:foregroundGravity="right|bottom"-->
 
         <LinearLayout
             android:id="@+id/item_card"
@@ -66,6 +63,7 @@
                         android:layout_height="wrap_content"
                         android:layout_weight="1" >
 
+                        <!--Use as short_intro or latest_chapter-->
                         <TextView
                             android:id="@+id/novel_item_text_author"
                             android:layout_width="wrap_content"
@@ -179,12 +177,13 @@
                     android:id="@+id/novel_option"
                     android:layout_width="32dp"
                     android:layout_height="32dp"
-                    android:src="@drawable/ic_clearcache"
+                    android:src="@drawable/ic_option"
                     android:background="@drawable/btn_menu_item_boardless"
                     android:clickable="true"
                     android:layout_alignParentTop="true"
                     android:layout_alignParentRight="true"
-                    android:layout_alignParentEnd="true" />
+                    android:layout_alignParentEnd="true"
+                    android:focusable="true" />
             </RelativeLayout>
         </LinearLayout>
     </android.support.v7.widget.CardView>

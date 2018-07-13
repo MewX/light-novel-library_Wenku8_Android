@@ -9,12 +9,10 @@ import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
 import android.view.LayoutInflater;
 import android.view.MenuItem;
-import android.view.View;
 import android.widget.LinearLayout;
 import android.widget.RelativeLayout;
 import android.widget.TextView;
 
-import com.afollestad.materialdialogs.GravityEnum;
 import com.afollestad.materialdialogs.MaterialDialog;
 import com.afollestad.materialdialogs.Theme;
 import com.readystatesoftware.systembartint.SystemBarTintManager;
@@ -90,169 +88,65 @@ public class NovelChapterActivity extends AppCompatActivity {
 
             TextView tv = rl.findViewById(R.id.chapter_title);
             tv.setText(ci.chapterName);
-            rl.findViewById(R.id.chapter_btn).setOnClickListener(new View.OnClickListener() {
-                @Override
-                public void onClick(View v) {
-                    // test does file exist
-                    if (from.equals(FromLocal) &&
-                            !LightCache.testFileExist(GlobalConfig.getFirstStoragePath()
-                                    + GlobalConfig.saveFolderName + File.separator + "novel" + File.separator + ci.cid + ".xml") &&
-                            !LightCache.testFileExist(GlobalConfig.getSecondStoragePath()
-                                    + GlobalConfig.saveFolderName + File.separator + "novel" + File.separator + ci.cid + ".xml")) {
-                        // local file not download, ask to download an read or cancel
-                        new MaterialDialog.Builder(NovelChapterActivity.this)
-                                .callback(new MaterialDialog.ButtonCallback() {
-                                    @Override
-                                    public void onPositive(MaterialDialog dialog) {
-                                        super.onPositive(dialog);
+            rl.findViewById(R.id.chapter_btn).setOnClickListener(ignored -> {
+                // jump to reader activity
+                Intent intent = new Intent(NovelChapterActivity.this, Wenku8ReaderActivityV1.class);
+                intent.putExtra("aid", aid);
+                intent.putExtra("volume", volumeList);
+                intent.putExtra("cid", ci.cid);
 
-                                        // jump to reader activity
-                                        Intent intent = new Intent(NovelChapterActivity.this, Wenku8ReaderActivityV1.class); //VerticalReaderActivity.class);
-                                        intent.putExtra("aid", aid);
-                                        intent.putExtra("volume", volumeList);
-                                        intent.putExtra("cid", ci.cid);
-                                        intent.putExtra("from", "cloud"); // from cloud
-                                        startActivity(intent);
-                                        overridePendingTransition(R.anim.fade_in, R.anim.hold); // fade in animation
-                                    }
-                                })
-                                .theme(Theme.LIGHT)
-                                .backgroundColorRes(R.color.dlgBackgroundColor)
-                                .contentColorRes(R.color.dlgContentColor)
-                                .positiveColorRes(R.color.dlgPositiveButtonColor)
-                                .negativeColorRes(R.color.dlgNegativeButtonColor)
-                                .content(getResources().getString(R.string.dialog_content_load_from_cloud))
-                                .contentGravity(GravityEnum.CENTER)
-                                .positiveText(R.string.dialog_positive_likethis)
-                                .negativeText(R.string.dialog_negative_preferno)
-                                .show();
-                        return;
-                    }
-
-                    // jump to reader activity
-                    Intent intent = new Intent(NovelChapterActivity.this, Wenku8ReaderActivityV1.class); //VerticalReaderActivity.class);
-                    intent.putExtra("aid", aid);
-                    intent.putExtra("volume", volumeList);
-                    intent.putExtra("cid", ci.cid);
+                // test does file exist
+                if (from.equals(FromLocal)
+                        && !LightCache.testFileExist(GlobalConfig.getFirstStoragePath() + GlobalConfig.saveFolderName + File.separator + "novel" + File.separator + ci.cid + ".xml")
+                        && !LightCache.testFileExist(GlobalConfig.getSecondStoragePath() + GlobalConfig.saveFolderName + File.separator + "novel" + File.separator + ci.cid + ".xml")) {
+                    intent.putExtra("from", "cloud"); // from cloud
+                }
+                else {
                     intent.putExtra("from", from); // from "fav"
-                    startActivity(intent);
-                    overridePendingTransition(R.anim.fade_in, R.anim.hold); // fade in animation
                 }
+
+                startActivity(intent);
+                overridePendingTransition(R.anim.fade_in, R.anim.hold); // fade in animation
             });
-            rl.findViewById(R.id.chapter_btn).setOnLongClickListener(new View.OnLongClickListener() {
-                @Override
-                public boolean onLongClick(View v) {
-                    new MaterialDialog.Builder(NovelChapterActivity.this)
-                            .theme(Theme.LIGHT)
-                            .title(R.string.system_choose_reader_engine)
-                            .items(R.array.reader_engine_option)
-                            .itemsCallback(new MaterialDialog.ListCallback() {
-                                @Override
-                                public void onSelection(MaterialDialog dialog, View view, int which, CharSequence text) {
-                                    switch (which) {
-                                        case 0:
-                                            // V1
-                                            // test does file exist
-                                            if (from.equals(FromLocal) &&
-                                                    !LightCache.testFileExist(GlobalConfig.getFirstStoragePath()
-                                                            + GlobalConfig.saveFolderName + File.separator + "novel" + File.separator + ci.cid + ".xml") &&
-                                                    !LightCache.testFileExist(GlobalConfig.getSecondStoragePath()
-                                                            + GlobalConfig.saveFolderName + File.separator + "novel" + File.separator + ci.cid + ".xml")) {
-                                                // local file not download, ask to download an read or cancel
-                                                new MaterialDialog.Builder(NovelChapterActivity.this)
-                                                        .callback(new MaterialDialog.ButtonCallback() {
-                                                            @Override
-                                                            public void onPositive(MaterialDialog dialog) {
-                                                                super.onPositive(dialog);
+            rl.findViewById(R.id.chapter_btn).setOnLongClickListener(ignored -> {
+                new MaterialDialog.Builder(NovelChapterActivity.this)
+                        .theme(Theme.LIGHT)
+                        .title(R.string.system_choose_reader_engine)
+                        .items(R.array.reader_engine_option)
+                        .itemsCallback((ignored1, ignored2, which, ignored3) -> {
+                            Class readerClass = Wenku8ReaderActivityV1.class;
+                            switch (which) {
+                                case 0:
+                                    // V1
+                                    readerClass = Wenku8ReaderActivityV1.class;
+                                    break;
 
-                                                                // jump to reader activity
-                                                                Intent intent = new Intent(NovelChapterActivity.this, Wenku8ReaderActivityV1.class); //VerticalReaderActivity.class);
-                                                                intent.putExtra("aid", aid);
-                                                                intent.putExtra("volume", volumeList);
-                                                                intent.putExtra("cid", ci.cid);
-                                                                intent.putExtra("from", "cloud"); // from cloud
-                                                                startActivity(intent);
-                                                                overridePendingTransition(R.anim.fade_in, R.anim.hold); // fade in animation
-                                                            }
-                                                        })
-                                                        .theme(Theme.LIGHT)
-                                                        .backgroundColorRes(R.color.dlgBackgroundColor)
-                                                        .contentColorRes(R.color.dlgContentColor)
-                                                        .positiveColorRes(R.color.dlgPositiveButtonColor)
-                                                        .negativeColorRes(R.color.dlgNegativeButtonColor)
-                                                        .content(getResources().getString(R.string.dialog_content_load_from_cloud))
-                                                        .contentGravity(GravityEnum.CENTER)
-                                                        .positiveText(R.string.dialog_positive_likethis)
-                                                        .negativeText(R.string.dialog_negative_preferno)
-                                                        .show();
-                                                return;
-                                            }
-                                            else {
-                                                // jump to reader activity
-                                                Intent intent = new Intent(NovelChapterActivity.this, Wenku8ReaderActivityV1.class); //VerticalReaderActivity.class);
-                                                intent.putExtra("aid", aid);
-                                                intent.putExtra("volume", volumeList);
-                                                intent.putExtra("cid", ci.cid);
-                                                intent.putExtra("from", from); // from "fav"
-                                                startActivity(intent);
-                                                overridePendingTransition(R.anim.fade_in, R.anim.hold); // fade in animation
-                                            }
-                                            break;
+                                case 1:
+                                    // old
+                                    readerClass = VerticalReaderActivity.class;
+                                    break;
+                            }
 
-                                        case 1:
-                                            // old
-                                            // test does file exist
-                                            if (from.equals(FromLocal) &&
-                                                    !LightCache.testFileExist(GlobalConfig.getFirstStoragePath()
-                                                            + GlobalConfig.saveFolderName + File.separator + "novel" + File.separator + ci.cid + ".xml") &&
-                                                    !LightCache.testFileExist(GlobalConfig.getSecondStoragePath()
-                                                            + GlobalConfig.saveFolderName + File.separator + "novel" + File.separator + ci.cid + ".xml")) {
-                                                // local file not download, ask to download an read or cancel
-                                                new MaterialDialog.Builder(NovelChapterActivity.this)
-                                                        .callback(new MaterialDialog.ButtonCallback() {
-                                                            @Override
-                                                            public void onPositive(MaterialDialog dialog) {
-                                                                super.onPositive(dialog);
+                            Intent intent = new Intent(NovelChapterActivity.this, readerClass);
+                            intent.putExtra("aid", aid);
+                            intent.putExtra("volume", volumeList);
+                            intent.putExtra("cid", ci.cid);
 
-                                                                // jump to reader activity
-                                                                Intent intent = new Intent(NovelChapterActivity.this, VerticalReaderActivity.class);
-                                                                intent.putExtra("aid", aid);
-                                                                intent.putExtra("volume", volumeList);
-                                                                intent.putExtra("cid", ci.cid);
-                                                                intent.putExtra("from", "cloud"); // from cloud
-                                                                startActivity(intent);
-                                                                overridePendingTransition(R.anim.fade_in, R.anim.hold); // fade in animation
-                                                            }
-                                                        })
-                                                        .theme(Theme.LIGHT)
-                                                        .backgroundColorRes(R.color.dlgBackgroundColor)
-                                                        .contentColorRes(R.color.dlgContentColor)
-                                                        .positiveColorRes(R.color.dlgPositiveButtonColor)
-                                                        .negativeColorRes(R.color.dlgNegativeButtonColor)
-                                                        .content(getResources().getString(R.string.dialog_content_load_from_cloud))
-                                                        .contentGravity(GravityEnum.CENTER)
-                                                        .positiveText(R.string.dialog_positive_likethis)
-                                                        .negativeText(R.string.dialog_negative_preferno)
-                                                        .show();
-                                                return;
-                                            }
-                                            else {
-                                                // jump to reader activity
-                                                Intent intent = new Intent(NovelChapterActivity.this, VerticalReaderActivity.class);
-                                                intent.putExtra("aid", aid);
-                                                intent.putExtra("volume", volumeList);
-                                                intent.putExtra("cid", ci.cid);
-                                                intent.putExtra("from", from); // from "fav"
-                                                startActivity(intent);
-                                                overridePendingTransition(R.anim.fade_in, R.anim.hold); // fade in animation
-                                            }
-                                            break;
-                                    }
-                                }
-                            })
-                            .show();
-                    return true;
-                }
+                            // test does file exist
+                            if (from.equals(FromLocal)
+                                    && !LightCache.testFileExist(GlobalConfig.getFirstStoragePath() + GlobalConfig.saveFolderName + File.separator + "novel" + File.separator + ci.cid + ".xml")
+                                    && !LightCache.testFileExist(GlobalConfig.getSecondStoragePath() + GlobalConfig.saveFolderName + File.separator + "novel" + File.separator + ci.cid + ".xml")) {
+                                // jump to reader activity
+                                intent.putExtra("from", "cloud"); // from cloud
+                            } else {
+                                intent.putExtra("from", from); // from "fav"
+                            }
+
+                            startActivity(intent);
+                            overridePendingTransition(R.anim.fade_in, R.anim.hold); // fade in animation
+                        })
+                        .show();
+                return true;
             });
 
             // add to scroll view

@@ -28,6 +28,7 @@ import com.readystatesoftware.systembartint.SystemBarTintManager;
 import com.umeng.analytics.MobclickAgent;
 import com.umeng.commonsdk.UMConfigure;
 
+import org.mewx.wenku8.BuildConfig;
 import org.mewx.wenku8.MyApp;
 import org.mewx.wenku8.R;
 import org.mewx.wenku8.fragment.NavigationDrawerFragment;
@@ -155,7 +156,7 @@ public class MainActivity extends AppCompatActivity {
         // getSupportActionBar().setDisplayShowHomeEnabled(true);
 
         // set Tool button
-        mNavigationDrawerFragment = (NavigationDrawerFragment) getFragmentManager().findFragmentById(R.id.fragment_drawer);
+        mNavigationDrawerFragment = (NavigationDrawerFragment) getSupportFragmentManager().findFragmentById(R.id.fragment_drawer);
         mNavigationDrawerFragment.setup(R.id.fragment_drawer, findViewById(R.id.drawer), mToolbar);
 
         // find search box
@@ -267,9 +268,8 @@ public class MainActivity extends AppCompatActivity {
         MobclickAgent.onResume(this);
 
         // load only the first time this activity is created
-        if (!NEW_VERSION_CHECKED.get()) {
-            NEW_VERSION_CHECKED.set(true);
-            new ArgsInitializer(MainActivity.this).execute();
+        if (!NEW_VERSION_CHECKED.getAndSet(true)) {
+            if (!NEW_VERSION_CHECKED.get()) new ArgsInitializer(MainActivity.this).execute();
         }
     }
 
@@ -378,31 +378,23 @@ public class MainActivity extends AppCompatActivity {
             if (context == null) return;
 
             // check whether there's new version
-            try {
-                int current = context.getPackageManager().getPackageInfo(context.getPackageName(), 0).versionCode;
-                Log.d("MewX", "current version code: " + current);
-                if (current < newVersionCode) {
-                    // update to new version
-                    new MaterialDialog.Builder(context)
-                            .theme(Theme.LIGHT)
-                            .title(R.string.system_update_found_new)
-                            .content(R.string.system_update_jump_to_page)
-                            .positiveText(R.string.dialog_positive_sure)
-                            .negativeText(R.string.dialog_negative_no)
-                            .negativeColorRes(R.color.menu_text_color)
-                            .callback(new MaterialDialog.ButtonCallback() {
-                                @Override
-                                public void onPositive(MaterialDialog dialog) {
-                                    super.onPositive(dialog);
-                                    Intent browserIntent = new Intent(Intent.ACTION_VIEW, Uri.parse(GlobalConfig.blogPageUrl));
-                                    context.startActivity(browserIntent);
-                                }
-                            })
-                            .show();
+            int current = BuildConfig.VERSION_CODE;
+            Log.d("MewX", "current version code: " + current);
+            if (current < newVersionCode) {
+                // update to new version
+                new MaterialDialog.Builder(context)
+                        .theme(Theme.LIGHT)
+                        .title(R.string.system_update_found_new)
+                        .content(R.string.system_update_jump_to_page)
+                        .positiveText(R.string.dialog_positive_sure)
+                        .negativeText(R.string.dialog_negative_no)
+                        .negativeColorRes(R.color.menu_text_color)
+                        .onPositive((dialog, which) -> {
+                            Intent browserIntent = new Intent(Intent.ACTION_VIEW, Uri.parse(GlobalConfig.blogPageUrl));
+                            context.startActivity(browserIntent);
+                        })
+                        .show();
 
-                }
-            } catch (PackageManager.NameNotFoundException e) {
-                e.printStackTrace();
             }
         }
     }

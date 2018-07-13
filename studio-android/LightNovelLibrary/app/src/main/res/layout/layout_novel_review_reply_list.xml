@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/myPrimaryColor"
+    android:fitsSystemWindows="true">
+
+    <include layout="@layout/toolbar_pure" />
+
+    <android.support.v4.widget.SwipeRefreshLayout
+        android:id="@+id/swipe_refresh_layout"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_above="@id/review_reply_edit_layout"
+        android:layout_below="@id/toolbar_actionbar"
+        android:background="@color/myWindowBackground">
+
+        <!-- Review List -->
+        <android.support.v7.widget.RecyclerView
+            android:id="@+id/review_item_list"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:scrollbars="vertical" />
+    </android.support.v4.widget.SwipeRefreshLayout>
+
+    <!-- edit text + send button -->
+    <RelativeLayout
+        android:id="@+id/review_reply_edit_layout"
+        android:layout_width="match_parent"
+        android:layout_height="?android:attr/actionBarSize"
+        android:layout_alignParentBottom="true"
+        android:background="@color/default_mask_background_white"
+        android:visibility="visible">
+
+        <!--FIXME: enable me-->
+        <EditText
+            android:id="@+id/review_reply_edit_text"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_alignParentBottom="true"
+            android:layout_alignParentLeft="true"
+            android:layout_alignParentStart="true"
+            android:layout_toLeftOf="@id/review_reply_send"
+            android:layout_toStartOf="@id/review_reply_send"
+            android:enabled="false"
+            android:hint="@string/action_review_reply"
+            android:inputType="textMultiLine"
+            android:padding="16dp"
+            android:scrollbars="vertical"
+            android:textColor="@color/default_text_color_black" />
+
+        <LinearLayout
+            android:id="@+id/review_reply_send"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:layout_alignParentBottom="true"
+            android:layout_alignParentEnd="true"
+            android:layout_alignParentRight="true"
+            android:layout_centerInParent="true"
+            android:background="@drawable/btn_menu_item_boardless"
+            android:clickable="true"
+            android:focusable="true"
+            android:padding="8dp">
+
+            <ImageView
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:src="@drawable/ic_svg_send" />
+        </LinearLayout>
+    </RelativeLayout>
+
+    <!-- Loading Frame -->
+    <LinearLayout
+        android:id="@+id/list_loading"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@color/myWindowBackground"
+        android:clickable="true"
+        android:focusable="true"
+        android:gravity="center"
+        android:orientation="vertical"
+        android:visibility="visible">
+
+        <!-- If loading failed, update this loading-status info -->
+        <TextView
+            android:id="@+id/list_loading_status"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/list_loading"
+            android:textColor="@color/default_text_color_black" />
+
+        <TextView
+            android:id="@+id/btn_loading"
+            android:layout_width="match_parent"
+            android:layout_height="60dp"
+            android:layout_marginTop="20dp"
+            android:background="@drawable/btn_menu_item"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center"
+            android:text="@string/task_retry"
+            android:textColor="@color/default_text_color_black"
+            android:visibility="gone" />
+
+    </LinearLayout>
+</RelativeLayout>
