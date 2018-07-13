@@ -299,4 +299,63 @@ public class Wenku8Parser {
             e.printStackTrace();
         }
     }
+
+    /**
+     * save the new xsl into an existing review reply list
+     * @param reviewReplyList the existing review reply list object
+     * @param xml the fetched xml
+     */
+    static public void parseReviewReplyList(ReviewReplyList reviewReplyList, String xml) {
+        reviewReplyList.setCurrentPage(reviewReplyList.getCurrentPage() + 1);
+
+        try {
+            XmlPullParserFactory factory = XmlPullParserFactory.newInstance();
+            XmlPullParser xmlPullParser = factory.newPullParser();
+            xmlPullParser.setInput(new StringReader(xml));
+            int eventType = xmlPullParser.getEventType();
+
+            Date replyTime = new Date();
+            String userName = "";
+            int uid = 0; // post user
+            String content = "";
+
+            while (eventType != XmlPullParser.END_DOCUMENT) {
+                switch (eventType) {
+                    case XmlPullParser.START_DOCUMENT:
+                        break;
+
+                    case XmlPullParser.START_TAG:
+                        if ("page".equals(xmlPullParser.getName())) {
+                            reviewReplyList.setTotalPage(Integer.valueOf(xmlPullParser.getAttributeValue(null, "num")));
+                        } else if ("item".equals(xmlPullParser.getName())) {
+                            String replyTimeStr = xmlPullParser.getAttributeValue(null, "timestamp");
+                            replyTime = new GregorianCalendar(
+                                    Integer.valueOf(replyTimeStr.substring(0, 4), 10),
+                                    Integer.valueOf(replyTimeStr.substring(4, 6), 10) - 1, // start from 0 - Calendar.JANUARY
+                                    Integer.valueOf(replyTimeStr.substring(6, 8), 10),
+                                    Integer.valueOf(replyTimeStr.substring(8, 10), 10),
+                                    Integer.valueOf(replyTimeStr.substring(10, 12), 10),
+                                    Integer.valueOf(replyTimeStr.substring(12), 10)
+                            ).getTime();
+                        } else if ("user".equals(xmlPullParser.getName())) {
+                            uid = Integer.valueOf(xmlPullParser.getAttributeValue(null, "uid"));
+                            userName = xmlPullParser.nextText();
+                        } else if ("content".equals(xmlPullParser.getName())) {
+                            content = xmlPullParser.nextText();
+                        }
+                        break;
+
+                    case XmlPullParser.END_TAG:
+                        if ("item".equals(xmlPullParser.getName())) {
+                            reviewReplyList.getList().add(
+                                    new ReviewReplyList.ReviewReply(replyTime, userName, uid, content));
+                        }
+                        break;
+                }
+                eventType = xmlPullParser.next();
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
 }

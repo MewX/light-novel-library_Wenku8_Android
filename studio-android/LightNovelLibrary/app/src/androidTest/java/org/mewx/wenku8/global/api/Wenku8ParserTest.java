@@ -26,6 +26,21 @@ public class Wenku8ParserTest {
             "\n" +
             "</metadata>";
 
+    private final String REVIEW_REPLY_LIST_XML = "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n" +
+            "<metadata>\n" +
+            "<page num='2'/>\n" +
+            "<item timestamp='20180713101811'>\n" +
+            "<user uid='233516'><![CDATA[a1b2c3d4]]></user>\n" +
+            "<content><![CDATA[嗯…………至少是一樓發完]]></content>\n" +
+            "</item>\n" +
+            "\n" +
+            "<item timestamp='20180713135735'>\n" +
+            "<user uid='230041'><![CDATA[156126]]></user>\n" +
+            "<content><![CDATA[滑稽✧(`ῧ′)机智]]></content>\n" +
+            "</item>\n" +
+            "\n" +
+            "</metadata>";
+
     // TODO: more tests
 
     @Test
@@ -129,5 +144,83 @@ public class Wenku8ParserTest {
         Assert.assertEquals(review.getUid(), 34925);
         Assert.assertEquals(review.getUserName(), "冒险奏鸣");
         Assert.assertEquals(review.getTitle(), "有种神曲奏界的既视感");
+    }
+
+    @Test
+    public void testParseReviewReplyList() {
+        ReviewReplyList reviewReplyList = new ReviewReplyList();
+        Wenku8Parser.parseReviewReplyList(reviewReplyList, REVIEW_REPLY_LIST_XML);
+
+        Assert.assertEquals(reviewReplyList.getTotalPage(), 2);
+        Assert.assertEquals(reviewReplyList.getCurrentPage(), 1);
+        Assert.assertEquals(reviewReplyList.getList().size(), 2);
+
+        ReviewReplyList.ReviewReply reviewReply = reviewReplyList.getList().get(0);
+        Assert.assertEquals(reviewReply.getReplyTime().getTime(),
+                new GregorianCalendar(2018, Calendar.JULY, 13, 10, 18, 11).getTime().getTime());
+        Assert.assertEquals(reviewReply.getUid(), 233516);
+        Assert.assertEquals(reviewReply.getUserName(), "a1b2c3d4");
+        Assert.assertEquals(reviewReply.getContent(), "嗯…………至少是一樓發完");
+
+        reviewReply = reviewReplyList.getList().get(1);
+        Assert.assertEquals(reviewReply.getReplyTime().getTime(),
+                new GregorianCalendar(2018, Calendar.JULY, 13, 13, 57, 35).getTime().getTime());
+        Assert.assertEquals(reviewReply.getUid(), 230041);
+        Assert.assertEquals(reviewReply.getUserName(), "156126");
+        Assert.assertEquals(reviewReply.getContent(), "滑稽✧(`ῧ′)机智");
+    }
+
+    @Test
+    public void testParseReviewReplyListPage2() {
+        final String REVIEW_REPLY_LIST_XML_PAGE_2 = "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n" +
+                "<metadata>\n" +
+                "<page num='2'/>\n" +
+                "<item timestamp='20180713101811'>\n" +
+                "<user uid='233517'><![CDATA[a1b2c3d4]]></user>\n" + // changed
+                "<content><![CDATA[嗯…………至少是一樓發完]]></content>\n" +
+                "</item>\n" +
+                "\n" +
+                "<item timestamp='20180713135735'>\n" +
+                "<user uid='230042'><![CDATA[156126]]></user>\n" + // changed
+                "<content><![CDATA[滑稽✧(`ῧ′)机智]]></content>\n" +
+                "</item>\n" +
+                "\n" +
+                "</metadata>";
+
+        ReviewReplyList reviewReplyList = new ReviewReplyList();
+        Wenku8Parser.parseReviewReplyList(reviewReplyList, REVIEW_REPLY_LIST_XML);
+        Wenku8Parser.parseReviewReplyList(reviewReplyList, REVIEW_REPLY_LIST_XML_PAGE_2);
+
+        Assert.assertEquals(reviewReplyList.getTotalPage(), 2);
+        Assert.assertEquals(reviewReplyList.getCurrentPage(), 2);
+        Assert.assertEquals(reviewReplyList.getList().size(), 4);
+
+        ReviewReplyList.ReviewReply reviewReply = reviewReplyList.getList().get(0);
+        Assert.assertEquals(reviewReply.getReplyTime().getTime(),
+                new GregorianCalendar(2018, Calendar.JULY, 13, 10, 18, 11).getTime().getTime());
+        Assert.assertEquals(reviewReply.getUid(), 233516);
+        Assert.assertEquals(reviewReply.getUserName(), "a1b2c3d4");
+        Assert.assertEquals(reviewReply.getContent(), "嗯…………至少是一樓發完");
+
+        reviewReply = reviewReplyList.getList().get(1);
+        Assert.assertEquals(reviewReply.getReplyTime().getTime(),
+                new GregorianCalendar(2018, Calendar.JULY, 13, 13, 57, 35).getTime().getTime());
+        Assert.assertEquals(reviewReply.getUid(), 230041);
+        Assert.assertEquals(reviewReply.getUserName(), "156126");
+        Assert.assertEquals(reviewReply.getContent(), "滑稽✧(`ῧ′)机智");
+
+        reviewReply = reviewReplyList.getList().get(2);
+        Assert.assertEquals(reviewReply.getReplyTime().getTime(),
+                new GregorianCalendar(2018, Calendar.JULY, 13, 10, 18, 11).getTime().getTime());
+        Assert.assertEquals(reviewReply.getUid(), 233517);
+        Assert.assertEquals(reviewReply.getUserName(), "a1b2c3d4");
+        Assert.assertEquals(reviewReply.getContent(), "嗯…………至少是一樓發完");
+
+        reviewReply = reviewReplyList.getList().get(3);
+        Assert.assertEquals(reviewReply.getReplyTime().getTime(),
+                new GregorianCalendar(2018, Calendar.JULY, 13, 13, 57, 35).getTime().getTime());
+        Assert.assertEquals(reviewReply.getUid(), 230042);
+        Assert.assertEquals(reviewReply.getUserName(), "156126");
+        Assert.assertEquals(reviewReply.getContent(), "滑稽✧(`ῧ′)机智");
     }
 }
