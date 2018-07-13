@@ -623,8 +623,9 @@ public class WenkuReaderPageView extends View {
                             canvas.drawText("正在加载图片：" + li.text.substring(21, li.text.length()), (float) (pxPageEdgeDistance + pxParagraphEdgeDistance), (float) heightSum, textPaint);
                         }
                         else {
-//                            canvas.drawText("Can you see image?", (float) (pxPageEdgeDistance + pxParagraphEdgeDistance), (float) heightSum, textPaint);
-                            canvas.drawBitmap(bitmapInfoList.get(foundIndex).bm, bitmapInfoList.get(foundIndex).x_beg, bitmapInfoList.get(foundIndex).y_beg, new Paint());
+                            int new_x = (screenSize.x - bitmapInfoList.get(foundIndex).x_beg * 2 - bitmapInfoList.get(foundIndex).width) / 2 + bitmapInfoList.get(foundIndex).x_beg;
+                            int new_y = (screenSize.y - bitmapInfoList.get(foundIndex).y_beg * 2 - bitmapInfoList.get(foundIndex).height) / 2 + bitmapInfoList.get(foundIndex).y_beg;
+                            canvas.drawBitmap(bitmapInfoList.get(foundIndex).bm, new_x, new_y, new Paint());
                         }
                     }
                 }
