@@ -32,6 +32,7 @@
     <string name="action_chapter_list">章节列表</string>
     <string name="action_review_list">评论区</string>
     <string name="action_review_reply_list">评论回复区</string>
+    <string name="action_review_reply">回复</string>
     <string name="action_old_vertical_reader">旧引擎阅读界面</string>
     <string name="action_horizontal_reader_v1">V1阅读引擎</string>
     <string name="action_user_login">Wenku8账号登录</string>
@@ -99,6 +100,8 @@
     <string name="system_update_ignored">已忽略</string>
     <string name="system_choose_reader_engine">选择一个阅读界面引擎</string>
     <string name="system_copied_to_clipboard">已复制：%s</string>
+    <string name="system_containing_bad_word">包含敏感词“%s”，请修改后重试！</string>
+    <string name="system_review_too_short">评论太短，请修改后重试！</string>
     <string name="missing_permission">由于历史原因，缺少必要的权限时，app可能无法正常工作，请考虑授予相应权限</string>
     <string name="task_stop">停止加载</string>
     <string name="task_retry">点击重新加载</string>
@@ -228,4 +231,6 @@
     <string name="about_seraphroy"><![CDATA[SeraphRoy <https://www.gaeblogx.com>]]></string>
     <string name="action_create_new_review">发布评论</string>
     <string name="action_create_new_review_reply">发表回复</string>
+    <string name="system_post_locked">帖子太久远，无法回复</string>
+    <string name="system_api_error">接口出现问题，暂时无法开发也无法使用，需要等待站长修复</string>
 </resources>

@@ -137,7 +137,7 @@ public class NovelReviewListActivity extends AppCompatActivity implements MyItem
         }
         else if (menuItem.getItemId() == R.id.action_new) {
             // TODO: new reply activity
-            Toast.makeText(getApplication(), "new", Toast.LENGTH_SHORT).show();
+            Toast.makeText(getApplication(), getResources().getString(R.string.system_api_error), Toast.LENGTH_SHORT).show();
         }
         return super.onOptionsItemSelected(menuItem);
     }

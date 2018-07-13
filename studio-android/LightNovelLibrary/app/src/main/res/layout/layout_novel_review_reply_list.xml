@@ -10,7 +10,8 @@
     <android.support.v4.widget.SwipeRefreshLayout
         android:id="@+id/swipe_refresh_layout"
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_above="@id/review_reply_edit_layout"
         android:layout_below="@id/toolbar_actionbar"
         android:background="@color/myWindowBackground">
 
@@ -18,12 +19,53 @@
         <android.support.v7.widget.RecyclerView
             android:id="@+id/review_item_list"
             android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:fastScrollEnabled="true"
+            android:layout_height="wrap_content"
             android:scrollbars="vertical" />
     </android.support.v4.widget.SwipeRefreshLayout>
 
-    <!--TODO: edit text + send button-->
+    <!-- edit text + send button -->
+    <RelativeLayout
+        android:id="@+id/review_reply_edit_layout"
+        android:layout_width="match_parent"
+        android:layout_height="?android:attr/actionBarSize"
+        android:layout_alignParentBottom="true"
+        android:background="@color/default_mask_background_white"
+        android:visibility="visible">
+
+        <EditText
+            android:id="@+id/review_reply_edit_text"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_alignParentBottom="true"
+            android:layout_alignParentLeft="true"
+            android:layout_alignParentStart="true"
+            android:layout_toLeftOf="@id/review_reply_send"
+            android:layout_toStartOf="@id/review_reply_send"
+            android:hint="@string/action_review_reply"
+            android:inputType="textMultiLine"
+            android:padding="16dp"
+            android:scrollbars="vertical"
+            android:textColor="@color/default_text_color_black" />
+
+        <LinearLayout
+            android:id="@+id/review_reply_send"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:layout_alignParentBottom="true"
+            android:layout_alignParentEnd="true"
+            android:layout_alignParentRight="true"
+            android:layout_centerInParent="true"
+            android:background="@drawable/btn_menu_item_boardless"
+            android:clickable="true"
+            android:focusable="true"
+            android:padding="8dp">
+
+            <ImageView
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:src="@drawable/ic_svg_send" />
+        </LinearLayout>
+    </RelativeLayout>
 
     <!-- Loading Frame -->
     <LinearLayout

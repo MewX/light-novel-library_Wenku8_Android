@@ -282,7 +282,7 @@ public class Wenku8Parser {
                             uid = Integer.valueOf(xmlPullParser.getAttributeValue(null, "uid"));
                             userName = xmlPullParser.nextText();
                         } else if ("content".equals(xmlPullParser.getName())) {
-                            title = xmlPullParser.nextText();
+                            title = xmlPullParser.nextText().trim();
                         }
                         break;
 
@@ -341,7 +341,7 @@ public class Wenku8Parser {
                             uid = Integer.valueOf(xmlPullParser.getAttributeValue(null, "uid"));
                             userName = xmlPullParser.nextText();
                         } else if ("content".equals(xmlPullParser.getName())) {
-                            content = xmlPullParser.nextText();
+                            content = xmlPullParser.nextText().trim();
                         }
                         break;
 

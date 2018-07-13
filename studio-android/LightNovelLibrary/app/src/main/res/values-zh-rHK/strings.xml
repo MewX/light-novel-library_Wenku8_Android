@@ -228,4 +228,9 @@
     <string name="action_create_new_review_reply">發表回復</string>
     <string name="action_review_reply_list">評論回復區</string>
     <string name="system_copied_to_clipboard">已復制：%s</string>
+    <string name="action_review_reply">回復</string>
+    <string name="system_containing_bad_word">包含敏感詞“%s”，請修改後重試！</string>
+    <string name="system_review_too_short">評論太短，請修改後重試！</string>
+    <string name="system_post_locked">帖子太久遠，無法回復</string>
+    <string name="system_api_error">接口出現問題，暫時無法開發也無法使用，需要等待站長修復</string>
 </resources>

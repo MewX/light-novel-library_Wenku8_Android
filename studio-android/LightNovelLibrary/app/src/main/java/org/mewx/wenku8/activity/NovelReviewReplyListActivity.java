@@ -1,5 +1,6 @@
 package org.mewx.wenku8.activity;
 
+import android.app.Activity;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
@@ -21,6 +22,8 @@ import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
+import android.view.inputmethod.InputMethodManager;
+import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -56,6 +59,7 @@ public class NovelReviewReplyListActivity extends AppCompatActivity implements M
     private RecyclerView mRecyclerView;
     private TextView mLoadingStatusTextView;
     private TextView mLoadingButton;
+    private EditText etReplyText;
 
     // switcher
     private ReviewReplyItemAdapter mAdapter;
@@ -66,7 +70,7 @@ public class NovelReviewReplyListActivity extends AppCompatActivity implements M
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.layout_novel_review_list);
+        setContentView(R.layout.layout_novel_review_reply_list);
 
         // fetch values
         rid = getIntent().getIntExtra("rid", 1);
@@ -106,6 +110,8 @@ public class NovelReviewReplyListActivity extends AppCompatActivity implements M
         mRecyclerView = findViewById(R.id.review_item_list);
         mLoadingStatusTextView = findViewById(R.id.list_loading_status);
         mLoadingButton = findViewById(R.id.btn_loading);
+        etReplyText = findViewById(R.id.review_reply_edit_text);
+        LinearLayout llReplyButton = findViewById(R.id.review_reply_send);
 
         mRecyclerView.setHasFixedSize(false);
         DividerItemDecoration horizontalDecoration = new DividerItemDecoration(mRecyclerView.getContext(), DividerItemDecoration.VERTICAL);
@@ -125,14 +131,35 @@ public class NovelReviewReplyListActivity extends AppCompatActivity implements M
         mLoadingButton.setOnClickListener(v -> new AsyncReviewReplyListLoader(this, mSwipeRefreshLayout, rid, reviewReplyList).execute()); // retry loading
 
         mSwipeRefreshLayout.setColorSchemeColors(getResources().getColor(R.color.myAccentColor));
-        mSwipeRefreshLayout.setOnRefreshListener(() -> {
-            // reload all
-            reviewReplyList = new ReviewReplyList();
-            mAdapter = null;
-            new AsyncReviewReplyListLoader(this, mSwipeRefreshLayout, rid, reviewReplyList).execute();
+        mSwipeRefreshLayout.setOnRefreshListener(this::refreshReviewReplyList);
+
+        llReplyButton.setOnClickListener(ignored -> {
+            String temp = etReplyText.getText().toString();
+            String badWord = Wenku8API.searchBadWords(temp);
+            if (badWord != null) {
+                Toast.makeText(getApplication(), String.format(getResources().getString(R.string.system_containing_bad_word), badWord), Toast.LENGTH_SHORT).show();
+            } else if (temp.length() < Wenku8API.MIN_REPLY_TEXT) {
+                Toast.makeText(getApplication(), getResources().getString(R.string.system_review_too_short), Toast.LENGTH_SHORT).show();
+            } else {
+                // hide ime
+                InputMethodManager imm = (InputMethodManager) getSystemService(Activity.INPUT_METHOD_SERVICE);
+                View view = getCurrentFocus();
+                if (view == null) view = new View(this);
+                if (imm != null) imm.hideSoftInputFromWindow(view.getWindowToken(), 0);
+
+                // submit
+                new AsyncPublishReply(etReplyText, this, rid, temp).execute();
+            }
         });
 
         // load initial content
+        new AsyncReviewReplyListLoader(this, mSwipeRefreshLayout, rid, reviewReplyList).execute();
+    }
+
+    void refreshReviewReplyList() {
+        // reload all
+        reviewReplyList = new ReviewReplyList();
+        mAdapter = null;
         new AsyncReviewReplyListLoader(this, mSwipeRefreshLayout, rid, reviewReplyList).execute();
     }
 
@@ -140,7 +167,6 @@ public class NovelReviewReplyListActivity extends AppCompatActivity implements M
     public boolean onCreateOptionsMenu(Menu menu) {
         if (getSupportActionBar() != null && reviewTitle != null && !reviewTitle.isEmpty())
             getSupportActionBar().setTitle(reviewTitle);
-        getMenuInflater().inflate(R.menu.menu_review_reply_list, menu);
         return true;
     }
 
@@ -148,10 +174,6 @@ public class NovelReviewReplyListActivity extends AppCompatActivity implements M
     public boolean onOptionsItemSelected(MenuItem menuItem) {
         if (menuItem.getItemId() == android.R.id.home) {
             onBackPressed();
-        }
-        else if (menuItem.getItemId() == R.id.action_new) {
-            // TODO: new reply activity (keep or remove)
-            Toast.makeText(getApplication(), "new", Toast.LENGTH_SHORT).show();
         }
         return super.onOptionsItemSelected(menuItem);
     }
@@ -166,6 +188,16 @@ public class NovelReviewReplyListActivity extends AppCompatActivity implements M
     protected void onResume() {
         super.onResume();
         MobclickAgent.onResume(this);
+    }
+
+    @Override
+    public void onBackPressed() {
+        String temp = etReplyText.getText().toString().trim();
+        if (!temp.isEmpty()) {
+            // TODO: new window to verify exit or not
+        } else {
+            super.onBackPressed();
+        }
     }
 
     ReviewReplyItemAdapter getAdapter() {
@@ -307,6 +339,87 @@ public class NovelReviewReplyListActivity extends AppCompatActivity implements M
 
             // reset loading status
             isLoading.set(false);
+        }
+    }
+
+
+    private static class AsyncPublishReply extends AsyncTask<String, Void, Integer> {
+        private static AtomicBoolean isLoading = new AtomicBoolean(false);
+
+        private WeakReference<EditText> editTextWeakReference;
+        private WeakReference<NovelReviewReplyListActivity> activityWeakReference;
+        private int rid;
+        private String content;
+
+        private boolean runOrNot = true; // true - run
+
+        AsyncPublishReply(@NonNull EditText editText, @NonNull NovelReviewReplyListActivity activity, int rid, @NonNull String content) {
+            this.editTextWeakReference = new WeakReference<>(editText);
+            this.activityWeakReference = new WeakReference<>(activity);
+            this.rid = rid;
+            this.content = content;
+        }
+
+        @Override
+        protected void onPreExecute() {
+            if (isLoading.getAndSet(true)) {
+                runOrNot = false; // do not run
+            } else {
+                // disable text and submit
+                EditText editText = editTextWeakReference.get();
+                if (editText != null) {
+                    editText.setEnabled(false);
+                }
+            }
+        }
+
+        @Override
+        protected Integer doInBackground(String... strings) {
+            byte[] tempXml = LightNetwork.LightHttpPostConnection(Wenku8API.BASE_URL, Wenku8API.getCommentReplyParams(rid, content));
+            if (tempXml == null) return 0; // network issue
+            String xml = new String(tempXml, Charset.forName("UTF-8")).trim();
+            Log.d(NovelReviewReplyListActivity.class.getSimpleName(), xml);
+            return Integer.valueOf(xml);
+        }
+
+        @Override
+        protected void onPostExecute(Integer i) {
+            if (runOrNot) {
+                EditText editText = editTextWeakReference.get();
+                NovelReviewReplyListActivity activity = activityWeakReference.get();
+                switch (i) {
+                    case 1:
+                        // successful -> clear and enable edit text
+                        if (editText != null) {
+                            editText.setText("");
+                        }
+
+                        // refresh page
+                        if (activity != null) {
+                            activity.refreshReviewReplyList();
+                        }
+                        break;
+
+                    case 11:
+                        if (activity != null) {
+                            Toast.makeText(activity, activity.getResources().getString(R.string.system_post_locked), Toast.LENGTH_SHORT).show();
+                        }
+                        break;
+
+                    default:
+                        // met network or other issue
+                        if (activity != null) {
+                            Toast.makeText(activity, activity.getResources().getString(R.string.system_network_error), Toast.LENGTH_SHORT).show();
+                        }
+                        break;
+                }
+
+                // enable edit text
+                if (editText != null) {
+                    editText.setEnabled(true);
+                }
+                isLoading.set(false);
+            }
         }
     }
 

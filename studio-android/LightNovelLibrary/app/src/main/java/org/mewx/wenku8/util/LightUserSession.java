@@ -2,6 +2,7 @@ package org.mewx.wenku8.util;
 
 import android.content.Intent;
 import android.os.AsyncTask;
+import android.util.Log;
 import android.widget.Toast;
 
 import org.mewx.wenku8.MyApp;
@@ -38,6 +39,9 @@ public class LightUserSession {
 
     // no null returned, default is ""
     public static String getSession() {
+        if (SESSION != null) {
+            Log.d(LightUserSession.class.getSimpleName(), SESSION);
+        }
         return SESSION == null ? "" : SESSION;
     }
 

@@ -44,7 +44,7 @@ public class ReviewReplyItemAdapter extends RecyclerView.Adapter<ReviewReplyItem
     public void onBindViewHolder(@NonNull ViewHolder viewHolder, int position) {
         ReviewReplyList.ReviewReply reviewReply = reviewReplyList.getList().get(position);
         if (viewHolder.tvUserName != null)
-            viewHolder.tvUserName.setText(reviewReply.getUserName());
+            viewHolder.tvUserName.setText(String.format("[%s]", reviewReply.getUserName()));
         if (viewHolder.tvReplyTime != null)
             viewHolder.tvReplyTime.setText(DATE_FORMATTER.format(reviewReply.getReplyTime()));
         if (viewHolder.tvNumberedId != null)
