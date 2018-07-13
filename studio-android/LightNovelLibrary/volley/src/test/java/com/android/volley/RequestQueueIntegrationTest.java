@@ -47,12 +47,12 @@ import static org.mockito.MockitoAnnotations.initMocks;
 @RunWith(RobolectricTestRunner.class)
 @Config(shadows = {ShadowSystemClock.class})
 public class RequestQueueIntegrationTest {
-    private static long TIMEOUT = 1000;
+    private static long TIMEOUT = 2000;
 
     private ResponseDelivery mDelivery;
     @Mock private Network mMockNetwork;
 
-    @Before public void setUp() throws Exception {
+    @Before public void setUp() {
         mDelivery = new ImmediateResponseDelivery();
         initMocks(this);
     }
@@ -156,7 +156,7 @@ public class RequestQueueIntegrationTest {
         queue.add(request);
 
         request.cancel();
-        verify(listener, timeout(100)).onRequestFinished(request);
+        verify(listener, timeout(TIMEOUT)).onRequestFinished(request);
         queue.stop();
     }
 
