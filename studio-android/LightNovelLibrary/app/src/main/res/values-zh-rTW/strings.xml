@@ -226,4 +226,6 @@
     <string name="about_seraphroy"><![CDATA[SeraphRoy <https://www.gaeblogx.com>]]></string>
     <string name="action_create_new_review">發布評論</string>
     <string name="action_create_new_review_reply">發表回復</string>
+    <string name="action_review_reply_list">評論回復區</string>
+    <string name="system_copied_to_clipboard">已復制：%s</string>
 </resources>

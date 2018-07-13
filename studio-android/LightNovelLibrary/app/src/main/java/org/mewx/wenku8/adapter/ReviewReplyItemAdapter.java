@@ -32,7 +32,7 @@ public class ReviewReplyItemAdapter extends RecyclerView.Adapter<ReviewReplyItem
     @Override
     @NonNull
     public ViewHolder onCreateViewHolder(@NonNull ViewGroup viewGroup, int viewType) {
-        View view = LayoutInflater.from(viewGroup.getContext()).inflate(R.layout.view_review_post_item,viewGroup,false);
+        View view = LayoutInflater.from(viewGroup.getContext()).inflate(R.layout.view_review_reply_item,viewGroup,false);
         return new ViewHolder(view, mItemLongClickListener);
     }
 
@@ -65,7 +65,7 @@ public class ReviewReplyItemAdapter extends RecyclerView.Adapter<ReviewReplyItem
         public ViewHolder(View view, MyItemLongClickListener longClickListener){
             super(view);
             this.mClickListener = longClickListener;
-            view.findViewById(R.id.item_card).setOnLongClickListener(this);
+            view.findViewById(R.id.review_reply_item).setOnLongClickListener(this);
 
             // real content
             tvUserName = view.findViewById(R.id.review_reply_item_user);

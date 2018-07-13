@@ -1,6 +1,8 @@
 package org.mewx.wenku8.activity;
 
-import android.content.Intent;
+import android.content.ClipData;
+import android.content.ClipboardManager;
+import android.content.Context;
 import android.graphics.PorterDuff;
 import android.graphics.drawable.Drawable;
 import android.os.AsyncTask;
@@ -8,8 +10,10 @@ import android.os.Build;
 import android.os.Bundle;
 import android.support.annotation.NonNull;
 import android.support.design.widget.Snackbar;
+import android.support.v4.content.ContextCompat;
 import android.support.v4.widget.SwipeRefreshLayout;
 import android.support.v7.app.AppCompatActivity;
+import android.support.v7.widget.DividerItemDecoration;
 import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
 import android.support.v7.widget.Toolbar;
@@ -25,11 +29,11 @@ import com.readystatesoftware.systembartint.SystemBarTintManager;
 import com.umeng.analytics.MobclickAgent;
 
 import org.mewx.wenku8.R;
-import org.mewx.wenku8.adapter.ReviewItemAdapter;
-import org.mewx.wenku8.global.api.ReviewList;
+import org.mewx.wenku8.adapter.ReviewReplyItemAdapter;
+import org.mewx.wenku8.global.api.ReviewReplyList;
 import org.mewx.wenku8.global.api.Wenku8API;
 import org.mewx.wenku8.global.api.Wenku8Parser;
-import org.mewx.wenku8.listener.MyItemClickListener;
+import org.mewx.wenku8.listener.MyItemLongClickListener;
 import org.mewx.wenku8.util.LightNetwork;
 
 import java.lang.ref.WeakReference;
@@ -40,9 +44,10 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * Created by MewX on 2018/7/12.
  * Novel Review Activity.
  */
-public class NovelReviewListActivity extends AppCompatActivity implements MyItemClickListener {
+public class NovelReviewReplyListActivity extends AppCompatActivity implements MyItemLongClickListener {
     // private vars
-    private int aid = 1;
+    private int rid = 1;
+    private String reviewTitle = "";
 
     // components
     private LinearLayoutManager mLayoutManager;
@@ -53,8 +58,8 @@ public class NovelReviewListActivity extends AppCompatActivity implements MyItem
     private TextView mLoadingButton;
 
     // switcher
-    private ReviewItemAdapter mAdapter;
-    private ReviewList reviewList = new ReviewList();
+    private ReviewReplyItemAdapter mAdapter;
+    private ReviewReplyList reviewReplyList = new ReviewReplyList();
     private static AtomicBoolean isLoading = new AtomicBoolean(false);
     int pastVisibleItems, visibleItemCount, totalItemCount;
 
@@ -64,7 +69,8 @@ public class NovelReviewListActivity extends AppCompatActivity implements MyItem
         setContentView(R.layout.layout_novel_review_list);
 
         // fetch values
-        aid = getIntent().getIntExtra("aid", 1);
+        rid = getIntent().getIntExtra("rid", 1);
+        reviewTitle = getIntent().getStringExtra("title");
 
         // set indicator enable
         Toolbar mToolbar = findViewById(R.id.toolbar_actionbar);
@@ -102,6 +108,12 @@ public class NovelReviewListActivity extends AppCompatActivity implements MyItem
         mLoadingButton = findViewById(R.id.btn_loading);
 
         mRecyclerView.setHasFixedSize(false);
+        DividerItemDecoration horizontalDecoration = new DividerItemDecoration(mRecyclerView.getContext(), DividerItemDecoration.VERTICAL);
+        Drawable horizontalDivider = ContextCompat.getDrawable(getApplication(), R.drawable.divider_horizontal);
+        if (horizontalDivider != null) {
+            horizontalDecoration.setDrawable(horizontalDivider);
+            mRecyclerView.addItemDecoration(horizontalDecoration);
+        }
         // use a linear layout manager
         mLayoutManager = new LinearLayoutManager(this);
         mRecyclerView.setLayoutManager(mLayoutManager);
@@ -110,23 +122,25 @@ public class NovelReviewListActivity extends AppCompatActivity implements MyItem
         mRecyclerView.addOnScrollListener(new MyOnScrollListener());
 
         // set click event for retry and cancel loading
-        mLoadingButton.setOnClickListener(v -> new AsyncReviewListLoader(this, mSwipeRefreshLayout, aid, reviewList).execute()); // retry loading
+        mLoadingButton.setOnClickListener(v -> new AsyncReviewReplyListLoader(this, mSwipeRefreshLayout, rid, reviewReplyList).execute()); // retry loading
 
         mSwipeRefreshLayout.setColorSchemeColors(getResources().getColor(R.color.myAccentColor));
         mSwipeRefreshLayout.setOnRefreshListener(() -> {
             // reload all
-            reviewList = new ReviewList();
+            reviewReplyList = new ReviewReplyList();
             mAdapter = null;
-            new AsyncReviewListLoader(this, mSwipeRefreshLayout, aid, reviewList).execute();
+            new AsyncReviewReplyListLoader(this, mSwipeRefreshLayout, rid, reviewReplyList).execute();
         });
 
         // load initial content
-        new AsyncReviewListLoader(this, mSwipeRefreshLayout, aid, reviewList).execute();
+        new AsyncReviewReplyListLoader(this, mSwipeRefreshLayout, rid, reviewReplyList).execute();
     }
 
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
-        getMenuInflater().inflate(R.menu.menu_review_list, menu);
+        if (getSupportActionBar() != null && reviewTitle != null && !reviewTitle.isEmpty())
+            getSupportActionBar().setTitle(reviewTitle);
+        getMenuInflater().inflate(R.menu.menu_review_reply_list, menu);
         return true;
     }
 
@@ -136,7 +150,7 @@ public class NovelReviewListActivity extends AppCompatActivity implements MyItem
             onBackPressed();
         }
         else if (menuItem.getItemId() == R.id.action_new) {
-            // TODO: new reply activity
+            // TODO: new reply activity (keep or remove)
             Toast.makeText(getApplication(), "new", Toast.LENGTH_SHORT).show();
         }
         return super.onOptionsItemSelected(menuItem);
@@ -154,11 +168,11 @@ public class NovelReviewListActivity extends AppCompatActivity implements MyItem
         MobclickAgent.onResume(this);
     }
 
-    ReviewItemAdapter getAdapter() {
+    ReviewReplyItemAdapter getAdapter() {
         return mAdapter;
     }
 
-    void setAdapter(ReviewItemAdapter adapter) {
+    void setAdapter(ReviewReplyItemAdapter adapter) {
         this.mAdapter = adapter;
     }
 
@@ -182,11 +196,16 @@ public class NovelReviewListActivity extends AppCompatActivity implements MyItem
     }
 
     @Override
-    public void onItemClick(View view, int position) {
-        Intent intent = new Intent(NovelReviewListActivity.this, NovelReviewReplyListActivity.class);
-        intent.putExtra("rid", reviewList.getList().get(position).getRid());
-        intent.putExtra("title", reviewList.getList().get(position).getTitle());
-        startActivity(intent);
+    public void onItemLongClick(View view, int position) {
+        String content = reviewReplyList.getList().get(position).getContent();
+        ClipboardManager clipboard = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
+        ClipData clip = ClipData.newPlainText(getResources().getString(R.string.app_name), content);
+        if (clipboard != null) {
+            clipboard.setPrimaryClip(clip);
+            Toast.makeText(NovelReviewReplyListActivity.this,
+                    String.format(getResources().getString(R.string.system_copied_to_clipboard), content),
+                    Toast.LENGTH_SHORT).show();
+        }
     }
 
     private class MyOnScrollListener extends RecyclerView.OnScrollListener {
@@ -201,32 +220,32 @@ public class NovelReviewListActivity extends AppCompatActivity implements MyItem
             // 剩余3个元素的时候就加载
             if (!isLoading.get() && visibleItemCount + pastVisibleItems >= totalItemCount) { // can be +1/2/3 >= total
                 // load more thread
-                if (reviewList.getCurrentPage() < reviewList.getTotalPage()) {
+                if (reviewReplyList.getCurrentPage() < reviewReplyList.getTotalPage()) {
                     // load more toast
                     Snackbar.make(mRecyclerView, getResources().getString(R.string.list_loading)
-                                    + "(" + Integer.toString(reviewList.getCurrentPage() + 1) + "/" + reviewList.getTotalPage() + ")",
+                                    + "(" + Integer.toString(reviewReplyList.getCurrentPage() + 1) + "/" + reviewReplyList.getTotalPage() + ")",
                             Snackbar.LENGTH_SHORT).show();
 
-                    new AsyncReviewListLoader(NovelReviewListActivity.this, mSwipeRefreshLayout, aid, reviewList).execute();
+                    new AsyncReviewReplyListLoader(NovelReviewReplyListActivity.this, mSwipeRefreshLayout, rid, reviewReplyList).execute();
                 }
             }
         }
     }
 
-    private static class AsyncReviewListLoader extends AsyncTask<Void, Void, Void> {
-        private WeakReference<NovelReviewListActivity> novelReviewListActivityWeakReference;
+    private static class AsyncReviewReplyListLoader extends AsyncTask<Void, Void, Void> {
+        private WeakReference<NovelReviewReplyListActivity> novelReviewListActivityWeakReference;
         private WeakReference<SwipeRefreshLayout> swipeRefreshLayoutWeakReference;
-        private int aid;
-        private ReviewList reviewList;
+        private int rid;
+        private ReviewReplyList reviewReplyList;
 
         private boolean runOrNot = true; // by default, run it
         private boolean metNetworkIssue = false;
 
-        AsyncReviewListLoader(@NonNull NovelReviewListActivity novelReviewListActivity, @NonNull SwipeRefreshLayout swipeRefreshLayout, int aid, @NonNull ReviewList reviewList) {
+        AsyncReviewReplyListLoader(@NonNull NovelReviewReplyListActivity novelReviewListActivity, @NonNull SwipeRefreshLayout swipeRefreshLayout, int rid, @NonNull ReviewReplyList reviewReplyList) {
             this.novelReviewListActivityWeakReference = new WeakReference<>(novelReviewListActivity);
             this.swipeRefreshLayoutWeakReference = new WeakReference<>(swipeRefreshLayout);
-            this.aid = aid;
-            this.reviewList = reviewList;
+            this.rid = rid;
+            this.reviewReplyList = reviewReplyList;
         }
 
         @Override
@@ -239,24 +258,24 @@ public class NovelReviewListActivity extends AppCompatActivity implements MyItem
                 SwipeRefreshLayout tempSwipeLayout = swipeRefreshLayoutWeakReference.get();
                 if (tempSwipeLayout != null) tempSwipeLayout.setRefreshing(true);
 
-                NovelReviewListActivity tempActivity = novelReviewListActivityWeakReference.get();
+                NovelReviewReplyListActivity tempActivity = novelReviewListActivityWeakReference.get();
                 if (tempActivity != null) tempActivity.hideRetryButton();
             }
         }
 
         @Override
         protected Void doInBackground(Void... v) {
-            if (!runOrNot || reviewList.getCurrentPage() + 1 > reviewList.getTotalPage()) return null;
+            if (!runOrNot || reviewReplyList.getCurrentPage() + 1 > reviewReplyList.getTotalPage()) return null;
 
             // load current page + 1
-            byte[] tempXml = LightNetwork.LightHttpPostConnection(Wenku8API.BASE_URL, Wenku8API.getCommentListParams(aid, reviewList.getCurrentPage() + 1));
+            byte[] tempXml = LightNetwork.LightHttpPostConnection(Wenku8API.BASE_URL, Wenku8API.getCommentContentParams(rid, reviewReplyList.getCurrentPage() + 1));
             if (tempXml == null) {
                 metNetworkIssue = true;
                 return null; // network issue
             }
             String xml = new String(tempXml, Charset.forName("UTF-8"));
-            Log.d(NovelReviewListActivity.class.getSimpleName(), xml);
-            Wenku8Parser.parseReviewList(reviewList, xml);
+            Log.d(NovelReviewReplyListActivity.class.getSimpleName(), xml);
+            Wenku8Parser.parseReviewReplyList(reviewReplyList, xml);
             return null;
         }
 
@@ -265,17 +284,17 @@ public class NovelReviewListActivity extends AppCompatActivity implements MyItem
             // refresh everything when required
             if (!runOrNot) return;
 
-            NovelReviewListActivity tempActivity = novelReviewListActivityWeakReference.get();
+            NovelReviewReplyListActivity tempActivity = novelReviewListActivityWeakReference.get();
             if (metNetworkIssue) {
                 // met net work issue, show retry button
                 if (tempActivity != null) tempActivity.showRetryButton();
             } else {
                 // all good, update list
                 if (tempActivity.getAdapter() == null) {
-                    ReviewItemAdapter reviewItemAdapter = new ReviewItemAdapter(reviewList);
-                    tempActivity.setAdapter(reviewItemAdapter);
-                    reviewItemAdapter.setOnItemClickListener(tempActivity);
-                    tempActivity.getRecyclerView().setAdapter(reviewItemAdapter);
+                    ReviewReplyItemAdapter reviewReplyItemAdapter = new ReviewReplyItemAdapter(reviewReplyList);
+                    tempActivity.setAdapter(reviewReplyItemAdapter);
+                    reviewReplyItemAdapter.setOnItemLongClickListener(tempActivity);
+                    tempActivity.getRecyclerView().setAdapter(reviewReplyItemAdapter);
                 }
                 tempActivity.getAdapter().notifyDataSetChanged();
 

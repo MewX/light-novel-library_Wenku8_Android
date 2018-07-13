@@ -636,10 +636,6 @@ public class Wenku8API {
     public static ContentValues getCommentContentParams(int rid, int page) {
         // 书评内容, rid为主题ID（不是aid）, page不得为空
         if (page < 1) page = 1;
-
-        // Return:
-        //
-
         return getEncryptedCV("action=review&do=show&rid=" + rid + "&page=" + page + "&t=" + getLANG(GlobalConfig.getCurrentLang()));
     }
 

@@ -1,8 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/review_reply_item"
     android:layout_width="wrap_content"
     android:layout_height="wrap_content"
+    android:background="@drawable/btn_menu_item"
+    android:clickable="true"
+    android:focusable="true"
     android:minHeight="36dp"
     android:orientation="vertical"
     android:padding="16dp">
@@ -12,9 +16,6 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:adjustViewBounds="true"
-        android:background="@drawable/btn_menu_item"
-        android:clickable="true"
-        android:focusable="true"
         android:gravity="center_horizontal">
 
         <TextView
@@ -44,13 +45,13 @@
 
         <TextView
             android:id="@+id/hash"
-            android:layout_width="16dp"
+            android:layout_width="wrap_content"
             android:layout_height="16dp"
             android:layout_marginLeft="16dp"
             android:layout_marginStart="16dp"
             android:layout_toLeftOf="@id/review_reply_item_numbered_id"
             android:layout_toStartOf="@id/review_reply_item_numbered_id"
-            android:text="#" />
+            android:text="# " />
 
         <TextView
             android:id="@+id/review_reply_item_numbered_id"
