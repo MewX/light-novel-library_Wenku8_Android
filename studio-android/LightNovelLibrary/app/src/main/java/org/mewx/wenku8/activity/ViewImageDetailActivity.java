@@ -199,7 +199,7 @@ public class ViewImageDetailActivity extends AppCompatActivity {
                                         @Override
                                         public void onPositive(MaterialDialog dialog) {
                                             // copy file from 'path' to 'uri + File.separator + input + ".jpg"'
-                                            LightCache.copyfile(path, newuri + File.separator + input + ".jpg", true);
+                                            LightCache.copyFile(path, newuri + File.separator + input + ".jpg", true);
                                             Toast.makeText(ViewImageDetailActivity.this, "已保存：" + newuri + File.separator + input + ".jpg", Toast.LENGTH_SHORT).show();
                                         }
 
@@ -224,7 +224,7 @@ public class ViewImageDetailActivity extends AppCompatActivity {
                         }
                         else {
                             // copy file from 'path' to 'uri + File.separator + input + ".jpg"'
-                            LightCache.copyfile(path, newuri + File.separator + input + ".jpg", true);
+                            LightCache.copyFile(path, newuri + File.separator + input + ".jpg", true);
                             Toast.makeText(ViewImageDetailActivity.this, "已保存：" + newuri + File.separator + input + ".jpg", Toast.LENGTH_SHORT).show();
                         }
                     }
