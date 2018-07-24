@@ -37,6 +37,7 @@ import org.mewx.wenku8.global.GlobalConfig;
 import org.mewx.wenku8.global.api.ChapterInfo;
 import org.mewx.wenku8.global.api.NovelItemMeta;
 import org.mewx.wenku8.global.api.OldNovelContentParser;
+import org.mewx.wenku8.global.api.OldNovelContentParser.NovelContentType;
 import org.mewx.wenku8.global.api.VolumeList;
 import org.mewx.wenku8.global.api.Wenku8API;
 import org.mewx.wenku8.global.api.Wenku8Error;
@@ -861,10 +862,9 @@ public class NovelInfoActivity extends AppCompatActivity {
                         // cache image
                         if (GlobalConfig.doCacheImage()) {
                             List<OldNovelContentParser.NovelContent> nc = OldNovelContentParser.NovelContentParser_onlyImage(xml);
-                            if (nc == null) return Wenku8Error.ErrorCode.NETWORK_ERROR;
 
                             for (int i = 0; i < nc.size(); i++) {
-                                if (nc.get(i).type == 'i') {
+                                if (nc.get(i).type == NovelContentType.IMAGE) {
                                     pDialog.setMaxProgress(++size_a);
 
                                     // save this images, judge exist first
@@ -972,7 +972,7 @@ public class NovelInfoActivity extends AppCompatActivity {
             String result;
             try {
                 result = new String(bytes, "UTF-8");
-                Log.e("MewX", result);
+                Log.d("MewX", result);
                 if (!LightTool.isInteger(result))
                     return Wenku8Error.ErrorCode.RETURNED_VALUE_EXCEPTION;
                 if(Wenku8Error.getSystemDefinedErrorCode(Integer.parseInt(result)) != Wenku8Error.ErrorCode.SYSTEM_1_SUCCEEDED
@@ -1075,10 +1075,9 @@ public class NovelInfoActivity extends AppCompatActivity {
                         // cache image
                         if (GlobalConfig.doCacheImage()) {
                             List<OldNovelContentParser.NovelContent> nc = OldNovelContentParser.NovelContentParser_onlyImage(xml);
-                            if (nc == null) return Wenku8Error.ErrorCode.NETWORK_ERROR;
 
                             for (int i = 0; i < nc.size(); i++) {
-                                if (nc.get(i).type == 'i') {
+                                if (nc.get(i).type == NovelContentType.IMAGE) {
                                     size_a ++;
 
                                     // save this images, judge exist first

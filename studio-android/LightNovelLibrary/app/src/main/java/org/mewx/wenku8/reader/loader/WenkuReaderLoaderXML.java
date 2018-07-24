@@ -5,6 +5,7 @@ import android.graphics.BitmapFactory;
 
 import org.mewx.wenku8.global.GlobalConfig;
 import org.mewx.wenku8.global.api.OldNovelContentParser;
+import org.mewx.wenku8.global.api.OldNovelContentParser.NovelContentType;
 
 import java.util.List;
 
@@ -43,11 +44,11 @@ public class WenkuReaderLoaderXML extends WenkuReaderLoader {
             }
             else {
                  // last one
-                if(nc.get(currentIndex).type == 't' && wordIndex + 1 < nc.get(currentIndex).content.length()) {
+                if(nc.get(currentIndex).type == NovelContentType.TEXT && wordIndex + 1 < nc.get(currentIndex).content.length()) {
                     // text but not last word
                     return true;
                 }
-                else if(nc.get(currentIndex).type != 't' && wordIndex == 0) {
+                else if(nc.get(currentIndex).type != NovelContentType.TEXT && wordIndex == 0) {
                     // image
                     return true;
                 }
@@ -66,11 +67,11 @@ public class WenkuReaderLoaderXML extends WenkuReaderLoader {
             }
             else {
                 // first one
-                if(nc.get(currentIndex).type == 't' && wordIndex - 1 >= 0) {
+                if(nc.get(currentIndex).type == NovelContentType.TEXT && wordIndex - 1 >= 0) {
                     // one more word ahead
                     return true;
                 }
-                else if(nc.get(currentIndex).type != 't' && wordIndex == nc.get(currentIndex).content.length() - 1)
+                else if(nc.get(currentIndex).type != NovelContentType.TEXT && wordIndex == nc.get(currentIndex).content.length() - 1)
                     // image previous use index last
                     return true;
             }
@@ -232,10 +233,10 @@ public class WenkuReaderLoaderXML extends WenkuReaderLoader {
         nc = null;
     }
 
-    private ElementType intepreteOldSign(char s) {
-        switch (s) {
-            case 't': return ElementType.TEXT;
-            case 'i': return ElementType.IMAGE_DEPENDENT;
+    private ElementType intepreteOldSign(NovelContentType type) {
+        switch (type) {
+            case TEXT: return ElementType.TEXT;
+            case IMAGE: return ElementType.IMAGE_DEPENDENT;
             default: return ElementType.TEXT;
         }
     }
