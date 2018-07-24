@@ -8,28 +8,16 @@ import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.Paint;
 import android.graphics.Point;
-import android.graphics.Rect;
 import android.graphics.Shader;
 import android.graphics.Typeface;
 import android.graphics.drawable.BitmapDrawable;
-import android.media.Image;
-import android.net.wifi.WifiManager;
 import android.os.AsyncTask;
 import android.os.Build;
-import android.os.Handler;
 import android.text.TextPaint;
-import android.util.AttributeSet;
 import android.util.Log;
-import android.util.TypedValue;
-import android.view.MotionEvent;
 import android.view.View;
-import android.view.ViewGroup;
-import android.widget.ImageView;
-import android.widget.RelativeLayout;
 import android.widget.Toast;
 
-import com.android.volley.toolbox.Volley;
-import com.nostra13.universalimageloader.core.DisplayImageOptions;
 import com.nostra13.universalimageloader.core.ImageLoader;
 import com.nostra13.universalimageloader.core.assist.ImageSize;
 
@@ -42,7 +30,6 @@ import org.mewx.wenku8.reader.loader.WenkuReaderLoader;
 import org.mewx.wenku8.reader.setting.WenkuReaderSettingV1;
 import org.mewx.wenku8.util.LightTool;
 
-import java.lang.annotation.ElementType;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
@@ -113,17 +100,17 @@ public class WenkuReaderPageView extends View {
     // useless constructs
 //    public WenkuReaderPageView(Context context) {
 //        super(context);
-//        Log.e("MewX", "-- view: construct 1");
+//        Log.d("MewX", "-- view: construct 1");
 //    }
 //
 //    public WenkuReaderPageView(Context context, AttributeSet attrs) {
 //        super(context, attrs);
-//        Log.e("MewX", "-- view: construct 2");
+//        Log.d("MewX", "-- view: construct 2");
 //    }
 //
 //    public WenkuReaderPageView(Context context, AttributeSet attrs, int defStyleAttr) {
 //        super(context, attrs, defStyleAttr);
-//        Log.e("MewX", "-- view: construct 3");
+//        Log.d("MewX", "-- view: construct 3");
 //    }
 
     static public boolean getInDayMode() {
@@ -226,7 +213,7 @@ public class WenkuReaderPageView extends View {
      */
     public WenkuReaderPageView(Context context, int lineIndex, int wordIndex, LOADING_DIRECTION directionForward) {
         super(context);
-        Log.e("MewX", "-- view: construct my");
+        Log.d("MewX", "-- view: construct my");
         lineInfoList = new ArrayList<>();
         bitmapInfoList = new ArrayList<>();
         mLoader.setCurrentIndex(lineIndex);
@@ -251,7 +238,7 @@ public class WenkuReaderPageView extends View {
                     firstWordIndex = 0;
                 }
                 else {
-                    Log.e("MewX", "-- view: end construct A, just return");
+                    Log.d("MewX", "-- view: end construct A, just return");
                     return;
                 }
                 mLoader.setCurrentIndex(firstLineIndex);
@@ -283,7 +270,7 @@ public class WenkuReaderPageView extends View {
         }
 
         for(LineInfo li : lineInfoList)
-            Log.e("MewX", "get: " + li.text);
+            Log.d("MewX", "get: " + li.text);
 
     }
 
@@ -294,15 +281,15 @@ public class WenkuReaderPageView extends View {
     private void calcFromFirst() {
         int widthSum = 0;
         int heightSum = fontHeight;
-        String tempText = "";
+        StringBuilder tempText = new StringBuilder();
 
-        Log.e("MewX", "firstLineIndex = " + firstLineIndex + "; firstWordIndex = " + firstWordIndex);
+        Log.d("MewX", "firstLineIndex = " + firstLineIndex + "; firstWordIndex = " + firstWordIndex);
         for(int curLineIndex = firstLineIndex, curWordIndex = firstWordIndex; curLineIndex < mLoader.getElementCount(); ) {
             // init paragraph head vars
             if(curWordIndex == 0 && mLoader.getCurrentType() == WenkuReaderLoader.ElementType.TEXT) {
                 // leading space
                 widthSum = 2 * fontHeight;
-                tempText = "　　";
+                tempText = new StringBuilder("　　");
             }
             else if(mLoader.getCurrentType() == WenkuReaderLoader.ElementType.IMAGE_DEPENDENT) {
                 if(lineInfoList.size() != 0) {
@@ -326,7 +313,7 @@ public class WenkuReaderPageView extends View {
 
             // get a record of line
             if(mLoader.getCurrentAsString() == null || mLoader.getCurrentAsString().length() == 0) {
-                Log.e("MewX", "empty string! in " + curLineIndex + "(" + curWordIndex + ")");
+                Log.d("MewX", "empty string! in " + curLineIndex + "(" + curWordIndex + ")");
                 curWordIndex = 0;
                 if(curLineIndex >= mLoader.getElementCount()) {
                     // out of bounds
@@ -343,7 +330,7 @@ public class WenkuReaderPageView extends View {
                 // wrap line, save line
                 LineInfo li = new LineInfo();
                 li.type = WenkuReaderLoader.ElementType.TEXT;
-                li.text = tempText;
+                li.text = tempText.toString();
                 lineInfoList.add(li);
                 heightSum += pxLineDistance;
 
@@ -366,12 +353,12 @@ public class WenkuReaderPageView extends View {
                 }
 
                 // height acceptable
-                tempText = temp;
+                tempText = new StringBuilder(temp);
                 widthSum = tempWidth;
                 heightSum += fontHeight;
             }
             else {
-                tempText = tempText + temp;
+                tempText.append(temp);
                 widthSum += tempWidth;
             }
 
@@ -380,7 +367,7 @@ public class WenkuReaderPageView extends View {
                 // next paragraph, wrap line
                 LineInfo li = new LineInfo();
                 li.type = WenkuReaderLoader.ElementType.TEXT;
-                li.text = tempText;
+                li.text = tempText.toString();
                 lineInfoList.add(li);
                 heightSum += pxParagraphDistance;
 
@@ -394,7 +381,7 @@ public class WenkuReaderPageView extends View {
                 // height acceptable
                 heightSum += fontHeight;
                 widthSum = 0;
-                tempText = "";
+                tempText = new StringBuilder();
                 curWordIndex = 0;
                 if(curLineIndex + 1 >= mLoader.getElementCount()) {
                     // out of bounds
@@ -428,7 +415,7 @@ public class WenkuReaderPageView extends View {
 
             // special to image
             if(curType == WenkuReaderLoader.ElementType.IMAGE_DEPENDENT && lineInfoList.size() != 0) {
-                Log.e("MewX", "jump 1");
+                Log.d("MewX", "jump 1");
                 firstLineIndex = curLineIndex + 1;
                 firstWordIndex = 0;
                 mLoader.setCurrentIndex(firstLineIndex);
@@ -516,7 +503,7 @@ public class WenkuReaderPageView extends View {
                 lineInfoList.add(0, curList.get(i));
             }
             for(LineInfo li : lineInfoList)
-                Log.e("MewX", "full: " + li.text);
+                Log.d("MewX", "full: " + li.text);
 
             // not full to continue, set curWord as last index of the string
             if(curLineIndex - 1 >= 0) {
@@ -524,7 +511,7 @@ public class WenkuReaderPageView extends View {
                 curWordIndex = mLoader.getCurrentAsString().length();
             }
             else {
-                Log.e("MewX", "jump 2");
+                Log.d("MewX", "jump 2");
                 firstLineIndex = 0;
                 firstWordIndex = 0;
                 mLoader.setCurrentIndex(firstLineIndex);
@@ -540,7 +527,7 @@ public class WenkuReaderPageView extends View {
         super.onDraw(canvas);
         //canvas.drawLine(0.0f, 0.0f, 320.0f, 320.0f, new Paint()); // px
         if(mSetting == null || mLoader == null) return;
-        Log.e("MewX", "onDraw()");
+        Log.d("MewX", "onDraw()");
 
         // draw background
         if(getInDayMode()) {
@@ -588,7 +575,7 @@ public class WenkuReaderPageView extends View {
                 }
             }
 
-            Log.e("MewX", "draw: " + li.text);
+            Log.d("MewX", "draw: " + li.text);
             if(li.type == WenkuReaderLoader.ElementType.TEXT) {
                 canvas.drawText( li.text, (float) (pxPageEdgeDistance + pxParagraphEdgeDistance), (float) heightSum, textPaint);
                 heightSum += fontHeight;

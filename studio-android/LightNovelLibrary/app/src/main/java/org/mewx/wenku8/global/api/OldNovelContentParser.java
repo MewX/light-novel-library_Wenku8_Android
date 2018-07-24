@@ -70,10 +70,10 @@ public class OldNovelContentParser {
                     NovelContent nc2 = new NovelContent();
                     int t2 = t.indexOf("<!--image-->", temp + 12);
                     if (t2 < 0) {
-                        Log.d(TAG, "Broke in parseNovelContent, t2 = " + t2);
+                        Log.d(TAG, "Incomplete image pair, t2 = " + t2);
                         NovelContent nc = new NovelContent();
                         nc.type = NovelContentType.TEXT;
-                        nc.content = t;
+                        nc.content = t.trim();
                         result.add(nc);
                         break;
                     }

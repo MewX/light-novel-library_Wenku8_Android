@@ -209,7 +209,7 @@ public class LatestFragment extends Fragment implements MyItemClickListener, MyI
                 String xml = new String(tempXml, "UTF-8");
                 totalPage = NovelListWithInfoParser.getNovelListWithInfoPageNum(xml);
                 List<NovelListWithInfoParser.NovelListWithInfo> l = NovelListWithInfoParser.getNovelListWithInfo(xml);
-                if (l == null)
+                if (l.isEmpty())
                     return -100; // network error
 
                 if (listNovelItemInfo == null)

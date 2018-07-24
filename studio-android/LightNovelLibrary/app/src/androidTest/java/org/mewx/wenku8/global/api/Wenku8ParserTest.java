@@ -74,6 +74,12 @@ public class Wenku8ParserTest {
         Assert.assertEquals(review.getTitle(), "有种神曲奏界的既视感");
     }
 
+    @Test
+    public void testParseReviewListInvalid() {
+        ReviewList reviewList = new ReviewList();
+        Wenku8Parser.parseReviewList(reviewList, "1324");
+        Assert.assertTrue(reviewList.getList().isEmpty());
+    }
 
     @Test
     public void testParseReviewListPageTwo() {
@@ -168,6 +174,13 @@ public class Wenku8ParserTest {
         Assert.assertEquals(reviewReply.getUid(), 230041);
         Assert.assertEquals(reviewReply.getUserName(), "156126");
         Assert.assertEquals(reviewReply.getContent(), "滑稽✧(`ῧ′)机智");
+    }
+
+    @Test
+    public void testParseReviewReplyListInvalid() {
+        ReviewReplyList reviewReplyList = new ReviewReplyList();
+        Wenku8Parser.parseReviewReplyList(reviewReplyList, "1234");
+        Assert.assertTrue(reviewReplyList.getList().isEmpty());
     }
 
     @Test

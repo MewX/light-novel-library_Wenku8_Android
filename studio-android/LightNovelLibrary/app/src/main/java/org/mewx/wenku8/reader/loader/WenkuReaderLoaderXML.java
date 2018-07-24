@@ -2,6 +2,7 @@ package org.mewx.wenku8.reader.loader;
 
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.support.annotation.NonNull;
 
 import org.mewx.wenku8.global.GlobalConfig;
 import org.mewx.wenku8.global.api.OldNovelContentParser;
@@ -17,10 +18,10 @@ import java.util.List;
 public class WenkuReaderLoaderXML extends WenkuReaderLoader {
 
     private int currentIndex = 0;
-    private List<OldNovelContentParser.NovelContent> nc = null; // 't'-text; 'i'-image
+    private List<OldNovelContentParser.NovelContent> nc;
     public String chapterName;
 
-    public WenkuReaderLoaderXML(List<OldNovelContentParser.NovelContent> onc) {
+    public WenkuReaderLoaderXML(@NonNull List<OldNovelContentParser.NovelContent> onc) {
         nc = onc;
     }
 

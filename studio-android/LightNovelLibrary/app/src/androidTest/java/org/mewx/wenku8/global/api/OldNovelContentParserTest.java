@@ -42,6 +42,37 @@ public class OldNovelContentParserTest {
     }
 
     @Test
+    public void parseNovelContentWithIncompleteImageTag() {
+        final String BROKEN_XML = "line 1\r\n" +
+                "    <!--image-->http://bbbbb.com/pictures/1/1339/90903/107724.jpg<!--image-->   \r\n" +
+                "    line 2     \r\n\r\n" +
+                "  <!--image-->http://bbbbb.com/pictures/1/1339/90903/107725.jpg \r\n" +
+                "line 3\r\n";
+        List<OldNovelContentParser.NovelContent> contents = OldNovelContentParser.parseNovelContent(BROKEN_XML, null);
+        assertEquals(5, contents.size());
+
+        OldNovelContentParser.NovelContent tempContent = contents.get(0);
+        assertEquals(TEXT, tempContent.type);
+        assertEquals("line 1", tempContent.content);
+
+        tempContent = contents.get(1);
+        assertEquals(IMAGE, tempContent.type);
+        assertEquals("http://bbbbb.com/pictures/1/1339/90903/107724.jpg", tempContent.content);
+
+        tempContent = contents.get(2);
+        assertEquals(TEXT, tempContent.type);
+        assertEquals("line 2", tempContent.content);
+
+        tempContent = contents.get(3);
+        assertEquals(TEXT, tempContent.type);
+        assertEquals("<!--image-->http://bbbbb.com/pictures/1/1339/90903/107725.jpg", tempContent.content);
+
+        tempContent = contents.get(4);
+        assertEquals(TEXT, tempContent.type);
+        assertEquals("line 3", tempContent.content);
+    }
+
+    @Test
     public void novelContentParser_onlyImage() {
         List<OldNovelContentParser.NovelContent> contents = OldNovelContentParser.NovelContentParser_onlyImage(NOVEL_CONTENT);
         assertEquals(2, contents.size());

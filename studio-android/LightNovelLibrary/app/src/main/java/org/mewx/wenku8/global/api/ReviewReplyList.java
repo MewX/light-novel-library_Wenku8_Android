@@ -15,10 +15,10 @@ public class ReviewReplyList {
         @NonNull private String content;
 
         public ReviewReply(@NonNull Date replyTime, @NonNull String userName, int uid, @NonNull String content) {
-            this.replyTime = replyTime;
-            this.userName = userName;
-            this.uid = uid;
-            this.content = content;
+            setReplyTime(replyTime);
+            setUserName(userName);
+            setUid(uid);
+            setContent(content);
         }
 
         @NonNull
