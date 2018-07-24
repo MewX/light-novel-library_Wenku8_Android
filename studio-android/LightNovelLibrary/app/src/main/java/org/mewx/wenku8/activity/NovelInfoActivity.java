@@ -194,10 +194,7 @@ public class NovelInfoActivity extends AppCompatActivity {
             tvLatestChapter.setBackground(getResources().getDrawable(R.drawable.btn_menu_item));
         }
         tvNovelTitle.setOnClickListener(v -> {
-            if(isLoading) {
-                Toast.makeText(NovelInfoActivity.this, getResources().getString(R.string.system_loading_please_wait), Toast.LENGTH_SHORT).show();
-                return;
-            }
+            if (runLoadingChecker()) return;
 
             // show aid: title
             new MaterialDialog.Builder(NovelInfoActivity.this)
@@ -213,10 +210,7 @@ public class NovelInfoActivity extends AppCompatActivity {
                     .show();
         });
         tvNovelAuthor.setOnClickListener(v -> {
-            if(isLoading) {
-                Toast.makeText(NovelInfoActivity.this, getResources().getString(R.string.system_loading_please_wait), Toast.LENGTH_SHORT).show();
-                return;
-            }
+            if (runLoadingChecker()) return;
 
             new MaterialDialog.Builder(NovelInfoActivity.this)
                     .theme(Theme.LIGHT)
@@ -234,10 +228,7 @@ public class NovelInfoActivity extends AppCompatActivity {
                     .show();
         });
         fabFavorite.setOnClickListener(v -> {
-            if(isLoading) {
-                Toast.makeText(NovelInfoActivity.this, getResources().getString(R.string.system_loading_please_wait), Toast.LENGTH_SHORT).show();
-                return;
-            }
+            if (runLoadingChecker()) return;
 
             // add to favorite
             if(GlobalConfig.testInLocalBookshelf(aid)) {
@@ -273,11 +264,9 @@ public class NovelInfoActivity extends AppCompatActivity {
             }
         });
         fabDownload.setOnClickListener(v -> {
-            if(isLoading) {
-                Toast.makeText(NovelInfoActivity.this, getResources().getString(R.string.system_loading_please_wait), Toast.LENGTH_SHORT).show();
-                return;
-            }
-            else if(!GlobalConfig.testInLocalBookshelf(aid)) {
+            if (runLoadingChecker()) return;
+
+            if(!GlobalConfig.testInLocalBookshelf(aid)) {
                 Toast.makeText(NovelInfoActivity.this, getResources().getString(R.string.system_fav_it_first), Toast.LENGTH_SHORT).show();
                 return;
             }
@@ -321,12 +310,25 @@ public class NovelInfoActivity extends AppCompatActivity {
                     .show();
         });
         tvLatestChapter.setOnClickListener(view -> {
+            if (runLoadingChecker()) return;
+
             // no sufficient info
             if (mNovelItemMeta != null && mNovelItemMeta.latestSectionCid != 0)
                 showDirectJumpToReaderDialog( mNovelItemMeta.latestSectionCid);
             else
                 Toast.makeText(this, getResources().getText(R.string.reader_msg_please_refresh_and_retry), Toast.LENGTH_SHORT).show();
         });
+    }
+
+    /**
+     * run loading checker
+     * @return true if loading; otherwise false
+     */
+    private boolean runLoadingChecker() {
+        if (isLoading) {
+            Toast.makeText(NovelInfoActivity.this, getResources().getString(R.string.system_loading_please_wait), Toast.LENGTH_SHORT).show();
+        }
+        return isLoading;
     }
 
     /**
@@ -516,10 +518,7 @@ public class NovelInfoActivity extends AppCompatActivity {
                 finishAfterTransition(); // end directly
         }
         else if (menuItem.getItemId() == R.id.action_continue_read_progress) {
-            if(isLoading) {
-                Toast.makeText(NovelInfoActivity.this, getResources().getString(R.string.system_loading_please_wait), Toast.LENGTH_SHORT).show();
-                return true;
-            }
+            if (runLoadingChecker()) return true;
 
             // show dialog, jump to last read position
             final GlobalConfig.ReadSavesV1 rs = GlobalConfig.getReadSavesRecordV1(aid);
