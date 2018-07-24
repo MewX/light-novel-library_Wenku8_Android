@@ -38,6 +38,7 @@ public class LightCache {
 
     /**
      * load file content
+     *
      * @param path full file path (can be relative)
      * @return null if the file does not exist; otherwise the file content string, can be empty
      */
@@ -117,6 +118,14 @@ public class LightCache {
         return new File(filepath).delete();
     }
 
+    /**
+     * Copy file from one place to another place,
+     * if target parent path does not exist, then create them
+     *
+     * @param from       full path
+     * @param to         full path
+     * @param forceWrite true if wanting to override
+     */
     public static void copyFile(String from, String to, Boolean forceWrite) {
         File fromFile = new File(from);
         File toFile = new File(to);
