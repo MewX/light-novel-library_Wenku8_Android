@@ -670,7 +670,7 @@ public class NovelInfoActivity extends AppCompatActivity {
                 }
 
                 listVolume = Wenku8Parser.getVolumeList(novelFullVolume);
-                if(listVolume == null) return -1;
+                if(listVolume.isEmpty()) return -1;
             } catch (UnsupportedEncodingException e) {
                 e.printStackTrace();
                 return -2;
@@ -793,7 +793,7 @@ public class NovelInfoActivity extends AppCompatActivity {
         @Override
         protected Wenku8Error.ErrorCode doInBackground(Integer... params) {
             if(params == null || params.length < 2) return Wenku8Error.ErrorCode.PARAM_COUNT_NOT_MATCHED;
-            int taskaid = params[0];
+            int taskAid = params[0];
             int operationType = params[1]; // type = 0, 1, 2, 3
 
             // get full range online, always
@@ -801,14 +801,14 @@ public class NovelInfoActivity extends AppCompatActivity {
                 // fetch intro
                 if (!isLoading)
                     return Wenku8Error.ErrorCode.USER_CANCELLED_TASK; // cancel
-                ContentValues cv = Wenku8API.getNovelIndex(taskaid, GlobalConfig.getCurrentLang());
+                ContentValues cv = Wenku8API.getNovelIndex(taskAid, GlobalConfig.getCurrentLang());
                 byte[] tempVolumeXml = LightNetwork.LightHttpPostConnection(Wenku8API.BASE_URL, cv);
                 if (tempVolumeXml == null) return Wenku8Error.ErrorCode.NETWORK_ERROR; // network error
                 volumeXml = new String(tempVolumeXml, "UTF-8");
 
                 if (!isLoading)
                     return Wenku8Error.ErrorCode.USER_CANCELLED_TASK; // cancel
-                cv = Wenku8API.getNovelFullMeta(taskaid, GlobalConfig.getCurrentLang());
+                cv = Wenku8API.getNovelFullMeta(taskAid, GlobalConfig.getCurrentLang());
                 byte[] tempIntroXml = LightNetwork.LightHttpPostConnection(Wenku8API.BASE_URL, cv);
                 if (tempIntroXml == null) return Wenku8Error.ErrorCode.NETWORK_ERROR; // network error
                 introXml = new String(tempIntroXml, "UTF-8");
@@ -816,7 +816,7 @@ public class NovelInfoActivity extends AppCompatActivity {
                 // parse into structures
                 vl = Wenku8Parser.getVolumeList(volumeXml);
                 ni = Wenku8Parser.parseNovelFullMeta(introXml);
-                if (vl == null || ni == null) return Wenku8Error.ErrorCode.XML_PARSE_FAILED; // parse failed
+                if (vl.isEmpty() || ni == null) return Wenku8Error.ErrorCode.XML_PARSE_FAILED; // parse failed
 
                 if (!isLoading)
                     return Wenku8Error.ErrorCode.USER_CANCELLED_TASK; // calcel
@@ -826,9 +826,9 @@ public class NovelInfoActivity extends AppCompatActivity {
                 ni.fullIntro = new String(tempFullIntro, "UTF-8");
 
                 // write into saved file
-                GlobalConfig.writeFullFileIntoSaveFolder("intro", taskaid + "-intro.xml", introXml);
-                GlobalConfig.writeFullFileIntoSaveFolder("intro", taskaid + "-introfull.xml", ni.fullIntro);
-                GlobalConfig.writeFullFileIntoSaveFolder("intro", taskaid + "-volume.xml", volumeXml);
+                GlobalConfig.writeFullFileIntoSaveFolder("intro", taskAid + "-intro.xml", introXml);
+                GlobalConfig.writeFullFileIntoSaveFolder("intro", taskAid + "-introfull.xml", ni.fullIntro);
+                GlobalConfig.writeFullFileIntoSaveFolder("intro", taskAid + "-volume.xml", volumeXml);
 
             } catch (UnsupportedEncodingException e) {
                 e.printStackTrace();

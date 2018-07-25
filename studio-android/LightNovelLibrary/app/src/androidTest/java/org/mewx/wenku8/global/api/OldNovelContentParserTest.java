@@ -15,6 +15,12 @@ public class OldNovelContentParserTest {
             "<!--image-->http://bbbbb.com/pictures/1/1339/90903/107725.jpg<!--image-->\r\n" +
             "line 3\r\n";
 
+    private static final String NOVEL_CONTENt_BROKEN_IMAGE = "line 1\r\n" +
+            "    <!--image-->http://bbbbb.com/pictures/1/1339/90903/107724.jpg<!--image-->   \r\n" +
+            "    line 2     \r\n\r\n" +
+            "  <!--image-->http://bbbbb.com/pictures/1/1339/90903/107725.jpg \r\n" +
+            "line 3\r\n";
+
     @Test
     public void parseNovelContent() {
         List<OldNovelContentParser.NovelContent> contents = OldNovelContentParser.parseNovelContent(NOVEL_CONTENT, null);
@@ -43,12 +49,7 @@ public class OldNovelContentParserTest {
 
     @Test
     public void parseNovelContentWithIncompleteImageTag() {
-        final String BROKEN_XML = "line 1\r\n" +
-                "    <!--image-->http://bbbbb.com/pictures/1/1339/90903/107724.jpg<!--image-->   \r\n" +
-                "    line 2     \r\n\r\n" +
-                "  <!--image-->http://bbbbb.com/pictures/1/1339/90903/107725.jpg \r\n" +
-                "line 3\r\n";
-        List<OldNovelContentParser.NovelContent> contents = OldNovelContentParser.parseNovelContent(BROKEN_XML, null);
+        List<OldNovelContentParser.NovelContent> contents = OldNovelContentParser.parseNovelContent(NOVEL_CONTENt_BROKEN_IMAGE, null);
         assertEquals(5, contents.size());
 
         OldNovelContentParser.NovelContent tempContent = contents.get(0);
@@ -84,5 +85,15 @@ public class OldNovelContentParserTest {
         tempContent = contents.get(1);
         assertEquals(IMAGE, tempContent.type);
         assertEquals("http://bbbbb.com/pictures/1/1339/90903/107725.jpg", tempContent.content);
+    }
+
+    @Test
+    public void novelContentParser_onlyImageBroken() {
+        List<OldNovelContentParser.NovelContent> contents = OldNovelContentParser.NovelContentParser_onlyImage(NOVEL_CONTENt_BROKEN_IMAGE);
+        assertEquals(1, contents.size());
+
+        OldNovelContentParser.NovelContent tempContent = contents.get(0);
+        assertEquals(IMAGE, tempContent.type);
+        assertEquals("http://bbbbb.com/pictures/1/1339/90903/107724.jpg", tempContent.content);
     }
 }

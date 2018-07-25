@@ -36,6 +36,11 @@ public class NovelListWithInfoParserTest {
             "</result>";
 
     @Test
+    public void getNovelListWithInfoPageNumInvalid() {
+        assertEquals(0, NovelListWithInfoParser.getNovelListWithInfoPageNum("1234"));
+    }
+
+    @Test
     public void getNovelListWithInfoPageNum() {
         assertEquals(166, NovelListWithInfoParser.getNovelListWithInfoPageNum(XML));
     }

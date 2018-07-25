@@ -22,6 +22,11 @@ public class NovelListWithInfoParser {
         public int fav = 0;
     }
 
+    /**
+     * get current 'page' attributes
+     * @param xml input xml
+     * @return the page in the xml file or 0 by default
+     */
     static public int getNovelListWithInfoPageNum(String xml) {
         try {
             XmlPullParserFactory factory = XmlPullParserFactory.newInstance();
