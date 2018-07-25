@@ -26,7 +26,7 @@ import org.mewx.wenku8.activity.MainActivity;
 import org.mewx.wenku8.activity.NovelInfoActivity;
 import org.mewx.wenku8.adapter.NovelItemAdapter;
 import org.mewx.wenku8.global.GlobalConfig;
-import org.mewx.wenku8.global.api.NovelItemInfo;
+import org.mewx.wenku8.global.api.NovelItemInfoUpdate;
 import org.mewx.wenku8.global.api.NovelListWithInfoParser;
 import org.mewx.wenku8.global.api.Wenku8API;
 import org.mewx.wenku8.listener.MyItemClickListener;
@@ -48,7 +48,7 @@ public class LatestFragment extends Fragment implements MyItemClickListener, MyI
     private TextView mTextView;
 
     // Novel Item info
-    private List<NovelItemInfo> listNovelItemInfo;
+    private List<NovelItemInfoUpdate> listNovelItemInfo;
     private NovelItemAdapter mAdapter;
     private int currentPage, totalPage; // currentP stores next reading page num, TODO: fix wrong number
 
@@ -140,9 +140,9 @@ public class LatestFragment extends Fragment implements MyItemClickListener, MyI
 
         // go to detail activity
         Intent intent = new Intent(getActivity(), NovelInfoActivity.class);
-        intent.putExtra("aid", listNovelItemInfo.get(position).getAid());
+        intent.putExtra("aid", listNovelItemInfo.get(position).aid);
         intent.putExtra("from", "latest");
-        intent.putExtra("title", listNovelItemInfo.get(position).getTitle());
+        intent.putExtra("title", listNovelItemInfo.get(position).title);
         if(Build.VERSION.SDK_INT < 21) {
             startActivity(intent);
         }
@@ -224,12 +224,11 @@ public class LatestFragment extends Fragment implements MyItemClickListener, MyI
                     // byte[] img = LightNetwork.LightHttpPost(
                     // Wenku8Interface.BaseURL, imgP);
 
-                    NovelItemInfo ni = new NovelItemInfo();
-                    ni.setAid(nlwi.aid);
-                    ni.setTitle(nlwi.name);
-                    ni.setAuthor(nlwi.hit + ""); // hit
-                    ni.setUpdate(nlwi.push + ""); // push
-                    ni.setIntro_short(nlwi.fav + ""); // fav
+                    NovelItemInfoUpdate ni = new NovelItemInfoUpdate(nlwi.aid);
+                    ni.title = nlwi.name;
+                    ni.author = nlwi.hit + ""; // hit
+                    ni.update = nlwi.push + ""; // push
+                    ni.intro_short = nlwi.fav + ""; // fav
                     listNovelItemInfo.add(ni);
                 }
 
