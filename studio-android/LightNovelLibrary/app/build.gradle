@@ -89,9 +89,9 @@ dependencies {
     androidTestImplementation 'com.android.support.test:runner:1.0.2'
     androidTestImplementation 'com.android.support.test:rules:1.0.2'
     androidTestImplementation 'junit:junit:4.12'
-    androidTestImplementation 'org.mockito:mockito-all:1.10.19'
-    androidTestImplementation 'com.google.dexmaker:dexmaker:1.2'
-    androidTestImplementation 'com.google.dexmaker:dexmaker-mockito:1.2'
+    androidTestImplementation 'org.mockito:mockito-core:2.19.0'
+    androidTestImplementation 'com.linkedin.dexmaker:dexmaker:2.19.1'
+    androidTestImplementation 'com.linkedin.dexmaker:dexmaker-mockito:2.19.1'
 
     testImplementation 'junit:junit:4.12'
     testImplementation 'org.mockito:mockito-all:1.10.19'
