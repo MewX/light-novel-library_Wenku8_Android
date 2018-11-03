@@ -280,7 +280,7 @@ public class NovelItemListFragment extends Fragment implements MyItemClickListen
                 // network error
                 return;
             }
-            if(tempNovelList != null && tempNovelList.size()==0) {
+            if (tempNovelList == null || tempNovelList.size() == 0) {
                 String error = "in AsyncGetNovelItemList: doInBackground: tempNovelList == null || tempNovelList.size() == 0";
                 return;
             }

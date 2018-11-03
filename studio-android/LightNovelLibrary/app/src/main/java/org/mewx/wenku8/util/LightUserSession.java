@@ -37,6 +37,10 @@ public class LightUserSession {
         return username == null ? "" : username;
     }
 
+    public static String getPassword() {
+        return password == null ? "" : password;
+    }
+
     // no null returned, default is ""
     public static String getSession() {
         if (SESSION != null) {
@@ -125,8 +129,7 @@ public class LightUserSession {
                 logStatus = true;
 
                 // save user info
-                username = name;
-                password = pwd;
+                setUserInfo(name, pwd);
                 saveUserInfoSet();
 
                 // TODO: activate session keeper
@@ -142,8 +145,7 @@ public class LightUserSession {
 
     public static void logOut() {
         logStatus = false;
-        username = "";
-        password = "";
+        setUserInfo("", "");
 
         // delete files
         if(!LightCache.deleteFile(GlobalConfig.getFirstFullUserAccountSaveFilePath())) {
@@ -171,6 +173,11 @@ public class LightUserSession {
         return username != null && password != null && username.length() != 0 && password.length() != 0;
     }
 
+    public static void setUserInfo(String username, String password) {
+        LightUserSession.username = username;
+        LightUserSession.password = password;
+    }
+
     /**
      * Decrypt user file raw content, which is 0-F byte values, encoded in UTF-8.
      * @param raw UTF-8 Charset raw file content.
@@ -179,8 +186,7 @@ public class LightUserSession {
         try {
             String[] a = raw.split("\\|"); // a[0]: username; a[1]: password;
             if (a.length != 2 || a[0].length() == 0 || a[1].length() == 0) {
-                username = "";
-                password = "";
+                setUserInfo("", "");
                 return; // fetch error to return
             }
 
@@ -225,8 +231,8 @@ public class LightUserSession {
             }
 
             // dec three times
-            username = LightBase64.DecodeBase64String(new String(temp_username));
-            password = LightBase64.DecodeBase64String(new String(temp_password));
+            setUserInfo(LightBase64.DecodeBase64String(new String(temp_username)),
+                    LightBase64.DecodeBase64String(new String(temp_password)));
         }
         catch (Exception e) {
             e.printStackTrace();

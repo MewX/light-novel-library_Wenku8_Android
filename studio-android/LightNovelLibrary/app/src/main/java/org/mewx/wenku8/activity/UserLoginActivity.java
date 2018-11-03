@@ -12,7 +12,6 @@ import android.os.Bundle;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
 import android.view.MenuItem;
-import android.view.View;
 import android.widget.EditText;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -50,7 +49,7 @@ public class UserLoginActivity extends AppCompatActivity {
         setContentView(R.layout.layout_user_login);
 
         // set indicator enable
-        Toolbar mToolbar = (Toolbar) findViewById(R.id.toolbar_actionbar);
+        Toolbar mToolbar = findViewById(R.id.toolbar_actionbar);
         setSupportActionBar(mToolbar);
         if(getSupportActionBar() != null) {
             getSupportActionBar().setDisplayHomeAsUpEnabled(true);
@@ -81,62 +80,43 @@ public class UserLoginActivity extends AppCompatActivity {
         }
 
         // get views
-        etUserName = (EditText)findViewById(R.id.edit_username);
-        etPassword = (EditText)findViewById(R.id.edit_password);
-        TextView tvLogin = (TextView)findViewById(R.id.btn_login);
-        TextView tvRegister = (TextView)findViewById(R.id.btn_register);
+        etUserName = findViewById(R.id.edit_username);
+        etPassword = findViewById(R.id.edit_password);
+        TextView tvLogin = findViewById(R.id.btn_login);
+        TextView tvRegister = findViewById(R.id.btn_register);
 
         // listeners
-        tvLogin.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                if(etUserName.getText().toString().length() == 0 || etUserName.getText().toString().length() > 30
-                        || etPassword.getText().toString().length() == 0 || etPassword.getText().toString().length() > 30) {
-                    Toast.makeText(UserLoginActivity.this, getResources().getString(R.string.system_info_fill_not_complete), Toast.LENGTH_SHORT).show();
-                    return;
-                }
-
-                // async login
-                AsyncLoginTask alt = new AsyncLoginTask();
-                alt.execute(etUserName.getText().toString(), etPassword.getText().toString());
+        tvLogin.setOnClickListener(v -> {
+            if(etUserName.getText().toString().length() == 0 || etUserName.getText().toString().length() > 30
+                    || etPassword.getText().toString().length() == 0 || etPassword.getText().toString().length() > 30) {
+                Toast.makeText(UserLoginActivity.this, getResources().getString(R.string.system_info_fill_not_complete), Toast.LENGTH_SHORT).show();
+                return;
             }
+
+            // async login
+            AsyncLoginTask alt = new AsyncLoginTask();
+            alt.execute(etUserName.getText().toString(), etPassword.getText().toString());
         });
 
-        tvRegister.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                new MaterialDialog.Builder(UserLoginActivity.this)
-                        .callback(new MaterialDialog.ButtonCallback() {
-                            @Override
-                            public void onPositive(MaterialDialog dialog) {
-                                super.onPositive(dialog);
-
-                                // use default browser
-//                                Uri uri = Uri.parse(Wenku8API.REGISTER_URL);
-//                                Intent intent = new Intent(Intent.ACTION_VIEW, uri);
-//                                startActivity(intent);
-
-                                // show browser list
-                                Intent intent = new Intent(Intent.ACTION_VIEW);
-                                intent.setData(Uri.parse(Wenku8API.REGISTER_URL));
-                                String title = getResources().getString(R.string.system_choose_browser);
-                                Intent chooser = Intent.createChooser(intent, title);
-                                startActivity(chooser);
-
-                            }
-                        })
-                        .theme(Theme.LIGHT)
-                        .backgroundColorRes(R.color.dlgBackgroundColor)
-                        .contentColorRes(R.color.dlgContentColor)
-                        .positiveColorRes(R.color.dlgPositiveButtonColor)
-                        .negativeColorRes(R.color.dlgNegativeButtonColor)
-                        .content(R.string.dialog_content_verify_register)
-                        .contentGravity(GravityEnum.CENTER)
-                        .positiveText(R.string.dialog_positive_ok)
-                        .negativeText(R.string.dialog_negative_pass)
-                        .show();
-            }
-        });
+        tvRegister.setOnClickListener(v -> new MaterialDialog.Builder(UserLoginActivity.this)
+                .onPositive((dialog, which) -> {
+                    // show browser list
+                    Intent intent = new Intent(Intent.ACTION_VIEW);
+                    intent.setData(Uri.parse(Wenku8API.REGISTER_URL));
+                    String title = getResources().getString(R.string.system_choose_browser);
+                    Intent chooser = Intent.createChooser(intent, title);
+                    startActivity(chooser);
+                })
+                .theme(Theme.LIGHT)
+                .backgroundColorRes(R.color.dlgBackgroundColor)
+                .contentColorRes(R.color.dlgContentColor)
+                .positiveColorRes(R.color.dlgPositiveButtonColor)
+                .negativeColorRes(R.color.dlgNegativeButtonColor)
+                .content(R.string.dialog_content_verify_register)
+                .contentGravity(GravityEnum.CENTER)
+                .positiveText(R.string.dialog_positive_ok)
+                .negativeText(R.string.dialog_negative_pass)
+                .show());
     }
 
     private class AsyncLoginTask extends AsyncTask<String, Integer, Wenku8Error.ErrorCode> {
@@ -187,7 +167,6 @@ public class UserLoginActivity extends AppCompatActivity {
             super.onPostExecute(i);
 
             md.dismiss();
-            //  Toast.makeText(MyApp.getContext(),"session=" + LightUserSession.getSession(), Toast.LENGTH_SHORT).show();
             switch(i) {
                 case SYSTEM_1_SUCCEEDED:
                     Toast.makeText(MyApp.getContext(), getResources().getString(R.string.system_logged), Toast.LENGTH_SHORT).show();
