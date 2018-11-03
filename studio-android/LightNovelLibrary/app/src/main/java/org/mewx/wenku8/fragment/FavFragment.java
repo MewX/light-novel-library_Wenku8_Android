@@ -541,10 +541,6 @@ public class FavFragment extends Fragment implements MyItemClickListener, MyItem
 
         // refresh list
         refreshList(timecount ++);
-//        if(mAdapter != null) {
-//            mAdapter.notifyDataSetChanged();
-//            mRecyclerView.setAdapter(mAdapter);
-//        }
     }
 
 }

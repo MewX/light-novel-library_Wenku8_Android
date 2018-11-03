@@ -786,7 +786,7 @@ public class NovelInfoActivity extends AppCompatActivity {
         // in: Aid, OperationType
         // out: current loading
         String volumeXml, introXml;
-        List<VolumeList> vl = null;
+        List<VolumeList> vl = new ArrayList<>();
         private NovelItemMeta ni;
         int size_a = 0, current = 0;
 
@@ -832,6 +832,7 @@ public class NovelInfoActivity extends AppCompatActivity {
 
             } catch (UnsupportedEncodingException e) {
                 e.printStackTrace();
+                return Wenku8Error.ErrorCode.SERVER_RETURN_NOTHING;
             }
             if(operationType == 0) return Wenku8Error.ErrorCode.SYSTEM_1_SUCCEEDED; // update info
 
