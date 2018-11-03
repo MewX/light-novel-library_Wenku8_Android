@@ -3,6 +3,7 @@ package org.mewx.wenku8.util;
 import android.content.Context;
 import android.graphics.Point;
 import android.os.Build;
+import android.support.annotation.NonNull;
 import android.view.Display;
 import android.view.WindowManager;
 
@@ -16,7 +17,7 @@ import java.lang.reflect.InvocationTargetException;
 public class LightTool {
 
     /* Number related useful functions */
-    public static boolean isInteger(String value) {
+    public static boolean isInteger(@NonNull String value) {
         try {
             Integer.parseInt(value);
             return true;
@@ -25,12 +26,10 @@ public class LightTool {
         }
     }
 
-    public static boolean isDouble(String value) {
+    public static boolean isDouble(@NonNull String value) {
         try {
             Double.parseDouble(value);
-            if (value.contains("."))
-                return true;
-            return false;
+            return value.contains(".");
         } catch (NumberFormatException e) {
             return false;
         }

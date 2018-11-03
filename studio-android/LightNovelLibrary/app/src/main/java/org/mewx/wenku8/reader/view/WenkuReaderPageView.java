@@ -320,8 +320,8 @@ public class WenkuReaderPageView extends View {
                     break;
                 }
                 mLoader.setCurrentIndex(++ curLineIndex);
+                continue;
             }
-            WenkuReaderLoader.ElementType type = mLoader.getCurrentType();
             String temp = mLoader.getCurrentAsString().charAt(curWordIndex) + "";
             int tempWidth = (int) textPaint.measureText(temp);
 
@@ -676,14 +676,6 @@ public class WenkuReaderPageView extends View {
         @Override
         protected void onPostExecute(Wenku8Error.ErrorCode errorCode) {
             super.onPostExecute(errorCode);
-
-//            RelativeLayout rl = (RelativeLayout) getParent();
-//            ImageView imageView = new ImageView(getContext());
-//            RelativeLayout.LayoutParams lp = new RelativeLayout.LayoutParams(bi_bak.width, bi_bak.height);
-//            lp.setMargins(bi_bak.x_beg, bi_bak.y_beg, 0, 0);
-//            if(rl == null || imageView == null) return; // ??
-//            rl.addView(imageView, lp);
-//            imageView.setImageBitmap(bi_bak.bm);
 
             if(errorCode == Wenku8Error.ErrorCode.SYSTEM_1_SUCCEEDED)
                 WenkuReaderPageView.this.postInvalidate();
