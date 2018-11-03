@@ -48,6 +48,7 @@ import org.mewx.wenku8.util.LightTool;
 
 import java.io.File;
 import java.io.UnsupportedEncodingException;
+import java.util.ArrayList;
 import java.util.List;
 
 import fr.castorflex.android.smoothprogressbar.SmoothProgressBar;
@@ -78,7 +79,7 @@ public class NovelInfoActivity extends AppCompatActivity {
     private FloatingActionsMenu famMenu = null;
     private SmoothProgressBar spb = null;
     private NovelItemMeta mNovelItemMeta = null;
-    private List<VolumeList> listVolume = null;
+    private List<VolumeList> listVolume = new ArrayList<>();
     private String novelFullMeta = null, novelFullIntro = null, novelFullVolume = null;
 
     @Override
@@ -669,8 +670,10 @@ public class NovelInfoActivity extends AppCompatActivity {
                     novelFullVolume = new String(byteNovelChapterList, "UTF-8"); // save
                 }
 
-                listVolume = Wenku8Parser.getVolumeList(novelFullVolume);
-                if(listVolume == null) return -1;
+                // update the volume list
+                List<VolumeList> tempListVolume = Wenku8Parser.getVolumeList(novelFullVolume);
+                if(tempListVolume == null) return -1;
+                listVolume = tempListVolume;
             } catch (UnsupportedEncodingException e) {
                 e.printStackTrace();
                 return -2;
@@ -683,8 +686,6 @@ public class NovelInfoActivity extends AppCompatActivity {
                     if(!LightCache.testFileExist(GlobalConfig.getFirstFullSaveFilePath() + "novel" + File.separator + ci.cid + ".xml")
                             && !LightCache.testFileExist(GlobalConfig.getSecondFullSaveFilePath() + "novel" + File.separator + ci.cid + ".xml"))
                         break;
-                    //String content = GlobalConfig.loadFullFileFromSaveFolder("novel", listVolume.get(i).chapterList.get(j).cid + ".xml");
-                    //List<OldNovelContentParser.NovelContent> listImage = OldNovelContentParser.NovelContentParser_onlyImage(content);
 
                     if(vl.chapterList.indexOf(ci) == vl.chapterList.size() - 1)
                         vl.inLocal = true;
