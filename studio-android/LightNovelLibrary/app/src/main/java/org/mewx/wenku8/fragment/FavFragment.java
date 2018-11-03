@@ -156,7 +156,7 @@ public class FavFragment extends Fragment implements MyItemClickListener, MyItem
                                                 novelFullVolume = GlobalConfig.loadFullFileFromSaveFolder("intro", aid + "-volume.xml");
                                                 if(novelFullVolume.isEmpty()) return;
                                                 listVolume = Wenku8Parser.getVolumeList(novelFullVolume);
-                                                if(listVolume == null) return;
+                                                if(listVolume.isEmpty()) return;
                                                 cleanVolumesCache(listVolume);
                                             }
                                         })
@@ -379,7 +379,7 @@ public class FavFragment extends Fragment implements MyItemClickListener, MyItem
                     // parse into structures
                     vl = Wenku8Parser.getVolumeList(volumeXml);
                     ni = Wenku8Parser.parseNovelFullMeta(introXml);
-                    if (vl == null || ni == null) return Wenku8Error.ErrorCode.XML_PARSE_FAILED;
+                    if (vl.isEmpty() || ni == null) return Wenku8Error.ErrorCode.XML_PARSE_FAILED;
 
                     if(!isLoading) return Wenku8Error.ErrorCode.USER_CANCELLED_TASK;
                     cv = Wenku8API.getNovelFullIntro(ni.aid, GlobalConfig.getCurrentLang());
@@ -488,7 +488,7 @@ public class FavFragment extends Fragment implements MyItemClickListener, MyItem
                     novelFullVolume = GlobalConfig.loadFullFileFromSaveFolder("intro", aid + "-volume.xml");
                     if(novelFullVolume.isEmpty()) return Wenku8Error.ErrorCode.ERROR_DEFAULT;
                     listVolume = Wenku8Parser.getVolumeList(novelFullVolume);
-                    if(listVolume == null) return Wenku8Error.ErrorCode.XML_PARSE_FAILED;
+                    if(listVolume.isEmpty()) return Wenku8Error.ErrorCode.XML_PARSE_FAILED;
 
                     cleanVolumesCache(listVolume);
                     // delete files

@@ -55,11 +55,6 @@ public class LightNetwork {
 	 */
 	@Nullable
 	public static byte[] LightHttpPostConnection(String u, ContentValues values) {
-
-		// a replacer
-//		u = u.replace(fromEle, toEle);
-//        long start = System.currentTimeMillis();
-
 		// new API, initial
 		URL url;
 		HttpURLConnection http;
@@ -115,9 +110,6 @@ public class LightNetwork {
 			byte[] data = outStream.toByteArray(); // copy to ByteArray
 			outStream.close();
 			inStream.close();
-
-//            long elapsed = System.currentTimeMillis() - start;
-//            Log.e("MewX-Net", "page fetched in " + elapsed + "ms");
 
 			return data; // return value
 

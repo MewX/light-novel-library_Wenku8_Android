@@ -1,5 +1,6 @@
 package org.mewx.wenku8.global.api;
 
+import android.support.annotation.NonNull;
 import android.util.Log;
 
 import org.mewx.wenku8.util.LightTool;
@@ -18,7 +19,8 @@ import java.util.List;
  */
 public class Wenku8Parser {
 
-    public static List<Integer> parseNovelItemList(String str) {
+    @NonNull
+    public static List<Integer> parseNovelItemList(@NonNull String str) {
         List<Integer> list = new ArrayList<>();
 
         // <?xml version="1.0" encoding="utf-8"?>
@@ -39,21 +41,21 @@ public class Wenku8Parser {
         // The returning list of this xml is: (total page, aids)
         // { 166, 1143, 1034, 1213, 1, 1011, 1192, 433, 47, 7, 374 }
 
-        final char SEPERATOR = '\''; // seperator
+        final char SEPARATOR = '\''; // seperator
 
         // get total page
         int beg, temp;
-        beg = str.indexOf(SEPERATOR);
-        temp = str.indexOf(SEPERATOR, beg + 1);
-        if (beg == -1 || temp == -1) return null; // this is an exception
+        beg = str.indexOf(SEPARATOR);
+        temp = str.indexOf(SEPARATOR, beg + 1);
+        if (beg == -1 || temp == -1) return list; // empty, this is an exception
         if(LightTool.isInteger(str.substring(beg + 1, temp)))
             list.add(Integer.parseInt(str.substring(beg + 1, temp)));
         beg = temp + 1; // prepare for loop
 
         // init array
         while (true) {
-            beg = str.indexOf(SEPERATOR, beg);
-            temp = str.indexOf(SEPERATOR, beg + 1);
+            beg = str.indexOf(SEPARATOR, beg);
+            temp = str.indexOf(SEPARATOR, beg + 1);
             if (beg == -1 || temp == -1) break;
 
             if(LightTool.isInteger(str.substring(beg + 1, temp)))
@@ -151,11 +153,12 @@ public class Wenku8Parser {
     }
 
 
-    static public ArrayList<VolumeList> getVolumeList(String xml) {
+    @NonNull
+    static public ArrayList<VolumeList> getVolumeList(@NonNull String xml) {
+        ArrayList<VolumeList> l = new ArrayList<>();
         try {
             XmlPullParserFactory factory = XmlPullParserFactory.newInstance();
             XmlPullParser xmlPullParser = factory.newPullParser();
-            ArrayList<VolumeList> l = new ArrayList<>();
             VolumeList vl = null;
             ChapterInfo ci;
             xmlPullParser.setInput(new StringReader(xml));
@@ -219,12 +222,10 @@ public class Wenku8Parser {
                 } else
                     break;
             }
-
-            return l;
         } catch (Exception e) {
             e.printStackTrace();
-            return null;
         }
+        return l;
     }
 
     /**

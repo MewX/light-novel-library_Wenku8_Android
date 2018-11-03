@@ -10,21 +10,21 @@ public class ReviewList {
 
     public static class Review {
         private int rid; // review id
-        @NonNull private Date postTime;
+        @NonNull private Date postTime = new Date();
         private int noReplies;
-        @NonNull private Date lastReplyTime;
-        @NonNull private String userName;
+        @NonNull private Date lastReplyTime = new Date();
+        @NonNull private String userName = "";
         private int uid; // post user
-        @NonNull private String title; // review title
+        @NonNull private String title = ""; // review title
 
         public Review(int rid, @NonNull Date postTime, int noReplies, @NonNull Date lastReplyTime, @NonNull String userName, int uid, @NonNull String title) {
-            this.rid = rid;
-            this.postTime = postTime;
-            this.noReplies = noReplies;
-            this.lastReplyTime = lastReplyTime;
-            this.userName = userName;
-            this.uid = uid;
-            this.title = title;
+            setRid(rid);
+            setPostTime(postTime);
+            setNoReplies(noReplies);
+            setLastReplyTime(lastReplyTime);
+            setUserName(userName);
+            setUid(uid);
+            setTitle(title);
         }
 
         public int getRid() {

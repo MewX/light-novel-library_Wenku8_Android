@@ -242,7 +242,7 @@ public class VerticalReaderActivity extends AppCompatActivity {
                     pDialog.setProgress(i);
 
                 switch (nc.get(i).type) {
-                    case 't':
+                    case TEXT:
                         TextView tempTV = new TextView(VerticalReaderActivity.this);
                         if (i == 0) {
                             tempTV.setTextSize(TypedValue.COMPLEX_UNIT_SP,
@@ -264,7 +264,7 @@ public class VerticalReaderActivity extends AppCompatActivity {
                         TextListLayout.addView(tempTV);
                         break;
 
-                    case 'i':
+                    case IMAGE:
                         final ImageView tempIV = new ImageView(VerticalReaderActivity.this);
                         tempIV.setClickable(true);
                         tempIV.setAdjustViewBounds(true);

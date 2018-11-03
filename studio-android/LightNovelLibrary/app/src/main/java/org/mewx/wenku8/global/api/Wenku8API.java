@@ -31,7 +31,7 @@ public class Wenku8API {
     // this only prevents good boys from doing bad things, and it's what we all know :-)
     // and I know the mixed use for both simplified and traditional do not work in this case
     public static final int MIN_REPLY_TEXT = 7;
-    public static final String[] badWords = {
+    private static final String[] badWords = {
             // Simplified
             "共产党", "政府",  "毛泽东",  "邓小平",  "江泽民",  "胡锦涛",  "温家宝",  "习近平",
             "李克强", "台独",  "藏独", "反日", "反共", "反中", "达赖", "刘晓波", "毛主席", "愤青",

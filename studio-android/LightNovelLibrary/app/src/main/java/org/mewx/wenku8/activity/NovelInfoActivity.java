@@ -37,6 +37,7 @@ import org.mewx.wenku8.global.GlobalConfig;
 import org.mewx.wenku8.global.api.ChapterInfo;
 import org.mewx.wenku8.global.api.NovelItemMeta;
 import org.mewx.wenku8.global.api.OldNovelContentParser;
+import org.mewx.wenku8.global.api.OldNovelContentParser.NovelContentType;
 import org.mewx.wenku8.global.api.VolumeList;
 import org.mewx.wenku8.global.api.Wenku8API;
 import org.mewx.wenku8.global.api.Wenku8Error;
@@ -195,10 +196,7 @@ public class NovelInfoActivity extends AppCompatActivity {
             tvLatestChapter.setBackground(getResources().getDrawable(R.drawable.btn_menu_item));
         }
         tvNovelTitle.setOnClickListener(v -> {
-            if(isLoading) {
-                Toast.makeText(NovelInfoActivity.this, getResources().getString(R.string.system_loading_please_wait), Toast.LENGTH_SHORT).show();
-                return;
-            }
+            if (runLoadingChecker()) return;
 
             // show aid: title
             new MaterialDialog.Builder(NovelInfoActivity.this)
@@ -214,10 +212,7 @@ public class NovelInfoActivity extends AppCompatActivity {
                     .show();
         });
         tvNovelAuthor.setOnClickListener(v -> {
-            if(isLoading) {
-                Toast.makeText(NovelInfoActivity.this, getResources().getString(R.string.system_loading_please_wait), Toast.LENGTH_SHORT).show();
-                return;
-            }
+            if (runLoadingChecker()) return;
 
             new MaterialDialog.Builder(NovelInfoActivity.this)
                     .theme(Theme.LIGHT)
@@ -235,10 +230,7 @@ public class NovelInfoActivity extends AppCompatActivity {
                     .show();
         });
         fabFavorite.setOnClickListener(v -> {
-            if(isLoading) {
-                Toast.makeText(NovelInfoActivity.this, getResources().getString(R.string.system_loading_please_wait), Toast.LENGTH_SHORT).show();
-                return;
-            }
+            if (runLoadingChecker()) return;
 
             // add to favorite
             if(GlobalConfig.testInLocalBookshelf(aid)) {
@@ -274,11 +266,9 @@ public class NovelInfoActivity extends AppCompatActivity {
             }
         });
         fabDownload.setOnClickListener(v -> {
-            if(isLoading) {
-                Toast.makeText(NovelInfoActivity.this, getResources().getString(R.string.system_loading_please_wait), Toast.LENGTH_SHORT).show();
-                return;
-            }
-            else if(!GlobalConfig.testInLocalBookshelf(aid)) {
+            if (runLoadingChecker()) return;
+
+            if(!GlobalConfig.testInLocalBookshelf(aid)) {
                 Toast.makeText(NovelInfoActivity.this, getResources().getString(R.string.system_fav_it_first), Toast.LENGTH_SHORT).show();
                 return;
             }
@@ -322,12 +312,25 @@ public class NovelInfoActivity extends AppCompatActivity {
                     .show();
         });
         tvLatestChapter.setOnClickListener(view -> {
+            if (runLoadingChecker()) return;
+
             // no sufficient info
             if (mNovelItemMeta != null && mNovelItemMeta.latestSectionCid != 0)
                 showDirectJumpToReaderDialog( mNovelItemMeta.latestSectionCid);
             else
                 Toast.makeText(this, getResources().getText(R.string.reader_msg_please_refresh_and_retry), Toast.LENGTH_SHORT).show();
         });
+    }
+
+    /**
+     * run loading checker
+     * @return true if loading; otherwise false
+     */
+    private boolean runLoadingChecker() {
+        if (isLoading) {
+            Toast.makeText(NovelInfoActivity.this, getResources().getString(R.string.system_loading_please_wait), Toast.LENGTH_SHORT).show();
+        }
+        return isLoading;
     }
 
     /**
@@ -517,10 +520,7 @@ public class NovelInfoActivity extends AppCompatActivity {
                 finishAfterTransition(); // end directly
         }
         else if (menuItem.getItemId() == R.id.action_continue_read_progress) {
-            if(isLoading) {
-                Toast.makeText(NovelInfoActivity.this, getResources().getString(R.string.system_loading_please_wait), Toast.LENGTH_SHORT).show();
-                return true;
-            }
+            if (runLoadingChecker()) return true;
 
             // show dialog, jump to last read position
             final GlobalConfig.ReadSavesV1 rs = GlobalConfig.getReadSavesRecordV1(aid);
@@ -671,9 +671,8 @@ public class NovelInfoActivity extends AppCompatActivity {
                 }
 
                 // update the volume list
-                List<VolumeList> tempListVolume = Wenku8Parser.getVolumeList(novelFullVolume);
-                if(tempListVolume == null) return -1;
-                listVolume = tempListVolume;
+                listVolume = Wenku8Parser.getVolumeList(novelFullVolume);
+                if(listVolume.isEmpty()) return -1;
             } catch (UnsupportedEncodingException e) {
                 e.printStackTrace();
                 return -2;
@@ -794,7 +793,7 @@ public class NovelInfoActivity extends AppCompatActivity {
         @Override
         protected Wenku8Error.ErrorCode doInBackground(Integer... params) {
             if(params == null || params.length < 2) return Wenku8Error.ErrorCode.PARAM_COUNT_NOT_MATCHED;
-            int taskaid = params[0];
+            int taskAid = params[0];
             int operationType = params[1]; // type = 0, 1, 2, 3
 
             // get full range online, always
@@ -802,14 +801,14 @@ public class NovelInfoActivity extends AppCompatActivity {
                 // fetch intro
                 if (!isLoading)
                     return Wenku8Error.ErrorCode.USER_CANCELLED_TASK; // cancel
-                ContentValues cv = Wenku8API.getNovelIndex(taskaid, GlobalConfig.getCurrentLang());
+                ContentValues cv = Wenku8API.getNovelIndex(taskAid, GlobalConfig.getCurrentLang());
                 byte[] tempVolumeXml = LightNetwork.LightHttpPostConnection(Wenku8API.BASE_URL, cv);
                 if (tempVolumeXml == null) return Wenku8Error.ErrorCode.NETWORK_ERROR; // network error
                 volumeXml = new String(tempVolumeXml, "UTF-8");
 
                 if (!isLoading)
                     return Wenku8Error.ErrorCode.USER_CANCELLED_TASK; // cancel
-                cv = Wenku8API.getNovelFullMeta(taskaid, GlobalConfig.getCurrentLang());
+                cv = Wenku8API.getNovelFullMeta(taskAid, GlobalConfig.getCurrentLang());
                 byte[] tempIntroXml = LightNetwork.LightHttpPostConnection(Wenku8API.BASE_URL, cv);
                 if (tempIntroXml == null) return Wenku8Error.ErrorCode.NETWORK_ERROR; // network error
                 introXml = new String(tempIntroXml, "UTF-8");
@@ -817,7 +816,7 @@ public class NovelInfoActivity extends AppCompatActivity {
                 // parse into structures
                 vl = Wenku8Parser.getVolumeList(volumeXml);
                 ni = Wenku8Parser.parseNovelFullMeta(introXml);
-                if (vl == null || ni == null) return Wenku8Error.ErrorCode.XML_PARSE_FAILED; // parse failed
+                if (vl.isEmpty() || ni == null) return Wenku8Error.ErrorCode.XML_PARSE_FAILED; // parse failed
 
                 if (!isLoading)
                     return Wenku8Error.ErrorCode.USER_CANCELLED_TASK; // calcel
@@ -827,9 +826,9 @@ public class NovelInfoActivity extends AppCompatActivity {
                 ni.fullIntro = new String(tempFullIntro, "UTF-8");
 
                 // write into saved file
-                GlobalConfig.writeFullFileIntoSaveFolder("intro", taskaid + "-intro.xml", introXml);
-                GlobalConfig.writeFullFileIntoSaveFolder("intro", taskaid + "-introfull.xml", ni.fullIntro);
-                GlobalConfig.writeFullFileIntoSaveFolder("intro", taskaid + "-volume.xml", volumeXml);
+                GlobalConfig.writeFullFileIntoSaveFolder("intro", taskAid + "-intro.xml", introXml);
+                GlobalConfig.writeFullFileIntoSaveFolder("intro", taskAid + "-introfull.xml", ni.fullIntro);
+                GlobalConfig.writeFullFileIntoSaveFolder("intro", taskAid + "-volume.xml", volumeXml);
 
             } catch (UnsupportedEncodingException e) {
                 e.printStackTrace();
@@ -863,10 +862,9 @@ public class NovelInfoActivity extends AppCompatActivity {
                         // cache image
                         if (GlobalConfig.doCacheImage()) {
                             List<OldNovelContentParser.NovelContent> nc = OldNovelContentParser.NovelContentParser_onlyImage(xml);
-                            if (nc == null) return Wenku8Error.ErrorCode.NETWORK_ERROR;
 
                             for (int i = 0; i < nc.size(); i++) {
-                                if (nc.get(i).type == 'i') {
+                                if (nc.get(i).type == NovelContentType.IMAGE) {
                                     pDialog.setMaxProgress(++size_a);
 
                                     // save this images, judge exist first
@@ -974,7 +972,7 @@ public class NovelInfoActivity extends AppCompatActivity {
             String result;
             try {
                 result = new String(bytes, "UTF-8");
-                Log.e("MewX", result);
+                Log.d("MewX", result);
                 if (!LightTool.isInteger(result))
                     return Wenku8Error.ErrorCode.RETURNED_VALUE_EXCEPTION;
                 if(Wenku8Error.getSystemDefinedErrorCode(Integer.parseInt(result)) != Wenku8Error.ErrorCode.SYSTEM_1_SUCCEEDED
@@ -1077,10 +1075,9 @@ public class NovelInfoActivity extends AppCompatActivity {
                         // cache image
                         if (GlobalConfig.doCacheImage()) {
                             List<OldNovelContentParser.NovelContent> nc = OldNovelContentParser.NovelContentParser_onlyImage(xml);
-                            if (nc == null) return Wenku8Error.ErrorCode.NETWORK_ERROR;
 
                             for (int i = 0; i < nc.size(); i++) {
-                                if (nc.get(i).type == 'i') {
+                                if (nc.get(i).type == NovelContentType.IMAGE) {
                                     size_a ++;
 
                                     // save this images, judge exist first

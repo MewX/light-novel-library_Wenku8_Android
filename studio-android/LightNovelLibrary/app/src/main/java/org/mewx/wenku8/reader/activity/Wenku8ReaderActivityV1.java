@@ -68,7 +68,7 @@ public class Wenku8ReaderActivityV1 extends AppCompatActivity {
     private int aid, cid;
     private String forcejump;
     private VolumeList volumeList= null;
-    private List<OldNovelContentParser.NovelContent> nc;
+    private List<OldNovelContentParser.NovelContent> nc = new ArrayList<>();
     private RelativeLayout mSliderHolder;
     private SlidingLayout sl;
 //    private int tempNavBarHeight;
@@ -413,7 +413,7 @@ public class Wenku8ReaderActivityV1 extends AppCompatActivity {
                 }
 
                 nc = OldNovelContentParser.parseNovelContent(xml, null);
-                if (nc == null || nc.size() == 0)
+                if (nc.size() == 0)
                     return xml.length() == 0 ? Wenku8Error.ErrorCode.SERVER_RETURN_NOTHING : Wenku8Error.ErrorCode.XML_PARSE_FAILED;
 
                 return Wenku8Error.ErrorCode.SYSTEM_1_SUCCEEDED;

@@ -55,7 +55,7 @@ public class UserInfoActivity extends AppCompatActivity {
         setContentView(R.layout.layout_account_info);
 
         // set indicator enable
-        Toolbar mToolbar = (Toolbar) findViewById(R.id.toolbar_actionbar);
+        Toolbar mToolbar = findViewById(R.id.toolbar_actionbar);
         setSupportActionBar(mToolbar);
         if(getSupportActionBar() != null) {
             getSupportActionBar().setDisplayHomeAsUpEnabled(true);
@@ -85,13 +85,13 @@ public class UserInfoActivity extends AppCompatActivity {
         }
 
         // get views
-        rivAvatar = (RoundedImageView)findViewById(R.id.user_avatar);
-        tvUserName = (TextView)findViewById(R.id.username);
-        tvNickyName = (TextView)findViewById(R.id.nickname);
-        tvScore = (TextView)findViewById(R.id.score);
-        tvExperience = (TextView)findViewById(R.id.experience);
-        tvRank = (TextView)findViewById(R.id.rank);
-        tvLogout = (TextView)findViewById(R.id.btn_logout);
+        rivAvatar = findViewById(R.id.user_avatar);
+        tvUserName = findViewById(R.id.username);
+        tvNickyName = findViewById(R.id.nickname);
+        tvScore = findViewById(R.id.score);
+        tvExperience = findViewById(R.id.experience);
+        tvRank = findViewById(R.id.rank);
+        tvLogout = findViewById(R.id.btn_logout);
 
         // sync get info
         agui = new AsyncGetUserInfo();
@@ -154,7 +154,7 @@ public class UserInfoActivity extends AppCompatActivity {
                 }
 
                 Log.e("MewX", xml);
-                ui = UserInfo.parseUserInfo(new UserInfo(), xml);
+                ui = UserInfo.parseUserInfo(xml);
                 if(ui == null) return Wenku8Error.ErrorCode.XML_PARSE_FAILED;
 
                 return Wenku8Error.ErrorCode.SYSTEM_1_SUCCEEDED;

@@ -13,7 +13,7 @@ import com.nostra13.universalimageloader.core.ImageLoader;
 import org.mewx.wenku8.MyApp;
 import org.mewx.wenku8.R;
 import org.mewx.wenku8.global.GlobalConfig;
-import org.mewx.wenku8.global.api.NovelItemInfo;
+import org.mewx.wenku8.global.api.NovelItemInfoUpdate;
 import org.mewx.wenku8.global.api.Wenku8API;
 import org.mewx.wenku8.listener.MyOptionClickListener;
 import org.mewx.wenku8.listener.MyItemClickListener;
@@ -33,19 +33,19 @@ public class NovelItemAdapter extends RecyclerView.Adapter<NovelItemAdapter.View
     private MyItemClickListener mItemClickListener;
     private MyOptionClickListener mMyOptionClickListener;
     private MyItemLongClickListener mItemLongClickListener;
-    private List<NovelItemInfo> mDataset;
+    private List<NovelItemInfoUpdate> mDataset;
 
     // empty list, then use append method to add list elements
     public NovelItemAdapter() {
         mDataset = new ArrayList<>();
     }
 
-    public NovelItemAdapter(List<NovelItemInfo> dataset) {
+    public NovelItemAdapter(List<NovelItemInfoUpdate> dataset) {
         super();
         mDataset = dataset; // reference
     }
 
-    public void RefreshDataset(List<NovelItemInfo> dataset) {
+    public void RefreshDataset(List<NovelItemInfoUpdate> dataset) {
         mDataset = dataset; // reference
     }
 
@@ -62,23 +62,23 @@ public class NovelItemAdapter extends RecyclerView.Adapter<NovelItemAdapter.View
 
         // set text
         if(viewHolder.tvNovelTitle != null)
-            viewHolder.tvNovelTitle.setText(mDataset.get(i).getTitle());
+            viewHolder.tvNovelTitle.setText(mDataset.get(i).title);
         if(viewHolder.tvNovelAuthor != null)
-            viewHolder.tvNovelAuthor.setText(mDataset.get(i).getAuthor());
+            viewHolder.tvNovelAuthor.setText(mDataset.get(i).author);
         if(viewHolder.tvNovelStatus != null)
-            viewHolder.tvNovelStatus.setText(Wenku8API.getStatusBySTATUS(Wenku8API.getSTATUSByInt(mDataset.get(i).getStatus())));
+            viewHolder.tvNovelStatus.setText(mDataset.get(i).status);
         if(viewHolder.tvNovelUpdate != null)
-            viewHolder.tvNovelUpdate.setText(mDataset.get(i).getUpdate());
+            viewHolder.tvNovelUpdate.setText(mDataset.get(i).update);
         if(viewHolder.tvNovelIntro != null)
-            viewHolder.tvNovelIntro.setText(mDataset.get(i).getIntroShort());
+            viewHolder.tvNovelIntro.setText(mDataset.get(i).intro_short);
 
         // need to solve flicking problem
-        if(LightCache.testFileExist(GlobalConfig.getFirstStoragePath() + "imgs" + File.separator + mDataset.get(i).getAid() + ".jpg"))
-            ImageLoader.getInstance().displayImage("file://" + GlobalConfig.getFirstStoragePath() + "imgs" + File.separator + mDataset.get(i).getAid() + ".jpg", viewHolder.ivNovelCover);
-        else if(LightCache.testFileExist(GlobalConfig.getSecondStoragePath() + "imgs" + File.separator + mDataset.get(i).getAid() + ".jpg"))
-            ImageLoader.getInstance().displayImage("file://" + GlobalConfig.getSecondStoragePath() + "imgs" + File.separator + mDataset.get(i).getAid() + ".jpg", viewHolder.ivNovelCover);
+        if(LightCache.testFileExist(GlobalConfig.getFirstStoragePath() + "imgs" + File.separator + mDataset.get(i).aid + ".jpg"))
+            ImageLoader.getInstance().displayImage("file://" + GlobalConfig.getFirstStoragePath() + "imgs" + File.separator + mDataset.get(i).aid + ".jpg", viewHolder.ivNovelCover);
+        else if(LightCache.testFileExist(GlobalConfig.getSecondStoragePath() + "imgs" + File.separator + mDataset.get(i).aid + ".jpg"))
+            ImageLoader.getInstance().displayImage("file://" + GlobalConfig.getSecondStoragePath() + "imgs" + File.separator + mDataset.get(i).aid + ".jpg", viewHolder.ivNovelCover);
         else
-            ImageLoader.getInstance().displayImage(Wenku8API.getCoverURL(mDataset.get(i).getAid()), viewHolder.ivNovelCover);
+            ImageLoader.getInstance().displayImage(Wenku8API.getCoverURL(mDataset.get(i).aid), viewHolder.ivNovelCover);
 
     }
 
@@ -110,17 +110,16 @@ public class NovelItemAdapter extends RecyclerView.Adapter<NovelItemAdapter.View
         private MyOptionClickListener mMyOptionClickListener;
         private MyItemLongClickListener mLongClickListener;
         public int position;
-        public boolean isLoading = false;
 
         private ImageButton ibNovelOption;
-        public ImageView ivNovelCover;
-        public TextView tvNovelTitle;
-        public TextView tvNovelStatus;
-        public TextView tvNovelAuthor;
-        public TextView tvNovelUpdate;
-        public TextView tvNovelIntro;
+        ImageView ivNovelCover;
+        TextView tvNovelTitle;
+        TextView tvNovelStatus;
+        TextView tvNovelAuthor;
+        TextView tvNovelUpdate;
+        TextView tvNovelIntro;
 
-        public ViewHolder(View itemView, MyItemClickListener clickListener, MyOptionClickListener myOptionClickListener, MyItemLongClickListener longClickListener) {
+        ViewHolder(View itemView, MyItemClickListener clickListener, MyOptionClickListener myOptionClickListener, MyItemLongClickListener longClickListener) {
             super(itemView);
             this.mClickListener = clickListener;
             this.mMyOptionClickListener = myOptionClickListener;

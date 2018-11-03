@@ -243,7 +243,7 @@ public class NovelItemListFragment extends Fragment implements MyItemClickListen
     }
 
     private class AsyncGetNovelItemList extends AsyncTask<Integer, Integer, Integer> {
-        private List<Integer> tempNovelList = null;
+        private List<Integer> tempNovelList = new ArrayList<>();
         @Override
         protected Integer doInBackground(Integer... params) {
             if(isLoading)
@@ -263,10 +263,9 @@ public class NovelItemListFragment extends Fragment implements MyItemClickListen
             }
 
             // judge result
-            if( tempNovelList == null || tempNovelList.size() == 0 ) {
-                String error = "in AsyncGetNovelItemList: doInBackground: tempNovelList == null || tempNovelList.size() == 0";
-            }
-            else {
+            if (tempNovelList.isEmpty()) {
+                Log.d("MewX", "in AsyncGetNovelItemList: doInBackground: tempNovelList == null || tempNovelList.size() == 0");
+            } else {
                 totalPage = tempNovelList.get(0);
                 tempNovelList.remove(0);
             }
@@ -276,12 +275,12 @@ public class NovelItemListFragment extends Fragment implements MyItemClickListen
 
         @Override
         protected void onPostExecute(Integer integer) {
-            if(integer == -1) {
+            if (integer == -1) {
                 // network error
                 return;
             }
-            if (tempNovelList == null || tempNovelList.size() == 0) {
-                String error = "in AsyncGetNovelItemList: doInBackground: tempNovelList == null || tempNovelList.size() == 0";
+            if (tempNovelList.isEmpty()) {
+                Log.d("MewX", "in AsyncGetNovelItemList: doInBackground: tempNovelList == null || tempNovelList.size() == 0");
                 return;
             }
 

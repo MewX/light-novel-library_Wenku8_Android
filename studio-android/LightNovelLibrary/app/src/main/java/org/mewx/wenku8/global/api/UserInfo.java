@@ -1,5 +1,7 @@
 package org.mewx.wenku8.global.api;
 
+import android.support.annotation.NonNull;
+import android.support.annotation.Nullable;
 import android.util.Log;
 
 import org.mewx.wenku8.global.GlobalConfig;
@@ -13,7 +15,7 @@ import java.io.StringReader;
  * User Info.
  */
 public class UserInfo {
-    /**
+    /*
      * <?xml version="1.0" encoding="utf-8"?>
      * <metadata>
      * <item name="uname"><![CDATA[apptest]]></item>
@@ -30,9 +32,10 @@ public class UserInfo {
     public int experience; // 经验值
     public String rank;
 
-    public static UserInfo parseUserInfo(UserInfo ui, String xml) {
-
+    @Nullable
+    public static UserInfo parseUserInfo(@NonNull String xml) {
         try {
+            UserInfo ui = new UserInfo();
             XmlPullParserFactory factory = XmlPullParserFactory.newInstance();
             XmlPullParser xmlPullParser = factory.newPullParser();
             xmlPullParser.setInput(new StringReader(xml));
@@ -48,23 +51,19 @@ public class UserInfo {
                             // root tag
                             break;
                         } else if ("item".equals(xmlPullParser.getName())) {
-                            if("uname".equals(xmlPullParser.getAttributeValue(0))) {
+                            if ("uname".equals(xmlPullParser.getAttributeValue(0))) {
                                 ui.username = xmlPullParser.nextText();
                                 Log.e("MewX", ui.username.length() == 0 ? GlobalConfig.UNKNOWN : ui.username);
-                            }
-                            else if("nickname".equals(xmlPullParser.getAttributeValue(0))) {
+                            } else if ("nickname".equals(xmlPullParser.getAttributeValue(0))) {
                                 ui.nickyname = xmlPullParser.nextText();
                                 Log.e("MewX", ui.nickyname.length() == 0 ? GlobalConfig.UNKNOWN : ui.nickyname);
-                            }
-                            else if("score".equals(xmlPullParser.getAttributeValue(0))) {
+                            } else if ("score".equals(xmlPullParser.getAttributeValue(0))) {
                                 ui.score = Integer.valueOf(xmlPullParser.nextText());
                                 Log.e("MewX", "score:" + ui.score);
-                            }
-                            else if("experience".equals(xmlPullParser.getAttributeValue(0))) {
+                            } else if ("experience".equals(xmlPullParser.getAttributeValue(0))) {
                                 ui.experience = Integer.valueOf(xmlPullParser.nextText());
                                 Log.e("MewX", "experience:" + ui.experience);
-                            }
-                            else if("rank".equals(xmlPullParser.getAttributeValue(0))) {
+                            } else if ("rank".equals(xmlPullParser.getAttributeValue(0))) {
                                 ui.rank = xmlPullParser.nextText();
                                 Log.e("MewX", ui.rank.length() == 0 ? GlobalConfig.UNKNOWN : ui.rank);
                             }

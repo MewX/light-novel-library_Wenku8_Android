@@ -1,11 +1,10 @@
 package org.mewx.wenku8.global.api;
 
+import android.support.annotation.NonNull;
+import android.support.annotation.Nullable;
 import android.util.Log;
-import android.widget.Toast;
 
 import com.afollestad.materialdialogs.MaterialDialog;
-
-import org.mewx.wenku8.MyApp;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -15,12 +14,19 @@ import java.util.List;
  * Old Novel Content Parser.
  */
 public class OldNovelContentParser {
+    private static final String TAG = OldNovelContentParser.class.getSimpleName();
+
+    public enum NovelContentType {
+        TEXT, IMAGE
+    }
+
     public static class NovelContent {
-        public char type = 't'; // 't' - text (default); 'i' - img
+        public NovelContentType type = NovelContentType.TEXT;
         public String content = "";
     }
 
-    public static List<NovelContent> parseNovelContent(String raw, MaterialDialog pDialog) {
+    @NonNull
+    public static List<NovelContent> parseNovelContent(@NonNull String raw, @Nullable MaterialDialog pDialog) {
         List<NovelContent> result = new ArrayList<>();
 
         // use split
@@ -42,7 +48,7 @@ public class OldNovelContentParser {
             temp = t.indexOf("<!--image-->", 0);
             if (temp == -1) {
                 NovelContent nc = new NovelContent();
-                nc.type = 't';
+                nc.type = NovelContentType.TEXT;
                 nc.content = t.trim(); //.replaceAll("[ |　]", " ").trim();
                 result.add(nc);
 
@@ -50,7 +56,7 @@ public class OldNovelContentParser {
                 if (pDialog != null)
                     pDialog.setMaxProgress(result.size());
             } else {
-                Log.v("MewX", "img index = " + temp);
+                Log.d(TAG, "img index = " + temp);
                 // nc.content = nc.content.substring(temp + 12,
                 // nc.content.indexOf("<!--image-->", temp + 12));
 
@@ -64,16 +70,15 @@ public class OldNovelContentParser {
                     NovelContent nc2 = new NovelContent();
                     int t2 = t.indexOf("<!--image-->", temp + 12);
                     if (t2 < 0) {
-                        Log.v("MewX", "Breaked in parseNovelContent, t2 = "
-                                + t2);
+                        Log.d(TAG, "Incomplete image pair, t2 = " + t2);
                         NovelContent nc = new NovelContent();
-                        nc.type = 't';
-                        nc.content = t;
+                        nc.type = NovelContentType.TEXT;
+                        nc.content = t.trim();
                         result.add(nc);
                         break;
                     }
                     nc2.content = t.substring(temp + 12, t2);
-                    nc2.type = 'i';
+                    nc2.type = NovelContentType.IMAGE;
                     result.add(nc2);
                     temp = t2 + 12;
 
@@ -89,7 +94,8 @@ public class OldNovelContentParser {
 
     }
 
-    public static List<NovelContent> NovelContentParser_onlyImage(String raw) {
+    @NonNull
+    public static List<NovelContent> NovelContentParser_onlyImage(@NonNull String raw) {
         List<NovelContent> result = new ArrayList<>();
 
         // use split
@@ -99,7 +105,7 @@ public class OldNovelContentParser {
             // test
             temp = t.indexOf("<!--image-->", 0);
             if (temp != -1) {
-                Log.v("MewX", "img index = " + temp);
+                Log.d(TAG, "img index = " + temp);
                 // nc.content = nc.content.substring(temp + 12,
                 // nc.content.indexOf("<!--image-->", temp + 12));
 
@@ -113,13 +119,11 @@ public class OldNovelContentParser {
                     NovelContent nc2 = new NovelContent();
                     int t2 = t.indexOf("<!--image-->", temp + 12);
                     if (t2 < 0) {
-                        Log.v("MewX",
-                                "Breaked in NovelContentParser_onlyImage, t2 = "
-                                        + t2);
+                        Log.d(TAG, "Breaked in NovelContentParser_onlyImage, t2 = " + t2);
                         break;
                     }
                     nc2.content = t.substring(temp + 12, t2);
-                    nc2.type = 'i';
+                    nc2.type = NovelContentType.IMAGE;
                     result.add(nc2);
                     temp = t2 + 12;
 
