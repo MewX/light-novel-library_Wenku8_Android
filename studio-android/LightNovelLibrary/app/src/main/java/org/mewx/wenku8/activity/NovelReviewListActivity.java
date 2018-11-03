@@ -269,7 +269,7 @@ public class NovelReviewListActivity extends AppCompatActivity implements MyItem
             if (metNetworkIssue) {
                 // met net work issue, show retry button
                 if (tempActivity != null) tempActivity.showRetryButton();
-            } else {
+            } else if (tempActivity != null) {
                 // all good, update list
                 if (tempActivity.getAdapter() == null) {
                     ReviewItemAdapter reviewItemAdapter = new ReviewItemAdapter(reviewList);
