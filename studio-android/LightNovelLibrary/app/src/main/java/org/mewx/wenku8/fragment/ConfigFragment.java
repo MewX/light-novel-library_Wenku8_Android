@@ -266,9 +266,9 @@ public class ConfigFragment extends Fragment {
             // return version code
             byte[] codeByte = LightNetwork.LightHttpDownload(strings[0]);
             if (codeByte == null) return -1;
-            String code = new String(codeByte);
+            String code = new String(codeByte).trim();
             Log.d("MewX", "version code: " + code);
-            if (code.trim().isEmpty() || !TextUtils.isDigitsOnly(code.trim())) return -1;
+            if (code.isEmpty() || !TextUtils.isDigitsOnly(code)) return -1;
             else return Integer.parseInt(code);
         }
 
