@@ -878,3 +878,6 @@ Material Design风格的`轻小说文库`App**完全**开源了！想实践Mater
     of this license document, but changing it is not allowed.
 
     ......
+
+[![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2FMewX%2Flight-novel-library_Wenku8_Android.svg?type=large)](https://app.fossa.io/projects/git%2Bgithub.com%2FMewX%2Flight-novel-library_Wenku8_Android?ref=badge_large)
+
