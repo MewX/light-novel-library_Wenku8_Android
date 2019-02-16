@@ -6,7 +6,7 @@ buildscript {
         google()
     }
     dependencies {
-        classpath 'com.android.tools.build:gradle:3.1.4'
+        classpath 'com.android.tools.build:gradle:3.3.1'
         classpath 'org.kt3k.gradle.plugin:coveralls-gradle-plugin:2.4.0'
 
         // NOTE: Do not place your application dependencies here; they belong
@@ -25,6 +25,6 @@ allprojects {
 
 ext {
     targetSdkVersion = 28
-    buildToolsVersion = "28.0.1"
-    supportLibVersion = "28.0.0-alpha3"
+    buildToolsVersion = "28.0.3"
+    supportLibVersion = "28.0.0"
 }
