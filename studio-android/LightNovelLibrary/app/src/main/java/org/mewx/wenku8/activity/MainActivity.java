@@ -141,9 +141,6 @@ public class MainActivity extends AppCompatActivity {
             GlobalConfig.initImageLoader(this);
         }
 
-        // global settings
-        GlobalConfig.initVolleyNetwork();
-
         // UMeng initialization
         UMConfigure.init(MyApp.getContext(), UMConfigure.DEVICE_TYPE_PHONE, null);
 
