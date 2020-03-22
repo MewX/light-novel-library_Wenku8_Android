@@ -1,5 +1,7 @@
 package org.mewx.wenku8.adapter;
 
+import android.annotation.SuppressLint;
+import android.os.AsyncTask;
 import android.support.annotation.NonNull;
 import android.support.v7.widget.RecyclerView;
 import android.view.View;
@@ -9,24 +11,24 @@ import android.widget.ImageView;
 import android.widget.TableRow;
 import android.widget.TextView;
 
-import com.android.volley.Request;
-import com.android.volley.toolbox.StringRequest;
 import com.nostra13.universalimageloader.core.ImageLoader;
 
 import org.mewx.wenku8.R;
 import org.mewx.wenku8.global.GlobalConfig;
 import org.mewx.wenku8.global.api.NovelItemInfoUpdate;
 import org.mewx.wenku8.global.api.Wenku8API;
-import org.mewx.wenku8.listener.MyOptionClickListener;
+import org.mewx.wenku8.global.api.Wenku8Error;
 import org.mewx.wenku8.listener.MyItemClickListener;
 import org.mewx.wenku8.listener.MyItemLongClickListener;
+import org.mewx.wenku8.listener.MyOptionClickListener;
 import org.mewx.wenku8.util.LightCache;
+import org.mewx.wenku8.util.LightNetwork;
 
 import java.io.File;
 import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
+import java.util.Objects;
 
 /**
  * Created by MewX on 2015/1/20.
@@ -63,46 +65,12 @@ public class NovelItemAdapterUpdate extends RecyclerView.Adapter<NovelItemAdapte
     }
 
     @Override
-    public void onBindViewHolder(@NonNull final ViewHolder viewHolder, int i) {
-
+    public void onBindViewHolder(@NonNull final ViewHolder viewHolder, int aid) {
         // judge if empty
-        if(Integer.toString(mDataset.get(i).aid).equals(mDataset.get(i).title) && !viewHolder.isLoading) {
-
-            // this is empty viewholder
-            viewHolder.isLoading = true;
-            final int tempAid = i;
-
-            StringRequest postRequest = new StringRequest(Request.Method.POST, Wenku8API.BASE_URL,
-                    response -> {
-                        // response
-                        try {
-                            response = new String(response.getBytes(), "UTF-8");
-                        } catch (UnsupportedEncodingException e) {
-                            e.printStackTrace();
-                        }
-
-                        // update info
-                        mDataset.set(tempAid,NovelItemInfoUpdate.parse(response));
-                        refreshAllContent(viewHolder, tempAid);
-                        viewHolder.isLoading = false;
-                    },
-                    error -> {
-                        // error
-                        viewHolder.isLoading = false;
-                    }
-            ) {
-                @Override
-                protected Map<String, String> getParams()
-                {
-                    return Wenku8API.getNovelShortInfoUpdate(mDataset.get(tempAid).aid, GlobalConfig.getCurrentLang());
-                }
-            };
-
-            if(GlobalConfig.volleyRequestQueue != null)
-                GlobalConfig.volleyRequestQueue.add(postRequest); // meet errors
+        if(Integer.toString(mDataset.get(aid).aid).equals(mDataset.get(aid).title) && !viewHolder.isLoading) {
+            new AsyncLoadNovelIntro(aid, viewHolder).execute();
         }
-
-        refreshAllContent(viewHolder, i);
+        refreshAllContent(viewHolder, aid);
     }
 
     private void refreshAllContent( final ViewHolder viewHolder, int i ) {
@@ -229,6 +197,50 @@ public class NovelItemAdapterUpdate extends RecyclerView.Adapter<NovelItemAdapte
                 mLongClickListener.onItemLongClick(v, getAdapterPosition());
             }
             return true;
+        }
+    }
+
+
+    @SuppressLint("StaticFieldLeak")
+    private class AsyncLoadNovelIntro extends AsyncTask<Void, Void, Wenku8Error.ErrorCode> {
+        private ViewHolder vh;
+        private int aid;
+        private String novelIntro;
+
+        AsyncLoadNovelIntro(int aid, ViewHolder vh) {
+            this.aid = aid;
+            this.vh = vh;
+        }
+
+        @Override
+        protected Wenku8Error.ErrorCode doInBackground(Void... params) {
+            vh.isLoading = true;
+            try {
+                byte[] res = LightNetwork.LightHttpPostConnection(Wenku8API.BASE_URL,
+                        Wenku8API.getNovelShortInfoUpdate_CV(mDataset.get(aid).aid,
+                                GlobalConfig.getCurrentLang()));
+                if (res == null) {
+                    return Wenku8Error.ErrorCode.ERROR_DEFAULT;
+                }
+
+                novelIntro = new String(res, "UTF-8");
+                return Wenku8Error.ErrorCode.SYSTEM_1_SUCCEEDED;
+            } catch (UnsupportedEncodingException e) {
+                e.printStackTrace();
+                return Wenku8Error.ErrorCode.ERROR_DEFAULT;
+            }
+        }
+
+        @Override
+        protected void onPostExecute(Wenku8Error.ErrorCode errorCode) {
+            super.onPostExecute(errorCode);
+
+            if(errorCode == Wenku8Error.ErrorCode.SYSTEM_1_SUCCEEDED) {
+                // update info
+                mDataset.set(aid,NovelItemInfoUpdate.parse(novelIntro));
+                refreshAllContent(vh, aid);
+            }
+            vh.isLoading = false;
         }
     }
 

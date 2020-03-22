@@ -245,8 +245,7 @@ public class FavFragment extends Fragment implements MyItemClickListener, MyItem
 
         // result
         if(retValue != 0) {
-            Toast.makeText(getActivity(), "Error: Some intro load failed, please redownload.", Toast.LENGTH_SHORT).show();
-            return;
+            Toast.makeText(getActivity(), getResources().getString(R.string.bookshelf_intro_load_failed), Toast.LENGTH_SHORT).show();
         }
 
         if(mAdapter == null) {
@@ -299,7 +298,7 @@ public class FavFragment extends Fragment implements MyItemClickListener, MyItem
             if(b == null) return Wenku8Error.ErrorCode.NETWORK_ERROR;
 
             if(LightTool.isInteger(new String(b))) {
-                if(Wenku8Error.getSystemDefinedErrorCode(Integer.valueOf(new String(b))) == Wenku8Error.ErrorCode.SYSTEM_4_NOT_LOGGED_IN) {
+                if(Wenku8Error.getSystemDefinedErrorCode(Integer.parseInt(new String(b))) == Wenku8Error.ErrorCode.SYSTEM_4_NOT_LOGGED_IN) {
                     // do log in
                     Wenku8Error.ErrorCode temp = LightUserSession.doLoginFromFile();
                     if(temp != Wenku8Error.ErrorCode.SYSTEM_1_SUCCEEDED) return temp; // return an error code

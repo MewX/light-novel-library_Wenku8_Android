@@ -22,8 +22,6 @@ import java.util.zip.GZIPInputStream;
  **/
 
 public class LightNetwork {
-//    final static private String fromEle = ".cn/";
-//    final static private String toEle = ".com/";
 
 	/**
 	 * encodeToHttp:
@@ -67,7 +65,7 @@ public class LightNetwork {
 				http.setRequestProperty("Cookie", "PHPSESSID=" + LightUserSession.getSession());
 			}
 			http.setConnectTimeout(3000);
-			http.setReadTimeout(3000);
+			http.setReadTimeout(5000);
 			http.setDoOutput(true); // has input name value pair
 			http.setInstanceFollowRedirects(true); // enable redirects
 		} catch (Exception e) {
