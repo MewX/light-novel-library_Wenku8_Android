@@ -878,3 +878,17 @@ Material Design风格的`轻小说文库`App**完全**开源了！想实践Mater
     of this license document, but changing it is not allowed.
 
     ......
+
+[![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2FMewX%2Flight-novel-library_Wenku8_Android.svg?type=large)](https://app.fossa.io/projects/git%2Bgithub.com%2FMewX%2Flight-novel-library_Wenku8_Android?ref=badge_large)
+
+
+## Contributors
+
+Thanks goes to these wonderful people ([emoji key](https://allcontributors.org/docs/en/emoji-key)):
+
+<!-- ALL-CONTRIBUTORS-LIST:START - Do not remove or modify this section -->
+<!-- prettier-ignore -->
+<table><tr><td align="center"><a href="https://www.gaeblogx.com"><img src="https://avatars0.githubusercontent.com/u/13044821?v=4" width="100px;" alt="Baby Pepper"/><br /><sub><b>Baby Pepper</b></sub></a><br /><a href="https://github.com/MewX/light-novel-library_Wenku8_Android/commits?author=SeraphRoy" title="Code">💻</a></td></tr></table>
+<!-- ALL-CONTRIBUTORS-LIST:END -->
+
+This project follows the [all-contributors](https://github.com/all-contributors/all-contributors) specification. Contributions of any kind welcome!
