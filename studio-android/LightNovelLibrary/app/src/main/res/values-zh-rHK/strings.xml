@@ -162,7 +162,7 @@
     <string name="bookshelf_error">未知錯誤，操作失敗！</string>
     <string name="bookshelf_removed">已取消收藏！</string>
     <string name="bookshelf_added">成功添加到收藏！</string>
-    <string name="bookshelf_intro_load_failed">小說信息讀取失敗，此小說信息需要手動同步。</string>
+    <string name="bookshelf_intro_load_failed">小說信息損壞，需要手動同步小說信息。</string>
     <string name="bookshelf_inlocal">已緩存</string>
     <string name="userinfo_username">用戶名</string>
     <string name="userinfo_nickyname">昵稱</string>

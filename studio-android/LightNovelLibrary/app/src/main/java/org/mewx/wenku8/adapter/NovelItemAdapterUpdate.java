@@ -216,10 +216,14 @@ public class NovelItemAdapterUpdate extends RecyclerView.Adapter<NovelItemAdapte
         protected Wenku8Error.ErrorCode doInBackground(Void... params) {
             vh.isLoading = true;
             try {
-                novelIntro = new String(Objects.requireNonNull(
-                        LightNetwork.LightHttpPostConnection(Wenku8API.BASE_URL,
-                                Wenku8API.getNovelShortInfoUpdate_CV(mDataset.get(aid).aid,
-                                        GlobalConfig.getCurrentLang()))), "UTF-8");
+                byte[] res = LightNetwork.LightHttpPostConnection(Wenku8API.BASE_URL,
+                        Wenku8API.getNovelShortInfoUpdate_CV(mDataset.get(aid).aid,
+                                GlobalConfig.getCurrentLang()));
+                if (res == null) {
+                    return Wenku8Error.ErrorCode.ERROR_DEFAULT;
+                }
+
+                novelIntro = new String(res, "UTF-8");
                 return Wenku8Error.ErrorCode.SYSTEM_1_SUCCEEDED;
             } catch (UnsupportedEncodingException e) {
                 e.printStackTrace();
