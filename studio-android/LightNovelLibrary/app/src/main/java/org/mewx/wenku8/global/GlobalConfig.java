@@ -10,10 +10,6 @@ import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.util.Log;
 
-import com.android.volley.Cache;
-import com.android.volley.Network;
-import com.android.volley.RequestQueue;
-import com.android.volley.toolbox.Volley;
 import com.nostra13.universalimageloader.cache.disc.impl.UnlimitedDiscCache;
 import com.nostra13.universalimageloader.core.DisplayImageOptions;
 import com.nostra13.universalimageloader.core.ImageLoader;
@@ -130,26 +126,6 @@ public class GlobalConfig {
                 currentLang = Wenku8API.LANG.SC;
         }
         return currentLang;
-    }
-
-    // external libs
-    private static Cache volleyCache = null;
-    private static Network volleyNetwork = null;
-    public static RequestQueue volleyRequestQueue = null;
-
-    // global configs, need to call first
-    public static void initVolleyNetwork() {
-        if(volleyRequestQueue!=null)
-            return;
-
-//        volleyCache = new DiskBasedCache(new File(getSecondStoragePath()), 1024 * 1024); // 1MB cap
-//        volleyNetwork = new BasicNetwork(new HurlStack());
-//        volleyRequestQueue = new RequestQueue(volleyCache, volleyNetwork);
-        volleyRequestQueue = Volley.newRequestQueue(MyApp.getContext());
-
-        if(volleyRequestQueue == null) {
-            Log.e("MewX", "GlobalConfig:initVolleyNetwork volleyRequestQueue is NULL");
-        }
     }
 
     public static void initImageLoader(Context context) {

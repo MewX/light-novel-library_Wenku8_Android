@@ -1005,7 +1005,6 @@ public class NovelInfoActivity extends AppCompatActivity {
                         return Wenku8Error.ErrorCode.SYSTEM_1_SUCCEEDED;
                     } else {
                         return Wenku8Error.ErrorCode.LOCAL_BOOK_REMOVE_FAILED;
-                        //Toast.makeText(NovelInfoActivity.this, getResources().getString(R.string.bookshelf_error), Toast.LENGTH_SHORT).show();
                     }
                 }
             } catch (UnsupportedEncodingException e) {
