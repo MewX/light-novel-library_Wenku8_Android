@@ -27,6 +27,10 @@ android {
             minifyEnabled true
             testProguardFile 'proguard-rules-tests.pro' // FIXME - the rule does not work
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+
+            ndk {
+                abiFilters 'armeabi-v7a'
+            }
         }
     }
     flavorDimensions "default"
