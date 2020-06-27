@@ -7,7 +7,7 @@
     android:paddingRight="6dp"
     android:paddingTop="2dp">
 
-    <android.support.v7.widget.CardView
+    <androidx.cardview.widget.CardView
         android:id="@+id/novel_card"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -186,5 +186,5 @@
                     android:focusable="true" />
             </RelativeLayout>
         </LinearLayout>
-    </android.support.v7.widget.CardView>
+    </androidx.cardview.widget.CardView>
 </RelativeLayout>

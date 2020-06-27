@@ -137,7 +137,7 @@
                 android:layout_marginTop="16dp"
                 android:layout_marginBottom="16dp">
 
-                <android.support.v7.widget.CardView
+                <androidx.cardview.widget.CardView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     app:cardBackgroundColor="@color/novel_item_white"
@@ -160,7 +160,7 @@
                         android:singleLine="true"
                         android:clickable="true"
                         android:textColor="@color/login_btn_dark" />
-                </android.support.v7.widget.CardView>
+                </androidx.cardview.widget.CardView>
             </RelativeLayout>
         </RelativeLayout>
     </ScrollView>

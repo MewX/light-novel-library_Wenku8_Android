@@ -16,7 +16,7 @@
         android:fitsSystemWindows="true"
         android:clipToPadding="false">
 
-        <android.support.v7.widget.Toolbar
+        <androidx.appcompat.widget.Toolbar
             style="@style/ToolBarStyle"
             android:id="@+id/toolbar_actionbar"
             android:layout_width="match_parent"

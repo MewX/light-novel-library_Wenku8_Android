@@ -1,7 +1,7 @@
 package org.mewx.wenku8;
 
 import android.app.Activity;
-import android.support.test.filters.SmallTest;
+import androidx.test.filters.SmallTest;
 
 import org.junit.Before;
 import org.junit.Test;

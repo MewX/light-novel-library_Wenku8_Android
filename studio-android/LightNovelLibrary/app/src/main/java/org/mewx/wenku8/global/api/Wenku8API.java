@@ -1,7 +1,7 @@
 package org.mewx.wenku8.global.api;
 
 import android.content.ContentValues;
-import android.support.annotation.Nullable;
+import androidx.annotation.Nullable;
 
 import org.mewx.wenku8.global.GlobalConfig;
 import org.mewx.wenku8.util.LightBase64;
