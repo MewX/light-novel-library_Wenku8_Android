@@ -29,7 +29,7 @@ public class LightCacheTest {
         final String TEMP_FILE_PATH = "test/path";
         final String TEMP_FILE_FULL_NAME_PATH = TEMP_FILE_PATH + File.separator + TEMP_FILE_NAME;
 
-        Context instrumentationCtx = InstrumentationRegistry.getTargetContext();
+        Context instrumentationCtx = InstrumentationRegistry.getInstrumentation().getTargetContext();
         BASE = instrumentationCtx.getFilesDir().getAbsolutePath() + File.separator;
         BASE_TEMP_FILE_PATH = BASE + TEMP_FILE_PATH;
         BASE_TEMP_FILE_NAME = BASE + TEMP_FILE_NAME;
