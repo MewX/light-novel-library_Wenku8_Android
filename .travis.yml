@@ -15,6 +15,7 @@ android:
   - android-$TARGET_SDK_VERSION
   - build-tools-$BUILD_TOOLS_VERSION
   - android-21
+  - android-22
   - sys-img-armeabi-v7a-android-21
 
 before_cache:
