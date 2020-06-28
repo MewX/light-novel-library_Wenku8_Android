@@ -26,7 +26,7 @@
                 android:paddingRight="6dp"
                 android:paddingTop="2dp">
 
-                <android.support.v7.widget.CardView
+                <androidx.cardview.widget.CardView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     card-view:cardBackgroundColor="@color/novel_item_white"
@@ -106,7 +106,7 @@
                             android:textColor="@color/menu_text_color"
                             android:textSize="14sp" />
                     </RelativeLayout>
-                </android.support.v7.widget.CardView>
+                </androidx.cardview.widget.CardView>
             </RelativeLayout>
 
             <RelativeLayout
@@ -116,7 +116,7 @@
                 android:paddingRight="6dp"
                 android:paddingTop="2dp">
 
-                <android.support.v7.widget.CardView
+                <androidx.cardview.widget.CardView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     card-view:cardBackgroundColor="@color/novel_item_white"
@@ -171,7 +171,7 @@
                             android:textSize="14sp" />
 
                     </RelativeLayout>
-                </android.support.v7.widget.CardView>
+                </androidx.cardview.widget.CardView>
             </RelativeLayout>
 
             <RelativeLayout
@@ -181,7 +181,7 @@
                 android:paddingRight="6dp"
                 android:paddingTop="2dp">
 
-                <android.support.v7.widget.CardView
+                <androidx.cardview.widget.CardView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     card-view:cardBackgroundColor="@color/novel_item_white"
@@ -235,7 +235,7 @@
                             android:textSize="14sp" />
 
                     </RelativeLayout>
-                </android.support.v7.widget.CardView>
+                </androidx.cardview.widget.CardView>
             </RelativeLayout>
 
             <RelativeLayout
@@ -245,7 +245,7 @@
                 android:paddingRight="6dp"
                 android:paddingTop="2dp">
 
-                <android.support.v7.widget.CardView
+                <androidx.cardview.widget.CardView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     card-view:cardBackgroundColor="@color/novel_item_white"
@@ -298,7 +298,7 @@
                             android:textColor="@color/menu_text_color"
                             android:textSize="14sp" />
                     </RelativeLayout>
-                </android.support.v7.widget.CardView>
+                </androidx.cardview.widget.CardView>
             </RelativeLayout>
 
         </LinearLayout>

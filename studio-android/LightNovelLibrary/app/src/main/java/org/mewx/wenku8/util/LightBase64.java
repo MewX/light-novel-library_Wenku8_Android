@@ -1,6 +1,6 @@
 package org.mewx.wenku8.util;
 
-import android.support.annotation.NonNull;
+import androidx.annotation.NonNull;
 import android.util.Base64;
 
 import java.nio.charset.Charset;

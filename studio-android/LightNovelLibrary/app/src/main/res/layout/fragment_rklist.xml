@@ -15,7 +15,7 @@
         android:background="@color/myPrimaryColor"
         app:pstsTabBackground="@drawable/btn_menu_item_boardless"/>
 
-    <android.support.v4.view.ViewPager
+    <androidx.viewpager.widget.ViewPager
         android:id="@+id/rklist_pager"
         android:layout_width="match_parent"
         android:layout_height="match_parent"

@@ -22,7 +22,7 @@
             android:paddingRight="6dp"
             android:paddingTop="2dp">
 
-            <android.support.v7.widget.CardView
+            <androidx.cardview.widget.CardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:clickable="true"
@@ -43,7 +43,7 @@
                     android:background="@color/menu_transparent"
                     android:text="@string/na"
                     android:textColor="@color/menu_text_color" />
-            </android.support.v7.widget.CardView>
+            </androidx.cardview.widget.CardView>
         </RelativeLayout>
 
         <!-- Layout DataBackup -->

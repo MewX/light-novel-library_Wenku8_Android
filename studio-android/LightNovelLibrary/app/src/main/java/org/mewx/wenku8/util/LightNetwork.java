@@ -1,7 +1,7 @@
 package org.mewx.wenku8.util;
 
 import android.content.ContentValues;
-import android.support.annotation.Nullable;
+import androidx.annotation.Nullable;
 import android.util.Log;
 
 import java.io.BufferedInputStream;

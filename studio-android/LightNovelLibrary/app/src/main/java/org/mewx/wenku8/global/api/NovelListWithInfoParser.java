@@ -1,6 +1,6 @@
 package org.mewx.wenku8.global.api;
 
-import android.support.annotation.NonNull;
+import androidx.annotation.NonNull;
 import android.util.Log;
 
 import org.xmlpull.v1.XmlPullParser;
