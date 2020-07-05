@@ -1,14 +1,13 @@
 package org.mewx.wenku8;
 
 import android.annotation.SuppressLint;
+import android.app.Application;
 import android.content.Context;
-
-import androidx.multidex.MultiDexApplication;
 
 /**
  * The class is for getting context everywhere
  */
-public class MyApp extends MultiDexApplication {
+public class MyApp extends Application {
     @SuppressLint("StaticFieldLeak")
     private static Context context;
 

@@ -10,7 +10,9 @@ import org.mewx.wenku8.global.GlobalConfig;
 import org.mewx.wenku8.util.LightBase64;
 import org.mewx.wenku8.util.LightNetwork;
 
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
 
 @SuppressWarnings("unused")
@@ -26,31 +28,30 @@ public class Wenku8API {
             NovelNotFinishedSC = "连载中", NovelNotFinishedTC = "連載中";
 
     public static String getCoverURL(int aid) {
-        return "http://img.wenku8.com/image/" + Integer.toString(aid / 1000)
-                + "/" + Integer.toString(aid) + "/" + Integer.toString(aid) + "s.jpg";
+        return "http://img.wenku8.com/image/" + (aid / 1000) + "/" + aid + "/" + aid + "s.jpg";
     }
 
     // this only prevents good boys from doing bad things, and it's what we all know :-)
     // and I know the mixed use for both simplified and traditional do not work in this case
     public static final int MIN_REPLY_TEXT = 7;
-    private static final String[] badWords = {
+    private static final HashSet<String> badWords = new HashSet<>(Arrays.asList(
             // Simplified
-            "共产党", "政府",  "毛泽东",  "邓小平",  "江泽民",  "胡锦涛",  "温家宝",  "习近平",
-            "李克强", "台独",  "藏独", "反日", "反共", "反中", "达赖", "刘晓波", "毛主席", "愤青",
+            "共产党", "政府", "毛泽东", "邓小平", "江泽民", "胡锦涛", "温家宝", "习近平",
+            "李克强", "台独", "藏独", "反日", "反共", "反中", "达赖", "刘晓波", "毛主席", "愤青",
             "反华", "右翼", "游行", "示威", "静坐", "公安", "李洪志", "法轮功", "刷分", "路过路过",
             ".......", "。。。。", "色情", "吃屎", "你妈", "他妈", "她妈", "操你", "垃圾", "去死",
             "迷魂药", "催情药", "毒品",
 
             // Traditional
-            "共產黨", "政府",  "毛澤東",  "鄧小平",  "江澤民",  "胡錦濤",  "溫家寶",  "習近平",
-            "李克強", "臺獨",  "藏獨", "反日", "反共", "反中", "達賴", "劉曉波", "毛主席", "憤青",
+            "共產黨", "政府", "毛澤東", "鄧小平", "江澤民", "胡錦濤", "溫家寶", "習近平",
+            "李克強", "臺獨", "藏獨", "反日", "反共", "反中", "達賴", "劉曉波", "毛主席", "憤青",
             "反華", "右翼", "遊行", "示威", "靜坐", "公安", "李洪誌", "法輪功", "刷分", "路過路過",
             ".......", "。。。。", "色情", "吃屎", "你媽", "他媽", "她媽", "操你", "垃圾", "去死",
             "迷魂藥", "催情藥", "毒品",
 
             // Testing
-            "blablabla",
-    };
+            "blablabla"
+    ));
 
 
     /*
@@ -116,8 +117,6 @@ public class Wenku8API {
         switch (n) {
             case "allvisit":
                 return NOVELSORTBY.allVisit;
-            case "allvote":
-                return NOVELSORTBY.allVote;
             case "monthvisit":
                 return NOVELSORTBY.monthVisit;
             case "monthvote":
@@ -140,6 +139,7 @@ public class Wenku8API {
                 return NOVELSORTBY.size;
             case "fullflag":
                 return NOVELSORTBY.fullFlag;
+            case "allvote":
             default:
                 return NOVELSORTBY.allVote; // default
         }
@@ -182,8 +182,6 @@ public class Wenku8API {
         switch (n) {
             case allVisit:
                 return R.string.tab_allvisit;
-            case allVote:
-                return R.string.tab_allvote;
             case monthVisit:
                 return R.string.tab_monthvisit;
             case monthVote:
@@ -206,6 +204,7 @@ public class Wenku8API {
                 return R.string.tab_size;
             case fullFlag:
                 return R.string.tab_fullflag;
+            case allVote:
             default:
                 return R.string.tab_allvote; // default
         }
@@ -302,19 +301,8 @@ public class Wenku8API {
         return getEncryptedCV("action=book&do=info&aid=" + aid + "&t=" + getLANG(l));
     }
 
-    public static Map<String,String> getNovelShortInfoUpdate(int aid, LANG l) {
-        // action=book&do=bookinfo&aid=3&t=1 //小说信息（升级版）
-//        Map<String, String> params = new HashMap<String, String>();
-//        params.put("action", "book");
-//        params.put("do", "bookinfo");
-//        params.put("aid",Integer.toString(aid));
-//        params.put("t", Integer.toString(getLANG(l)));
-        //return params;
-
-        return getEncryptedMAP("action=book&do=bookinfo&aid=" + aid + "&t=" + getLANG(l));
-    }
-
     public static ContentValues getNovelShortInfoUpdate_CV(int aid, LANG l) {
+        // action=book&do=bookinfo&aid=3&t=1 //小说信息（升级版）
         return getEncryptedCV("action=book&do=bookinfo&aid=" + aid + "&t=" + getLANG(l));
     }
 

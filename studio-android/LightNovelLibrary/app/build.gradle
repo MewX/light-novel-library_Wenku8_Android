@@ -11,9 +11,6 @@ android {
         versionCode 40
         versionName "1.9"
         testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner'
-
-        // this one has to be added due to the intermediate outputs for debug
-        multiDexEnabled true
     }
     buildTypes {
         debug {
@@ -89,12 +86,12 @@ dependencies {
 
     androidTestImplementation 'androidx.test.ext:junit:1.1.1'
     androidTestImplementation 'androidx.test:rules:1.2.0'
-    androidTestImplementation 'junit:junit:4.12'
+    androidTestImplementation 'junit:junit:4.13'
     androidTestImplementation 'org.mockito:mockito-core:2.19.0'
     androidTestImplementation 'com.linkedin.dexmaker:dexmaker:2.19.1'
     androidTestImplementation 'com.linkedin.dexmaker:dexmaker-mockito:2.19.1'
 
-    testImplementation 'junit:junit:4.12'
+    testImplementation 'junit:junit:4.13'
     testImplementation 'org.mockito:mockito-all:1.10.19'
     testImplementation 'org.powermock:powermock-module-junit4:1.7.4'
     testImplementation 'org.powermock:powermock-api-mockito:1.7.4'
