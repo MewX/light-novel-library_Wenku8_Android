@@ -1,12 +1,14 @@
 package org.mewx.wenku8.global.api;
 
 import android.content.ContentValues;
+
 import androidx.annotation.Nullable;
 
+import org.mewx.wenku8.BuildConfig;
+import org.mewx.wenku8.R;
 import org.mewx.wenku8.global.GlobalConfig;
 import org.mewx.wenku8.util.LightBase64;
 import org.mewx.wenku8.util.LightNetwork;
-import org.mewx.wenku8.R;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -44,7 +46,10 @@ public class Wenku8API {
             "李克強", "臺獨",  "藏獨", "反日", "反共", "反中", "達賴", "劉曉波", "毛主席", "憤青",
             "反華", "右翼", "遊行", "示威", "靜坐", "公安", "李洪誌", "法輪功", "刷分", "路過路過",
             ".......", "。。。。", "色情", "吃屎", "你媽", "他媽", "她媽", "操你", "垃圾", "去死",
-            "迷魂藥", "催情藥", "毒品"
+            "迷魂藥", "催情藥", "毒品",
+
+            // Testing
+            "blablabla",
     };
 
 
@@ -258,9 +263,11 @@ public class Wenku8API {
      * This part are the old API writing ways.
      * It's not efficient enough, and maybe bug-hidden.
      */
-    static Map<String,String> getEncryptedMAP(String str) {
+    static Map<String, String> getEncryptedMAP(String str) {
         Map<String, String> params = new HashMap<>();
-        params.put("request", LightBase64.EncodeBase64(str+"&timetoken="+System.currentTimeMillis()));
+        params.put("appver=" + BuildConfig.VERSION_NAME
+                + "&request", LightBase64.EncodeBase64(str)
+                + "&timetoken=" + System.currentTimeMillis());
         return params;
     }
 
@@ -676,8 +683,9 @@ public class Wenku8API {
 
         // 需要敏感词过滤，特殊符号处理
 
-        return getEncryptedCV("action=review&do=post&aid=" + aid + "&title="+ LightBase64.EncodeBase64(title)
-                +"&content=" + LightBase64.EncodeBase64(content));
+        return getEncryptedCV("action=review&do=post&aid=" + aid
+                + "&title=" + LightBase64.EncodeBase64(LightNetwork.encodeToHttp(title, "GBK"))
+                + "&content=" + LightBase64.EncodeBase64(LightNetwork.encodeToHttp(content, "GBK")));
     }
 
     public static ContentValues getCommentReplyParams(int rid, String content) {
@@ -687,7 +695,9 @@ public class Wenku8API {
 
         // 需要敏感词过滤，特殊符号处理
 
-        return getEncryptedCV("action=review&do=reply&rid=" + rid + "&content=" + LightBase64.EncodeBase64(content));
+        // Server-side bug, only GBK worked.
+        return getEncryptedCV("action=review&do=reply&rid=" + rid
+                + "&content=" + LightBase64.EncodeBase64(LightNetwork.encodeToHttp(content, "GBK")));
     }
 
 }

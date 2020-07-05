@@ -1,5 +1,6 @@
 package org.mewx.wenku8.activity;
 
+import android.app.Activity;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
@@ -21,6 +22,7 @@ import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
+import android.view.inputmethod.InputMethodManager;
 import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.TextView;
@@ -132,25 +134,22 @@ public class NovelReviewReplyListActivity extends AppCompatActivity implements M
         mSwipeRefreshLayout.setOnRefreshListener(this::refreshReviewReplyList);
 
         llReplyButton.setOnClickListener(ignored -> {
-            // FIXME: enable these
-            Toast.makeText(getApplication(), getResources().getString(R.string.system_api_error), Toast.LENGTH_SHORT).show();
+            String temp = etReplyText.getText().toString();
+            String badWord = Wenku8API.searchBadWords(temp);
+            if (badWord != null) {
+                Toast.makeText(getApplication(), String.format(getResources().getString(R.string.system_containing_bad_word), badWord), Toast.LENGTH_SHORT).show();
+            } else if (temp.length() < Wenku8API.MIN_REPLY_TEXT) {
+                Toast.makeText(getApplication(), getResources().getString(R.string.system_review_too_short), Toast.LENGTH_SHORT).show();
+            } else {
+                // hide ime
+                InputMethodManager imm = (InputMethodManager) getSystemService(Activity.INPUT_METHOD_SERVICE);
+                View view = getCurrentFocus();
+                if (view == null) view = new View(this);
+                if (imm != null) imm.hideSoftInputFromWindow(view.getWindowToken(), 0);
 
-//            String temp = etReplyText.getText().toString();
-//            String badWord = Wenku8API.searchBadWords(temp);
-//            if (badWord != null) {
-//                Toast.makeText(getApplication(), String.format(getResources().getString(R.string.system_containing_bad_word), badWord), Toast.LENGTH_SHORT).show();
-//            } else if (temp.length() < Wenku8API.MIN_REPLY_TEXT) {
-//                Toast.makeText(getApplication(), getResources().getString(R.string.system_review_too_short), Toast.LENGTH_SHORT).show();
-//            } else {
-//                // hide ime
-//                InputMethodManager imm = (InputMethodManager) getSystemService(Activity.INPUT_METHOD_SERVICE);
-//                View view = getCurrentFocus();
-//                if (view == null) view = new View(this);
-//                if (imm != null) imm.hideSoftInputFromWindow(view.getWindowToken(), 0);
-//
-//                // submit
-//                new AsyncPublishReply(etReplyText, this, rid, temp).execute();
-//            }
+                // submit
+                new AsyncPublishReply(etReplyText, this, rid, temp).execute();
+            }
         });
 
         // load initial content
