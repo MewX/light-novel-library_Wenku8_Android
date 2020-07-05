@@ -78,6 +78,12 @@
             android:screenOrientation="unspecified">
         </activity>
 
+        <!-- Novel Review New Post Activity -->
+        <activity android:name=".activity.NovelReviewNewPostActivity"
+            android:label="@string/action_review_new_post"
+            android:screenOrientation="unspecified">
+        </activity>
+
         <!-- Novel Review Reply List Activity -->
         <activity android:name=".activity.NovelReviewReplyListActivity"
             android:label="@string/action_review_reply_list"

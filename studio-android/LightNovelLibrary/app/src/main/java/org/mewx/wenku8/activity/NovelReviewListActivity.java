@@ -6,20 +6,19 @@ import android.graphics.drawable.Drawable;
 import android.os.AsyncTask;
 import android.os.Build;
 import android.os.Bundle;
-import androidx.annotation.NonNull;
-import androidx.appcompat.app.AppCompatActivity;
-import androidx.recyclerview.widget.LinearLayoutManager;
-import androidx.recyclerview.widget.RecyclerView;
-import androidx.appcompat.widget.Toolbar;
-import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
-
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
 import android.widget.LinearLayout;
 import android.widget.TextView;
-import android.widget.Toast;
+
+import androidx.annotation.NonNull;
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.appcompat.widget.Toolbar;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
+import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 
 import com.google.android.material.snackbar.Snackbar;
 import com.readystatesoftware.systembartint.SystemBarTintManager;
@@ -114,14 +113,12 @@ public class NovelReviewListActivity extends AppCompatActivity implements MyItem
         mLoadingButton.setOnClickListener(v -> new AsyncReviewListLoader(this, mSwipeRefreshLayout, aid, reviewList).execute()); // retry loading
 
         mSwipeRefreshLayout.setColorSchemeColors(getResources().getColor(R.color.myAccentColor));
-        mSwipeRefreshLayout.setOnRefreshListener(() -> {
-            // reload all
-            reviewList = new ReviewList();
-            mAdapter = null;
-            new AsyncReviewListLoader(this, mSwipeRefreshLayout, aid, reviewList).execute();
-        });
+        mSwipeRefreshLayout.setOnRefreshListener(this::reloadAllReviews);
+    }
 
-        // load initial content
+    private void reloadAllReviews() {
+        reviewList = new ReviewList();
+        mAdapter = null;
         new AsyncReviewListLoader(this, mSwipeRefreshLayout, aid, reviewList).execute();
     }
 
@@ -137,8 +134,9 @@ public class NovelReviewListActivity extends AppCompatActivity implements MyItem
             onBackPressed();
         }
         else if (menuItem.getItemId() == R.id.action_new) {
-            // FIXME: new reply activity
-            Toast.makeText(getApplication(), getResources().getString(R.string.system_api_error), Toast.LENGTH_SHORT).show();
+            Intent intent = new Intent(NovelReviewListActivity.this, NovelReviewNewPostActivity.class);
+            intent.putExtra("aid", aid);
+            startActivity(intent);
         }
         return super.onOptionsItemSelected(menuItem);
     }
@@ -153,6 +151,9 @@ public class NovelReviewListActivity extends AppCompatActivity implements MyItem
     protected void onResume() {
         super.onResume();
         MobclickAgent.onResume(this);
+
+        // Load initial content or refresh the list when resumed.
+        reloadAllReviews();
     }
 
     ReviewItemAdapter getAdapter() {
@@ -205,7 +206,7 @@ public class NovelReviewListActivity extends AppCompatActivity implements MyItem
                 if (reviewList.getCurrentPage() < reviewList.getTotalPage()) {
                     // load more toast
                     Snackbar.make(mRecyclerView, getResources().getString(R.string.list_loading)
-                                    + "(" + Integer.toString(reviewList.getCurrentPage() + 1) + "/" + reviewList.getTotalPage() + ")",
+                                    + "(" + (reviewList.getCurrentPage() + 1) + "/" + reviewList.getTotalPage() + ")",
                             Snackbar.LENGTH_SHORT).show();
 
                     new AsyncReviewListLoader(NovelReviewListActivity.this, mSwipeRefreshLayout, aid, reviewList).execute();
