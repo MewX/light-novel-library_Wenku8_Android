@@ -12,6 +12,7 @@ import java.io.UnsupportedEncodingException;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLEncoder;
+import java.util.Objects;
 import java.util.zip.GZIPInputStream;
 
 /**
@@ -24,22 +25,27 @@ import java.util.zip.GZIPInputStream;
 public class LightNetwork {
 
 	/**
-	 * encodeToHttp:
-	 * 
-	 * Encode UTF-8 character to http postable style. For example: "妹" =
-	 * "%E5%A6%B9"
-	 * 
-	 * @param str
-	 *            : input string
+	 * Encode UTF-8 character to http postable style. For example: "妹" = "%E5%A6%B9"
+	 * @param str input string
 	 * @return result encoded string or empty string
 	 */
 	public static String encodeToHttp(String str) {
+		return encodeToHttp(str, "UTF-8");
+	}
+
+	/**
+	 * Universal encoding to percent-encoding.
+	 * @param str the string to be encoded.
+	 * @param encoding the encoding in text form.
+	 * @return the percent-encoded text.
+	 */
+	public static String encodeToHttp(String str, String encoding) {
 		String enc;
 		try {
-			enc = URLEncoder.encode(str, "UTF-8");
+			enc = URLEncoder.encode(str, encoding);
 		} catch (UnsupportedEncodingException e) {
 			e.printStackTrace();
-			Log.v("MewX-Net", e.getMessage());
+			Log.v("MewX-Net", Objects.requireNonNull(e.getMessage()));
 			enc = ""; // prevent crash
 		}
 		return enc;
@@ -74,7 +80,7 @@ public class LightNetwork {
 		}
 
 		// make request args
-		StringBuilder params = new StringBuilder("");
+		StringBuilder params = new StringBuilder();
 		for( String key : values.keySet() ) {
 			if( !(values.get(key) instanceof String)) continue;
 			params.append("&").append(key).append("=").append(values.get(key)); // now, like "&a=1&b=1&c=1"

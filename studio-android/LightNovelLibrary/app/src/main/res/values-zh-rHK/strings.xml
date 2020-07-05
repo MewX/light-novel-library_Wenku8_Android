@@ -214,6 +214,7 @@
     <string name="action_go_to_forum">進入評論區</string>
     <string name="novel_item_latest_chapter">最新章節：</string>
     <string name="action_review_list">評論區</string>
+    <string name="action_review_new_post">發表新評論</string>
     <string name="about_wenku8_com">輕小說文庫 (Wenku8.com)</string>
     <string name="about_version_template">版本：%s (%d)</string>
     <string name="about_project_homepage">項目主頁: https://wenku8.mewx.org</string>
@@ -229,8 +230,12 @@
     <string name="action_review_reply_list">評論回復區</string>
     <string name="system_copied_to_clipboard">已復制：%s</string>
     <string name="action_review_reply">回復</string>
+    <string name="action_review_submit">發表</string>
     <string name="system_containing_bad_word">包含敏感詞“%s”，請修改後重試！</string>
     <string name="system_review_too_short">評論太短，請修改後重試！</string>
+    <string name="system_review_title">新評論的標題</string>
+    <string name="system_review_content">新評論的內容</string>
     <string name="system_post_locked">帖子太久遠，無法回復</string>
-    <string name="system_api_error">接口出現問題，暫時無法開發也無法使用，需要等待站長修復</string>
+    <string name="system_review_draft_will_be_lost">返回將丟失未發布的草稿，是否繼續返回？</string>
+    <string name="system_warning">註意</string>
 </resources>
