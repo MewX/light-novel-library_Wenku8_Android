@@ -24,7 +24,7 @@ public class Wenku8API {
             NovelNotFinishedSC = "连载中", NovelNotFinishedTC = "連載中";
 
     public static String getCoverURL(int aid) {
-        return "http://img.wkcdn.com/image/" + Integer.toString(aid / 1000)
+        return "http://img.wenku8.com/image/" + Integer.toString(aid / 1000)
                 + "/" + Integer.toString(aid) + "/" + Integer.toString(aid) + "s.jpg";
     }
 
