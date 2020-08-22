@@ -106,34 +106,20 @@ public class ConfigFragment extends Fragment {
                 .content(R.string.dialog_content_language_tip)
                 .items(R.array.choose_language_option)
                 .itemsCallback((dialog, view, which, text) -> {
-                    switch (which) {
-                        case 0:
-                            // sc
-                            if(GlobalConfig.getCurrentLang() != Wenku8API.LANG.SC) {
-                                GlobalConfig.setCurrentLang(Wenku8API.LANG.SC);
-                                Intent intent = new Intent();
-                                intent.setClass(getActivity(), MainActivity.class);
-                                startActivity(intent);
-                                getActivity().overridePendingTransition(R.anim.fade_in, R.anim.hold); // fade in animation
-                                getActivity().finish(); // destroy itself
-                            }
-                            else
-                                Toast.makeText(getActivity(), "Already in.", Toast.LENGTH_SHORT).show();
-                            break;
-                        case 1:
-                            // tc
-                            if(GlobalConfig.getCurrentLang() != Wenku8API.LANG.TC) {
-                                GlobalConfig.setCurrentLang(Wenku8API.LANG.TC);
-                                Intent intent = new Intent();
-                                intent.setClass(getActivity(), MainActivity.class);
-                                startActivity(intent);
-                                getActivity().overridePendingTransition(R.anim.fade_in, R.anim.hold); // fade in animation
-                                getActivity().finish(); // destroy itself
-                            }
-                            else
-                                Toast.makeText(getActivity(), "Already in.", Toast.LENGTH_SHORT).show();
-                            break;
+                    // 0 means Simplified Chinese; 1 means Traditional Chinese.
+                    Wenku8API.LANG selected = which == 0 ? Wenku8API.LANG.SC : Wenku8API.LANG.TC;
+                    if (selected == GlobalConfig.getCurrentLang()) {
+                        Toast.makeText(getActivity(), "Already in.", Toast.LENGTH_SHORT).show();
+                        return;
                     }
+
+                    // Selected a different languages.
+                    GlobalConfig.setCurrentLang(selected);
+                    Intent intent = new Intent();
+                    intent.setClass(getActivity(), MainActivity.class);
+                    startActivity(intent);
+                    getActivity().overridePendingTransition(R.anim.fade_in, R.anim.hold); // fade in animation
+                    getActivity().finish(); // destroy itself
                 })
                 .show());
         getActivity().findViewById(R.id.btn_clear_cache).setOnClickListener(v -> new MaterialDialog.Builder(getActivity())
@@ -141,17 +127,10 @@ public class ConfigFragment extends Fragment {
                 .title(R.string.config_clear_cache)
                 .items(R.array.wipe_cache_option)
                 .itemsCallback((dialog, view, which, text) -> {
-                    switch (which) {
-                        case 0:
-                            // fast mode
-                            AsyncDeleteFast adf = new AsyncDeleteFast(getActivity());
-                            adf.execute();
-                            break;
-                        case 1:
-                            // slow mode
-                            AsyncDeleteSlow ads = new AsyncDeleteSlow(getActivity());
-                            ads.execute();
-                            break;
+                    if (which == 0) {
+                        new AsyncDeleteFast(getActivity()).execute();
+                    } else if (which == 1) {
+                        new AsyncDeleteSlow(getActivity()).execute();
                     }
                 })
                 .show());
@@ -166,11 +145,6 @@ public class ConfigFragment extends Fragment {
             Intent intent = new Intent(getActivity(), AboutActivity.class);
             startActivity(intent);
         });
-    }
-
-    @Override
-    public void onDetach() {
-        super.onDetach();
     }
 
     @Override
