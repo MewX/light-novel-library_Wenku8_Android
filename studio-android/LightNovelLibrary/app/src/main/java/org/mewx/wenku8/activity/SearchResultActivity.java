@@ -2,16 +2,13 @@ package org.mewx.wenku8.activity;
 
 import android.graphics.PorterDuff;
 import android.graphics.drawable.Drawable;
-import android.os.Build;
 import android.os.Bundle;
-import androidx.fragment.app.FragmentTransaction;
-import androidx.appcompat.app.AppCompatActivity;
-import androidx.appcompat.widget.Toolbar;
 import android.view.MenuItem;
 import android.widget.TextView;
 
+import androidx.fragment.app.FragmentTransaction;
+
 import com.nostra13.universalimageloader.core.ImageLoader;
-import com.readystatesoftware.systembartint.SystemBarTintManager;
 import com.umeng.analytics.MobclickAgent;
 
 import org.mewx.wenku8.R;
@@ -22,41 +19,15 @@ import org.mewx.wenku8.global.GlobalConfig;
  * Created by MewX on 2015/5/11.
  * Search Result Activity.
  */
-public class SearchResultActivity extends AppCompatActivity {
+public class SearchResultActivity extends BaseMaterialActivity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.layout_search_result);
+        initMaterialStyle(R.layout.layout_search_result, StatusBarColor.WHITE);
 
         // get arguments
         String searchKey = getIntent().getStringExtra("key");
-
-        // set indicator enable
-        Toolbar mToolbar = (Toolbar) findViewById(R.id.toolbar_actionbar);
-        setSupportActionBar(mToolbar);
-        if(getSupportActionBar() != null ) {
-            getSupportActionBar().setDisplayHomeAsUpEnabled(true);
-            getSupportActionBar().setHomeButtonEnabled(true);
-        }
-
-        // change status bar color tint, and this require SDK16
-        if (Build.VERSION.SDK_INT >= 16 ) { //&& Build.VERSION.SDK_INT <= 21) {
-            // Android API 22 has more effects on status bar, so ignore
-
-            // create our manager instance after the content view is set
-            SystemBarTintManager tintManager = new SystemBarTintManager(this);
-            // enable all tint
-            tintManager.setStatusBarTintEnabled(true);
-            tintManager.setNavigationBarTintEnabled(true);
-            tintManager.setTintAlpha(0.15f);
-            tintManager.setNavigationBarAlpha(0.0f);
-            // set all color
-            tintManager.setTintColor(getResources().getColor(android.R.color.black));
-            // set Navigation bar color
-            if(Build.VERSION.SDK_INT >= 21)
-                getWindow().setNavigationBarColor(getResources().getColor(R.color.myNavigationColorWhite));
-        }
 
         // set action bat title
         TextView mTextView = (TextView) findViewById(R.id.search_result_title);

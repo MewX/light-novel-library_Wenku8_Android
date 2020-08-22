@@ -1,12 +1,7 @@
 package org.mewx.wenku8.activity;
 
 import android.content.Intent;
-import android.graphics.PorterDuff;
-import android.graphics.drawable.Drawable;
-import android.os.Build;
 import android.os.Bundle;
-import androidx.appcompat.app.AppCompatActivity;
-import androidx.appcompat.widget.Toolbar;
 import android.view.LayoutInflater;
 import android.view.MenuItem;
 import android.widget.LinearLayout;
@@ -15,7 +10,6 @@ import android.widget.TextView;
 
 import com.afollestad.materialdialogs.MaterialDialog;
 import com.afollestad.materialdialogs.Theme;
-import com.readystatesoftware.systembartint.SystemBarTintManager;
 import com.umeng.analytics.MobclickAgent;
 
 import org.mewx.wenku8.R;
@@ -31,7 +25,7 @@ import java.io.File;
  * Created by MewX on 2015/5/14.
  * Novel Chapter Activity.
  */
-public class NovelChapterActivity extends AppCompatActivity {
+public class NovelChapterActivity extends BaseMaterialActivity {
 
     // constant
     private final String FromLocal = "fav";
@@ -44,39 +38,12 @@ public class NovelChapterActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.layout_novel_chapter);
+        initMaterialStyle(R.layout.layout_novel_chapter);
 
         // fetch values
         aid = getIntent().getIntExtra("aid", 1);
         from = getIntent().getStringExtra("from");
         volumeList = (VolumeList) getIntent().getSerializableExtra("volume");
-
-        // set indicator enable
-        Toolbar mToolbar = findViewById(R.id.toolbar_actionbar);
-        setSupportActionBar(mToolbar);
-        final Drawable upArrow = getResources().getDrawable(R.drawable.ic_svg_back);
-        if(getSupportActionBar() != null && upArrow != null) {
-            getSupportActionBar().setDisplayHomeAsUpEnabled(true);
-            getSupportActionBar().setHomeButtonEnabled(true);
-            upArrow.setColorFilter(getResources().getColor(R.color.default_white), PorterDuff.Mode.SRC_ATOP);
-            getSupportActionBar().setHomeAsUpIndicator(upArrow);
-        }
-
-        // change status bar color tint, and this require SDK16
-        if (Build.VERSION.SDK_INT >= 16 ) {
-            // create our manager instance after the content view is set
-            SystemBarTintManager tintManager = new SystemBarTintManager(this);
-            // enable all tint
-            tintManager.setStatusBarTintEnabled(true);
-            tintManager.setNavigationBarTintEnabled(true);
-            tintManager.setTintAlpha(0.15f);
-            tintManager.setNavigationBarAlpha(0.0f);
-            // set all color
-            tintManager.setTintColor(getResources().getColor(android.R.color.black));
-            // set Navigation bar color
-            if(Build.VERSION.SDK_INT >= 21)
-                getWindow().setNavigationBarColor(getResources().getColor(R.color.myNavigationColor));
-        }
 
         // get views and set title
         LinearLayout mLinearLayout = findViewById(R.id.novel_chapter_scroll);

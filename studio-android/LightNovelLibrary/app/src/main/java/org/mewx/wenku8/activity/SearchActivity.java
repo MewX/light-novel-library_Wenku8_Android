@@ -3,23 +3,20 @@ package org.mewx.wenku8.activity;
 import android.content.Intent;
 import android.graphics.PorterDuff;
 import android.graphics.drawable.Drawable;
-import android.os.Build;
 import android.os.Bundle;
-import androidx.appcompat.app.AppCompatActivity;
-import androidx.recyclerview.widget.DefaultItemAnimator;
-import androidx.recyclerview.widget.LinearLayoutManager;
-import androidx.recyclerview.widget.RecyclerView;
-import androidx.appcompat.widget.Toolbar;
 import android.view.MenuItem;
 import android.view.View;
 import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.Toast;
 
+import androidx.recyclerview.widget.DefaultItemAnimator;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
+
 import com.afollestad.materialdialogs.GravityEnum;
 import com.afollestad.materialdialogs.MaterialDialog;
 import com.afollestad.materialdialogs.Theme;
-import com.readystatesoftware.systembartint.SystemBarTintManager;
 import com.umeng.analytics.MobclickAgent;
 
 import org.mewx.wenku8.R;
@@ -34,7 +31,7 @@ import java.util.List;
  * Created by MewX on 2015/5/7.
  * Search Activity.
  */
-public class SearchActivity extends AppCompatActivity implements MyItemClickListener, MyItemLongClickListener {
+public class SearchActivity extends BaseMaterialActivity implements MyItemClickListener, MyItemLongClickListener {
 
     // private vars
     private EditText toolbarSearchView = null;
@@ -44,7 +41,7 @@ public class SearchActivity extends AppCompatActivity implements MyItemClickList
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.layout_search);
+        initMaterialStyle(R.layout.layout_search, StatusBarColor.WHITE);
 
         // bind views
         toolbarSearchView = findViewById(R.id.search_view);
@@ -52,32 +49,6 @@ public class SearchActivity extends AppCompatActivity implements MyItemClickList
 
         // Clear search text when clear button is tapped
         searchClearButton.setOnClickListener(v -> toolbarSearchView.setText(""));
-
-        // set indicator enable
-        Toolbar mToolbar = findViewById(R.id.toolbar_actionbar);
-        setSupportActionBar(mToolbar);
-        if(getSupportActionBar() != null) {
-            getSupportActionBar().setDisplayHomeAsUpEnabled(true);
-            getSupportActionBar().setHomeButtonEnabled(true);
-        }
-
-        // change status bar color tint, and this require SDK16
-        if (Build.VERSION.SDK_INT >= 16 ) { //&& Build.VERSION.SDK_INT <= 21) {
-            // Android API 22 has more effects on status bar, so ignore
-
-            // create our manager instance after the content view is set
-            SystemBarTintManager tintManager = new SystemBarTintManager(this);
-            // enable all tint
-            tintManager.setStatusBarTintEnabled(true);
-            tintManager.setNavigationBarTintEnabled(true);
-            tintManager.setTintAlpha(0.15f);
-            tintManager.setNavigationBarAlpha(0.0f);
-            // set all color
-            tintManager.setTintColor(getResources().getColor(android.R.color.black));
-            // set Navigation bar color
-            if(Build.VERSION.SDK_INT >= 21)
-                getWindow().setNavigationBarColor(getResources().getColor(R.color.myNavigationColorWhite));
-        }
 
         // set search clear icon color
         ImageView searchClearIcon = findViewById(R.id.search_clear_icon);

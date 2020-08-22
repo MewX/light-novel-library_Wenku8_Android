@@ -1,10 +1,7 @@
 package org.mewx.wenku8.activity;
 
 import android.content.Intent;
-import android.graphics.PorterDuff;
-import android.graphics.drawable.Drawable;
 import android.os.AsyncTask;
-import android.os.Build;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.Menu;
@@ -14,14 +11,11 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
-import androidx.appcompat.app.AppCompatActivity;
-import androidx.appcompat.widget.Toolbar;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 
 import com.google.android.material.snackbar.Snackbar;
-import com.readystatesoftware.systembartint.SystemBarTintManager;
 import com.umeng.analytics.MobclickAgent;
 
 import org.mewx.wenku8.R;
@@ -40,7 +34,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * Created by MewX on 2018/7/12.
  * Novel Review Activity.
  */
-public class NovelReviewListActivity extends AppCompatActivity implements MyItemClickListener {
+public class NovelReviewListActivity extends BaseMaterialActivity implements MyItemClickListener {
     // private vars
     private int aid = 1;
 
@@ -61,37 +55,10 @@ public class NovelReviewListActivity extends AppCompatActivity implements MyItem
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.layout_novel_review_list);
+        initMaterialStyle(R.layout.layout_novel_review_list);
 
         // fetch values
         aid = getIntent().getIntExtra("aid", 1);
-
-        // set indicator enable
-        Toolbar mToolbar = findViewById(R.id.toolbar_actionbar);
-        setSupportActionBar(mToolbar);
-        final Drawable upArrow = getResources().getDrawable(R.drawable.ic_svg_back);
-        if(getSupportActionBar() != null && upArrow != null) {
-            getSupportActionBar().setHomeButtonEnabled(true);
-            getSupportActionBar().setDisplayHomeAsUpEnabled(true);
-            upArrow.setColorFilter(getResources().getColor(R.color.default_white), PorterDuff.Mode.SRC_ATOP);
-            getSupportActionBar().setHomeAsUpIndicator(upArrow);
-        }
-
-        // change status bar color tint, and this require SDK16
-        if (Build.VERSION.SDK_INT >= 16 ) {
-            // create our manager instance after the content view is set
-            SystemBarTintManager tintManager = new SystemBarTintManager(this);
-            // enable all tint
-            tintManager.setStatusBarTintEnabled(true);
-            tintManager.setNavigationBarTintEnabled(true);
-            tintManager.setTintAlpha(0.15f);
-            tintManager.setNavigationBarAlpha(0.0f);
-            // set all color
-            tintManager.setTintColor(getResources().getColor(android.R.color.black));
-            // set Navigation bar color
-            if(Build.VERSION.SDK_INT >= 21)
-                getWindow().setNavigationBarColor(getResources().getColor(R.color.myNavigationColor));
-        }
 
         // get views and set title
         // get views

@@ -6,19 +6,16 @@ import android.content.pm.PackageManager;
 import android.content.res.Configuration;
 import android.os.Build;
 import android.os.Bundle;
-import androidx.annotation.NonNull;
-import androidx.core.app.ActivityCompat;
-import androidx.fragment.app.Fragment;
-import androidx.fragment.app.FragmentTransaction;
-import androidx.core.content.ContextCompat;
-import androidx.appcompat.app.AppCompatActivity;
-import androidx.appcompat.widget.Toolbar;
-
 import android.view.Menu;
 import android.widget.Toast;
 
+import androidx.annotation.NonNull;
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
+import androidx.fragment.app.Fragment;
+import androidx.fragment.app.FragmentTransaction;
+
 import com.nostra13.universalimageloader.core.ImageLoader;
-import com.readystatesoftware.systembartint.SystemBarTintManager;
 import com.umeng.analytics.MobclickAgent;
 import com.umeng.commonsdk.UMConfigure;
 
@@ -39,7 +36,7 @@ import java.util.TimerTask;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 
-public class MainActivity extends AppCompatActivity {
+public class MainActivity extends BaseMaterialActivity {
     private static final int REQUEST_WRITE_EXTERNAL = 100;
     private static final int REQUEST_READ_EXTERNAL = 101;
 
@@ -67,12 +64,10 @@ public class MainActivity extends AppCompatActivity {
         // load language
         Locale locale;
         switch (GlobalConfig.getCurrentLang()) {
-            case SC:
-                locale = Locale.SIMPLIFIED_CHINESE;
-                break;
             case TC:
                 locale = Locale.TRADITIONAL_CHINESE;
                 break;
+            case SC:
             default:
                 locale = Locale.SIMPLIFIED_CHINESE;
                 break;
@@ -81,10 +76,6 @@ public class MainActivity extends AppCompatActivity {
         config.locale = locale;
         Locale.setDefault(locale);
         getBaseContext().getResources().updateConfiguration(config, getBaseContext().getResources().getDisplayMetrics());
-
-        // tint
-        SystemBarTintManager tintManager = new SystemBarTintManager(this);
-        tintManager.setTintAlpha(0.0f);
 
         // request write permission (112 write permission)
         boolean hasPermission = (ContextCompat.checkSelfPermission(this,
@@ -126,7 +117,7 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.layout_main); // have 3 styles
+        initMaterialStyle(R.layout.layout_main, HomeIndicatorStyle.HAMBURGER);
         initialApp();
 
         // UIL setting
@@ -140,44 +131,22 @@ public class MainActivity extends AppCompatActivity {
         // Update old save files ----------------
 
 
-        // set Toolbar
-        Toolbar mToolbar = findViewById(R.id.toolbar_actionbar);
-        setSupportActionBar(mToolbar);
-        // getSupportActionBar().setDisplayShowHomeEnabled(true);
-
         // set Tool button
         mNavigationDrawerFragment = (NavigationDrawerFragment) getSupportFragmentManager().findFragmentById(R.id.fragment_drawer);
-        mNavigationDrawerFragment.setup(R.id.fragment_drawer, findViewById(R.id.drawer), mToolbar);
+        if (mNavigationDrawerFragment != null) {
+            mNavigationDrawerFragment.setup(R.id.fragment_drawer, findViewById(R.id.drawer), getToolbar());
+        }
 
         // find search box
-        mToolbar.setOnMenuItemClickListener(item -> {
+        getToolbar().setOnMenuItemClickListener(item -> {
             //Toast.makeText(MyApp.getContext(),"called button",Toast.LENGTH_SHORT).show();
             if (item.getItemId() == R.id.action_search) {
                 // start search activity
                 startActivity(new Intent(MainActivity.this, SearchActivity.class));
                 overridePendingTransition(R.anim.fade_in, R.anim.hold); // fade in animation
-
             }
             return true;
         });
-
-        // change status bar color tint, and this require SDK16
-        if (Build.VERSION.SDK_INT >= 16) { //&& Build.VERSION.SDK_INT <= 21) {
-            // Android API 22 has more effects on status bar, so ignore
-
-            // create our manager instance after the content view is set
-            SystemBarTintManager tintManager = new SystemBarTintManager(this);
-            // enable all tint
-            tintManager.setStatusBarTintEnabled(true);
-            tintManager.setNavigationBarTintEnabled(true);
-            tintManager.setTintAlpha(0.15f);
-            tintManager.setNavigationBarAlpha(0.0f);
-            // set all color
-            tintManager.setTintColor(getResources().getColor(android.R.color.black));
-            // set Navigation bar color
-            if (Build.VERSION.SDK_INT >= 21)
-                getWindow().setNavigationBarColor(getResources().getColor(R.color.myNavigationColor));
-        }
     }
 
 
@@ -309,7 +278,6 @@ public class MainActivity extends AppCompatActivity {
                     isExit = false; // cancel exit
                 }
             }, 2000); // 2 seconds cancel exit task
-
         } else {
             finish();
         }

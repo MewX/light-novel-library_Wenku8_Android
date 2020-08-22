@@ -13,9 +13,6 @@ import android.os.AsyncTask;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
-import androidx.annotation.NonNull;
-import androidx.appcompat.app.AppCompatActivity;
-import androidx.appcompat.widget.Toolbar;
 import android.util.Log;
 import android.view.KeyEvent;
 import android.view.Menu;
@@ -26,16 +23,18 @@ import android.view.ViewGroup;
 import android.widget.RelativeLayout;
 import android.widget.Toast;
 
+import androidx.annotation.NonNull;
+
 import com.afollestad.materialdialogs.GravityEnum;
 import com.afollestad.materialdialogs.MaterialDialog;
 import com.afollestad.materialdialogs.Theme;
 import com.nononsenseapps.filepicker.FilePickerActivity;
 import com.nostra13.universalimageloader.core.ImageLoader;
-import com.readystatesoftware.systembartint.SystemBarTintManager;
 import com.umeng.analytics.MobclickAgent;
 
 import org.adw.library.widgets.discreteseekbar.DiscreteSeekBar;
 import org.mewx.wenku8.R;
+import org.mewx.wenku8.activity.BaseMaterialActivity;
 import org.mewx.wenku8.global.GlobalConfig;
 import org.mewx.wenku8.global.api.ChapterInfo;
 import org.mewx.wenku8.global.api.OldNovelContentParser;
@@ -59,7 +58,7 @@ import java.util.List;
  * Created by MewX on 2015/7/10.
  * Novel Reader Engine V1.
  */
-public class Wenku8ReaderActivityV1 extends AppCompatActivity {
+public class Wenku8ReaderActivityV1 extends BaseMaterialActivity {
     // constant
     static private final String FromLocal = "fav";
 
@@ -74,7 +73,6 @@ public class Wenku8ReaderActivityV1 extends AppCompatActivity {
 //    private int tempNavBarHeight;
 
     // components
-    private SystemBarTintManager tintManager;
     private SlidingPageAdapter mSlidingPageAdapter;
     private WenkuReaderLoader loader;
     private WenkuReaderSettingV1 setting;
@@ -82,8 +80,7 @@ public class Wenku8ReaderActivityV1 extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-//        getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN, WindowManager.LayoutParams.FLAG_FULLSCREEN);
-        setContentView(R.layout.layout_reader_swipe_temp);
+        initMaterialStyle(R.layout.layout_reader_swipe_temp, BaseMaterialActivity.StatusBarColor.DARK);
 
         // fetch values
         aid = getIntent().getIntExtra("aid", 1);
@@ -94,30 +91,9 @@ public class Wenku8ReaderActivityV1 extends AppCompatActivity {
         if(forcejump == null || forcejump.length() == 0) forcejump = "no";
 //        tempNavBarHeight = LightTool.getNavigationBarSize(this).y;
 
-        // set indicator enable
-        Toolbar mToolbar = findViewById(R.id.toolbar_actionbar);
-        setSupportActionBar(mToolbar);
+        getTintManager().setTintAlpha(0.0f);
         if(getSupportActionBar() != null) {
             getSupportActionBar().setTitle(volumeList.volumeName);
-            final Drawable upArrow = getResources().getDrawable(R.drawable.ic_back);
-            if (upArrow != null)
-                upArrow.setColorFilter(getResources().getColor(R.color.default_white), PorterDuff.Mode.SRC_ATOP);
-            getSupportActionBar().setDisplayHomeAsUpEnabled(true);
-            getSupportActionBar().setHomeButtonEnabled(true);
-            getSupportActionBar().setHomeAsUpIndicator(upArrow);
-        }
-
-        if (Build.VERSION.SDK_INT >= 16 ) {
-            // Android API 22 has more effects on status bar, so ignore
-
-            // create our manager instance after the content view is set
-            tintManager = new SystemBarTintManager(this);
-            // enable all tint
-            tintManager.setStatusBarTintEnabled(true);
-            tintManager.setNavigationBarTintEnabled(true);
-            tintManager.setTintAlpha(0.0f);
-            // set all color
-            tintManager.setTintColor(getResources().getColor(android.R.color.black));
         }
 
         // find views
@@ -472,8 +448,8 @@ public class Wenku8ReaderActivityV1 extends AppCompatActivity {
                             findViewById(R.id.reader_bot).setVisibility(View.VISIBLE);
 
                             if (Build.VERSION.SDK_INT >= 16 ) {
-                                tintManager.setStatusBarAlpha(0.90f);
-                                tintManager.setNavigationBarAlpha(0.80f); // TODO: fix bug
+                                getTintManager().setStatusBarAlpha(0.90f);
+                                getTintManager().setNavigationBarAlpha(0.80f); // TODO: fix bug
                             }
                             barStatus = true;
 
@@ -772,8 +748,8 @@ public class Wenku8ReaderActivityV1 extends AppCompatActivity {
                             findViewById(R.id.reader_bot_seeker).setVisibility(View.INVISIBLE);
                             findViewById(R.id.reader_bot_settings).setVisibility(View.INVISIBLE);
                             if (Build.VERSION.SDK_INT >= 16 ) {
-                                tintManager.setStatusBarAlpha(0.0f);
-                                tintManager.setNavigationBarAlpha(0.0f);
+                                getTintManager().setStatusBarAlpha(0.0f);
+                                getTintManager().setNavigationBarAlpha(0.0f);
                             }
                             barStatus = false;
                         }
@@ -907,6 +883,8 @@ public class Wenku8ReaderActivityV1 extends AppCompatActivity {
 
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+
         if (requestCode == 0 && resultCode == Activity.RESULT_OK) {
             // get ttf path
             if (data.getBooleanExtra(FilePickerActivity.EXTRA_ALLOW_MULTIPLE, false)) {
@@ -924,7 +902,7 @@ public class Wenku8ReaderActivityV1 extends AppCompatActivity {
                 } else {
                     ArrayList<String> paths = data.getStringArrayListExtra(FilePickerActivity.EXTRA_PATHS);
                     if (paths != null) {
-                        for (String path: paths) {
+                        for (String path : paths) {
                             Uri uri = Uri.parse(path);
                             // Do something with the URI
                             runSaveCustomFontPath(uri.toString().replaceAll("file://", ""));
@@ -936,8 +914,7 @@ public class Wenku8ReaderActivityV1 extends AppCompatActivity {
                 // Do something with the URI
                 runSaveCustomFontPath(uri.toString().replaceAll("file://", ""));
             }
-        }
-        else if (requestCode == 1 && resultCode == Activity.RESULT_OK) {
+        } else if (requestCode == 1 && resultCode == Activity.RESULT_OK) {
             // get image path
             if (data.getBooleanExtra(FilePickerActivity.EXTRA_ALLOW_MULTIPLE, false)) {
                 // For JellyBean and above
@@ -954,7 +931,7 @@ public class Wenku8ReaderActivityV1 extends AppCompatActivity {
                 } else {
                     ArrayList<String> paths = data.getStringArrayListExtra(FilePickerActivity.EXTRA_PATHS);
                     if (paths != null) {
-                        for (String path: paths) {
+                        for (String path : paths) {
                             Uri uri = Uri.parse(path);
                             // Do something with the URI
                             runSaveCustomBackgroundPath(uri.toString().replaceAll("file://", ""));

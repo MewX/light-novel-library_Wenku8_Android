@@ -3,19 +3,16 @@ package org.mewx.wenku8.activity;
 import android.app.Activity;
 import android.content.ClipData;
 import android.content.Intent;
-import android.graphics.PorterDuff;
-import android.graphics.drawable.Drawable;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
-import androidx.annotation.NonNull;
-import androidx.appcompat.app.AppCompatActivity;
-import androidx.appcompat.widget.Toolbar;
 import android.text.InputType;
 import android.view.MenuItem;
 import android.view.View;
 import android.widget.Toast;
+
+import androidx.annotation.NonNull;
 
 import com.afollestad.materialdialogs.GravityEnum;
 import com.afollestad.materialdialogs.MaterialDialog;
@@ -23,7 +20,6 @@ import com.afollestad.materialdialogs.Theme;
 import com.davemorrissey.labs.subscaleview.ImageSource;
 import com.davemorrissey.labs.subscaleview.SubsamplingScaleImageView;
 import com.nononsenseapps.filepicker.FilePickerActivity;
-import com.readystatesoftware.systembartint.SystemBarTintManager;
 import com.umeng.analytics.MobclickAgent;
 
 import org.mewx.wenku8.R;
@@ -37,44 +33,20 @@ import java.util.ArrayList;
  * Created by MewX on 2015/7/28.
  * View large image activity.
  */
-public class ViewImageDetailActivity extends AppCompatActivity {
+public class ViewImageDetailActivity extends BaseMaterialActivity {
 
-    private SystemBarTintManager tintManager;
     private String path;
     private SubsamplingScaleImageView imageView;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.layout_view_image_detail);
+        initMaterialStyle(R.layout.layout_view_image_detail, StatusBarColor.DARK);
 
         // fetch value
         path = getIntent().getStringExtra("path");
-
-        // set indicator enable
-        Toolbar mToolbar = findViewById(R.id.toolbar_actionbar);
-        setSupportActionBar(mToolbar);
-        final Drawable upArrow = getResources().getDrawable(R.drawable.ic_svg_back);
-        if(getSupportActionBar() != null && upArrow != null) {
-            getSupportActionBar().setDisplayHomeAsUpEnabled(true);
-            getSupportActionBar().setHomeButtonEnabled(true);
-            upArrow.setColorFilter(getResources().getColor(R.color.default_white), PorterDuff.Mode.SRC_ATOP);
-            getSupportActionBar().setHomeAsUpIndicator(upArrow);
-        }
-        getSupportActionBar().setTitle(path.split("/")[path.split("/").length-1]);
-
-        // set tint color
-        if (Build.VERSION.SDK_INT >= 16 ) {
-            // Android API 22 has more effects on status bar, so ignore
-            // create our manager instance after the content view is set
-            tintManager = new SystemBarTintManager(this);
-            // enable all tint
-            tintManager.setStatusBarTintEnabled(true);
-            tintManager.setNavigationBarTintEnabled(true);
-            tintManager.setStatusBarAlpha(0.9f);
-            tintManager.setNavigationBarAlpha(0.8f);
-            // set all color
-            tintManager.setTintColor(getResources().getColor(android.R.color.black));
+        if(getSupportActionBar() != null) {
+            getSupportActionBar().setTitle(path.split("/")[path.split("/").length-1]);
         }
 
         // set image
@@ -93,8 +65,8 @@ public class ViewImageDetailActivity extends AppCompatActivity {
                     findViewById(R.id.toolbar_actionbar).setVisibility(View.INVISIBLE);
                     findViewById(R.id.image_detail_bot).setVisibility(View.INVISIBLE);
                     if (Build.VERSION.SDK_INT >= 16 ) {
-                        tintManager.setStatusBarAlpha(0.0f);
-                        tintManager.setNavigationBarAlpha(0.0f);
+                        getTintManager().setStatusBarAlpha(0.0f);
+                        getTintManager().setNavigationBarAlpha(0.0f);
                     }
                 } else {
                     shown = true;
@@ -102,8 +74,8 @@ public class ViewImageDetailActivity extends AppCompatActivity {
                     findViewById(R.id.toolbar_actionbar).setVisibility(View.VISIBLE);
                     findViewById(R.id.image_detail_bot).setVisibility(View.VISIBLE);
                     if (Build.VERSION.SDK_INT >= 16 ) {
-                        tintManager.setStatusBarAlpha(0.9f);
-                        tintManager.setNavigationBarAlpha(0.8f);
+                        getTintManager().setStatusBarAlpha(0.9f);
+                        getTintManager().setNavigationBarAlpha(0.8f);
                     }
                 }
             }
