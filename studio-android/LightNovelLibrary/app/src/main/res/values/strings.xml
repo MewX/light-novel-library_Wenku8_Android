@@ -81,7 +81,7 @@
     <string name="list_loading">正在载入列表……</string>
     <string name="system_press_again_to_exit">退出请再抚摸一下返回键哦～\n&lt;(=～￣▽￣)→)￣▽￣=)>o</string>
     <string name="system_network_error">连接服务器失败！\n\n可能的原因有：\n登录过期，请重新登录；\n手机网络异常，试试浏览器访问；\n运营商劫持（部分地区的10086）；\nWIFI切换到数据需等待域名解析缓存刷新（约10min）；\n服务器暂时无法响应请求；\n此时段请求服务器次数过多。</string>
-    <string name="system_parse_failed">数据解析失败！\n\n可能的原因有：\n你修改了存储的数据；\n服务姬傲娇了，试试浏览器访问；\n程序内部错误，请反馈给开发者；</string>
+    <string name="system_parse_failed">数据解析失败！\n\n可能的原因有：\n你还没有登录；\n你的注册时间太晚 (晚于站点关闭日期) ；\n程序内部错误，请反馈给开发者；</string>
     <string name="system_manually_cancelled">任务已被手动取消</string>
     <string name="system_loading_please_wait">加载中……请稍后再试</string>
     <string name="system_fav_it_first">请先收藏后再下载！</string>

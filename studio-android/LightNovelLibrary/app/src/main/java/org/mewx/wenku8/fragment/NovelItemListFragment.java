@@ -194,7 +194,6 @@ public class NovelItemListFragment extends Fragment implements MyItemClickListen
             listNovelItemInfo.add(new NovelItemInfoUpdate(temp));
         }
 
-        //if(mAdapter == null) {
         if(mAdapter == null) {
             mAdapter = new NovelItemAdapterUpdate();
             mAdapter.setOnItemClickListener(this);
@@ -235,8 +234,7 @@ public class NovelItemListFragment extends Fragment implements MyItemClickListen
                             Snackbar.LENGTH_SHORT).show();
 
                     // load more thread
-                    AsyncGetNovelItemList asynctask = new AsyncGetNovelItemList();
-                    asynctask.execute(currentPage + 1);
+                    new AsyncGetNovelItemList().execute(currentPage + 1);
                 }
             }
         }
