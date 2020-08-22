@@ -190,7 +190,6 @@ public class NovelInfoActivity extends BaseMaterialActivity {
                         // search author name
                         Intent intent = new Intent(NovelInfoActivity.this, SearchResultActivity.class);
                         intent.putExtra("key", mNovelItemMeta.author);
-                        intent.addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT); // long-press will cause repetitions
                         startActivity(intent);
                         overridePendingTransition(R.anim.fade_in, R.anim.hold);
                     })
