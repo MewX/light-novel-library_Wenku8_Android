@@ -9,7 +9,6 @@ import androidx.annotation.NonNull;
 import androidx.fragment.app.Fragment;
 import android.text.Html;
 import android.text.SpannableStringBuilder;
-import android.text.TextUtils;
 import android.text.method.LinkMovementMethod;
 import android.text.style.ClickableSpan;
 import android.text.style.URLSpan;
@@ -24,17 +23,16 @@ import com.afollestad.materialdialogs.MaterialDialog;
 import com.afollestad.materialdialogs.Theme;
 import com.umeng.analytics.MobclickAgent;
 
-import org.mewx.wenku8.BuildConfig;
 import org.mewx.wenku8.R;
 import org.mewx.wenku8.activity.AboutActivity;
 import org.mewx.wenku8.activity.MainActivity;
 import org.mewx.wenku8.activity.MenuBackgroundSelectorActivity;
+import org.mewx.wenku8.async.CheckAppNewVersion;
 import org.mewx.wenku8.global.GlobalConfig;
 import org.mewx.wenku8.global.api.OldNovelContentParser;
 import org.mewx.wenku8.global.api.Wenku8API;
 import org.mewx.wenku8.global.api.Wenku8Error;
 import org.mewx.wenku8.util.LightCache;
-import org.mewx.wenku8.util.LightNetwork;
 import org.mewx.wenku8.util.LightTool;
 
 import java.io.File;
@@ -162,9 +160,7 @@ public class ConfigFragment extends Fragment {
             startActivity(intent);
         });
         getActivity().findViewById(R.id.btn_check_update).setOnClickListener(v -> {
-            // alpha version does not contains auto-update function
-            // check for update
-            new CheckNewVersion(getActivity()).execute(GlobalConfig.versionCheckUrl);
+            new CheckAppNewVersion(getActivity(), true).execute();
         });
         getActivity().findViewById(R.id.btn_about).setOnClickListener(v -> {
             Intent intent = new Intent(getActivity(), AboutActivity.class);
@@ -250,54 +246,6 @@ public class ConfigFragment extends Fragment {
             Context ctx = contextWeakReference.get();
             if (ctx != null) {
                 Toast.makeText(ctx, "OK", Toast.LENGTH_SHORT).show();
-            }
-        }
-    }
-
-    private static class CheckNewVersion extends AsyncTask<String, Integer, Integer> {
-        private WeakReference<Context> contextWeakReference;
-
-        CheckNewVersion(Context context) {
-            this.contextWeakReference = new WeakReference<>(context);
-        }
-
-        @Override
-        protected Integer doInBackground(String... strings) {
-            // return version code
-            byte[] codeByte = LightNetwork.LightHttpDownload(strings[0]);
-            if (codeByte == null) return -1;
-            String code = new String(codeByte).trim();
-            Log.d("MewX", "version code: " + code);
-            if (code.isEmpty() || !TextUtils.isDigitsOnly(code)) return -1;
-            else return Integer.parseInt(code);
-        }
-
-        @Override
-        protected void onPostExecute(Integer code) {
-            super.onPostExecute(code);
-
-            Context ctx = contextWeakReference.get();
-            if (ctx == null) return;
-
-            if (code == -1)
-                Toast.makeText(ctx, ctx.getResources().getString(R.string.system_update_timeout), Toast.LENGTH_SHORT).show();
-
-            int current = BuildConfig.VERSION_CODE;
-            if (current >= code) {
-                Toast.makeText(ctx, ctx.getResources().getString(R.string.system_update_latest_version), Toast.LENGTH_SHORT).show();
-            } else {
-                // update to new version
-                new MaterialDialog.Builder(ctx)
-                        .theme(Theme.LIGHT)
-                        .title(R.string.system_update_found_new)
-                        .content(R.string.system_update_jump_to_page)
-                        .positiveText(R.string.dialog_positive_sure)
-                        .negativeText(R.string.dialog_negative_biao)
-                        .onPositive((dialog, which) -> {
-                            Intent browserIntent = new Intent(Intent.ACTION_VIEW, Uri.parse(GlobalConfig.blogPageUrl));
-                            ctx.startActivity(browserIntent);
-                        })
-                        .show();
             }
         }
     }

@@ -1,12 +1,9 @@
 package org.mewx.wenku8.activity;
 
 import android.Manifest;
-import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.content.res.Configuration;
-import android.net.Uri;
-import android.os.AsyncTask;
 import android.os.Build;
 import android.os.Bundle;
 import androidx.annotation.NonNull;
@@ -16,30 +13,26 @@ import androidx.fragment.app.FragmentTransaction;
 import androidx.core.content.ContextCompat;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.Toolbar;
-import android.text.TextUtils;
-import android.util.Log;
+
 import android.view.Menu;
 import android.widget.Toast;
 
-import com.afollestad.materialdialogs.MaterialDialog;
-import com.afollestad.materialdialogs.Theme;
 import com.nostra13.universalimageloader.core.ImageLoader;
 import com.readystatesoftware.systembartint.SystemBarTintManager;
 import com.umeng.analytics.MobclickAgent;
 import com.umeng.commonsdk.UMConfigure;
 
-import org.mewx.wenku8.BuildConfig;
 import org.mewx.wenku8.MyApp;
 import org.mewx.wenku8.R;
+import org.mewx.wenku8.async.CheckAppNewVersion;
+import org.mewx.wenku8.async.UpdateNotificationMessage;
 import org.mewx.wenku8.fragment.NavigationDrawerFragment;
 import org.mewx.wenku8.global.GlobalConfig;
 import org.mewx.wenku8.global.api.Wenku8API;
 import org.mewx.wenku8.util.LightCache;
-import org.mewx.wenku8.util.LightNetwork;
 import org.mewx.wenku8.util.LightUserSession;
 
 import java.io.File;
-import java.lang.ref.WeakReference;
 import java.util.Locale;
 import java.util.Timer;
 import java.util.TimerTask;
@@ -266,7 +259,8 @@ public class MainActivity extends AppCompatActivity {
 
         // load only the first time this activity is created
         if (!NEW_VERSION_CHECKED.getAndSet(true)) {
-            if (!NEW_VERSION_CHECKED.get()) new ArgsInitializer(MainActivity.this).execute();
+            new CheckAppNewVersion(MainActivity.this).execute();
+            new UpdateNotificationMessage().execute();
         }
     }
 
@@ -321,78 +315,4 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    /**
-     * this class is used for checking new versions and new notice text,
-     * only when the app is loaded at the beginning
-     */
-    private static class ArgsInitializer extends AsyncTask<Void, Void, Void> {
-        private final WeakReference<Context> contextReference;
-        private int newVersionCode = 0;
-
-        ArgsInitializer(Context c) {
-            contextReference = new WeakReference<>(c);
-        }
-
-        @Override
-        protected void onPreExecute() {
-            super.onPreExecute();
-        }
-
-        @Override
-        protected Void doInBackground(Void... voids) {
-            // load new version
-            byte[] codeByte = LightNetwork.LightHttpDownload(GlobalConfig.versionCheckUrl);
-            if (codeByte != null) {
-                String code = new String(codeByte);
-                Log.d("MewX", "version code: " + code);
-                if (!code.trim().isEmpty() && TextUtils.isDigitsOnly(code.trim())) {
-                    newVersionCode = Integer.parseInt(code);
-                }
-            }
-
-            // load parameters
-            codeByte = LightNetwork.LightHttpDownload(
-                    GlobalConfig.getCurrentLang() != Wenku8API.LANG.SC ?
-                            GlobalConfig.noticeCheckTc : GlobalConfig.noticeCheckSc
-            );
-            if (codeByte != null) {
-                String notice = new String(codeByte);
-                Log.d("MewX", "notice text: " + notice);
-                if (!notice.trim().isEmpty()) {
-                    // update the latest string
-                    Wenku8API.NoticeString = notice;
-                    // save to local file
-                    GlobalConfig.writeTheNotice(notice);
-                }
-            }
-
-            return null;
-        }
-
-        @Override
-        protected void onPostExecute(Void v) {
-            Context context = contextReference.get();
-            if (context == null) return;
-
-            // check whether there's new version
-            int current = BuildConfig.VERSION_CODE;
-            Log.d("MewX", "current version code: " + current);
-            if (current < newVersionCode) {
-                // update to new version
-                new MaterialDialog.Builder(context)
-                        .theme(Theme.LIGHT)
-                        .title(R.string.system_update_found_new)
-                        .content(R.string.system_update_jump_to_page)
-                        .positiveText(R.string.dialog_positive_sure)
-                        .negativeText(R.string.dialog_negative_no)
-                        .negativeColorRes(R.color.menu_text_color)
-                        .onPositive((dialog, which) -> {
-                            Intent browserIntent = new Intent(Intent.ACTION_VIEW, Uri.parse(GlobalConfig.blogPageUrl));
-                            context.startActivity(browserIntent);
-                        })
-                        .show();
-
-            }
-        }
-    }
 }
