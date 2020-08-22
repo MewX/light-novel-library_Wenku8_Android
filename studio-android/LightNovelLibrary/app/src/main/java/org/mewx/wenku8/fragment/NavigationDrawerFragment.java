@@ -1,5 +1,6 @@
 package org.mewx.wenku8.fragment;
 
+import android.annotation.SuppressLint;
 import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
@@ -57,54 +58,42 @@ public class NavigationDrawerFragment extends Fragment {
         return inflater.inflate(R.layout.layout_main_menu, container, false);
     }
 
+    private View.OnClickListener generateNavigationButtonOnClickListener(
+            @NonNull MainActivity.FRAGMENT_LIST targetFragment, @NonNull Fragment fragment) {
+        return v -> {
+            if (mainActivity.getCurrentFragment() == targetFragment) {
+                // Already selected, so just ignore.
+                return;
+            }
+            clearAllButtonColor();
+            setHighLightButton(targetFragment);
+            mainActivity.setCurrentFragment(targetFragment);
+            mainActivity.changeFragment(fragment);
+            closeDrawer();
+        };
+    }
+
     @Override
     public void onActivityCreated(Bundle savedInstanceState) {
         super.onActivityCreated(savedInstanceState);
 
         // set button clicked listener, mainly working on change fragment in MainActivity.
         try {
-            mainActivity.findViewById(R.id.main_menu_rklist).setOnClickListener(v -> {
-                        if (mainActivity.getCurrentFragment() == MainActivity.FRAGMENT_LIST.RKLIST)
-                            return; // selected button, so just ignore.
-                        clearAllButtonColor();
-                        setHighLightButton(MainActivity.FRAGMENT_LIST.RKLIST);
-                        mainActivity.setCurrentFragment(MainActivity.FRAGMENT_LIST.RKLIST);
-                        mainActivity.changeFragment(new RKListFragment());
-                        closeDrawer();
-                    }
+            mainActivity.findViewById(R.id.main_menu_rklist).setOnClickListener(
+                    generateNavigationButtonOnClickListener(
+                            MainActivity.FRAGMENT_LIST.RKLIST, new RKListFragment())
             );
-
-            mainActivity.findViewById(R.id.main_menu_latest).setOnClickListener(v -> {
-                        if (mainActivity.getCurrentFragment() == MainActivity.FRAGMENT_LIST.LATEST)
-                            return; // selected button, so just ignore.
-                        clearAllButtonColor();
-                        setHighLightButton(MainActivity.FRAGMENT_LIST.LATEST);
-                        mainActivity.setCurrentFragment(MainActivity.FRAGMENT_LIST.LATEST);
-                        mainActivity.changeFragment(new LatestFragment());
-                        closeDrawer();
-                    }
+            mainActivity.findViewById(R.id.main_menu_latest).setOnClickListener(
+                    generateNavigationButtonOnClickListener(
+                            MainActivity.FRAGMENT_LIST.LATEST, new LatestFragment())
             );
-
-            mainActivity.findViewById(R.id.main_menu_fav).setOnClickListener(v -> {
-                        if (mainActivity.getCurrentFragment() == MainActivity.FRAGMENT_LIST.FAV)
-                            return; // selected button, so just ignore.
-                        clearAllButtonColor();
-                        setHighLightButton(MainActivity.FRAGMENT_LIST.FAV);
-                        mainActivity.setCurrentFragment(MainActivity.FRAGMENT_LIST.FAV);
-                        mainActivity.changeFragment(new FavFragment());
-                        closeDrawer();
-                    }
+            mainActivity.findViewById(R.id.main_menu_fav).setOnClickListener(
+                    generateNavigationButtonOnClickListener(
+                            MainActivity.FRAGMENT_LIST.FAV, new FavFragment())
             );
-
-            mainActivity.findViewById(R.id.main_menu_config).setOnClickListener(v -> {
-                        if (mainActivity.getCurrentFragment() == MainActivity.FRAGMENT_LIST.CONFIG)
-                            return; // selected button, so just ignore.
-                        clearAllButtonColor();
-                        setHighLightButton(MainActivity.FRAGMENT_LIST.CONFIG);
-                        mainActivity.setCurrentFragment(MainActivity.FRAGMENT_LIST.CONFIG);
-                        mainActivity.changeFragment(new ConfigFragment());
-                        closeDrawer();
-                    }
+            mainActivity.findViewById(R.id.main_menu_config).setOnClickListener(
+                    generateNavigationButtonOnClickListener(
+                            MainActivity.FRAGMENT_LIST.CONFIG, new ConfigFragment())
             );
 
             mainActivity.findViewById(R.id.main_menu_open_source).setOnClickListener(v -> {
@@ -221,6 +210,28 @@ public class NavigationDrawerFragment extends Fragment {
         updateNavigationBar();
     }
 
+    private void clearOneButtonColor(int iconId, int textId, int backgroundId) {
+        // Clear icon color.
+        ImageButton imageButton = mainActivity.findViewById(iconId);
+        if (imageButton != null) {
+            imageButton.setColorFilter(getResources().getColor(R.color.menu_text_color));
+        }
+
+        // Clear text color.
+        TextView textView = mainActivity.findViewById(textId);
+        if (textView != null) {
+            textView.setTextColor(getResources().getColor(R.color.menu_text_color));
+        }
+
+        // Clear view background color (only works for API 16+).
+        if (Build.VERSION.SDK_INT >= 16) {
+            TableRow tableRow = mainActivity.findViewById(backgroundId);
+            if (tableRow != null) {
+                tableRow.setBackground(getResources().getDrawable(R.drawable.btn_menu_item));
+            }
+        }
+    }
+
     /**
      * This function clear all the effects on button, and it needs API Level 16.
      * So if the device is between 4.0-4.1, it will appear no effects.
@@ -229,77 +240,32 @@ public class NavigationDrawerFragment extends Fragment {
      * Once the enum MainActivity.FRAGMENT_LIST changes, this function show be edited.
      */
     private void clearAllButtonColor() {
-        // sdk ver is too low
-        if (Build.VERSION.SDK_INT < 16) {
-            try {
-                // Clear icon color
-                ImageButton imageButton;
-                imageButton = mainActivity.findViewById(R.id.main_menu_ic_rklist);
-                imageButton.setColorFilter(getResources().getColor(R.color.menu_text_color));
-                imageButton = mainActivity.findViewById(R.id.main_menu_ic_latest);
-                imageButton.setColorFilter(getResources().getColor(R.color.menu_text_color));
-                imageButton = mainActivity.findViewById(R.id.main_menu_ic_fav);
-                imageButton.setColorFilter(getResources().getColor(R.color.menu_text_color));
-                imageButton = mainActivity.findViewById(R.id.main_menu_ic_config);
-                imageButton.setColorFilter(getResources().getColor(R.color.menu_text_color));
+        clearOneButtonColor(R.id.main_menu_ic_rklist, R.id.main_menu_text_rklist, R.id.main_menu_rklist);
+        clearOneButtonColor(R.id.main_menu_ic_latest, R.id.main_menu_text_latest, R.id.main_menu_latest);
+        clearOneButtonColor(R.id.main_menu_ic_fav, R.id.main_menu_text_fav, R.id.main_menu_fav);
+        clearOneButtonColor(R.id.main_menu_ic_config, R.id.main_menu_text_config, R.id.main_menu_config);
+    }
 
-                // Clear icon color effects
-                TextView textView;
-                textView = mainActivity.findViewById(R.id.main_menu_text_rklist);
-                textView.setTextColor(getResources().getColor(R.color.menu_text_color));
-                textView = mainActivity.findViewById(R.id.main_menu_text_latest);
-                textView.setTextColor(getResources().getColor(R.color.menu_text_color));
-                textView = mainActivity.findViewById(R.id.main_menu_text_fav);
-                textView.setTextColor(getResources().getColor(R.color.menu_text_color));
-                textView = mainActivity.findViewById(R.id.main_menu_text_config);
-                textView.setTextColor(getResources().getColor(R.color.menu_text_color));
-            } catch (NullPointerException e) {
-                Toast.makeText(mainActivity, "NullPointerException in clearAllButtonColor(); sdk16-", Toast.LENGTH_SHORT).show();
-                e.printStackTrace();
-            }
-        } else {
-            try {
-                // Clear the background effects on "main buttons"
-                TableRow tableRow;
-                tableRow = mainActivity.findViewById(R.id.main_menu_rklist);
-                tableRow.setBackground(getResources().getDrawable(R.drawable.btn_menu_item));
-                tableRow = mainActivity.findViewById(R.id.main_menu_latest);
-                tableRow.setBackground(getResources().getDrawable(R.drawable.btn_menu_item));
-                tableRow = mainActivity.findViewById(R.id.main_menu_fav);
-                tableRow.setBackground(getResources().getDrawable(R.drawable.btn_menu_item));
-                tableRow = mainActivity.findViewById(R.id.main_menu_config);
-                tableRow.setBackground(getResources().getDrawable(R.drawable.btn_menu_item));
+    @SuppressLint("NewApi")
+    private void setHighLightButton(int iconId, int textId, int backgroundId) {
+        final boolean api16plus = Build.VERSION.SDK_INT >= 16;
+        ImageButton icon = mainActivity.findViewById(iconId);
+        if (icon != null) {
+            icon.setColorFilter(getResources().getColor(
+                    api16plus ? R.color.menu_text_color_selected : R.color.menu_item_blue));
+        }
 
-                // Clear icon color effects
-                TextView textView;
-                textView = mainActivity.findViewById(R.id.main_menu_text_rklist);
-                textView.setTextColor(getResources().getColor(R.color.menu_text_color));
-                textView = mainActivity.findViewById(R.id.main_menu_text_latest);
-                textView.setTextColor(getResources().getColor(R.color.menu_text_color));
-                textView = mainActivity.findViewById(R.id.main_menu_text_fav);
-                textView.setTextColor(getResources().getColor(R.color.menu_text_color));
-                textView = mainActivity.findViewById(R.id.main_menu_text_config);
-                textView.setTextColor(getResources().getColor(R.color.menu_text_color));
+        TextView textView = mainActivity.findViewById(textId);
+        if (textView != null) {
+            textView.setTextColor(getResources().getColor(
+                    api16plus ? R.color.menu_item_white : R.color.menu_item_blue));
+        }
 
-                // Clear icon color
-                ImageButton imageButton;
-                imageButton = mainActivity.findViewById(R.id.main_menu_ic_rklist);
-                imageButton.setColorFilter(getResources().getColor(R.color.menu_text_color));
-                imageButton = mainActivity.findViewById(R.id.main_menu_ic_latest);
-                imageButton.setColorFilter(getResources().getColor(R.color.menu_text_color));
-                imageButton = mainActivity.findViewById(R.id.main_menu_ic_fav);
-                imageButton.setColorFilter(getResources().getColor(R.color.menu_text_color));
-                imageButton = mainActivity.findViewById(R.id.main_menu_ic_config);
-                imageButton.setColorFilter(getResources().getColor(R.color.menu_text_color));
-
-                // Clear the dark and light switcher button effect
-//            textView = (TextView) mainActivity.findViewById(R.id.main_menu_dark_mode_switcher);
-//            textView.setTextColor(getResources().getColor(R.color.main_menu_color_text));
-//            textView.setBackground(getResources().getDrawable(R.drawable.btn_menu_item));
-
-            } catch (NullPointerException e) {
-                Toast.makeText(mainActivity, "NullPointerException in clearAllButtonColor();", Toast.LENGTH_SHORT).show();
-                e.printStackTrace();
+        // Set view background color (only works for API 16+).
+        if (api16plus) {
+            TableRow tableRow = mainActivity.findViewById(backgroundId);
+            if (tableRow != null) {
+                tableRow.setBackground(getResources().getDrawable(R.drawable.btn_menu_item_selected));
             }
         }
     }
@@ -310,107 +276,22 @@ public class NavigationDrawerFragment extends Fragment {
      * @param f the target fragment, type MainActivity.FRAGMENT_LIST.
      */
     private void setHighLightButton(MainActivity.FRAGMENT_LIST f) {
-        // sdk ver is too low
-        if (Build.VERSION.SDK_INT < 16) {
-            try {
-                switch (f) {
-                    case RKLIST:
-                        ((TextView) mainActivity.findViewById(R.id.main_menu_text_rklist)).setTextColor(
-                                getResources().getColor(R.color.menu_item_blue)
-                        );
-                        ((ImageButton) mainActivity.findViewById(R.id.main_menu_ic_rklist)).setColorFilter(
-                                getResources().getColor(R.color.menu_item_blue)
-                        );
-                        break;
+        switch (f) {
+            case RKLIST:
+                setHighLightButton(R.id.main_menu_ic_rklist, R.id.main_menu_text_rklist, R.id.main_menu_rklist);
+                break;
 
-                    case LATEST:
-                        ((TextView) mainActivity.findViewById(R.id.main_menu_text_latest)).setTextColor(
-                                getResources().getColor(R.color.menu_item_blue)
-                        );
-                        ((ImageButton) mainActivity.findViewById(R.id.main_menu_ic_latest)).setColorFilter(
-                                getResources().getColor(R.color.menu_item_blue)
-                        );
-                        break;
+            case LATEST:
+                setHighLightButton(R.id.main_menu_ic_latest, R.id.main_menu_text_latest, R.id.main_menu_latest);
+                break;
 
-                    case FAV:
-                        ((TextView) mainActivity.findViewById(R.id.main_menu_text_fav)).setTextColor(
-                                getResources().getColor(R.color.menu_item_blue)
-                        );
-                        ((ImageButton) mainActivity.findViewById(R.id.main_menu_ic_fav)).setColorFilter(
-                                getResources().getColor(R.color.menu_item_blue)
-                        );
-                        break;
+            case FAV:
+                setHighLightButton(R.id.main_menu_ic_fav, R.id.main_menu_text_fav, R.id.main_menu_fav);
+                break;
 
-                    case CONFIG:
-                        ((TextView) mainActivity.findViewById(R.id.main_menu_text_config)).setTextColor(
-                                getResources().getColor(R.color.menu_item_blue)
-                        );
-                        ((ImageButton) mainActivity.findViewById(R.id.main_menu_ic_config)).setColorFilter(
-                                getResources().getColor(R.color.menu_item_blue)
-                        );
-                        break;
-
-                }
-            } catch (NullPointerException e) {
-                Toast.makeText(mainActivity, "NullPointerException in setHighLightButton(); sdk16-", Toast.LENGTH_SHORT).show();
-                e.printStackTrace();
-            }
-        } else {
-            try {
-                switch (f) {
-                    case RKLIST:
-                        mainActivity.findViewById(R.id.main_menu_rklist).setBackground(
-                                getResources().getDrawable(R.drawable.btn_menu_item_selected)
-                        );
-                        ((TextView) mainActivity.findViewById(R.id.main_menu_text_rklist)).setTextColor(
-                                getResources().getColor(R.color.menu_text_color_selected)
-                        );
-                        ((ImageButton) mainActivity.findViewById(R.id.main_menu_ic_rklist)).setColorFilter(
-                                getResources().getColor(R.color.menu_item_white)
-                        );
-                        break;
-
-                    case LATEST:
-                        mainActivity.findViewById(R.id.main_menu_latest).setBackground(
-                                getResources().getDrawable(R.drawable.btn_menu_item_selected)
-                        );
-                        ((TextView) mainActivity.findViewById(R.id.main_menu_text_latest)).setTextColor(
-                                getResources().getColor(R.color.menu_text_color_selected)
-                        );
-                        ((ImageButton) mainActivity.findViewById(R.id.main_menu_ic_latest)).setColorFilter(
-                                getResources().getColor(R.color.menu_item_white)
-                        );
-                        break;
-
-                    case FAV:
-                        mainActivity.findViewById(R.id.main_menu_fav).setBackground(
-                                getResources().getDrawable(R.drawable.btn_menu_item_selected)
-                        );
-                        ((TextView) mainActivity.findViewById(R.id.main_menu_text_fav)).setTextColor(
-                                getResources().getColor(R.color.menu_text_color_selected)
-                        );
-                        ((ImageButton) mainActivity.findViewById(R.id.main_menu_ic_fav)).setColorFilter(
-                                getResources().getColor(R.color.menu_item_white)
-                        );
-                        break;
-
-                    case CONFIG:
-                        mainActivity.findViewById(R.id.main_menu_config).setBackground(
-                                getResources().getDrawable(R.drawable.btn_menu_item_selected)
-                        );
-                        ((TextView) mainActivity.findViewById(R.id.main_menu_text_config)).setTextColor(
-                                getResources().getColor(R.color.menu_text_color_selected)
-                        );
-                        ((ImageButton) mainActivity.findViewById(R.id.main_menu_ic_config)).setColorFilter(
-                                getResources().getColor(R.color.menu_item_white)
-                        );
-                        break;
-
-                }
-            } catch (NullPointerException e) {
-                Toast.makeText(mainActivity, "NullPointerException in setHighLightButton();", Toast.LENGTH_SHORT).show();
-                e.printStackTrace();
-            }
+            case CONFIG:
+                setHighLightButton(R.id.main_menu_ic_config, R.id.main_menu_text_config, R.id.main_menu_config);
+                break;
         }
     }
 
@@ -418,46 +299,21 @@ public class NavigationDrawerFragment extends Fragment {
      * Judge whether the dark mode is open. If is open, close it; else open it.
      */
     private void openOrCloseDarkMode() {
-        // sdk ver is too low
-        if (Build.VERSION.SDK_INT < 16) {
-            try {
-                if (fakeDarkSwitcher) {
-                    // In dark mode, so close it
-                    ((TextView) mainActivity.findViewById(R.id.main_menu_dark_mode_switcher)).setTextColor(
-                            getResources().getColor(R.color.menu_text_color)
-                    );
-                } else {
-                    // In light mode, so open it
-                    ((TextView) mainActivity.findViewById(R.id.main_menu_dark_mode_switcher)).setTextColor(
-                            getResources().getColor(R.color.menu_item_blue)
-                    );
-                }
-            } catch (NullPointerException e) {
-                Toast.makeText(mainActivity, "NullPointerException in openOrCloseDarkMode(); sdk16-", Toast.LENGTH_SHORT).show();
-                e.printStackTrace();
-            }
-        } else {
-            try {
-                if (fakeDarkSwitcher) {
-                    // In dark mode, so close it
-                    ((TextView) mainActivity.findViewById(R.id.main_menu_dark_mode_switcher)).setTextColor(
-                            getResources().getColor(R.color.menu_text_color)
-                    );
-                    mainActivity.findViewById(R.id.main_menu_dark_mode_switcher).setBackground(
-                            getResources().getDrawable(R.drawable.btn_menu_item)
-                    );
-                } else {
-                    // In light mode, so open it
-                    ((TextView) mainActivity.findViewById(R.id.main_menu_dark_mode_switcher)).setTextColor(
-                            getResources().getColor(R.color.menu_text_color_selected)
-                    );
-                    mainActivity.findViewById(R.id.main_menu_dark_mode_switcher).setBackground(
-                            getResources().getDrawable(R.drawable.btn_menu_item_selected)
-                    );
-                }
-            } catch (NullPointerException e) {
-                Toast.makeText(mainActivity, "NullPointerException in openOrCloseDarkMode();", Toast.LENGTH_SHORT).show();
-                e.printStackTrace();
+        TextView darkModeSwitcherText = mainActivity.findViewById(R.id.main_menu_dark_mode_switcher);
+        if (darkModeSwitcherText != null) {
+            // Set view background color (only works for API 16+).
+            if (Build.VERSION.SDK_INT >= 16) {
+                darkModeSwitcherText.setTextColor(getResources().getColor(
+                        fakeDarkSwitcher ?/*switch off*/ R.color.menu_text_color :/*switch on*/ R.color.menu_text_color_selected
+                ));
+                darkModeSwitcherText.setBackground(getResources().getDrawable(
+                        fakeDarkSwitcher ?/*switch off*/R.drawable.btn_menu_item :/*switch on*/R.drawable.btn_menu_item_selected
+                ));
+            } else {
+                // Fall back to old Android style.
+                darkModeSwitcherText.setTextColor(getResources().getColor(
+                        fakeDarkSwitcher ?/*switch off*/ R.color.menu_text_color :/*switch on*/ R.color.menu_item_blue
+                ));
             }
         }
 
