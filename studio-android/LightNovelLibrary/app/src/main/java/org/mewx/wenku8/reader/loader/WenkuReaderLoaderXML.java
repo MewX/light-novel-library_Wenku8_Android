@@ -133,12 +133,21 @@ public class WenkuReaderLoaderXML extends WenkuReaderLoader {
         return null;
     }
 
+    /**
+     * Use with cautious! This method copies the whole text for each call!
+     * @return the whole chapter text.
+     */
     @Override
     public String getCurrentAsString() {
         if(currentIndex < nc.size() && currentIndex >= 0) {
             return nc.get(currentIndex).content;
         }
         return null;
+    }
+
+    @Override
+    public int getCurrentStringLength() {
+        return getStringLength(currentIndex);
     }
 
     @Override

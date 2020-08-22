@@ -187,7 +187,7 @@ public class Wenku8ReaderActivityV1 extends BaseMaterialActivity {
         // save record
         if(mSlidingPageAdapter != null && loader != null) {
             loader.setCurrentIndex(mSlidingPageAdapter.getCurrentLastLineIndex());
-            if (volumeList.chapterList.size() > 1 && volumeList.chapterList.get(volumeList.chapterList.size() - 1).cid == cid && mSlidingPageAdapter.getCurrentLastWordIndex() == loader.getCurrentAsString().length() - 1)
+            if (volumeList.chapterList.size() > 1 && volumeList.chapterList.get(volumeList.chapterList.size() - 1).cid == cid && mSlidingPageAdapter.getCurrentLastWordIndex() == loader.getCurrentStringLength() - 1)
                 GlobalConfig.removeReadSavesRecordV1(aid);
             else
                 GlobalConfig.addReadSavesRecordV1(aid, volumeList.vid, cid, mSlidingPageAdapter.getCurrentFirstLineIndex(), mSlidingPageAdapter.getCurrentFirstWordIndex());
@@ -228,7 +228,7 @@ public class Wenku8ReaderActivityV1 extends BaseMaterialActivity {
             // check valid first
             if(firstLineIndex + 1 >= loader.getElementCount()) firstLineIndex = loader.getElementCount() - 1; // to last one
             loader.setCurrentIndex(firstLineIndex);
-            if(firstWordIndex + 1 >= loader.getCurrentAsString().length()) {
+            if(firstWordIndex + 1 >= loader.getCurrentStringLength()) {
                 firstLineIndex --;
                 firstWordIndex = 0;
                 if(firstLineIndex < 0) firstLineIndex = 0;
@@ -269,7 +269,7 @@ public class Wenku8ReaderActivityV1 extends BaseMaterialActivity {
         public void setCurrentIndex(int lineIndex, int wordIndex) {
             firstLineIndex = lineIndex + 1 >= loader.getElementCount() ? loader.getElementCount() - 1 : lineIndex;
             loader.setCurrentIndex(firstLineIndex);
-            firstWordIndex = wordIndex + 1 >= loader.getCurrentAsString().length() ? loader.getCurrentAsString().length() - 1 : wordIndex;
+            firstWordIndex = wordIndex + 1 >= loader.getCurrentStringLength() ? loader.getCurrentStringLength() - 1 : wordIndex;
 
             WenkuReaderPageView temp = new WenkuReaderPageView(Wenku8ReaderActivityV1.this, firstLineIndex, firstWordIndex, WenkuReaderPageView.LOADING_DIRECTION.CURRENT);
             firstLineIndex = temp.getFirstLineIndex();

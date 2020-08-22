@@ -25,6 +25,8 @@ public class OldNovelContentParser {
         public String content = "";
     }
 
+    private static final String IMAGE_ENTRY = "<!--image-->";
+
     @NonNull
     public static List<NovelContent> parseNovelContent(@NonNull String raw, @Nullable MaterialDialog pDialog) {
         List<NovelContent> result = new ArrayList<>();
@@ -45,11 +47,11 @@ public class OldNovelContentParser {
                 continue;
 
             // test
-            temp = t.indexOf("<!--image-->", 0);
+            temp = t.indexOf(IMAGE_ENTRY, 0);
             if (temp == -1) {
                 NovelContent nc = new NovelContent();
                 nc.type = NovelContentType.TEXT;
-                nc.content = t.trim(); //.replaceAll("[ |　]", " ").trim();
+                nc.content = t.trim();
                 result.add(nc);
 
                 // update progress
@@ -57,18 +59,16 @@ public class OldNovelContentParser {
                     pDialog.setMaxProgress(result.size());
             } else {
                 Log.d(TAG, "img index = " + temp);
-                // nc.content = nc.content.substring(temp + 12,
-                // nc.content.indexOf("<!--image-->", temp + 12));
 
                 // one line contains more than one images
                 temp = 0;
                 while (true) {
-                    temp = t.indexOf("<!--image-->", temp);
+                    temp = t.indexOf(IMAGE_ENTRY, temp);
                     if (temp == -1)
                         break;
 
                     NovelContent nc2 = new NovelContent();
-                    int t2 = t.indexOf("<!--image-->", temp + 12);
+                    int t2 = t.indexOf(IMAGE_ENTRY, temp + IMAGE_ENTRY.length());
                     if (t2 < 0) {
                         Log.d(TAG, "Incomplete image pair, t2 = " + t2);
                         NovelContent nc = new NovelContent();
@@ -77,10 +77,10 @@ public class OldNovelContentParser {
                         result.add(nc);
                         break;
                     }
-                    nc2.content = t.substring(temp + 12, t2);
+                    nc2.content = t.substring(temp + IMAGE_ENTRY.length(), t2);
                     nc2.type = NovelContentType.IMAGE;
                     result.add(nc2);
-                    temp = t2 + 12;
+                    temp = t2 + IMAGE_ENTRY.length();
 
                     // update progress
                     if (pDialog != null)
@@ -103,29 +103,27 @@ public class OldNovelContentParser {
         int temp;
         for (String t : s) {
             // test
-            temp = t.indexOf("<!--image-->", 0);
+            temp = t.indexOf(IMAGE_ENTRY, 0);
             if (temp != -1) {
                 Log.d(TAG, "img index = " + temp);
-                // nc.content = nc.content.substring(temp + 12,
-                // nc.content.indexOf("<!--image-->", temp + 12));
 
                 // one line contains more than one images
                 temp = 0;
                 while (true) {
-                    temp = t.indexOf("<!--image-->", temp);
+                    temp = t.indexOf(IMAGE_ENTRY, temp);
                     if (temp == -1)
                         break;
 
                     NovelContent nc2 = new NovelContent();
-                    int t2 = t.indexOf("<!--image-->", temp + 12);
+                    int t2 = t.indexOf(IMAGE_ENTRY, temp + IMAGE_ENTRY.length());
                     if (t2 < 0) {
                         Log.d(TAG, "Breaked in NovelContentParser_onlyImage, t2 = " + t2);
                         break;
                     }
-                    nc2.content = t.substring(temp + 12, t2);
+                    nc2.content = t.substring(temp + IMAGE_ENTRY.length(), t2);
                     nc2.type = NovelContentType.IMAGE;
                     result.add(nc2);
-                    temp = t2 + 12;
+                    temp = t2 + IMAGE_ENTRY.length();
 
                 }
             }

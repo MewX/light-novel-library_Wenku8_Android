@@ -36,6 +36,8 @@ public abstract class WenkuReaderLoader {
 
     public abstract String getCurrentAsString(); // index keep
 
+    public abstract int getCurrentStringLength();
+
     public abstract Bitmap getCurrentAsBitmap(); // index keep
 
     public abstract ElementType getPreviousType(); // nullable (index keep)
