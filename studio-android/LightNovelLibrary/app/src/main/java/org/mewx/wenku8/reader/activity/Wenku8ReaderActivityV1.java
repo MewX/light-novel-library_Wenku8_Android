@@ -778,8 +778,9 @@ public class Wenku8ReaderActivityV1 extends BaseMaterialActivity {
                         mSlidingPageAdapter.setCurrentIndex(rs.lineId, rs.wordId);
                         mSlidingPageAdapter.restoreState(null, null);
                         mSlidingPageAdapter.notifyDataSetChanged();
-                    }
-                    else {
+                    } else if (mSlidingPageAdapter.getCurrentFirstLineIndex() != rs.lineId ||
+                            mSlidingPageAdapter.getCurrentFirstWordIndex() != rs.wordId) {
+                        // Popping up jump dialog only when the user didn't exist at the first page.
                         new MaterialDialog.Builder(Wenku8ReaderActivityV1.this)
                                 .onPositive((dialog, which) -> {
                                     mSlidingPageAdapter.setCurrentIndex(rs.lineId, rs.wordId);
