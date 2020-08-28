@@ -102,7 +102,7 @@ public class GlobalConfig {
         reader_font_size, // (int) sp (8 - 32)
         reader_line_distance, // (int) dp (0 - 32)
         reader_paragraph_distance, // (int) dp (0 - 48)
-        reader_paragraph_edge_distance, // (int) dp (0 - 16)
+        reader_paragraph_edge_distance, // (int) dp (0 - 32)
         reader_background_path, // (String) path to an image, day mode only, "0" means default
     }
 

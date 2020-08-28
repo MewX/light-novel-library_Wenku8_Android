@@ -76,7 +76,7 @@ public class WenkuReaderPageView extends View {
     static private String sampleText = "轻";
     static private WenkuReaderLoader mLoader;
     static private WenkuReaderSettingV1 mSetting;
-    static private int pxLineDistance, pxParagraphDistance, pxParagraphEdgeDistance, pxPageEdgeDistance, pxWidgetHeight;
+    static private int pxLineDistance, pxParagraphDistance, pxPageEdgeDistance, pxWidgetHeight;
     static private Point screenSize; // Screen real size.
     static private Pair<Point, Point> screenDrawArea; // The area we want to draw text/images in.
     private Point textAreaSize; // TODO: remove this variable.
@@ -118,7 +118,6 @@ public class WenkuReaderPageView extends View {
         mSetting = wrs;
         pxLineDistance = LightTool.dip2px(MyApp.getContext(), mSetting.getLineDistance()); // 行间距
         pxParagraphDistance = LightTool.dip2px(MyApp.getContext(), mSetting.getParagraphDistance()); // 段落间距
-        pxParagraphEdgeDistance = LightTool.dip2px(MyApp.getContext(), mSetting.getParagraghEdgeDistance()); // TODO: merge with page edge distance, with a config update
         pxPageEdgeDistance = LightTool.dip2px(MyApp.getContext(), mSetting.getPageEdgeDistance()); // 页面边距
         pxWidgetHeight = LightTool.dip2px(MyApp.getContext(), mSetting.widgetHeight);
 
@@ -199,9 +198,9 @@ public class WenkuReaderPageView extends View {
         // Add cutting positions.
         Rect cutout = LightTool.getDisplayCutout();
         // TODO: remove the top widget.
-        int top = pxPageEdgeDistance + pxParagraphEdgeDistance + pxWidgetHeight + Math.max(cutout.top, statusBarHeight);
-        int left = pxPageEdgeDistance + pxParagraphEdgeDistance + cutout.left;
-        int right = pxPageEdgeDistance + pxParagraphEdgeDistance + cutout.right;
+        int top = pxPageEdgeDistance + pxWidgetHeight + Math.max(cutout.top, statusBarHeight);
+        int left = pxPageEdgeDistance + cutout.left;
+        int right = pxPageEdgeDistance + cutout.right;
         int bottom = pxPageEdgeDistance + pxWidgetHeight + cutout.bottom;
 
         Point topLeft = new Point(left, top);
@@ -583,48 +582,44 @@ public class WenkuReaderPageView extends View {
             if(li.type == WenkuReaderLoader.ElementType.TEXT) {
                 canvas.drawText( li.text, (float) screenDrawArea.first.x, (float) heightSum, textPaint);
                 heightSum += fontHeight;
-            }
-            else if(li.type == WenkuReaderLoader.ElementType.IMAGE_DEPENDENT){
-                if(bitmapInfoList != null) {
-                    int foundIndex = -1;
-                    for(BitmapInfo bi : bitmapInfoList) {
-                        if(bi.idxLineInfo == i) {
-                            foundIndex = bitmapInfoList.indexOf(bi);
-                            break;
-                        }
-                    }
-
-                    if(foundIndex == -1) {
-                        // not found, new load task
-                        canvas.drawText("正在加载图片：" + li.text.substring(21), (float) screenDrawArea.first.x, (float) heightSum, textPaint);
-                        BitmapInfo bitmapInfo = new BitmapInfo();
-                        bitmapInfo.idxLineInfo = i;
-                        bitmapInfo.x_beg = screenDrawArea.first.x;
-                        bitmapInfo.y_beg = screenDrawArea.first.y;
-                        if(Build.VERSION.SDK_INT < 19) bitmapInfo.y_beg -= pxWidgetHeight;
-                        bitmapInfo.height = textAreaSize.y;
-                        bitmapInfo.width = textAreaSize.x;
-                        bitmapInfoList.add(0, bitmapInfo);
-
-                        AsyncLoadImage ali = new AsyncLoadImage();
-                        ali.execute(bitmapInfoList.get(0));
-                    }
-                    else {
-                        if(bitmapInfoList.get(foundIndex).bm == null) {
-                            canvas.drawText("正在加载图片：" + li.text.substring(21), (float) screenDrawArea.first.x, (float) heightSum, textPaint);
-                        }
-                        else {
-                            int new_x = (screenSize.x - bitmapInfoList.get(foundIndex).x_beg * 2 - bitmapInfoList.get(foundIndex).width) / 2 + bitmapInfoList.get(foundIndex).x_beg;
-                            int new_y = (screenSize.y - bitmapInfoList.get(foundIndex).y_beg * 2 - bitmapInfoList.get(foundIndex).height) / 2 + bitmapInfoList.get(foundIndex).y_beg;
-                            canvas.drawBitmap(bitmapInfoList.get(foundIndex).bm, new_x, new_y, new Paint());
-                        }
-                    }
-                }
-                else {
+            } else if(li.type == WenkuReaderLoader.ElementType.IMAGE_DEPENDENT){
+                if (bitmapInfoList == null) {
                     canvas.drawText("Unexpected array: " + li.text.substring(21), (float) screenDrawArea.first.x, (float) heightSum, textPaint);
+                    continue;
                 }
-            }
-            else {
+
+                int foundIndex = -1;
+                for (BitmapInfo bi : bitmapInfoList) {
+                    if (bi.idxLineInfo == i) {
+                        foundIndex = bitmapInfoList.indexOf(bi);
+                        break;
+                    }
+                }
+
+                if (foundIndex == -1) {
+                    // not found, new load task
+                    canvas.drawText("正在加载图片：" + li.text.substring(21), (float) screenDrawArea.first.x, (float) heightSum, textPaint);
+                    BitmapInfo bitmapInfo = new BitmapInfo();
+                    bitmapInfo.idxLineInfo = i;
+                    bitmapInfo.x_beg = screenDrawArea.first.x;
+                    bitmapInfo.y_beg = screenDrawArea.first.y;
+                    if (Build.VERSION.SDK_INT < 19) bitmapInfo.y_beg -= pxWidgetHeight;
+                    bitmapInfo.height = textAreaSize.y;
+                    bitmapInfo.width = textAreaSize.x;
+                    bitmapInfoList.add(0, bitmapInfo);
+
+                    AsyncLoadImage ali = new AsyncLoadImage();
+                    ali.execute(bitmapInfoList.get(0));
+                } else {
+                    if (bitmapInfoList.get(foundIndex).bm == null) {
+                        canvas.drawText("正在加载图片：" + li.text.substring(21), (float) screenDrawArea.first.x, (float) heightSum, textPaint);
+                    } else {
+                        int new_x = (screenSize.x - bitmapInfoList.get(foundIndex).x_beg * 2 - bitmapInfoList.get(foundIndex).width) / 2 + bitmapInfoList.get(foundIndex).x_beg;
+                        int new_y = (screenSize.y - bitmapInfoList.get(foundIndex).y_beg * 2 - bitmapInfoList.get(foundIndex).height) / 2 + bitmapInfoList.get(foundIndex).y_beg;
+                        canvas.drawBitmap(bitmapInfoList.get(foundIndex).bm, new_x, new_y, new Paint());
+                    }
+                }
+            } else {
                 canvas.drawText("（！请先用旧引擎浏览）图片" + li.text.substring(21), (float) screenDrawArea.first.x, (float) heightSum, textPaint);
             }
         }

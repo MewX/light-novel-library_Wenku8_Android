@@ -40,10 +40,9 @@ public class WenkuReaderSettingV1 {
     // paragraph setting
     private int lineDistance = 16; // in "dp"
     private int paragraphDistance = 20; // in "dp"
-    private int paragraghEdgeDistance = 8; // in "dp", text part edge distance (left&right)
 
     // page setting
-    private int pageEdgeDistance = 8; // in "dp", top&right&bottom&left 4 directions distances to screen edge, and paragraph to side view widgets
+    private int pageEdgeDistance = 8; // in "dp", page edge distance
     private PAGE_BACKGROUND_TYPE pageBackgroundType = PAGE_BACKGROUND_TYPE.SYSTEM_DEFAULT;
     private String pageBackgrounCustomPath = "";
 
@@ -80,8 +79,8 @@ public class WenkuReaderSettingV1 {
         size = GlobalConfig.getFromAllSetting(GlobalConfig.SettingItems.reader_paragraph_edge_distance);
         if(size != null && LightTool.isInteger(size)) {
             int temp = Integer.parseInt(size);
-            if(0 <= temp && temp <= 16)
-                paragraghEdgeDistance = temp;
+            if(0 <= temp && temp <= 32)
+                pageEdgeDistance = temp;
         }
 
         // background path
@@ -161,17 +160,9 @@ public class WenkuReaderSettingV1 {
         return paragraphDistance;
     }
 
-    public void setParagraphEdgeDistance(int l) {
-        paragraghEdgeDistance = l;
-        GlobalConfig.setToAllSetting(GlobalConfig.SettingItems.reader_paragraph_edge_distance, Integer.toString(l));
-    }
-
-    public int getParagraghEdgeDistance() {
-        return paragraghEdgeDistance;
-    }
-
     public void setPageEdgeDistance(int l) {
         pageEdgeDistance = l;
+        GlobalConfig.setToAllSetting(GlobalConfig.SettingItems.reader_paragraph_edge_distance, Integer.toString(l));
     }
 
     public int getPageEdgeDistance() {

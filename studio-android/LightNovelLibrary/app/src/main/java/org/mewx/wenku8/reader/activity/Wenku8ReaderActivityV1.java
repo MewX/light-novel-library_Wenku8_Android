@@ -610,7 +610,7 @@ public class Wenku8ReaderActivityV1 extends BaseMaterialActivity {
                                             }
                                         });
 
-                                        seekerParagraphEdgeDistance.setProgress(setting.getParagraghEdgeDistance());
+                                        seekerParagraphEdgeDistance.setProgress(setting.getPageEdgeDistance());
                                         seekerParagraphEdgeDistance.setOnProgressChangeListener(new DiscreteSeekBar.OnProgressChangeListener() {
                                             @Override
                                             public void onProgressChanged(DiscreteSeekBar discreteSeekBar, int i, boolean b) { }
@@ -620,7 +620,7 @@ public class Wenku8ReaderActivityV1 extends BaseMaterialActivity {
 
                                             @Override
                                             public void onStopTrackingTouch(DiscreteSeekBar discreteSeekBar) {
-                                                setting.setParagraphEdgeDistance(discreteSeekBar.getProgress());
+                                                setting.setPageEdgeDistance(discreteSeekBar.getProgress());
                                                 WenkuReaderPageView.setViewComponents(loader, setting, false);
                                                 mSlidingPageAdapter.restoreState(null, null);
                                                 mSlidingPageAdapter.notifyDataSetChanged();

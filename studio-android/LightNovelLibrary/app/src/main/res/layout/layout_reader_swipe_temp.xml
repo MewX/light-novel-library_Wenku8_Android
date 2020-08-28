@@ -314,7 +314,7 @@
                     app:dsb_trackColor="@color/default_white"
                     app:dsb_indicatorElevation="4dp"
                     app:dsb_min="0"
-                    app:dsb_max="16"/>
+                    app:dsb_max="32"/>
             </RelativeLayout>
 
             <LinearLayout
