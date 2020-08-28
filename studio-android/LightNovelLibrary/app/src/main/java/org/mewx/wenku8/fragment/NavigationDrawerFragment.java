@@ -326,6 +326,7 @@ public class NavigationDrawerFragment extends Fragment {
         FragmentActivity activity = getActivity();
         Point navBar = LightTool.getNavigationBarSize(getActivity());
 
+        // TODO: fix this margin for screen cutout.
         LinearLayout ll = mainActivity.findViewById(R.id.main_menu_bottom_layout);
         if (activity != null && navBar.y == 0)
             ll.setPadding(0, 0, 0, 0); // hide
