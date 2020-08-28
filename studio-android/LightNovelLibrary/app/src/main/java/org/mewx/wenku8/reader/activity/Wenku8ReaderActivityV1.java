@@ -7,6 +7,7 @@ import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.PorterDuff;
+import android.graphics.Rect;
 import android.graphics.drawable.Drawable;
 import android.net.Uri;
 import android.os.AsyncTask;
@@ -14,6 +15,7 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
 import android.util.Log;
+import android.view.DisplayCutout;
 import android.view.KeyEvent;
 import android.view.Menu;
 import android.view.MenuItem;
@@ -49,6 +51,7 @@ import org.mewx.wenku8.reader.slider.SlidingLayout;
 import org.mewx.wenku8.reader.slider.base.OverlappedSlider;
 import org.mewx.wenku8.reader.view.WenkuReaderPageView;
 import org.mewx.wenku8.util.LightNetwork;
+import org.mewx.wenku8.util.LightTool;
 
 import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
@@ -132,6 +135,23 @@ public class Wenku8ReaderActivityV1 extends BaseMaterialActivity {
         }
 
         return true;
+    }
+
+    @Override
+    public void onAttachedToWindow() {
+        super.onAttachedToWindow();
+
+        // Update display cutout area.
+        if (Build.VERSION.SDK_INT >= 28) {
+            DisplayCutout cutout = getWindow().getDecorView().getRootWindowInsets().getDisplayCutout();
+            if (cutout != null) {
+                LightTool.setDisplayCutout(
+                        new Rect(cutout.getSafeInsetLeft(),
+                                cutout.getSafeInsetTop(),
+                                cutout.getSafeInsetRight(),
+                                cutout.getSafeInsetBottom()));
+            }
+        }
     }
 
     private void hideNavigationBar() {

@@ -2,6 +2,7 @@ package org.mewx.wenku8.util;
 
 import android.content.Context;
 import android.graphics.Point;
+import android.graphics.Rect;
 import android.os.Build;
 import androidx.annotation.NonNull;
 import android.view.Display;
@@ -15,6 +16,7 @@ import java.lang.reflect.InvocationTargetException;
  * Util tools collects.
  */
 public class LightTool {
+    private static Rect displayCutout = new Rect(0, 0, 0, 0);
 
     /* Number related useful functions */
     public static boolean isInteger(@NonNull String value) {
@@ -67,6 +69,15 @@ public class LightTool {
         return size;
     }
 
+    public static void setDisplayCutout(Rect rect) {
+        displayCutout = rect;
+    }
+
+    public static Rect getDisplayCutout() {
+        // Make a copy.
+        return new Rect(displayCutout);
+    }
+
     public static Point getRealScreenSize(Context context) {
         WindowManager windowManager = (WindowManager) context.getSystemService(Context.WINDOW_SERVICE);
         Display display = windowManager.getDefaultDisplay();
@@ -74,7 +85,7 @@ public class LightTool {
 
         if (Build.VERSION.SDK_INT >= 17) {
             display.getRealSize(size);
-        } else if (Build.VERSION.SDK_INT >= 14) {
+        } else {
             try {
                 size.x = (Integer) Display.class.getMethod("getRawWidth").invoke(display);
                 size.y = (Integer) Display.class.getMethod("getRawHeight").invoke(display);

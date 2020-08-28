@@ -8,6 +8,7 @@ import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.Paint;
 import android.graphics.Point;
+import android.graphics.Rect;
 import android.graphics.Shader;
 import android.graphics.Typeface;
 import android.graphics.drawable.BitmapDrawable;
@@ -15,6 +16,7 @@ import android.os.AsyncTask;
 import android.os.Build;
 import android.text.TextPaint;
 import android.util.Log;
+import android.util.Pair;
 import android.view.View;
 import android.widget.Toast;
 
@@ -75,8 +77,9 @@ public class WenkuReaderPageView extends View {
     static private WenkuReaderLoader mLoader;
     static private WenkuReaderSettingV1 mSetting;
     static private int pxLineDistance, pxParagraphDistance, pxParagraphEdgeDistance, pxPageEdgeDistance, pxWidgetHeight;
-    static private Point screenSize;
-    private Point textAreaSize;
+    static private Point screenSize; // Screen real size.
+    static private Pair<Point, Point> screenDrawArea; // The area we want to draw text/images in.
+    private Point textAreaSize; // TODO: remove this variable.
     static private Typeface typeface;
     static private TextPaint textPaint, widgetTextPaint;
     static private int fontHeight, widgetFontHeihgt;
@@ -113,10 +116,10 @@ public class WenkuReaderPageView extends View {
     static public void setViewComponents(WenkuReaderLoader wrl, WenkuReaderSettingV1 wrs, boolean forceMode) {
         mLoader = wrl;
         mSetting = wrs;
-        pxLineDistance = LightTool.dip2px(MyApp.getContext(), mSetting.getLineDistance());
-        pxParagraphDistance = LightTool.dip2px(MyApp.getContext(), mSetting.getParagraphDistance());
-        pxParagraphEdgeDistance = LightTool.dip2px(MyApp.getContext(), mSetting.getParagraghEdgeDistance());
-        pxPageEdgeDistance = LightTool.dip2px(MyApp.getContext(), mSetting.getPageEdgeDistance());
+        pxLineDistance = LightTool.dip2px(MyApp.getContext(), mSetting.getLineDistance()); // 行间距
+        pxParagraphDistance = LightTool.dip2px(MyApp.getContext(), mSetting.getParagraphDistance()); // 段落间距
+        pxParagraphEdgeDistance = LightTool.dip2px(MyApp.getContext(), mSetting.getParagraghEdgeDistance()); // TODO: merge with page edge distance, with a config update
+        pxPageEdgeDistance = LightTool.dip2px(MyApp.getContext(), mSetting.getPageEdgeDistance()); // 页面边距
         pxWidgetHeight = LightTool.dip2px(MyApp.getContext(), mSetting.widgetHeight);
 
         // calc general var
@@ -186,6 +189,27 @@ public class WenkuReaderPageView extends View {
     }
 
     /**
+     * Calculate the actual area for drawing.
+     * @return the two points forming a rectangle that can actually hold content.
+     *         The two points are: top left point and bottom right point.
+     */
+    private Pair<Point, Point> getScreenLayout() {
+        int statusBarHeight = LightTool.getStatusBarHeightValue(MyApp.getContext());
+
+        // Add cutting positions.
+        Rect cutout = LightTool.getDisplayCutout();
+        // TODO: remove the top widget.
+        int top = pxPageEdgeDistance + pxParagraphEdgeDistance + pxWidgetHeight + Math.max(cutout.top, statusBarHeight);
+        int left = pxPageEdgeDistance + pxParagraphEdgeDistance + cutout.left;
+        int right = pxPageEdgeDistance + pxParagraphEdgeDistance + cutout.right;
+        int bottom = pxPageEdgeDistance + pxWidgetHeight + cutout.bottom;
+
+        Point topLeft = new Point(left, top);
+        Point bottomRight = new Point(screenSize.x - right, screenSize.y - bottom);
+        return new Pair<>(topLeft, bottomRight);
+    }
+
+    /**
      * This function init the view class。
      * Notice: (-1, -1), (-1, 0), (0, -1) means first page.
      * @param context current context, should be WenkuReaderActivity
@@ -201,9 +225,15 @@ public class WenkuReaderPageView extends View {
         bitmapInfoList = new ArrayList<>();
         mLoader.setCurrentIndex(lineIndex);
 
-        // get environmental vars, use actual layout size
-        textAreaSize = new Point(screenSize.x - 2 * (pxPageEdgeDistance + pxParagraphEdgeDistance),
-                screenSize.y - 2 * (pxPageEdgeDistance + pxWidgetHeight));
+        // first.x = left
+        // first.y = top
+        // second.x = screen.x - right
+        // second.y = screen.y - bottom
+        screenDrawArea = getScreenLayout();
+
+        // get environmental vars, use actual layout size: width x height
+        textAreaSize = new Point(screenDrawArea.second.x - screenDrawArea.first.x,
+                screenDrawArea.second.y - screenDrawArea.first.y);
         if(Build.VERSION.SDK_INT < 19) textAreaSize.y = textAreaSize.y + pxWidgetHeight;
 
         // save vars, calc all ints
@@ -530,13 +560,13 @@ public class WenkuReaderPageView extends View {
         }
 
         // draw widgets
-        canvas.drawText(mLoader.getChapterName(), pxPageEdgeDistance, screenSize.y - pxPageEdgeDistance, widgetTextPaint);
+        canvas.drawText(mLoader.getChapterName(), screenDrawArea.first.x, screenDrawArea.second.y, widgetTextPaint);
         String percentage = "( " + (lastLineIndex + 1) * 100 / mLoader.getElementCount() + "% )";
-        int tempWidth = (int) widgetTextPaint.measureText(percentage);
-        canvas.drawText(percentage, screenSize.x - pxPageEdgeDistance - tempWidth, screenSize.y - pxPageEdgeDistance, widgetTextPaint);
+        final int textWidth = (int) widgetTextPaint.measureText(percentage);
+        canvas.drawText(percentage, screenDrawArea.second.x - textWidth, screenDrawArea.second.y, widgetTextPaint);
 
         // draw text on average in page and line
-        int heightSum = fontHeight + pxPageEdgeDistance + pxWidgetHeight;
+        int heightSum = screenDrawArea.first.y;
         if(Build.VERSION.SDK_INT < 19) heightSum -= pxWidgetHeight;
         for(int i = 0; i < lineInfoList.size(); i ++) {
             final LineInfo li = lineInfoList.get(i);
@@ -551,7 +581,7 @@ public class WenkuReaderPageView extends View {
 
             Log.d("MewX", "draw: " + li.text);
             if(li.type == WenkuReaderLoader.ElementType.TEXT) {
-                canvas.drawText( li.text, (float) (pxPageEdgeDistance + pxParagraphEdgeDistance), (float) heightSum, textPaint);
+                canvas.drawText( li.text, (float) screenDrawArea.first.x, (float) heightSum, textPaint);
                 heightSum += fontHeight;
             }
             else if(li.type == WenkuReaderLoader.ElementType.IMAGE_DEPENDENT){
@@ -566,11 +596,11 @@ public class WenkuReaderPageView extends View {
 
                     if(foundIndex == -1) {
                         // not found, new load task
-                        canvas.drawText("正在加载图片：" + li.text.substring(21), (float) (pxPageEdgeDistance + pxParagraphEdgeDistance), (float) heightSum, textPaint);
+                        canvas.drawText("正在加载图片：" + li.text.substring(21), (float) screenDrawArea.first.x, (float) heightSum, textPaint);
                         BitmapInfo bitmapInfo = new BitmapInfo();
                         bitmapInfo.idxLineInfo = i;
-                        bitmapInfo.x_beg = pxPageEdgeDistance + pxParagraphEdgeDistance;
-                        bitmapInfo.y_beg = pxPageEdgeDistance + pxWidgetHeight;
+                        bitmapInfo.x_beg = screenDrawArea.first.x;
+                        bitmapInfo.y_beg = screenDrawArea.first.y;
                         if(Build.VERSION.SDK_INT < 19) bitmapInfo.y_beg -= pxWidgetHeight;
                         bitmapInfo.height = textAreaSize.y;
                         bitmapInfo.width = textAreaSize.x;
@@ -581,7 +611,7 @@ public class WenkuReaderPageView extends View {
                     }
                     else {
                         if(bitmapInfoList.get(foundIndex).bm == null) {
-                            canvas.drawText("正在加载图片：" + li.text.substring(21), (float) (pxPageEdgeDistance + pxParagraphEdgeDistance), (float) heightSum, textPaint);
+                            canvas.drawText("正在加载图片：" + li.text.substring(21), (float) screenDrawArea.first.x, (float) heightSum, textPaint);
                         }
                         else {
                             int new_x = (screenSize.x - bitmapInfoList.get(foundIndex).x_beg * 2 - bitmapInfoList.get(foundIndex).width) / 2 + bitmapInfoList.get(foundIndex).x_beg;
@@ -591,11 +621,11 @@ public class WenkuReaderPageView extends View {
                     }
                 }
                 else {
-                    canvas.drawText("Unexpected array: " + li.text.substring(21), (float) (pxPageEdgeDistance + pxParagraphEdgeDistance), (float) heightSum, textPaint);
+                    canvas.drawText("Unexpected array: " + li.text.substring(21), (float) screenDrawArea.first.x, (float) heightSum, textPaint);
                 }
             }
             else {
-                canvas.drawText("（！请先用旧引擎浏览）图片" + li.text.substring(21), (float) (pxPageEdgeDistance + pxParagraphEdgeDistance), (float) heightSum, textPaint);
+                canvas.drawText("（！请先用旧引擎浏览）图片" + li.text.substring(21), (float) screenDrawArea.first.x, (float) heightSum, textPaint);
             }
         }
     }
