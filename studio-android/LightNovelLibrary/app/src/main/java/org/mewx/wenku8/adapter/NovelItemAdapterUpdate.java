@@ -47,7 +47,6 @@ public class NovelItemAdapterUpdate extends RecyclerView.Adapter<NovelItemAdapte
 
     public NovelItemAdapterUpdate(List<NovelItemInfoUpdate> dataset) {
         super();
-        mDataset = null;
         mDataset = dataset;
     }
 

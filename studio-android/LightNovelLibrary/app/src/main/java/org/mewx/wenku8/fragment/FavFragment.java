@@ -64,7 +64,7 @@ public class FavFragment extends Fragment implements MyItemClickListener, MyItem
 
     // novel list info
     private List<Integer> listNovelItemAid = null; // aid list
-    private NovelItemAdapterUpdate mAdapter = null;
+    private List<NovelItemInfoUpdate> listNovelItemInfo = null; // info list
 
     public static FavFragment newInstance() {
         return new FavFragment();
@@ -207,8 +207,7 @@ public class FavFragment extends Fragment implements MyItemClickListener, MyItem
     private void refreshList(int time) {
         if(time == 0) {
             mSwipeRefreshLayout.setRefreshing(true);
-            AsyncLoadAllCloud alac = new AsyncLoadAllCloud();
-            alac.execute();
+            new AsyncLoadAllCloud().execute();
         }
         else {
             loadAllLocal();
@@ -217,30 +216,46 @@ public class FavFragment extends Fragment implements MyItemClickListener, MyItem
 
     private void loadAllLocal() {
         int retValue = 0;
+        boolean datasetChanged = false;
 
         // init
         listNovelItemAid = GlobalConfig.getLocalBookshelfList();
-        List<NovelItemInfoUpdate> listNovelItemInfo = new ArrayList<>(); // novel info list
+        if (listNovelItemInfo == null) {
+            listNovelItemInfo = new ArrayList<>();
+        }
 
         // load all meta file
-        for(Integer aid : listNovelItemAid) {
-            String xml = GlobalConfig.loadFullFileFromSaveFolder("intro", aid + "-intro.xml");
-            NovelItemInfoUpdate niiu;
+        aids:
+        for (int j = 0; j < listNovelItemAid.size(); j++) {
+            final Integer aid = listNovelItemAid.get(j);
+            // See if it's in the list already. Expecting the list will not be more than 100.
+            for (int i = 0; i < listNovelItemInfo.size(); i++) {
+                final NovelItemInfoUpdate info = listNovelItemInfo.get(i);
+                if (info.aid == aid) {
+                    // Found but in the same place.
+                    if (i == j) continue aids;
 
+                    // Found, not in the same place remove and re-insert.
+                    listNovelItemInfo.remove(i);
+                    listNovelItemInfo.add(j, info);
+                    datasetChanged = true;
+                    continue aids;
+                }
+            }
+
+            // Not found.
+            final String xml = GlobalConfig.loadFullFileFromSaveFolder("intro", aid + "-intro.xml");
+            NovelItemInfoUpdate info;
             if (xml.isEmpty()) {
                 // the intro file was deleted
-                retValue = -2;
-                niiu = new NovelItemInfoUpdate(aid);
+                retValue = -1;
+                info = new NovelItemInfoUpdate(aid);
             }
             else {
-                niiu = NovelItemInfoUpdate.convertFromMeta(Objects.requireNonNull(Wenku8Parser.parseNovelFullMeta(xml)));
+                info = NovelItemInfoUpdate.convertFromMeta(Objects.requireNonNull(Wenku8Parser.parseNovelFullMeta(xml)));
             }
-
-            if(niiu == null) {
-                retValue = -1;
-                continue;
-            }
-            listNovelItemInfo.add(niiu);
+            datasetChanged = true;
+            listNovelItemInfo.add(j, info);
         }
 
         // result
@@ -248,15 +263,18 @@ public class FavFragment extends Fragment implements MyItemClickListener, MyItem
             Toast.makeText(getActivity(), getResources().getString(R.string.bookshelf_intro_load_failed), Toast.LENGTH_SHORT).show();
         }
 
-        if(mAdapter == null) {
-            mAdapter = new NovelItemAdapterUpdate();
-            mRecyclerView.setAdapter(mAdapter);
+        // Reuse the adapter and datasets.
+        if (mRecyclerView.getAdapter() == null) {
+            NovelItemAdapterUpdate adapter = new NovelItemAdapterUpdate();
+            adapter.RefreshDataset(listNovelItemInfo);
+            adapter.setOnItemClickListener(FavFragment.this);
+            adapter.setOnDeleteClickListener(FavFragment.this);
+            adapter.setOnItemLongClickListener(FavFragment.this);
+            mRecyclerView.setAdapter(adapter);
         }
-        mAdapter.RefreshDataset(listNovelItemInfo);
-        mAdapter.setOnItemClickListener(FavFragment.this);
-        mAdapter.setOnDeleteClickListener(FavFragment.this);
-        mAdapter.setOnItemLongClickListener(FavFragment.this);
-        mAdapter.notifyDataSetChanged();
+        if (datasetChanged) {
+            mRecyclerView.getAdapter().notifyDataSetChanged();
+        }
         mSwipeRefreshLayout.setRefreshing(false);
     }
 
