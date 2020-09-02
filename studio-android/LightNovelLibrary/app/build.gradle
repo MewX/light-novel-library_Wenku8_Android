@@ -26,7 +26,8 @@ android {
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
 
             ndk {
-                abiFilters 'armeabi-v7a'//, /*for Play Store*/'arm64-v8a'//, 'x86', 'x86_64'
+                // Default for arm 32 only.
+                abiFilters 'armeabi-v7a' //, 'arm64-v8a', 'x86', 'x86_64'
             }
         }
     }
@@ -39,15 +40,18 @@ android {
         }
 
         baidu {
-            // 百度网盘分发
+            // 百度/其他网盘分发
             dimension "default"
             manifestPlaceholders = [ UMENG_CHANNEL_NAME : "baidu"]
         }
 
-        coolapk {
-            // 酷安
+        playstore {
+            // Google Play Store
             dimension "default"
-            manifestPlaceholders = [ UMENG_CHANNEL_NAME : "coolapk"]
+            manifestPlaceholders = [ UMENG_CHANNEL_NAME : "playstore"]
+            ndk {
+                abiFilters 'armeabi-v7a', 'arm64-v8a'
+            }
         }
     }
     packagingOptions {
