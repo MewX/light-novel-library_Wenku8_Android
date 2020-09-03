@@ -3,7 +3,7 @@
 [![Coverage Status](https://coveralls.io/repos/github/MewX/light-novel-library_Wenku8_Android/badge.svg)](https://coveralls.io/github/MewX/light-novel-library_Wenku8_Android)
 :point_left: **HISTORICAL ISSUE AND THAT'S WHAT WE ALL KNOW** :sob:
 
-[![play-store-badge](https://raw.githubusercontent.com/MewX/light-novel-library_Wenku8_Android/master/graph-source/google-play-badge.png)](https://play.google.com/store/apps/details?id=org.mewx.wenku8))
+[<img src="https://raw.githubusercontent.com/MewX/light-novel-library_Wenku8_Android/master/graph-source/google-play-badge.png" width="200px" height="auto" alt="play-store-badge">](https://play.google.com/store/apps/details?id=org.mewx.wenku8)
 
 文档目录
 ==========
