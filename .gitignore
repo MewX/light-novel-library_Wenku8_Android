@@ -2,3 +2,5 @@ _site/
 _temp/
 *.lock
 .directory
+studio-android/
+
