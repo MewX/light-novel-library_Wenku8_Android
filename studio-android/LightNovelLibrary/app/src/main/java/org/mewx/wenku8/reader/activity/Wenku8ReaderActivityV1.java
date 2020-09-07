@@ -641,6 +641,7 @@ public class Wenku8ReaderActivityV1 extends BaseMaterialActivity {
                                                             mSlidingPageAdapter.notifyDataSetChanged();
                                                             break;
                                                         case 1:
+                                                            // TODO: use system UI FilePicker.
                                                             // choose a ttf file
                                                             Intent i = new Intent(Wenku8ReaderActivityV1.this, FilePickerActivity.class);
                                                             i.putExtra(FilePickerActivity.EXTRA_ALLOW_MULTIPLE, false);
@@ -649,7 +650,7 @@ public class Wenku8ReaderActivityV1 extends BaseMaterialActivity {
                                                             i.putExtra(FilePickerActivity.EXTRA_START_PATH,
                                                                     GlobalConfig.pathPickedSave == null || GlobalConfig.pathPickedSave.length() == 0 ?
                                                                             Environment.getExternalStorageDirectory().getPath() : GlobalConfig.pathPickedSave);
-                                                            startActivityForResult(i, 0); // chooose font is 0
+                                                            startActivityForResult(i, 0); // choose font is 0
                                                             break;
                                                     }
                                                 })
@@ -669,6 +670,7 @@ public class Wenku8ReaderActivityV1 extends BaseMaterialActivity {
                                                             mSlidingPageAdapter.notifyDataSetChanged();
                                                             break;
                                                         case 1:
+                                                            // TODO: use system UI file picker.
                                                             // choose a image file
                                                             Intent i = new Intent(Wenku8ReaderActivityV1.this, FilePickerActivity.class);
                                                             i.putExtra(FilePickerActivity.EXTRA_ALLOW_MULTIPLE, false);
@@ -677,7 +679,7 @@ public class Wenku8ReaderActivityV1 extends BaseMaterialActivity {
                                                             i.putExtra(FilePickerActivity.EXTRA_START_PATH,
                                                                     GlobalConfig.pathPickedSave == null || GlobalConfig.pathPickedSave.length() == 0 ?
                                                                             Environment.getExternalStorageDirectory().getPath() : GlobalConfig.pathPickedSave);
-                                                            startActivityForResult(i, 1); // chooose image is 1
+                                                            startActivityForResult(i, 1); // choose image is 1
                                                             break;
                                                     }
                                                 })

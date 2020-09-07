@@ -103,6 +103,7 @@ public class ViewImageDetailActivity extends BaseMaterialActivity {
             return true;
         });
         findViewById(R.id.btn_download).setOnClickListener(v -> {
+            // TODO: use system directory picker. (for API >= 21)
             Intent i = new Intent(ViewImageDetailActivity.this, FilePickerActivity.class);
             i.putExtra(FilePickerActivity.EXTRA_ALLOW_MULTIPLE, false);
             i.putExtra(FilePickerActivity.EXTRA_ALLOW_CREATE_DIR, true);
@@ -132,7 +133,6 @@ public class ViewImageDetailActivity extends BaseMaterialActivity {
                             runSaveProcedure(uri.toString());
                         }
                     }
-                    // For Ice Cream Sandwich
                 } else {
                     ArrayList<String> paths = data.getStringArrayListExtra(FilePickerActivity.EXTRA_PATHS);
                     if (paths != null) {
