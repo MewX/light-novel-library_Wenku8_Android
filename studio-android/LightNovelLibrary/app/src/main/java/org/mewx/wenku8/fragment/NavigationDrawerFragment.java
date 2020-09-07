@@ -322,18 +322,26 @@ public class NavigationDrawerFragment extends Fragment {
     }
 
     private void updateNavigationBar() {
+        if (Build.VERSION.SDK_INT < 19) {
+            // Transparency is not supported in below KitKat.
+            return;
+        }
+
         // test navigation bar exist
         FragmentActivity activity = getActivity();
         Point navBar = LightTool.getNavigationBarSize(getActivity());
 
         // TODO: fix this margin for screen cutout.
         LinearLayout ll = mainActivity.findViewById(R.id.main_menu_bottom_layout);
-        if (activity != null && navBar.y == 0)
+        if (activity != null && navBar.y == 0) {
             ll.setPadding(0, 0, 0, 0); // hide
-        else if (activity != null && (navBar.y < 10 || navBar.y >= LightTool.getAppUsableScreenSize(activity).y))
+        }
+        else if (activity != null && (navBar.y < 10 || navBar.y >= LightTool.getAppUsableScreenSize(activity).y)) {
             ll.setPadding(0, 0, 0, LightTool.getAppUsableScreenSize(activity).y / 10);
-        else
+        }
+        else {
             ll.setPadding(0, 0, 0, navBar.y); // show
+        }
     }
 
     @Override
