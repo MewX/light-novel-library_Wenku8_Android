@@ -6,6 +6,10 @@ import android.os.AsyncTask;
 import android.os.Build;
 import android.os.Bundle;
 import androidx.annotation.NonNull;
+
+import com.afollestad.materialdialogs.GravityEnum;
+import com.afollestad.materialdialogs.MaterialDialog;
+import com.afollestad.materialdialogs.Theme;
 import com.google.android.material.snackbar.Snackbar;
 import androidx.core.app.ActivityCompat;
 import androidx.core.app.ActivityOptionsCompat;
@@ -82,6 +86,18 @@ public class LatestFragment extends Fragment implements MyItemClickListener, MyI
                              Bundle savedInstanceState) {
         // Inflate the layout for this fragment
         View rootView = inflater.inflate(R.layout.fragment_latest, container, false);
+
+        // Set warning message.
+        rootView.findViewById(R.id.relay_warning).setOnClickListener(view -> new MaterialDialog.Builder(getContext())
+                .theme(Theme.LIGHT)
+                .backgroundColorRes(R.color.dlgBackgroundColor)
+                .contentColorRes(R.color.dlgContentColor)
+                .positiveColorRes(R.color.dlgPositiveButtonColor)
+                .negativeColorRes(R.color.dlgNegativeButtonColor)
+                .title(getResources().getString(R.string.system_warning))
+                .content(getResources().getString(R.string.relay_warning_full))
+                .positiveText(R.string.dialog_positive_ok)
+                .show());
 
         // get views
         mRecyclerView = rootView.findViewById(R.id.novel_item_list);
@@ -198,32 +214,47 @@ public class LatestFragment extends Fragment implements MyItemClickListener, MyI
     }
 
     class AsyncLoadLatestList extends AsyncTask<ContentValues, Integer, Integer> {
+        private boolean usingWenku8Relay = false;
+
         // fail return -1
         @Override
         protected Integer doInBackground(ContentValues... params) {
-
             try {
+                // Try requesting from the original website.
                 byte[] tempXml = LightNetwork.LightHttpPostConnection(Wenku8API.BASE_URL, params[0]);
-                if (tempXml == null)
-                    return -100;
+                if (tempXml == null) {
+                    // Try requesting from the relay.
+                    tempXml = LightNetwork.LightHttpPostConnection(Wenku8API.RELAY_URL, params[0], false);
+                    if (tempXml == null) {
+                        // Still failed, return the error code.
+                        return -100;
+                    }
+                    usingWenku8Relay = true;
+                }
                 String xml = new String(tempXml, "UTF-8");
                 totalPage = NovelListWithInfoParser.getNovelListWithInfoPageNum(xml);
                 List<NovelListWithInfoParser.NovelListWithInfo> l = NovelListWithInfoParser.getNovelListWithInfo(xml);
-                if (l.isEmpty())
-                    return -100; // network error
+                if (l.isEmpty()) {
+                    // Try requesting from the relay.
+                    tempXml = LightNetwork.LightHttpPostConnection(Wenku8API.RELAY_URL, params[0], false);
+                    if (tempXml == null) {
+                        // Relay network error.
+                        return -100;
+                    }
+                    xml = new String(tempXml, "UTF-8");
+                    totalPage = NovelListWithInfoParser.getNovelListWithInfoPageNum(xml);
+                    l = NovelListWithInfoParser.getNovelListWithInfo(xml);
+                    if (l.isEmpty()) {
+                        // Blocked error.
+                        return -100;
+                    }
+                    usingWenku8Relay = true;
+                }
 
                 if (listNovelItemInfo == null)
                     listNovelItemInfo = new ArrayList<>();
                 for (int i = 0; i < l.size(); i++) {
                     NovelListWithInfoParser.NovelListWithInfo nlwi = l.get(i);
-
-                    // getImage
-                    // List<NameValuePair> imgP = new
-                    // ArrayList<NameValuePair>();
-                    // imgP.add(Wenku8Interface.getNovelCover(nlwi.aid));
-                    // byte[] img = LightNetwork.LightHttpPost(
-                    // Wenku8Interface.BaseURL, imgP);
-
                     NovelItemInfoUpdate ni = new NovelItemInfoUpdate(nlwi.aid);
                     ni.title = nlwi.name;
                     ni.author = nlwi.hit + ""; // hit
@@ -231,13 +262,10 @@ public class LatestFragment extends Fragment implements MyItemClickListener, MyI
                     ni.intro_short = nlwi.fav + ""; // fav
                     listNovelItemInfo.add(ni);
                 }
-
-                // onProgressUpdate(j);
-
             } catch (UnsupportedEncodingException e) {
                 e.printStackTrace();
             }
-            return -1;
+            return 0;
         }
 
         @Override
@@ -267,6 +295,12 @@ public class LatestFragment extends Fragment implements MyItemClickListener, MyI
 
             currentPage ++; // add when loaded
             isLoading = false;
+
+            if (usingWenku8Relay) {
+                mainActivity.findViewById(R.id.relay_warning).setVisibility(View.VISIBLE);
+            } else {
+                mainActivity.findViewById(R.id.relay_warning).setVisibility(View.GONE);
+            }
         }
     }
 
