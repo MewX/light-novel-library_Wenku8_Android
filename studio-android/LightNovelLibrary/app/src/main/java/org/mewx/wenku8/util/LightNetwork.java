@@ -59,6 +59,11 @@ public class LightNetwork {
 	 */
 	@Nullable
 	public static byte[] LightHttpPostConnection(String u, ContentValues values) {
+		return LightHttpPostConnection(u, values, true);
+	}
+
+	@Nullable
+	public static byte[] LightHttpPostConnection(String u, ContentValues values, boolean withSession) {
 		// new API, initial
 		URL url;
 		HttpURLConnection http;
@@ -67,7 +72,7 @@ public class LightNetwork {
 			http = (HttpURLConnection) url.openConnection();
             http.setRequestMethod("POST");
 			http.setRequestProperty("Accept-Encoding", "gzip"); // set gzip
-			if(LightUserSession.getSession().length() != 0) {
+			if(withSession && LightUserSession.getSession().length() != 0) {
 				http.setRequestProperty("Cookie", "PHPSESSID=" + LightUserSession.getSession());
 			}
 			http.setConnectTimeout(3000);

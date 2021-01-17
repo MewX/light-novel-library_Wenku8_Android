@@ -238,4 +238,6 @@
     <string name="system_post_locked">帖子太久遠，無法回復</string>
     <string name="system_review_draft_will_be_lost">返回將丟失未發布的草稿，是否繼續返回？</string>
     <string name="system_warning">註意</string>
+    <string name="relay_warning">您正在使用MewX提供的第三方中繼服務，點擊查看詳情。</string>
+    <string name="relay_warning_full">已啟用第三方Wenku8中繼服務，由於以下的可能原因：\n登錄過期，請重新登錄；\n手機網絡異常，試試瀏覽器訪問；\n運營商劫持（部分地區的10086）；\nWIFI切換到數據需等待域名解析緩存刷新（約10min）；\n服務器暫時無法響應請求；\n此時段請求服務器次數過多。\n\n該中繼服務列表服務由mewx.org提供，與wenku8無關。另外，此列表數據僅供海外用戶使用，並可能滯後網站24小時以上。請勿在中國大陸使用，否則後果自負，望悉知。</string>
 </resources>

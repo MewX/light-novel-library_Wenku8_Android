@@ -7,6 +7,9 @@ import android.os.Build;
 import android.os.Bundle;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+
+import com.afollestad.materialdialogs.MaterialDialog;
+import com.afollestad.materialdialogs.Theme;
 import com.google.android.material.snackbar.Snackbar;
 import androidx.core.app.ActivityCompat;
 import androidx.core.app.ActivityOptionsCompat;
@@ -85,6 +88,18 @@ public class NovelItemListFragment extends Fragment implements MyItemClickListen
     public View onCreateView(@NonNull LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
         View rootView = inflater.inflate(R.layout.fragment_novel_item_list,container,false);
         rootView.setTag(type); // set TAG
+
+        // Set warning message.
+        rootView.findViewById(R.id.relay_warning).setOnClickListener(view -> new MaterialDialog.Builder(getContext())
+                .theme(Theme.LIGHT)
+                .backgroundColorRes(R.color.dlgBackgroundColor)
+                .contentColorRes(R.color.dlgContentColor)
+                .positiveColorRes(R.color.dlgPositiveButtonColor)
+                .negativeColorRes(R.color.dlgNegativeButtonColor)
+                .title(getResources().getString(R.string.system_warning))
+                .content(getResources().getString(R.string.relay_warning_full))
+                .positiveText(R.string.dialog_positive_ok)
+                .show());
 
         // init values
         listNovelItemAid = null;
@@ -241,6 +256,8 @@ public class NovelItemListFragment extends Fragment implements MyItemClickListen
     }
 
     private class AsyncGetNovelItemList extends AsyncTask<Integer, Integer, Integer> {
+        private boolean usingWenku8Relay = false;
+
         private List<Integer> tempNovelList = new ArrayList<>();
         @Override
         protected Integer doInBackground(Integer... params) {
@@ -252,7 +269,15 @@ public class NovelItemListFragment extends Fragment implements MyItemClickListen
             // params[0] is current page number
             ContentValues cv = Wenku8API.getNovelList(Wenku8API.getNOVELSORTBY(type), currentPage);
             byte[] temp = LightNetwork.LightHttpPostConnection( Wenku8API.BASE_URL, cv);
-            if(temp == null) return -1;
+            if(temp == null) {
+                // Try requesting from the relay.
+                temp = LightNetwork.LightHttpPostConnection(Wenku8API.RELAY_URL, cv, false);
+                if (temp == null) {
+                    // Still failed, return the error code.
+                    return -1;
+                }
+                usingWenku8Relay = true;
+            }
             try {
                 tempNovelList = Wenku8Parser.parseNovelItemList(new String(temp, "UTF-8"));
             }
@@ -263,11 +288,27 @@ public class NovelItemListFragment extends Fragment implements MyItemClickListen
             // judge result
             if (tempNovelList.isEmpty()) {
                 Log.d("MewX", "in AsyncGetNovelItemList: doInBackground: tempNovelList == null || tempNovelList.size() == 0");
-            } else {
-                totalPage = tempNovelList.get(0);
-                tempNovelList.remove(0);
+                // Try requesting from the relay.
+                temp = LightNetwork.LightHttpPostConnection(Wenku8API.RELAY_URL, cv, false);
+                if (temp == null) {
+                    // Still failed, returns no error code.
+                    return 0;
+                }
+                try {
+                    tempNovelList = Wenku8Parser.parseNovelItemList(new String(temp, "UTF-8"));
+                }
+                catch (UnsupportedEncodingException e) {
+                    e.printStackTrace();
+                }
+                if (tempNovelList.isEmpty()) {
+                    // Still failed.
+                    return 0;
+                }
+                usingWenku8Relay = true;
             }
 
+            totalPage = tempNovelList.get(0);
+            tempNovelList.remove(0);
             return 0;
         }
 
@@ -288,7 +329,12 @@ public class NovelItemListFragment extends Fragment implements MyItemClickListen
 
             refreshIdList();
             isLoading = false;
-            super.onPostExecute(integer);
+
+            if (usingWenku8Relay) {
+                getActivity().findViewById(R.id.relay_warning).setVisibility(View.VISIBLE);
+            } else {
+                getActivity().findViewById(R.id.relay_warning).setVisibility(View.GONE);
+            }
         }
     }
 
