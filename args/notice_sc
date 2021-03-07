@@ -1,3 +1,4 @@
 <p>通知：</p>
+<p><b>近期注意到列表中继服务无法使用，是因为第三方服务Cloudflare的服务更新导致的。最近比较忙，估计两周后可以重新在AWS Lambda上实现一个。</b></p>
 <p>文库app不定期更新，欢迎有兴趣参与更新开发的联系我~</p>
 <p>本项目开源：<a href="https://git.io/v8Ck3">https://git.io/v8Ck3</a></p>
