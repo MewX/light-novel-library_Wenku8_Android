@@ -161,7 +161,7 @@
     <string name="config_navigation_drawer_wallpaper">侧栏壁纸</string>
     <string name="config_check_update">检查更新</string>
     <string name="config_about">关于</string>
-    <string name="login_username">用户名</string>
+    <string name="login_username">用户名/邮箱</string>
     <string name="login_password">密码</string>
     <string name="login_login">登录</string>
     <string name="login_register">注册</string>

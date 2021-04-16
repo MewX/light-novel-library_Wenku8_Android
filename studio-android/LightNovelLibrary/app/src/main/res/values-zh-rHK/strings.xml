@@ -146,7 +146,7 @@
     <string name="config_navigation_drawer_wallpaper">側欄壁紙</string>
     <string name="config_check_update">檢查更新</string>
     <string name="config_about">關於</string>
-    <string name="login_username">用戶名</string>
+    <string name="login_username">用戶名/郵箱</string>
     <string name="login_password">密碼</string>
     <string name="login_login">登錄</string>
     <string name="login_register">註冊</string>

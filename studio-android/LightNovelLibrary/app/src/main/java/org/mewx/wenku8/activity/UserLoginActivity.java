@@ -34,7 +34,7 @@ import java.io.ByteArrayOutputStream;
 public class UserLoginActivity extends BaseMaterialActivity {
 
     // private vars
-    private EditText etUserName = null;
+    private EditText etUserNameOrEmail = null;
     private EditText etPassword = null;
 
     @Override
@@ -43,14 +43,14 @@ public class UserLoginActivity extends BaseMaterialActivity {
         initMaterialStyle(R.layout.layout_user_login);
 
         // get views
-        etUserName = findViewById(R.id.edit_username);
+        etUserNameOrEmail = findViewById(R.id.edit_username_or_email);
         etPassword = findViewById(R.id.edit_password);
         TextView tvLogin = findViewById(R.id.btn_login);
         TextView tvRegister = findViewById(R.id.btn_register);
 
         // listeners
         tvLogin.setOnClickListener(v -> {
-            if(etUserName.getText().toString().length() == 0 || etUserName.getText().toString().length() > 30
+            if(etUserNameOrEmail.getText().toString().length() == 0 || etUserNameOrEmail.getText().toString().length() > 30
                     || etPassword.getText().toString().length() == 0 || etPassword.getText().toString().length() > 30) {
                 Toast.makeText(UserLoginActivity.this, getResources().getString(R.string.system_info_fill_not_complete), Toast.LENGTH_SHORT).show();
                 return;
@@ -58,7 +58,7 @@ public class UserLoginActivity extends BaseMaterialActivity {
 
             // async login
             AsyncLoginTask alt = new AsyncLoginTask();
-            alt.execute(etUserName.getText().toString(), etPassword.getText().toString());
+            alt.execute(etUserNameOrEmail.getText().toString(), etPassword.getText().toString());
         });
 
         tvRegister.setOnClickListener(v -> new MaterialDialog.Builder(UserLoginActivity.this)

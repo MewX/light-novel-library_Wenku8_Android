@@ -350,10 +350,10 @@ public class NavigationDrawerFragment extends Fragment {
         MobclickAgent.onPageStart(TAG);
 
         // user info update
-        if(LightUserSession.isUserInfoSet() && !tvUserName.getText().toString().equals(LightUserSession.getUsername())
+        if(LightUserSession.isUserInfoSet() && !tvUserName.getText().toString().equals(LightUserSession.getUsernameOrEmail())
                 && (LightCache.testFileExist(GlobalConfig.getFirstUserAvatarSaveFilePath())
                 || LightCache.testFileExist(GlobalConfig.getSecondUserAvatarSaveFilePath()))) {
-            tvUserName.setText(LightUserSession.getUsername());
+            tvUserName.setText(LightUserSession.getUsernameOrEmail());
 
             String avatarPath;
             if(LightCache.testFileExist(GlobalConfig.getFirstUserAvatarSaveFilePath()))

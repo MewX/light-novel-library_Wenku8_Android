@@ -24,17 +24,17 @@ public class LightUserSession {
 
     // Secret part
     private static boolean logStatus = false; // true - logged in; false - not logged in.
-    private static String username = null;
+    private static String usernameOrEmail = null;
     private static String password = null;
     private static String SESSION = null;
 
     // no null returned
     public static String getLoggedAs() {
-        return ( logStatus && SESSION != null && SESSION.length() != 0 && isUserInfoSet()) ? username : "";
+        return ( logStatus && SESSION != null && SESSION.length() != 0 && isUserInfoSet()) ? usernameOrEmail : "";
     }
 
-    public static String getUsername() {
-        return username == null ? "" : username;
+    public static String getUsernameOrEmail() {
+        return usernameOrEmail == null ? "" : usernameOrEmail;
     }
 
     public static String getPassword() {
@@ -89,13 +89,34 @@ public class LightUserSession {
         return true;
     }
 
+    /**
+     * Send the login call to server.
+     * Must be called in async thread.
+     * @param usernameOrEmail the username or email string.
+     * @param password the password string.
+     * @return the returned bytes from server.
+     */
+    private static byte[] executeLoginRequest(String usernameOrEmail, String password){
+        if (usernameOrEmail == null || password == null) {
+            return null;
+        }
+
+        if (usernameOrEmail.contains("@")) {
+            // Assuming it's email.
+            return LightNetwork.LightHttpPostConnection(Wenku8API.BASE_URL, Wenku8API.getUserLoginEmailParams(usernameOrEmail, password));
+        } else {
+            // Assuming it's username.
+            return LightNetwork.LightHttpPostConnection(Wenku8API.BASE_URL, Wenku8API.getUserLoginParams(usernameOrEmail, password));
+        }
+    }
+
     // async action
     public static Wenku8Error.ErrorCode doLoginFromFile() {
         // This function will read from file, if failed return false
         if(!isUserInfoSet()) loadUserInfoSet();
         if(!isUserInfoSet()) return Wenku8Error.ErrorCode.USER_INFO_EMPTY;
 
-        byte[] b = LightNetwork.LightHttpPostConnection(Wenku8API.BASE_URL, Wenku8API.getUserLoginParams(username, password));
+        byte[] b = executeLoginRequest(usernameOrEmail, password);
         if(b == null) return Wenku8Error.ErrorCode.NETWORK_ERROR;
         try {
             String result = new String(b, "UTF-8");
@@ -116,8 +137,7 @@ public class LightUserSession {
     // async action
     public static Wenku8Error.ErrorCode doLoginFromGiven(String name, String pwd) {
         // This function will test given name:pwd, if pass(receive '1'), save file, else return false
-
-        byte[] b = LightNetwork.LightHttpPostConnection(Wenku8API.BASE_URL, Wenku8API.getUserLoginParams(name, pwd));
+        byte[] b = executeLoginRequest(name, pwd);
         if(b == null) return Wenku8Error.ErrorCode.NETWORK_ERROR;
         try {
             String result = new String(b, "UTF-8");
@@ -170,11 +190,11 @@ public class LightUserSession {
      * @return true is okay.
      */
     public static boolean isUserInfoSet() {
-        return username != null && password != null && username.length() != 0 && password.length() != 0;
+        return usernameOrEmail != null && password != null && usernameOrEmail.length() != 0 && password.length() != 0;
     }
 
     public static void setUserInfo(String username, String password) {
-        LightUserSession.username = username;
+        LightUserSession.usernameOrEmail = username;
         LightUserSession.password = password;
     }
 
@@ -249,7 +269,7 @@ public class LightUserSession {
             return ""; // empty, not null
 
         // username, password enc to base64
-        char[] temp_username = LightBase64.EncodeBase64(username).toCharArray();
+        char[] temp_username = LightBase64.EncodeBase64(usernameOrEmail).toCharArray();
         char[] temp_password = LightBase64.EncodeBase64(password).toCharArray();
 
         // cap to uncap, uncap to cap
@@ -311,7 +331,7 @@ public class LightUserSession {
                 if(!LightCache.deleteFile(GlobalConfig.getFirstUserAvatarSaveFilePath()))
                     LightCache.deleteFile(GlobalConfig.getSecondUserAvatarSaveFilePath());
 
-                username = "";
+                usernameOrEmail = "";
                 password = "";
                 Toast.makeText(MyApp.getContext(), MyApp.getContext().getResources().getString(R.string.system_log_info_outofdate), Toast.LENGTH_SHORT).show();
                 return;

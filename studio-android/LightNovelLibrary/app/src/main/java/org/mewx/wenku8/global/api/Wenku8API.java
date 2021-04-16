@@ -516,14 +516,14 @@ public class Wenku8API {
      * This part uses AFinal and that's more efficient.
      */
 
-    /**
-     * This part is user related, and is using the latest API 22 features.
-     * Banned NameValuePair, HttpPost.
-     */
     public static ContentValues getUserLoginParams(String username, String password) {
-        // 使用session方式判断是否已登录
-//        Log.e("MewX", "Uname: " + username + "\nPwd: " + password + " (" + LightNetwork.encodeToHttp(password) + ")");
+        // By username.
         String temp = "action=login&username=" + LightNetwork.encodeToHttp(username) + "&password=" + LightNetwork.encodeToHttp(password);
+        return getEncryptedCV(temp);
+    }
+    public static ContentValues getUserLoginEmailParams(String email, String password) {
+        // By email.
+        String temp = "action=loginemail&username=" + LightNetwork.encodeToHttp(email) + "&password=" + LightNetwork.encodeToHttp(password);
         return getEncryptedCV(temp);
     }
 

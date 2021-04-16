@@ -13,7 +13,7 @@ public class LightUserSessionTest {
     public void decodeThenEncodeUserInfo() {
         final String src = "Z1NxZFhlPT0=|Z1dwUlhiPT0=";
         LightUserSession.decAndSetUserFile(src);
-        assertEquals("abc", LightUserSession.getUsername());
+        assertEquals("abc", LightUserSession.getUsernameOrEmail());
         assertEquals("123", LightUserSession.getPassword());
         assertEquals(src, LightUserSession.encUserFile());
     }
@@ -22,7 +22,7 @@ public class LightUserSessionTest {
     public void encodeThenDecodeUserInfo() {
         LightUserSession.setUserInfo("xyz", "987");
         LightUserSession.decAndSetUserFile(LightUserSession.encUserFile());
-        assertEquals("xyz", LightUserSession.getUsername());
+        assertEquals("xyz", LightUserSession.getUsernameOrEmail());
         assertEquals("987", LightUserSession.getPassword());
     }
 }
