@@ -24,39 +24,34 @@ import org.mewx.wenku8.global.GlobalConfig;
 import org.mewx.wenku8.util.LightCache;
 
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * Created by MewX on 2015/7/29.
  * Let user select a menu background.
  */
 public class MenuBackgroundSelectorActivity extends BaseMaterialActivity {
+    private static final Map<Integer, String> viewIdToSettingItemMap = new HashMap<Integer, String>() {{
+        put(R.id.bg01, "1");
+        put(R.id.bg02, "2");
+        put(R.id.bg03, "3");
+        put(R.id.bg04, "4");
+        put(R.id.bg05, "5");
+    }};
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         initMaterialStyle(R.layout.layout_menu_background_selector);
 
-        // listeners
-        findViewById(R.id.bg01).setOnClickListener(v -> {
-            GlobalConfig.setToAllSetting(GlobalConfig.SettingItems.menu_bg_id, "1");
-            MenuBackgroundSelectorActivity.this.finish();
-        });
-        findViewById(R.id.bg02).setOnClickListener(v -> {
-            GlobalConfig.setToAllSetting(GlobalConfig.SettingItems.menu_bg_id, "2");
-            MenuBackgroundSelectorActivity.this.finish();
-        });
-        findViewById(R.id.bg03).setOnClickListener(v -> {
-            GlobalConfig.setToAllSetting(GlobalConfig.SettingItems.menu_bg_id, "3");
-            MenuBackgroundSelectorActivity.this.finish();
-        });
-        findViewById(R.id.bg04).setOnClickListener(v -> {
-            GlobalConfig.setToAllSetting(GlobalConfig.SettingItems.menu_bg_id, "4");
-            MenuBackgroundSelectorActivity.this.finish();
-        });
-        findViewById(R.id.bg05).setOnClickListener(v -> {
-            GlobalConfig.setToAllSetting(GlobalConfig.SettingItems.menu_bg_id, "5");
-            MenuBackgroundSelectorActivity.this.finish();
-        });
+        // Init listeners.
+        for (Integer id : viewIdToSettingItemMap.keySet()) {
+            findViewById(id).setOnClickListener(v -> {
+                GlobalConfig.setToAllSetting(GlobalConfig.SettingItems.menu_bg_id, viewIdToSettingItemMap.get(id));
+                MenuBackgroundSelectorActivity.this.finish();
+            });
+        }
     }
 
     @Override
