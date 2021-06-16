@@ -2,6 +2,7 @@ package org.mewx.wenku8.activity;
 
 import android.content.ContentValues;
 import android.content.Intent;
+import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.PorterDuff;
 import android.graphics.drawable.Drawable;
@@ -710,16 +711,22 @@ public class NovelInfoActivity extends BaseMaterialActivity {
             if(mLinearLayout.getChildCount() >= 3)
                 mLinearLayout.removeViews(2, mLinearLayout.getChildCount() - 2);
 
+            final GlobalConfig.ReadSavesV1 rs = GlobalConfig.getReadSavesRecordV1(aid);
             for(final VolumeList vl : listVolume) {
                 // get view
                 RelativeLayout rl = (RelativeLayout) LayoutInflater.from(NovelInfoActivity.this).inflate(R.layout.view_novel_chapter_item, null);
-
                 // set text and listeners
                 TextView tv = rl.findViewById(R.id.chapter_title);
                 tv.setText(vl.volumeName);
                 if(vl.inLocal)
                     ((TextView) rl.findViewById(R.id.chapter_status)).setText(getResources().getString(R.string.bookshelf_inlocal));
-                rl.findViewById(R.id.chapter_btn).setOnLongClickListener(v -> {
+
+                final RelativeLayout btn = rl.findViewById(R.id.chapter_btn);
+                // added indicator for last read volume
+                if (rs != null && rs.vid == vl.vid) {
+                  btn.setBackgroundColor(Color.LTGRAY);
+                }
+                btn.setOnLongClickListener(v -> {
                     new MaterialDialog.Builder(NovelInfoActivity.this)
                             .theme(Theme.LIGHT)
                             .onPositive((ignored1, ignored2) -> {
@@ -732,7 +739,7 @@ public class NovelInfoActivity extends BaseMaterialActivity {
                             .show();
                     return true;
                 });
-                rl.findViewById(R.id.chapter_btn).setOnClickListener(v -> {
+                btn.setOnClickListener(v -> {
                     // jump to chapter select activity
                     Intent intent = new Intent(NovelInfoActivity.this, NovelChapterActivity.class);
                     intent.putExtra("aid", aid);

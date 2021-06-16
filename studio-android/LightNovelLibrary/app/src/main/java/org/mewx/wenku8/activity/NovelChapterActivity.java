@@ -1,6 +1,7 @@
 package org.mewx.wenku8.activity;
 
 import android.content.Intent;
+import android.graphics.Color;
 import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.MenuItem;
@@ -49,13 +50,20 @@ public class NovelChapterActivity extends BaseMaterialActivity {
         LinearLayout mLinearLayout = findViewById(R.id.novel_chapter_scroll);
         getSupportActionBar().setTitle(volumeList.volumeName);
 
+        final GlobalConfig.ReadSavesV1 rs = GlobalConfig.getReadSavesRecordV1(aid);
         for(final ChapterInfo ci : volumeList.chapterList) {
             // get view
             RelativeLayout rl = (RelativeLayout) LayoutInflater.from(NovelChapterActivity.this).inflate(R.layout.view_novel_chapter_item, null);
 
             TextView tv = rl.findViewById(R.id.chapter_title);
             tv.setText(ci.chapterName);
-            rl.findViewById(R.id.chapter_btn).setOnClickListener(ignored -> {
+
+            final RelativeLayout btn = rl.findViewById(R.id.chapter_btn);
+            // added indicator for last read chapter
+            if (rs != null && rs.cid == ci.cid) {
+                btn.setBackgroundColor(Color.LTGRAY);
+            }
+            btn.setOnClickListener(ignored -> {
                 // jump to reader activity
                 Intent intent = new Intent(NovelChapterActivity.this, Wenku8ReaderActivityV1.class);
                 intent.putExtra("aid", aid);
@@ -75,7 +83,7 @@ public class NovelChapterActivity extends BaseMaterialActivity {
                 startActivity(intent);
                 overridePendingTransition(R.anim.fade_in, R.anim.hold); // fade in animation
             });
-            rl.findViewById(R.id.chapter_btn).setOnLongClickListener(ignored -> {
+            btn.setOnLongClickListener(ignored -> {
                 new MaterialDialog.Builder(NovelChapterActivity.this)
                         .theme(Theme.LIGHT)
                         .title(R.string.system_choose_reader_engine)
