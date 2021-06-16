@@ -706,56 +706,59 @@ public class NovelInfoActivity extends BaseMaterialActivity {
             }
             else if(integer < 0)
                 return; // ignore other exceptions
-
-            // remove all TextView(in CardView, in RelativeView)
-            if(mLinearLayout.getChildCount() >= 3)
-                mLinearLayout.removeViews(2, mLinearLayout.getChildCount() - 2);
-
-            final GlobalConfig.ReadSavesV1 rs = GlobalConfig.getReadSavesRecordV1(aid);
-            for(final VolumeList vl : listVolume) {
-                // get view
-                RelativeLayout rl = (RelativeLayout) LayoutInflater.from(NovelInfoActivity.this).inflate(R.layout.view_novel_chapter_item, null);
-                // set text and listeners
-                TextView tv = rl.findViewById(R.id.chapter_title);
-                tv.setText(vl.volumeName);
-                if(vl.inLocal)
-                    ((TextView) rl.findViewById(R.id.chapter_status)).setText(getResources().getString(R.string.bookshelf_inlocal));
-
-                final RelativeLayout btn = rl.findViewById(R.id.chapter_btn);
-                // added indicator for last read volume
-                if (rs != null && rs.vid == vl.vid) {
-                  btn.setBackgroundColor(Color.LTGRAY);
-                }
-                btn.setOnLongClickListener(v -> {
-                    new MaterialDialog.Builder(NovelInfoActivity.this)
-                            .theme(Theme.LIGHT)
-                            .onPositive((ignored1, ignored2) -> {
-                                vl.cleanLocalCache();
-                                ((TextView) rl.findViewById(R.id.chapter_status)).setText("");
-                            })
-                            .content(R.string.dialog_sure_to_clear_cache)
-                            .positiveText(R.string.dialog_positive_want)
-                            .negativeText(R.string.dialog_negative_biao)
-                            .show();
-                    return true;
-                });
-                btn.setOnClickListener(v -> {
-                    // jump to chapter select activity
-                    Intent intent = new Intent(NovelInfoActivity.this, NovelChapterActivity.class);
-                    intent.putExtra("aid", aid);
-                    intent.putExtra("volume", vl);
-                    intent.putExtra("from", from);
-                    startActivity(intent);
-                });
-
-                // add to scroll view
-                mLinearLayout.addView(rl);
-            }
+            buildVolumeList();
 
             isLoading = false;
             spb.progressiveStop();
             super.onPostExecute(integer);
         }
+    }
+
+    private void buildVolumeList() {
+      // remove all TextView(in CardView, in RelativeView)
+      if(mLinearLayout.getChildCount() >= 3)
+        mLinearLayout.removeViews(2, mLinearLayout.getChildCount() - 2);
+
+      final GlobalConfig.ReadSavesV1 rs = GlobalConfig.getReadSavesRecordV1(aid);
+      for(final VolumeList vl : listVolume) {
+        // get view
+        RelativeLayout rl = (RelativeLayout) LayoutInflater.from(NovelInfoActivity.this).inflate(R.layout.view_novel_chapter_item, null);
+        // set text and listeners
+        TextView tv = rl.findViewById(R.id.chapter_title);
+        tv.setText(vl.volumeName);
+        if(vl.inLocal)
+          ((TextView) rl.findViewById(R.id.chapter_status)).setText(getResources().getString(R.string.bookshelf_inlocal));
+
+        final RelativeLayout btn = rl.findViewById(R.id.chapter_btn);
+        // added indicator for last read volume
+        if (rs != null && rs.vid == vl.vid) {
+          btn.setBackgroundColor(Color.LTGRAY);
+        }
+        btn.setOnLongClickListener(v -> {
+          new MaterialDialog.Builder(NovelInfoActivity.this)
+              .theme(Theme.LIGHT)
+              .onPositive((ignored1, ignored2) -> {
+                vl.cleanLocalCache();
+                ((TextView) rl.findViewById(R.id.chapter_status)).setText("");
+              })
+              .content(R.string.dialog_sure_to_clear_cache)
+              .positiveText(R.string.dialog_positive_want)
+              .negativeText(R.string.dialog_negative_biao)
+              .show();
+          return true;
+        });
+        btn.setOnClickListener(v -> {
+          // jump to chapter select activity
+          Intent intent = new Intent(NovelInfoActivity.this, NovelChapterActivity.class);
+          intent.putExtra("aid", aid);
+          intent.putExtra("volume", vl);
+          intent.putExtra("from", from);
+          startActivity(intent);
+        });
+
+        // add to scroll view
+        mLinearLayout.addView(rl);
+      }
     }
 
     class AsyncUpdateCacheTask extends AsyncTask<Integer, Integer, Wenku8Error.ErrorCode> {
@@ -1152,6 +1155,9 @@ public class NovelInfoActivity extends BaseMaterialActivity {
             upArrow.setColorFilter(getResources().getColor(R.color.default_white), PorterDuff.Mode.SRC_ATOP);
             getSupportActionBar().setHomeAsUpIndicator(upArrow);
         }
+
+        // refresh when back from reader activity
+        buildVolumeList();
     }
 
     private void refreshInfoFromLocal() {
