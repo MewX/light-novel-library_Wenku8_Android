@@ -17,7 +17,17 @@
       "contributions": [
         "code"
       ]
+    },
+    {
+      "login": "aaassseee",
+      "name": "Jack Liu",
+      "avatar_url": "https://avatars.githubusercontent.com/u/2054978?v=4",
+      "profile": "https://github.com/aaassseee",
+      "contributions": [
+        "code"
+      ]
     }
   ],
-  "contributorsPerLine": 7
+  "contributorsPerLine": 7,
+  "skipCi": true
 }
