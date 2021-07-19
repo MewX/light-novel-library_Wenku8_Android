@@ -43,17 +43,17 @@ public class MainActivity extends BaseMaterialActivity {
     private static final AtomicBoolean NEW_VERSION_CHECKED = new AtomicBoolean(false);
 
     // This is for fragment switch
-    public enum FRAGMENT_LIST {
+    public enum FragmentMenuOption {
         RKLIST, LATEST, FAV, CONFIG
     }
 
-    private FRAGMENT_LIST status = FRAGMENT_LIST.LATEST;
+    private FragmentMenuOption status = FragmentMenuOption.LATEST;
 
-    public FRAGMENT_LIST getCurrentFragment() {
+    public FragmentMenuOption getCurrentFragment() {
         return status;
     }
 
-    public void setCurrentFragment(FRAGMENT_LIST f) {
+    public void setCurrentFragment(FragmentMenuOption f) {
         status = f;
     }
 
@@ -200,7 +200,7 @@ public class MainActivity extends BaseMaterialActivity {
     public void changeFragment(Fragment targetFragment) {
         // temporarily set elevation to remove rank list toolbar shadow
         if (getSupportActionBar() != null) {
-            if (status == FRAGMENT_LIST.RKLIST)
+            if (status == FragmentMenuOption.RKLIST)
                 getSupportActionBar().setElevation(0);
             else
                 getSupportActionBar().setElevation(getResources().getDimension(R.dimen.toolbar_elevation));

@@ -59,7 +59,7 @@ public class NavigationDrawerFragment extends Fragment {
     }
 
     private View.OnClickListener generateNavigationButtonOnClickListener(
-            @NonNull MainActivity.FRAGMENT_LIST targetFragment, @NonNull Fragment fragment) {
+            @NonNull MainActivity.FragmentMenuOption targetFragment, @NonNull Fragment fragment) {
         return v -> {
             if (mainActivity.getCurrentFragment() == targetFragment) {
                 // Already selected, so just ignore.
@@ -81,19 +81,19 @@ public class NavigationDrawerFragment extends Fragment {
         try {
             mainActivity.findViewById(R.id.main_menu_rklist).setOnClickListener(
                     generateNavigationButtonOnClickListener(
-                            MainActivity.FRAGMENT_LIST.RKLIST, new RKListFragment())
+                            MainActivity.FragmentMenuOption.RKLIST, new RKListFragment())
             );
             mainActivity.findViewById(R.id.main_menu_latest).setOnClickListener(
                     generateNavigationButtonOnClickListener(
-                            MainActivity.FRAGMENT_LIST.LATEST, new LatestFragment())
+                            MainActivity.FragmentMenuOption.LATEST, new LatestFragment())
             );
             mainActivity.findViewById(R.id.main_menu_fav).setOnClickListener(
                     generateNavigationButtonOnClickListener(
-                            MainActivity.FRAGMENT_LIST.FAV, new FavFragment())
+                            MainActivity.FragmentMenuOption.FAV, new FavFragment())
             );
             mainActivity.findViewById(R.id.main_menu_config).setOnClickListener(
                     generateNavigationButtonOnClickListener(
-                            MainActivity.FRAGMENT_LIST.CONFIG, new ConfigFragment())
+                            MainActivity.FragmentMenuOption.CONFIG, new ConfigFragment())
             );
 
             mainActivity.findViewById(R.id.main_menu_open_source).setOnClickListener(v -> {
@@ -156,8 +156,8 @@ public class NavigationDrawerFragment extends Fragment {
         // get net work status, no net -> FAV
         if(activity != null && !GlobalConfig.isNetworkAvailable(activity)) {
             clearAllButtonColor();
-            setHighLightButton(MainActivity.FRAGMENT_LIST.FAV);
-            mainActivity.setCurrentFragment(MainActivity.FRAGMENT_LIST.FAV);
+            setHighLightButton(MainActivity.FragmentMenuOption.FAV);
+            mainActivity.setCurrentFragment(MainActivity.FragmentMenuOption.FAV);
             mainActivity.changeFragment(new FavFragment());
         }
         else {
@@ -275,7 +275,7 @@ public class NavigationDrawerFragment extends Fragment {
      *
      * @param f the target fragment, type MainActivity.FRAGMENT_LIST.
      */
-    private void setHighLightButton(MainActivity.FRAGMENT_LIST f) {
+    private void setHighLightButton(MainActivity.FragmentMenuOption f) {
         switch (f) {
             case RKLIST:
                 setHighLightButton(R.id.main_menu_ic_rklist, R.id.main_menu_text_rklist, R.id.main_menu_rklist);
