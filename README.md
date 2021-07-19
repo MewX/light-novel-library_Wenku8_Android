@@ -887,8 +887,18 @@ Material Design风格的`轻小说文库`App**完全**开源了！想实践Mater
 Thanks goes to these wonderful people ([emoji key](https://allcontributors.org/docs/en/emoji-key)):
 
 <!-- ALL-CONTRIBUTORS-LIST:START - Do not remove or modify this section -->
-<!-- prettier-ignore -->
-<table><tr><td align="center"><a href="https://www.gaeblogx.com"><img src="https://avatars0.githubusercontent.com/u/13044821?v=4" width="100px;" alt="Baby Pepper"/><br /><sub><b>Baby Pepper</b></sub></a><br /><a href="https://github.com/MewX/light-novel-library_Wenku8_Android/commits?author=SeraphRoy" title="Code">💻</a></td></tr></table>
+<!-- prettier-ignore-start -->
+<!-- markdownlint-disable -->
+<table>
+  <tr>
+    <td align="center"><a href="https://www.gaeblogx.com"><img src="https://avatars0.githubusercontent.com/u/13044821?v=4?s=100" width="100px;" alt=""/><br /><sub><b>Baby Pepper</b></sub></a><br /><a href="https://github.com/MewX/light-novel-library_Wenku8_Android/commits?author=SeraphRoy" title="Code">💻</a></td>
+    <td align="center"><a href="https://github.com/aaassseee"><img src="https://avatars.githubusercontent.com/u/2054978?v=4?s=100" width="100px;" alt=""/><br /><sub><b>Jack Liu</b></sub></a><br /><a href="https://github.com/MewX/light-novel-library_Wenku8_Android/commits?author=aaassseee" title="Code">💻</a></td>
+  </tr>
+</table>
+
+<!-- markdownlint-restore -->
+<!-- prettier-ignore-end -->
+
 <!-- ALL-CONTRIBUTORS-LIST:END -->
 
 This project follows the [all-contributors](https://github.com/all-contributors/all-contributors) specification. Contributions of any kind welcome!
