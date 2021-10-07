@@ -591,7 +591,7 @@ public class NovelInfoActivity extends BaseMaterialActivity {
             try {
                 if(fromLocal) {
                     novelFullMeta = GlobalConfig.loadFullFileFromSaveFolder("intro", aid + "-intro.xml");
-                    if(novelFullMeta.equals("")) return -9;
+                    if(novelFullMeta.isEmpty()) return -9;
                 }
                 else {
                     ContentValues cv = Wenku8API.getNovelFullMeta(aid, GlobalConfig.getCurrentLang());
@@ -611,7 +611,7 @@ public class NovelInfoActivity extends BaseMaterialActivity {
             try {
                 if(fromLocal) {
                     novelFullIntro = GlobalConfig.loadFullFileFromSaveFolder("intro", aid + "-introfull.xml");
-                    if(novelFullIntro.equals("")) return -9;
+                    if(novelFullIntro.isEmpty()) return -9;
                 }
                 else {
                     ContentValues cvFullIntroRequest = Wenku8API.getNovelFullIntro(aid, GlobalConfig.getCurrentLang());
@@ -631,7 +631,7 @@ public class NovelInfoActivity extends BaseMaterialActivity {
             try {
                 if(fromLocal) {
                     novelFullVolume = GlobalConfig.loadFullFileFromSaveFolder("intro", aid + "-volume.xml");
-                    if(novelFullVolume.equals("")) return -9;
+                    if(novelFullVolume.isEmpty()) return -9;
                 }
                 else {
                     ContentValues cv = Wenku8API.getNovelIndex(aid, GlobalConfig.getCurrentLang());
@@ -696,21 +696,22 @@ public class NovelInfoActivity extends BaseMaterialActivity {
 
         @Override
         protected void onPostExecute(Integer integer) {
+            isLoading = false;
+            spb.progressiveStop();
+            super.onPostExecute(integer);
+
             if( integer == -1 ) {
                 Toast.makeText(NovelInfoActivity.this, "FetchInfoAsyncTask:onPostExecute network error", Toast.LENGTH_SHORT).show();
                 return;
             }
             else if(integer == -9) {
                 Toast.makeText(NovelInfoActivity.this, getResources().getString(R.string.bookshelf_intro_load_failed), Toast.LENGTH_SHORT).show();
+                // TODO: a better fix with optionCheckUpdates(), but need to avoid recursive calls.
                 return;
             }
             else if(integer < 0)
                 return; // ignore other exceptions
             buildVolumeList();
-
-            isLoading = false;
-            spb.progressiveStop();
-            super.onPostExecute(integer);
         }
     }
 
