@@ -334,8 +334,13 @@ public class FavFragment extends Fragment implements MyItemClickListener, MyItem
 
                 Pattern p = Pattern.compile("aid=\"(.*)\""); // match content between "aid=\"" and "\""
                 Matcher m = p.matcher(new String(b, "UTF-8"));
-                while (m.find())
-                    listResultList.add(Integer.valueOf(m.group(1)));
+                while (m.find()) {
+                    try {
+                        listResultList.add(Integer.valueOf(m.group(1)));
+                    } catch (NumberFormatException e) {
+                        Log.e(FavFragment.class.getSimpleName(), "Found and skipped broken aid.");
+                    }
+                }
             } catch (UnsupportedEncodingException e) {
                 e.printStackTrace();
             }
