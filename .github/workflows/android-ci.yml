@@ -34,7 +34,7 @@ jobs:
     - name: Set up Android emulator, build, test and Coveralls
       uses: reactivecircus/android-emulator-runner@v2
       with:
-        api-level: 29
+        api-level: 21
         working-directory: ./studio-android/LightNovelLibrary
         script: ./gradlew assembleAlpha connectedAlphaDebugAndroidTest coveralls
 
