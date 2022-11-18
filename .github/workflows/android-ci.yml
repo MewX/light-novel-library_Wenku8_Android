@@ -10,6 +10,10 @@ env:
   TARGET_SDK_VERSION: 29
   BUILD_TOOLS_VERSION: 29.0.3
 
+defaults:
+  run:
+    working-directory: ./studio-android/LightNovelLibrary
+
 jobs:
   build:
 
@@ -24,14 +28,6 @@ jobs:
         distribution: 'temurin'
         cache: gradle
 
-    - name: Navigate to the right directory
-      run: cd studio-android/LightNovelLibrary
-
-    - name: Navigate to the right directory
-      run: cd studio-android/LightNovelLibrary
-
-    - name: Navigate to the right directory
-      run: cd studio-android/LightNovelLibrary
     - name: Grant execute permission for gradlew
       run: chmod +x gradlew
 
