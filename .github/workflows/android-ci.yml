@@ -35,7 +35,7 @@ jobs:
       uses: reactivecircus/android-emulator-runner@v2
       with:
         api-level: 29
-        script: ./gradlew connectedCheck
+        script: ./studio-android/LightNovelLibrary/gradlew connectedCheck
 
     - name: Build with Gradle and upload to Coveralls
       run: ./gradlew assembleAlpha connectedAlphaDebugAndroidTest coveralls
