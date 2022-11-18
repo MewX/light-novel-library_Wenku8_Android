@@ -35,5 +35,5 @@ jobs:
       uses: reactivecircus/android-emulator-runner@v2
       with:
         api-level: 29
-        script: ./studio-android/LightNovelLibrary/gradlew assembleAlpha connectedAlphaDebugAndroidTest coveralls
+        script: cd ./studio-android/LightNovelLibrary && ./gradlew assembleAlpha connectedAlphaDebugAndroidTest coveralls
 
