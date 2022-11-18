@@ -34,7 +34,7 @@ jobs:
       run: cd studio-android/LightNovelLibrary
     - name: Grant execute permission for gradlew
       run: chmod +x gradlew
-      
+
     - name: Set up Android emulator
       uses: reactivecircus/android-emulator-runner@v2
       with:
