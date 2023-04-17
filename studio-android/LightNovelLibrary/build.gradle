@@ -27,6 +27,6 @@ allprojects {
 
 ext {
     // TODO: Since API 30, the storage access should have been removed completely.
-    targetSdkVersion = 31
-    buildToolsVersion = "31.0.0"
+    targetSdkVersion = 32
+    buildToolsVersion = "32.0.0"
 }
