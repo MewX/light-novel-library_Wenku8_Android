@@ -26,7 +26,7 @@ allprojects {
 }
 
 ext {
-    // TODO: Migrate to API 30 only when storage access has been removed completely.
-    targetSdkVersion = 30
-    buildToolsVersion = "30.0.3"
+    // TODO: Since API 30, the storage access should have been removed completely.
+    targetSdkVersion = 31
+    buildToolsVersion = "31.0.0"
 }
