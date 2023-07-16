@@ -341,9 +341,7 @@ public class Wenku8ReaderActivityV1 extends BaseMaterialActivity {
         @Override
         public WenkuReaderPageView getNext() {
             Log.d("MewX", "-- slider getNext");
-//            isLoadingNext = true;
             nextPage = new WenkuReaderPageView(Wenku8ReaderActivityV1.this, lastLineIndex, lastWordIndex, WenkuReaderPageView.LOADING_DIRECTION.FORWARDS);
-//            isLoadingNext = false;
             return nextPage;
         }
 
@@ -357,9 +355,7 @@ public class Wenku8ReaderActivityV1 extends BaseMaterialActivity {
         @Override
         public WenkuReaderPageView getPrevious() {
             Log.d("MewX", "-- slider getPrevious");
-//            isLoadingPrevious = true;
             previousPage = new WenkuReaderPageView(Wenku8ReaderActivityV1.this, firstLineIndex, firstWordIndex, WenkuReaderPageView.LOADING_DIRECTION.BACKWARDS);
-//            isLoadingPrevious = false;
             return previousPage;
         }
 
@@ -704,7 +700,7 @@ public class Wenku8ReaderActivityV1 extends BaseMaterialActivity {
                                                 final int i_bak = i;
                                                 new MaterialDialog.Builder(Wenku8ReaderActivityV1.this)
                                                         .onPositive((dialog, which) -> {
-                                                            Intent intent = new Intent(Wenku8ReaderActivityV1.this, Wenku8ReaderActivityV1.class); //VerticalReaderActivity.class);
+                                                            Intent intent = new Intent(Wenku8ReaderActivityV1.this, Wenku8ReaderActivityV1.class);
                                                             intent.putExtra("aid", aid);
                                                             intent.putExtra("volume", volumeList);
                                                             intent.putExtra("cid", volumeList.chapterList.get(i_bak - 1).cid);
@@ -739,7 +735,7 @@ public class Wenku8ReaderActivityV1 extends BaseMaterialActivity {
                                                 final int i_bak = i;
                                                 new MaterialDialog.Builder(Wenku8ReaderActivityV1.this)
                                                         .onPositive((dialog, which) -> {
-                                                            Intent intent = new Intent(Wenku8ReaderActivityV1.this, Wenku8ReaderActivityV1.class); //VerticalReaderActivity.class);
+                                                            Intent intent = new Intent(Wenku8ReaderActivityV1.this, Wenku8ReaderActivityV1.class);
                                                             intent.putExtra("aid", aid);
                                                             intent.putExtra("volume", volumeList);
                                                             intent.putExtra("cid", volumeList.chapterList.get(i_bak + 1).cid);
@@ -836,7 +832,7 @@ public class Wenku8ReaderActivityV1 extends BaseMaterialActivity {
                         final int i_bak = i;
                         new MaterialDialog.Builder(Wenku8ReaderActivityV1.this)
                                 .onPositive((dialog, which) -> {
-                                    Intent intent = new Intent(Wenku8ReaderActivityV1.this, Wenku8ReaderActivityV1.class); //VerticalReaderActivity.class);
+                                    Intent intent = new Intent(Wenku8ReaderActivityV1.this, Wenku8ReaderActivityV1.class);
                                     intent.putExtra("aid", aid);
                                     intent.putExtra("volume", volumeList);
                                     intent.putExtra("cid", volumeList.chapterList.get(i_bak + 1).cid);
@@ -877,7 +873,7 @@ public class Wenku8ReaderActivityV1 extends BaseMaterialActivity {
                         final int i_bak = i;
                         new MaterialDialog.Builder(Wenku8ReaderActivityV1.this)
                                 .onPositive((dialog, which) -> {
-                                    Intent intent = new Intent(Wenku8ReaderActivityV1.this, Wenku8ReaderActivityV1.class); //VerticalReaderActivity.class);
+                                    Intent intent = new Intent(Wenku8ReaderActivityV1.this, Wenku8ReaderActivityV1.class);
                                     intent.putExtra("aid", aid);
                                     intent.putExtra("volume", volumeList);
                                     intent.putExtra("cid", volumeList.chapterList.get(i_bak - 1).cid);
@@ -921,8 +917,8 @@ public class Wenku8ReaderActivityV1 extends BaseMaterialActivity {
                             runSaveCustomFontPath(uri.toString().replaceAll("file://", ""));
                         }
                     }
-                    // For Ice Cream Sandwich
                 } else {
+                    // For Ice Cream Sandwich
                     ArrayList<String> paths = data.getStringArrayListExtra(FilePickerActivity.EXTRA_PATHS);
                     if (paths != null) {
                         for (String path : paths) {
@@ -950,8 +946,8 @@ public class Wenku8ReaderActivityV1 extends BaseMaterialActivity {
                             runSaveCustomBackgroundPath(uri.toString().replaceAll("file://", ""));
                         }
                     }
-                    // For Ice Cream Sandwich
                 } else {
+                    // For Ice Cream Sandwich
                     ArrayList<String> paths = data.getStringArrayListExtra(FilePickerActivity.EXTRA_PATHS);
                     if (paths != null) {
                         for (String path : paths) {
@@ -971,6 +967,7 @@ public class Wenku8ReaderActivityV1 extends BaseMaterialActivity {
     }
 
     private void runSaveCustomFontPath(String path) {
+        // TODO: need to make a copy of the file to the custom path for easier access.
         setting.setCustomFontPath(path);
         WenkuReaderPageView.setViewComponents(loader, setting, false);
         mSlidingPageAdapter.restoreState(null, null);
@@ -978,17 +975,18 @@ public class Wenku8ReaderActivityV1 extends BaseMaterialActivity {
     }
 
     private void runSaveCustomBackgroundPath(String path) {
+        // TODO: need to make a copy of the file to the custom path for easier access.
         try {
-            Bitmap bitmap = BitmapFactory.decodeFile(path);
+            BitmapFactory.decodeFile(path);
         } catch (OutOfMemoryError oome) {
             try {
                 BitmapFactory.Options options = new BitmapFactory.Options();
                 options.inSampleSize = 2;
                 Bitmap bitmap = BitmapFactory.decodeFile(path, options);
-                if(bitmap == null) throw new Exception("PictureDecodeFailedException");
-            } catch(Exception e) {
+                if (bitmap == null) throw new Exception("PictureDecodeFailedException");
+            } catch (Exception e) {
                 e.printStackTrace();
-                Toast.makeText(this, "Exception: " + e.toString() + "\n可能的原因有：图片不在内置SD卡；图片格式不正确；图片像素尺寸太大，请使用小一点的图，谢谢，此功能为试验性功能；", Toast.LENGTH_LONG).show();
+                Toast.makeText(this, "Exception: " + e + "\n可能的原因有：图片不在内置SD卡；图片格式不正确；图片像素尺寸太大，请使用小一点的图，谢谢，此功能为试验性功能；", Toast.LENGTH_LONG).show();
                 return;
             }
         }
