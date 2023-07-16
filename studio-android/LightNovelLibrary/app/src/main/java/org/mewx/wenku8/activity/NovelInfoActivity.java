@@ -307,82 +307,56 @@ public class NovelInfoActivity extends BaseMaterialActivity {
      * 0 <string name="dialog_option_check_for_update">检查更新</string>
      */
     private void optionCheckUpdates() {
-        new MaterialDialog.Builder(NovelInfoActivity.this)
-                .onPositive((ignored1, ignored2) -> {
-                    // async task
-                    isLoading = true;
-                    final AsyncUpdateCacheTask auct = new AsyncUpdateCacheTask();
-                    auct.execute(aid, 0);
+        // async task
+        isLoading = true;
+        final AsyncUpdateCacheTask auct = new AsyncUpdateCacheTask();
+        auct.execute(aid, 0);
 
-                    // show progress
-                    pDialog = new MaterialDialog.Builder(NovelInfoActivity.this)
-                            .theme(Theme.LIGHT)
-                            .content(R.string.dialog_content_downloading)
-                            .progress(false, 1, true)
-                            .cancelable(true)
-                            .cancelListener(dialog12 -> {
-                                isLoading = false;
-                                auct.cancel(true);
-                                pDialog.dismiss();
-                                pDialog = null;
-                            })
-                            .show();
-
-                    pDialog.setProgress(0);
-                    pDialog.setMaxProgress(1);
-                    pDialog.show();
-                })
+        // show progress
+        pDialog = new MaterialDialog.Builder(NovelInfoActivity.this)
                 .theme(Theme.LIGHT)
-                .backgroundColorRes(R.color.dlgBackgroundColor)
-                .contentColorRes(R.color.dlgContentColor)
-                .positiveColorRes(R.color.dlgPositiveButtonColor)
-                .negativeColorRes(R.color.dlgNegativeButtonColor)
-                .content(R.string.dialog_content_verify_update)
-                .contentGravity(GravityEnum.CENTER)
-                .positiveText(R.string.dialog_positive_likethis)
-                .negativeText(R.string.dialog_negative_preferno)
+                .content(R.string.dialog_content_downloading)
+                .progress(false, 1, true)
+                .cancelable(true)
+                .cancelListener(dialog12 -> {
+                    isLoading = false;
+                    auct.cancel(true);
+                    pDialog.dismiss();
+                    pDialog = null;
+                })
                 .show();
+
+        pDialog.setProgress(0);
+        pDialog.setMaxProgress(1);
+        pDialog.show();
     }
 
     /**
      * 1 <string name="dialog_option_update_uncached_volumes">更新下载</string>
      */
     private void optionDownloadUpdates() {
-        new MaterialDialog.Builder(NovelInfoActivity.this)
-                .onPositive((ignored1, ignored2) -> {
-                    // async task
-                    isLoading = true;
-                    final AsyncUpdateCacheTask auct = new AsyncUpdateCacheTask();
-                    auct.execute(aid, 1);
+        // async task
+        isLoading = true;
+        final AsyncUpdateCacheTask auct = new AsyncUpdateCacheTask();
+        auct.execute(aid, 1);
 
-                    // show progress
-                    pDialog = new MaterialDialog.Builder(NovelInfoActivity.this)
-                            .theme(Theme.LIGHT)
-                            .content(R.string.dialog_content_downloading)
-                            .progress(false, 1, true)
-                            .cancelable(true)
-                            .cancelListener(dialog1 -> {
-                                isLoading = false;
-                                auct.cancel(true);
-                                pDialog.dismiss();
-                                pDialog = null;
-                            })
-                            .show();
-
-                    pDialog.setProgress(0);
-                    pDialog.setMaxProgress(1);
-                    pDialog.show();
-                })
+        // show progress
+        pDialog = new MaterialDialog.Builder(NovelInfoActivity.this)
                 .theme(Theme.LIGHT)
-                .backgroundColorRes(R.color.dlgBackgroundColor)
-                .contentColorRes(R.color.dlgContentColor)
-                .positiveColorRes(R.color.dlgPositiveButtonColor)
-                .negativeColorRes(R.color.dlgNegativeButtonColor)
-                .content(R.string.dialog_content_verify_download)
-                .contentGravity(GravityEnum.CENTER)
-                .positiveText(R.string.dialog_positive_likethis)
-                .negativeText(R.string.dialog_negative_preferno)
+                .content(R.string.dialog_content_downloading)
+                .progress(false, 1, true)
+                .cancelable(true)
+                .cancelListener(dialog1 -> {
+                    isLoading = false;
+                    auct.cancel(true);
+                    pDialog.dismiss();
+                    pDialog = null;
+                })
                 .show();
+
+        pDialog.setProgress(0);
+        pDialog.setMaxProgress(1);
+        pDialog.show();
     }
 
     /**
@@ -431,33 +405,19 @@ public class NovelInfoActivity extends BaseMaterialActivity {
      */
     private void optionDownloadSelected() {
         // select volumes
-        String[] strings = new String[listVolume.size()];
+        String[] volumes = new String[listVolume.size()];
         for(int i = 0; i < listVolume.size(); i ++)
-            strings[i] = listVolume.get(i).volumeName;
+            volumes[i] = listVolume.get(i).volumeName;
 
         new MaterialDialog.Builder(NovelInfoActivity.this)
                 .theme(Theme.LIGHT)
                 .title(R.string.dialog_option_select_and_update)
-                .items(strings)
+                .items(volumes)
                 .itemsCallbackMultiChoice(null, (dialog, which, text) -> {
-                    if(which == null || which.length == 0) return true;
+                    if (which == null || which.length == 0) return true;
 
-                    // show verify dialog
-                    new MaterialDialog.Builder(NovelInfoActivity.this)
-                            .onPositive((ignored1, ignored2) -> {
-                                AsyncDownloadVolumes adv = new AsyncDownloadVolumes();
-                                adv.execute(which);
-                            })
-                            .theme(Theme.LIGHT)
-                            .backgroundColorRes(R.color.dlgBackgroundColor)
-                            .contentColorRes(R.color.dlgContentColor)
-                            .positiveColorRes(R.color.dlgPositiveButtonColor)
-                            .negativeColorRes(R.color.dlgNegativeButtonColor)
-                            .content(R.string.dialog_content_verify_download)
-                            .contentGravity(GravityEnum.CENTER)
-                            .positiveText(R.string.dialog_positive_likethis)
-                            .negativeText(R.string.dialog_negative_preferno)
-                            .show();
+                    AsyncDownloadVolumes adv = new AsyncDownloadVolumes();
+                    adv.execute(which);
                     return true;
                 })
                 .positiveText(R.string.dialog_positive_ok)
@@ -897,7 +857,7 @@ public class NovelInfoActivity extends BaseMaterialActivity {
         {
             if (result == Wenku8Error.ErrorCode.USER_CANCELLED_TASK) {
                 // user cancelled
-                Toast.makeText(NovelInfoActivity.this, "User cancelled!", Toast.LENGTH_LONG).show();
+                Toast.makeText(NovelInfoActivity.this, R.string.system_manually_cancelled, Toast.LENGTH_LONG).show();
                 if (pDialog != null)
                     pDialog.dismiss();
                 onResume();
@@ -1109,7 +1069,7 @@ public class NovelInfoActivity extends BaseMaterialActivity {
             super.onPostExecute(errorCode);
             if (errorCode == Wenku8Error.ErrorCode.USER_CANCELLED_TASK) {
                 // user cancelled
-                Toast.makeText(NovelInfoActivity.this, "User cancelled!", Toast.LENGTH_LONG).show();
+                Toast.makeText(NovelInfoActivity.this, R.string.system_manually_cancelled, Toast.LENGTH_LONG).show();
                 if (md != null) md.dismiss();
                 onResume();
                 loading = false;

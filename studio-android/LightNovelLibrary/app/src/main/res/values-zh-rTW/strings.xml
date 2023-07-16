@@ -100,9 +100,6 @@
     <string name="dialog_content_language_tip">緩存內容如何切換語言？\n書架可以下拉重新獲取繁體內容；已緩存的內容可以通過覆蓋下載獲取當前語言內容；</string>
     <string name="dialog_content_search_author">要查找所有該作者的書嗎？</string>
     <string name="dialog_content_delete_one_search_record">確定要刪除該搜索歷史嗎？\n</string>
-    <string name="dialog_content_load_from_cloud">該章節未緩存，是否立即聯網閱讀？</string>
-    <string name="dialog_content_verify_download">確定要開始聯網下載該書嗎？\n（高清原圖也會下載）</string>
-    <string name="dialog_content_verify_update">確定要開始聯網檢查更新嗎？\n（只會更新卷目）</string>
     <string name="dialog_content_verify_force_update">確定要開始覆蓋下載更新嗎？\n（高清原圖也會重復下載）</string>
     <string name="dialog_content_verify_register">註冊需要去wenku8.cn進行。\n是否打開瀏覽器去註冊？</string>
     <string name="dialog_content_downloading">正在緩存……</string>
