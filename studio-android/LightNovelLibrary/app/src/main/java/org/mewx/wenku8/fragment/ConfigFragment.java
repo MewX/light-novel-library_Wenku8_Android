@@ -185,8 +185,8 @@ public class ConfigFragment extends Fragment {
         @Override
         protected Wenku8Error.ErrorCode doInBackground(Integer... params) {
             // covers
-            File dir = new File(GlobalConfig.getFirstStoragePath() + "imgs");
-            if(!dir.exists()) dir = new File(GlobalConfig.getSecondStoragePath() + "imgs");
+            File dir = new File(GlobalConfig.getDefaultStoragePath() + "imgs");
+            if(!dir.exists()) dir = new File(GlobalConfig.getBackupStoragePath() + "imgs");
             File[] childFile = dir.listFiles();
             if(childFile != null && childFile.length != 0) {
                 for (File f : childFile) {
@@ -200,8 +200,8 @@ public class ConfigFragment extends Fragment {
             }
 
             // cache
-            dir = new File(GlobalConfig.getFirstStoragePath() + "cache");
-            if(!dir.exists()) dir = new File(GlobalConfig.getSecondStoragePath() + "cache");
+            dir = new File(GlobalConfig.getDefaultStoragePath() + "cache");
+            if(!dir.exists()) dir = new File(GlobalConfig.getBackupStoragePath() + "cache");
             childFile = dir.listFiles();
             if(childFile != null && childFile.length != 0) {
                 for (File f : childFile) {
@@ -256,8 +256,8 @@ public class ConfigFragment extends Fragment {
         @Override
         protected Wenku8Error.ErrorCode doInBackground(Integer... params) {
             // covers
-            File dir = new File(GlobalConfig.getFirstStoragePath() + "imgs");
-            if(!dir.exists()) dir = new File(GlobalConfig.getSecondStoragePath() + "imgs");
+            File dir = new File(GlobalConfig.getDefaultStoragePath() + "imgs");
+            if(!dir.exists()) dir = new File(GlobalConfig.getBackupStoragePath() + "imgs");
             File[] childFile = dir.listFiles();
             if(childFile != null && childFile.length != 0) {
                 for (File f : childFile) {
@@ -271,8 +271,8 @@ public class ConfigFragment extends Fragment {
             }
 
             // cache
-            dir = new File(GlobalConfig.getFirstStoragePath() + "cache");
-            if(!dir.exists()) dir = new File(GlobalConfig.getSecondStoragePath() + "cache");
+            dir = new File(GlobalConfig.getDefaultStoragePath() + "cache");
+            if(!dir.exists()) dir = new File(GlobalConfig.getBackupStoragePath() + "cache");
             childFile = dir.listFiles();
             if(childFile != null && childFile.length != 0) {
                 for (File f : childFile) {

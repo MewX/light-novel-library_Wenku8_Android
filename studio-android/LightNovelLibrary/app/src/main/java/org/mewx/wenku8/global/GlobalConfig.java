@@ -5,7 +5,7 @@ import android.content.Context;
 import android.graphics.Bitmap;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
-import android.os.Environment;
+
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import android.util.Log;
@@ -68,7 +68,7 @@ public class GlobalConfig {
     private static boolean isInBookshelf = false;
     private static boolean isInLatest = false;
     private static boolean doLoadImage = true;
-    private static boolean FirstStoragePathStatus = true;
+    private static boolean firstStoragePathAvailable = true;
     private static Wenku8API.LANG currentLang = Wenku8API.LANG.SC;
     public static String pathPickedSave; // dir picker save path
 
@@ -132,7 +132,7 @@ public class GlobalConfig {
 
     public static void initImageLoader(Context context) {
         UnlimitedDiscCache localUnlimitedDiscCache = new UnlimitedDiscCache(
-                new File(GlobalConfig.getFirstStoragePath() + "cache"),
+                new File(GlobalConfig.getDefaultStoragePath() + "cache"),
                 new File(context.getCacheDir() + File.separator + "imgs"));
         DisplayImageOptions localDisplayImageOptions = new DisplayImageOptions.Builder()
                 .resetViewBeforeLoading(true)
@@ -172,28 +172,27 @@ public class GlobalConfig {
 
 
     /**
-     * 设置第一存储路径的合法性（）第一路径可以只有设置
+     * 设置第一存储路径的合法性（第一路径可以只有设置）
      * @param a true-合法可以使用; false-不能使用，只能只用第二路径
      */
-    public static void setFirstStoragePathStatus( boolean a ) {
-
+    public static void setFirstStoragePathAvailable(boolean a) {
+        firstStoragePathAvailable = a;
     }
 
-    // TODO: get rid of this shortcut.
-    public static String getFirstStoragePath() {
+    public static String getDefaultStoragePath() {
+        // The lookupInternalStorageOnly flag has the highest priority.
+        if (lookupInternalStorageOnly || !firstStoragePathAvailable) {
+            return SaveFileMigration.getInternalSavePath();
+        }
         return SaveFileMigration.getExternalStoragePath();
     }
 
     // TODO: get rid of this shortcut.
-    public static String getSecondStoragePath() {
-        return SaveFileMigration.getInternalSavePath();
+    public static String getBackupStoragePath() {
+        String internalPath = SaveFileMigration.getInternalSavePath();
+        return getDefaultStoragePath().equals(internalPath) ?
+                SaveFileMigration.getExternalStoragePath() : internalPath;
     }
-
-    public static String getDefaultStoragePath() {
-        // TODO: fix with the migration status.
-        return FirstStoragePathStatus ? getFirstStoragePath() : getSecondStoragePath();
-    }
-
 
     public static boolean doCacheImage() {
         // for non-image mode
@@ -224,12 +223,13 @@ public class GlobalConfig {
         return 2;
     }
 
+    // TODO: get rid of those ugly shortcuts.
     public static String getFirstFullSaveFilePath() {
-        return getFirstStoragePath() + saveFolderName + File.separator;
+        return getDefaultStoragePath() + saveFolderName + File.separator;
     }
 
     public static String getSecondFullSaveFilePath() {
-        return getSecondStoragePath() + saveFolderName + File.separator;
+        return getBackupStoragePath() + saveFolderName + File.separator;
     }
 
     public static String getFirstFullUserAccountSaveFilePath() {
@@ -270,18 +270,18 @@ public class GlobalConfig {
     private static String loadFullSaveFileContent(@NonNull String FileName) {
         // get full file in file save path
         String h = "";
-        if (LightCache.testFileExist(getFirstStoragePath() + saveFolderName + File.separator + FileName)) {
+        if (LightCache.testFileExist(getDefaultStoragePath() + saveFolderName + File.separator + FileName)) {
             try {
-                byte[] b = LightCache.loadFile(getFirstStoragePath() + saveFolderName + File.separator + FileName);
+                byte[] b = LightCache.loadFile(getDefaultStoragePath() + saveFolderName + File.separator + FileName);
                 if(b == null) return "";
                 h = new String(b, "UTF-8");
             } catch (UnsupportedEncodingException e) {
                 e.printStackTrace();
             }
 
-        } else if (LightCache.testFileExist(getSecondStoragePath() + saveFolderName + File.separator + FileName)) {
+        } else if (LightCache.testFileExist(getBackupStoragePath() + saveFolderName + File.separator + FileName)) {
             try {
-                byte[] b = LightCache.loadFile(getSecondStoragePath() + saveFolderName + File.separator + FileName);
+                byte[] b = LightCache.loadFile(getBackupStoragePath() + saveFolderName + File.separator + FileName);
                 if(b == null) return "";
                 h = new String(b, "UTF-8");
             } catch (UnsupportedEncodingException e) {
@@ -302,8 +302,8 @@ public class GlobalConfig {
         }
 
         // write save file in save path
-        if (!LightCache.saveFile(getFirstStoragePath() + saveFolderName + File.separator + path, fileName, s.getBytes(), true)) // if not exist
-            return LightCache.saveFile(getSecondStoragePath() + saveFolderName
+        if (!LightCache.saveFile(getDefaultStoragePath() + saveFolderName + File.separator + path, fileName, s.getBytes(), true)) // if not exist
+            return LightCache.saveFile(getBackupStoragePath() + saveFolderName
                     + File.separator + path, fileName, s.getBytes(), true);
         return true;
     }
@@ -798,25 +798,6 @@ public class GlobalConfig {
                 || LightCache.saveFile(getSecondFullSaveFilePath() + imgsSaveFolderName + File.separator, imgFileName, fileContent, true);
         }
         return true; // file exist
-    }
-
-    /**
-     * removeNovelContentImage:
-     *
-     * get image url and delete the corresponding local file
-     *
-     * @param url
-     *            : full http url of target image
-     * @return true if file deleted successfully.
-     */
-    public static boolean removeNovelContentImage(String url) {
-        String imgFileName = generateImageFileNameByURL(url);
-
-        // in fact, one of them deleted is ok, so use "or"
-        return LightCache.deleteFile(getFirstFullSaveFilePath()
-                + imgsSaveFolderName + File.separator, imgFileName)
-                || LightCache.deleteFile(getSecondFullSaveFilePath()
-                + imgsSaveFolderName + File.separator, imgFileName);
     }
 
     /**

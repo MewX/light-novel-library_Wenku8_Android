@@ -116,10 +116,10 @@ public class NovelInfoActivity extends BaseMaterialActivity {
 
         // hide view and set colors
         tvNovelTitle.setText(title);
-        if(LightCache.testFileExist(GlobalConfig.getFirstStoragePath() + "imgs" + File.separator + aid + ".jpg"))
-            ImageLoader.getInstance().displayImage("file://" + GlobalConfig.getFirstStoragePath() + "imgs" + File.separator + aid + ".jpg", ivNovelCover);
-        else if(LightCache.testFileExist(GlobalConfig.getSecondStoragePath() + "imgs" + File.separator + aid + ".jpg"))
-            ImageLoader.getInstance().displayImage("file://" + GlobalConfig.getSecondStoragePath() + "imgs" + File.separator + aid + ".jpg", ivNovelCover);
+        if(LightCache.testFileExist(GlobalConfig.getDefaultStoragePath() + "imgs" + File.separator + aid + ".jpg"))
+            ImageLoader.getInstance().displayImage("file://" + GlobalConfig.getDefaultStoragePath() + "imgs" + File.separator + aid + ".jpg", ivNovelCover);
+        else if(LightCache.testFileExist(GlobalConfig.getBackupStoragePath() + "imgs" + File.separator + aid + ".jpg"))
+            ImageLoader.getInstance().displayImage("file://" + GlobalConfig.getBackupStoragePath() + "imgs" + File.separator + aid + ".jpg", ivNovelCover);
         else
             ImageLoader.getInstance().displayImage(Wenku8API.getCoverURL(aid), ivNovelCover); // move to onCreateView!
         tvLatestChapterNameText.setText(getResources().getText(R.string.novel_item_latest_chapter));
@@ -498,8 +498,8 @@ public class NovelInfoActivity extends BaseMaterialActivity {
 
                     // test does file exist
                     if (from.equals(FromLocal)
-                            && !LightCache.testFileExist(GlobalConfig.getFirstStoragePath() + GlobalConfig.saveFolderName + File.separator + "novel" + File.separator + cid + ".xml")
-                            && !LightCache.testFileExist(GlobalConfig.getSecondStoragePath() + GlobalConfig.saveFolderName + File.separator + "novel" + File.separator + cid + ".xml")) {
+                            && !LightCache.testFileExist(GlobalConfig.getDefaultStoragePath() + GlobalConfig.saveFolderName + File.separator + "novel" + File.separator + cid + ".xml")
+                            && !LightCache.testFileExist(GlobalConfig.getBackupStoragePath() + GlobalConfig.saveFolderName + File.separator + "novel" + File.separator + cid + ".xml")) {
                         intent.putExtra("from", "cloud"); // from cloud
                     } else {
                         intent.putExtra("from", from); // from "fav"

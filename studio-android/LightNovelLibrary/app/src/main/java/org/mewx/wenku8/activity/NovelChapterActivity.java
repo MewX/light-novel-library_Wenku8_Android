@@ -78,8 +78,8 @@ public class NovelChapterActivity extends BaseMaterialActivity {
 
                 // test does file exist
                 if (from.equals(FromLocal)
-                    && !LightCache.testFileExist(GlobalConfig.getFirstStoragePath() + GlobalConfig.saveFolderName + File.separator + "novel" + File.separator + ci.cid + ".xml")
-                    && !LightCache.testFileExist(GlobalConfig.getSecondStoragePath() + GlobalConfig.saveFolderName + File.separator + "novel" + File.separator + ci.cid + ".xml")) {
+                    && !LightCache.testFileExist(GlobalConfig.getDefaultStoragePath() + GlobalConfig.saveFolderName + File.separator + "novel" + File.separator + ci.cid + ".xml")
+                    && !LightCache.testFileExist(GlobalConfig.getBackupStoragePath() + GlobalConfig.saveFolderName + File.separator + "novel" + File.separator + ci.cid + ".xml")) {
                     intent.putExtra("from", "cloud"); // from cloud
                 }
                 else {
@@ -115,8 +115,8 @@ public class NovelChapterActivity extends BaseMaterialActivity {
 
                         // test does file exist
                         if (from.equals(FromLocal)
-                            && !LightCache.testFileExist(GlobalConfig.getFirstStoragePath() + GlobalConfig.saveFolderName + File.separator + "novel" + File.separator + ci.cid + ".xml")
-                            && !LightCache.testFileExist(GlobalConfig.getSecondStoragePath() + GlobalConfig.saveFolderName + File.separator + "novel" + File.separator + ci.cid + ".xml")) {
+                            && !LightCache.testFileExist(GlobalConfig.getDefaultStoragePath() + GlobalConfig.saveFolderName + File.separator + "novel" + File.separator + ci.cid + ".xml")
+                            && !LightCache.testFileExist(GlobalConfig.getBackupStoragePath() + GlobalConfig.saveFolderName + File.separator + "novel" + File.separator + ci.cid + ".xml")) {
                             // jump to reader activity
                             intent.putExtra("from", "cloud"); // from cloud
                         } else {

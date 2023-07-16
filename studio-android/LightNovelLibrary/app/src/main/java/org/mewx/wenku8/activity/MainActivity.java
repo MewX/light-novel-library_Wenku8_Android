@@ -130,15 +130,11 @@ public class MainActivity extends BaseMaterialActivity {
 
         // create save folder.
         // TODO: can stop creating those files and folders.
-        LightCache.saveFile(GlobalConfig.getFirstStoragePath() + "imgs", ".nomedia", "".getBytes(), false);
-        LightCache.saveFile(GlobalConfig.getSecondStoragePath() + "imgs", ".nomedia", "".getBytes(), false);
-        LightCache.saveFile(GlobalConfig.getFirstStoragePath() + GlobalConfig.customFolderName, ".nomedia", "".getBytes(), false);
-        LightCache.saveFile(GlobalConfig.getSecondStoragePath() + GlobalConfig.customFolderName, ".nomedia", "".getBytes(), false);
-
-        GlobalConfig.setFirstStoragePathStatus(LightCache.testFileExist(GlobalConfig.getFirstStoragePath() + "imgs" + File.separator + ".nomedia", true));
-        // TODO: set status? tell app where is available
-        LightCache.saveFile(GlobalConfig.getFirstFullSaveFilePath() + "imgs", ".nomedia", "".getBytes(), false);
-        LightCache.saveFile(GlobalConfig.getSecondFullSaveFilePath() + "imgs", ".nomedia", "".getBytes(), false);
+        LightCache.saveFile(GlobalConfig.getDefaultStoragePath() + "imgs", ".nomedia", "".getBytes(), false);
+        LightCache.saveFile(GlobalConfig.getBackupStoragePath() + "imgs", ".nomedia", "".getBytes(), false);
+        LightCache.saveFile(GlobalConfig.getDefaultStoragePath() + GlobalConfig.customFolderName, ".nomedia", "".getBytes(), false);
+        LightCache.saveFile(GlobalConfig.getBackupStoragePath() + GlobalConfig.customFolderName, ".nomedia", "".getBytes(), false);
+        GlobalConfig.setFirstStoragePathAvailable(LightCache.testFileExist(SaveFileMigration.getExternalStoragePath() + "imgs" + File.separator + ".nomedia", true));
     }
 
     /**

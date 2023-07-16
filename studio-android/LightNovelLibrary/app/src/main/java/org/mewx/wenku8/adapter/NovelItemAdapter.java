@@ -73,10 +73,10 @@ public class NovelItemAdapter extends RecyclerView.Adapter<NovelItemAdapter.View
             viewHolder.tvNovelIntro.setText(mDataset.get(i).intro_short);
 
         // need to solve flicking problem
-        if(LightCache.testFileExist(GlobalConfig.getFirstStoragePath() + "imgs" + File.separator + mDataset.get(i).aid + ".jpg"))
-            ImageLoader.getInstance().displayImage("file://" + GlobalConfig.getFirstStoragePath() + "imgs" + File.separator + mDataset.get(i).aid + ".jpg", viewHolder.ivNovelCover);
-        else if(LightCache.testFileExist(GlobalConfig.getSecondStoragePath() + "imgs" + File.separator + mDataset.get(i).aid + ".jpg"))
-            ImageLoader.getInstance().displayImage("file://" + GlobalConfig.getSecondStoragePath() + "imgs" + File.separator + mDataset.get(i).aid + ".jpg", viewHolder.ivNovelCover);
+        if(LightCache.testFileExist(GlobalConfig.getDefaultStoragePath() + "imgs" + File.separator + mDataset.get(i).aid + ".jpg"))
+            ImageLoader.getInstance().displayImage("file://" + GlobalConfig.getDefaultStoragePath() + "imgs" + File.separator + mDataset.get(i).aid + ".jpg", viewHolder.ivNovelCover);
+        else if(LightCache.testFileExist(GlobalConfig.getBackupStoragePath() + "imgs" + File.separator + mDataset.get(i).aid + ".jpg"))
+            ImageLoader.getInstance().displayImage("file://" + GlobalConfig.getBackupStoragePath() + "imgs" + File.separator + mDataset.get(i).aid + ".jpg", viewHolder.ivNovelCover);
         else
             ImageLoader.getInstance().displayImage(Wenku8API.getCoverURL(mDataset.get(i).aid), viewHolder.ivNovelCover);
 
