@@ -130,6 +130,7 @@
     <string name="dialog_content_novel_title">小说完整标题</string>
     <string name="dialog_content_novel_remove_from_cloud">正在从云端书架移除……</string>
     <string name="dialog_content_saved_path">已选择的路径：\n</string>
+    <string name="dialog_content_wrong_path">路径似乎不正确呢：\n%s</string>
     <string name="dialog_content_force_write_file">确定要覆盖文件吗？</string>
     <string name="dialog_content_wipe_cache_fast">正在快速清理缓存……</string>
     <string name="dialog_content_wipe_cache_slow">正在仔细清理缓存……</string>
@@ -137,6 +138,7 @@
     <string name="dialog_sure_to_clear_cache">要清除缓存吗？</string>
     <string name="dialog_delete_book">删除这本书</string>
     <string name="dialog_positive_ok">OK</string>
+    <string name="dialog_positive_retry">重试一下？</string>
     <string name="dialog_positive_want">要</string>
     <string name="dialog_positive_sure">好滴~</string>
     <string name="dialog_positive_yes">是的</string>
@@ -242,4 +244,5 @@
     <string name="about_qqq">QQ交流群: 181789084</string>
     <string name="system_save_upgrading">存档升级中……</string>
     <string name="system_save_migrated">存档升级完成，已升级%d个文件（其中%d个文件失败）。从现在开始，手机内部/外部存储中的wenku8文件夹将不再被更新。如果需要重新升级存档，清空app的存储和缓存。即将重新加载app~</string>
+    <string name="system_save_need_to_migrate">发现内部存储中有未升级的存档需要升级，由于权限原因，请在弹出的界面中选定手机内部存储的wenku8目录并确认（注意不是同名的图片文件夹）。</string>
 </resources>

@@ -154,11 +154,19 @@ public class MainActivity extends BaseMaterialActivity {
         // The permission issue for Android API 33+.
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && SaveFileMigration.migrationEligible()) {
             Log.d(TAG, "startOldSaveMigration: Eligible");
-
-            // TODO: add dialogs
-            Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
-            intent.addCategory(Intent.CATEGORY_DEFAULT);
-            startActivityForResult(Intent.createChooser(intent, "Choose directory"), REQUEST_READ_EXTERNAL_SAVES);
+            new MaterialDialog.Builder(MainActivity.this)
+                    .theme(Theme.LIGHT)
+                    .backgroundColorRes(R.color.dlgBackgroundColor)
+                    .contentColorRes(R.color.dlgContentColor)
+                    .positiveColorRes(R.color.dlgPositiveButtonColor)
+                    .content(R.string.system_save_need_to_migrate)
+                    .positiveText(R.string.dialog_positive_ok)
+                    .onPositive((unused1, unused2) -> {
+                        Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
+                        intent.addCategory(Intent.CATEGORY_DEFAULT);
+                        startActivityForResult(Intent.createChooser(intent, "Choose directory"), REQUEST_READ_EXTERNAL_SAVES);
+                    })
+                    .show();
 
             // Return early to wait for the permissions grant on the directory.
             return;
@@ -203,6 +211,13 @@ public class MainActivity extends BaseMaterialActivity {
 
                 int finalProgress = progress;
                 handler.post(() -> progressDialog.setProgress(finalProgress));
+            }
+
+            // Adding some delay to prevent UI crashing at the time of reloading.
+            try {
+                Thread.sleep(2000);
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
             }
 
             int finalFailedFiles = failedFiles;
@@ -374,7 +389,18 @@ public class MainActivity extends BaseMaterialActivity {
             if (!wenku8Uri.getLastPathSegment().endsWith("wenku8") || wenku8Path.contains("DCIM") || wenku8Path.contains("Picture")) {
                 Log.i(TAG, "LastPathSegment: " + wenku8Uri.getLastPathSegment());
                 Log.i(TAG, "Selected path for save migration doesn't look right: " + wenku8Uri);
-                Toast.makeText(this, getResources().getText(R.string.missing_permission), Toast.LENGTH_LONG).show();
+
+                new MaterialDialog.Builder(MainActivity.this)
+                        .theme(Theme.LIGHT)
+                        .backgroundColorRes(R.color.dlgBackgroundColor)
+                        .contentColorRes(R.color.dlgContentColor)
+                        .positiveColorRes(R.color.dlgPositiveButtonColor)
+                        .negativeColorRes(R.color.dlgNegativeButtonColor)
+                        .content(R.string.dialog_content_wrong_path, wenku8Path)
+                        .positiveText(R.string.dialog_positive_retry)
+                        .negativeText(R.string.dialog_negative_preferno)
+                        .onPositive((unused1, unused2) -> reloadApp())
+                        .show();
                 return;
             }
 
