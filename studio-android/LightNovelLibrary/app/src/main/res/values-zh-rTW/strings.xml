@@ -1,10 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">輕小說文庫</string>
-    <string name="app_architect">MewX</string>
-    <string name="app_ui_designer">ZERO</string>
-    <string name="app_architect_text">Architect</string>
-    <string name="app_ui_designer_text">UI-Designer</string>
     <string name="navigation_drawer_open">Open navigation drawer</string>
     <string name="navigation_drawer_close">Close navigation drawer</string>
     <string name="error_unknown">未知錯誤，請將觸發步驟反饋給開發者。</string>
@@ -21,7 +17,6 @@
     <string name="error_10">推薦失敗</string>
     <string name="error_11">帖子發送失敗</string>
     <string name="error_22">非法頁碼請求</string>
-    <string name="action_example">Example action</string>
     <string name="action_settings">Settings</string>
     <string name="drawer_open">Menu opened</string>
     <string name="drawer_close">Menu closed</string>
@@ -220,11 +215,8 @@
     <string name="about_project_homepage">項目主頁: https://wenku8.mewx.org</string>
     <string name="about_no_duty">所有數據來自於互聯網，開發者、設計師、客服均與網站無任何關系，而且本項目完全免費，完整源代碼均開放，純憑興趣做的app，僅供大家學習安卓應用程序制作之法，如有侵犯您的權益，請務必郵件聯系，保證12小時內回復，app內會做屏蔽。</string>
     <string name="about_software_arch">軟體架構</string>
-    <string name="about_mewx"><![CDATA[MewX <https://mewx.org>]]></string>
     <string name="about_screen_design">界面設計</string>
-    <string name="about_zero"><![CDATA[ZERO <78283358@qq.com>]]></string>
     <string name="about_acknowledgement">致謝</string>
-    <string name="about_seraphroy"><![CDATA[SeraphRoy <https://www.gaeblogx.com>]]></string>
     <string name="action_create_new_review">發布評論</string>
     <string name="action_create_new_review_reply">發表回復</string>
     <string name="action_review_reply_list">評論回復區</string>

@@ -2,10 +2,10 @@
 <resources>
     <string name="app_name">轻小说文库</string>
     <string name="app_description">MewX与轻小说文库(Wenku8.com)合作的轻小说阅读app。</string>
-    <string name="app_architect">MewX</string>
-    <string name="app_ui_designer">ZERO</string>
-    <string name="app_architect_text">Architect</string>
-    <string name="app_ui_designer_text">UI-Designer</string>
+    <string name="app_architect" translatable="false">MewX</string>
+    <string name="app_ui_designer" translatable="false">ZERO</string>
+    <string name="app_architect_text" translatable="false">Architect</string>
+    <string name="app_ui_designer_text" translatable="false">UI-Designer</string>
     <string name="navigation_drawer_open">Open navigation drawer</string>
     <string name="navigation_drawer_close">Close navigation drawer</string>
     <string name="error_unknown">未知错误，请将触发步骤反馈给开发者。</string>
@@ -22,7 +22,7 @@
     <string name="error_10">推荐失败</string>
     <string name="error_11">帖子发送失败</string>
     <string name="error_22">非法页码请求</string>
-    <string name="action_example">Example action</string>
+    <string name="action_example" translatable="false">Example action</string>
     <string name="action_settings">Settings</string>
     <string name="drawer_open">Menu opened</string>
     <string name="drawer_close">Menu closed</string>
@@ -231,11 +231,12 @@
     <string name="about_project_homepage">项目主页: https://wenku8.mewx.org</string>
     <string name="about_no_duty">所有数据来自于互联网，开发者、设计师、客服均与网站无任何关系，而且本项目完全免费，完整源代码均开放，纯凭兴趣做的app，仅供大家学习安卓应用程序制作之法，如有侵犯您的权益，请务必邮件联系，保证12小时内回复，app内会做屏蔽。</string>
     <string name="about_software_arch">软件架构</string>
-    <string name="about_mewx"><![CDATA[MewX <https://mewx.org>]]></string>
+    <string name="about_mewx" translatable="false"><![CDATA[MewX <https://mewx.org>]]></string>
     <string name="about_screen_design">界面设计</string>
-    <string name="about_zero"><![CDATA[ZERO <78283358@qq.com>]]></string>
+    <string name="about_zero" translatable="false"><![CDATA[ZERO <78283358@qq.com>]]></string>
     <string name="about_acknowledgement">致谢</string>
-    <string name="about_seraphroy"><![CDATA[SeraphRoy <https://www.gaeblogx.com>]]></string>
+    <string name="about_seraphroy" translatable="false"><![CDATA[Yanix <https://github.com/SeraphRoy>]]></string>
+    <string name="about_aaassseee" translatable="false"><![CDATA[Jack Liu <https://github.com/aaassseee>]]></string>
     <string name="action_create_new_review">发布评论</string>
     <string name="action_create_new_review_reply">发表回复</string>
     <string name="system_post_locked">帖子太久远，无法回复</string>
