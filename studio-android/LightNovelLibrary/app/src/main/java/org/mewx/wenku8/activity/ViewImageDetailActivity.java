@@ -165,9 +165,7 @@ public class ViewImageDetailActivity extends BaseMaterialActivity {
         super.onActivityResult(requestCode, resultCode, data);
         // Saving images to local storage.
         if (requestCode == 0 && resultCode == Activity.RESULT_OK) {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                runSaveProcedure(data.getData().toString());
-            } else if (data.getBooleanExtra(FilePickerActivity.EXTRA_ALLOW_MULTIPLE, false)) {
+            if (data.getBooleanExtra(FilePickerActivity.EXTRA_ALLOW_MULTIPLE, false)) {
                 // For JellyBean and above
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
                     ClipData clip = data.getClipData();
