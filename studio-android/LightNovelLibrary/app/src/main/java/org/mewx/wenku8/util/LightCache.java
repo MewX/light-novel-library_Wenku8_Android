@@ -16,7 +16,8 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.net.URISyntaxException;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Light Cache
@@ -35,9 +36,13 @@ public class LightCache {
      * otherwise false, and if the file exists but it's empty, it will get removed
      */
     public static boolean testFileExist(String path) {
+        return testFileExist(path, false);
+    }
+
+    public static boolean testFileExist(String path, boolean allowEmptyFile) {
         File file = new File(path);
         if (file.exists()) {
-            if (file.length() == 0)
+            if (!allowEmptyFile && file.length() == 0)
                 deleteFile(path); // delete empty file and return false
             else
                 return true;
