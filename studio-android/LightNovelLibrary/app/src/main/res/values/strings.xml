@@ -112,6 +112,7 @@
     <string name="task_stop">停止加载</string>
     <string name="task_retry">点击重新加载</string>
     <string name="task_null">没有结果</string>
+    <string name="dialog_content_ask_for_storage_permission">由于历史原因，app需要写入存储目录下的wenku8文件夹，是否授予写入权限？</string>
     <string name="dialog_title_choose_download_option">选择执行的下载操作：</string>
     <string name="dialog_title_choose_delete_option">选择执行的删除操作：</string>
     <string name="dialog_title_save_file_name">输入保存的文件名（不要加.jpg）</string>
@@ -240,5 +241,5 @@
     <string name="system_post_locked">帖子太久远，无法回复</string>
     <string name="relay_warning">您正在使用MewX提供的第三方中继服务，点击查看详情。</string>
     <string name="relay_warning_full">已启用第三方Wenku8中继服务，由于以下的可能原因：\n登录过期，请重新登录；\n手机网络异常，试试浏览器访问；\n运营商劫持（部分地区的10086）；\nWIFI切换到数据需等待域名解析缓存刷新（约10min）；\n服务器暂时无法响应请求；\n此时段请求服务器次数过多。\n\n该中继服务列表服务由mewx.org提供，与wenku8无关。另外，此列表数据仅供海外用户使用，并可能滞后网站24小时以上。请勿在中国大陆使用，否则后果自负，望悉知。</string>
-    <string name="about_qqq">QQ交流群: 427577610</string>
+    <string name="about_qqq">QQ交流群: 181789084</string>
 </resources>
