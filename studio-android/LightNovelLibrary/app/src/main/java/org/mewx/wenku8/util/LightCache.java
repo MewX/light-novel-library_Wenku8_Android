@@ -10,12 +10,16 @@ import android.provider.DocumentsContract;
 import android.provider.MediaStore;
 import android.util.Log;
 
+import androidx.documentfile.provider.DocumentFile;
+
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -61,22 +65,31 @@ public class LightCache {
         File file = new File(path);
         if (file.exists() && file.isFile()) {
             // load existing file
-            int fileSize = (int) file.length(); // get file size
             try {
-                FileInputStream in = new FileInputStream(file);
-                DataInputStream dis = new DataInputStream(in);
-
-                // read all
-                byte[] bs = new byte[fileSize];
-                if (dis.read(bs, 0, fileSize) == -1)
-                    return null; // error
-
-                dis.close();
-                in.close();
-                return bs;
-            } catch (IOException e) {
+                return loadStream(new FileInputStream(file));
+            } catch (FileNotFoundException e) {
                 e.printStackTrace();
             }
+        }
+        return null;
+    }
+
+    public static byte[] loadStream(InputStream inputStream) {
+        try {
+            // Hopefully to get the file size.
+            int fileSize = inputStream.available();
+            DataInputStream dis = new DataInputStream(inputStream);
+
+            // read all
+            byte[] bs = new byte[fileSize];
+            if (dis.read(bs, 0, fileSize) == -1)
+                return null;
+
+            dis.close();
+            inputStream.close();
+            return bs;
+        } catch (IOException e) {
+            e.printStackTrace();
         }
         return null;
     }
@@ -242,8 +255,8 @@ public class LightCache {
      * @param fullDirectoryPath the directory to look up
      * @return the list of absolute paths for all files inside
      */
-    public static List<String> listAllFilesInDirectory(File fullDirectoryPath) {
-        ArrayList<String> paths = new ArrayList<>();
+    public static List<Uri> listAllFilesInDirectory(File fullDirectoryPath) {
+        ArrayList<Uri> paths = new ArrayList<>();
 
         File[] list = fullDirectoryPath.listFiles();
         if (list == null) {
@@ -254,7 +267,21 @@ public class LightCache {
             if (f.isDirectory()) {
                 paths.addAll(listAllFilesInDirectory(f));
             } else {
-                paths.add(f.getAbsolutePath());
+                paths.add(Uri.fromFile(f));
+            }
+        }
+        return paths;
+    }
+
+    public static List<Uri> listAllFilesInDirectory(DocumentFile fullDirectoryPath) {
+        ArrayList<Uri> paths = new ArrayList<>();
+
+
+        for (DocumentFile file : fullDirectoryPath.listFiles()) {
+            if (file.isDirectory()) {
+                paths.addAll(listAllFilesInDirectory(file));
+            } else if (file.isFile()) {
+                paths.add(file.getUri());
             }
         }
         return paths;

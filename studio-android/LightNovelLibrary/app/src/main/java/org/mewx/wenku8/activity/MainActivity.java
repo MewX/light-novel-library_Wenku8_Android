@@ -1,9 +1,11 @@
 package org.mewx.wenku8.activity;
 
 import android.Manifest;
+import android.app.Activity;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.content.res.Configuration;
+import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.util.Log;
@@ -11,6 +13,7 @@ import android.view.Menu;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
@@ -34,6 +37,7 @@ import org.mewx.wenku8.util.LightUserSession;
 import org.mewx.wenku8.util.SaveFileMigration;
 
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.util.List;
 import java.util.Locale;
 import java.util.Timer;
@@ -48,6 +52,7 @@ public class MainActivity extends BaseMaterialActivity {
     private static final int REQUEST_WRITE_EXTERNAL = 100;
     private static final int REQUEST_READ_EXTERNAL = 101;
     private static final int REQUEST_READ_MEDIA_IMAGES = 102;
+    private static final int REQUEST_READ_EXTERNAL_SAVES = 103;
 
     private static final AtomicBoolean NEW_VERSION_CHECKED = new AtomicBoolean(false);
 
@@ -136,23 +141,36 @@ public class MainActivity extends BaseMaterialActivity {
      * For API 29+, migrate saves from external storage to internal storage.
      */
     private void startOldSaveMigration() {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q
-                || SaveFileMigration.migrationCompleted()
-                || missingPermission(Manifest.permission.READ_EXTERNAL_STORAGE)) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q || SaveFileMigration.migrationCompleted()
+                || (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU
+                && missingPermission(Manifest.permission.READ_EXTERNAL_STORAGE))) {
             return;
         }
 
-        // TODO: need fix permission issue for Android API 33.
+        // The permission issue for Android API 33+.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && SaveFileMigration.migrationEligible()) {
+            Log.d(TAG, "startOldSaveMigration: Eligible");
 
+            // TODO: add dialogs
+            Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
+            intent.addCategory(Intent.CATEGORY_DEFAULT);
+            startActivityForResult(Intent.createChooser(intent, "Choose directory"), REQUEST_READ_EXTERNAL_SAVES);
+
+            // Return early to wait for the permissions grant on the directory.
+            return;
+        }
+
+        runExternalSaveMigration();
+    }
+
+    private void runExternalSaveMigration() {
         // Directly start migration dialog.
-        List<String> filesToCopy = SaveFileMigration.generateMigrationPlan();
+        List<Uri> filesToCopy = SaveFileMigration.generateMigrationPlan();
         if (filesToCopy.isEmpty()) {
+            Log.d(TAG, "Empty list of files to copy");
             SaveFileMigration.markMigrationCompleted();
             return;
         }
-
-        // TODO: clean up.
-        filesToCopy.forEach(path -> Log.d(TAG, "startOldSaveMigration: " + path));
 
         MaterialDialog progressDialog = new MaterialDialog.Builder(MainActivity.this)
                 .theme(Theme.LIGHT)
@@ -161,13 +179,19 @@ public class MainActivity extends BaseMaterialActivity {
                 .cancelable(false)
                 .show();
 
+        // TODO: make it async and non-UI thread blocking.
         int progress = 0;
         int failedFiles = 0;
-        for (String filePath : filesToCopy) {
-            String targetFilePath = SaveFileMigration.migrateFile(filePath);
-            if (!LightCache.testFileExist(targetFilePath, true)) {
-                Log.d(TAG, String.format("Failed migrating: %s (from %s)", targetFilePath, filePath));
+        for (Uri filePath : filesToCopy) {
+            try {
+                String targetFilePath = SaveFileMigration.migrateFile(filePath);
+                if (!LightCache.testFileExist(targetFilePath, true)) {
+                    Log.d(TAG, String.format("Failed migrating: %s (from %s)", targetFilePath, filePath));
+                    failedFiles++;
+                }
+            } catch (FileNotFoundException e) {
                 failedFiles++;
+                e.printStackTrace();
             }
             progress++;
             progressDialog.setProgress(progress);
@@ -321,6 +345,32 @@ public class MainActivity extends BaseMaterialActivity {
                 } else {
                     Toast.makeText(this, getResources().getText(R.string.missing_permission), Toast.LENGTH_LONG).show();
                 }
+        }
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == REQUEST_READ_EXTERNAL_SAVES && resultCode == Activity.RESULT_OK && data != null) {
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.KITKAT) {
+                return;
+            }
+
+            Uri wenku8Uri = data.getData();
+            String wenku8Path = wenku8Uri.getPath();
+            if (!wenku8Uri.getLastPathSegment().endsWith("wenku8") || wenku8Path.contains("DCIM") || wenku8Path.contains("Picture")) {
+                Log.i(TAG, "LastPathSegment: " + wenku8Uri.getLastPathSegment());
+                Log.i(TAG, "Selected path for save migration doesn't look right: " + wenku8Uri);
+                Toast.makeText(this, getResources().getText(R.string.missing_permission), Toast.LENGTH_LONG).show();
+                return;
+            }
+
+            getContentResolver().takePersistableUriPermission(wenku8Uri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
+
+            Log.i(TAG, "Selected the right directory: " + wenku8Path);
+            // Overriding the external path is needed to help generating new paths.
+            SaveFileMigration.overrideExternalPath(wenku8Uri);
+            runExternalSaveMigration();
         }
     }
 
