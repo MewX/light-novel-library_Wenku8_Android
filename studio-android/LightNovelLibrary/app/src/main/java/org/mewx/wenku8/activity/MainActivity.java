@@ -1,15 +1,11 @@
 package org.mewx.wenku8.activity;
 
-import static android.provider.Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION;
-
 import android.Manifest;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.content.res.Configuration;
-import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
-import android.os.Environment;
 import android.util.Log;
 import android.view.Menu;
 import android.widget.Toast;
@@ -20,13 +16,10 @@ import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
 import androidx.fragment.app.FragmentTransaction;
 
-import com.afollestad.materialdialogs.MaterialDialog;
-import com.afollestad.materialdialogs.Theme;
 import com.nostra13.universalimageloader.core.ImageLoader;
 import com.umeng.analytics.MobclickAgent;
 import com.umeng.commonsdk.UMConfigure;
 
-import org.mewx.wenku8.BuildConfig;
 import org.mewx.wenku8.MyApp;
 import org.mewx.wenku8.R;
 import org.mewx.wenku8.async.CheckAppNewVersion;
@@ -36,6 +29,7 @@ import org.mewx.wenku8.global.GlobalConfig;
 import org.mewx.wenku8.global.api.Wenku8API;
 import org.mewx.wenku8.util.LightCache;
 import org.mewx.wenku8.util.LightUserSession;
+import org.mewx.wenku8.util.SaveFileMigration;
 
 import java.io.File;
 import java.util.Locale;
@@ -45,10 +39,12 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 
 public class MainActivity extends BaseMaterialActivity {
+    private static final String TAG = MainActivity.class.getSimpleName();
+
     // Below request codes can be any value.
     private static final int REQUEST_WRITE_EXTERNAL = 100;
     private static final int REQUEST_READ_EXTERNAL = 101;
-    private static final int APP_STORAGE_ACCESS_REQUEST_CODE = 501;
+    private static final int REQUEST_READ_MEDIA_IMAGES = 102;
 
     private static final AtomicBoolean NEW_VERSION_CHECKED = new AtomicBoolean(false);
 
@@ -87,29 +83,25 @@ public class MainActivity extends BaseMaterialActivity {
         Locale.setDefault(locale);
         getBaseContext().getResources().updateConfiguration(config, getBaseContext().getResources().getDisplayMetrics());
 
-        // Requests storage RW permissions (112 write permission).
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && !Environment.isExternalStorageManager()) {
-            // Shows a dialog to confirm requesting for the permission.
-            new MaterialDialog.Builder(MainActivity.this)
-                    .theme(Theme.LIGHT)
-                    .onPositive((ignored1, ignored2) -> {
-                        Intent intent = new Intent(ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION, Uri.parse("package:" + BuildConfig.APPLICATION_ID));
-                        startActivityForResult(intent, APP_STORAGE_ACCESS_REQUEST_CODE);
-                    })
-                    .onNegative((ignored1, ignored2) -> {
-                        Toast.makeText(this, getResources().getText(R.string.missing_permission), Toast.LENGTH_LONG).show();
-                    })
-                    .content(R.string.dialog_content_ask_for_storage_permission)
-                    .positiveText(R.string.dialog_positive_ok)
-                    .negativeText(R.string.dialog_negative_preferno)
-                    .show();
+        // Requests storage RW permissions only when save file migration is not done.
+        if (SaveFileMigration.migrationCompleted()) {
+            Log.i(TAG, "Save file migration has completed.");
         } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
             // Write permission.
             if (missingPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE)) {
                 ActivityCompat.requestPermissions(this,
                         new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE}, REQUEST_WRITE_EXTERNAL);
             }
-            // Read permission.
+        }
+
+        // Read permissions.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            // FIXME: this doesn't work yet.
+            if (missingPermission(Manifest.permission.READ_MEDIA_IMAGES)) {
+                ActivityCompat.requestPermissions(this,
+                        new String[]{Manifest.permission.READ_MEDIA_IMAGES}, REQUEST_READ_MEDIA_IMAGES);
+            }
+        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
             if (missingPermission(Manifest.permission.READ_EXTERNAL_STORAGE)) {
                 ActivityCompat.requestPermissions(this,
                         new String[]{Manifest.permission.READ_EXTERNAL_STORAGE}, REQUEST_READ_EXTERNAL);
@@ -255,33 +247,21 @@ public class MainActivity extends BaseMaterialActivity {
     }
 
     @Override
-    public void onActivityResult(int requestCode, int resultCode, Intent data) {
-        super.onActivityResult(requestCode, resultCode, data);
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && requestCode == APP_STORAGE_ACCESS_REQUEST_CODE) {
-            // Note that the result Code could either be OK or CANCELLED.
-            if (Environment.isExternalStorageManager()) {
-                // Permission granted.
-                reloadApp();
-            } else {
-                Toast.makeText(this, getResources().getText(R.string.missing_permission), Toast.LENGTH_LONG).show();
-            }
-        }
-    }
-
-    @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
         switch (requestCode) {
             case REQUEST_WRITE_EXTERNAL:
             case REQUEST_READ_EXTERNAL:
-                if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
-                    if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                        reloadApp();
-                    } else {
-                        Toast.makeText(this, getResources().getText(R.string.missing_permission), Toast.LENGTH_LONG).show();
-                    }
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    // The result will fall through.
+                    break;
                 }
-                break;
+            case REQUEST_READ_MEDIA_IMAGES:
+                if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                    reloadApp();
+                } else {
+                    Toast.makeText(this, getResources().getText(R.string.missing_permission), Toast.LENGTH_LONG).show();
+                }
         }
     }
 
