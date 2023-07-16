@@ -2,11 +2,14 @@ package org.mewx.wenku8.activity;
 
 import android.app.Activity;
 import android.content.ClipData;
+import android.content.ContentResolver;
+import android.content.ContentValues;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
+import android.provider.MediaStore;
 import android.text.InputType;
 import android.view.MenuItem;
 import android.view.View;
@@ -27,6 +30,8 @@ import org.mewx.wenku8.global.GlobalConfig;
 import org.mewx.wenku8.util.LightCache;
 
 import java.io.File;
+import java.io.IOException;
+import java.io.OutputStream;
 import java.util.ArrayList;
 
 /**
@@ -36,6 +41,7 @@ import java.util.ArrayList;
 public class ViewImageDetailActivity extends BaseMaterialActivity {
 
     private String path;
+    private String fileName;
     private SubsamplingScaleImageView imageView;
 
     @Override
@@ -45,8 +51,9 @@ public class ViewImageDetailActivity extends BaseMaterialActivity {
 
         // fetch value
         path = getIntent().getStringExtra("path");
-        if(getSupportActionBar() != null) {
-            getSupportActionBar().setTitle(path.split("/")[path.split("/").length-1]);
+        fileName = path.contains("/") ? path.split("/")[path.split("/").length - 1] : "default.jpg";
+        if (getSupportActionBar() != null) {
+            getSupportActionBar().setTitle(fileName);
         }
 
         // set image
@@ -103,15 +110,20 @@ public class ViewImageDetailActivity extends BaseMaterialActivity {
             return true;
         });
         findViewById(R.id.btn_download).setOnClickListener(v -> {
-            // TODO: use system directory picker. (for API >= 21)
-            Intent i = new Intent(ViewImageDetailActivity.this, FilePickerActivity.class);
-            i.putExtra(FilePickerActivity.EXTRA_ALLOW_MULTIPLE, false);
-            i.putExtra(FilePickerActivity.EXTRA_ALLOW_CREATE_DIR, true);
-            i.putExtra(FilePickerActivity.EXTRA_MODE, FilePickerActivity.MODE_DIR);
-            i.putExtra(FilePickerActivity.EXTRA_START_PATH,
-                    GlobalConfig.pathPickedSave == null || GlobalConfig.pathPickedSave.length() == 0 ?
-                            Environment.getExternalStorageDirectory().getPath() : GlobalConfig.pathPickedSave);
-            startActivityForResult(i, 0);
+            // For API >= 29, does not show a directory picker; instead, save to DCIM/wenku8 directly.
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                insertImageToDcimFolder();
+                Toast.makeText(ViewImageDetailActivity.this, "已保存： DCIM/wenku8/" + fileName, Toast.LENGTH_SHORT).show();
+            } else {
+                Intent i = new Intent(ViewImageDetailActivity.this, FilePickerActivity.class);
+                i.putExtra(FilePickerActivity.EXTRA_ALLOW_MULTIPLE, false);
+                i.putExtra(FilePickerActivity.EXTRA_ALLOW_CREATE_DIR, true);
+                i.putExtra(FilePickerActivity.EXTRA_MODE, FilePickerActivity.MODE_DIR);
+                i.putExtra(FilePickerActivity.EXTRA_START_PATH,
+                        GlobalConfig.pathPickedSave == null || GlobalConfig.pathPickedSave.length() == 0 ?
+                                Environment.getExternalStorageDirectory().getPath() : GlobalConfig.pathPickedSave);
+                startActivityForResult(i, 0);
+            }
         });
         findViewById(R.id.btn_download).setOnLongClickListener(v -> {
             Toast.makeText(ViewImageDetailActivity.this, getResources().getString(R.string.reader_download), Toast.LENGTH_SHORT).show();
@@ -119,11 +131,43 @@ public class ViewImageDetailActivity extends BaseMaterialActivity {
         });
     }
 
+    /**
+     * Saves the image in this context to the DCIM/wenku8 folder.
+     * <p>
+     * Note that this is only tested on API 29 - 33.
+     */
+    private void insertImageToDcimFolder() {
+        ContentValues contentValues = new ContentValues();
+        contentValues.put(MediaStore.Images.Media.DISPLAY_NAME, fileName);
+        contentValues.put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg");
+        contentValues.put(MediaStore.Images.Media.RELATIVE_PATH, Environment.DIRECTORY_DCIM + "/wenku8");
+        // Adds the date meta data to ensure the image is added at the front of the gallery.
+        contentValues.put(MediaStore.Images.Media.DATE_ADDED, System.currentTimeMillis());
+        contentValues.put(MediaStore.Images.Media.DATE_TAKEN, System.currentTimeMillis());
+
+        ContentResolver resolver = getContentResolver();
+        Uri imageUri = resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, contentValues);
+
+        // Open an OutputStream to write data to the imageUri
+        try {
+            OutputStream outputStream = resolver.openOutputStream(imageUri);
+            outputStream.write(LightCache.loadFile(path));
+            outputStream.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+            // TODO: handle the exception better.
+            Toast.makeText(this, "Failed: " + e, Toast.LENGTH_SHORT).show();
+        }
+    }
+
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
+        // Saving images to local storage.
         if (requestCode == 0 && resultCode == Activity.RESULT_OK) {
-            if (data.getBooleanExtra(FilePickerActivity.EXTRA_ALLOW_MULTIPLE, false)) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                runSaveProcedure(data.getData().toString());
+            } else if (data.getBooleanExtra(FilePickerActivity.EXTRA_ALLOW_MULTIPLE, false)) {
                 // For JellyBean and above
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
                     ClipData clip = data.getClipData();
@@ -168,19 +212,13 @@ public class ViewImageDetailActivity extends BaseMaterialActivity {
                         if(LightCache.testFileExist(newuri + File.separator + input + ".jpg")) {
                             // judge force write
                             new MaterialDialog.Builder(ViewImageDetailActivity.this)
-                                    .callback(new MaterialDialog.ButtonCallback() {
-                                        @Override
-                                        public void onPositive(MaterialDialog dialog) {
-                                            // copy file from 'path' to 'uri + File.separator + input + ".jpg"'
-                                            LightCache.copyFile(path, newuri + File.separator + input + ".jpg", true);
-                                            Toast.makeText(ViewImageDetailActivity.this, "已保存：" + newuri + File.separator + input + ".jpg", Toast.LENGTH_SHORT).show();
-                                        }
-
-                                        @Override
-                                        public void onNegative(MaterialDialog dialog) {
-                                            super.onNegative(dialog);
-                                            Toast.makeText(ViewImageDetailActivity.this, "目标文件名已存在，未保存。", Toast.LENGTH_SHORT).show();
-                                        }
+                                    .onPositive((unused1, unused2) -> {
+                                        // copy file from 'path' to 'uri + File.separator + input + ".jpg"'
+                                        LightCache.copyFile(path, newuri + File.separator + input + ".jpg", true);
+                                        Toast.makeText(ViewImageDetailActivity.this, "已保存：" + newuri + File.separator + input + ".jpg", Toast.LENGTH_SHORT).show();
+                                    })
+                                    .onNegative((unused1, unused2) -> {
+                                        Toast.makeText(ViewImageDetailActivity.this, "目标文件名已存在，未保存。", Toast.LENGTH_SHORT).show();
                                     })
                                     .theme(Theme.LIGHT)
                                     .titleColorRes(R.color.dlgTitleColor)
