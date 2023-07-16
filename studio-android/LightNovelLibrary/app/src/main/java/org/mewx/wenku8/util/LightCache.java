@@ -236,4 +236,27 @@ public class LightCache {
     public static boolean isGooglePhotosUri(Uri uri) {
         return "com.google.android.apps.photos.content".equals(uri.getAuthority());
     }
+
+    /**
+     * Lists all files in the given directory recursively.
+     * @param fullDirectoryPath the directory to look up
+     * @return the list of absolute paths for all files inside
+     */
+    public static List<String> listAllFilesInDirectory(File fullDirectoryPath) {
+        ArrayList<String> paths = new ArrayList<>();
+
+        File[] list = fullDirectoryPath.listFiles();
+        if (list == null) {
+            return paths;
+        }
+
+        for (File f : list) {
+            if (f.isDirectory()) {
+                paths.addAll(listAllFilesInDirectory(f));
+            } else {
+                paths.add(f.getAbsolutePath());
+            }
+        }
+        return paths;
+    }
 }

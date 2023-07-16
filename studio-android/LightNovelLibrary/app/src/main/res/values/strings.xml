@@ -240,4 +240,6 @@
     <string name="relay_warning">您正在使用MewX提供的第三方中继服务，点击查看详情。</string>
     <string name="relay_warning_full">已启用第三方Wenku8中继服务，由于以下的可能原因：\n登录过期，请重新登录；\n手机网络异常，试试浏览器访问；\n运营商劫持（部分地区的10086）；\nWIFI切换到数据需等待域名解析缓存刷新（约10min）；\n服务器暂时无法响应请求；\n此时段请求服务器次数过多。\n\n该中继服务列表服务由mewx.org提供，与wenku8无关。另外，此列表数据仅供海外用户使用，并可能滞后网站24小时以上。请勿在中国大陆使用，否则后果自负，望悉知。</string>
     <string name="about_qqq">QQ交流群: 181789084</string>
+    <string name="system_save_upgrading">存档升级中……</string>
+    <string name="system_save_migrated">存档升级完成，已升级%d个文件（其中%d个文件失败）。从现在开始，手机内部/外部存储中的wenku8文件夹将不再被更新。如果需要重新升级存档，清空app的存储和缓存。即将重新加载app~</string>
 </resources>

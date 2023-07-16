@@ -16,6 +16,8 @@ import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
 import androidx.fragment.app.FragmentTransaction;
 
+import com.afollestad.materialdialogs.MaterialDialog;
+import com.afollestad.materialdialogs.Theme;
 import com.nostra13.universalimageloader.core.ImageLoader;
 import com.umeng.analytics.MobclickAgent;
 import com.umeng.commonsdk.UMConfigure;
@@ -32,6 +34,7 @@ import org.mewx.wenku8.util.LightUserSession;
 import org.mewx.wenku8.util.SaveFileMigration;
 
 import java.io.File;
+import java.util.List;
 import java.util.Locale;
 import java.util.Timer;
 import java.util.TimerTask;
@@ -116,15 +119,71 @@ public class MainActivity extends BaseMaterialActivity {
         // check new version and load notice text
         Wenku8API.NoticeString = GlobalConfig.loadSavedNotice();
 
-        // create save folder
+        // create save folder.
+        // TODO: can stop creating those files and folders.
         LightCache.saveFile(GlobalConfig.getFirstStoragePath() + "imgs", ".nomedia", "".getBytes(), false);
         LightCache.saveFile(GlobalConfig.getSecondStoragePath() + "imgs", ".nomedia", "".getBytes(), false);
         LightCache.saveFile(GlobalConfig.getFirstStoragePath() + GlobalConfig.customFolderName, ".nomedia", "".getBytes(), false);
         LightCache.saveFile(GlobalConfig.getSecondStoragePath() + GlobalConfig.customFolderName, ".nomedia", "".getBytes(), false);
-        GlobalConfig.setFirstStoragePathStatus(LightCache.testFileExist(GlobalConfig.getFirstStoragePath() + "imgs" + File.separator + ".nomedia"));
+
+        GlobalConfig.setFirstStoragePathStatus(LightCache.testFileExist(GlobalConfig.getFirstStoragePath() + "imgs" + File.separator + ".nomedia", true));
         // TODO: set status? tell app where is available
         LightCache.saveFile(GlobalConfig.getFirstFullSaveFilePath() + "imgs", ".nomedia", "".getBytes(), false);
         LightCache.saveFile(GlobalConfig.getSecondFullSaveFilePath() + "imgs", ".nomedia", "".getBytes(), false);
+    }
+
+    /**
+     * For API 29+, migrate saves from external storage to internal storage.
+     */
+    private void startOldSaveMigration() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q
+                || SaveFileMigration.migrationCompleted()
+                || missingPermission(Manifest.permission.READ_EXTERNAL_STORAGE)) {
+            return;
+        }
+
+        // TODO: need fix permission issue for Android API 33.
+
+        // Directly start migration dialog.
+        List<String> filesToCopy = SaveFileMigration.generateMigrationPlan();
+        if (filesToCopy.isEmpty()) {
+            SaveFileMigration.markMigrationCompleted();
+            return;
+        }
+
+        // TODO: clean up.
+        filesToCopy.forEach(path -> Log.d(TAG, "startOldSaveMigration: " + path));
+
+        MaterialDialog progressDialog = new MaterialDialog.Builder(MainActivity.this)
+                .theme(Theme.LIGHT)
+                .content(R.string.system_save_upgrading)
+                .progress(false, filesToCopy.size(), true)
+                .cancelable(false)
+                .show();
+
+        int progress = 0;
+        int failedFiles = 0;
+        for (String filePath : filesToCopy) {
+            String targetFilePath = SaveFileMigration.migrateFile(filePath);
+            if (!LightCache.testFileExist(targetFilePath, true)) {
+                Log.d(TAG, String.format("Failed migrating: %s (from %s)", targetFilePath, filePath));
+                failedFiles++;
+            }
+            progress++;
+            progressDialog.setProgress(progress);
+        }
+        SaveFileMigration.markMigrationCompleted();
+        progressDialog.dismiss();
+
+        new MaterialDialog.Builder(MainActivity.this)
+                .theme(Theme.LIGHT)
+                .backgroundColorRes(R.color.dlgBackgroundColor)
+                .contentColorRes(R.color.dlgContentColor)
+                .positiveColorRes(R.color.dlgPositiveButtonColor)
+                .content(R.string.system_save_migrated, filesToCopy.size(), failedFiles)
+                .positiveText(R.string.dialog_positive_sure)
+                .onPositive((unused1, unused2) -> reloadApp())
+                .show();
     }
 
     @Override
@@ -141,8 +200,8 @@ public class MainActivity extends BaseMaterialActivity {
         // UMeng initialization
         UMConfigure.init(MyApp.getContext(), UMConfigure.DEVICE_TYPE_PHONE, null);
 
-        // Update old save files ----------------
-
+        // Updates old save files.
+        startOldSaveMigration();
 
         // set Tool button
         mNavigationDrawerFragment = (NavigationDrawerFragment) getSupportFragmentManager().findFragmentById(R.id.fragment_drawer);

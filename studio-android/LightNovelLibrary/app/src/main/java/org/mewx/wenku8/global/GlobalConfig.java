@@ -22,6 +22,7 @@ import org.mewx.wenku8.global.api.Wenku8API;
 import org.mewx.wenku8.util.LightCache;
 import org.mewx.wenku8.util.LightNetwork;
 import org.mewx.wenku8.util.LightTool;
+import org.mewx.wenku8.util.SaveFileMigration;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -63,6 +64,7 @@ public class GlobalConfig {
     public static final String UNKNOWN = "Unknown";
 
     // vars
+    private static boolean lookupInternalStorageOnly = false;
     private static boolean isInBookshelf = false;
     private static boolean isInLatest = false;
     private static boolean doLoadImage = true;
@@ -177,16 +179,18 @@ public class GlobalConfig {
 
     }
 
+    // TODO: get rid of this shortcut.
     public static String getFirstStoragePath() {
-        return Environment.getExternalStorageDirectory() + File.separator
-                + "wenku8" + File.separator;
+        return SaveFileMigration.getExternalStoragePath();
     }
 
+    // TODO: get rid of this shortcut.
     public static String getSecondStoragePath() {
-        return MyApp.getContext().getFilesDir() + File.separator;
+        return SaveFileMigration.getInternalSavePath();
     }
 
     public static String getDefaultStoragePath() {
+        // TODO: fix with the migration status.
         return FirstStoragePathStatus ? getFirstStoragePath() : getSecondStoragePath();
     }
 
@@ -720,6 +724,10 @@ public class GlobalConfig {
 
     /** All settings */
     public static void loadAllSetting() {
+        // Verify which storage source to user.
+        lookupInternalStorageOnly = SaveFileMigration.migrationCompleted();
+
+        // Loads all settings.
         allSetting = new ContentValues();
         String h = loadFullSaveFileContent(saveSetting);
 
@@ -731,8 +739,12 @@ public class GlobalConfig {
             allSetting.put(temp[0], temp[1]);
         }
 
-        if(getFromAllSetting(SettingItems.version) == null || getFromAllSetting(SettingItems.version).equals(""))
+        // Updates settings version.
+        String version = getFromAllSetting(SettingItems.version);
+        if(version == null || version.isEmpty()) {
             setToAllSetting(SettingItems.version, "1");
+        }
+        // Else, reserved for future settings migration.
     }
 
     public static void saveAllSetting() {

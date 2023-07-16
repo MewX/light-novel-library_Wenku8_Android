@@ -231,4 +231,6 @@
     <string name="relay_warning_full">已啟用第三方Wenku8中繼服務，由於以下的可能原因：\n登錄過期，請重新登錄；\n手機網絡異常，試試瀏覽器訪問；\n運營商劫持（部分地區的10086）；\nWIFI切換到數據需等待域名解析緩存刷新（約10min）；\n服務器暫時無法響應請求；\n此時段請求服務器次數過多。\n\n該中繼服務列表服務由mewx.org提供，與wenku8無關。另外，此列表數據僅供海外用戶使用，並可能滯後網站24小時以上。請勿在中國大陸使用，否則後果自負，望悉知。</string>
     <string name="about_qqq">QQ交流群: 181789084</string>
     <string name="dialog_content_ask_for_storage_permission">由於曆史原因，app需要冩入存儲目錄下的wenku8文件夾，是否授予冩入權限？</string>
+    <string name="system_save_upgrading">存檔昇級中……</string>
+    <string name="system_save_migrated">存檔昇級完成，已昇級%d個文件（其中%d個文件失敗）。從現在開始，手機內部/外部存儲中的wenku8文件夾將不再被更新。如果需要重新昇級存檔，清空app的存儲和緩存。即將重新加載app~</string>
 </resources>
