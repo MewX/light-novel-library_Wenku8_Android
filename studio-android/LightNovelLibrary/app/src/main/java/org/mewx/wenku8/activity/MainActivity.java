@@ -8,6 +8,8 @@ import android.content.res.Configuration;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.util.Log;
 import android.view.Menu;
 import android.widget.Toast;
@@ -42,6 +44,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Timer;
 import java.util.TimerTask;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 
@@ -179,35 +183,44 @@ public class MainActivity extends BaseMaterialActivity {
                 .cancelable(false)
                 .show();
 
-        // TODO: make it async and non-UI thread blocking.
-        int progress = 0;
-        int failedFiles = 0;
-        for (Uri filePath : filesToCopy) {
-            try {
-                String targetFilePath = SaveFileMigration.migrateFile(filePath);
-                if (!LightCache.testFileExist(targetFilePath, true)) {
-                    Log.d(TAG, String.format("Failed migrating: %s (from %s)", targetFilePath, filePath));
+        ExecutorService executor = Executors.newSingleThreadExecutor();
+        Handler handler = new Handler(Looper.getMainLooper()); // Handles the UI works.
+        executor.execute(() -> {
+            int progress = 0;
+            int failedFiles = 0;
+            for (Uri filePath : filesToCopy) {
+                try {
+                    String targetFilePath = SaveFileMigration.migrateFile(filePath);
+                    if (!LightCache.testFileExist(targetFilePath, true)) {
+                        Log.d(TAG, String.format("Failed migrating: %s (from %s)", targetFilePath, filePath));
+                        failedFiles++;
+                    }
+                } catch (FileNotFoundException e) {
                     failedFiles++;
+                    e.printStackTrace();
                 }
-            } catch (FileNotFoundException e) {
-                failedFiles++;
-                e.printStackTrace();
-            }
-            progress++;
-            progressDialog.setProgress(progress);
-        }
-        SaveFileMigration.markMigrationCompleted();
-        progressDialog.dismiss();
+                progress++;
 
-        new MaterialDialog.Builder(MainActivity.this)
-                .theme(Theme.LIGHT)
-                .backgroundColorRes(R.color.dlgBackgroundColor)
-                .contentColorRes(R.color.dlgContentColor)
-                .positiveColorRes(R.color.dlgPositiveButtonColor)
-                .content(R.string.system_save_migrated, filesToCopy.size(), failedFiles)
-                .positiveText(R.string.dialog_positive_sure)
-                .onPositive((unused1, unused2) -> reloadApp())
-                .show();
+                int finalProgress = progress;
+                handler.post(() -> progressDialog.setProgress(finalProgress));
+            }
+
+            int finalFailedFiles = failedFiles;
+            handler.post(() -> {
+                SaveFileMigration.markMigrationCompleted();
+                progressDialog.dismiss();
+
+                new MaterialDialog.Builder(MainActivity.this)
+                        .theme(Theme.LIGHT)
+                        .backgroundColorRes(R.color.dlgBackgroundColor)
+                        .contentColorRes(R.color.dlgContentColor)
+                        .positiveColorRes(R.color.dlgPositiveButtonColor)
+                        .content(R.string.system_save_migrated, filesToCopy.size(), finalFailedFiles)
+                        .positiveText(R.string.dialog_positive_sure)
+                        .onPositive((unused1, unused2) -> reloadApp())
+                        .show();
+            });
+        });
     }
 
     @Override
