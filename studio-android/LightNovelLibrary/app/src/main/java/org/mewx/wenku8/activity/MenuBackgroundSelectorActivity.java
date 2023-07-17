@@ -11,7 +11,6 @@ import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
-import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.widget.Toast;
@@ -23,6 +22,8 @@ import org.mewx.wenku8.R;
 import org.mewx.wenku8.global.GlobalConfig;
 import org.mewx.wenku8.util.LightCache;
 
+import java.io.File;
+import java.io.FileNotFoundException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
@@ -150,18 +151,21 @@ public class MenuBackgroundSelectorActivity extends BaseMaterialActivity {
                 return; // shouldn't happen.
             }
 
-            Log.d("Mewx", "Received URI from system file picker: " + mediaUri.getPath());
-            String path = LightCache.getFilePath(getBaseContext(), mediaUri);
-            Log.d("Mewx", "Received URI decoded to: " + path);
-            if (path == null) {
-                return; // ignore.
+            String copiedFilePath = GlobalConfig.getDefaultStoragePath() + GlobalConfig.customFolderName + File.separator + "menu_bg";
+            try {
+                byte[] content = LightCache.loadStream(getApplicationContext().getContentResolver().openInputStream(mediaUri));
+                LightCache.saveFile(copiedFilePath, content, true);
+
+                runSaveCustomMenuBackground(copiedFilePath.replaceAll("file://", ""));
+            } catch (FileNotFoundException e) {
+                e.printStackTrace();
+                Toast.makeText(this, "Exception: " + e, Toast.LENGTH_SHORT).show();
+                // Failed to copy. Just ignore it.
             }
-            runSaveCustomMenuBackground(path.replaceAll("file://", ""));
         }
     }
 
     private void runSaveCustomMenuBackground(String path) {
-        // TODO: make a copy of the image.
         BitmapFactory.Options options;
         try {
             BitmapFactory.decodeFile(path);
@@ -174,25 +178,13 @@ public class MenuBackgroundSelectorActivity extends BaseMaterialActivity {
                 if(bitmap == null) throw new Exception("PictureDecodeFailedException");
             } catch(Exception e) {
                 e.printStackTrace();
-                Toast.makeText(this, "Exception: " + e.toString(), Toast.LENGTH_SHORT).show();
+                Toast.makeText(this, "Exception: " + e, Toast.LENGTH_SHORT).show();
                 return;
             }
         }
+
         GlobalConfig.setToAllSetting(GlobalConfig.SettingItems.menu_bg_id, "0");
         GlobalConfig.setToAllSetting(GlobalConfig.SettingItems.menu_bg_path, path);
         finish();
-
-
-        try {
-            BitmapFactory.Options opt = new BitmapFactory.Options();
-            opt.inPreferredConfig = Bitmap.Config.RGB_565;
-            opt.inPurgeable = true;
-            opt.inInputShareable = true;
-            Bitmap bm = BitmapFactory.decodeFile(path);
-            if(bm == null) throw new Exception("PictureDecodeFailedException: " + path);
-        }
-        catch (Exception e) {
-            Toast.makeText(this, "Exception: " + e.toString(), Toast.LENGTH_SHORT).show();
-        }
     }
 }
