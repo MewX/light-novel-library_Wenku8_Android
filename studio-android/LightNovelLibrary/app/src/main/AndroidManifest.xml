@@ -7,19 +7,13 @@
     <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
-    <uses-permission android:name="android.permission.READ_PHONE_STATE" />
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
-    <uses-permission android:name="android.permission.WRITE_SETTINGS"
-        tools:ignore="ProtectedPermissions" />
     <!-- The legacy READ/WRITE permissions are not used in API 30+ anymore (except for migrating old saves). -->
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
     <!-- This permission is used for reading images as reading backgrounds. -->
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
-    <uses-permission android:name="android.permission.WRITE_USER_DICTIONARY" />
-    <uses-permission android:name="android.permission.MOUNT_UNMOUNT_FILESYSTEMS"
-        tools:ignore="ProtectedPermissions" />
     <!-- For root device -->
     <!--<uses-permission android:name="android.permission.WRITE_MEDIA_STORAGE"/>-->
 
@@ -34,10 +28,6 @@
         android:requestLegacyExternalStorage="true"
         android:theme="@style/AppTheme"
         tools:replace="android:label">
-
-        <!-- UMeng Mob Statistics -->
-        <meta-data android:value="55220944fd98c5d81f000a71" android:name="UMENG_APPKEY"/>
-        <meta-data android:value="${UMENG_CHANNEL_NAME}" android:name="UMENG_CHANNEL"/>
 
         <!-- Activity list -->
         <activity

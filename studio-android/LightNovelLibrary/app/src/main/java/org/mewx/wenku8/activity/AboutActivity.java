@@ -4,8 +4,6 @@ import android.os.Bundle;
 import android.view.MenuItem;
 import android.widget.TextView;
 
-import com.umeng.analytics.MobclickAgent;
-
 import org.mewx.wenku8.BuildConfig;
 import org.mewx.wenku8.R;
 
@@ -23,19 +21,6 @@ public class AboutActivity extends BaseMaterialActivity {
         TextView tvVersion = findViewById(R.id.app_version);
         tvVersion.setText(String.format(getResources().getString(R.string.about_version_template), BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE));
     }
-
-    @Override
-    protected void onPause() {
-        super.onPause();
-        MobclickAgent.onPause(this);
-    }
-
-    @Override
-    protected void onResume() {
-        super.onResume();
-        MobclickAgent.onResume(this);
-    }
-
 
     @Override
     public boolean onOptionsItemSelected(MenuItem menuItem) {

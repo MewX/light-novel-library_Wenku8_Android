@@ -15,7 +15,6 @@ import com.afollestad.materialdialogs.GravityEnum;
 import com.afollestad.materialdialogs.MaterialDialog;
 import com.afollestad.materialdialogs.Theme;
 import com.makeramen.roundedimageview.RoundedImageView;
-import com.umeng.analytics.MobclickAgent;
 
 import org.mewx.wenku8.R;
 import org.mewx.wenku8.global.GlobalConfig;
@@ -269,17 +268,5 @@ public class UserInfoActivity extends BaseMaterialActivity {
                 Toast.makeText(this, "Please wait...", Toast.LENGTH_SHORT).show();
         }
         return super.onOptionsItemSelected(menuItem);
-    }
-
-    @Override
-    protected void onPause() {
-        super.onPause();
-        MobclickAgent.onPause(this);
-    }
-
-    @Override
-    protected void onResume() {
-        super.onResume();
-        MobclickAgent.onResume(this);
     }
 }

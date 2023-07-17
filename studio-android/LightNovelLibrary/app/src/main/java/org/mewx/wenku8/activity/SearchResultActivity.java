@@ -9,7 +9,6 @@ import android.widget.TextView;
 import androidx.fragment.app.FragmentTransaction;
 
 import com.nostra13.universalimageloader.core.ImageLoader;
-import com.umeng.analytics.MobclickAgent;
 
 import org.mewx.wenku8.R;
 import org.mewx.wenku8.fragment.NovelItemListFragment;
@@ -53,15 +52,8 @@ public class SearchResultActivity extends BaseMaterialActivity {
     }
 
     @Override
-    protected void onPause() {
-        super.onPause();
-        MobclickAgent.onPause(this);
-    }
-
-    @Override
     protected void onResume() {
         super.onResume();
-        MobclickAgent.onResume(this);
 
         // set back arrow icon
         final Drawable upArrow = getResources().getDrawable(R.drawable.ic_svg_back);

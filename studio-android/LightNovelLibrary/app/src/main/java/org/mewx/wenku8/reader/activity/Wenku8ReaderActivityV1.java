@@ -32,7 +32,6 @@ import com.afollestad.materialdialogs.MaterialDialog;
 import com.afollestad.materialdialogs.Theme;
 import com.nononsenseapps.filepicker.FilePickerActivity;
 import com.nostra13.universalimageloader.core.ImageLoader;
-import com.umeng.analytics.MobclickAgent;
 
 import org.adw.library.widgets.discreteseekbar.DiscreteSeekBar;
 import org.mewx.wenku8.R;
@@ -124,7 +123,6 @@ public class Wenku8ReaderActivityV1 extends BaseMaterialActivity {
     @Override
     protected void onResume() {
         super.onResume();
-        MobclickAgent.onResume(this);
 
         if(findViewById(R.id.reader_bot).getVisibility() != View.VISIBLE)
             hideNavigationBar();
@@ -210,7 +208,6 @@ public class Wenku8ReaderActivityV1 extends BaseMaterialActivity {
     @Override
     protected void onPause() {
         super.onPause();
-        MobclickAgent.onPause(this);
 
         // save record
         if(mSlidingPageAdapter != null && loader != null) {

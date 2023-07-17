@@ -24,7 +24,6 @@ import android.widget.Toast;
 import com.afollestad.materialdialogs.MaterialDialog;
 import com.afollestad.materialdialogs.Theme;
 import com.nostra13.universalimageloader.core.ImageLoader;
-import com.umeng.analytics.MobclickAgent;
 
 import org.mewx.wenku8.R;
 import org.mewx.wenku8.component.ScrollViewNoFling;
@@ -143,7 +142,6 @@ public class VerticalReaderActivity extends AppCompatActivity {
     @Override
     protected void onResume() {
         super.onResume();
-        MobclickAgent.onResume(this);
 
         // set navigation bar status, remember to disable "setNavigationBarTintEnabled"
         final int flags = View.SYSTEM_UI_FLAG_LAYOUT_STABLE
@@ -343,7 +341,6 @@ public class VerticalReaderActivity extends AppCompatActivity {
     @Override
     protected void onPause() {
         super.onPause();
-        MobclickAgent.onPause(this);
 
         saveRecord();
     }

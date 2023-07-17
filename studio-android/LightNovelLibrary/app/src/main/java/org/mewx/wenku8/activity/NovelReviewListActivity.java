@@ -16,7 +16,6 @@ import androidx.recyclerview.widget.RecyclerView;
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 
 import com.google.android.material.snackbar.Snackbar;
-import com.umeng.analytics.MobclickAgent;
 
 import org.mewx.wenku8.R;
 import org.mewx.wenku8.adapter.ReviewItemAdapter;
@@ -109,15 +108,8 @@ public class NovelReviewListActivity extends BaseMaterialActivity implements MyI
     }
 
     @Override
-    protected void onPause() {
-        super.onPause();
-        MobclickAgent.onPause(this);
-    }
-
-    @Override
     protected void onResume() {
         super.onResume();
-        MobclickAgent.onResume(this);
 
         // Load initial content or refresh the list when resumed.
         reloadAllReviews();

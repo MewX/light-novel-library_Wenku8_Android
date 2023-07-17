@@ -11,7 +11,6 @@ import android.widget.TextView;
 
 import com.afollestad.materialdialogs.MaterialDialog;
 import com.afollestad.materialdialogs.Theme;
-import com.umeng.analytics.MobclickAgent;
 
 import org.mewx.wenku8.R;
 import org.mewx.wenku8.global.GlobalConfig;
@@ -136,15 +135,8 @@ public class NovelChapterActivity extends BaseMaterialActivity {
     }
 
     @Override
-    protected void onPause() {
-        super.onPause();
-        MobclickAgent.onPause(this);
-    }
-
-    @Override
     protected void onResume() {
         super.onResume();
-        MobclickAgent.onResume(this);
 
         // refresh when back from reader activity
         buildChapterList();

@@ -88,8 +88,6 @@
 -keepnames class * implements java.io.Serializable
 -keepclassmembers class * implements java.io.Serializable { *; }
 
-# umeng self
--keep class com.umeng.** {*;}
 -keepclassmembers class * {
    public <init> (org.json.JSONObject);
 }

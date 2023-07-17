@@ -16,7 +16,6 @@ import android.view.MenuItem;
 import android.widget.Toast;
 
 import com.nononsenseapps.filepicker.FilePickerActivity;
-import com.umeng.analytics.MobclickAgent;
 
 import org.mewx.wenku8.R;
 import org.mewx.wenku8.global.GlobalConfig;
@@ -53,18 +52,6 @@ public class MenuBackgroundSelectorActivity extends BaseMaterialActivity {
                 MenuBackgroundSelectorActivity.this.finish();
             });
         }
-    }
-
-    @Override
-    protected void onPause() {
-        super.onPause();
-        MobclickAgent.onPause(this);
-    }
-
-    @Override
-    protected void onResume() {
-        super.onResume();
-        MobclickAgent.onResume(this);
     }
 
     @Override

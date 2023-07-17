@@ -24,7 +24,6 @@ import android.widget.Toast;
 import com.afollestad.materialdialogs.GravityEnum;
 import com.afollestad.materialdialogs.MaterialDialog;
 import com.afollestad.materialdialogs.Theme;
-import com.umeng.analytics.MobclickAgent;
 
 import org.mewx.wenku8.MyApp;
 import org.mewx.wenku8.R;
@@ -551,14 +550,12 @@ public class FavFragment extends Fragment implements MyItemClickListener, MyItem
     @Override
     public void onPause() {
         super.onPause();
-        MobclickAgent.onPageEnd("FavFragment");
         GlobalConfig.LeaveBookshelf();
     }
 
     @Override
     public void onResume() {
         super.onResume();
-        MobclickAgent.onPageStart("FavFragment");
         GlobalConfig.EnterBookshelf();
 
         // refresh list

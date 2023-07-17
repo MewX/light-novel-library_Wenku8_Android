@@ -23,7 +23,6 @@ import com.afollestad.materialdialogs.Theme;
 import com.davemorrissey.labs.subscaleview.ImageSource;
 import com.davemorrissey.labs.subscaleview.SubsamplingScaleImageView;
 import com.nononsenseapps.filepicker.FilePickerActivity;
-import com.umeng.analytics.MobclickAgent;
 
 import org.mewx.wenku8.R;
 import org.mewx.wenku8.global.GlobalConfig;
@@ -243,7 +242,6 @@ public class ViewImageDetailActivity extends BaseMaterialActivity {
     @Override
     protected void onResume() {
         super.onResume();
-        MobclickAgent.onResume(this);
 
         showNavigationBar();
     }
@@ -291,12 +289,6 @@ public class ViewImageDetailActivity extends BaseMaterialActivity {
                 }
             });
         }
-    }
-
-    @Override
-    protected void onPause() {
-        super.onPause();
-        MobclickAgent.onPause(this);
     }
 
     @Override

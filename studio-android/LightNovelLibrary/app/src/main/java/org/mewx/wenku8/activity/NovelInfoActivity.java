@@ -28,7 +28,6 @@ import com.afollestad.materialdialogs.Theme;
 import com.getbase.floatingactionbutton.FloatingActionButton;
 import com.getbase.floatingactionbutton.FloatingActionsMenu;
 import com.nostra13.universalimageloader.core.ImageLoader;
-import com.umeng.analytics.MobclickAgent;
 
 import org.mewx.wenku8.R;
 import org.mewx.wenku8.global.GlobalConfig;
@@ -1098,15 +1097,8 @@ public class NovelInfoActivity extends BaseMaterialActivity {
     }
 
     @Override
-    protected void onPause() {
-        super.onPause();
-        MobclickAgent.onPause(this);
-    }
-
-    @Override
     protected void onResume() {
         super.onResume();
-        MobclickAgent.onResume(this);
 
         // return from search activity
         final Drawable upArrow = getResources().getDrawable(R.drawable.ic_svg_back);

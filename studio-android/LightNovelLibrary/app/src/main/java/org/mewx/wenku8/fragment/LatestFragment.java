@@ -7,7 +7,6 @@ import android.os.Build;
 import android.os.Bundle;
 import androidx.annotation.NonNull;
 
-import com.afollestad.materialdialogs.GravityEnum;
 import com.afollestad.materialdialogs.MaterialDialog;
 import com.afollestad.materialdialogs.Theme;
 import com.google.android.material.snackbar.Snackbar;
@@ -22,8 +21,6 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.TextView;
 import android.widget.Toast;
-
-import com.umeng.analytics.MobclickAgent;
 
 import org.mewx.wenku8.R;
 import org.mewx.wenku8.activity.MainActivity;
@@ -307,14 +304,12 @@ public class LatestFragment extends Fragment implements MyItemClickListener, MyI
     @Override
     public void onPause() {
         super.onPause();
-        MobclickAgent.onPageEnd(TAG);
         GlobalConfig.LeaveLatest();
     }
 
     @Override
     public void onResume() {
         super.onResume();
-        MobclickAgent.onPageStart(TAG);
         GlobalConfig.EnterLatest();
     }
 

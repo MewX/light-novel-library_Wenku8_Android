@@ -25,7 +25,6 @@ import androidx.recyclerview.widget.RecyclerView;
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 
 import com.google.android.material.snackbar.Snackbar;
-import com.umeng.analytics.MobclickAgent;
 
 import org.mewx.wenku8.R;
 import org.mewx.wenku8.adapter.ReviewReplyItemAdapter;
@@ -145,18 +144,6 @@ public class NovelReviewReplyListActivity extends BaseMaterialActivity implement
             onBackPressed();
         }
         return super.onOptionsItemSelected(menuItem);
-    }
-
-    @Override
-    protected void onPause() {
-        super.onPause();
-        MobclickAgent.onPause(this);
-    }
-
-    @Override
-    protected void onResume() {
-        super.onResume();
-        MobclickAgent.onResume(this);
     }
 
     @Override

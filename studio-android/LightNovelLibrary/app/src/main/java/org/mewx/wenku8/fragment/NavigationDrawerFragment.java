@@ -29,7 +29,6 @@ import com.afollestad.materialdialogs.MaterialDialog;
 import com.afollestad.materialdialogs.StackingBehavior;
 import com.afollestad.materialdialogs.Theme;
 import com.makeramen.roundedimageview.RoundedImageView;
-import com.umeng.analytics.MobclickAgent;
 
 import org.mewx.wenku8.R;
 import org.mewx.wenku8.activity.MainActivity;
@@ -347,7 +346,6 @@ public class NavigationDrawerFragment extends Fragment {
     @Override
     public void onResume() {
         super.onResume();
-        MobclickAgent.onPageStart(TAG);
 
         // user info update
         if(LightUserSession.isUserInfoSet() && !tvUserName.getText().toString().equals(LightUserSession.getUsernameOrEmail())
@@ -439,9 +437,4 @@ public class NavigationDrawerFragment extends Fragment {
         super.onSaveInstanceState(outState);
     }
 
-    @Override
-    public void onPause() {
-        super.onPause();
-        MobclickAgent.onPageEnd(TAG);
-    }
 }

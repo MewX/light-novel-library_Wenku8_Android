@@ -24,8 +24,6 @@ import androidx.fragment.app.FragmentTransaction;
 import com.afollestad.materialdialogs.MaterialDialog;
 import com.afollestad.materialdialogs.Theme;
 import com.nostra13.universalimageloader.core.ImageLoader;
-import com.umeng.analytics.MobclickAgent;
-import com.umeng.commonsdk.UMConfigure;
 
 import org.mewx.wenku8.MyApp;
 import org.mewx.wenku8.R;
@@ -249,9 +247,6 @@ public class MainActivity extends BaseMaterialActivity {
             GlobalConfig.initImageLoader(this);
         }
 
-        // UMeng initialization
-        UMConfigure.init(MyApp.getContext(), UMConfigure.DEVICE_TYPE_PHONE, null);
-
         // Updates old save files.
         startOldSaveMigration();
 
@@ -338,17 +333,8 @@ public class MainActivity extends BaseMaterialActivity {
     }
 
     @Override
-    protected void onPause() {
-        super.onPause();
-        MobclickAgent.onPageEnd("MainActivity");
-        MobclickAgent.onPause(this);
-    }
-
-    @Override
     protected void onResume() {
         super.onResume();
-        MobclickAgent.onPageStart("MainActivity");
-        MobclickAgent.onResume(this);
 
         // load only the first time this activity is created
         if (!NEW_VERSION_CHECKED.getAndSet(true)) {

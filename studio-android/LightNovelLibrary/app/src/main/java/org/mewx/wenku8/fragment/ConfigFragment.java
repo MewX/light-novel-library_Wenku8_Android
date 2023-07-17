@@ -21,7 +21,6 @@ import android.widget.Toast;
 
 import com.afollestad.materialdialogs.MaterialDialog;
 import com.afollestad.materialdialogs.Theme;
-import com.umeng.analytics.MobclickAgent;
 
 import org.mewx.wenku8.R;
 import org.mewx.wenku8.activity.AboutActivity;
@@ -145,18 +144,6 @@ public class ConfigFragment extends Fragment {
             Intent intent = new Intent(getActivity(), AboutActivity.class);
             startActivity(intent);
         });
-    }
-
-    @Override
-    public void onPause() {
-        super.onPause();
-        MobclickAgent.onPageEnd("ConfigFragment");
-    }
-
-    @Override
-    public void onResume() {
-        super.onResume();
-        MobclickAgent.onPageStart("ConfigFragment");
     }
 
     private static class AsyncDeleteFast extends AsyncTask<Integer, Integer, Wenku8Error.ErrorCode> {

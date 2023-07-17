@@ -17,7 +17,6 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.afollestad.materialdialogs.GravityEnum;
 import com.afollestad.materialdialogs.MaterialDialog;
 import com.afollestad.materialdialogs.Theme;
-import com.umeng.analytics.MobclickAgent;
 
 import org.mewx.wenku8.R;
 import org.mewx.wenku8.adapter.SearchHistoryAdapter;
@@ -94,7 +93,6 @@ public class SearchActivity extends BaseMaterialActivity implements MyItemClickL
     @Override
     protected void onResume() {
         super.onResume();
-        MobclickAgent.onResume(this);
 
         // set back arrow icon
         final Drawable upArrow = getResources().getDrawable(R.drawable.ic_svg_back);
@@ -161,9 +159,4 @@ public class SearchActivity extends BaseMaterialActivity implements MyItemClickL
         overridePendingTransition(0, R.anim.fade_out);
     }
 
-    @Override
-    protected void onPause() {
-        super.onPause();
-        MobclickAgent.onPause(this);
-    }
 }

@@ -14,7 +14,6 @@ import android.widget.Toast;
 import com.afollestad.materialdialogs.GravityEnum;
 import com.afollestad.materialdialogs.MaterialDialog;
 import com.afollestad.materialdialogs.Theme;
-import com.umeng.analytics.MobclickAgent;
 
 import org.mewx.wenku8.MyApp;
 import org.mewx.wenku8.R;
@@ -153,17 +152,5 @@ public class UserLoginActivity extends BaseMaterialActivity {
             onBackPressed();
         }
         return super.onOptionsItemSelected(menuItem);
-    }
-
-    @Override
-    protected void onPause() {
-        super.onPause();
-        MobclickAgent.onPause(this);
-    }
-
-    @Override
-    protected void onResume() {
-        super.onResume();
-        MobclickAgent.onResume(this);
     }
 }
