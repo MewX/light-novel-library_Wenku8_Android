@@ -10,8 +10,12 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <!-- The legacy READ/WRITE permissions are not used in API 30+ anymore (except for migrating old saves). -->
-    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
-    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+    <uses-permission
+        android:name="android.permission.READ_EXTERNAL_STORAGE"
+        android:maxSdkVersion="32" />
+    <uses-permission
+        android:name="android.permission.WRITE_EXTERNAL_STORAGE"
+        android:maxSdkVersion="29" />
     <!-- This permission is used for reading images as reading backgrounds. -->
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
     <!-- For root device -->

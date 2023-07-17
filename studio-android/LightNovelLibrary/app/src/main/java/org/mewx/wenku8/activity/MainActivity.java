@@ -25,7 +25,6 @@ import com.afollestad.materialdialogs.MaterialDialog;
 import com.afollestad.materialdialogs.Theme;
 import com.nostra13.universalimageloader.core.ImageLoader;
 
-import org.mewx.wenku8.MyApp;
 import org.mewx.wenku8.R;
 import org.mewx.wenku8.async.CheckAppNewVersion;
 import org.mewx.wenku8.async.UpdateNotificationMessage;
@@ -106,7 +105,7 @@ public class MainActivity extends BaseMaterialActivity {
 
         // Read permissions.
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            // FIXME: this doesn't work yet.
+            // FIXME: this doesn't work on the first launch yet (it works on the second+ launch somehow).
             if (missingPermission(Manifest.permission.READ_MEDIA_IMAGES)) {
                 ActivityCompat.requestPermissions(this,
                         new String[]{Manifest.permission.READ_MEDIA_IMAGES}, REQUEST_READ_MEDIA_IMAGES);
