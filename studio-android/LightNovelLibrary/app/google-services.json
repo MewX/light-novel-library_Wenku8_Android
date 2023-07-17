@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "618341848233",
+    "firebase_url": "https://wenku8-ba1a9.firebaseio.com",
+    "project_id": "wenku8-ba1a9",
+    "storage_bucket": "wenku8-ba1a9.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:618341848233:android:2eb7c186df0d5cdb5905b8",
+        "android_client_info": {
+          "package_name": "org.mewx.wenku8"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "618341848233-pvcr5apf3olk9rvl38efvqab97l4euc9.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "org.mewx.wenku8",
+            "certificate_hash": "cdac2fd012a95dd6c746d281e26f3bc0db33dd6b"
+          }
+        },
+        {
+          "client_id": "618341848233-ke7eigt5a730q2lnevjede5r0tm3kapj.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBq9TPF3K80EB8ya9cTBWKBetR5kR7_BMA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "618341848233-ke7eigt5a730q2lnevjede5r0tm3kapj.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
