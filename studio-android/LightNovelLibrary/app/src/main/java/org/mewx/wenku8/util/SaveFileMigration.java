@@ -31,6 +31,10 @@ public class SaveFileMigration {
         LightCache.saveFile(getInternalSavePath(), SIGNAL_FILE_NAME, "".getBytes(), false);
     }
 
+    public static void revertMigrationStatus() {
+        LightCache.deleteFile(getInternalSavePath(), SIGNAL_FILE_NAME);
+    }
+
     /**
      * Checks if the external storage contains the wenku8 directory.
      * @return true if eligible; otherwise false

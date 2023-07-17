@@ -391,11 +391,15 @@ public class MainActivity extends BaseMaterialActivity {
                         .backgroundColorRes(R.color.dlgBackgroundColor)
                         .contentColorRes(R.color.dlgContentColor)
                         .positiveColorRes(R.color.dlgPositiveButtonColor)
-                        .negativeColorRes(R.color.dlgNegativeButtonColor)
-                        .content(R.string.dialog_content_wrong_path, wenku8Path)
+                        .neutralColorRes(R.color.dlgNegativeButtonColor)
+                        .negativeColorRes(R.color.myAccentColor)
+                        .content(R.string.dialog_content_wrong_path, wenku8Path.replace("/tree/primary:", "/"))
                         .positiveText(R.string.dialog_positive_retry)
-                        .negativeText(R.string.dialog_negative_preferno)
+                        .neutralText(R.string.dialog_negative_pass_for_now)
+                        .negativeText(R.string.dialog_negative_never)
                         .onPositive((unused1, unused2) -> reloadApp())
+                        // Do nothing for onNeutral.
+                        .onNegative((dialog, which) -> SaveFileMigration.markMigrationCompleted())
                         .show();
                 return;
             }
