@@ -50,9 +50,12 @@ import org.mewx.wenku8.reader.slider.SlidingAdapter;
 import org.mewx.wenku8.reader.slider.SlidingLayout;
 import org.mewx.wenku8.reader.slider.base.OverlappedSlider;
 import org.mewx.wenku8.reader.view.WenkuReaderPageView;
+import org.mewx.wenku8.util.LightCache;
 import org.mewx.wenku8.util.LightNetwork;
 import org.mewx.wenku8.util.LightTool;
 
+import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
 import java.util.List;
@@ -64,6 +67,11 @@ import java.util.List;
 public class Wenku8ReaderActivityV1 extends BaseMaterialActivity {
     // constant
     static private final String FromLocal = "fav";
+
+    private static final int REQUEST_FONT_PICKER_LEGACY = 0;
+    private static final int REQUEST_IMAGE_PICKER_LEGACY = 1;
+    private static final int REQUEST_FONT_PICKER = 100;
+    private static final int REQUEST_IMAGE_PICKER = 101;
 
     // vars
     private String from = "";
@@ -646,7 +654,7 @@ public class Wenku8ReaderActivityV1 extends BaseMaterialActivity {
                                                             i.putExtra(FilePickerActivity.EXTRA_START_PATH,
                                                                     GlobalConfig.pathPickedSave == null || GlobalConfig.pathPickedSave.length() == 0 ?
                                                                             Environment.getExternalStorageDirectory().getPath() : GlobalConfig.pathPickedSave);
-                                                            startActivityForResult(i, 0); // choose font is 0
+                                                            startActivityForResult(i, REQUEST_FONT_PICKER_LEGACY);
                                                             break;
                                                     }
                                                 })
@@ -666,16 +674,23 @@ public class Wenku8ReaderActivityV1 extends BaseMaterialActivity {
                                                             mSlidingPageAdapter.notifyDataSetChanged();
                                                             break;
                                                         case 1:
-                                                            // TODO: use system UI file picker.
                                                             // choose a image file
-                                                            Intent i = new Intent(Wenku8ReaderActivityV1.this, FilePickerActivity.class);
-                                                            i.putExtra(FilePickerActivity.EXTRA_ALLOW_MULTIPLE, false);
-                                                            i.putExtra(FilePickerActivity.EXTRA_ALLOW_CREATE_DIR, true);
-                                                            i.putExtra(FilePickerActivity.EXTRA_MODE, FilePickerActivity.MODE_FILE);
-                                                            i.putExtra(FilePickerActivity.EXTRA_START_PATH,
-                                                                    GlobalConfig.pathPickedSave == null || GlobalConfig.pathPickedSave.length() == 0 ?
-                                                                            Environment.getExternalStorageDirectory().getPath() : GlobalConfig.pathPickedSave);
-                                                            startActivityForResult(i, 1); // choose image is 1
+                                                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
+                                                                Intent intent = new Intent();
+                                                                intent.setAction(Intent.ACTION_OPEN_DOCUMENT);
+                                                                intent.addCategory(Intent.CATEGORY_OPENABLE);
+                                                                intent.setType("image/*");
+                                                                startActivityForResult(intent, REQUEST_IMAGE_PICKER);
+                                                            } else {
+                                                                Intent i = new Intent(Wenku8ReaderActivityV1.this, FilePickerActivity.class);
+                                                                i.putExtra(FilePickerActivity.EXTRA_ALLOW_MULTIPLE, false);
+                                                                i.putExtra(FilePickerActivity.EXTRA_ALLOW_CREATE_DIR, true);
+                                                                i.putExtra(FilePickerActivity.EXTRA_MODE, FilePickerActivity.MODE_FILE);
+                                                                i.putExtra(FilePickerActivity.EXTRA_START_PATH,
+                                                                        GlobalConfig.pathPickedSave == null || GlobalConfig.pathPickedSave.length() == 0 ?
+                                                                                Environment.getExternalStorageDirectory().getPath() : GlobalConfig.pathPickedSave);
+                                                                startActivityForResult(i, REQUEST_IMAGE_PICKER_LEGACY);
+                                                            }
                                                             break;
                                                     }
                                                 })
@@ -904,7 +919,7 @@ public class Wenku8ReaderActivityV1 extends BaseMaterialActivity {
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
 
-        if (requestCode == 0 && resultCode == Activity.RESULT_OK) {
+        if (requestCode == REQUEST_FONT_PICKER_LEGACY && resultCode == Activity.RESULT_OK) {
             // get ttf path
             if (data.getBooleanExtra(FilePickerActivity.EXTRA_ALLOW_MULTIPLE, false)) {
                 // For JellyBean and above
@@ -933,7 +948,7 @@ public class Wenku8ReaderActivityV1 extends BaseMaterialActivity {
                 // Do something with the URI
                 runSaveCustomFontPath(uri.toString().replaceAll("file://", ""));
             }
-        } else if (requestCode == 1 && resultCode == Activity.RESULT_OK) {
+        } else if (requestCode == REQUEST_IMAGE_PICKER_LEGACY && resultCode == Activity.RESULT_OK) {
             // get image path
             if (data.getBooleanExtra(FilePickerActivity.EXTRA_ALLOW_MULTIPLE, false)) {
                 // For JellyBean and above
@@ -962,7 +977,19 @@ public class Wenku8ReaderActivityV1 extends BaseMaterialActivity {
                 // Do something with the URI
                 runSaveCustomBackgroundPath(uri.toString().replaceAll("file://", ""));
             }
+        } else if (requestCode == REQUEST_IMAGE_PICKER && resultCode == Activity.RESULT_OK && data != null) {
+            Uri mediaUri = data.getData();
+            String copiedFilePath = GlobalConfig.getDefaultStoragePath() + GlobalConfig.customFolderName + File.separator + "reader_background";
+            try {
+                byte[] content = LightCache.loadStream(getApplicationContext().getContentResolver().openInputStream(mediaUri));
+                LightCache.saveFile(copiedFilePath, content, true);
 
+                runSaveCustomBackgroundPath(copiedFilePath.replaceAll("file://", ""));
+            } catch (FileNotFoundException e) {
+                e.printStackTrace();
+                Toast.makeText(this, "Exception: " + e, Toast.LENGTH_SHORT).show();
+                // Failed to copy. Just ignore it.
+            }
         }
     }
 
@@ -975,7 +1002,6 @@ public class Wenku8ReaderActivityV1 extends BaseMaterialActivity {
     }
 
     private void runSaveCustomBackgroundPath(String path) {
-        // TODO: need to make a copy of the file to the custom path for easier access.
         try {
             BitmapFactory.decodeFile(path);
         } catch (OutOfMemoryError oome) {
