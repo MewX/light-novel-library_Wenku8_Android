@@ -130,7 +130,7 @@ public class WenkuReaderPageView extends View {
         textPaint = new TextPaint();
         textPaint.setColor(getInDayMode() ? mSetting.fontColorDark : mSetting.fontColorLight);
         textPaint.setTextSize(LightTool.sp2px(MyApp.getContext(), (float) mSetting.getFontSize()));
-        if(typeface != null) textPaint.setTypeface(typeface);
+        if(mSetting.getUseCustomFont() && typeface != null) textPaint.setTypeface(typeface);
         textPaint.setAntiAlias(true);
         fontHeight = (int) textPaint.measureText(sampleText); // in "px"
         widgetTextPaint = new TextPaint();

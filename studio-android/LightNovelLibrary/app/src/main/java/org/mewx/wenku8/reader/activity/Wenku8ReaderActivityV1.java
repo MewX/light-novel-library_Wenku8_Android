@@ -645,16 +645,23 @@ public class Wenku8ReaderActivityV1 extends BaseMaterialActivity {
                                                             mSlidingPageAdapter.notifyDataSetChanged();
                                                             break;
                                                         case 1:
-                                                            // TODO: use system UI FilePicker.
-                                                            // choose a ttf file
-                                                            Intent i = new Intent(Wenku8ReaderActivityV1.this, FilePickerActivity.class);
-                                                            i.putExtra(FilePickerActivity.EXTRA_ALLOW_MULTIPLE, false);
-                                                            i.putExtra(FilePickerActivity.EXTRA_ALLOW_CREATE_DIR, true);
-                                                            i.putExtra(FilePickerActivity.EXTRA_MODE, FilePickerActivity.MODE_FILE);
-                                                            i.putExtra(FilePickerActivity.EXTRA_START_PATH,
-                                                                    GlobalConfig.pathPickedSave == null || GlobalConfig.pathPickedSave.length() == 0 ?
-                                                                            Environment.getExternalStorageDirectory().getPath() : GlobalConfig.pathPickedSave);
-                                                            startActivityForResult(i, REQUEST_FONT_PICKER_LEGACY);
+                                                            // choose a ttf/otf file
+                                                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
+                                                                Intent intent = new Intent();
+                                                                intent.setAction(Intent.ACTION_OPEN_DOCUMENT);
+                                                                intent.addCategory(Intent.CATEGORY_OPENABLE);
+                                                                intent.setType("font/*");
+                                                                startActivityForResult(intent, REQUEST_FONT_PICKER);
+                                                            } else {
+                                                                Intent i = new Intent(Wenku8ReaderActivityV1.this, FilePickerActivity.class);
+                                                                i.putExtra(FilePickerActivity.EXTRA_ALLOW_MULTIPLE, false);
+                                                                i.putExtra(FilePickerActivity.EXTRA_ALLOW_CREATE_DIR, true);
+                                                                i.putExtra(FilePickerActivity.EXTRA_MODE, FilePickerActivity.MODE_FILE);
+                                                                i.putExtra(FilePickerActivity.EXTRA_START_PATH,
+                                                                        GlobalConfig.pathPickedSave == null || GlobalConfig.pathPickedSave.length() == 0 ?
+                                                                                Environment.getExternalStorageDirectory().getPath() : GlobalConfig.pathPickedSave);
+                                                                startActivityForResult(i, REQUEST_FONT_PICKER_LEGACY);
+                                                            }
                                                             break;
                                                     }
                                                 })
@@ -977,6 +984,17 @@ public class Wenku8ReaderActivityV1 extends BaseMaterialActivity {
                 // Do something with the URI
                 runSaveCustomBackgroundPath(uri.toString().replaceAll("file://", ""));
             }
+        } else if (requestCode == REQUEST_FONT_PICKER && resultCode == Activity.RESULT_OK && data != null) {
+            Uri fontUri = data.getData();
+            String copiedFilePath = GlobalConfig.getDefaultStoragePath() + GlobalConfig.customFolderName + File.separator + "reader_font";
+            try {
+                LightCache.copyFile(getApplicationContext().getContentResolver().openInputStream(fontUri), copiedFilePath, true);
+                runSaveCustomFontPath(copiedFilePath.replaceAll("file://", ""));
+            } catch (FileNotFoundException e) {
+                e.printStackTrace();
+                Toast.makeText(this, "Exception: " + e, Toast.LENGTH_SHORT).show();
+                // Failed to copy. Just ignore it.
+            }
         } else if (requestCode == REQUEST_IMAGE_PICKER && resultCode == Activity.RESULT_OK && data != null) {
             Uri mediaUri = data.getData();
             String copiedFilePath = GlobalConfig.getDefaultStoragePath() + GlobalConfig.customFolderName + File.separator + "reader_background";
@@ -992,7 +1010,6 @@ public class Wenku8ReaderActivityV1 extends BaseMaterialActivity {
     }
 
     private void runSaveCustomFontPath(String path) {
-        // TODO: need to make a copy of the file to the custom path for easier access.
         setting.setCustomFontPath(path);
         WenkuReaderPageView.setViewComponents(loader, setting, false);
         mSlidingPageAdapter.restoreState(null, null);
