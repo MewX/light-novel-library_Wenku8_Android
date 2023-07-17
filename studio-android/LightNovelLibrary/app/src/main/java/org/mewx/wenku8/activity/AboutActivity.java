@@ -4,6 +4,8 @@ import android.os.Bundle;
 import android.view.MenuItem;
 import android.widget.TextView;
 
+import com.google.firebase.analytics.FirebaseAnalytics;
+
 import org.mewx.wenku8.BuildConfig;
 import org.mewx.wenku8.R;
 
@@ -16,6 +18,9 @@ public class AboutActivity extends BaseMaterialActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         initMaterialStyle(R.layout.layout_about);
+
+        // Init Firebase Analytics on GA4.
+        FirebaseAnalytics.getInstance(this);
 
         // get version code
         TextView tvVersion = findViewById(R.id.app_version);

@@ -15,6 +15,7 @@ import android.view.Menu;
 import android.view.MenuItem;
 import android.widget.Toast;
 
+import com.google.firebase.analytics.FirebaseAnalytics;
 import com.nononsenseapps.filepicker.FilePickerActivity;
 
 import org.mewx.wenku8.R;
@@ -44,6 +45,9 @@ public class MenuBackgroundSelectorActivity extends BaseMaterialActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         initMaterialStyle(R.layout.layout_menu_background_selector);
+
+        // Init Firebase Analytics on GA4.
+        FirebaseAnalytics.getInstance(this);
 
         // Init listeners.
         for (Integer id : viewIdToSettingItemMap.keySet()) {

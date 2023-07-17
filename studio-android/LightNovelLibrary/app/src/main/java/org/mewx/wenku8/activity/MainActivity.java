@@ -23,6 +23,7 @@ import androidx.fragment.app.FragmentTransaction;
 
 import com.afollestad.materialdialogs.MaterialDialog;
 import com.afollestad.materialdialogs.Theme;
+import com.google.firebase.analytics.FirebaseAnalytics;
 import com.nostra13.universalimageloader.core.ImageLoader;
 
 import org.mewx.wenku8.R;
@@ -73,6 +74,7 @@ public class MainActivity extends BaseMaterialActivity {
     }
 
     private NavigationDrawerFragment mNavigationDrawerFragment;
+    private FirebaseAnalytics mFirebaseAnalytics;
     private static Boolean isExit = false; // used for exit by twice
 
     private void initialApp() {
@@ -240,6 +242,9 @@ public class MainActivity extends BaseMaterialActivity {
         super.onCreate(savedInstanceState);
         initMaterialStyle(R.layout.layout_main, HomeIndicatorStyle.HAMBURGER);
         initialApp();
+
+        // Init Firebase Analytics on GA4.
+        mFirebaseAnalytics = FirebaseAnalytics.getInstance(this);
 
         // UIL setting
         if (ImageLoader.getInstance() == null || !ImageLoader.getInstance().isInited()) {

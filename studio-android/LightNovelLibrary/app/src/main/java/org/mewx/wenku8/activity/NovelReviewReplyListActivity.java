@@ -25,6 +25,7 @@ import androidx.recyclerview.widget.RecyclerView;
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 
 import com.google.android.material.snackbar.Snackbar;
+import com.google.firebase.analytics.FirebaseAnalytics;
 
 import org.mewx.wenku8.R;
 import org.mewx.wenku8.adapter.ReviewReplyItemAdapter;
@@ -66,6 +67,9 @@ public class NovelReviewReplyListActivity extends BaseMaterialActivity implement
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         initMaterialStyle(R.layout.layout_novel_review_reply_list);
+
+        // Init Firebase Analytics on GA4.
+        FirebaseAnalytics.getInstance(this);
 
         // fetch values
         rid = getIntent().getIntExtra("rid", 1);

@@ -22,6 +22,7 @@ import com.afollestad.materialdialogs.MaterialDialog;
 import com.afollestad.materialdialogs.Theme;
 import com.davemorrissey.labs.subscaleview.ImageSource;
 import com.davemorrissey.labs.subscaleview.SubsamplingScaleImageView;
+import com.google.firebase.analytics.FirebaseAnalytics;
 import com.nononsenseapps.filepicker.FilePickerActivity;
 
 import org.mewx.wenku8.R;
@@ -47,6 +48,9 @@ public class ViewImageDetailActivity extends BaseMaterialActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         initMaterialStyle(R.layout.layout_view_image_detail, StatusBarColor.DARK);
+
+        // Init Firebase Analytics on GA4.
+        FirebaseAnalytics.getInstance(this);
 
         // fetch value
         path = getIntent().getStringExtra("path");

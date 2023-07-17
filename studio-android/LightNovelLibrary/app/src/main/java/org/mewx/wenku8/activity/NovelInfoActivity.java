@@ -27,6 +27,7 @@ import com.afollestad.materialdialogs.MaterialDialog;
 import com.afollestad.materialdialogs.Theme;
 import com.getbase.floatingactionbutton.FloatingActionButton;
 import com.getbase.floatingactionbutton.FloatingActionsMenu;
+import com.google.firebase.analytics.FirebaseAnalytics;
 import com.nostra13.universalimageloader.core.ImageLoader;
 
 import org.mewx.wenku8.R;
@@ -61,6 +62,7 @@ public class NovelInfoActivity extends BaseMaterialActivity {
     private final String FromLocal = "fav";
 
     // private vars
+    private FirebaseAnalytics mFirebaseAnalytics;
     private int aid = 1;
     private String from = "", title = "";
     private boolean isLoading = true;
@@ -84,6 +86,9 @@ public class NovelInfoActivity extends BaseMaterialActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         initMaterialStyle(R.layout.layout_novel_info);
+
+        // Init Firebase Analytics on GA4.
+        mFirebaseAnalytics = FirebaseAnalytics.getInstance(this);
 
         // fetch values
         aid = getIntent().getIntExtra("aid", 1);

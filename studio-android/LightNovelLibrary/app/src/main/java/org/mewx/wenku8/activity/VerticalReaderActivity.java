@@ -23,6 +23,7 @@ import android.widget.Toast;
 
 import com.afollestad.materialdialogs.MaterialDialog;
 import com.afollestad.materialdialogs.Theme;
+import com.google.firebase.analytics.FirebaseAnalytics;
 import com.nostra13.universalimageloader.core.ImageLoader;
 
 import org.mewx.wenku8.R;
@@ -67,6 +68,9 @@ public class VerticalReaderActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN, WindowManager.LayoutParams.FLAG_FULLSCREEN);
         setContentView(R.layout.layout_vertical_reader_temp);
+
+        // Init Firebase Analytics on GA4.
+        FirebaseAnalytics.getInstance(this);
 
         // fetch values
         aid = getIntent().getIntExtra("aid", 1);

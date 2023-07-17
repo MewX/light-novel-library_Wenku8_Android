@@ -14,6 +14,7 @@ import android.widget.Toast;
 import com.afollestad.materialdialogs.GravityEnum;
 import com.afollestad.materialdialogs.MaterialDialog;
 import com.afollestad.materialdialogs.Theme;
+import com.google.firebase.analytics.FirebaseAnalytics;
 
 import org.mewx.wenku8.MyApp;
 import org.mewx.wenku8.R;
@@ -40,6 +41,9 @@ public class UserLoginActivity extends BaseMaterialActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         initMaterialStyle(R.layout.layout_user_login);
+
+        // Init Firebase Analytics on GA4.
+        FirebaseAnalytics.getInstance(this);
 
         // get views
         etUserNameOrEmail = findViewById(R.id.edit_username_or_email);

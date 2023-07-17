@@ -8,6 +8,7 @@ import android.widget.TextView;
 
 import androidx.fragment.app.FragmentTransaction;
 
+import com.google.firebase.analytics.FirebaseAnalytics;
 import com.nostra13.universalimageloader.core.ImageLoader;
 
 import org.mewx.wenku8.R;
@@ -20,10 +21,15 @@ import org.mewx.wenku8.global.GlobalConfig;
  */
 public class SearchResultActivity extends BaseMaterialActivity {
 
+    private FirebaseAnalytics mFirebaseAnalytics;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         initMaterialStyle(R.layout.layout_search_result, StatusBarColor.WHITE);
+
+        // Init Firebase Analytics on GA4.
+        mFirebaseAnalytics = FirebaseAnalytics.getInstance(this);
 
         // get arguments
         String searchKey = getIntent().getStringExtra("key");

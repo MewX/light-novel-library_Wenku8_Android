@@ -30,6 +30,7 @@ import androidx.annotation.NonNull;
 import com.afollestad.materialdialogs.GravityEnum;
 import com.afollestad.materialdialogs.MaterialDialog;
 import com.afollestad.materialdialogs.Theme;
+import com.google.firebase.analytics.FirebaseAnalytics;
 import com.nononsenseapps.filepicker.FilePickerActivity;
 import com.nostra13.universalimageloader.core.ImageLoader;
 
@@ -73,6 +74,7 @@ public class Wenku8ReaderActivityV1 extends BaseMaterialActivity {
     private static final int REQUEST_IMAGE_PICKER = 101;
 
     // vars
+    private FirebaseAnalytics mFirebaseAnalytics;
     private String from = "";
     private int aid, cid;
     private String forcejump;
@@ -91,6 +93,9 @@ public class Wenku8ReaderActivityV1 extends BaseMaterialActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         initMaterialStyle(R.layout.layout_reader_swipe_temp, BaseMaterialActivity.StatusBarColor.DARK);
+
+        // Init Firebase Analytics on GA4.
+        mFirebaseAnalytics = FirebaseAnalytics.getInstance(this);
 
         // fetch values
         aid = getIntent().getIntExtra("aid", 1);

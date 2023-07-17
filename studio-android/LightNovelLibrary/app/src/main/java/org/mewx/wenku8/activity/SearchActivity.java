@@ -17,6 +17,7 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.afollestad.materialdialogs.GravityEnum;
 import com.afollestad.materialdialogs.MaterialDialog;
 import com.afollestad.materialdialogs.Theme;
+import com.google.firebase.analytics.FirebaseAnalytics;
 
 import org.mewx.wenku8.R;
 import org.mewx.wenku8.adapter.SearchHistoryAdapter;
@@ -41,6 +42,9 @@ public class SearchActivity extends BaseMaterialActivity implements MyItemClickL
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         initMaterialStyle(R.layout.layout_search, StatusBarColor.WHITE);
+
+        // Init Firebase Analytics on GA4.
+        FirebaseAnalytics.getInstance(this);
 
         // bind views
         toolbarSearchView = findViewById(R.id.search_view);

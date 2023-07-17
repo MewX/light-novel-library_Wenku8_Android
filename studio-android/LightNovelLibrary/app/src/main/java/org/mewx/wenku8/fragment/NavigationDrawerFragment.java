@@ -28,6 +28,7 @@ import android.widget.Toast;
 import com.afollestad.materialdialogs.MaterialDialog;
 import com.afollestad.materialdialogs.StackingBehavior;
 import com.afollestad.materialdialogs.Theme;
+import com.google.firebase.analytics.FirebaseAnalytics;
 import com.makeramen.roundedimageview.RoundedImageView;
 
 import org.mewx.wenku8.R;
@@ -42,6 +43,7 @@ import org.mewx.wenku8.util.LightUserSession;
 public class NavigationDrawerFragment extends Fragment {
     private static final String TAG = NavigationDrawerFragment.class.getSimpleName();
 
+    private FirebaseAnalytics mFirebaseAnalytics;
     private View mFragmentContainerView;
     private ImageView bgImage;
     private MainActivity mainActivity = null;
@@ -69,6 +71,8 @@ public class NavigationDrawerFragment extends Fragment {
             mainActivity.setCurrentFragment(targetFragment);
             mainActivity.changeFragment(fragment);
             closeDrawer();
+
+            mFirebaseAnalytics.setCurrentScreen(mainActivity, fragment.getClass().getSimpleName(), fragment.getClass().getSimpleName());
         };
     }
 
@@ -164,6 +168,7 @@ public class NavigationDrawerFragment extends Fragment {
             setHighLightButton(mainActivity.getCurrentFragment());
             mainActivity.changeFragment(new LatestFragment());
         }
+        // TODO: need to track the initial fragment.
 
         // set menu background
         if (activity != null) {
@@ -182,6 +187,9 @@ public class NavigationDrawerFragment extends Fragment {
         mainActivity = (MainActivity) getActivity();
         if (mainActivity == null)
             Toast.makeText(getActivity(), "mainActivity == null !!! in setup()", Toast.LENGTH_SHORT).show();
+
+        // Init Firebase Analytics on GA4.
+        mFirebaseAnalytics = FirebaseAnalytics.getInstance(mainActivity);
 
         mFragmentContainerView = mainActivity.findViewById(fragmentId);
         mDrawerLayout = drawerLayout;

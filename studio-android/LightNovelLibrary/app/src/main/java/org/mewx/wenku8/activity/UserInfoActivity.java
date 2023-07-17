@@ -14,6 +14,7 @@ import android.widget.Toast;
 import com.afollestad.materialdialogs.GravityEnum;
 import com.afollestad.materialdialogs.MaterialDialog;
 import com.afollestad.materialdialogs.Theme;
+import com.google.firebase.analytics.FirebaseAnalytics;
 import com.makeramen.roundedimageview.RoundedImageView;
 
 import org.mewx.wenku8.R;
@@ -35,6 +36,7 @@ import java.io.UnsupportedEncodingException;
 public class UserInfoActivity extends BaseMaterialActivity {
 
     // private vars
+    private FirebaseAnalytics mFirebaseAnalytics;
     private RoundedImageView rivAvatar;
     private TextView tvUserName, tvNickyName, tvScore, tvExperience, tvRank;
     private TextView tvLogout;
@@ -46,6 +48,9 @@ public class UserInfoActivity extends BaseMaterialActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         initMaterialStyle(R.layout.layout_account_info);
+
+        // Init Firebase Analytics on GA4.
+        mFirebaseAnalytics = FirebaseAnalytics.getInstance(this);
 
         // get views
         rivAvatar = findViewById(R.id.user_avatar);
