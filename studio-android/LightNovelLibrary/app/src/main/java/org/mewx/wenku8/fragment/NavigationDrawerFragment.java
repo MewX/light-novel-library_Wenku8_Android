@@ -72,7 +72,11 @@ public class NavigationDrawerFragment extends Fragment {
             mainActivity.changeFragment(fragment);
             closeDrawer();
 
-            mFirebaseAnalytics.setCurrentScreen(mainActivity, fragment.getClass().getSimpleName(), fragment.getClass().getSimpleName());
+            // Analysis.
+            Bundle bundle = new Bundle();
+            bundle.putString(FirebaseAnalytics.Param.SCREEN_NAME, fragment.getClass().getSimpleName());
+            bundle.putString(FirebaseAnalytics.Param.SCREEN_CLASS, fragment.getClass().getSimpleName());
+            mFirebaseAnalytics.logEvent(FirebaseAnalytics.Event.SCREEN_VIEW, bundle);
         };
     }
 
