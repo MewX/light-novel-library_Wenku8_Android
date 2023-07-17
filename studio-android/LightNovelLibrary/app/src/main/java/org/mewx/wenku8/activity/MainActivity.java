@@ -155,13 +155,16 @@ public class MainActivity extends BaseMaterialActivity {
                     .backgroundColorRes(R.color.dlgBackgroundColor)
                     .contentColorRes(R.color.dlgContentColor)
                     .positiveColorRes(R.color.dlgPositiveButtonColor)
+                    .neutralColorRes(R.color.dlgNegativeButtonColor)
                     .content(R.string.system_save_need_to_migrate)
                     .positiveText(R.string.dialog_positive_ok)
+                    .neutralText(R.string.dialog_negative_pass_for_now)
                     .onPositive((unused1, unused2) -> {
                         Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
                         intent.addCategory(Intent.CATEGORY_DEFAULT);
                         startActivityForResult(Intent.createChooser(intent, "Choose directory"), REQUEST_READ_EXTERNAL_SAVES);
                     })
+                    .cancelable(false)
                     .show();
 
             // Return early to wait for the permissions grant on the directory.
@@ -229,6 +232,7 @@ public class MainActivity extends BaseMaterialActivity {
                         .content(R.string.system_save_migrated, filesToCopy.size(), finalFailedFiles)
                         .positiveText(R.string.dialog_positive_sure)
                         .onPositive((unused1, unused2) -> reloadApp())
+                        .cancelable(false)
                         .show();
             });
         });
@@ -400,6 +404,7 @@ public class MainActivity extends BaseMaterialActivity {
                         .onPositive((unused1, unused2) -> reloadApp())
                         // Do nothing for onNeutral.
                         .onNegative((dialog, which) -> SaveFileMigration.markMigrationCompleted())
+                        .cancelable(false)
                         .show();
                 return;
             }
