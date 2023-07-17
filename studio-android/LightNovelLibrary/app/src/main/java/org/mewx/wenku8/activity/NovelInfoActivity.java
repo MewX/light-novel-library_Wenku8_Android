@@ -95,6 +95,13 @@ public class NovelInfoActivity extends BaseMaterialActivity {
         from = getIntent().getStringExtra("from");
         title = getIntent().getStringExtra("title");
 
+        // Analysis.
+        Bundle viewItemParams = new Bundle();
+        viewItemParams.putString(FirebaseAnalytics.Param.ITEM_ID, "" + aid);
+        viewItemParams.putString(FirebaseAnalytics.Param.ITEM_NAME, title);
+        viewItemParams.putString("from", from);
+        mFirebaseAnalytics.logEvent(FirebaseAnalytics.Event.VIEW_ITEM, viewItemParams);
+
         // UIL setting
         if(ImageLoader.getInstance() == null || !ImageLoader.getInstance().isInited()) {
             GlobalConfig.initImageLoader(this);

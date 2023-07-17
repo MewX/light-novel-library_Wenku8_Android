@@ -106,6 +106,15 @@ public class Wenku8ReaderActivityV1 extends BaseMaterialActivity {
         if(forcejump == null || forcejump.length() == 0) forcejump = "no";
 //        tempNavBarHeight = LightTool.getNavigationBarSize(this).y;
 
+        // Analysis.
+        Bundle readerParams = new Bundle();
+        readerParams.putString(FirebaseAnalytics.Param.ITEM_ID, "" + aid);
+        readerParams.putString("chapter_id", "" + cid);
+        readerParams.putString("from", from);
+        readerParams.putString("jump_to_saved_page", forcejump);
+        mFirebaseAnalytics.logEvent("reader_v1", readerParams);
+
+
         getTintManager().setTintAlpha(0.0f);
         if(getSupportActionBar() != null) {
             getSupportActionBar().setTitle(volumeList.volumeName);

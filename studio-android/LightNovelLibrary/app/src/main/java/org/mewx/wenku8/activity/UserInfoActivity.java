@@ -138,6 +138,11 @@ public class UserInfoActivity extends BaseMaterialActivity {
 
             md.dismiss();
             if(operation == 1) {
+                // Analysis.
+                Bundle checkInParams = new Bundle();
+                checkInParams.putString("effective_click", "" + (errorCode != Wenku8Error.ErrorCode.SYSTEM_9_SIGN_FAILED));
+                mFirebaseAnalytics.logEvent("daily_check_in", checkInParams);
+
                 // fetch from sign
                 if(errorCode == Wenku8Error.ErrorCode.SYSTEM_9_SIGN_FAILED)
                     Toast.makeText(UserInfoActivity.this, getResources().getString(R.string.userinfo_sign_failed), Toast.LENGTH_SHORT).show();

@@ -176,6 +176,12 @@ public class MainActivity extends BaseMaterialActivity {
     private void runExternalSaveMigration() {
         // Directly start migration dialog.
         List<Uri> filesToCopy = SaveFileMigration.generateMigrationPlan();
+
+        // Analysis.
+        Bundle saveMigrationFilesTotalParams = new Bundle();
+        saveMigrationFilesTotalParams.putString("count", "" + filesToCopy.size());
+        mFirebaseAnalytics.logEvent("save_migration_files_total", saveMigrationFilesTotalParams);
+
         if (filesToCopy.isEmpty()) {
             Log.d(TAG, "Empty list of files to copy");
             SaveFileMigration.markMigrationCompleted();
@@ -219,6 +225,12 @@ public class MainActivity extends BaseMaterialActivity {
             }
 
             int finalFailedFiles = failedFiles;
+
+            // Analysis.
+            Bundle saveMigrationFilesFailedParams = new Bundle();
+            saveMigrationFilesFailedParams.putString("failed", "" + finalFailedFiles);
+            mFirebaseAnalytics.logEvent("save_migration_files_failed", saveMigrationFilesFailedParams);
+
             handler.post(() -> {
                 SaveFileMigration.markMigrationCompleted();
                 progressDialog.dismiss();
@@ -380,6 +392,11 @@ public class MainActivity extends BaseMaterialActivity {
                 Log.i(TAG, "LastPathSegment: " + wenku8Uri.getLastPathSegment());
                 Log.i(TAG, "Selected path for save migration doesn't look right: " + wenku8Uri);
 
+                Bundle saveMigrationParams = new Bundle();
+                saveMigrationParams.putString("path", wenku8Path);
+                saveMigrationParams.putString("valid_path", "false");
+                mFirebaseAnalytics.logEvent("save_migration_path_selection", saveMigrationParams);
+
                 new MaterialDialog.Builder(MainActivity.this)
                         .theme(Theme.LIGHT)
                         .backgroundColorRes(R.color.dlgBackgroundColor)
@@ -397,6 +414,11 @@ public class MainActivity extends BaseMaterialActivity {
                         .cancelable(false)
                         .show();
                 return;
+            } else {
+                Bundle saveMigrationParams = new Bundle();
+                saveMigrationParams.putString("path", wenku8Path);
+                saveMigrationParams.putString("valid_path", "true");
+                mFirebaseAnalytics.logEvent("save_migration_path_selection", saveMigrationParams);
             }
 
             getContentResolver().takePersistableUriPermission(wenku8Uri, Intent.FLAG_GRANT_READ_URI_PERMISSION);

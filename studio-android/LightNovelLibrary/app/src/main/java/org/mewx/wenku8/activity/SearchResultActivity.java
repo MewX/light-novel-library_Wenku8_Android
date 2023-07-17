@@ -34,6 +34,11 @@ public class SearchResultActivity extends BaseMaterialActivity {
         // get arguments
         String searchKey = getIntent().getStringExtra("key");
 
+        // Analysis.
+        Bundle searchParams = new Bundle();
+        searchParams.putString(FirebaseAnalytics.Param.SEARCH_TERM, searchKey);
+        mFirebaseAnalytics.logEvent(FirebaseAnalytics.Event.SEARCH, searchParams);
+
         // set action bat title
         TextView mTextView = (TextView) findViewById(R.id.search_result_title);
         if(mTextView != null)
