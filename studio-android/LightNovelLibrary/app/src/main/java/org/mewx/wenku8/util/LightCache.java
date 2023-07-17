@@ -155,8 +155,21 @@ public class LightCache {
      */
     public static void copyFile(String from, String to, Boolean forceWrite) {
         File fromFile = new File(from);
+        if (!fromFile.exists() || !fromFile.isFile() || !fromFile.canRead()) {
+            return;
+        }
+
+        try {
+            java.io.FileInputStream fosFrom = new java.io.FileInputStream(fromFile);
+            copyFile(fosFrom, to, forceWrite);
+        } catch (Exception ex) {
+            ex.printStackTrace();
+        }
+    }
+
+    public static void copyFile(InputStream from, String to, Boolean forceWrite) {
         File toFile = new File(to);
-        if (!fromFile.exists() || !fromFile.isFile() || !fromFile.canRead() || toFile.exists() && !forceWrite)
+        if (toFile.exists() && !forceWrite)
             return;
 
         if (!toFile.getParentFile().exists() && !toFile.getParentFile().mkdirs())
@@ -165,13 +178,12 @@ public class LightCache {
             Log.d(TAG, "Failed to create or delete target file: " + to);
 
         try {
-            java.io.FileInputStream fosFrom = new java.io.FileInputStream(fromFile);
             java.io.FileOutputStream fosTo = new FileOutputStream(toFile);
 
             byte bt[] = new byte[1024];
             int c;
-            while ((c = fosFrom.read(bt)) > 0) fosTo.write(bt, 0, c);
-            fosFrom.close();
+            while ((c = from.read(bt)) > 0) fosTo.write(bt, 0, c);
+            from.close();
             fosTo.close();
         } catch (Exception ex) {
             ex.printStackTrace();

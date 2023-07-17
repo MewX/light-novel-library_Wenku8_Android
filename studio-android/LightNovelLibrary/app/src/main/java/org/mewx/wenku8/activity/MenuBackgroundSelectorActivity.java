@@ -153,9 +153,7 @@ public class MenuBackgroundSelectorActivity extends BaseMaterialActivity {
 
             String copiedFilePath = GlobalConfig.getDefaultStoragePath() + GlobalConfig.customFolderName + File.separator + "menu_bg";
             try {
-                byte[] content = LightCache.loadStream(getApplicationContext().getContentResolver().openInputStream(mediaUri));
-                LightCache.saveFile(copiedFilePath, content, true);
-
+                LightCache.copyFile(getApplicationContext().getContentResolver().openInputStream(mediaUri), copiedFilePath, true);
                 runSaveCustomMenuBackground(copiedFilePath.replaceAll("file://", ""));
             } catch (FileNotFoundException e) {
                 e.printStackTrace();

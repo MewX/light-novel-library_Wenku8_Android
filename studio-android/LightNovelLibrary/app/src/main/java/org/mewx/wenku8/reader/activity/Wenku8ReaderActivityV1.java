@@ -981,9 +981,7 @@ public class Wenku8ReaderActivityV1 extends BaseMaterialActivity {
             Uri mediaUri = data.getData();
             String copiedFilePath = GlobalConfig.getDefaultStoragePath() + GlobalConfig.customFolderName + File.separator + "reader_background";
             try {
-                byte[] content = LightCache.loadStream(getApplicationContext().getContentResolver().openInputStream(mediaUri));
-                LightCache.saveFile(copiedFilePath, content, true);
-
+                LightCache.copyFile(getApplicationContext().getContentResolver().openInputStream(mediaUri), copiedFilePath, true);
                 runSaveCustomBackgroundPath(copiedFilePath.replaceAll("file://", ""));
             } catch (FileNotFoundException e) {
                 e.printStackTrace();

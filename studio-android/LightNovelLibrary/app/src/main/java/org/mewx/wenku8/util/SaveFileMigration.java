@@ -69,8 +69,7 @@ public class SaveFileMigration {
         String internalFilePath = externalFilePath.getPath().replace(getExternalStoragePath(), getInternalSavePath());
         // The missing parent folders will also be created.
         if (overrideExternalPathUrl != null) {
-            byte[] content = LightCache.loadStream(MyApp.getContext().getContentResolver().openInputStream(externalFilePath));
-            LightCache.saveFile(internalFilePath, content, true);
+            LightCache.copyFile(MyApp.getContext().getContentResolver().openInputStream(externalFilePath), internalFilePath, true);
         } else {
             LightCache.copyFile(externalFilePath.getPath(), internalFilePath, true);
         }
