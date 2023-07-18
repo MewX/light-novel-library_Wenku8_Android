@@ -165,14 +165,19 @@ public class MainActivity extends BaseMaterialActivity {
                     .contentColorRes(R.color.dlgContentColor)
                     .positiveColorRes(R.color.dlgPositiveButtonColor)
                     .neutralColorRes(R.color.dlgNegativeButtonColor)
+                    .negativeColorRes(R.color.myAccentColor)
                     .content(R.string.system_save_need_to_migrate)
-                    .positiveText(R.string.dialog_positive_ok)
+                    .positiveText(R.string.dialog_positive_upgrade)
+                    // This neutral text is needed because some users couldn't get system file picker.
                     .neutralText(R.string.dialog_negative_pass_for_now)
+                    .negativeText(R.string.dialog_negative_never)
                     .onPositive((unused1, unused2) -> {
                         Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
                         intent.addCategory(Intent.CATEGORY_DEFAULT);
                         startActivityForResult(Intent.createChooser(intent, "Choose directory"), REQUEST_READ_EXTERNAL_SAVES);
                     })
+                    // Do nothing for onNeutral.
+                    .onNegative((dialog, which) -> SaveFileMigration.markMigrationCompleted())
                     .cancelable(false)
                     .show();
 

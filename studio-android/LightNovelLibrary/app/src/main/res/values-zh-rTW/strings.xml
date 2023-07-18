@@ -234,8 +234,9 @@
     <string name="dialog_content_ask_for_storage_permission">由於曆史原因，app需要冩入存儲目錄下的wenku8文件夾，是否授予冩入權限？</string>
     <string name="system_save_upgrading">存檔昇級中……</string>
     <string name="system_save_migrated">存檔昇級完成，已昇級%d個文件（其中%d個文件失敗）。從現在開始，手機內部/外部存儲中的wenku8文件夾將不再被更新。如果需要重新昇級存檔，清空app的存儲和緩存。即將重新加載app~</string>
-    <string name="system_save_need_to_migrate">髮現內部存儲中有未昇級的存檔需要昇級，由於權限原因，請在接下來彈出的界麵中選定手機內部存儲根目錄裡的wenku8目錄並確認（注意不是同名的圖片文件夾）。</string>
+    <string name="system_save_need_to_migrate">髮現內部存儲中有未昇級的存檔需要昇級，由於權限原因，請在接下來彈出的界麵中選定手機內部存儲根目錄裡的wenku8目錄並確認（注意不是同名的圖片文件夾）。\n\n（注意：選擇了“永遠不要昇級”後，可以通過清空app的存儲，然後重新開始昇級。）</string>
     <string name="dialog_content_wrong_path">路徑似乎不正確呢：\n%s\n是否重新選擇？\n\n（注意：選擇了“永遠不要昇級”後，可以通過清空app的存儲，然後重新開始昇級。）</string>
     <string name="dialog_positive_retry">重試一下？</string>
     <string name="dialog_negative_pass_for_now">暫時不要</string>
+    <string name="dialog_positive_upgrade">昇級</string>
 </resources>
