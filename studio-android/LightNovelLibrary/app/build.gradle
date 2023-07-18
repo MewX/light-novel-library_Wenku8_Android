@@ -81,7 +81,7 @@ dependencies {
     implementation 'com.afollestad.material-dialogs:core:0.9.6.0'
     implementation 'com.getbase:floatingactionbutton:1.9.0'
     implementation 'com.makeramen:roundedimageview:2.0.1'
-    implementation 'com.davemorrissey.labs:subsampling-scale-image-view:3.4.1'
+    implementation 'com.davemorrissey.labs:subsampling-scale-image-view:3.10.0'
     implementation 'com.github.castorflex.smoothprogressbar:library:1.1.0'
     implementation 'com.jpardogo.googleprogressbar:library:1.2.0'
     implementation 'org.adw.library:discrete-seekbar:1.0.1'
