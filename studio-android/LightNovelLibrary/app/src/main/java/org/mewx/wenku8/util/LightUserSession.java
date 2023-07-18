@@ -70,7 +70,7 @@ public class LightUserSession {
         }
 
         try {
-            //Log.e("MewX", new String(bytes, "UTF-8"));
+            Log.d("MewX", new String(bytes, "UTF-8"));
             decAndSetUserFile(new String(bytes, "UTF-8"));
         } catch (Exception e) {
             e.printStackTrace();

@@ -121,7 +121,7 @@ public class UserInfoActivity extends BaseMaterialActivity {
                     else return Wenku8Error.getSystemDefinedErrorCode(Integer.valueOf(xml));
                 }
 
-                Log.e("MewX", xml);
+                Log.d("MewX", xml);
                 ui = UserInfo.parseUserInfo(xml);
                 if(ui == null) return Wenku8Error.ErrorCode.XML_PARSE_FAILED;
 

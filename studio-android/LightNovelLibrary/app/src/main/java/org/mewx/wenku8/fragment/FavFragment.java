@@ -493,7 +493,7 @@ public class FavFragment extends Fragment implements MyItemClickListener, MyItem
             String result;
             try {
                 result = new String(bytes, "UTF-8");
-                Log.e("MewX", result);
+                Log.d("MewX", result);
                 if (!LightTool.isInteger(result))
                     return Wenku8Error.ErrorCode.RETURNED_VALUE_EXCEPTION;
                 if(Wenku8Error.getSystemDefinedErrorCode(Integer.parseInt(result)) != Wenku8Error.ErrorCode.SYSTEM_1_SUCCEEDED

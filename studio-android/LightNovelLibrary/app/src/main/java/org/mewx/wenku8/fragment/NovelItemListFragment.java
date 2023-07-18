@@ -351,7 +351,7 @@ public class NovelItemListFragment extends Fragment implements MyItemClickListen
             // purify returned data
             List<Integer> listResultList = new ArrayList<>(); // result list
             try {
-                //Log.i("MewX", new String(tempListTitle, "UTF-8"));
+                Log.d("MewX", new String(tempListTitle, "UTF-8"));
                 Pattern p = Pattern.compile("aid=\'(.*)\'"); // match content between "aid=\'" and "\'"
                 Matcher m = p.matcher(new String(tempListTitle, "UTF-8"));
                 while (m.find())
@@ -368,12 +368,12 @@ public class NovelItemListFragment extends Fragment implements MyItemClickListen
             // purify returned data
             List<Integer> listResultList2 = new ArrayList<>(); // result list
             try {
-                Log.i("MewX", new String(tempListName, "UTF-8"));
+                Log.d("MewX", new String(tempListName, "UTF-8"));
                 Pattern p = Pattern.compile("aid=\'(.*)\'"); // match content between "aid=\'" and "\'"
                 Matcher m = p.matcher(new String(tempListName, "UTF-8"));
                 while (m.find()) {
                     listResultList2.add(Integer.valueOf(m.group(1)));
-                    Log.e("MewX", listResultList2.get(listResultList2.size()-1).toString());
+                    Log.d("MewX", listResultList2.get(listResultList2.size()-1).toString());
                 }
             } catch (UnsupportedEncodingException e) {
                 e.printStackTrace();

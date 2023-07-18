@@ -53,19 +53,19 @@ public class UserInfo {
                         } else if ("item".equals(xmlPullParser.getName())) {
                             if ("uname".equals(xmlPullParser.getAttributeValue(0))) {
                                 ui.username = xmlPullParser.nextText();
-                                Log.e("MewX", ui.username.length() == 0 ? GlobalConfig.UNKNOWN : ui.username);
+                                Log.d("MewX", ui.username.length() == 0 ? GlobalConfig.UNKNOWN : ui.username);
                             } else if ("nickname".equals(xmlPullParser.getAttributeValue(0))) {
                                 ui.nickyname = xmlPullParser.nextText();
-                                Log.e("MewX", ui.nickyname.length() == 0 ? GlobalConfig.UNKNOWN : ui.nickyname);
+                                Log.d("MewX", ui.nickyname.length() == 0 ? GlobalConfig.UNKNOWN : ui.nickyname);
                             } else if ("score".equals(xmlPullParser.getAttributeValue(0))) {
                                 ui.score = Integer.valueOf(xmlPullParser.nextText());
-                                Log.e("MewX", "score:" + ui.score);
+                                Log.d("MewX", "score:" + ui.score);
                             } else if ("experience".equals(xmlPullParser.getAttributeValue(0))) {
                                 ui.experience = Integer.valueOf(xmlPullParser.nextText());
-                                Log.e("MewX", "experience:" + ui.experience);
+                                Log.d("MewX", "experience:" + ui.experience);
                             } else if ("rank".equals(xmlPullParser.getAttributeValue(0))) {
                                 ui.rank = xmlPullParser.nextText();
-                                Log.e("MewX", ui.rank.length() == 0 ? GlobalConfig.UNKNOWN : ui.rank);
+                                Log.d("MewX", ui.rank.length() == 0 ? GlobalConfig.UNKNOWN : ui.rank);
                             }
                         }
                         break;
