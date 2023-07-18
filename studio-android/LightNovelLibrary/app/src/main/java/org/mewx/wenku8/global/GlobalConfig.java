@@ -68,7 +68,7 @@ public class GlobalConfig {
     private static boolean isInBookshelf = false;
     private static boolean isInLatest = false;
     private static boolean doLoadImage = true;
-    private static boolean firstStoragePathAvailable = true;
+    private static boolean externalStoragePathAvailable = true;
     private static Wenku8API.LANG currentLang = Wenku8API.LANG.SC;
     public static String pathPickedSave; // dir picker save path
 
@@ -173,15 +173,15 @@ public class GlobalConfig {
 
     /**
      * 设置第一存储路径的合法性（第一路径可以只有设置）
-     * @param a true-合法可以使用; false-不能使用，只能只用第二路径
+     * @param available true-合法可以使用; false-不能使用，只能只用第二路径
      */
-    public static void setFirstStoragePathAvailable(boolean a) {
-        firstStoragePathAvailable = a;
+    public static void setExternalStoragePathAvailable(boolean available) {
+        externalStoragePathAvailable = available;
     }
 
     public static String getDefaultStoragePath() {
         // The lookupInternalStorageOnly flag has the highest priority.
-        if (lookupInternalStorageOnly || !firstStoragePathAvailable) {
+        if (lookupInternalStorageOnly || !externalStoragePathAvailable) {
             return SaveFileMigration.getInternalSavePath();
         }
         return SaveFileMigration.getExternalStoragePath();

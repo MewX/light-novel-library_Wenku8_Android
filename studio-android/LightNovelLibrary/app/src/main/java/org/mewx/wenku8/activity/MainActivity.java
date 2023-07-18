@@ -50,6 +50,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public class MainActivity extends BaseMaterialActivity {
     private static final String TAG = MainActivity.class.getSimpleName();
 
+    private static final int EXTERNAL_SAVE_MIGRATION_API = Build.VERSION_CODES.Q; // Decrease only.
+
     // Below request codes can be any value.
     private static final int REQUEST_WRITE_EXTERNAL = 100;
     private static final int REQUEST_READ_EXTERNAL = 101;
@@ -119,6 +121,21 @@ public class MainActivity extends BaseMaterialActivity {
             }
         }
 
+        // Create save folder.
+        if (Build.VERSION.SDK_INT >= EXTERNAL_SAVE_MIGRATION_API) {
+            // Does not support external storage if the file isn't already created.
+            if (!LightCache.testFileExist(SaveFileMigration.getExternalStoragePath())) {
+                GlobalConfig.setExternalStoragePathAvailable(false);
+            }
+            // Else, start migration.
+        } else {
+            LightCache.saveFile(GlobalConfig.getDefaultStoragePath() + "imgs", ".nomedia", "".getBytes(), false);
+            LightCache.saveFile(GlobalConfig.getDefaultStoragePath() + GlobalConfig.customFolderName, ".nomedia", "".getBytes(), false);
+            LightCache.saveFile(GlobalConfig.getBackupStoragePath() + "imgs", ".nomedia", "".getBytes(), false);
+            LightCache.saveFile(GlobalConfig.getBackupStoragePath() + GlobalConfig.customFolderName, ".nomedia", "".getBytes(), false);
+            GlobalConfig.setExternalStoragePathAvailable(LightCache.testFileExist(SaveFileMigration.getExternalStoragePath() + "imgs" + File.separator + ".nomedia", true));
+        }
+
         // execute background action
         LightUserSession.aiui = new LightUserSession.AsyncInitUserInfo();
         LightUserSession.aiui.execute();
@@ -126,21 +143,13 @@ public class MainActivity extends BaseMaterialActivity {
 
         // check new version and load notice text
         Wenku8API.NoticeString = GlobalConfig.loadSavedNotice();
-
-        // create save folder.
-        // TODO: can stop creating those files and folders.
-        LightCache.saveFile(GlobalConfig.getDefaultStoragePath() + "imgs", ".nomedia", "".getBytes(), false);
-        LightCache.saveFile(GlobalConfig.getBackupStoragePath() + "imgs", ".nomedia", "".getBytes(), false);
-        LightCache.saveFile(GlobalConfig.getDefaultStoragePath() + GlobalConfig.customFolderName, ".nomedia", "".getBytes(), false);
-        LightCache.saveFile(GlobalConfig.getBackupStoragePath() + GlobalConfig.customFolderName, ".nomedia", "".getBytes(), false);
-        GlobalConfig.setFirstStoragePathAvailable(LightCache.testFileExist(SaveFileMigration.getExternalStoragePath() + "imgs" + File.separator + ".nomedia", true));
     }
 
     /**
      * For API 29+, migrate saves from external storage to internal storage.
      */
     private void startOldSaveMigration() {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q || SaveFileMigration.migrationCompleted()
+        if (Build.VERSION.SDK_INT < EXTERNAL_SAVE_MIGRATION_API || SaveFileMigration.migrationCompleted()
                 || (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU
                 && missingPermission(Manifest.permission.READ_EXTERNAL_STORAGE))) {
             return;
@@ -170,6 +179,7 @@ public class MainActivity extends BaseMaterialActivity {
             return;
         }
 
+        // The rest Android Q+ devices.
         runExternalSaveMigration();
     }
 
