@@ -276,10 +276,8 @@ public class VerticalReaderActivity extends AppCompatActivity {
                         tempIV.setImageResource(R.drawable.ic_empty_image); // default
 
                         // async loader
-                        final String imgFileName = GlobalConfig
-                                .generateImageFileNameByURL(nc.get(i).content);
-                        final String path = GlobalConfig
-                                .getAvailableNovolContentImagePath(imgFileName);
+                        final String imgFileName = GlobalConfig.generateImageFileNameByURL(nc.get(i).content);
+                        final String path = GlobalConfig.getAvailableNovelContentImagePath(imgFileName);
 
                         if (path != null) {
                             ImageLoader.getInstance().displayImage(
@@ -299,10 +297,8 @@ public class VerticalReaderActivity extends AppCompatActivity {
                                 @Override
                                 protected String doInBackground(String... params) {
                                     GlobalConfig.saveNovelContentImage(params[0]);
-                                    String name = GlobalConfig
-                                            .generateImageFileNameByURL(params[0]);
-                                    return GlobalConfig
-                                            .getAvailableNovolContentImagePath(name);
+                                    String name = GlobalConfig.generateImageFileNameByURL(params[0]);
+                                    return GlobalConfig.getAvailableNovelContentImagePath(name);
                                 }
 
                                 @Override

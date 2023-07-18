@@ -129,6 +129,7 @@ public class MainActivity extends BaseMaterialActivity {
             }
             // Else, start migration.
         } else {
+            // FIXME: these imgs folders are actually no in use.
             LightCache.saveFile(GlobalConfig.getDefaultStoragePath() + "imgs", ".nomedia", "".getBytes(), false);
             LightCache.saveFile(GlobalConfig.getDefaultStoragePath() + GlobalConfig.customFolderName, ".nomedia", "".getBytes(), false);
             LightCache.saveFile(GlobalConfig.getBackupStoragePath() + "imgs", ".nomedia", "".getBytes(), false);

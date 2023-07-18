@@ -11,6 +11,7 @@ import android.os.Bundle;
 import android.os.Environment;
 import android.provider.MediaStore;
 import android.text.InputType;
+import android.util.Log;
 import android.view.MenuItem;
 import android.view.View;
 import android.widget.Toast;
@@ -32,13 +33,13 @@ import org.mewx.wenku8.util.LightCache;
 import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
-import java.util.ArrayList;
 
 /**
  * Created by MewX on 2015/7/28.
  * View large image activity.
  */
 public class ViewImageDetailActivity extends BaseMaterialActivity {
+    private static final String TAG = ViewImageDetailActivity.class.getSimpleName();
 
     private String path;
     private String fileName;
@@ -55,6 +56,8 @@ public class ViewImageDetailActivity extends BaseMaterialActivity {
         // fetch value
         path = getIntent().getStringExtra("path");
         fileName = path.contains("/") ? path.split("/")[path.split("/").length - 1] : "default.jpg";
+        Log.d(TAG, "onCreate: path = " + path);
+        Log.d(TAG, "onCreate: fileName = " + fileName);
         if (getSupportActionBar() != null) {
             getSupportActionBar().setTitle(fileName);
         }

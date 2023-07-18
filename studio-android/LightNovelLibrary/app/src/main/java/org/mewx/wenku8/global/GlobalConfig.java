@@ -133,6 +133,7 @@ public class GlobalConfig {
     public static void initImageLoader(Context context) {
         UnlimitedDiscCache localUnlimitedDiscCache = new UnlimitedDiscCache(
                 new File(GlobalConfig.getDefaultStoragePath() + "cache"),
+                // FIXME: these imgs folders are actually no in use.
                 new File(context.getCacheDir() + File.separator + "imgs"));
         DisplayImageOptions localDisplayImageOptions = new DisplayImageOptions.Builder()
                 .resetViewBeforeLoading(true)
@@ -776,12 +777,9 @@ public class GlobalConfig {
 
     /* Novel content */
     /**
-     * saveNovelContentImage:
+     * Async gets image url and download to save folder's image folder.
      *
-     * Async get image url and download to save folder's image folder
-     *
-     * @param url
-     *            : full http url of target image
+     * @param url full http url of target image
      * @return if file finally exist, if already exist before saving, still
      *          return true; if finally the file does not exist, return false.
      */
@@ -801,15 +799,12 @@ public class GlobalConfig {
     }
 
     /**
-     * getAvailableNovolContentImagePath:
+     * Gets available local saving path of target image.
      *
-     * get available local saving path of target image.
-     *
-     * @param fileName
-     *            : just need the fileName
+     * @param fileName just need the fileName
      * @return direct fileName or just null
      */
-    public static String getAvailableNovolContentImagePath(String fileName) {
+    public static String getAvailableNovelContentImagePath(String fileName) {
         if (LightCache.testFileExist(getFirstFullSaveFilePath() + imgsSaveFolderName + File.separator + fileName)) {
             return getFirstFullSaveFilePath() + imgsSaveFolderName + File.separator + fileName;
         } else if (LightCache.testFileExist(getSecondFullSaveFilePath() + imgsSaveFolderName + File.separator + fileName)) {

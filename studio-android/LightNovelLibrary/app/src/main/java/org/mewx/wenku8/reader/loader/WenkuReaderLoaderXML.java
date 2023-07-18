@@ -105,12 +105,12 @@ public class WenkuReaderLoaderXML extends WenkuReaderLoader {
         if(currentIndex + 1 < nc.size() && currentIndex >= 0) {
             currentIndex++;
             String imgFileName = GlobalConfig.generateImageFileNameByURL(nc.get(currentIndex).content);
-            String path = GlobalConfig.getAvailableNovolContentImagePath(imgFileName);
+            String path = GlobalConfig.getAvailableNovelContentImagePath(imgFileName);
 
             if (path == null || path.equals("")) {
                 GlobalConfig.saveNovelContentImage(nc.get(currentIndex).content);
                 String name = GlobalConfig.generateImageFileNameByURL(nc.get(currentIndex).content);
-                path = GlobalConfig.getAvailableNovolContentImagePath(name);
+                path = GlobalConfig.getAvailableNovelContentImagePath(name);
             }
 
             // load bitmap
@@ -155,12 +155,12 @@ public class WenkuReaderLoaderXML extends WenkuReaderLoader {
         // Async get bitmap from local or internet
         if(currentIndex < nc.size() && currentIndex >= 0) {
             String imgFileName = GlobalConfig.generateImageFileNameByURL(nc.get(currentIndex).content);
-            String path = GlobalConfig.getAvailableNovolContentImagePath(imgFileName);
+            String path = GlobalConfig.getAvailableNovelContentImagePath(imgFileName);
 
             if (path == null || path.equals("")) {
                 GlobalConfig.saveNovelContentImage(nc.get(currentIndex).content);
                 String name = GlobalConfig.generateImageFileNameByURL(nc.get(currentIndex).content);
-                path = GlobalConfig.getAvailableNovolContentImagePath(name);
+                path = GlobalConfig.getAvailableNovelContentImagePath(name);
             }
 
             // load bitmap
@@ -198,12 +198,12 @@ public class WenkuReaderLoaderXML extends WenkuReaderLoader {
         if(currentIndex < nc.size() && currentIndex - 1 >= 0) {
             currentIndex--;
             String imgFileName = GlobalConfig.generateImageFileNameByURL(nc.get(currentIndex).content);
-            String path = GlobalConfig.getAvailableNovolContentImagePath(imgFileName);
+            String path = GlobalConfig.getAvailableNovelContentImagePath(imgFileName);
 
             if (path == null || path.equals("")) {
                 GlobalConfig.saveNovelContentImage(nc.get(currentIndex).content);
                 String name = GlobalConfig.generateImageFileNameByURL(nc.get(currentIndex).content);
-                path = GlobalConfig.getAvailableNovolContentImagePath(name);
+                path = GlobalConfig.getAvailableNovelContentImagePath(name);
             }
 
             // load bitmap

@@ -127,6 +127,7 @@ public class NovelInfoActivity extends BaseMaterialActivity {
 
         // hide view and set colors
         tvNovelTitle.setText(title);
+        // FIXME: these imgs folders are actually no in use.
         if(LightCache.testFileExist(GlobalConfig.getDefaultStoragePath() + "imgs" + File.separator + aid + ".jpg"))
             ImageLoader.getInstance().displayImage("file://" + GlobalConfig.getDefaultStoragePath() + "imgs" + File.separator + aid + ".jpg", ivNovelCover);
         else if(LightCache.testFileExist(GlobalConfig.getBackupStoragePath() + "imgs" + File.separator + aid + ".jpg"))

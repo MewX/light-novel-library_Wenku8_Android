@@ -73,6 +73,7 @@ public class NovelItemAdapter extends RecyclerView.Adapter<NovelItemAdapter.View
             viewHolder.tvNovelIntro.setText(mDataset.get(i).intro_short);
 
         // need to solve flicking problem
+        // FIXME: these imgs folders are actually no in use.
         if(LightCache.testFileExist(GlobalConfig.getDefaultStoragePath() + "imgs" + File.separator + mDataset.get(i).aid + ".jpg"))
             ImageLoader.getInstance().displayImage("file://" + GlobalConfig.getDefaultStoragePath() + "imgs" + File.separator + mDataset.get(i).aid + ".jpg", viewHolder.ivNovelCover);
         else if(LightCache.testFileExist(GlobalConfig.getBackupStoragePath() + "imgs" + File.separator + mDataset.get(i).aid + ".jpg"))

@@ -662,14 +662,14 @@ public class WenkuReaderPageView extends View {
             bi_bak = params[0];
 
             String imgFileName = GlobalConfig.generateImageFileNameByURL(lineInfoList.get(params[0].idxLineInfo).text);
-            if(GlobalConfig.getAvailableNovolContentImagePath(imgFileName) == null) {
+            if(GlobalConfig.getAvailableNovelContentImagePath(imgFileName) == null) {
                 if(!GlobalConfig.saveNovelContentImage(lineInfoList.get(params[0].idxLineInfo).text))
                     return Wenku8Error.ErrorCode.NETWORK_ERROR;
                 imgFileName = GlobalConfig.generateImageFileNameByURL(lineInfoList.get(params[0].idxLineInfo).text);
             }
 
             ImageSize targetSize = new ImageSize(params[0].width, params[0].height); // result Bitmap will be fit to this size
-            params[0].bm = ImageLoader.getInstance().loadImageSync("file://" + GlobalConfig.getAvailableNovolContentImagePath(imgFileName), targetSize);
+            params[0].bm = ImageLoader.getInstance().loadImageSync("file://" + GlobalConfig.getAvailableNovelContentImagePath(imgFileName), targetSize);
             int width = params[0].bm.getWidth(), height = params[0].bm.getHeight();
             if(params[0].height / (float)params[0].width > height / (float)width) {
                 // fit width
@@ -702,7 +702,7 @@ public class WenkuReaderPageView extends View {
         }
         else {
             Intent intent = new Intent(activity, ViewImageDetailActivity.class);
-            intent.putExtra("path", GlobalConfig.getAvailableNovolContentImagePath(GlobalConfig.generateImageFileNameByURL(lineInfoList.get(bitmapInfoList.get(0).idxLineInfo).text)));
+            intent.putExtra("path", GlobalConfig.getAvailableNovelContentImagePath(GlobalConfig.generateImageFileNameByURL(lineInfoList.get(bitmapInfoList.get(0).idxLineInfo).text)));
             activity.startActivity(intent);
             activity.overridePendingTransition(R.anim.fade_in, R.anim.hold); // fade in animation
         }

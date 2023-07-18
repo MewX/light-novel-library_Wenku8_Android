@@ -93,6 +93,7 @@ public class NovelItemAdapterUpdate extends RecyclerView.Adapter<NovelItemAdapte
             viewHolder.tvNovelIntro.setText(mDataset.get(i).latest_chapter);
         }
 
+        // FIXME: these imgs folders are actually no in use.
         if(LightCache.testFileExist(GlobalConfig.getDefaultStoragePath() + "imgs" + File.separator + mDataset.get(i).aid + ".jpg"))
             ImageLoader.getInstance().displayImage("file://" + GlobalConfig.getDefaultStoragePath() + "imgs" + File.separator + mDataset.get(i).aid + ".jpg", viewHolder.ivNovelCover);
         else if(LightCache.testFileExist(GlobalConfig.getBackupStoragePath() + "imgs" + File.separator + mDataset.get(i).aid + ".jpg"))
