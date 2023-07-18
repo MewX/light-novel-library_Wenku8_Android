@@ -172,11 +172,9 @@ public class NovelInfoActivity extends BaseMaterialActivity {
             if (famMenu.isExpanded())
                 famMenu.collapse();
         });
-        if(Build.VERSION.SDK_INT >= 16) {
-            tvNovelTitle.setBackground(getResources().getDrawable(R.drawable.btn_menu_item));
-            tvNovelAuthor.setBackground(getResources().getDrawable(R.drawable.btn_menu_item));
-            tvLatestChapter.setBackground(getResources().getDrawable(R.drawable.btn_menu_item));
-        }
+        tvNovelTitle.setBackground(getResources().getDrawable(R.drawable.btn_menu_item));
+        tvNovelAuthor.setBackground(getResources().getDrawable(R.drawable.btn_menu_item));
+        tvLatestChapter.setBackground(getResources().getDrawable(R.drawable.btn_menu_item));
         tvNovelTitle.setOnClickListener(v -> {
             if (runLoadingChecker()) return;
 

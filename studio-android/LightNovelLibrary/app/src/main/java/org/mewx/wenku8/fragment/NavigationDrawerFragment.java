@@ -235,11 +235,9 @@ public class NavigationDrawerFragment extends Fragment {
         }
 
         // Clear view background color (only works for API 16+).
-        if (Build.VERSION.SDK_INT >= 16) {
-            TableRow tableRow = mainActivity.findViewById(backgroundId);
-            if (tableRow != null) {
-                tableRow.setBackground(getResources().getDrawable(R.drawable.btn_menu_item));
-            }
+        TableRow tableRow = mainActivity.findViewById(backgroundId);
+        if (tableRow != null) {
+            tableRow.setBackground(getResources().getDrawable(R.drawable.btn_menu_item));
         }
     }
 
@@ -259,25 +257,20 @@ public class NavigationDrawerFragment extends Fragment {
 
     @SuppressLint("NewApi")
     private void setHighLightButton(int iconId, int textId, int backgroundId) {
-        final boolean api16plus = Build.VERSION.SDK_INT >= 16;
         ImageButton icon = mainActivity.findViewById(iconId);
         if (icon != null) {
-            icon.setColorFilter(getResources().getColor(
-                    api16plus ? R.color.menu_text_color_selected : R.color.menu_item_blue));
+            icon.setColorFilter(getResources().getColor(R.color.menu_text_color_selected));
         }
 
         TextView textView = mainActivity.findViewById(textId);
         if (textView != null) {
-            textView.setTextColor(getResources().getColor(
-                    api16plus ? R.color.menu_item_white : R.color.menu_item_blue));
+            textView.setTextColor(getResources().getColor(R.color.menu_item_white));
         }
 
         // Set view background color (only works for API 16+).
-        if (api16plus) {
-            TableRow tableRow = mainActivity.findViewById(backgroundId);
-            if (tableRow != null) {
-                tableRow.setBackground(getResources().getDrawable(R.drawable.btn_menu_item_selected));
-            }
+        TableRow tableRow = mainActivity.findViewById(backgroundId);
+        if (tableRow != null) {
+            tableRow.setBackground(getResources().getDrawable(R.drawable.btn_menu_item_selected));
         }
     }
 
@@ -313,19 +306,12 @@ public class NavigationDrawerFragment extends Fragment {
         TextView darkModeSwitcherText = mainActivity.findViewById(R.id.main_menu_dark_mode_switcher);
         if (darkModeSwitcherText != null) {
             // Set view background color (only works for API 16+).
-            if (Build.VERSION.SDK_INT >= 16) {
-                darkModeSwitcherText.setTextColor(getResources().getColor(
-                        fakeDarkSwitcher ?/*switch off*/ R.color.menu_text_color :/*switch on*/ R.color.menu_text_color_selected
-                ));
-                darkModeSwitcherText.setBackground(getResources().getDrawable(
-                        fakeDarkSwitcher ?/*switch off*/R.drawable.btn_menu_item :/*switch on*/R.drawable.btn_menu_item_selected
-                ));
-            } else {
-                // Fall back to old Android style.
-                darkModeSwitcherText.setTextColor(getResources().getColor(
-                        fakeDarkSwitcher ?/*switch off*/ R.color.menu_text_color :/*switch on*/ R.color.menu_item_blue
-                ));
-            }
+            darkModeSwitcherText.setTextColor(getResources().getColor(
+                    fakeDarkSwitcher ?/*switch off*/ R.color.menu_text_color :/*switch on*/ R.color.menu_text_color_selected
+            ));
+            darkModeSwitcherText.setBackground(getResources().getDrawable(
+                    fakeDarkSwitcher ?/*switch off*/R.drawable.btn_menu_item :/*switch on*/R.drawable.btn_menu_item_selected
+            ));
         }
 
         fakeDarkSwitcher = !fakeDarkSwitcher;

@@ -482,10 +482,9 @@ public class Wenku8ReaderActivityV1 extends BaseMaterialActivity {
                             findViewById(R.id.reader_top).setVisibility(View.VISIBLE);
                             findViewById(R.id.reader_bot).setVisibility(View.VISIBLE);
 
-                            if (Build.VERSION.SDK_INT >= 16 ) {
-                                getTintManager().setStatusBarAlpha(0.90f);
-                                getTintManager().setNavigationBarAlpha(0.80f); // TODO: fix bug
-                            }
+                            getTintManager().setStatusBarAlpha(0.90f);
+                            getTintManager().setNavigationBarAlpha(0.80f); // TODO: fix bug
+
                             barStatus = true;
 
                             if(!isSet) {
@@ -798,10 +797,10 @@ public class Wenku8ReaderActivityV1 extends BaseMaterialActivity {
                             findViewById(R.id.reader_bot).setVisibility(View.INVISIBLE);
                             findViewById(R.id.reader_bot_seeker).setVisibility(View.INVISIBLE);
                             findViewById(R.id.reader_bot_settings).setVisibility(View.INVISIBLE);
-                            if (Build.VERSION.SDK_INT >= 16 ) {
-                                getTintManager().setStatusBarAlpha(0.0f);
-                                getTintManager().setNavigationBarAlpha(0.0f);
-                            }
+
+                            getTintManager().setStatusBarAlpha(0.0f);
+                            getTintManager().setNavigationBarAlpha(0.0f);
+
                             barStatus = false;
                         }
                         return;
@@ -940,25 +939,12 @@ public class Wenku8ReaderActivityV1 extends BaseMaterialActivity {
         if (requestCode == REQUEST_FONT_PICKER_LEGACY && resultCode == Activity.RESULT_OK) {
             // get ttf path
             if (data.getBooleanExtra(FilePickerActivity.EXTRA_ALLOW_MULTIPLE, false)) {
-                // For JellyBean and above
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
-                    ClipData clip = data.getClipData();
-                    if (clip != null) {
-                        for (int i = 0; i < clip.getItemCount(); i++) {
-                            Uri uri = clip.getItemAt(i).getUri();
-                            // Do something with the URI
-                            runSaveCustomFontPath(uri.toString().replaceAll("file://", ""));
-                        }
-                    }
-                } else {
-                    // For Ice Cream Sandwich
-                    ArrayList<String> paths = data.getStringArrayListExtra(FilePickerActivity.EXTRA_PATHS);
-                    if (paths != null) {
-                        for (String path : paths) {
-                            Uri uri = Uri.parse(path);
-                            // Do something with the URI
-                            runSaveCustomFontPath(uri.toString().replaceAll("file://", ""));
-                        }
+                ClipData clip = data.getClipData();
+                if (clip != null) {
+                    for (int i = 0; i < clip.getItemCount(); i++) {
+                        Uri uri = clip.getItemAt(i).getUri();
+                        // Do something with the URI
+                        runSaveCustomFontPath(uri.toString().replaceAll("file://", ""));
                     }
                 }
             } else {
@@ -969,25 +955,12 @@ public class Wenku8ReaderActivityV1 extends BaseMaterialActivity {
         } else if (requestCode == REQUEST_IMAGE_PICKER_LEGACY && resultCode == Activity.RESULT_OK) {
             // get image path
             if (data.getBooleanExtra(FilePickerActivity.EXTRA_ALLOW_MULTIPLE, false)) {
-                // For JellyBean and above
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
-                    ClipData clip = data.getClipData();
-                    if (clip != null) {
-                        for (int i = 0; i < clip.getItemCount(); i++) {
-                            Uri uri = clip.getItemAt(i).getUri();
-                            // Do something with the URI
-                            runSaveCustomBackgroundPath(uri.toString().replaceAll("file://", ""));
-                        }
-                    }
-                } else {
-                    // For Ice Cream Sandwich
-                    ArrayList<String> paths = data.getStringArrayListExtra(FilePickerActivity.EXTRA_PATHS);
-                    if (paths != null) {
-                        for (String path : paths) {
-                            Uri uri = Uri.parse(path);
-                            // Do something with the URI
-                            runSaveCustomBackgroundPath(uri.toString().replaceAll("file://", ""));
-                        }
+                ClipData clip = data.getClipData();
+                if (clip != null) {
+                    for (int i = 0; i < clip.getItemCount(); i++) {
+                        Uri uri = clip.getItemAt(i).getUri();
+                        // Do something with the URI
+                        runSaveCustomBackgroundPath(uri.toString().replaceAll("file://", ""));
                     }
                 }
             } else {

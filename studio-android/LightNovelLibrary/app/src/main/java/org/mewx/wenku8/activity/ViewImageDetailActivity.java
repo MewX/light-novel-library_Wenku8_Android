@@ -74,19 +74,15 @@ public class ViewImageDetailActivity extends BaseMaterialActivity {
                     hideNavigationBar();
                     findViewById(R.id.toolbar_actionbar).setVisibility(View.INVISIBLE);
                     findViewById(R.id.image_detail_bot).setVisibility(View.INVISIBLE);
-                    if (Build.VERSION.SDK_INT >= 16 ) {
-                        getTintManager().setStatusBarAlpha(0.0f);
-                        getTintManager().setNavigationBarAlpha(0.0f);
-                    }
+                    getTintManager().setStatusBarAlpha(0.0f);
+                    getTintManager().setNavigationBarAlpha(0.0f);
                 } else {
                     shown = true;
                     showNavigationBar();
                     findViewById(R.id.toolbar_actionbar).setVisibility(View.VISIBLE);
                     findViewById(R.id.image_detail_bot).setVisibility(View.VISIBLE);
-                    if (Build.VERSION.SDK_INT >= 16 ) {
-                        getTintManager().setStatusBarAlpha(0.9f);
-                        getTintManager().setNavigationBarAlpha(0.8f);
-                    }
+                    getTintManager().setStatusBarAlpha(0.9f);
+                    getTintManager().setNavigationBarAlpha(0.8f);
                 }
             }
         });
@@ -169,24 +165,12 @@ public class ViewImageDetailActivity extends BaseMaterialActivity {
         // Saving images to local storage.
         if (requestCode == 0 && resultCode == Activity.RESULT_OK) {
             if (data.getBooleanExtra(FilePickerActivity.EXTRA_ALLOW_MULTIPLE, false)) {
-                // For JellyBean and above
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
-                    ClipData clip = data.getClipData();
-                    if (clip != null) {
-                        for (int i = 0; i < clip.getItemCount(); i++) {
-                            Uri uri = clip.getItemAt(i).getUri();
-                            // Do something with the URI
-                            runSaveProcedure(uri.toString());
-                        }
-                    }
-                } else {
-                    ArrayList<String> paths = data.getStringArrayListExtra(FilePickerActivity.EXTRA_PATHS);
-                    if (paths != null) {
-                        for (String path: paths) {
-                            Uri uri = Uri.parse(path);
-                            // Do something with the URI
-                            runSaveProcedure(uri.toString());
-                        }
+                ClipData clip = data.getClipData();
+                if (clip != null) {
+                    for (int i = 0; i < clip.getItemCount(); i++) {
+                        Uri uri = clip.getItemAt(i).getUri();
+                        // Do something with the URI
+                        runSaveProcedure(uri.toString());
                     }
                 }
             } else {

@@ -79,24 +79,21 @@ public class BaseMaterialActivity extends AppCompatActivity {
         }
 
         // change status bar color tint, and this require SDK16
-        if (Build.VERSION.SDK_INT >= 16) {
-            // Android API 22 has more effects on status bar, so ignore
+        // Android API 22 has more effects on status bar, so ignore
+        // create our manager instance after the content view is set
+        tintManager = getTintManager();
+        tintManager.setStatusBarTintEnabled(true);
+        tintManager.setNavigationBarTintEnabled(true);
+        tintManager.setTintAlpha(statusBarColor == StatusBarColor.DARK ? 0.9f : 0.15f);
+        tintManager.setNavigationBarAlpha(statusBarColor == StatusBarColor.DARK ? 0.8f : 0.0f);
+        // set all color
+        tintManager.setTintColor(getResources().getColor(android.R.color.black));
 
-            // create our manager instance after the content view is set
-            tintManager = getTintManager();
-            tintManager.setStatusBarTintEnabled(true);
-            tintManager.setNavigationBarTintEnabled(true);
-            tintManager.setTintAlpha(statusBarColor == StatusBarColor.DARK ? 0.9f : 0.15f);
-            tintManager.setNavigationBarAlpha(statusBarColor == StatusBarColor.DARK ? 0.8f : 0.0f);
-            // set all color
-            tintManager.setTintColor(getResources().getColor(android.R.color.black));
-
-            // set Navigation bar color
-            if (Build.VERSION.SDK_INT >= 21 && statusBarColor != StatusBarColor.DARK) {
-                final int statusBarColorId = statusBarColor == StatusBarColor.PRIMARY ?
-                        R.color.myNavigationColor : R.color.myNavigationColorWhite;
-                getWindow().setNavigationBarColor(getResources().getColor(statusBarColorId));
-            }
+        // set Navigation bar color
+        if (Build.VERSION.SDK_INT >= 21 && statusBarColor != StatusBarColor.DARK) {
+            final int statusBarColorId = statusBarColor == StatusBarColor.PRIMARY ?
+                    R.color.myNavigationColor : R.color.myNavigationColorWhite;
+            getWindow().setNavigationBarColor(getResources().getColor(statusBarColorId));
         }
     }
 

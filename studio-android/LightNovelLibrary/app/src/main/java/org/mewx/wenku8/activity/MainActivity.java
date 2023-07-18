@@ -97,7 +97,7 @@ public class MainActivity extends BaseMaterialActivity {
         // Requests storage RW permissions only when save file migration is not done.
         if (SaveFileMigration.migrationCompleted()) {
             Log.i(TAG, "Save file migration has completed.");
-        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
+        } else {
             // Write permission.
             if (missingPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE)) {
                 ActivityCompat.requestPermissions(this,
@@ -112,7 +112,7 @@ public class MainActivity extends BaseMaterialActivity {
                 ActivityCompat.requestPermissions(this,
                         new String[]{Manifest.permission.READ_MEDIA_IMAGES}, REQUEST_READ_MEDIA_IMAGES);
             }
-        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
+        } else {
             if (missingPermission(Manifest.permission.READ_EXTERNAL_STORAGE)) {
                 ActivityCompat.requestPermissions(this,
                         new String[]{Manifest.permission.READ_EXTERNAL_STORAGE}, REQUEST_READ_EXTERNAL);

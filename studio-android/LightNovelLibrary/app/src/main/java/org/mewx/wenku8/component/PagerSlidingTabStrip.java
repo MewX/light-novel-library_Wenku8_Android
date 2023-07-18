@@ -262,11 +262,7 @@ public class PagerSlidingTabStrip extends HorizontalScrollView {
             @Override
             public void onGlobalLayout() {
 
-                if (Build.VERSION.SDK_INT < Build.VERSION_CODES.JELLY_BEAN) {
-                    getViewTreeObserver().removeGlobalOnLayoutListener(this);
-                } else {
-                    getViewTreeObserver().removeOnGlobalLayoutListener(this);
-                }
+                getViewTreeObserver().removeOnGlobalLayoutListener(this);
 
                 currentPosition = pager.getCurrentItem();
                 currentPositionOffset = 0f;
@@ -393,11 +389,7 @@ public class PagerSlidingTabStrip extends HorizontalScrollView {
         public void onGlobalLayout() {
             View view = tabsContainer.getChildAt(0);
 
-            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.JELLY_BEAN) {
-                getViewTreeObserver().removeGlobalOnLayoutListener(this);
-            } else {
-                getViewTreeObserver().removeOnGlobalLayoutListener(this);
-            }
+            getViewTreeObserver().removeOnGlobalLayoutListener(this);
 
             if (isPaddingMiddle) {
                 int mHalfWidthFirstTab = view.getWidth() / 2;

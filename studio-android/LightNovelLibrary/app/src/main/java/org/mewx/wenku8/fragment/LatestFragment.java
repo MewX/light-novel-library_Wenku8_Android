@@ -293,6 +293,7 @@ public class LatestFragment extends Fragment implements MyItemClickListener, MyI
             currentPage ++; // add when loaded
             isLoading = false;
 
+            // FIXME: java.lang.NullPointerException: Attempt to invoke virtual method 'void android.view.View.setVisibility(int)' on a null object reference
             if (usingWenku8Relay) {
                 mainActivity.findViewById(R.id.relay_warning).setVisibility(View.VISIBLE);
             } else {

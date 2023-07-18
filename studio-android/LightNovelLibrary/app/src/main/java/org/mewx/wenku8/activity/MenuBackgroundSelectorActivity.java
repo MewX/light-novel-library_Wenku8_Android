@@ -108,24 +108,12 @@ public class MenuBackgroundSelectorActivity extends BaseMaterialActivity {
         if (requestCode == 0) {
             // get ttf path
             if (data.getBooleanExtra(FilePickerActivity.EXTRA_ALLOW_MULTIPLE, false)) {
-                // For JellyBean and above
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
-                    ClipData clip = data.getClipData();
-                    if (clip != null) {
-                        for (int i = 0; i < clip.getItemCount(); i++) {
-                            Uri uri = clip.getItemAt(i).getUri();
-                            // Do something with the URI
-                            runSaveCustomMenuBackground(uri.toString().replaceAll("file://", ""));
-                        }
-                    }
-                } else {
-                    ArrayList<String> paths = data.getStringArrayListExtra(FilePickerActivity.EXTRA_PATHS);
-                    if (paths != null) {
-                        for (String path : paths) {
-                            Uri uri = Uri.parse(path);
-                            // Do something with the URI
-                            runSaveCustomMenuBackground(uri.toString().replaceAll("file://", ""));
-                        }
+                ClipData clip = data.getClipData();
+                if (clip != null) {
+                    for (int i = 0; i < clip.getItemCount(); i++) {
+                        Uri uri = clip.getItemAt(i).getUri();
+                        // Do something with the URI
+                        runSaveCustomMenuBackground(uri.toString().replaceAll("file://", ""));
                     }
                 }
             } else {
