@@ -7,8 +7,8 @@ on:
     branches: [ "master" ]
 
 env:
-  TARGET_SDK_VERSION: 29
-  BUILD_TOOLS_VERSION: 30.0.3
+  TARGET_SDK_VERSION: 33
+  BUILD_TOOLS_VERSION: 33.0.2
 
 defaults:
   run:
@@ -34,8 +34,9 @@ jobs:
     - name: Set up Android emulator, build, test and Coveralls
       uses: reactivecircus/android-emulator-runner@v2
       with:
-        api-level: 30
-        arch: arm64-v8a
+        api-level: 33
+        arch: x86_64
+        profile: Pixel 6
         working-directory: ./studio-android/LightNovelLibrary
         script: ./gradlew assembleAlpha connectedAlphaDebugAndroidTest coveralls
 
