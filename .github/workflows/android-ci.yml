@@ -34,7 +34,7 @@ jobs:
     - name: Set up Android emulator, build, test and Coveralls
       uses: reactivecircus/android-emulator-runner@v2
       with:
-        api-level: 33
+        api-level: 30
         arch: x86_64
         profile: Pixel 6
         working-directory: ./studio-android/LightNovelLibrary
