@@ -36,7 +36,7 @@ jobs:
       with:
         api-level: 30
         arch: x86_64
-        profile: Pixel 6
+        profile: Nexus 6
         working-directory: ./studio-android/LightNovelLibrary
         script: ./gradlew assembleAlpha connectedAlphaDebugAndroidTest coveralls
 
