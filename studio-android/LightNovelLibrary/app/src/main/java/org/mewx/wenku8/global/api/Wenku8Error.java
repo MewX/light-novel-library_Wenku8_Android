@@ -27,17 +27,14 @@ public class Wenku8Error {
         BYTE_TO_STRING_EXCEPTION,
         USER_INFO_EMPTY,
         NETWORK_ERROR,
+        STORAGE_ERROR,
+        IMAGE_LOADING_ERROR,
         STRING_CONVERSION_ERROR,
         XML_PARSE_FAILED,
         USER_CANCELLED_TASK,
         PARAM_COUNT_NOT_MATCHED,
         LOCAL_BOOK_REMOVE_FAILED,
         SERVER_RETURN_NOTHING
-    }
-
-    public static String translateErrorCode(ErrorCode ec) {
-
-        return "";
     }
 
     public static ErrorCode getSystemDefinedErrorCode(int err) {

@@ -5,10 +5,10 @@ import android.content.Context;
 import android.graphics.Bitmap;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
+import android.util.Log;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import android.util.Log;
 
 import com.nostra13.universalimageloader.cache.disc.impl.UnlimitedDiscCache;
 import com.nostra13.universalimageloader.core.DisplayImageOptions;
@@ -785,15 +785,17 @@ public class GlobalConfig {
      */
     public static boolean saveNovelContentImage(String url) {
         String imgFileName = generateImageFileNameByURL(url);
-        if (!LightCache.testFileExist(getFirstFullSaveFilePath() + imgsSaveFolderName + File.separator + imgFileName)
-                && !LightCache.testFileExist(getSecondFullSaveFilePath() + imgsSaveFolderName + File.separator + imgFileName)) {
+        String defaultFullPath = getFirstFullSaveFilePath() + imgsSaveFolderName + File.separator + imgFileName;
+        String fallbackFullPath = getSecondFullSaveFilePath() + imgsSaveFolderName + File.separator + imgFileName;
+
+        if (!LightCache.testFileExist(defaultFullPath) && !LightCache.testFileExist(fallbackFullPath)) {
             // neither of the file exist
             byte[] fileContent = LightNetwork.LightHttpDownload(url);
             if (fileContent == null)
                 return false; // network error
 
-            return LightCache.saveFile(getFirstFullSaveFilePath() + imgsSaveFolderName + File.separator, imgFileName, fileContent, true)
-                || LightCache.saveFile(getSecondFullSaveFilePath() + imgsSaveFolderName + File.separator, imgFileName, fileContent, true);
+            return LightCache.saveFile(defaultFullPath, fileContent, true)
+                    || LightCache.saveFile(fallbackFullPath, fileContent, true);
         }
         return true; // file exist
     }
@@ -805,12 +807,16 @@ public class GlobalConfig {
      * @return direct fileName or just null
      */
     public static String getAvailableNovelContentImagePath(String fileName) {
-        if (LightCache.testFileExist(getFirstFullSaveFilePath() + imgsSaveFolderName + File.separator + fileName)) {
-            return getFirstFullSaveFilePath() + imgsSaveFolderName + File.separator + fileName;
-        } else if (LightCache.testFileExist(getSecondFullSaveFilePath() + imgsSaveFolderName + File.separator + fileName)) {
-            return getSecondFullSaveFilePath() + imgsSaveFolderName + File.separator + fileName;
-        } else
+        String defaultFullPath = getFirstFullSaveFilePath() + imgsSaveFolderName + File.separator + fileName;
+        String fallbackFullPath = getSecondFullSaveFilePath() + imgsSaveFolderName + File.separator + fileName;
+
+        if (LightCache.testFileExist(defaultFullPath)) {
+            return defaultFullPath;
+        } else if (LightCache.testFileExist(fallbackFullPath)) {
+            return fallbackFullPath;
+        } else {
             return null;
+        }
     }
 
 

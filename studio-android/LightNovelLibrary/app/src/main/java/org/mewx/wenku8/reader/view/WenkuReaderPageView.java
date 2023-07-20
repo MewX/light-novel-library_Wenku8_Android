@@ -50,6 +50,8 @@ import java.util.Random;
  *  - Bot: ToolBar
  */
 public class WenkuReaderPageView extends View {
+    private static final String TAG = WenkuReaderPageView.class.getSimpleName();
+
     // enum
     public enum LOADING_DIRECTION {
         FORWARDS, // go to next page
@@ -586,6 +588,7 @@ public class WenkuReaderPageView extends View {
                 heightSum += fontHeight;
             } else if(li.type == WenkuReaderLoader.ElementType.IMAGE_DEPENDENT){
                 if (bitmapInfoList == null) {
+                    // TODO: fix this magic number 21.
                     canvas.drawText("Unexpected array: " + li.text.substring(21), (float) screenDrawArea.first.x, (float) heightSum, textPaint);
                     continue;
                 }
@@ -600,6 +603,7 @@ public class WenkuReaderPageView extends View {
 
                 if (bi == null) {
                     // not found, new load task
+                    // TODO: fix this magic number 21.
                     canvas.drawText("正在加载图片：" + li.text.substring(21), (float) screenDrawArea.first.x, (float) heightSum, textPaint);
                     bi = new BitmapInfo();
                     bi.idxLineInfo = i;
@@ -613,6 +617,7 @@ public class WenkuReaderPageView extends View {
                     ali.execute(bitmapInfoList.get(0));
                 } else {
                     if (bi.bm == null) {
+                        // TODO: fix this magic number 21.
                         canvas.drawText("正在加载图片：" + li.text.substring(21), (float) screenDrawArea.first.x, (float) heightSum, textPaint);
                     } else {
                         int new_x = (screenDrawArea.second.x - screenDrawArea.first.x - bi.width) / 2 + bi.x_beg;
@@ -621,6 +626,7 @@ public class WenkuReaderPageView extends View {
                     }
                 }
             } else {
+                // TODO: fix this magic number 21.
                 canvas.drawText("（！请先用旧引擎浏览）图片" + li.text.substring(21), (float) screenDrawArea.first.x, (float) heightSum, textPaint);
             }
         }
@@ -655,33 +661,45 @@ public class WenkuReaderPageView extends View {
     }
 
     private class AsyncLoadImage extends AsyncTask<BitmapInfo, Integer, Wenku8Error.ErrorCode> {
-        BitmapInfo bi_bak;
 
         @Override
         protected Wenku8Error.ErrorCode doInBackground(BitmapInfo... params) {
-            bi_bak = params[0];
+            // Make an alias for the bitmap info.
+            BitmapInfo bitmapInfo = params[0];
 
-            String imgFileName = GlobalConfig.generateImageFileNameByURL(lineInfoList.get(params[0].idxLineInfo).text);
+            String imgFileName = GlobalConfig.generateImageFileNameByURL(lineInfoList.get(bitmapInfo.idxLineInfo).text);
             if(GlobalConfig.getAvailableNovelContentImagePath(imgFileName) == null) {
-                if(!GlobalConfig.saveNovelContentImage(lineInfoList.get(params[0].idxLineInfo).text))
+                if (!GlobalConfig.saveNovelContentImage(lineInfoList.get(bitmapInfo.idxLineInfo).text)) {
                     return Wenku8Error.ErrorCode.NETWORK_ERROR;
-                imgFileName = GlobalConfig.generateImageFileNameByURL(lineInfoList.get(params[0].idxLineInfo).text);
+                }
+
+                // Double check if the image exists in local storage.
+                if (GlobalConfig.getAvailableNovelContentImagePath(imgFileName) == null) {
+                    return Wenku8Error.ErrorCode.STORAGE_ERROR;
+                }
+
+                // The image should be downloaded.
+                imgFileName = GlobalConfig.generateImageFileNameByURL(lineInfoList.get(bitmapInfo.idxLineInfo).text);
             }
 
-            ImageSize targetSize = new ImageSize(params[0].width, params[0].height); // result Bitmap will be fit to this size
-            params[0].bm = ImageLoader.getInstance().loadImageSync("file://" + GlobalConfig.getAvailableNovelContentImagePath(imgFileName), targetSize);
-            int width = params[0].bm.getWidth(), height = params[0].bm.getHeight();
-            if(params[0].height / (float)params[0].width > height / (float)width) {
+            ImageSize targetSize = new ImageSize(bitmapInfo.width, bitmapInfo.height); // result Bitmap will be fit to this size
+            bitmapInfo.bm = ImageLoader.getInstance().loadImageSync("file://" + GlobalConfig.getAvailableNovelContentImagePath(imgFileName), targetSize);
+            if (bitmapInfo.bm == null) {
+                return Wenku8Error.ErrorCode.IMAGE_LOADING_ERROR;
+            }
+
+            int width = bitmapInfo.bm.getWidth(), height = bitmapInfo.bm.getHeight();
+            if (bitmapInfo.height / (float) bitmapInfo.width > height / (float) width) {
                 // fit width
                 float percentage = (float)height / width;
-                params[0].height = (int)(params[0].width * percentage);
+                bitmapInfo.height = (int) (bitmapInfo.width * percentage);
             }
             else {
                 // fit height
                 float percentage = (float)width / height;
-                params[0].width = (int)(params[0].height * percentage);
+                bitmapInfo.width = (int) (bitmapInfo.height * percentage);
             }
-            params[0].bm = Bitmap.createScaledBitmap(params[0].bm, params[0].width, params[0].height, true);
+            bitmapInfo.bm = Bitmap.createScaledBitmap(bitmapInfo.bm, bitmapInfo.width, bitmapInfo.height, true);
             return Wenku8Error.ErrorCode.SYSTEM_1_SUCCEEDED;
         }
 
@@ -689,10 +707,12 @@ public class WenkuReaderPageView extends View {
         protected void onPostExecute(Wenku8Error.ErrorCode errorCode) {
             super.onPostExecute(errorCode);
 
-            if(errorCode == Wenku8Error.ErrorCode.SYSTEM_1_SUCCEEDED)
+            if (errorCode == Wenku8Error.ErrorCode.SYSTEM_1_SUCCEEDED) {
                 WenkuReaderPageView.this.postInvalidate();
-            else
+            } else {
+                Log.e(TAG, "onPostExecute: image cannot be loaded " + errorCode.toString());
                 Toast.makeText(getContext(), errorCode.toString(), Toast.LENGTH_SHORT).show();
+            }
         }
     }
 
