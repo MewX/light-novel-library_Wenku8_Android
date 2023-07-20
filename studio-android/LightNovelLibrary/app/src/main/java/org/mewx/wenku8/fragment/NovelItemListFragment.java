@@ -110,10 +110,8 @@ public class NovelItemListFragment extends Fragment implements MyItemClickListen
         currentPage = 1; // default 1
         totalPage = 0; // default 0
 
-        mLayoutManager = null;
         mLayoutManager = new LinearLayoutManager(getActivity());
         mLayoutManager.setOrientation(LinearLayoutManager.VERTICAL);
-        mRecyclerView = null;
         mRecyclerView = rootView.findViewById(R.id.novel_item_list);
         mRecyclerView.setHasFixedSize(false); // set variable size
         mRecyclerView.setItemAnimator(new DefaultItemAnimator());
@@ -360,10 +358,11 @@ public class NovelItemListFragment extends Fragment implements MyItemClickListen
             refreshPartialIdList(tempNovelList);
             isLoading.set(false);
 
-            if (usingWenku8Relay) {
-                getActivity().findViewById(R.id.relay_warning).setVisibility(View.VISIBLE);
-            } else {
-                getActivity().findViewById(R.id.relay_warning).setVisibility(View.GONE);
+            if (getActivity() != null) {
+                View relayWarningView = getActivity().findViewById(R.id.relay_warning);
+                if (relayWarningView != null) {
+                    relayWarningView.setVisibility(usingWenku8Relay ? View.VISIBLE : View.GONE);
+                }
             }
         }
     }
