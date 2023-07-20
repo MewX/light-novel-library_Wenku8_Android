@@ -6,10 +6,6 @@ on:
   pull_request:
     branches: [ "master" ]
 
-env:
-  TARGET_SDK_VERSION: 33
-  BUILD_TOOLS_VERSION: 33.0.2
-
 defaults:
   run:
     working-directory: ./studio-android/LightNovelLibrary
@@ -38,5 +34,5 @@ jobs:
         arch: x86_64
         profile: Nexus 6
         working-directory: ./studio-android/LightNovelLibrary
-        script: ./gradlew assembleAlpha connectedAlphaDebugAndroidTest coveralls
+        script: ./gradlew assembleAlpha testAlphaDebugUnitTest connectedAlphaDebugAndroidTest coveralls
 
