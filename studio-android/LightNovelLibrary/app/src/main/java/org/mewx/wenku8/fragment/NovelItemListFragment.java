@@ -5,27 +5,28 @@ import android.content.Intent;
 import android.os.AsyncTask;
 import android.os.Build;
 import android.os.Bundle;
-import androidx.annotation.NonNull;
-import androidx.annotation.Nullable;
-
-import com.afollestad.materialdialogs.MaterialDialog;
-import com.afollestad.materialdialogs.Theme;
-import com.google.android.material.snackbar.Snackbar;
-import androidx.core.app.ActivityCompat;
-import androidx.core.app.ActivityOptionsCompat;
-import androidx.fragment.app.Fragment;
-import androidx.core.util.Pair;
-import androidx.appcompat.app.ActionBar;
-import androidx.appcompat.app.AppCompatActivity;
-import androidx.recyclerview.widget.DefaultItemAnimator;
-import androidx.recyclerview.widget.LinearLayoutManager;
-import androidx.recyclerview.widget.RecyclerView;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.TextView;
 import android.widget.Toast;
+
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+import androidx.appcompat.app.ActionBar;
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.app.ActivityCompat;
+import androidx.core.app.ActivityOptionsCompat;
+import androidx.core.util.Pair;
+import androidx.fragment.app.Fragment;
+import androidx.recyclerview.widget.DefaultItemAnimator;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
+
+import com.afollestad.materialdialogs.MaterialDialog;
+import com.afollestad.materialdialogs.Theme;
+import com.google.android.material.snackbar.Snackbar;
 
 import org.mewx.wenku8.R;
 import org.mewx.wenku8.activity.NovelInfoActivity;
@@ -41,6 +42,7 @@ import org.mewx.wenku8.util.LightNetwork;
 import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -48,10 +50,11 @@ import fr.castorflex.android.smoothprogressbar.SmoothProgressBar;
 
 public class NovelItemListFragment extends Fragment implements MyItemClickListener, MyItemLongClickListener {
 
-    // type def
-    private final String searchType = "search";
-    private String type, key;
-    private boolean isLoading = false; // judge network thread continue
+    private static final String SEARCH_TYPE = "search";
+
+    private String listType = "";
+    private String searchKey = "";
+    private final AtomicBoolean isLoading = new AtomicBoolean(false);
 
     // members
     private ActionBar actionBar = null;
@@ -60,8 +63,8 @@ public class NovelItemListFragment extends Fragment implements MyItemClickListen
     private SmoothProgressBar spb = null;
 
     // novel list info
-    private List<Integer> listNovelItemAid = null; // aid list
-    private List<NovelItemInfoUpdate> listNovelItemInfo = null; // novel info list
+    private List<Integer> listNovelItemAid = new ArrayList<>(); // aid list
+    private List<NovelItemInfoUpdate> listNovelItemInfo = new ArrayList<>(); // novel info list
     private NovelItemAdapterUpdate mAdapter = null;
 
     // page info
@@ -77,9 +80,9 @@ public class NovelItemListFragment extends Fragment implements MyItemClickListen
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        type = getArguments().getString("type");
+        listType = getArguments().getString("type");
         // judge if is 'search'
-        key = type != null && type.equals(searchType) ? getArguments().getString("key") : "";
+        searchKey = listType.equals(SEARCH_TYPE) ? getArguments().getString("key") : "";
 
         actionBar = ((AppCompatActivity) getActivity()).getSupportActionBar();
     }
@@ -87,7 +90,7 @@ public class NovelItemListFragment extends Fragment implements MyItemClickListen
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
         View rootView = inflater.inflate(R.layout.fragment_novel_item_list,container,false);
-        rootView.setTag(type); // set TAG
+        rootView.setTag(listType); // set TAG
 
         // Set warning message.
         rootView.findViewById(R.id.relay_warning).setOnClickListener(view -> new MaterialDialog.Builder(getContext())
@@ -102,8 +105,8 @@ public class NovelItemListFragment extends Fragment implements MyItemClickListen
                 .show());
 
         // init values
-        listNovelItemAid = null;
-        listNovelItemInfo = null;
+        listNovelItemAid = new ArrayList<>();
+        listNovelItemInfo = new ArrayList<>();
         currentPage = 1; // default 1
         totalPage = 0; // default 0
 
@@ -117,15 +120,15 @@ public class NovelItemListFragment extends Fragment implements MyItemClickListen
         mRecyclerView.setLayoutManager(mLayoutManager);
 
         // List request
-        if(type.equals(searchType)) {
+        if(listType.equals(SEARCH_TYPE)) {
             // update UI
             spb = getActivity().findViewById(R.id.spb);
             spb.progressiveStart();
 
-            // excute task
+            // execute task
             Toast.makeText(getActivity(),"search",Toast.LENGTH_SHORT).show();
             AsyncGetSearchResultList asyncGetSearchResultList = new AsyncGetSearchResultList();
-            asyncGetSearchResultList.execute(key);
+            asyncGetSearchResultList.execute(searchKey);
         }
         else {
             // Listener
@@ -190,19 +193,45 @@ public class NovelItemListFragment extends Fragment implements MyItemClickListen
     }
 
 
+    private void refreshPartialIdList(List<Integer> newNovelItemAids) {
+        // Some sanity checks.
+        if (newNovelItemAids == null || newNovelItemAids.isEmpty()) {
+            return;
+        }
+
+        // add to total list
+        listNovelItemAid.addAll(newNovelItemAids);
+
+        // Just append new updates.
+        int startIndex = listNovelItemInfo.size();
+
+        // set empty
+        for(Integer aid : newNovelItemAids) {
+            listNovelItemInfo.add(new NovelItemInfoUpdate(aid));
+        }
+
+        if(mAdapter == null) {
+            mAdapter = new NovelItemAdapterUpdate();
+            mAdapter.setOnItemClickListener(this);
+            mAdapter.setOnItemLongClickListener(this);
+        }
+        mAdapter.refreshDataset(listNovelItemInfo);
+
+        if(currentPage == 1 && mRecyclerView != null) {
+            mRecyclerView.setAdapter(mAdapter);
+        }
+        else {
+            mAdapter.notifyItemRangeInserted(startIndex, newNovelItemAids.size());
+        }
+    }
+
     /**
      * Refresh all the list with Integer array.
      * If empty, create;
      */
-    private void refreshIdList() {
-        if(listNovelItemAid==null)
-            listNovelItemAid = new ArrayList<>();
-
-        // set empty list with id only
-        if(listNovelItemInfo == null)
-            listNovelItemInfo = new ArrayList<>();
-        else
-            listNovelItemInfo.clear();
+    private void refreshEntireIdList() {
+        // Not creating new list for incremental data update.
+        listNovelItemInfo.clear();
 
         // set empty
         for(Integer temp : listNovelItemAid) {
@@ -214,20 +243,13 @@ public class NovelItemListFragment extends Fragment implements MyItemClickListen
             mAdapter.setOnItemClickListener(this);
             mAdapter.setOnItemLongClickListener(this);
         }
-        mAdapter.RefreshDataset(listNovelItemInfo);
+        mAdapter.refreshDataset(listNovelItemInfo);
 
         if(currentPage == 1 && mRecyclerView != null) {
             mRecyclerView.setAdapter(mAdapter);
         }
         else
             mAdapter.notifyDataSetChanged();
-    }
-
-    private void appendToIdList(List<Integer> l) {
-        if(listNovelItemAid==null)
-            listNovelItemAid = new ArrayList<>();
-        if(l!=null)
-            listNovelItemAid.addAll(l);
     }
 
     private class MyOnScrollListener extends RecyclerView.OnScrollListener {
@@ -240,12 +262,12 @@ public class NovelItemListFragment extends Fragment implements MyItemClickListen
             totalItemCount = mLayoutManager.getItemCount();
             pastVisiblesItems = mLayoutManager.findFirstVisibleItemPosition();
 
-            if (!isLoading) {
+            if (!isLoading.get()) {
                 // 滚动到一半的时候加载，即：剩余2个元素的时候就加载
                 if (visibleItemCount + pastVisiblesItems + 2 >= totalItemCount && (totalPage==0 || currentPage < totalPage)) {
                     // load more toast
                     Snackbar.make(mRecyclerView, getResources().getString(R.string.list_loading)
-                                    + "(" + Integer.toString(currentPage + 1) + "/" + Integer.toString(totalPage) + ")",
+                                    + "(" + (currentPage + 1) + "/" + totalPage + ")",
                             Snackbar.LENGTH_SHORT).show();
 
                     // load more thread
@@ -259,15 +281,26 @@ public class NovelItemListFragment extends Fragment implements MyItemClickListen
         private boolean usingWenku8Relay = false;
 
         private List<Integer> tempNovelList = new ArrayList<>();
+
+        private boolean raceCondition;
+
+        AsyncGetNovelItemList() {
+            raceCondition = !isLoading.compareAndSet(false, true);
+        }
+
         @Override
         protected Integer doInBackground(Integer... params) {
-            if(isLoading)
+            // Check if another loading happening.
+            if(raceCondition) {
+                Log.d("MewX", "doInBackground: blocking change");
                 return -1;
-            isLoading = true;
+            }
+
+            // Update the current page to the new page.
             currentPage = params[0];
 
             // params[0] is current page number
-            ContentValues cv = Wenku8API.getNovelList(Wenku8API.getNOVELSORTBY(type), currentPage);
+            ContentValues cv = Wenku8API.getNovelList(Wenku8API.getNOVELSORTBY(listType), currentPage);
             byte[] temp = LightNetwork.LightHttpPostConnection( Wenku8API.BASE_URL, cv);
             if(temp == null) {
                 // Try requesting from the relay.
@@ -279,6 +312,7 @@ public class NovelItemListFragment extends Fragment implements MyItemClickListen
                 usingWenku8Relay = true;
             }
             try {
+                Log.d("MewX", "doInBackground: loading page " + currentPage);
                 tempNovelList = Wenku8Parser.parseNovelItemList(new String(temp, "UTF-8"));
             }
             catch (UnsupportedEncodingException e) {
@@ -319,16 +353,12 @@ public class NovelItemListFragment extends Fragment implements MyItemClickListen
                 return;
             }
             if (tempNovelList.isEmpty()) {
-                Log.d("MewX", "in AsyncGetNovelItemList: doInBackground: tempNovelList == null || tempNovelList.size() == 0");
+                Log.d("MewX", "in AsyncGetNovelItemList: onPostExecute: tempNovelList == null || tempNovelList.size() == 0");
                 return;
             }
 
-            // add to total list
-            appendToIdList(tempNovelList);
-            tempNovelList = null;
-
-            refreshIdList();
-            isLoading = false;
+            refreshPartialIdList(tempNovelList);
+            isLoading.set(false);
 
             if (usingWenku8Relay) {
                 getActivity().findViewById(R.id.relay_warning).setVisibility(View.VISIBLE);
@@ -396,12 +426,12 @@ public class NovelItemListFragment extends Fragment implements MyItemClickListen
                 Toast.makeText(getActivity(), getResources().getString(R.string.system_network_error),Toast.LENGTH_LONG).show();
                 return;
             }
-            if(listNovelItemAid == null || listNovelItemAid.size() == 0) {
+            if(listNovelItemAid.isEmpty()) {
                 Toast.makeText(getActivity(), getResources().getString(R.string.task_null),Toast.LENGTH_LONG).show();
                 return;
             }
             // show all items
-            refreshIdList();
+            refreshEntireIdList();
         }
     }
 

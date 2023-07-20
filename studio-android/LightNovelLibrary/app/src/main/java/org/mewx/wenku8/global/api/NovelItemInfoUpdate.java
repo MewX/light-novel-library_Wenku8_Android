@@ -100,4 +100,8 @@ public class NovelItemInfoUpdate {
         this.title = Integer.toString(aid);
     }
 
+    public boolean isInitialized() {
+        return title.equals(Integer.toString(aid));
+    }
+
 }

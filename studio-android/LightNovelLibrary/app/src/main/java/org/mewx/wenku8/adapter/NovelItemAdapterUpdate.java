@@ -2,14 +2,15 @@ package org.mewx.wenku8.adapter;
 
 import android.annotation.SuppressLint;
 import android.os.AsyncTask;
-import androidx.annotation.NonNull;
-import androidx.recyclerview.widget.RecyclerView;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.TableRow;
 import android.widget.TextView;
+
+import androidx.annotation.NonNull;
+import androidx.recyclerview.widget.RecyclerView;
 
 import com.nostra13.universalimageloader.core.ImageLoader;
 
@@ -28,6 +29,7 @@ import java.io.File;
 import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Created by MewX on 2015/1/20.
@@ -50,7 +52,7 @@ public class NovelItemAdapterUpdate extends RecyclerView.Adapter<NovelItemAdapte
         mDataset = dataset;
     }
 
-    public void RefreshDataset(List<NovelItemInfoUpdate> dataset) {
+    public void refreshDataset(List<NovelItemInfoUpdate> dataset) {
         mDataset = dataset;
     }
 
@@ -63,48 +65,44 @@ public class NovelItemAdapterUpdate extends RecyclerView.Adapter<NovelItemAdapte
     }
 
     @Override
-    public void onBindViewHolder(@NonNull final ViewHolder viewHolder, int aid) {
-        // judge if empty
-        if(Integer.toString(mDataset.get(aid).aid).equals(mDataset.get(aid).title) && !viewHolder.isLoading) {
-            new AsyncLoadNovelIntro(aid, viewHolder).execute();
+    public void onBindViewHolder(@NonNull final ViewHolder viewHolder, int i) {
+        if (!mDataset.get(i).isInitialized()) {
+            refreshAllContent(viewHolder, mDataset.get(i));
+        } else if (!viewHolder.isLoading.get()) {
+            // Have to cache the aid here in UI thread.
+            new AsyncLoadNovelIntro(mDataset.get(i).aid, viewHolder).execute();
         }
-        refreshAllContent(viewHolder, aid);
     }
 
-    private void refreshAllContent( final ViewHolder viewHolder, int i ) {
+    private void refreshAllContent(final ViewHolder viewHolder, NovelItemInfoUpdate info) {
         // unknown NPE, just make
-        if(viewHolder == null || mDataset == null || mDataset.get(i) == null)
+        if (viewHolder == null || mDataset == null || info == null)
             return;
 
         // set text
-        viewHolder.tvNovelTitle.setText(mDataset.get(i).title);
-        viewHolder.tvNovelAuthor.setText(mDataset.get(i).author);
-        viewHolder.tvNovelStatus.setText(mDataset.get(i).status);
-        viewHolder.tvNovelUpdate.setText(mDataset.get(i).update);
+        viewHolder.tvNovelTitle.setText(info.title);
+        viewHolder.tvNovelAuthor.setText(info.author);
+        viewHolder.tvNovelStatus.setText(info.status);
+        viewHolder.tvNovelUpdate.setText(info.update);
         if(!GlobalConfig.testInBookshelf())
             // show short intro
-            viewHolder.tvNovelIntro.setText(mDataset.get(i).intro_short);
-        else if (mDataset.get(i).latest_chapter.isEmpty()){
+            viewHolder.tvNovelIntro.setText(info.intro_short);
+        else if (info.latest_chapter.isEmpty()) {
             // latest chapter not set, hide it
             viewHolder.tvNovelIntro.setVisibility(View.GONE);
         } else {
             // latest chapter is set, show it
             viewHolder.tvLatestChapterNameText.setText(viewHolder.tvLatestChapterNameText.getResources().getText(R.string.novel_item_latest_chapter));
-            viewHolder.tvNovelIntro.setText(mDataset.get(i).latest_chapter);
+            viewHolder.tvNovelIntro.setText(info.latest_chapter);
         }
 
         // FIXME: these imgs folders are actually no in use.
-        if(LightCache.testFileExist(GlobalConfig.getDefaultStoragePath() + "imgs" + File.separator + mDataset.get(i).aid + ".jpg"))
-            ImageLoader.getInstance().displayImage("file://" + GlobalConfig.getDefaultStoragePath() + "imgs" + File.separator + mDataset.get(i).aid + ".jpg", viewHolder.ivNovelCover);
-        else if(LightCache.testFileExist(GlobalConfig.getBackupStoragePath() + "imgs" + File.separator + mDataset.get(i).aid + ".jpg"))
-            ImageLoader.getInstance().displayImage("file://" + GlobalConfig.getBackupStoragePath() + "imgs" + File.separator + mDataset.get(i).aid + ".jpg", viewHolder.ivNovelCover);
+        if (LightCache.testFileExist(GlobalConfig.getDefaultStoragePath() + "imgs" + File.separator + info.aid + ".jpg"))
+            ImageLoader.getInstance().displayImage("file://" + GlobalConfig.getDefaultStoragePath() + "imgs" + File.separator + info.aid + ".jpg", viewHolder.ivNovelCover);
+        else if (LightCache.testFileExist(GlobalConfig.getBackupStoragePath() + "imgs" + File.separator + info.aid + ".jpg"))
+            ImageLoader.getInstance().displayImage("file://" + GlobalConfig.getBackupStoragePath() + "imgs" + File.separator + info.aid + ".jpg", viewHolder.ivNovelCover);
         else
-            ImageLoader.getInstance().displayImage(Wenku8API.getCoverURL(mDataset.get(i).aid), viewHolder.ivNovelCover);
-    }
-
-    public List<NovelItemInfoUpdate> getDataset() {
-        // reference
-        return mDataset;
+            ImageLoader.getInstance().displayImage(Wenku8API.getCoverURL(info.aid), viewHolder.ivNovelCover);
     }
 
     @Override
@@ -136,9 +134,8 @@ public class NovelItemAdapterUpdate extends RecyclerView.Adapter<NovelItemAdapte
         private MyOptionClickListener mMyOptionClickListener;
         private MyItemLongClickListener mLongClickListener;
         public int position;
-        public boolean isLoading = false;
+        public AtomicBoolean isLoading = new AtomicBoolean(false);
 
-        //public View loadingLayout;
         private ImageButton ibNovelOption;
         private TableRow trNovelIntro;
         public ImageView ivNovelCover;
@@ -202,22 +199,27 @@ public class NovelItemAdapterUpdate extends RecyclerView.Adapter<NovelItemAdapte
 
     @SuppressLint("StaticFieldLeak")
     private class AsyncLoadNovelIntro extends AsyncTask<Void, Void, Wenku8Error.ErrorCode> {
-        private ViewHolder vh;
-        private int aid;
+        private final ViewHolder vh;
+        private final int aid;
         private String novelIntro;
+        private boolean raceCondition;
 
         AsyncLoadNovelIntro(int aid, ViewHolder vh) {
             this.aid = aid;
             this.vh = vh;
+
+            raceCondition = !vh.isLoading.compareAndSet(false, true);
         }
 
         @Override
         protected Wenku8Error.ErrorCode doInBackground(Void... params) {
-            vh.isLoading = true;
+            if (raceCondition) {
+                return Wenku8Error.ErrorCode.ERROR_DEFAULT;
+            }
+
             try {
                 byte[] res = LightNetwork.LightHttpPostConnection(Wenku8API.BASE_URL,
-                        Wenku8API.getNovelShortInfoUpdate_CV(mDataset.get(aid).aid,
-                                GlobalConfig.getCurrentLang()));
+                        Wenku8API.getNovelShortInfoUpdate_CV(aid, GlobalConfig.getCurrentLang()));
                 if (res == null) {
                     return Wenku8Error.ErrorCode.ERROR_DEFAULT;
                 }
@@ -235,11 +237,24 @@ public class NovelItemAdapterUpdate extends RecyclerView.Adapter<NovelItemAdapte
             super.onPostExecute(errorCode);
 
             if(errorCode == Wenku8Error.ErrorCode.SYSTEM_1_SUCCEEDED) {
-                // update info
-                mDataset.set(aid,NovelItemInfoUpdate.parse(novelIntro));
-                refreshAllContent(vh, aid);
+                // The index might have been changed. We need to find the correct index again.
+                int currentIndex = -1;
+                for (int j = 0; j < mDataset.size(); j ++) {
+                    if (mDataset.get(j).aid == aid) {
+                        currentIndex = j;
+                        break;
+                    }
+                }
+
+                // Update info, but we need to validate the index first.
+                if (currentIndex >= 0) {
+                    NovelItemInfoUpdate info = NovelItemInfoUpdate.parse(novelIntro);
+                    mDataset.set(currentIndex, info);
+                    notifyItemChanged(currentIndex);
+                }
             }
-            vh.isLoading = false;
+
+            vh.isLoading.set(false);
         }
     }
 
