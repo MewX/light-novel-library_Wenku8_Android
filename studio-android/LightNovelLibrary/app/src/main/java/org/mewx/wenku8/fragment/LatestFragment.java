@@ -5,22 +5,23 @@ import android.content.Intent;
 import android.os.AsyncTask;
 import android.os.Build;
 import android.os.Bundle;
-import androidx.annotation.NonNull;
-
-import com.afollestad.materialdialogs.MaterialDialog;
-import com.afollestad.materialdialogs.Theme;
-import com.google.android.material.snackbar.Snackbar;
-import androidx.core.app.ActivityCompat;
-import androidx.core.app.ActivityOptionsCompat;
-import androidx.fragment.app.Fragment;
-import androidx.core.util.Pair;
-import androidx.recyclerview.widget.LinearLayoutManager;
-import androidx.recyclerview.widget.RecyclerView;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.TextView;
 import android.widget.Toast;
+
+import androidx.annotation.NonNull;
+import androidx.core.app.ActivityCompat;
+import androidx.core.app.ActivityOptionsCompat;
+import androidx.core.util.Pair;
+import androidx.fragment.app.Fragment;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
+
+import com.afollestad.materialdialogs.MaterialDialog;
+import com.afollestad.materialdialogs.Theme;
+import com.google.android.material.snackbar.Snackbar;
 
 import org.mewx.wenku8.R;
 import org.mewx.wenku8.activity.MainActivity;
@@ -286,18 +287,19 @@ public class LatestFragment extends Fragment implements MyItemClickListener, MyI
                 mAdapter.setOnItemLongClickListener(LatestFragment.this);
                 mRecyclerView.setAdapter(mAdapter);
             }
-            if (mainActivity.findViewById(R.id.list_loading) != null)
-                mainActivity.findViewById(R.id.list_loading).setVisibility(View.GONE);
+
+            View listLoadingView = mainActivity.findViewById(R.id.list_loading);
+            if (listLoadingView != null) {
+                listLoadingView.setVisibility(View.GONE);
+            }
             mAdapter.notifyDataSetChanged();
 
             currentPage ++; // add when loaded
             isLoading = false;
 
-            // FIXME: java.lang.NullPointerException: Attempt to invoke virtual method 'void android.view.View.setVisibility(int)' on a null object reference
-            if (usingWenku8Relay) {
-                mainActivity.findViewById(R.id.relay_warning).setVisibility(View.VISIBLE);
-            } else {
-                mainActivity.findViewById(R.id.relay_warning).setVisibility(View.GONE);
+            View relayWarningView = mainActivity.findViewById(R.id.relay_warning);
+            if (relayWarningView != null) {
+                relayWarningView.setVisibility(usingWenku8Relay ? View.VISIBLE : View.GONE);
             }
         }
     }
