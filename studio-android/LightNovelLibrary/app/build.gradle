@@ -20,13 +20,13 @@ android {
             debuggable true
             minifyEnabled false
             testCoverageEnabled true
-            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt')
         }
         release {
             debuggable false
             minifyEnabled true
             testProguardFile 'proguard-rules-tests.pro' // FIXME - the rule does not work
-            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
 
             ndk {
                 // Default for arm only.
@@ -55,6 +55,7 @@ android {
             manifestPlaceholders = [ UMENG_CHANNEL_NAME : "playstore"]
             ndk {
                 abiFilters 'armeabi-v7a', 'arm64-v8a', 'x86' , 'x86_64'
+                debugSymbolLevel 'FULL'
             }
         }
     }
