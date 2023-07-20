@@ -1,19 +1,22 @@
 package org.mewx.wenku8.util;
 
+import static org.junit.Assert.assertArrayEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
+
 import android.content.Context;
-import androidx.test.platform.app.InstrumentationRegistry;
+import android.net.Uri;
+
 import androidx.test.filters.SmallTest;
+import androidx.test.platform.app.InstrumentationRegistry;
 
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
 import java.io.File;
-
-import static org.junit.Assert.assertArrayEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertTrue;
+import java.util.Arrays;
 
 @SmallTest
 public class LightCacheTest {
@@ -185,6 +188,25 @@ public class LightCacheTest {
         LightCache.copyFile(BASE_TEMP_FILE_NAME, BASE_TEMP_FILE_FULL_NAME_PATH, true);
         assertTrue(LightCache.testFileExist(BASE_TEMP_FILE_FULL_NAME_PATH));
         assertArrayEquals(new byte[]{'a', 'b', 'c'}, LightCache.loadFile(BASE_TEMP_FILE_FULL_NAME_PATH));
+    }
+
+    @Test
+    public void listAllFilesInDirectory_withFilePathAsInput() {
+        String fileName1 = BASE + "file1";
+        assertTrue(LightCache.saveFile(fileName1, new byte[]{'1'}, false));
+        assertTrue(LightCache.listAllFilesInDirectory(new File(fileName1)).isEmpty());
+    }
+
+    @Test
+    public void listAllFilesInDirectory() {
+        String fileName1 = BASE + "file1";
+        String fileName2 = BASE + "dir1/file2";
+        assertTrue(LightCache.saveFile(fileName1, new byte[]{'1'}, false));
+        assertTrue(LightCache.saveFile(fileName2, new byte[]{'2'}, false));
+
+        assertTrue(LightCache.listAllFilesInDirectory(new File(BASE + "dir1")).contains(Uri.fromFile(new File(fileName2))));
+        assertTrue(LightCache.listAllFilesInDirectory(new File(BASE))
+                .containsAll(Arrays.asList(Uri.fromFile(new File(fileName1)), Uri.fromFile(new File(fileName2)))));
     }
 
 }

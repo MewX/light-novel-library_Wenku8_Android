@@ -21,7 +21,9 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
+import java.util.LinkedList;
 import java.util.List;
+import java.util.Queue;
 
 /**
  * Light Cache
@@ -269,17 +271,25 @@ public class LightCache {
      */
     public static List<Uri> listAllFilesInDirectory(File fullDirectoryPath) {
         ArrayList<Uri> paths = new ArrayList<>();
-
-        File[] list = fullDirectoryPath.listFiles();
-        if (list == null) {
-            return paths;
+        Queue<File> directoryQueue = new LinkedList<>();
+        if (fullDirectoryPath.isDirectory()) {
+            directoryQueue.add(fullDirectoryPath);
         }
 
-        for (File f : list) {
-            if (f.isDirectory()) {
-                paths.addAll(listAllFilesInDirectory(f));
-            } else {
-                paths.add(Uri.fromFile(f));
+        // BFS getting all file Uris.
+        while (!directoryQueue.isEmpty()) {
+            File currentDir = directoryQueue.remove();
+            File[] fileList = currentDir.listFiles();
+            if (fileList == null) {
+                continue;
+            }
+
+            for (File file : fileList) {
+                if (file.isDirectory()) {
+                    directoryQueue.add(file);
+                } else if (file.isFile()) {
+                    paths.add(Uri.fromFile(file));
+                }
             }
         }
         return paths;
@@ -287,13 +297,20 @@ public class LightCache {
 
     public static List<Uri> listAllFilesInDirectory(DocumentFile fullDirectoryPath) {
         ArrayList<Uri> paths = new ArrayList<>();
+        Queue<DocumentFile> directoryQueue = new LinkedList<>();
+        if (fullDirectoryPath.isDirectory()) {
+            directoryQueue.add(fullDirectoryPath);
+        }
 
-
-        for (DocumentFile file : fullDirectoryPath.listFiles()) {
-            if (file.isDirectory()) {
-                paths.addAll(listAllFilesInDirectory(file));
-            } else if (file.isFile()) {
-                paths.add(file.getUri());
+        // BFS getting all file Uris.
+        while (!directoryQueue.isEmpty()) {
+            DocumentFile currentDir = directoryQueue.remove();
+            for (DocumentFile file : currentDir.listFiles()) {
+                if (file.isDirectory()) {
+                    directoryQueue.add(file);
+                } else if (file.isFile()) {
+                    paths.add(file.getUri());
+                }
             }
         }
         return paths;
