@@ -1,7 +1,8 @@
 apply plugin: 'com.android.application'
 apply plugin: 'com.google.gms.google-services'
-apply plugin: 'com.github.kt3k.coveralls'
 apply plugin: 'com.google.firebase.crashlytics'
+//apply plugin: "jacoco"
+//apply plugin: 'com.github.kt3k.coveralls'
 
 android {
     compileSdkVersion rootProject.targetSdkVersion
@@ -109,11 +110,17 @@ dependencies {
     testImplementation 'org.powermock:powermock-api-mockito:1.7.4'
 }
 
-coveralls {
-    jacocoReportPath = "${buildDir}/reports/coverage/alpha/debug/report.xml"
-}
-
-tasks.coveralls {
-    dependsOn 'connectedAndroidTest'
-    onlyIf { System.env.'CI' }
-}
+//jacocoTestReport {
+//    reports {
+//        xml.enabled = true // coveralls plugin depends on xml format report
+//        html.enabled = true
+//    }
+//}
+//
+//coveralls {
+//    jacocoReportPath = "${buildDir}/reports/coverage/alpha/debug/report.xml"
+//}
+//
+//tasks.coveralls {
+//    dependsOn 'connectedAlphaDebugAndroidTest'
+//}
