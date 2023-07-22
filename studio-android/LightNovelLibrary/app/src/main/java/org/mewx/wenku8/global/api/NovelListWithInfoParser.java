@@ -1,7 +1,8 @@
 package org.mewx.wenku8.global.api;
 
-import androidx.annotation.NonNull;
 import android.util.Log;
+
+import androidx.annotation.NonNull;
 
 import org.xmlpull.v1.XmlPullParser;
 import org.xmlpull.v1.XmlPullParserFactory;
@@ -84,8 +85,7 @@ public class NovelListWithInfoParser {
 
                     case XmlPullParser.END_TAG:
                         if ("item".equals(xmlPullParser.getName())) {
-                            Log.v("MewX-XML", n.aid + ";" + n.name + ";" + n.hit
-                                    + ";" + n.push + ";" + n.fav);
+                            Log.d("MewX-XML", n.aid + ";" + n.name + ";" + n.hit + ";" + n.push + ";" + n.fav);
                             l.add(n);
                         }
                         break;

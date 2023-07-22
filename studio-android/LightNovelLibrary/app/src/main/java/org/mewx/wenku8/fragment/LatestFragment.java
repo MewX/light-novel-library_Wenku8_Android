@@ -38,6 +38,7 @@ import org.mewx.wenku8.util.LightNetwork;
 import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public class LatestFragment extends Fragment implements MyItemClickListener, MyItemLongClickListener {
 
@@ -50,33 +51,27 @@ public class LatestFragment extends Fragment implements MyItemClickListener, MyI
     private TextView mTextView;
 
     // Novel Item info
-    private List<NovelItemInfoUpdate> listNovelItemInfo;
+    private List<NovelItemInfoUpdate> listNovelItemInfo = new ArrayList<>();
     private NovelItemAdapter mAdapter;
     private int currentPage, totalPage; // currentP stores next reading page num, TODO: fix wrong number
 
     // switcher
-    private boolean isLoading;
+    private final AtomicBoolean isLoading = new AtomicBoolean(false);
     int pastVisibleItems, visibleItemCount, totalItemCount;
 
     public LatestFragment() {
         // Required empty public constructor
     }
 
-    public static LatestFragment newInstance() {
-        return new LatestFragment();
-    }
-
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        // get main activity
+        listNovelItemInfo = new ArrayList<>();
+
+        // FIXME: get main activity in a nicer way
         while (mainActivity == null)
             mainActivity = (MainActivity) getActivity();
-    }
-
-    public NovelItemAdapter getNovelItemAdapter() {
-        return mAdapter;
     }
 
     @Override
@@ -111,21 +106,20 @@ public class LatestFragment extends Fragment implements MyItemClickListener, MyI
 
         // set click event
         rootView.findViewById(R.id.btn_loading).setOnClickListener(v -> {
-            if (isLoading) {
-                isLoading = false; // set this false as a terminator signal
-            } else {
+            // To prepare for a loading, need to set the loading status to false.
+            // If it's already loading, then do nothing.
+            if (!isLoading.compareAndSet(true, false)) {
                 // need to reload novel list all
                 currentPage = 1;
                 totalPage = 1;
-                isLoading = false;
                 loadNovelList(currentPage);
             }
         });
 
-        // fetch novel list
+        // fetch initial novel list and reset isLoading
         currentPage = 1;
         totalPage = 1;
-        isLoading = false;
+        isLoading.set(false);
         loadNovelList(currentPage);
 
         return rootView;
@@ -134,7 +128,10 @@ public class LatestFragment extends Fragment implements MyItemClickListener, MyI
     private void loadNovelList(int page) {
         // In fact, I don't need to know what it really is.
         // I just need to get the NOVELSORTBY
-        isLoading = true; // set loading states
+        if (!isLoading.compareAndSet(false, true)) {
+            // Is loading already.
+            return;
+        }
         hideRetryButton();
 
         // fetch list
@@ -145,7 +142,6 @@ public class LatestFragment extends Fragment implements MyItemClickListener, MyI
 
     @Override
     public void onItemClick(View view, final int position) {
-        //Toast.makeText(getActivity(),"item click detected", Toast.LENGTH_SHORT).show();
         if(position < 0 || position >= listNovelItemInfo.size()) {
             // ArrayIndexOutOfBoundsException
             Toast.makeText(getActivity(), "ArrayIndexOutOfBoundsException: " + position + " in size " + listNovelItemInfo.size(), Toast.LENGTH_SHORT).show();
@@ -177,7 +173,7 @@ public class LatestFragment extends Fragment implements MyItemClickListener, MyI
 
     @Override
     public void onDetach() {
-        isLoading = false;
+        isLoading.set(false);
         super.onDetach();
     }
 
@@ -190,22 +186,18 @@ public class LatestFragment extends Fragment implements MyItemClickListener, MyI
             totalItemCount = mLayoutManager.getItemCount();
             pastVisibleItems = mLayoutManager.findFirstVisibleItemPosition();
 
-            if (!isLoading) {
-                // 滚动到一半的时候加载，即：剩余3个元素的时候就加载
-                if (visibleItemCount + pastVisibleItems + 3 >= totalItemCount) {
-                    isLoading = true;
+            // 滚动到一半的时候加载，即：剩余3个元素的时候就加载
+            if (!isLoading.get() && visibleItemCount + pastVisibleItems + 3 >= totalItemCount) {
+                // load more toast
+                Snackbar.make(mRecyclerView, getResources().getString(R.string.list_loading)
+                                + "(" + currentPage + "/" + totalPage + ")",
+                        Snackbar.LENGTH_SHORT).show();
 
-                    // load more toast
-                    Snackbar.make(mRecyclerView, getResources().getString(R.string.list_loading)
-                                    + "(" + Integer.toString(currentPage) + "/" + totalPage + ")",
-                            Snackbar.LENGTH_SHORT).show();
-
-                    // load more thread
-                    if (currentPage <= totalPage) {
-                        loadNovelList(currentPage);
-                    } else {
-                        Snackbar.make(mRecyclerView, getResources().getText(R.string.loading_done), Snackbar.LENGTH_SHORT).show();
-                    }
+                // load more thread
+                if (currentPage <= totalPage) {
+                    loadNovelList(currentPage);
+                } else {
+                    Snackbar.make(mRecyclerView, getResources().getText(R.string.loading_done), Snackbar.LENGTH_SHORT).show();
                 }
             }
         }
@@ -213,6 +205,7 @@ public class LatestFragment extends Fragment implements MyItemClickListener, MyI
 
     class AsyncLoadLatestList extends AsyncTask<ContentValues, Integer, Integer> {
         private boolean usingWenku8Relay = false;
+        private int numOfItemsToRefresh = 0;
 
         // fail return -1
         @Override
@@ -249,8 +242,6 @@ public class LatestFragment extends Fragment implements MyItemClickListener, MyI
                     usingWenku8Relay = true;
                 }
 
-                if (listNovelItemInfo == null)
-                    listNovelItemInfo = new ArrayList<>();
                 for (int i = 0; i < l.size(); i++) {
                     NovelListWithInfoParser.NovelListWithInfo nlwi = l.get(i);
                     NovelItemInfoUpdate ni = new NovelItemInfoUpdate(nlwi.aid);
@@ -259,6 +250,7 @@ public class LatestFragment extends Fragment implements MyItemClickListener, MyI
                     ni.update = nlwi.push + ""; // push
                     ni.intro_short = nlwi.fav + ""; // fav
                     listNovelItemInfo.add(ni);
+                    numOfItemsToRefresh ++;
                 }
             } catch (UnsupportedEncodingException e) {
                 e.printStackTrace();
@@ -274,7 +266,7 @@ public class LatestFragment extends Fragment implements MyItemClickListener, MyI
 
                 mTextView.setText(getResources().getString(R.string.system_parse_failed));
                 showRetryButton();
-                isLoading = false;
+                isLoading.set(false);
                 return;
             }
 
@@ -292,10 +284,13 @@ public class LatestFragment extends Fragment implements MyItemClickListener, MyI
             if (listLoadingView != null) {
                 listLoadingView.setVisibility(View.GONE);
             }
-            mAdapter.notifyDataSetChanged();
+            // Incremental changes
+            if (numOfItemsToRefresh != 0) {
+                mAdapter.notifyItemRangeInserted(listNovelItemInfo.size() - numOfItemsToRefresh, numOfItemsToRefresh);
+            }
 
             currentPage ++; // add when loaded
-            isLoading = false;
+            isLoading.set(false);
 
             View relayWarningView = mainActivity.findViewById(R.id.relay_warning);
             if (relayWarningView != null) {
