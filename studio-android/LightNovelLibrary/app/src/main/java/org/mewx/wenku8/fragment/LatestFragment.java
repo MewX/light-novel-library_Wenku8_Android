@@ -273,7 +273,8 @@ public class LatestFragment extends Fragment implements MyItemClickListener, MyI
             // result:
             // add imageView, only here can fetch the layout2 id!!!
             // hide loading layout
-            if (mAdapter == null) {
+            // Note that after switching between fragments, the adapter has a chance to disappear. So, we need to attach it back.
+            if (mAdapter == null || mRecyclerView.getAdapter() == null) {
                 mAdapter = new NovelItemAdapter(listNovelItemInfo);
                 mAdapter.setOnItemClickListener(LatestFragment.this);
                 mAdapter.setOnItemLongClickListener(LatestFragment.this);
