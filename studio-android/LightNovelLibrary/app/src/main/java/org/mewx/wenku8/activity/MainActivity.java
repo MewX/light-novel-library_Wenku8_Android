@@ -190,30 +190,34 @@ public class MainActivity extends BaseMaterialActivity {
     }
 
     private void runExternalSaveMigration() {
-        // Directly start migration dialog.
-        List<Uri> filesToCopy = SaveFileMigration.generateMigrationPlan();
-
-        // Analysis.
-        Bundle saveMigrationFilesTotalParams = new Bundle();
-        saveMigrationFilesTotalParams.putString("count", "" + filesToCopy.size());
-        mFirebaseAnalytics.logEvent("save_migration_files_total", saveMigrationFilesTotalParams);
-
-        if (filesToCopy.isEmpty()) {
-            Log.d(TAG, "Empty list of files to copy");
-            SaveFileMigration.markMigrationCompleted();
-            return;
-        }
-
         MaterialDialog progressDialog = new MaterialDialog.Builder(MainActivity.this)
                 .theme(Theme.LIGHT)
                 .content(R.string.system_save_upgrading)
-                .progress(false, filesToCopy.size(), true)
+                .progress(false, 1, false)
                 .cancelable(false)
                 .show();
 
         ExecutorService executor = Executors.newSingleThreadExecutor();
         Handler handler = new Handler(Looper.getMainLooper()); // Handles the UI works.
         executor.execute(() -> {
+            // Generate the migration plan in async path.
+            List<Uri> filesToCopy = SaveFileMigration.generateMigrationPlan();
+
+            // Analysis.
+            Bundle saveMigrationFilesTotalParams = new Bundle();
+            saveMigrationFilesTotalParams.putString("count", "" + filesToCopy.size());
+            mFirebaseAnalytics.logEvent("save_migration_files_total", saveMigrationFilesTotalParams);
+
+            if (filesToCopy.isEmpty()) {
+                Log.d(TAG, "Empty list of files to copy");
+                handler.post(progressDialog::dismiss);
+                SaveFileMigration.markMigrationCompleted();
+                return;
+            }
+            // Update max in the progress UI.
+            handler.post(() -> progressDialog.setMaxProgress(filesToCopy.size()));
+
+            // Start migration.
             int progress = 0;
             int failedFiles = 0;
             for (Uri filePath : filesToCopy) {
