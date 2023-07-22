@@ -3,6 +3,7 @@ package org.mewx.wenku8.global.api;
 import android.content.ContentValues;
 
 import androidx.annotation.Nullable;
+import androidx.annotation.VisibleForTesting;
 
 import org.mewx.wenku8.BuildConfig;
 import org.mewx.wenku8.R;
@@ -263,11 +264,12 @@ public class Wenku8API {
      * This part are the old API writing ways.
      * It's not efficient enough, and maybe bug-hidden.
      */
+    @VisibleForTesting
     static Map<String, String> getEncryptedMAP(String str) {
         Map<String, String> params = new HashMap<>();
-        params.put("appver=" + BuildConfig.VERSION_NAME
-                + "&request", LightBase64.EncodeBase64(str)
-                + "&timetoken=" + System.currentTimeMillis());
+        params.put("appver", BuildConfig.VERSION_NAME);
+        params.put("request", LightBase64.EncodeBase64(str));
+        params.put("timetoken", "" + System.currentTimeMillis());
         return params;
     }
 

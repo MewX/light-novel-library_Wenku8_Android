@@ -20,7 +20,7 @@ android {
         debug {
             debuggable true
             minifyEnabled false
-            testCoverageEnabled true
+            // testCoverageEnabled true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt')
         }
         release {
@@ -100,14 +100,12 @@ dependencies {
     androidTestImplementation 'androidx.test.ext:junit:1.1.5'
     androidTestImplementation 'androidx.test:rules:1.5.0'
     androidTestImplementation 'junit:junit:4.13.2'
-    androidTestImplementation 'org.mockito:mockito-core:2.19.0'
+    androidTestImplementation 'org.mockito:mockito-core:5.4.0'
     androidTestImplementation 'com.linkedin.dexmaker:dexmaker:2.19.1'
     androidTestImplementation 'com.linkedin.dexmaker:dexmaker-mockito:2.19.1'
 
     testImplementation 'junit:junit:4.13.2'
-    testImplementation 'org.mockito:mockito-all:1.10.19'
-    testImplementation 'org.powermock:powermock-module-junit4:1.7.4'
-    testImplementation 'org.powermock:powermock-api-mockito:1.7.4'
+    testImplementation 'org.mockito:mockito-core:5.4.0'
 }
 
 //jacocoTestReport {

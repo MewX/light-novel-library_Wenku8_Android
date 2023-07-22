@@ -35,4 +35,4 @@ jobs:
         profile: Nexus 6
         working-directory: ./studio-android/LightNovelLibrary
         # script: ./gradlew assembleAlpha connectedAlphaDebugAndroidTest jacocoTestReport coveralls
-        script: ./gradlew assembleAlpha connectedAlphaDebugAndroidTest
+        script: ./gradlew assembleAlpha testAlphaDebugUnitTest connectedAlphaDebugAndroidTest
