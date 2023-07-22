@@ -1,6 +1,7 @@
 package org.mewx.wenku8.fragment;
 
 import android.content.ContentValues;
+import android.content.Context;
 import android.content.Intent;
 import android.os.AsyncTask;
 import android.os.Build;
@@ -68,10 +69,6 @@ public class LatestFragment extends Fragment implements MyItemClickListener, MyI
         super.onCreate(savedInstanceState);
 
         listNovelItemInfo = new ArrayList<>();
-
-        // FIXME: get main activity in a nicer way
-        while (mainActivity == null)
-            mainActivity = (MainActivity) getActivity();
     }
 
     @Override
@@ -170,11 +167,17 @@ public class LatestFragment extends Fragment implements MyItemClickListener, MyI
         onItemClick(view, position);
     }
 
+    @Override
+    public void onAttach(@NonNull Context context) {
+        super.onAttach(context);
+        mainActivity = (MainActivity) getActivity();
+    }
 
     @Override
     public void onDetach() {
-        isLoading.set(false);
         super.onDetach();
+        mainActivity = null;
+        isLoading.set(false);
     }
 
     private class MyOnScrollListener extends RecyclerView.OnScrollListener {
