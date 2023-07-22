@@ -100,7 +100,8 @@ dependencies {
     androidTestImplementation 'androidx.test.ext:junit:1.1.5'
     androidTestImplementation 'androidx.test:rules:1.5.0'
     androidTestImplementation 'junit:junit:4.13.2'
-    androidTestImplementation 'org.mockito:mockito-core:5.4.0'
+    // Note Mockito 5.x has issue: 	java.lang.NoSuchMethodError: No static method stream([Ljava/lang/Object;)Ljava/util/stream/Stream; in class Ljava/util/Arrays; or its super classes (declaration of 'java.util.Arrays' appears in /system/framework/core-libart.jar)
+    androidTestImplementation 'org.mockito:mockito-core:2.19.0'
     androidTestImplementation 'com.linkedin.dexmaker:dexmaker:2.19.1'
     androidTestImplementation 'com.linkedin.dexmaker:dexmaker-mockito:2.19.1'
 
