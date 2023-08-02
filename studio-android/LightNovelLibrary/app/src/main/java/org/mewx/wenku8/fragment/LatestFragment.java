@@ -284,10 +284,6 @@ public class LatestFragment extends Fragment implements MyItemClickListener, MyI
                 mRecyclerView.setAdapter(mAdapter);
             }
 
-            View listLoadingView = mainActivity.findViewById(R.id.list_loading);
-            if (listLoadingView != null) {
-                listLoadingView.setVisibility(View.GONE);
-            }
             // Incremental changes
             if (numOfItemsToRefresh != 0) {
                 mAdapter.notifyItemRangeInserted(listNovelItemInfo.size() - numOfItemsToRefresh, numOfItemsToRefresh);
@@ -295,6 +291,17 @@ public class LatestFragment extends Fragment implements MyItemClickListener, MyI
 
             currentPage ++; // add when loaded
             isLoading.set(false);
+
+            // Exit early if it's not attached.
+            // Note that the null mainActivity used to cause many issues.
+            if (!isAdded() || mainActivity == null) {
+                return;
+            }
+
+            View listLoadingView = mainActivity.findViewById(R.id.list_loading);
+            if (listLoadingView != null) {
+                listLoadingView.setVisibility(View.GONE);
+            }
 
             View relayWarningView = mainActivity.findViewById(R.id.relay_warning);
             if (relayWarningView != null) {
@@ -316,7 +323,10 @@ public class LatestFragment extends Fragment implements MyItemClickListener, MyI
     }
 
     private void showRetryButton() {
-        if (mainActivity.findViewById(R.id.btn_loading) == null || !isAdded()) return;
+        if (mainActivity == null || mainActivity.findViewById(R.id.btn_loading) == null || !isAdded()) {
+            return;
+        }
+
         ((TextView) mainActivity.findViewById(R.id.btn_loading)).setText(getResources().getString(R.string.task_retry));
         mainActivity.findViewById(R.id.google_progress).setVisibility(View.GONE);
         mainActivity.findViewById(R.id.btn_loading).setVisibility(View.VISIBLE);
@@ -326,7 +336,10 @@ public class LatestFragment extends Fragment implements MyItemClickListener, MyI
      * After button pressed, should hide the "retry" button
      */
     private void hideRetryButton() {
-        if (mainActivity.findViewById(R.id.btn_loading) == null) return;
+        if (mainActivity == null || mainActivity.findViewById(R.id.btn_loading) == null) {
+            return;
+        }
+
         mTextView.setText(getResources().getString(R.string.list_loading));
         mainActivity.findViewById(R.id.google_progress).setVisibility(View.VISIBLE);
         mainActivity.findViewById(R.id.btn_loading).setVisibility(View.GONE);
