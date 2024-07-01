@@ -5,6 +5,9 @@
 
 [<img src="https://raw.githubusercontent.com/MewX/light-novel-library_Wenku8_Android/master/graph-source/google-play-badge.png" width="200px" height="auto" alt="play-store-badge">](https://play.google.com/store/apps/details?id=org.mewx.wenku8)
 
+如果您想打赏我用爱发电的代码，可以点击这个链接帮我充电 ❤️：
+[!["充电按钮"](https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png)](https://www.buymeacoffee.com/mewx)
+
 文档目录
 ==========
 
