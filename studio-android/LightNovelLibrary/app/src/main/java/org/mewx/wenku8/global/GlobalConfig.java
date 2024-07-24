@@ -362,12 +362,14 @@ public class GlobalConfig {
     }
 
     public static void removeFromLocalBookshelf(int aid) {
-        if (bookshelf == null)
+        if (bookshelf == null) {
             loadLocalBookShelf();
+        }
 
         int i = bookshelf.indexOf(aid);
-        if (i != -1)
+        if (i != -1) {
             bookshelf.remove(i);
+        }
 
         writeLocalBookShelf();
     }
@@ -380,18 +382,20 @@ public class GlobalConfig {
     }
 
     public static boolean testInLocalBookshelf(int aid) {
-        if (bookshelf == null)
+        if (bookshelf == null) {
             loadLocalBookShelf();
+        }
 
-        return bookshelf.indexOf(aid) != -1;
+        return bookshelf.contains(aid);
     }
 
-    public static void accessToLocalBookshelf(int aid) {
-        int temp = bookshelf.indexOf(aid);
-        if (aid == -1)
+    public static void moveBookToTheTopOfBookshelf(int aid) {
+        int i = bookshelf.indexOf(aid);
+        if (i == -1) {
             return;
+        }
 
-        bookshelf.remove(temp);
+        bookshelf.remove(i);
         bookshelf.add(0, aid);
 
         writeLocalBookShelf();

@@ -63,8 +63,8 @@ public class FavFragment extends Fragment implements MyItemClickListener, MyItem
     private int timecount;
 
     // novel list info
-    private List<Integer> listNovelItemAid = null; // aid list
-    private List<NovelItemInfoUpdate> listNovelItemInfo = null; // info list
+    private final List<Integer> listNovelItemAid = new ArrayList<>(); // aid list
+    private final List<NovelItemInfoUpdate> listNovelItemInfo = new ArrayList<>(); // info list
 
     public static FavFragment newInstance() {
         return new FavFragment();
@@ -100,7 +100,7 @@ public class FavFragment extends Fragment implements MyItemClickListener, MyItem
         mRecyclerView.setLayoutManager(mLayoutManager);
 
         mSwipeRefreshLayout.setColorSchemeColors(getResources().getColor(R.color.myAccentColor));
-        mSwipeRefreshLayout.setOnRefreshListener(() -> new AsyncLoadAllCloud().execute(1));
+        mSwipeRefreshLayout.setOnRefreshListener(() -> new AsyncLoadAllFromCloud().execute(1));
 
         return rootView;
     }
@@ -112,7 +112,7 @@ public class FavFragment extends Fragment implements MyItemClickListener, MyItem
         intent.putExtra("aid", listNovelItemAid.get(position));
         intent.putExtra("from", "fav");
         intent.putExtra("title", ((TextView) view.findViewById(R.id.novel_title)).getText());
-        GlobalConfig.accessToLocalBookshelf(listNovelItemAid.get(position)); // sort event
+        GlobalConfig.moveBookToTheTopOfBookshelf(listNovelItemAid.get(position)); // sort event
 
         if(Build.VERSION.SDK_INT < 21) {
             startActivity(intent);
@@ -151,11 +151,9 @@ public class FavFragment extends Fragment implements MyItemClickListener, MyItem
                                             public void onPositive(MaterialDialog dialog) {
                                                 super.onPositive(dialog);
                                                 int aid = listNovelItemAid.get(position);
-                                                List<VolumeList> listVolume;
-                                                String novelFullVolume;
-                                                novelFullVolume = GlobalConfig.loadFullFileFromSaveFolder("intro", aid + "-volume.xml");
+                                                String novelFullVolume = GlobalConfig.loadFullFileFromSaveFolder("intro", aid + "-volume.xml");
                                                 if(novelFullVolume.isEmpty()) return;
-                                                listVolume = Wenku8Parser.getVolumeList(novelFullVolume);
+                                                List<VolumeList> listVolume = Wenku8Parser.getVolumeList(novelFullVolume);
                                                 if(listVolume.isEmpty()) return;
                                                 cleanVolumesCache(listVolume);
                                             }
@@ -173,10 +171,11 @@ public class FavFragment extends Fragment implements MyItemClickListener, MyItem
                                             @Override
                                             public void onPositive(MaterialDialog dialog) {
                                                 super.onPositive(dialog);
-                                                // delete operation, delete from cloud first, if succeed then delete from local
-                                                AsyncRemoveBookFromCloud arbfc = new AsyncRemoveBookFromCloud();
-                                                arbfc.execute(listNovelItemAid.get(position));
+                                                // Delete operation: delete from in-memory index and cloud first.
+                                                // Then, the async task will remove the deleted book from local bookshelf.
+                                                int aid = listNovelItemAid.get(position);
                                                 listNovelItemAid.remove(position);
+                                                new AsyncRemoveBookFromCloud().execute(aid);
                                                 refreshList(timecount ++);
                                             }
                                         })
@@ -207,7 +206,7 @@ public class FavFragment extends Fragment implements MyItemClickListener, MyItem
     private void refreshList(int time) {
         if(time == 0) {
             mSwipeRefreshLayout.setRefreshing(true);
-            new AsyncLoadAllCloud().execute();
+            new AsyncLoadAllFromCloud().execute();
         }
         else {
             loadAllLocal();
@@ -219,17 +218,15 @@ public class FavFragment extends Fragment implements MyItemClickListener, MyItem
         boolean datasetChanged = false;
 
         // init
-        listNovelItemAid = GlobalConfig.getLocalBookshelfList();
-        if (listNovelItemInfo == null) {
-            listNovelItemInfo = new ArrayList<>();
-        }
+        listNovelItemAid.clear();
+        listNovelItemAid.addAll(GlobalConfig.getLocalBookshelfList());
 
-        // load all meta file
+        // load all metadata file
         aids:
         for (int j = 0; j < listNovelItemAid.size(); j++) {
-            final Integer aid = listNovelItemAid.get(j);
+            int aid = listNovelItemAid.get(j);
             // See if it's in the list already. Expecting the list will not be more than 100.
-            for (int i = 0; i < listNovelItemInfo.size(); i++) {
+            for (int i = j; i < listNovelItemInfo.size(); i++) {
                 final NovelItemInfoUpdate info = listNovelItemInfo.get(i);
                 if (info.aid == aid) {
                     // Found but in the same place.
@@ -257,6 +254,10 @@ public class FavFragment extends Fragment implements MyItemClickListener, MyItem
             datasetChanged = true;
             listNovelItemInfo.add(j, info);
         }
+        // Trim everything after aid.size().
+        if (listNovelItemInfo.size() > listNovelItemAid.size()) {
+            listNovelItemInfo.subList(listNovelItemAid.size(), listNovelItemInfo.size()).clear();
+        }
 
         // result
         if(retValue != 0) {
@@ -278,7 +279,7 @@ public class FavFragment extends Fragment implements MyItemClickListener, MyItem
         mSwipeRefreshLayout.setRefreshing(false);
     }
 
-    private class AsyncLoadAllCloud extends AsyncTask<Integer, Integer, Wenku8Error.ErrorCode> {
+    private class AsyncLoadAllFromCloud extends AsyncTask<Integer, Integer, Wenku8Error.ErrorCode> {
         private MaterialDialog md;
         private boolean isLoading; // check in "doInBackground" to make sure to continue or not
         private boolean forceLoad = false;
@@ -526,11 +527,9 @@ public class FavFragment extends Fragment implements MyItemClickListener, MyItem
                         return Wenku8Error.ErrorCode.SYSTEM_1_SUCCEEDED;
                     } else {
                         return Wenku8Error.ErrorCode.LOCAL_BOOK_REMOVE_FAILED;
-                        //Toast.makeText(NovelInfoActivity.this, getResources().getString(R.string.bookshelf_error), Toast.LENGTH_SHORT).show();
                     }
                 }
             } catch (UnsupportedEncodingException e) {
-                e.printStackTrace();
                 return Wenku8Error.ErrorCode.BYTE_TO_STRING_EXCEPTION;
             }
         }
@@ -540,11 +539,12 @@ public class FavFragment extends Fragment implements MyItemClickListener, MyItem
             super.onPostExecute(err);
 
             md.dismiss();
-            if(err == Wenku8Error.ErrorCode.SYSTEM_1_SUCCEEDED) {
+            if (err == Wenku8Error.ErrorCode.SYSTEM_1_SUCCEEDED) {
                 Toast.makeText(getActivity(), getResources().getString(R.string.bookshelf_removed), Toast.LENGTH_SHORT).show();
-            }
-            else
+                loadAllLocal();
+            } else {
                 Toast.makeText(getActivity(), err.toString(), Toast.LENGTH_SHORT).show();
+            }
         }
     }
 
