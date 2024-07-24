@@ -88,9 +88,13 @@ public class ReviewList {
         }
     }
 
-    private List<Review> list = new ArrayList<>();
-    private int totalPage = 1;
-    private int currentPage = 0; // 1-totalPage, 0 means not yet loaded
+    private final List<Review> list = new ArrayList<>();
+    private int totalPage;
+    private int currentPage; // 1-totalPage, 0 means not yet loaded
+
+    public ReviewList() {
+        resetList();
+    }
 
     public List<Review> getList() {
         return list;
@@ -110,5 +114,11 @@ public class ReviewList {
 
     public void setCurrentPage(int currentPage) {
         this.currentPage = currentPage;
+    }
+
+    public void resetList() {
+        list.clear();
+        totalPage = 1;
+        currentPage = 0;
     }
 }

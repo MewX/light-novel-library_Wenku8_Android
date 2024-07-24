@@ -47,9 +47,9 @@ public class NovelReviewListActivity extends BaseMaterialActivity implements MyI
     private TextView mLoadingButton;
 
     // switcher
-    private ReviewItemAdapter mAdapter;
-    private ReviewList reviewList = new ReviewList();
-    private static AtomicBoolean isLoading = new AtomicBoolean(false);
+    private final ReviewList reviewList = new ReviewList();
+    private final ReviewItemAdapter mAdapter = new ReviewItemAdapter(reviewList);
+    private static final AtomicBoolean isLoading = new AtomicBoolean(false);
     int pastVisibleItems, visibleItemCount, totalItemCount;
 
     @Override
@@ -83,12 +83,14 @@ public class NovelReviewListActivity extends BaseMaterialActivity implements MyI
         mLoadingButton.setOnClickListener(v -> new AsyncReviewListLoader(this, mSwipeRefreshLayout, aid, reviewList).execute()); // retry loading
 
         mSwipeRefreshLayout.setColorSchemeColors(getResources().getColor(R.color.myAccentColor));
+
+        mAdapter.setOnItemClickListener(this);
+        mRecyclerView.setAdapter(mAdapter);
         mSwipeRefreshLayout.setOnRefreshListener(this::reloadAllReviews);
     }
 
     private void reloadAllReviews() {
-        reviewList = new ReviewList();
-        mAdapter = null;
+        reviewList.resetList();
         new AsyncReviewListLoader(this, mSwipeRefreshLayout, aid, reviewList).execute();
     }
 
@@ -121,14 +123,6 @@ public class NovelReviewListActivity extends BaseMaterialActivity implements MyI
 
     ReviewItemAdapter getAdapter() {
         return mAdapter;
-    }
-
-    void setAdapter(ReviewItemAdapter adapter) {
-        this.mAdapter = adapter;
-    }
-
-    RecyclerView getRecyclerView() {
-        return mRecyclerView;
     }
 
     void showRetryButton() {
@@ -181,7 +175,7 @@ public class NovelReviewListActivity extends BaseMaterialActivity implements MyI
     private static class AsyncReviewListLoader extends AsyncTask<Void, Void, Void> {
         private WeakReference<NovelReviewListActivity> novelReviewListActivityWeakReference;
         private WeakReference<SwipeRefreshLayout> swipeRefreshLayoutWeakReference;
-        private int aid;
+        private final int aid;
         private ReviewList reviewList;
 
         private boolean runOrNot = true; // by default, run it
@@ -236,14 +230,7 @@ public class NovelReviewListActivity extends BaseMaterialActivity implements MyI
                 if (tempActivity != null) tempActivity.showRetryButton();
             } else if (tempActivity != null) {
                 // all good, update list
-                if (tempActivity.getAdapter() == null) {
-                    ReviewItemAdapter reviewItemAdapter = new ReviewItemAdapter(reviewList);
-                    tempActivity.setAdapter(reviewItemAdapter);
-                    reviewItemAdapter.setOnItemClickListener(tempActivity);
-                    tempActivity.getRecyclerView().setAdapter(reviewItemAdapter);
-                }
-                tempActivity.getAdapter().notifyDataSetChanged();
-
+                tempActivity.getAdapter().notifyItemRangeChanged(0, reviewList.getList().size());
                 tempActivity.hideListLoading();
             }
 

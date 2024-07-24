@@ -76,8 +76,8 @@ public class ReviewItemAdapter extends RecyclerView.Adapter<ReviewItemAdapter.Vi
 
         @Override
         public void onClick(View v) {
-            if(mClickListener != null){
-                mClickListener.onItemClick(v,getAdapterPosition());
+            if (mClickListener != null && getAdapterPosition() != RecyclerView.NO_POSITION) {
+                mClickListener.onItemClick(v, getAdapterPosition());
             }
         }
     }
