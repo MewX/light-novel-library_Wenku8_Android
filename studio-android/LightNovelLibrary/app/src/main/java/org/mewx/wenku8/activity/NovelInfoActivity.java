@@ -233,15 +233,28 @@ public class NovelInfoActivity extends BaseMaterialActivity {
             }
             else {
                 // not in bookshelf, add it to.
-                GlobalConfig.writeFullFileIntoSaveFolder("intro", aid + "-intro.xml", novelFullMeta);
-                GlobalConfig.writeFullFileIntoSaveFolder("intro", aid + "-introfull.xml", novelFullIntro);
-                GlobalConfig.writeFullFileIntoSaveFolder("intro", aid+ "-volume.xml", novelFullVolume);
-                GlobalConfig.addToLocalBookshelf(aid);
-                if (GlobalConfig.testInLocalBookshelf(aid)) { // in
-                    Toast.makeText(NovelInfoActivity.this, getResources().getString(R.string.bookshelf_added), Toast.LENGTH_SHORT).show();
-                    fabFavorite.setIcon(R.drawable.ic_favorate_pressed);
+                if (novelFullMeta == null || novelFullIntro == null || novelFullVolume == null) {
+                    ArrayList<String> nullStuff = new ArrayList<>();
+                    if (novelFullMeta == null) nullStuff.add("meta");
+                    if (novelFullIntro == null) nullStuff.add("intro");
+                    if (novelFullVolume == null) nullStuff.add("volume");
+                    Bundle somethingIsNull = new Bundle();
+                    somethingIsNull.putStringArrayList("novel_info_save_null", nullStuff);
+                    mFirebaseAnalytics.logEvent(FirebaseAnalytics.Event.VIEW_ITEM, somethingIsNull);
+
+                    Toast.makeText(NovelInfoActivity.this, getResources().getString(R.string.system_loading_please_wait), Toast.LENGTH_SHORT).show();
                 } else {
-                    Toast.makeText(NovelInfoActivity.this, getResources().getString(R.string.bookshelf_error), Toast.LENGTH_SHORT).show();
+                    // No null text.
+                    GlobalConfig.writeFullFileIntoSaveFolder("intro", aid + "-intro.xml", novelFullMeta);
+                    GlobalConfig.writeFullFileIntoSaveFolder("intro", aid + "-introfull.xml", novelFullIntro);
+                    GlobalConfig.writeFullFileIntoSaveFolder("intro", aid + "-volume.xml", novelFullVolume);
+                    GlobalConfig.addToLocalBookshelf(aid);
+                    if (GlobalConfig.testInLocalBookshelf(aid)) { // in
+                        Toast.makeText(NovelInfoActivity.this, getResources().getString(R.string.bookshelf_added), Toast.LENGTH_SHORT).show();
+                        fabFavorite.setIcon(R.drawable.ic_favorate_pressed);
+                    } else {
+                        Toast.makeText(NovelInfoActivity.this, getResources().getString(R.string.bookshelf_error), Toast.LENGTH_SHORT).show();
+                    }
                 }
             }
         });

@@ -71,6 +71,10 @@ public class NovelItemListFragment extends Fragment implements MyItemClickListen
     private int currentPage = 1; // default 1
     private int totalPage = 0; // default 0
 
+    public NovelItemListFragment() {
+        // Required empty public constructor
+    }
+
     public static NovelItemListFragment newInstance(Bundle args) {
         NovelItemListFragment fragment = new NovelItemListFragment();
         fragment.setArguments(args);

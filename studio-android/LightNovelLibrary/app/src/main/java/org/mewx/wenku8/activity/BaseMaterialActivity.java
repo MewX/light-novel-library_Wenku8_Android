@@ -30,6 +30,10 @@ public class BaseMaterialActivity extends AppCompatActivity {
     private SystemBarTintManager tintManager;
     private Toolbar toolbar;
 
+    public BaseMaterialActivity() {
+        super();
+    }
+
     protected SystemBarTintManager getTintManager() {
         if (tintManager == null) {
             tintManager = new SystemBarTintManager(this);
