@@ -19,13 +19,18 @@ android {
     buildTypes {
         debug {
             debuggable true
-            minifyEnabled false
+            minifyEnabled true
             // testCoverageEnabled true
-            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt')
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            firebaseCrashlytics {
+                mappingFileUploadEnabled false
+            }
         }
         release {
             debuggable false
             minifyEnabled true
+
+            // See https://android.googlesource.com/platform/sdk/+/master/files/proguard-android-optimize.txt
             testProguardFile 'proguard-rules-tests.pro' // FIXME - the rule does not work
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
 
@@ -41,19 +46,30 @@ android {
         alpha {
             // 内测渠道，群分发
             dimension "default"
+            // TODO: Get rid of those Umeng channel names.
             manifestPlaceholders = [ UMENG_CHANNEL_NAME : "alpha"]
+            firebaseCrashlytics {
+                mappingFileUploadEnabled false
+            }
         }
 
         baidu {
             // 百度/其他网盘分发
             dimension "default"
             manifestPlaceholders = [ UMENG_CHANNEL_NAME : "baidu"]
+            firebaseCrashlytics {
+                mappingFileUploadEnabled false
+            }
         }
 
         playstore {
             // Google Play Store
             dimension "default"
             manifestPlaceholders = [ UMENG_CHANNEL_NAME : "playstore"]
+            firebaseCrashlytics {
+                // Only upload in one flavor.
+                mappingFileUploadEnabled true
+            }
             ndk {
                 abiFilters 'armeabi-v7a', 'arm64-v8a', 'x86' , 'x86_64'
                 debugSymbolLevel 'FULL'
