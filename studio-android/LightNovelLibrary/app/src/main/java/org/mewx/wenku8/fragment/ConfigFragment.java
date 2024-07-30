@@ -42,11 +42,6 @@ import java.util.List;
 import java.util.Objects;
 
 public class ConfigFragment extends Fragment {
-
-    public static ConfigFragment newInstance() {
-        return new ConfigFragment();
-    }
-
     public ConfigFragment() {
         // Required empty public constructor
     }
