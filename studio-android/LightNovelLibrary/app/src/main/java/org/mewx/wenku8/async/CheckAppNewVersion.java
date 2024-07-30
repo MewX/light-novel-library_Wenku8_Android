@@ -1,5 +1,6 @@
 package org.mewx.wenku8.async;
 
+import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
@@ -77,8 +78,10 @@ public class CheckAppNewVersion extends AsyncTask<Void, Void, Integer> {
             if (verboseMode) {
                 Toast.makeText(ctx, ctx.getResources().getString(R.string.system_update_latest_version), Toast.LENGTH_SHORT).show();
             }
-        } else {
-            // update to new version
+        } else if (ctx instanceof Activity && ((Activity) ctx).hasWindowFocus()) {
+            // Note that checking window focus is needed: https://stackoverflow.com/a/41118674/4206925
+
+            // Update to new version.
             new MaterialDialog.Builder(ctx)
                     .theme(Theme.LIGHT)
                     .title(R.string.system_update_found_new)
