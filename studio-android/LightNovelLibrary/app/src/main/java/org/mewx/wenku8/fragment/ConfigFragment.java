@@ -87,6 +87,7 @@ public class ConfigFragment extends Fragment {
                 int flags = strBuilder.getSpanFlags(span);
                 ClickableSpan clickable = new ClickableSpan() {
                     public void onClick(View view) {
+                        // TODO: Parse the href from the <a> tag and use the real URL for links.
                         // Do something with span.getURL() to handle the link click...
                         Intent browserIntent = new Intent(Intent.ACTION_VIEW, Uri.parse(GlobalConfig.blogPageUrl));
                         Objects.requireNonNull(getContext()).startActivity(browserIntent);
