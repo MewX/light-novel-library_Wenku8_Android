@@ -54,11 +54,11 @@ public class PagerSlidingTabStrip extends HorizontalScrollView {
     private static final float HALF_TRANSP = 0.5f;
 
     public interface CustomTabProvider {
-        public View getCustomTabView(ViewGroup parent, int position);
+        View getCustomTabView(ViewGroup parent, int position);
     }
 
     public interface OnTabReselectedListener {
-        public void onTabReselected(int position);
+        void onTabReselected(int position);
     }
 
     // @formatter:off
@@ -257,7 +257,6 @@ public class PagerSlidingTabStrip extends HorizontalScrollView {
         updateTabStyles();
         getViewTreeObserver().addOnGlobalLayoutListener(new OnGlobalLayoutListener() {
 
-            @SuppressWarnings("deprecation")
             @SuppressLint("NewApi")
             @Override
             public void onGlobalLayout() {

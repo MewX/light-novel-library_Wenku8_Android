@@ -59,12 +59,6 @@ public class RKListFragment extends Fragment {
         pager.setAdapter(adapter);
     }
 
-    @Override
-    public void onDetach() {
-        super.onDetach();
-
-    }
-
     public class MyPagerAdapter extends FragmentPagerAdapter {
 
         private final Wenku8API.NOVELSORTBY[] TITLELIST = {

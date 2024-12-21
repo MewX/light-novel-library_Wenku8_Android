@@ -351,12 +351,10 @@ public class FavFragment extends Fragment implements MyItemClickListener, MyItem
             listAll.addAll(GlobalConfig.getLocalBookshelfList()); // make a copy
             listAll.addAll(listResultList);
 
-            List<Integer> localOnly = new ArrayList<>();
-            localOnly.addAll(listAll);
+            List<Integer> localOnly = new ArrayList<>(listAll);
             localOnly.removeAll(listResultList); // local only
 
-            List<Integer> listDiff = new ArrayList<>();
-            listDiff.addAll(listAll);
+            List<Integer> listDiff = new ArrayList<>(listAll);
             if(!forceLoad) {
                 // cloud only
                 listDiff.removeAll(GlobalConfig.getLocalBookshelfList());

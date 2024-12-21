@@ -117,7 +117,7 @@ public class SlidingLayout extends ViewGroup {
     }
 
     public interface OnTapListener {
-        public void onSingleTap(MotionEvent event);
+        void onSingleTap(MotionEvent event);
     }
 
     @Override
@@ -226,8 +226,8 @@ public class SlidingLayout extends ViewGroup {
     }
 
     public interface OnSlideChangeListener {
-        public void onSlideScrollStateChanged(int touchResult);
-        public void onSlideSelected(Object obj);
+        void onSlideScrollStateChanged(int touchResult);
+        void onSlideSelected(Object obj);
     }
 
     public void slideScrollStateChanged(int moveDirection) {

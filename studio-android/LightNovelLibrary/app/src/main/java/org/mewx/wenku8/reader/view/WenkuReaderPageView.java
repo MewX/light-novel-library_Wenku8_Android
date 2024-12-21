@@ -132,7 +132,7 @@ public class WenkuReaderPageView extends View {
             if(mSetting.getUseCustomFont()) typeface = Typeface.createFromFile(mSetting.getCustomFontPath()); // custom font
         }
         catch (Exception e) {
-            Toast.makeText(MyApp.getContext(), e.toString() + "\n可能的原因有：字体文件不在内置SD卡；内存太小字体太大，请使用简体中文字体，而不是CJK或GBK，谢谢，此功能为试验性功能；", Toast.LENGTH_SHORT).show();
+            Toast.makeText(MyApp.getContext(), e + "\n可能的原因有：字体文件不在内置SD卡；内存太小字体太大，请使用简体中文字体，而不是CJK或GBK，谢谢，此功能为试验性功能；", Toast.LENGTH_SHORT).show();
         }
         textPaint = new TextPaint();
         textPaint.setColor(getInDayMode() ? mSetting.fontColorDark : mSetting.fontColorLight);
