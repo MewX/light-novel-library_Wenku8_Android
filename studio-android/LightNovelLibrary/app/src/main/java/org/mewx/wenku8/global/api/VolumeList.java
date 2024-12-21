@@ -21,7 +21,7 @@ public class VolumeList implements Serializable {
     public void cleanLocalCache() {
         for (ChapterInfo tempCi : this.chapterList) {
             String xml = GlobalConfig.loadFullFileFromSaveFolder("novel", tempCi.cid + ".xml");
-            if (xml.length() == 0) {
+            if (xml.isEmpty()) {
                 return;
             }
             List<OldNovelContentParser.NovelContent> nc = OldNovelContentParser.NovelContentParser_onlyImage(xml);

@@ -122,7 +122,7 @@ public class ViewImageDetailActivity extends BaseMaterialActivity {
                 i.putExtra(FilePickerActivity.EXTRA_ALLOW_CREATE_DIR, true);
                 i.putExtra(FilePickerActivity.EXTRA_MODE, FilePickerActivity.MODE_DIR);
                 i.putExtra(FilePickerActivity.EXTRA_START_PATH,
-                        GlobalConfig.pathPickedSave == null || GlobalConfig.pathPickedSave.length() == 0 ?
+                        GlobalConfig.pathPickedSave == null || GlobalConfig.pathPickedSave.isEmpty() ?
                                 Environment.getExternalStorageDirectory().getPath() : GlobalConfig.pathPickedSave);
                 startActivityForResult(i, 0);
             }

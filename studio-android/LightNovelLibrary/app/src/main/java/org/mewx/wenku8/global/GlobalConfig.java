@@ -739,7 +739,7 @@ public class GlobalConfig {
         String[] sets = h.split("\\|\\|\\|\\|");
         for(String set : sets) {
             String[] temp = set.split("::::");
-            if(temp.length != 2 || temp[0] == null || temp[0].length() == 0 || temp[1] == null || temp[1].length() == 0) continue;
+            if(temp.length != 2 || temp[0] == null || temp[0].isEmpty() || temp[1] == null || temp[1].isEmpty()) continue;
 
             allSetting.put(temp[0], temp[1]);
         }

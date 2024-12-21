@@ -212,7 +212,7 @@ public class VerticalReaderActivity extends AppCompatActivity {
                 }
 
                 nc = OldNovelContentParser.parseNovelContent(xml, pDialog);
-                if (nc == null || nc.size() == 0) {
+                if (nc == null || nc.isEmpty()) {
                     Log.e("MewX-Main", "getNullFromParser (NovelContentParser.parseNovelContent(xml);)");
 
                     // network error or parse failed

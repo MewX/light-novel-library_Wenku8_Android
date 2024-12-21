@@ -317,7 +317,7 @@ public class WenkuReaderPageView extends View {
                 tempText = new StringBuilder("　　");
             }
             else if(mLoader.getCurrentType() == WenkuReaderLoader.ElementType.IMAGE_DEPENDENT) {
-                if(lineInfoList.size() != 0) {
+                if(!lineInfoList.isEmpty()) {
                     // end a page first
                     lastLineIndex = mLoader.getCurrentIndex() - 1;
                     mLoader.setCurrentIndex(lastLineIndex);
@@ -439,7 +439,7 @@ public class WenkuReaderPageView extends View {
             String curString = mLoader.getCurrentAsString();
 
             // special to image
-            if(curType == WenkuReaderLoader.ElementType.IMAGE_DEPENDENT && lineInfoList.size() != 0) {
+            if(curType == WenkuReaderLoader.ElementType.IMAGE_DEPENDENT && !lineInfoList.isEmpty()) {
                 Log.d("MewX", "jump 1");
                 firstLineIndex = curLineIndex + 1;
                 firstWordIndex = 0;
@@ -719,7 +719,7 @@ public class WenkuReaderPageView extends View {
     }
 
     public void watchImageDetailed(Activity activity) {
-        if(bitmapInfoList == null || bitmapInfoList.size() == 0 || bitmapInfoList.get(0).bm == null) {
+        if(bitmapInfoList == null || bitmapInfoList.isEmpty() || bitmapInfoList.get(0).bm == null) {
             Toast.makeText(getContext(), getResources().getString(R.string.reader_view_image_no_image), Toast.LENGTH_SHORT).show();
         }
         else {

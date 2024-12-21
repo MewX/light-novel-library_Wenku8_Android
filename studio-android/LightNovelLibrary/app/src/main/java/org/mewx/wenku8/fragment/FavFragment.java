@@ -367,7 +367,7 @@ public class FavFragment extends Fragment implements MyItemClickListener, MyItem
                 listDiff.clear();
                 listDiff.addAll(hs);
             }
-            if(listDiff.size() == 0 && localOnly.size() == 0) {
+            if(listDiff.isEmpty() && localOnly.isEmpty()) {
                 // equal, so exit
                 return Wenku8Error.ErrorCode.SYSTEM_1_SUCCEEDED;
             }

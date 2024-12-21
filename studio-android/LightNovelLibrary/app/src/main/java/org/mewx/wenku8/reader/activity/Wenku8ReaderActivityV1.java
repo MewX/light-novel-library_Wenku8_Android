@@ -103,7 +103,7 @@ public class Wenku8ReaderActivityV1 extends BaseMaterialActivity {
         cid = getIntent().getIntExtra("cid", 1);
         from = getIntent().getStringExtra("from");
         forcejump = getIntent().getStringExtra("forcejump");
-        if(forcejump == null || forcejump.length() == 0) forcejump = "no";
+        if(forcejump == null || forcejump.isEmpty()) forcejump = "no";
 //        tempNavBarHeight = LightTool.getNavigationBarSize(this).y;
 
         // Analysis.
@@ -247,8 +247,8 @@ public class Wenku8ReaderActivityV1 extends BaseMaterialActivity {
     }
 
     class SlidingPageAdapter extends SlidingAdapter<WenkuReaderPageView> {
-        int firstLineIndex = 0; // line index of first index of this page
-        int firstWordIndex = 0; // first index of this page
+        int firstLineIndex; // line index of first index of this page
+        int firstWordIndex; // first index of this page
         int lastLineIndex = 0; // line index of last index of this page
         int lastWordIndex = 0; // last index of this page
 
@@ -424,8 +424,8 @@ public class Wenku8ReaderActivityV1 extends BaseMaterialActivity {
                 }
 
                 nc = OldNovelContentParser.parseNovelContent(xml, null);
-                if (nc.size() == 0)
-                    return xml.length() == 0 ? Wenku8Error.ErrorCode.SERVER_RETURN_NOTHING : Wenku8Error.ErrorCode.XML_PARSE_FAILED;
+                if (nc.isEmpty())
+                    return xml.isEmpty() ? Wenku8Error.ErrorCode.SERVER_RETURN_NOTHING : Wenku8Error.ErrorCode.XML_PARSE_FAILED;
 
                 return Wenku8Error.ErrorCode.SYSTEM_1_SUCCEEDED;
             } catch (UnsupportedEncodingException e) {
@@ -668,7 +668,7 @@ public class Wenku8ReaderActivityV1 extends BaseMaterialActivity {
                                                                 i.putExtra(FilePickerActivity.EXTRA_ALLOW_CREATE_DIR, true);
                                                                 i.putExtra(FilePickerActivity.EXTRA_MODE, FilePickerActivity.MODE_FILE);
                                                                 i.putExtra(FilePickerActivity.EXTRA_START_PATH,
-                                                                        GlobalConfig.pathPickedSave == null || GlobalConfig.pathPickedSave.length() == 0 ?
+                                                                        GlobalConfig.pathPickedSave == null || GlobalConfig.pathPickedSave.isEmpty() ?
                                                                                 Environment.getExternalStorageDirectory().getPath() : GlobalConfig.pathPickedSave);
                                                                 startActivityForResult(i, REQUEST_FONT_PICKER_LEGACY);
                                                             }
@@ -704,7 +704,7 @@ public class Wenku8ReaderActivityV1 extends BaseMaterialActivity {
                                                                 i.putExtra(FilePickerActivity.EXTRA_ALLOW_CREATE_DIR, true);
                                                                 i.putExtra(FilePickerActivity.EXTRA_MODE, FilePickerActivity.MODE_FILE);
                                                                 i.putExtra(FilePickerActivity.EXTRA_START_PATH,
-                                                                        GlobalConfig.pathPickedSave == null || GlobalConfig.pathPickedSave.length() == 0 ?
+                                                                        GlobalConfig.pathPickedSave == null || GlobalConfig.pathPickedSave.isEmpty() ?
                                                                                 Environment.getExternalStorageDirectory().getPath() : GlobalConfig.pathPickedSave);
                                                                 startActivityForResult(i, REQUEST_IMAGE_PICKER_LEGACY);
                                                             }

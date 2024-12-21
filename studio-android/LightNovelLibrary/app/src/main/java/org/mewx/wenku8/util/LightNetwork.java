@@ -72,7 +72,7 @@ public class LightNetwork {
 			http = (HttpURLConnection) url.openConnection();
             http.setRequestMethod("POST");
 			http.setRequestProperty("Accept-Encoding", "gzip"); // set gzip
-			if(withSession && LightUserSession.getSession().length() != 0) {
+			if(withSession && !LightUserSession.getSession().isEmpty()) {
 				http.setRequestProperty("Cookie", "PHPSESSID=" + LightUserSession.getSession());
 			}
 			http.setConnectTimeout(3000);
