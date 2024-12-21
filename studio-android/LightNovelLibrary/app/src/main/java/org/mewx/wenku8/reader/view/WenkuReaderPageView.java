@@ -88,9 +88,14 @@ public class WenkuReaderPageView extends View {
     private int lineCount;
 
     // background
-    static private Bitmap bmBackgroundYellow, bmTextureYellow[];
+    static private final Random random = new Random();
+    static private Bitmap bmBackgroundYellow;
+    private static final int[] bmTextureYellowResourceIds = new int[]{
+            R.drawable.reader_bg_yellow1,
+            R.drawable.reader_bg_yellow2,
+            R.drawable.reader_bg_yellow3,
+    };
     static private BitmapDrawable bmdBackground;
-    static private Random random = new Random();
     static private boolean isBackgroundSet = false;
 
     // vars
@@ -170,12 +175,9 @@ public class WenkuReaderPageView extends View {
             if(mSetting.getPageBackgroundType() == WenkuReaderSettingV1.PAGE_BACKGROUND_TYPE.SYSTEM_DEFAULT || bmBackgroundYellow == null) {
                 // use system default
                 bmBackgroundYellow = BitmapFactory.decodeResource(MyApp.getContext().getResources(), R.drawable.reader_bg_yellow_edge);
-                bmTextureYellow = new Bitmap[3];
-                bmTextureYellow[0] = BitmapFactory.decodeResource(MyApp.getContext().getResources(), R.drawable.reader_bg_yellow1);
-                bmTextureYellow[1] = BitmapFactory.decodeResource(MyApp.getContext().getResources(), R.drawable.reader_bg_yellow2);
-                bmTextureYellow[2] = BitmapFactory.decodeResource(MyApp.getContext().getResources(), R.drawable.reader_bg_yellow3);
-
-                bmdBackground = new BitmapDrawable(MyApp.getContext().getResources(), bmTextureYellow[random.nextInt(bmTextureYellow.length)]);
+                Bitmap bmTexturePattern = BitmapFactory.decodeResource(MyApp.getContext().getResources(),
+                        bmTextureYellowResourceIds[random.nextInt(bmTextureYellowResourceIds.length)]);
+                bmdBackground = new BitmapDrawable(MyApp.getContext().getResources(), bmTexturePattern);
                 bmdBackground.setTileModeXY(Shader.TileMode.REPEAT, Shader.TileMode.REPEAT);
                 bmdBackground.setBounds(0, 0, screenSize.x, screenSize.y);
             }
