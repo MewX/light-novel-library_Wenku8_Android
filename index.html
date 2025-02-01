@@ -94,6 +94,26 @@
                 dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
                 (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
             })();
+
+	    // Remove the annoying disqus Ads.
+            // Copied from https://stackoverflow.com/a/78583202/4206925
+            document.addEventListener("DOMContentLoaded", function() {
+                          const disqus = document.getElementById('disqus_thread');
+                          const observer = new MutationObserver(function(mutations) {
+                            mutations.forEach(function(mutation) {
+                              const iframes = disqus.getElementsByTagName('iframe');
+                              if (iframes.length > 1) {
+                                const commentsIframe = iframes[1];
+                                while (disqus.firstChild) {
+                                  disqus.removeChild(disqus.firstChild);
+                                }
+                                disqus.appendChild(commentsIframe);
+                                observer.disconnect();
+                              }
+                            });
+                          });
+                          observer.observe(disqus, { childList: true, subtree: true });
+            });
         </script>
         <noscript>允许 JavaScript 才能看到<a href="https://disqus.com/?ref_noscript">由 Disqus 提供的评论系统。</a></noscript>
         
