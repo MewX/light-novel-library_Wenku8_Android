@@ -25,6 +25,8 @@ allprojects {
         jcenter()
         maven { url 'https://jitpack.io' }
         maven { url 'https://mvnrepository.com' }
+        maven { url 'https://maven.bint.bintray.com/org/adw/library/' }
+        maven { url 'https://maven.bint.bintray.com/com/nononsenseapps/' }
     }
 }
 
