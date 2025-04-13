@@ -90,6 +90,9 @@ android {
         targetCompatibility JavaVersion.VERSION_17
     }
     namespace 'org.mewx.wenku8'
+    buildFeatures {
+        buildConfig true
+    }
 }
 
 dependencies {
