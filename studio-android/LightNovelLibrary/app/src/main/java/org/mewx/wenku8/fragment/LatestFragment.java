@@ -214,35 +214,15 @@ public class LatestFragment extends Fragment implements MyItemClickListener, MyI
         @Override
         protected Integer doInBackground(ContentValues... params) {
             try {
-                // Try requesting from the original website.
                 byte[] tempXml = LightNetwork.LightHttpPostConnection(Wenku8API.BASE_URL, params[0]);
                 if (tempXml == null) {
-                    // Try requesting from the relay.
-                    tempXml = LightNetwork.LightHttpPostConnection(Wenku8API.RELAY_URL, params[0], false);
-                    if (tempXml == null) {
-                        // Still failed, return the error code.
-                        return -100;
-                    }
-                    usingWenku8Relay = true;
+                    return -100;
                 }
                 String xml = new String(tempXml, "UTF-8");
                 totalPage = NovelListWithInfoParser.getNovelListWithInfoPageNum(xml);
                 List<NovelListWithInfoParser.NovelListWithInfo> l = NovelListWithInfoParser.getNovelListWithInfo(xml);
                 if (l.isEmpty()) {
-                    // Try requesting from the relay.
-                    tempXml = LightNetwork.LightHttpPostConnection(Wenku8API.RELAY_URL, params[0], false);
-                    if (tempXml == null) {
-                        // Relay network error.
-                        return -100;
-                    }
-                    xml = new String(tempXml, "UTF-8");
-                    totalPage = NovelListWithInfoParser.getNovelListWithInfoPageNum(xml);
-                    l = NovelListWithInfoParser.getNovelListWithInfo(xml);
-                    if (l.isEmpty()) {
-                        // Blocked error.
-                        return -100;
-                    }
-                    usingWenku8Relay = true;
+                    return -100;
                 }
 
                 for (int i = 0; i < l.size(); i++) {
@@ -303,6 +283,7 @@ public class LatestFragment extends Fragment implements MyItemClickListener, MyI
                 listLoadingView.setVisibility(View.GONE);
             }
 
+            // TODO: remove this warning view because all traffic will come from the relay.
             View relayWarningView = mainActivity.findViewById(R.id.relay_warning);
             if (relayWarningView != null) {
                 relayWarningView.setVisibility(usingWenku8Relay ? View.VISIBLE : View.GONE);

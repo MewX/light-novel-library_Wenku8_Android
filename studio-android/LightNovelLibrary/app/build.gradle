@@ -12,7 +12,7 @@ android {
         minSdkVersion 16
         targetSdkVersion rootProject.targetSdkVersion
         versionCode 62
-        versionName "1.23"
+        versionName "1.23-nano-mewx"
         testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner'
         multiDexEnabled true
     }

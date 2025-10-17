@@ -304,14 +304,8 @@ public class NovelItemListFragment extends Fragment implements MyItemClickListen
             // params[0] is current page number
             ContentValues cv = Wenku8API.getNovelList(Wenku8API.getNOVELSORTBY(listType), currentPage);
             byte[] temp = LightNetwork.LightHttpPostConnection( Wenku8API.BASE_URL, cv);
-            if(temp == null) {
-                // Try requesting from the relay.
-                temp = LightNetwork.LightHttpPostConnection(Wenku8API.RELAY_URL, cv, false);
-                if (temp == null) {
-                    // Still failed, return the error code.
-                    return -1;
-                }
-                usingWenku8Relay = true;
+            if (temp == null) {
+                return -1;
             }
             try {
                 Log.d("MewX", "doInBackground: loading page " + currentPage);
@@ -324,23 +318,7 @@ public class NovelItemListFragment extends Fragment implements MyItemClickListen
             // judge result
             if (tempNovelList.isEmpty()) {
                 Log.d("MewX", "in AsyncGetNovelItemList: doInBackground: tempNovelList == null || tempNovelList.size() == 0");
-                // Try requesting from the relay.
-                temp = LightNetwork.LightHttpPostConnection(Wenku8API.RELAY_URL, cv, false);
-                if (temp == null) {
-                    // Still failed, returns no error code.
-                    return 0;
-                }
-                try {
-                    tempNovelList = Wenku8Parser.parseNovelItemList(new String(temp, "UTF-8"));
-                }
-                catch (UnsupportedEncodingException e) {
-                    e.printStackTrace();
-                }
-                if (tempNovelList.isEmpty()) {
-                    // Still failed.
-                    return 0;
-                }
-                usingWenku8Relay = true;
+                return 0;
             }
 
             totalPage = tempNovelList.get(0);
@@ -362,6 +340,7 @@ public class NovelItemListFragment extends Fragment implements MyItemClickListen
             refreshPartialIdList(tempNovelList);
             isLoading.set(false);
 
+            // TODO: remove this warning view because all traffic will come from the relay.
             if (getActivity() != null) {
                 View relayWarningView = getActivity().findViewById(R.id.relay_warning);
                 if (relayWarningView != null) {
