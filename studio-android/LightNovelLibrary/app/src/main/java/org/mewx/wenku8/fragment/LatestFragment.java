@@ -43,8 +43,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 public class LatestFragment extends Fragment implements MyItemClickListener, MyItemLongClickListener {
 
-    static private final String TAG = "LatestFragment";
-
     // components
     private MainActivity mainActivity = null;
     private LinearLayoutManager mLayoutManager;

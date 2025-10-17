@@ -211,54 +211,6 @@ public class Wenku8API {
         }
     }
 
-    public static int getErrorInfo_ResId(int errNo) {
-        switch (errNo) {
-            case 0:
-                // 请求发生错误
-                return R.string.error_00;
-            case 1:
-                // 成功(登陆、添加、删除、发帖)
-                return R.string.error_01;
-            case 2:
-                // 用户名错误
-                return R.string.error_02;
-            case 3:
-                // 密码错误
-                return R.string.error_03;
-            case 4:
-                // 请先登陆
-                return R.string.error_04;
-            case 5:
-                // 已经在书架
-                return R.string.error_05;
-            case 6:
-                // 书架已满
-                return R.string.error_06;
-            case 7:
-                // 小说不在书架
-                return R.string.error_07;
-            case 8:
-                // 回复帖子主题不存在
-                return R.string.error_08;
-            case 9:
-                // 签到失败
-                return R.string.error_09;
-            case 10:
-                // 推荐失败
-                return R.string.error_10;
-            case 11:
-                // 帖子发送失败
-                return R.string.error_11;
-            case 22:
-                // refer page 0
-                return R.string.error_22;
-            default:
-                // unknown
-                return R.string.error_unknown;
-        }
-    }
-
-
     /**
      * This part are the old API writing ways.
      * It's not efficient enough, and maybe bug-hidden.

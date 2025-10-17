@@ -42,7 +42,6 @@ import org.mewx.wenku8.util.LightTool;
 import org.mewx.wenku8.util.LightUserSession;
 
 public class NavigationDrawerFragment extends Fragment {
-    private static final String TAG = NavigationDrawerFragment.class.getSimpleName();
 
     private FirebaseAnalytics mFirebaseAnalytics;
     private View mFragmentContainerView;

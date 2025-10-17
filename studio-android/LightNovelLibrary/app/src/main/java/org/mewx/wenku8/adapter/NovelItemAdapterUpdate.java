@@ -133,7 +133,6 @@ public class NovelItemAdapterUpdate extends RecyclerView.Adapter<NovelItemAdapte
         private MyItemClickListener mClickListener;
         private MyOptionClickListener mMyOptionClickListener;
         private MyItemLongClickListener mLongClickListener;
-        public int position;
         public AtomicBoolean isLoading = new AtomicBoolean(false);
 
         private ImageButton ibNovelOption;
