@@ -24,8 +24,7 @@ public class Wenku8API {
      */
     public static String NoticeString = "";
     public static final String REGISTER_URL = "http://www.wenku8.com/register.php";
-    private static final String RELAY_URL = "https://wenku8-relay.mewx.org/";
-    public static final String BASE_URL = RELAY_URL;
+    public static final String BASE_URL = "https://wenku8-relay.mewx.org/";
     private static final String NovelFinishedSC = "已完成", NovelFinishedTC = "已完成",
             NovelNotFinishedSC = "连载中", NovelNotFinishedTC = "連載中";
 
