@@ -24,7 +24,6 @@ import org.mewx.wenku8.util.LightCache;
 
 import java.io.File;
 import java.io.FileNotFoundException;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -88,7 +87,7 @@ public class MenuBackgroundSelectorActivity extends BaseMaterialActivity {
                 i.putExtra(FilePickerActivity.EXTRA_ALLOW_CREATE_DIR, true);
                 i.putExtra(FilePickerActivity.EXTRA_MODE, FilePickerActivity.MODE_FILE);
                 i.putExtra(FilePickerActivity.EXTRA_START_PATH,
-                        GlobalConfig.pathPickedSave == null || GlobalConfig.pathPickedSave.length() == 0 ?
+                        GlobalConfig.pathPickedSave == null || GlobalConfig.pathPickedSave.isEmpty() ?
                                 Environment.getExternalStorageDirectory().getPath() : GlobalConfig.pathPickedSave);
                 startActivityForResult(i, 0);
             }

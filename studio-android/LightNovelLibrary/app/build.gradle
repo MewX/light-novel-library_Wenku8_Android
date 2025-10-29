@@ -11,8 +11,8 @@ android {
         applicationId "org.mewx.wenku8"
         minSdkVersion 16
         targetSdkVersion rootProject.targetSdkVersion
-        versionCode 60
-        versionName "1.21"
+        versionCode 62
+        versionName "1.23-nano-mewx"
         testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner'
         multiDexEnabled true
     }
@@ -21,11 +21,16 @@ android {
             debuggable true
             minifyEnabled false
             // testCoverageEnabled true
-            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt')
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            firebaseCrashlytics {
+                mappingFileUploadEnabled false
+            }
         }
         release {
             debuggable false
             minifyEnabled true
+
+            // See https://android.googlesource.com/platform/sdk/+/master/files/proguard-android-optimize.txt
             testProguardFile 'proguard-rules-tests.pro' // FIXME - the rule does not work
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
 
@@ -41,19 +46,30 @@ android {
         alpha {
             // 内测渠道，群分发
             dimension "default"
+            // TODO: Get rid of those Umeng channel names.
             manifestPlaceholders = [ UMENG_CHANNEL_NAME : "alpha"]
+            firebaseCrashlytics {
+                mappingFileUploadEnabled false
+            }
         }
 
         baidu {
             // 百度/其他网盘分发
             dimension "default"
             manifestPlaceholders = [ UMENG_CHANNEL_NAME : "baidu"]
+            firebaseCrashlytics {
+                mappingFileUploadEnabled false
+            }
         }
 
         playstore {
             // Google Play Store
             dimension "default"
             manifestPlaceholders = [ UMENG_CHANNEL_NAME : "playstore"]
+            firebaseCrashlytics {
+                // Only upload in one flavor.
+                mappingFileUploadEnabled true
+            }
             ndk {
                 abiFilters 'armeabi-v7a', 'arm64-v8a', 'x86' , 'x86_64'
                 debugSymbolLevel 'FULL'
@@ -70,10 +86,13 @@ android {
         cruncherEnabled = false
     }
     compileOptions {
-        sourceCompatibility JavaVersion.VERSION_1_8
-        targetCompatibility JavaVersion.VERSION_1_8
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
     }
     namespace 'org.mewx.wenku8'
+    buildFeatures {
+        buildConfig true
+    }
 }
 
 dependencies {
@@ -86,8 +105,8 @@ dependencies {
     implementation 'com.davemorrissey.labs:subsampling-scale-image-view-androidx:3.10.0'
     implementation 'com.github.castorflex.smoothprogressbar:library:1.1.0'
     implementation 'com.jpardogo.googleprogressbar:library:1.2.0'
-    implementation 'org.adw.library:discrete-seekbar:1.0.1'
-    implementation 'com.nononsenseapps:filepicker:2.2'
+    implementation 'com.github.AnderWeb:discreteSeekBar:1.0.0'  // TODO: Get rid of it.
+    implementation 'com.nononsenseapps:filepicker:4.2.1'  // TODO: Get rid of it.
     implementation 'androidx.cardview:cardview:1.0.0'
     implementation 'com.google.android.material:material:1.3.0'
     implementation 'androidx.swiperefreshlayout:swiperefreshlayout:1.1.0'
@@ -102,8 +121,8 @@ dependencies {
     androidTestImplementation 'junit:junit:4.13.2'
     // Note Mockito 5.x has issue: 	java.lang.NoSuchMethodError: No static method stream([Ljava/lang/Object;)Ljava/util/stream/Stream; in class Ljava/util/Arrays; or its super classes (declaration of 'java.util.Arrays' appears in /system/framework/core-libart.jar)
     androidTestImplementation 'org.mockito:mockito-core:2.19.0'
-    androidTestImplementation 'com.linkedin.dexmaker:dexmaker:2.19.1'
-    androidTestImplementation 'com.linkedin.dexmaker:dexmaker-mockito:2.19.1'
+    androidTestImplementation 'com.linkedin.dexmaker:dexmaker:2.28.4'
+    androidTestImplementation 'com.linkedin.dexmaker:dexmaker-mockito:2.28.4'
 
     testImplementation 'junit:junit:4.13.2'
     testImplementation 'org.mockito:mockito-core:5.4.0'

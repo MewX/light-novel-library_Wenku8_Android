@@ -603,7 +603,7 @@ public class NovelInfoActivity extends BaseMaterialActivity {
                     novelFullIntro = new String(byteNovelFullInfo, "UTF-8"); // save
                 }
                 mNovelItemMeta.fullIntro = novelFullIntro;
-                if(mNovelItemMeta.fullIntro.length() == 0) return -1;
+                if(mNovelItemMeta.fullIntro.isEmpty()) return -1;
             } catch (UnsupportedEncodingException e) {
                 e.printStackTrace();
                 return -2;
@@ -815,11 +815,11 @@ public class NovelInfoActivity extends BaseMaterialActivity {
                         // load from local first
                         if (!isLoading) return Wenku8Error.ErrorCode.USER_CANCELLED_TASK; // calcel
                         String xml = GlobalConfig.loadFullFileFromSaveFolder("novel", tempCi.cid + ".xml"); // prevent empty file
-                        if (xml.length() == 0 || operationType == 2) {
+                        if (xml.isEmpty() || operationType == 2) {
                             byte[] tempXml = LightNetwork.LightHttpPostConnection(Wenku8API.BASE_URL, cv);
                             if (tempXml == null) return Wenku8Error.ErrorCode.NETWORK_ERROR; // network error
                             xml = new String(tempXml, "UTF-8");
-                            if(xml.trim().length() == 0) return Wenku8Error.ErrorCode.SERVER_RETURN_NOTHING;
+                            if(xml.trim().isEmpty()) return Wenku8Error.ErrorCode.SERVER_RETURN_NOTHING;
                             GlobalConfig.writeFullFileIntoSaveFolder("novel", tempCi.cid + ".xml", xml);
                         }
 
@@ -1027,11 +1027,11 @@ public class NovelInfoActivity extends BaseMaterialActivity {
                         // load from local first
                         if (!loading) return Wenku8Error.ErrorCode.USER_CANCELLED_TASK; // cancel
                         String xml = GlobalConfig.loadFullFileFromSaveFolder("novel", tempCi.cid + ".xml"); // prevent empty file
-                        if (xml.length() == 0) {
+                        if (xml.isEmpty()) {
                             byte[] tempXml = LightNetwork.LightHttpPostConnection(Wenku8API.BASE_URL, cv);
                             if (tempXml == null) return Wenku8Error.ErrorCode.NETWORK_ERROR; // network error
                             xml = new String(tempXml, "UTF-8");
-                            if(xml.trim().length() == 0) return Wenku8Error.ErrorCode.SERVER_RETURN_NOTHING;
+                            if(xml.trim().isEmpty()) return Wenku8Error.ErrorCode.SERVER_RETURN_NOTHING;
                             GlobalConfig.writeFullFileIntoSaveFolder("novel", tempCi.cid + ".xml", xml);
                         }
 

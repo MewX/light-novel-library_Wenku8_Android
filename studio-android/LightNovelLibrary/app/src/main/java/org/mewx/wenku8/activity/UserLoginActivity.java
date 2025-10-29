@@ -53,8 +53,8 @@ public class UserLoginActivity extends BaseMaterialActivity {
 
         // listeners
         tvLogin.setOnClickListener(v -> {
-            if(etUserNameOrEmail.getText().toString().length() == 0 || etUserNameOrEmail.getText().toString().length() > 30
-                    || etPassword.getText().toString().length() == 0 || etPassword.getText().toString().length() > 30) {
+            if(etUserNameOrEmail.getText().toString().isEmpty() || etUserNameOrEmail.getText().toString().length() > 30
+                    || etPassword.getText().toString().isEmpty() || etPassword.getText().toString().length() > 30) {
                 Toast.makeText(UserLoginActivity.this, getResources().getString(R.string.system_info_fill_not_complete), Toast.LENGTH_SHORT).show();
                 return;
             }

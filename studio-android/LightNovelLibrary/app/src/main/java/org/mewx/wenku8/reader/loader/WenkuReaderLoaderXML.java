@@ -107,7 +107,7 @@ public class WenkuReaderLoaderXML extends WenkuReaderLoader {
             String imgFileName = GlobalConfig.generateImageFileNameByURL(nc.get(currentIndex).content);
             String path = GlobalConfig.getAvailableNovelContentImagePath(imgFileName);
 
-            if (path == null || path.equals("")) {
+            if (path == null || path.isEmpty()) {
                 GlobalConfig.saveNovelContentImage(nc.get(currentIndex).content);
                 String name = GlobalConfig.generateImageFileNameByURL(nc.get(currentIndex).content);
                 path = GlobalConfig.getAvailableNovelContentImagePath(name);
@@ -157,7 +157,7 @@ public class WenkuReaderLoaderXML extends WenkuReaderLoader {
             String imgFileName = GlobalConfig.generateImageFileNameByURL(nc.get(currentIndex).content);
             String path = GlobalConfig.getAvailableNovelContentImagePath(imgFileName);
 
-            if (path == null || path.equals("")) {
+            if (path == null || path.isEmpty()) {
                 GlobalConfig.saveNovelContentImage(nc.get(currentIndex).content);
                 String name = GlobalConfig.generateImageFileNameByURL(nc.get(currentIndex).content);
                 path = GlobalConfig.getAvailableNovelContentImagePath(name);
@@ -200,7 +200,7 @@ public class WenkuReaderLoaderXML extends WenkuReaderLoader {
             String imgFileName = GlobalConfig.generateImageFileNameByURL(nc.get(currentIndex).content);
             String path = GlobalConfig.getAvailableNovelContentImagePath(imgFileName);
 
-            if (path == null || path.equals("")) {
+            if (path == null || path.isEmpty()) {
                 GlobalConfig.saveNovelContentImage(nc.get(currentIndex).content);
                 String name = GlobalConfig.generateImageFileNameByURL(nc.get(currentIndex).content);
                 path = GlobalConfig.getAvailableNovelContentImagePath(name);

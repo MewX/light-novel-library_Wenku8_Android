@@ -88,9 +88,14 @@ public class WenkuReaderPageView extends View {
     private int lineCount;
 
     // background
-    static private Bitmap bmBackgroundYellow, bmTextureYellow[];
+    static private final Random random = new Random();
+    static private Bitmap bmBackgroundYellow;
+    private static final int[] bmTextureYellowResourceIds = new int[]{
+            R.drawable.reader_bg_yellow1,
+            R.drawable.reader_bg_yellow2,
+            R.drawable.reader_bg_yellow3,
+    };
     static private BitmapDrawable bmdBackground;
-    static private Random random = new Random();
     static private boolean isBackgroundSet = false;
 
     // vars
@@ -127,7 +132,7 @@ public class WenkuReaderPageView extends View {
             if(mSetting.getUseCustomFont()) typeface = Typeface.createFromFile(mSetting.getCustomFontPath()); // custom font
         }
         catch (Exception e) {
-            Toast.makeText(MyApp.getContext(), e.toString() + "\n可能的原因有：字体文件不在内置SD卡；内存太小字体太大，请使用简体中文字体，而不是CJK或GBK，谢谢，此功能为试验性功能；", Toast.LENGTH_SHORT).show();
+            Toast.makeText(MyApp.getContext(), e + "\n可能的原因有：字体文件不在内置SD卡；内存太小字体太大，请使用简体中文字体，而不是CJK或GBK，谢谢，此功能为试验性功能；", Toast.LENGTH_SHORT).show();
         }
         textPaint = new TextPaint();
         textPaint.setColor(getInDayMode() ? mSetting.fontColorDark : mSetting.fontColorLight);
@@ -170,12 +175,9 @@ public class WenkuReaderPageView extends View {
             if(mSetting.getPageBackgroundType() == WenkuReaderSettingV1.PAGE_BACKGROUND_TYPE.SYSTEM_DEFAULT || bmBackgroundYellow == null) {
                 // use system default
                 bmBackgroundYellow = BitmapFactory.decodeResource(MyApp.getContext().getResources(), R.drawable.reader_bg_yellow_edge);
-                bmTextureYellow = new Bitmap[3];
-                bmTextureYellow[0] = BitmapFactory.decodeResource(MyApp.getContext().getResources(), R.drawable.reader_bg_yellow1);
-                bmTextureYellow[1] = BitmapFactory.decodeResource(MyApp.getContext().getResources(), R.drawable.reader_bg_yellow2);
-                bmTextureYellow[2] = BitmapFactory.decodeResource(MyApp.getContext().getResources(), R.drawable.reader_bg_yellow3);
-
-                bmdBackground = new BitmapDrawable(MyApp.getContext().getResources(), bmTextureYellow[random.nextInt(bmTextureYellow.length)]);
+                Bitmap bmTexturePattern = BitmapFactory.decodeResource(MyApp.getContext().getResources(),
+                        bmTextureYellowResourceIds[random.nextInt(bmTextureYellowResourceIds.length)]);
+                bmdBackground = new BitmapDrawable(MyApp.getContext().getResources(), bmTexturePattern);
                 bmdBackground.setTileModeXY(Shader.TileMode.REPEAT, Shader.TileMode.REPEAT);
                 bmdBackground.setBounds(0, 0, screenSize.x, screenSize.y);
             }
@@ -315,7 +317,7 @@ public class WenkuReaderPageView extends View {
                 tempText = new StringBuilder("　　");
             }
             else if(mLoader.getCurrentType() == WenkuReaderLoader.ElementType.IMAGE_DEPENDENT) {
-                if(lineInfoList.size() != 0) {
+                if(!lineInfoList.isEmpty()) {
                     // end a page first
                     lastLineIndex = mLoader.getCurrentIndex() - 1;
                     mLoader.setCurrentIndex(lastLineIndex);
@@ -437,7 +439,7 @@ public class WenkuReaderPageView extends View {
             String curString = mLoader.getCurrentAsString();
 
             // special to image
-            if(curType == WenkuReaderLoader.ElementType.IMAGE_DEPENDENT && lineInfoList.size() != 0) {
+            if(curType == WenkuReaderLoader.ElementType.IMAGE_DEPENDENT && !lineInfoList.isEmpty()) {
                 Log.d("MewX", "jump 1");
                 firstLineIndex = curLineIndex + 1;
                 firstWordIndex = 0;
@@ -717,7 +719,7 @@ public class WenkuReaderPageView extends View {
     }
 
     public void watchImageDetailed(Activity activity) {
-        if(bitmapInfoList == null || bitmapInfoList.size() == 0 || bitmapInfoList.get(0).bm == null) {
+        if(bitmapInfoList == null || bitmapInfoList.isEmpty() || bitmapInfoList.get(0).bm == null) {
             Toast.makeText(getContext(), getResources().getString(R.string.reader_view_image_no_image), Toast.LENGTH_SHORT).show();
         }
         else {

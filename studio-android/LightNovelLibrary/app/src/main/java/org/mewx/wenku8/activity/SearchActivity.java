@@ -76,7 +76,7 @@ public class SearchActivity extends BaseMaterialActivity implements MyItemClickL
         toolbarSearchView.setOnEditorActionListener((v, actionId, event) -> {
             // purify
             String temp = toolbarSearchView.getText().toString().trim();
-            if(temp.length()==0) return false;
+            if(temp.isEmpty()) return false;
 
             // real action
             //Toast.makeText(MyApp.getContext(), temp, Toast.LENGTH_SHORT).show();

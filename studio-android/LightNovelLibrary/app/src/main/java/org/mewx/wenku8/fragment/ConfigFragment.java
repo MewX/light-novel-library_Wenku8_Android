@@ -42,11 +42,6 @@ import java.util.List;
 import java.util.Objects;
 
 public class ConfigFragment extends Fragment {
-
-    public static ConfigFragment newInstance() {
-        return new ConfigFragment();
-    }
-
     public ConfigFragment() {
         // Required empty public constructor
     }
@@ -69,7 +64,7 @@ public class ConfigFragment extends Fragment {
 
         // get views
         TextView tvNotice = Objects.requireNonNull(getActivity()).findViewById(R.id.notice);
-        if(Wenku8API.NoticeString.equals(""))
+        if(Wenku8API.NoticeString.isEmpty())
             getActivity().findViewById(R.id.notice_layout).setVisibility(View.GONE);
         else {
             CharSequence sequence = Html.fromHtml(Wenku8API.NoticeString.trim());

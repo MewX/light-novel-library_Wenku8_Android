@@ -215,7 +215,7 @@ public class NovelReviewReplyListActivity extends BaseMaterialActivity implement
                 if (reviewReplyList.getCurrentPage() < reviewReplyList.getTotalPage()) {
                     // load more toast
                     Snackbar.make(mRecyclerView, getResources().getString(R.string.list_loading)
-                                    + "(" + Integer.toString(reviewReplyList.getCurrentPage() + 1) + "/" + reviewReplyList.getTotalPage() + ")",
+                                    + "(" + (reviewReplyList.getCurrentPage() + 1) + "/" + reviewReplyList.getTotalPage() + ")",
                             Snackbar.LENGTH_SHORT).show();
 
                     new AsyncReviewReplyListLoader(NovelReviewReplyListActivity.this, mSwipeRefreshLayout, rid, reviewReplyList).execute();

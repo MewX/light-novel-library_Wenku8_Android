@@ -1,12 +1,13 @@
 package org.mewx.wenku8.adapter;
 
-import androidx.annotation.NonNull;
-import androidx.recyclerview.widget.RecyclerView;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.TextView;
+
+import androidx.annotation.NonNull;
+import androidx.recyclerview.widget.RecyclerView;
 
 import com.nostra13.universalimageloader.core.ImageLoader;
 
@@ -15,9 +16,9 @@ import org.mewx.wenku8.R;
 import org.mewx.wenku8.global.GlobalConfig;
 import org.mewx.wenku8.global.api.NovelItemInfoUpdate;
 import org.mewx.wenku8.global.api.Wenku8API;
-import org.mewx.wenku8.listener.MyOptionClickListener;
 import org.mewx.wenku8.listener.MyItemClickListener;
 import org.mewx.wenku8.listener.MyItemLongClickListener;
+import org.mewx.wenku8.listener.MyOptionClickListener;
 import org.mewx.wenku8.util.LightCache;
 
 import java.io.File;
@@ -44,11 +45,6 @@ public class NovelItemAdapter extends RecyclerView.Adapter<NovelItemAdapter.View
         super();
         mDataset = dataset; // reference
     }
-
-    public void RefreshDataset(List<NovelItemInfoUpdate> dataset) {
-        mDataset = dataset; // reference
-    }
-
 
     @Override
     @NonNull
@@ -110,7 +106,6 @@ public class NovelItemAdapter extends RecyclerView.Adapter<NovelItemAdapter.View
         private MyItemClickListener mClickListener;
         private MyOptionClickListener mMyOptionClickListener;
         private MyItemLongClickListener mLongClickListener;
-        public int position;
 
         private ImageButton ibNovelOption;
         ImageView ivNovelCover;

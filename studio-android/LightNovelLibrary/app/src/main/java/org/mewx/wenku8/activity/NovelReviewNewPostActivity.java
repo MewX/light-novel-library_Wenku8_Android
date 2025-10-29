@@ -98,8 +98,8 @@ public class NovelReviewNewPostActivity extends BaseMaterialActivity {
     public void onBackPressed() {
         // TODO: save draft
 
-        if (etTitle.getText().toString().trim().length() != 0 ||
-                etContent.getText().toString().trim().length() != 0) {
+        if (!etTitle.getText().toString().trim().isEmpty() ||
+                !etContent.getText().toString().trim().isEmpty()) {
             new MaterialDialog.Builder(this)
                     .theme(Theme.LIGHT)
                     .title(R.string.system_warning)

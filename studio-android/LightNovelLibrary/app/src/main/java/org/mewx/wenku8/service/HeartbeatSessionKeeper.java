@@ -17,16 +17,7 @@ import java.util.TimerTask;
  * Heartbeat Session Keeper. Useless.
  */
 public class HeartbeatSessionKeeper extends Service {
-    private int interval = 60 * 10 * 1000;
-
-    /**
-     * Set interval, must cancel it, then set & start.
-     * @param i time count
-     */
-    public void setInterval(int i) {
-        if(i > 0)
-            interval = i;
-    }
+    private static final int INTERVAL = 60 * 10 * 1000;
 
     @Override
     public IBinder onBind(Intent intent) {
@@ -44,7 +35,7 @@ public class HeartbeatSessionKeeper extends Service {
                 Toast.makeText(MyApp.getContext(), err.toString(), Toast.LENGTH_SHORT).show();
 
             }
-        }, 0, interval);
+        }, 0, INTERVAL);
 
 
         return super.onStartCommand(intent, flags, startId);

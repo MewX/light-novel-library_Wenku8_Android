@@ -8,9 +8,9 @@ buildscript {
         // maven { url "https://plugins.gradle.org/m2/" }
     }
     dependencies {
-        classpath 'com.android.tools.build:gradle:8.5.1'
-        classpath 'com.google.gms:google-services:4.4.2'
-        classpath 'com.google.firebase:firebase-crashlytics-gradle:3.0.2'
+        classpath 'com.android.tools.build:gradle:8.12.3'
+        classpath 'com.google.gms:google-services:4.4.4'
+        classpath 'com.google.firebase:firebase-crashlytics-gradle:3.0.6'
         // classpath "gradle.plugin.org.kt3k.gradle.plugin:coveralls-gradle-plugin:2.12.2"
 
         // NOTE: Do not place your application dependencies here; they belong
@@ -22,7 +22,6 @@ allprojects {
     repositories {
         mavenCentral()
         google()
-        jcenter()
         maven { url 'https://jitpack.io' }
         maven { url 'https://mvnrepository.com' }
     }

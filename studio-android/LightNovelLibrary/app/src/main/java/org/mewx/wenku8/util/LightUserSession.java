@@ -30,7 +30,7 @@ public class LightUserSession {
 
     // no null returned
     public static String getLoggedAs() {
-        return ( logStatus && SESSION != null && SESSION.length() != 0 && isUserInfoSet()) ? usernameOrEmail : "";
+        return ( logStatus && SESSION != null && !SESSION.isEmpty() && isUserInfoSet()) ? usernameOrEmail : "";
     }
 
     public static String getUsernameOrEmail() {
@@ -50,7 +50,7 @@ public class LightUserSession {
     }
 
     public static void setSession(String s) {
-        if(s != null && s.length() != 0) SESSION = s;
+        if(s != null && !s.isEmpty()) SESSION = s;
     }
 
     public static boolean getLogStatus() {
@@ -190,7 +190,7 @@ public class LightUserSession {
      * @return true is okay.
      */
     public static boolean isUserInfoSet() {
-        return usernameOrEmail != null && password != null && usernameOrEmail.length() != 0 && password.length() != 0;
+        return usernameOrEmail != null && password != null && !usernameOrEmail.isEmpty() && !password.isEmpty();
     }
 
     public static void setUserInfo(String username, String password) {
@@ -205,7 +205,7 @@ public class LightUserSession {
     public static void decAndSetUserFile(String raw) {
         try {
             String[] a = raw.split("\\|"); // a[0]: username; a[1]: password;
-            if (a.length != 2 || a[0].length() == 0 || a[1].length() == 0) {
+            if (a.length != 2 || a[0].isEmpty() || a[1].isEmpty()) {
                 setUserInfo("", "");
                 return; // fetch error to return
             }

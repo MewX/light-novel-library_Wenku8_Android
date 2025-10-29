@@ -1,8 +1,9 @@
 package org.mewx.wenku8.util;
 
 import android.content.ContentValues;
-import androidx.annotation.Nullable;
 import android.util.Log;
+
+import androidx.annotation.Nullable;
 
 import java.io.BufferedInputStream;
 import java.io.ByteArrayOutputStream;
@@ -59,11 +60,6 @@ public class LightNetwork {
 	 */
 	@Nullable
 	public static byte[] LightHttpPostConnection(String u, ContentValues values) {
-		return LightHttpPostConnection(u, values, true);
-	}
-
-	@Nullable
-	public static byte[] LightHttpPostConnection(String u, ContentValues values, boolean withSession) {
 		// new API, initial
 		URL url;
 		HttpURLConnection http;
@@ -72,7 +68,8 @@ public class LightNetwork {
 			http = (HttpURLConnection) url.openConnection();
             http.setRequestMethod("POST");
 			http.setRequestProperty("Accept-Encoding", "gzip"); // set gzip
-			if(withSession && LightUserSession.getSession().length() != 0) {
+			// The cookies are carried over the relay network for authentication purpose.
+			if (!LightUserSession.getSession().isEmpty()) {
 				http.setRequestProperty("Cookie", "PHPSESSID=" + LightUserSession.getSession());
 			}
 			http.setConnectTimeout(3000);

@@ -1,7 +1,6 @@
 package org.mewx.wenku8.global.api;
 
 import org.junit.Assert;
-import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mewx.wenku8.BuildConfig;
@@ -14,9 +13,6 @@ import java.util.Objects;
 
 @RunWith(MockitoJUnitRunner.class)
 public class Wenku8APITest {
-
-    @Before
-    public void init() {}
 
     @Test
     public void testGetEncryptedMAP() {

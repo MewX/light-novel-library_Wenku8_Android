@@ -182,7 +182,7 @@ public class LightCache {
         try {
             java.io.FileOutputStream fosTo = new FileOutputStream(toFile);
 
-            byte bt[] = new byte[1024];
+            byte[] bt = new byte[1024];
             int c;
             while ((c = from.read(bt)) > 0) fosTo.write(bt, 0, c);
             from.close();

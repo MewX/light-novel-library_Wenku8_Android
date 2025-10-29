@@ -331,7 +331,7 @@ public class GlobalConfig {
         String h = loadFullSaveFileContent(saveLocalBookshelfFileName);
         String[] p = h.split("\\|\\|"); // regular expression
         for (String t : p) {
-            if (t.equals(""))
+            if (t.isEmpty())
                 continue;
             bookshelf.add(Integer.valueOf(t));
         }
@@ -341,21 +341,20 @@ public class GlobalConfig {
         if (bookshelf == null)
             loadLocalBookShelf();
 
-        String s = "";
+        StringBuilder sb = new StringBuilder();
         for (int i = 0; i < bookshelf.size(); i++) {
             if (i != 0)
-                s += "||";
-            s += bookshelf.get(i);
+                sb.append("||");
+            sb.append(bookshelf.get(i));
         }
-
-        writeFullSaveFileContent(saveLocalBookshelfFileName, s);
+        writeFullSaveFileContent(saveLocalBookshelfFileName, sb.toString());
     }
 
     public static void addToLocalBookshelf(int aid) {
         if (bookshelf == null)
             loadLocalBookShelf();
 
-        if (bookshelf.indexOf(aid) == -1)
+        if (!bookshelf.contains(aid))
             bookshelf.add(0, aid); // add to the first place
 
         writeLocalBookShelf();
@@ -472,7 +471,7 @@ public class GlobalConfig {
         if (searchHistory == null)
             readSearchHistory();
 
-        if (searchHistory.indexOf("[") != -1)
+        if (searchHistory.contains("["))
             return; // harmful
 
         // remove same thing
@@ -496,7 +495,7 @@ public class GlobalConfig {
         if (searchHistory == null)
             readSearchHistory();
 
-        if (searchHistory.indexOf("[") != -1)
+        if (searchHistory.contains("["))
             return; // harmful
 
         // remove same thing
@@ -739,7 +738,7 @@ public class GlobalConfig {
         String[] sets = h.split("\\|\\|\\|\\|");
         for(String set : sets) {
             String[] temp = set.split("::::");
-            if(temp.length != 2 || temp[0] == null || temp[0].length() == 0 || temp[1] == null || temp[1].length() == 0) continue;
+            if(temp.length != 2 || temp[0] == null || temp[0].isEmpty() || temp[1] == null || temp[1].isEmpty()) continue;
 
             allSetting.put(temp[0], temp[1]);
         }
@@ -757,7 +756,7 @@ public class GlobalConfig {
 
         StringBuilder result = new StringBuilder();
         for( String key : allSetting.keySet() ) {
-            if(!result.toString().equals("")) result.append("||||");
+            if(!result.toString().isEmpty()) result.append("||||");
             result.append(key).append("::::").append(allSetting.getAsString(key));
         }
         writeFullSaveFileContent(saveSetting, result.toString());
