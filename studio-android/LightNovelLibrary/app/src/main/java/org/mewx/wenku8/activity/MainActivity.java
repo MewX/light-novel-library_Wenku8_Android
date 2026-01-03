@@ -31,9 +31,9 @@ import org.mewx.wenku8.async.CheckAppNewVersion;
 import org.mewx.wenku8.async.UpdateNotificationMessage;
 import org.mewx.wenku8.fragment.NavigationDrawerFragment;
 import org.mewx.wenku8.global.GlobalConfig;
-import org.mewx.wenku8.global.api.Wenku8API;
+import org.mewx.wenku8.api.Wenku8API;
 import org.mewx.wenku8.util.LightCache;
-import org.mewx.wenku8.util.LightUserSession;
+import org.mewx.wenku8.network.LightUserSession;
 import org.mewx.wenku8.util.SaveFileMigration;
 
 import java.io.File;

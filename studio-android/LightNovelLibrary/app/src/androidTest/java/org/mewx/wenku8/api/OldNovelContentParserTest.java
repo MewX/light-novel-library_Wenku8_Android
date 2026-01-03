@@ -1,10 +1,11 @@
-package org.mewx.wenku8.global.api;
+package org.mewx.wenku8.api;
 
 import org.junit.Test;
+import org.mewx.wenku8.api.OldNovelContentParser;
 
 import java.util.List;
 
-import static org.mewx.wenku8.global.api.OldNovelContentParser.NovelContentType.*;
+import static org.mewx.wenku8.api.OldNovelContentParser.NovelContentType.*;
 
 import static org.junit.Assert.assertEquals;
 

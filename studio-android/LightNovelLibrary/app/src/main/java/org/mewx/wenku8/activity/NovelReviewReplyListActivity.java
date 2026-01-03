@@ -29,11 +29,11 @@ import com.google.firebase.analytics.FirebaseAnalytics;
 
 import org.mewx.wenku8.R;
 import org.mewx.wenku8.adapter.ReviewReplyItemAdapter;
-import org.mewx.wenku8.global.api.ReviewReplyList;
-import org.mewx.wenku8.global.api.Wenku8API;
-import org.mewx.wenku8.global.api.Wenku8Parser;
+import org.mewx.wenku8.api.ReviewReplyList;
+import org.mewx.wenku8.api.Wenku8API;
+import org.mewx.wenku8.api.Wenku8Parser;
 import org.mewx.wenku8.listener.MyItemLongClickListener;
-import org.mewx.wenku8.util.LightNetwork;
+import org.mewx.wenku8.network.LightNetwork;
 
 import java.lang.ref.WeakReference;
 import java.nio.charset.Charset;

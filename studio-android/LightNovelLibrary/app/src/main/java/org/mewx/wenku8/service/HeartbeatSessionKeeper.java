@@ -6,8 +6,8 @@ import android.os.IBinder;
 import android.widget.Toast;
 
 import org.mewx.wenku8.MyApp;
-import org.mewx.wenku8.global.api.Wenku8Error;
-import org.mewx.wenku8.util.LightUserSession;
+import org.mewx.wenku8.api.Wenku8Error;
+import org.mewx.wenku8.network.LightUserSession;
 
 import java.util.Timer;
 import java.util.TimerTask;

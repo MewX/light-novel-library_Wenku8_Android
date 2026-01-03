@@ -8,7 +8,7 @@ import android.view.ViewGroup;
 import android.widget.TextView;
 
 import org.mewx.wenku8.R;
-import org.mewx.wenku8.global.api.ReviewList;
+import org.mewx.wenku8.api.ReviewList;
 import org.mewx.wenku8.listener.MyItemClickListener;
 
 import java.text.SimpleDateFormat;

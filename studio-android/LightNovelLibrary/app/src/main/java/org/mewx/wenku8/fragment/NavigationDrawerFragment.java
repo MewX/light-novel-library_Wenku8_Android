@@ -39,7 +39,7 @@ import org.mewx.wenku8.activity.UserLoginActivity;
 import org.mewx.wenku8.global.GlobalConfig;
 import org.mewx.wenku8.util.LightCache;
 import org.mewx.wenku8.util.LightTool;
-import org.mewx.wenku8.util.LightUserSession;
+import org.mewx.wenku8.network.LightUserSession;
 
 public class NavigationDrawerFragment extends Fragment {
 

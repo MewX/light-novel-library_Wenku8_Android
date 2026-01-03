@@ -1,4 +1,4 @@
-package org.mewx.wenku8.util;
+package org.mewx.wenku8.network;
 
 import android.content.Intent;
 import android.os.AsyncTask;
@@ -8,9 +8,12 @@ import android.widget.Toast;
 import org.mewx.wenku8.MyApp;
 import org.mewx.wenku8.R;
 import org.mewx.wenku8.global.GlobalConfig;
-import org.mewx.wenku8.global.api.Wenku8API;
-import org.mewx.wenku8.global.api.Wenku8Error;
+import org.mewx.wenku8.api.Wenku8API;
+import org.mewx.wenku8.api.Wenku8Error;
 import org.mewx.wenku8.service.HeartbeatSessionKeeper;
+import org.mewx.wenku8.util.LightBase64;
+import org.mewx.wenku8.util.LightCache;
+import org.mewx.wenku8.util.LightTool;
 
 import java.io.UnsupportedEncodingException;
 

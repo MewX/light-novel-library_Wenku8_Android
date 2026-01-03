@@ -1,4 +1,4 @@
-package org.mewx.wenku8.util;
+package org.mewx.wenku8.network;
 
 import androidx.test.filters.SmallTest;
 

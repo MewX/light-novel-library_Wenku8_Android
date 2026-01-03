@@ -1,4 +1,4 @@
-package org.mewx.wenku8.global.api;
+package org.mewx.wenku8.api;
 
 import android.content.ContentValues;
 
@@ -9,7 +9,7 @@ import org.mewx.wenku8.BuildConfig;
 import org.mewx.wenku8.R;
 import org.mewx.wenku8.global.GlobalConfig;
 import org.mewx.wenku8.util.LightBase64;
-import org.mewx.wenku8.util.LightNetwork;
+import org.mewx.wenku8.network.LightNetwork;
 
 import java.util.Arrays;
 import java.util.HashMap;

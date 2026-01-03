@@ -29,10 +29,10 @@ import com.nostra13.universalimageloader.core.ImageLoader;
 import org.mewx.wenku8.R;
 import org.mewx.wenku8.component.ScrollViewNoFling;
 import org.mewx.wenku8.global.GlobalConfig;
-import org.mewx.wenku8.global.api.OldNovelContentParser;
-import org.mewx.wenku8.global.api.VolumeList;
-import org.mewx.wenku8.global.api.Wenku8API;
-import org.mewx.wenku8.util.LightNetwork;
+import org.mewx.wenku8.api.OldNovelContentParser;
+import org.mewx.wenku8.api.VolumeList;
+import org.mewx.wenku8.api.Wenku8API;
+import org.mewx.wenku8.network.LightNetwork;
 
 import java.io.UnsupportedEncodingException;
 import java.util.List;

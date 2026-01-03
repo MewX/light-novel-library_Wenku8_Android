@@ -15,7 +15,7 @@ import android.view.ViewGroup;
 import org.mewx.wenku8.component.PagerSlidingTabStrip;
 
 import org.mewx.wenku8.R;
-import org.mewx.wenku8.global.api.Wenku8API;
+import org.mewx.wenku8.api.Wenku8API;
 
 /**
  * This fragment is the parent fragment to hold all specific fragment.

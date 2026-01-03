@@ -1,4 +1,4 @@
-package org.mewx.wenku8.global.api;
+package org.mewx.wenku8.api;
 
 import android.util.Log;
 

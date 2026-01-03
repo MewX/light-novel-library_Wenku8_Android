@@ -1,4 +1,4 @@
-package org.mewx.wenku8.global.api;
+package org.mewx.wenku8.api;
 
 /**
  * Created by MewX on 2015/6/12.
