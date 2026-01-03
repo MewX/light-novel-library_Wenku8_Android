@@ -423,7 +423,7 @@ public class Wenku8ReaderActivityV1 extends BaseMaterialActivity {
                     xml = new String(tempXml, "UTF-8");
                 }
 
-                nc = OldNovelContentParser.parseNovelContent(xml, null);
+                nc = OldNovelContentParser.parseNovelContent(xml, unused -> {});
                 if (nc.isEmpty())
                     return xml.isEmpty() ? Wenku8Error.ErrorCode.SERVER_RETURN_NOTHING : Wenku8Error.ErrorCode.XML_PARSE_FAILED;
 

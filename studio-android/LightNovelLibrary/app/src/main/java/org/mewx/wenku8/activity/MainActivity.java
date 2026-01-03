@@ -26,6 +26,7 @@ import com.afollestad.materialdialogs.Theme;
 import com.google.firebase.analytics.FirebaseAnalytics;
 import com.nostra13.universalimageloader.core.ImageLoader;
 
+import org.mewx.wenku8.MyApp;
 import org.mewx.wenku8.R;
 import org.mewx.wenku8.async.CheckAppNewVersion;
 import org.mewx.wenku8.async.UpdateNotificationMessage;
@@ -138,7 +139,14 @@ public class MainActivity extends BaseMaterialActivity {
         }
 
         // execute background action
-        LightUserSession.aiui = new LightUserSession.AsyncInitUserInfo();
+        LightUserSession.aiui = new LightUserSession.AsyncInitUserInfo(getApplicationContext(),
+                /* failureCallback= */ () -> {
+            if (!LightCache.deleteFile(GlobalConfig.getFirstFullUserAccountSaveFilePath()))
+                LightCache.deleteFile(GlobalConfig.getSecondFullUserAccountSaveFilePath());
+            if (!LightCache.deleteFile(GlobalConfig.getFirstUserAvatarSaveFilePath()))
+                LightCache.deleteFile(GlobalConfig.getSecondUserAvatarSaveFilePath());
+            Toast.makeText(getApplicationContext(), getApplicationContext().getResources().getString(R.string.system_log_info_outofdate), Toast.LENGTH_SHORT).show();
+        }, GlobalConfig::loadUserInfoSet);
         LightUserSession.aiui.execute();
         GlobalConfig.loadAllSetting();
 

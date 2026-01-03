@@ -110,7 +110,7 @@ public class UserInfoActivity extends BaseMaterialActivity {
                 if(LightTool.isInteger(xml)) {
                     if(Wenku8Error.getSystemDefinedErrorCode(Integer.valueOf(xml)) == Wenku8Error.ErrorCode.SYSTEM_4_NOT_LOGGED_IN) {
                         // do log in
-                        Wenku8Error.ErrorCode temp = LightUserSession.doLoginFromFile();
+                        Wenku8Error.ErrorCode temp = LightUserSession.doLoginFromFile(GlobalConfig::loadUserInfoSet);
                         if(temp != Wenku8Error.ErrorCode.SYSTEM_1_SUCCEEDED) return temp; // return an error code
 
                         // rquest again
@@ -242,7 +242,16 @@ public class UserInfoActivity extends BaseMaterialActivity {
             super.onPostExecute(errorCode);
 
             if(errorCode == Wenku8Error.ErrorCode.SYSTEM_1_SUCCEEDED || errorCode == Wenku8Error.ErrorCode.SYSTEM_4_NOT_LOGGED_IN) {
-                LightUserSession.logOut();
+                LightUserSession.logOut(() -> {
+                    // TODO: extract this to a util.
+                    // delete files
+                    if(!LightCache.deleteFile(GlobalConfig.getFirstFullUserAccountSaveFilePath())) {
+                        LightCache.deleteFile(GlobalConfig.getSecondFullUserAccountSaveFilePath());
+                    }
+                    if(!LightCache.deleteFile(GlobalConfig.getFirstUserAvatarSaveFilePath())) {
+                        LightCache.deleteFile(GlobalConfig.getSecondUserAvatarSaveFilePath());
+                    }
+                });
                 Toast.makeText(UserInfoActivity.this, "Logged out!", Toast.LENGTH_SHORT).show();
             }
             else

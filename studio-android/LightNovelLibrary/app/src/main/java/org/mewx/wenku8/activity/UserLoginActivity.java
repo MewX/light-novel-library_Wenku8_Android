@@ -108,7 +108,7 @@ public class UserLoginActivity extends BaseMaterialActivity {
                 e.printStackTrace();
             }
 
-            we = LightUserSession.doLoginFromGiven(params[0], params[1]);
+            we = LightUserSession.doLoginFromGiven(params[0], params[1], GlobalConfig::saveUserInfoSet);
             if(we == Wenku8Error.ErrorCode.SYSTEM_1_SUCCEEDED) {
                 // fetch avatar
                 byte[] b = LightNetwork.LightHttpPostConnection(Wenku8API.BASE_URL, Wenku8API.getUserAvatar());

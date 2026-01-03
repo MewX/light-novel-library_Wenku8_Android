@@ -211,7 +211,7 @@ public class VerticalReaderActivity extends AppCompatActivity {
                     xml = new String(tempXml, "UTF-8");
                 }
 
-                nc = OldNovelContentParser.parseNovelContent(xml, pDialog);
+                nc = OldNovelContentParser.parseNovelContent(xml, size -> pDialog.setMaxProgress(size));
                 if (nc.isEmpty()) {
                     Log.e("MewX-Main", "getNullFromParser (NovelContentParser.parseNovelContent(xml);)");
 

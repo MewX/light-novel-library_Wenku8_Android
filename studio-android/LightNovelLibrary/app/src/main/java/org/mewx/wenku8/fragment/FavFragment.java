@@ -199,7 +199,7 @@ public class FavFragment extends Fragment implements MyItemClickListener, MyItem
     private void cleanVolumesCache(List<VolumeList> listVolume) {
         // remove from local bookshelf, already in bookshelf
         for (VolumeList vl : listVolume) {
-            vl.cleanLocalCache();
+            LightCache.cleanLocalCache(vl);
         }
     }
 
@@ -319,7 +319,7 @@ public class FavFragment extends Fragment implements MyItemClickListener, MyItem
             if(LightTool.isInteger(new String(b))) {
                 if(Wenku8Error.getSystemDefinedErrorCode(Integer.parseInt(new String(b))) == Wenku8Error.ErrorCode.SYSTEM_4_NOT_LOGGED_IN) {
                     // do log in
-                    Wenku8Error.ErrorCode temp = LightUserSession.doLoginFromFile();
+                    Wenku8Error.ErrorCode temp = LightUserSession.doLoginFromFile(GlobalConfig::loadUserInfoSet);
                     if(temp != Wenku8Error.ErrorCode.SYSTEM_1_SUCCEEDED) return temp; // return an error code
 
                     // request again

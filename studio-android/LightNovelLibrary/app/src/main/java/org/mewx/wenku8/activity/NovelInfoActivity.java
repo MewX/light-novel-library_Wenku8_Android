@@ -722,7 +722,7 @@ public class NovelInfoActivity extends BaseMaterialActivity {
           new MaterialDialog.Builder(NovelInfoActivity.this)
               .theme(Theme.LIGHT)
               .onPositive((ignored1, ignored2) -> {
-                vl.cleanLocalCache();
+                LightCache.cleanLocalCache(vl);
                 ((TextView) rl.findViewById(R.id.chapter_status)).setText("");
               })
               .content(R.string.dialog_sure_to_clear_cache)

@@ -82,7 +82,7 @@ public class RKListFragment extends Fragment {
 
         @Override
         public CharSequence getPageTitle(int position) {
-            return getResources().getString(Wenku8API.getNOVELSORTBY_ChsId(TITLELIST[position]));
+            return getResources().getString(getNOVELSORTBY_ChsId(TITLELIST[position]));
         }
 
         @Override
@@ -95,6 +95,38 @@ public class RKListFragment extends Fragment {
             Bundle bundle = new Bundle();
             bundle.putString("type", Wenku8API.getNOVELSORTBY(TITLELIST[type]));
             return NovelItemListFragment.newInstance(bundle);
+        }
+
+        public static int getNOVELSORTBY_ChsId(Wenku8API.NOVELSORTBY n) {
+            switch (n) {
+                case allVisit:
+                    return R.string.tab_allvisit;
+                case monthVisit:
+                    return R.string.tab_monthvisit;
+                case monthVote:
+                    return R.string.tab_monthvote;
+                case weekVisit:
+                    return R.string.tab_weekvisit;
+                case weekVote:
+                    return R.string.tab_weekvote;
+                case dayVisit:
+                    return R.string.tab_dayvisit;
+                case dayVote:
+                    return R.string.tab_dayvote;
+                case postDate:
+                    return R.string.tab_postdate;
+                case lastUpdate:
+                    return R.string.tab_lastupdate;
+                case goodNum:
+                    return R.string.tab_goodnum;
+                case size:
+                    return R.string.tab_size;
+                case fullFlag:
+                    return R.string.tab_fullflag;
+                case allVote:
+                default:
+                    return R.string.tab_allvote; // default
+            }
         }
     }
 
