@@ -332,9 +332,13 @@ const Hero = ({ darkMode }) => {
                 <img
                     src="imgs/site/tab_bg.jpg"
                     alt="Background"
-                    className="w-full h-full object-cover opacity-20 blur-sm"
-                />
-                <div className={`absolute inset-0 bg-gradient-to-b ${darkMode ? 'from-slate-900/80 to-slate-900' : 'from-blue-50/80 to-white'}`}></div>
+                    className="w-full h-full object-cover object-top opacity-30" />
+                <div className={`absolute inset-0 bg-gradient-to-b 
+                    ${darkMode
+                        ? 'from-slate-900/10 to-slate-900/90'   // Dark mode: 30% top opacity -> 90% bottom opacity
+                        : 'from-blue-50/0 to-white/90'         // Light mode: 10% top opacity -> 80% bottom opacity
+                    }`}>
+                </div>
             </div>
 
             <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
