@@ -94,6 +94,7 @@ android {
     buildFeatures {
         buildConfig true
     }
+    ndkVersion '29.0.14206865'
 }
 
 dependencies {
@@ -116,7 +117,7 @@ dependencies {
     implementation project(':api')
     coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.1.5'
 
-    implementation(platform("com.google.firebase:firebase-bom:28.4.2"))
+    implementation(platform("com.google.firebase:firebase-bom:33.16.0"))
     implementation("com.google.firebase:firebase-analytics")
     implementation("com.google.firebase:firebase-crashlytics")
 
