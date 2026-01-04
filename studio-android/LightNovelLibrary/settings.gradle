@@ -1,3 +1,10 @@
 include ':app'
-// TODO: add api stub
-include ':api'
+
+// If the private folder exists, use it. If not (open source), use the stub.
+if (file('api').exists()) {
+    include ':api'
+} else {
+    include ':api'
+    // Point the module to the stub folder.
+    project(':api').projectDir = new File('api-stub')
+}

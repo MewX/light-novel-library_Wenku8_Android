@@ -1,7 +1,6 @@
 package org.mewx.wenku8.global.api;
 
 import org.junit.Test;
-import org.mewx.wenku8.api.NovelListWithInfoParser;
 
 import java.util.List;
 
