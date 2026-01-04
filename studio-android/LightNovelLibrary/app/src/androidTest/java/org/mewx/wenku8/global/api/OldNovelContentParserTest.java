@@ -48,7 +48,7 @@ public class OldNovelContentParserTest {
 
     @Test
     public void parseNovelContentWithIncompleteImageTag() {
-        List<OldNovelContentParser.NovelContent> contents = OldNovelContentParser.parseNovelContent(NOVEL_CONTENt_BROKEN_IMAGE, null);
+        List<OldNovelContentParser.NovelContent> contents = OldNovelContentParser.parseNovelContent(NOVEL_CONTENt_BROKEN_IMAGE, unused -> {});
         assertEquals(5, contents.size());
 
         OldNovelContentParser.NovelContent tempContent = contents.get(0);
