@@ -28,11 +28,11 @@ const STAFF = [
 
 // TODO: No need to have thumbnails nowadays.
 const SCREENSHOTS = [
-    { thumb: 'imgs/app/android.thumb.01.jpg', full: 'imgs/app/android.01.png' },
-    { thumb: 'imgs/app/android.thumb.02.jpg', full: 'imgs/app/android.02.png' },
-    { thumb: 'imgs/app/android.thumb.03.jpg', full: 'imgs/app/android.03.png' },
-    { thumb: 'imgs/app/android.thumb.04.jpg', full: 'imgs/app/android.04.png' },
-    { thumb: 'imgs/app/android.thumb.05.jpg', full: 'imgs/app/android.05.png' },
+    { thumb: 'imgs/app/android.01.png', full: 'imgs/app/android.01.png' },
+    { thumb: 'imgs/app/android.02.png', full: 'imgs/app/android.02.png' },
+    { thumb: 'imgs/app/android.03.png', full: 'imgs/app/android.03.png' },
+    { thumb: 'imgs/app/android.04.png', full: 'imgs/app/android.04.png' },
+    { thumb: 'imgs/app/android.05.png', full: 'imgs/app/android.05.png' },
 ];
 
 // Complete list converted from microblog.xml
@@ -446,10 +446,6 @@ const ScreenshotGallery = ({ darkMode }) => {
                         </div>
                     ))}
                 </div>
-
-                <p className={`text-center text-sm mt-4 ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>
-                    Click on an image to view full size
-                </p>
             </div>
 
             {/* Lightbox Modal */}
