@@ -1,13 +1,11 @@
 package org.mewx.wenku8.global.api;
 
 import org.junit.Test;
-import org.mewx.wenku8.api.OldNovelContentParser;
 
 import java.util.List;
 
-import static org.mewx.wenku8.api.OldNovelContentParser.NovelContentType.*;
-
 import static org.junit.Assert.assertEquals;
+import static org.mewx.wenku8.global.api.OldNovelContentParser.NovelContentType.*;
 
 public class OldNovelContentParserTest {
     private static final String NOVEL_CONTENT = "line 1\r\n" +

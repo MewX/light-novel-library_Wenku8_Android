@@ -3,7 +3,6 @@ package org.mewx.wenku8.global.api;
 import androidx.test.filters.SmallTest;
 
 import org.junit.Test;
-import org.mewx.wenku8.api.UserInfo;
 
 import static org.junit.Assert.*;
 
