@@ -472,7 +472,7 @@ const ScreenshotGallery = ({ darkMode }) => {
     );
 };
 
-const BlogCard = ({ post, darkMode, compact = false, className = '' }) => {
+const BlogCard = ({ post, darkMode, compact = false, fullText = false, className = '' }) => {
     const [likes, setLikes] = useState(Math.floor(Math.random() * 20));
     const [liked, setLiked] = useState(false);
 
@@ -510,7 +510,7 @@ const BlogCard = ({ post, darkMode, compact = false, className = '' }) => {
             </div>
 
             <div
-                className={`prose prose-sm max-w-none flex-grow ${compact ? 'text-xs line-clamp-4' : ''} mb-4 ${darkMode ? 'prose-invert text-gray-300' : 'text-gray-600'}`}
+                className={`prose prose-sm max-w-none flex-grow ${compact ? 'text-xs' : ''} ${compact && !fullText ? 'line-clamp-4' : ''} mb-4 ${darkMode ? 'prose-invert text-gray-300' : 'text-gray-600'}`}
                 dangerouslySetInnerHTML={{ __html: post.content }}
             />
 
@@ -564,7 +564,7 @@ const NewsDrawer = ({ isOpen, onClose, darkMode }) => {
 
                     <div className="flex-1 overflow-y-auto p-6 scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-slate-700">
                         {BLOG_POSTS.map((post) => (
-                            <BlogCard key={post.id} post={post} darkMode={darkMode} compact={true} className="mb-4" />
+                            <BlogCard key={post.id} post={post} darkMode={darkMode} compact={true} fullText={true} className="mb-4" />
                         ))}
 
                         <div className="text-center py-8">
