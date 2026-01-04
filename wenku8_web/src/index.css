@@ -1,0 +1,5 @@
+@import "tailwindcss";
+
+@theme {
+  --animate-bounce-slow: bounce 3s infinite;
+}
