@@ -5,8 +5,8 @@ import android.graphics.BitmapFactory;
 import androidx.annotation.NonNull;
 
 import org.mewx.wenku8.global.GlobalConfig;
-import org.mewx.wenku8.api.OldNovelContentParser;
-import org.mewx.wenku8.api.OldNovelContentParser.NovelContentType;
+import org.mewx.wenku8.global.api.OldNovelContentParser;
+import org.mewx.wenku8.global.api.OldNovelContentParser.NovelContentType;
 
 import java.util.List;
 

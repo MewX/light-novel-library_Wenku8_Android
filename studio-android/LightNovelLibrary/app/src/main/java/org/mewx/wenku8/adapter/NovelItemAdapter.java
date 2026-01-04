@@ -14,7 +14,7 @@ import com.nostra13.universalimageloader.core.ImageLoader;
 import org.mewx.wenku8.MyApp;
 import org.mewx.wenku8.R;
 import org.mewx.wenku8.global.GlobalConfig;
-import org.mewx.wenku8.api.NovelItemInfoUpdate;
+import org.mewx.wenku8.global.api.NovelItemInfoUpdate;
 import org.mewx.wenku8.api.Wenku8API;
 import org.mewx.wenku8.listener.MyItemClickListener;
 import org.mewx.wenku8.listener.MyItemLongClickListener;

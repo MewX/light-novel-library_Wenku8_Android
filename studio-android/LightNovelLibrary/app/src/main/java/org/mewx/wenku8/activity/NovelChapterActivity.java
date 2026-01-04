@@ -15,8 +15,8 @@ import com.google.firebase.analytics.FirebaseAnalytics;
 
 import org.mewx.wenku8.R;
 import org.mewx.wenku8.global.GlobalConfig;
-import org.mewx.wenku8.api.ChapterInfo;
-import org.mewx.wenku8.api.VolumeList;
+import org.mewx.wenku8.global.api.ChapterInfo;
+import org.mewx.wenku8.global.api.VolumeList;
 import org.mewx.wenku8.reader.activity.Wenku8ReaderActivityV1;
 import org.mewx.wenku8.util.LightCache;
 

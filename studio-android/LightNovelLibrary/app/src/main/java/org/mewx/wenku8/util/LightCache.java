@@ -12,9 +12,9 @@ import android.util.Log;
 
 import androidx.documentfile.provider.DocumentFile;
 
-import org.mewx.wenku8.api.ChapterInfo;
-import org.mewx.wenku8.api.OldNovelContentParser;
-import org.mewx.wenku8.api.VolumeList;
+import org.mewx.wenku8.global.api.ChapterInfo;
+import org.mewx.wenku8.global.api.OldNovelContentParser;
+import org.mewx.wenku8.global.api.VolumeList;
 import org.mewx.wenku8.global.GlobalConfig;
 
 import java.io.DataInputStream;
