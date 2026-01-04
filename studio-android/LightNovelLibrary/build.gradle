@@ -29,5 +29,6 @@ allprojects {
 
 ext {
     targetSdkVersion = 36
-    buildToolsVersion = "36.0.0"
+    buildToolsVersion = "36.1.0"
+    minSdkVersion = 21  // Minimum requirement for Play Store.
 }
