@@ -412,7 +412,7 @@ const Hero = ({ darkMode }) => {
                 <div className="mt-8 flex flex-col items-center justify-center gap-2 text-sm text-gray-500">
                     <div className="flex items-center gap-2">
                         <span>最新版本:</span>
-                        <a href="https://github.com/MewX/light-novel-library_Wenku8_Android/releases" target="_blank" className="font-mono bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300 px-2 py-1 rounded">v1.23 (2025-10-29)</a>
+                        <a href="https://github.com/MewX/light-novel-library_Wenku8_Android/releases" target="_blank" className="font-mono bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300 px-2 py-1 rounded">v1.24 (2026-01-04)</a>
                     </div>
                     <div className="flex items-center gap-2">
                         <span>历史稳定版本:</span>
