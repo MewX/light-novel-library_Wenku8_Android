@@ -15,7 +15,8 @@ import {
     ChevronRight,
     Globe,
     History,
-    ArrowRight
+    ArrowRight,
+    MessageSquare
 } from 'lucide-react';
 
 // --- Data Constants ---
@@ -286,6 +287,7 @@ const Navbar = ({ darkMode, toggleDarkMode }) => {
                             <a href="#home" className={`hover:bg-blue-500 hover:text-white px-3 py-2 rounded-md text-sm font-medium transition-colors ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>首页</a>
                             <a href="#news" className={`hover:bg-blue-500 hover:text-white px-3 py-2 rounded-md text-sm font-medium transition-colors ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>日志</a>
                             <a href="#staff" className={`hover:bg-blue-500 hover:text-white px-3 py-2 rounded-md text-sm font-medium transition-colors ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>作者</a>
+                            <a href="#comments" className={`hover:bg-blue-500 hover:text-white px-3 py-2 rounded-md text-sm font-medium transition-colors ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>留言</a>
                             <button
                                 onClick={toggleDarkMode}
                                 className={`p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors ${darkMode ? 'text-yellow-400' : 'text-slate-600'}`}
@@ -317,7 +319,9 @@ const Navbar = ({ darkMode, toggleDarkMode }) => {
                 <div className={`md:hidden ${darkMode ? 'bg-slate-800' : 'bg-white'} shadow-lg`}>
                     <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3">
                         <a href="#home" className={`block px-3 py-2 rounded-md text-base font-medium ${darkMode ? 'text-gray-300 hover:text-white hover:bg-slate-700' : 'text-gray-700 hover:text-gray-900 hover:bg-gray-50'}`}>首页</a>
-                        <a href="#news" className={`block px-3 py-2 rounded-md text-base font-medium ${darkMode ? 'text-gray-300 hover:text-white hover:bg-slate-700' : 'text-gray-700 hover:text-gray-900 hover:bg-gray-50'}`}>动态</a>
+                        <a href="#news" className={`block px-3 py-2 rounded-md text-base font-medium ${darkMode ? 'text-gray-300 hover:text-white hover:bg-slate-700' : 'text-gray-700 hover:text-gray-900 hover:bg-gray-50'}`}>日志</a>
+                        <a href="#staff" className={`block px-3 py-2 rounded-md text-base font-medium ${darkMode ? 'text-gray-300 hover:text-white hover:bg-slate-700' : 'text-gray-700 hover:text-gray-900 hover:bg-gray-50'}`}>作者</a>
+                        <a href="#comments" className={`block px-3 py-2 rounded-md text-base font-medium ${darkMode ? 'text-gray-300 hover:text-white hover:bg-slate-700' : 'text-gray-700 hover:text-gray-900 hover:bg-gray-50'}`}>留言</a>
                     </div>
                 </div>
             )}
@@ -653,6 +657,72 @@ const StaffSection = ({ darkMode }) => {
     );
 };
 
+
+const DisqusComments = ({ darkMode }) => {
+    useEffect(() => {
+        // Define global config if not already defined
+        window.disqus_config = function () {
+            this.page.url = 'http://wenku8.mewx.org/';
+            this.page.identifier = 'wenku8android';
+        };
+
+        // Load Disqus script
+        const d = document;
+        const s = d.createElement('script');
+        s.src = 'https://wenku8android.disqus.com/embed.js';
+        s.setAttribute('data-timestamp', +new Date());
+        (d.head || d.body).appendChild(s);
+
+        // Remove the annoying disqus Ads.
+        // Based on a copy of https://stackoverflow.com/a/78583202/4206925
+        const disqusThread = d.getElementById('disqus_thread');
+        if (disqusThread) {
+            const observer = new MutationObserver((mutations) => {
+                mutations.forEach(() => {
+                    const iframes = disqusThread.getElementsByTagName('iframe');
+                    // Original logic: assumes ads create multiple iframes and the 2nd one is the real comment box? 
+                    // Replicating exactly as requested:
+                    if (iframes.length > 1) {
+                        const commentsIframe = iframes[1];
+                        while (disqusThread.firstChild) {
+                            disqusThread.removeChild(disqusThread.firstChild);
+                        }
+                        disqusThread.appendChild(commentsIframe);
+                        observer.disconnect();
+                    }
+                });
+            });
+            observer.observe(disqusThread, { childList: true, subtree: true });
+
+            // Clean up observer on unmount
+            return () => observer.disconnect();
+        }
+    }, []);
+
+    return (
+        <section id="comments" className={`py-16 ${darkMode ? 'bg-slate-900' : 'bg-gray-50'}`}>
+            <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div className="flex items-center gap-3 mb-10">
+                    <div className={`p-2 rounded-full ${darkMode ? 'bg-blue-900/30 text-blue-400' : 'bg-blue-100 text-blue-600'}`}>
+                        <MessageSquare size={24} />
+                    </div>
+                    <h2 className={`text-3xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                        留言板
+                    </h2>
+                </div>
+
+                <div className={`p-6 md:p-8 rounded-2xl shadow-lg border ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-gray-100'}`}>
+                    <div id="disqus_thread"></div>
+                    <noscript>
+                        Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a>
+                    </noscript>
+                </div>
+            </div>
+        </section>
+    );
+};
+
+
 const Footer = ({ darkMode }) => {
     return (
         <footer className={`py-12 ${darkMode ? 'bg-slate-950 text-gray-400' : 'bg-gray-900 text-gray-400'}`}>
@@ -689,6 +759,7 @@ const App = () => {
             <ScreenshotGallery darkMode={darkMode} />
             <NewsSection darkMode={darkMode} onOpenDrawer={() => setIsNewsDrawerOpen(true)} />
             <StaffSection darkMode={darkMode} />
+            <DisqusComments darkMode={darkMode} />
             <Footer darkMode={darkMode} />
 
             <NewsDrawer
