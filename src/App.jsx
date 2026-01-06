@@ -603,7 +603,7 @@ const NewsSection = ({ darkMode, onOpenDrawer }) => {
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
                     {recentPosts.map((post) => (
-                        <BlogCard key={post.id} post={post} darkMode={darkMode} compact={true} className="h-full" />
+                        <BlogCard key={post.id} post={post} darkMode={darkMode} compact={true} fullText={true} className="h-full" />
                     ))}
                 </div>
 
