@@ -32,10 +32,10 @@
         android:theme="@style/AppTheme"
         tools:replace="android:label">
 
-        <!-- Sample AdMob App ID: ca-app-pub-3940256099942544~3347511713 -->
+        <!-- Sample AdMob App ID: ca-app-pub-7333757578973883~9635263460 -->
         <meta-data
             android:name="com.google.android.gms.ads.APPLICATION_ID"
-            android:value="ca-app-pub-3940256099942544~3347511713"/>
+            android:value="ca-app-pub-7333757578973883~9635263460"/>
 
         <!-- Resolve conflict between AdMob and Analytics -->
         <property
