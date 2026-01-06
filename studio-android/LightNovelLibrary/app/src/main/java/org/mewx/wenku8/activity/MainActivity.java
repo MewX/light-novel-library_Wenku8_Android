@@ -26,14 +26,15 @@ import com.afollestad.materialdialogs.Theme;
 import com.google.firebase.analytics.FirebaseAnalytics;
 import com.nostra13.universalimageloader.core.ImageLoader;
 
+import org.mewx.wenku8.MyApp;
 import org.mewx.wenku8.R;
 import org.mewx.wenku8.async.CheckAppNewVersion;
 import org.mewx.wenku8.async.UpdateNotificationMessage;
 import org.mewx.wenku8.fragment.NavigationDrawerFragment;
 import org.mewx.wenku8.global.GlobalConfig;
-import org.mewx.wenku8.global.api.Wenku8API;
+import org.mewx.wenku8.api.Wenku8API;
 import org.mewx.wenku8.util.LightCache;
-import org.mewx.wenku8.util.LightUserSession;
+import org.mewx.wenku8.network.LightUserSession;
 import org.mewx.wenku8.util.SaveFileMigration;
 
 import java.io.File;
@@ -138,7 +139,14 @@ public class MainActivity extends BaseMaterialActivity {
         }
 
         // execute background action
-        LightUserSession.aiui = new LightUserSession.AsyncInitUserInfo();
+        LightUserSession.aiui = new LightUserSession.AsyncInitUserInfo(getApplicationContext(),
+                /* failureCallback= */ () -> {
+            if (!LightCache.deleteFile(GlobalConfig.getFirstFullUserAccountSaveFilePath()))
+                LightCache.deleteFile(GlobalConfig.getSecondFullUserAccountSaveFilePath());
+            if (!LightCache.deleteFile(GlobalConfig.getFirstUserAvatarSaveFilePath()))
+                LightCache.deleteFile(GlobalConfig.getSecondUserAvatarSaveFilePath());
+            Toast.makeText(getApplicationContext(), getApplicationContext().getResources().getString(R.string.system_log_info_outofdate), Toast.LENGTH_SHORT).show();
+        }, GlobalConfig::loadUserInfoSet);
         LightUserSession.aiui.execute();
         GlobalConfig.loadAllSetting();
 

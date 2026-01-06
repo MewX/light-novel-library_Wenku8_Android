@@ -27,7 +27,7 @@ import org.mewx.wenku8.MyApp;
 import org.mewx.wenku8.R;
 import org.mewx.wenku8.activity.ViewImageDetailActivity;
 import org.mewx.wenku8.global.GlobalConfig;
-import org.mewx.wenku8.global.api.Wenku8Error;
+import org.mewx.wenku8.api.Wenku8Error;
 import org.mewx.wenku8.reader.loader.WenkuReaderLoader;
 import org.mewx.wenku8.reader.setting.WenkuReaderSettingV1;
 import org.mewx.wenku8.util.LightTool;

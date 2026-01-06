@@ -33,11 +33,11 @@ import org.mewx.wenku8.activity.NovelInfoActivity;
 import org.mewx.wenku8.adapter.NovelItemAdapterUpdate;
 import org.mewx.wenku8.global.GlobalConfig;
 import org.mewx.wenku8.global.api.NovelItemInfoUpdate;
-import org.mewx.wenku8.global.api.Wenku8API;
+import org.mewx.wenku8.api.Wenku8API;
 import org.mewx.wenku8.global.api.Wenku8Parser;
 import org.mewx.wenku8.listener.MyItemClickListener;
 import org.mewx.wenku8.listener.MyItemLongClickListener;
-import org.mewx.wenku8.util.LightNetwork;
+import org.mewx.wenku8.network.LightNetwork;
 
 import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;

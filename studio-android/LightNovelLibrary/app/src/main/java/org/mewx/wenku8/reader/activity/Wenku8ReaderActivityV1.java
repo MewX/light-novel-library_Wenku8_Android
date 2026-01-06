@@ -41,8 +41,8 @@ import org.mewx.wenku8.global.GlobalConfig;
 import org.mewx.wenku8.global.api.ChapterInfo;
 import org.mewx.wenku8.global.api.OldNovelContentParser;
 import org.mewx.wenku8.global.api.VolumeList;
-import org.mewx.wenku8.global.api.Wenku8API;
-import org.mewx.wenku8.global.api.Wenku8Error;
+import org.mewx.wenku8.api.Wenku8API;
+import org.mewx.wenku8.api.Wenku8Error;
 import org.mewx.wenku8.reader.loader.WenkuReaderLoader;
 import org.mewx.wenku8.reader.loader.WenkuReaderLoaderXML;
 import org.mewx.wenku8.reader.setting.WenkuReaderSettingV1;
@@ -51,7 +51,7 @@ import org.mewx.wenku8.reader.slider.SlidingLayout;
 import org.mewx.wenku8.reader.slider.base.OverlappedSlider;
 import org.mewx.wenku8.reader.view.WenkuReaderPageView;
 import org.mewx.wenku8.util.LightCache;
-import org.mewx.wenku8.util.LightNetwork;
+import org.mewx.wenku8.network.LightNetwork;
 import org.mewx.wenku8.util.LightTool;
 
 import java.io.File;
@@ -423,7 +423,7 @@ public class Wenku8ReaderActivityV1 extends BaseMaterialActivity {
                     xml = new String(tempXml, "UTF-8");
                 }
 
-                nc = OldNovelContentParser.parseNovelContent(xml, null);
+                nc = OldNovelContentParser.parseNovelContent(xml, unused -> {});
                 if (nc.isEmpty())
                     return xml.isEmpty() ? Wenku8Error.ErrorCode.SERVER_RETURN_NOTHING : Wenku8Error.ErrorCode.XML_PARSE_FAILED;
 

@@ -6,6 +6,8 @@ import android.content.Context;
 
 import com.google.android.gms.ads.MobileAds;
 
+import org.mewx.wenku8.api.Wenku8API;
+
 /**
  * The class is for getting context everywhere
  */
@@ -19,6 +21,9 @@ public class MyApp extends Application {
         context = getApplicationContextLocal();
 
         MobileAds.initialize(this, initializationStatus -> {});
+
+        // TODO: use a better dependency injection for this value.
+        Wenku8API.AppVer = BuildConfig.VERSION_NAME;
     }
 
     /**

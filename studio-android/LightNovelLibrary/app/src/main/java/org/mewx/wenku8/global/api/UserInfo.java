@@ -4,7 +4,7 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import android.util.Log;
 
-import org.mewx.wenku8.global.GlobalConfig;
+import org.mewx.wenku8.api.Wenku8API;
 import org.xmlpull.v1.XmlPullParser;
 import org.xmlpull.v1.XmlPullParserFactory;
 
@@ -53,10 +53,10 @@ public class UserInfo {
                         } else if ("item".equals(xmlPullParser.getName())) {
                             if ("uname".equals(xmlPullParser.getAttributeValue(0))) {
                                 ui.username = xmlPullParser.nextText();
-                                Log.d("MewX", ui.username.isEmpty() ? GlobalConfig.UNKNOWN : ui.username);
+                                Log.d("MewX", ui.username.isEmpty() ? Wenku8API.UNKNOWN : ui.username);
                             } else if ("nickname".equals(xmlPullParser.getAttributeValue(0))) {
                                 ui.nickyname = xmlPullParser.nextText();
-                                Log.d("MewX", ui.nickyname.isEmpty() ? GlobalConfig.UNKNOWN : ui.nickyname);
+                                Log.d("MewX", ui.nickyname.isEmpty() ? Wenku8API.UNKNOWN : ui.nickyname);
                             } else if ("score".equals(xmlPullParser.getAttributeValue(0))) {
                                 ui.score = Integer.valueOf(xmlPullParser.nextText());
                                 Log.d("MewX", "score:" + ui.score);
@@ -65,7 +65,7 @@ public class UserInfo {
                                 Log.d("MewX", "experience:" + ui.experience);
                             } else if ("rank".equals(xmlPullParser.getAttributeValue(0))) {
                                 ui.rank = xmlPullParser.nextText();
-                                Log.d("MewX", ui.rank.isEmpty() ? GlobalConfig.UNKNOWN : ui.rank);
+                                Log.d("MewX", ui.rank.isEmpty() ? Wenku8API.UNKNOWN : ui.rank);
                             }
                         }
                         break;

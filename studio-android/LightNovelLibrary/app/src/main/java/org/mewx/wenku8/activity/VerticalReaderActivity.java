@@ -31,8 +31,8 @@ import org.mewx.wenku8.component.ScrollViewNoFling;
 import org.mewx.wenku8.global.GlobalConfig;
 import org.mewx.wenku8.global.api.OldNovelContentParser;
 import org.mewx.wenku8.global.api.VolumeList;
-import org.mewx.wenku8.global.api.Wenku8API;
-import org.mewx.wenku8.util.LightNetwork;
+import org.mewx.wenku8.api.Wenku8API;
+import org.mewx.wenku8.network.LightNetwork;
 
 import java.io.UnsupportedEncodingException;
 import java.util.List;
@@ -211,7 +211,7 @@ public class VerticalReaderActivity extends AppCompatActivity {
                     xml = new String(tempXml, "UTF-8");
                 }
 
-                nc = OldNovelContentParser.parseNovelContent(xml, pDialog);
+                nc = OldNovelContentParser.parseNovelContent(xml, size -> pDialog.setMaxProgress(size));
                 if (nc.isEmpty()) {
                     Log.e("MewX-Main", "getNullFromParser (NovelContentParser.parseNovelContent(xml);)");
 

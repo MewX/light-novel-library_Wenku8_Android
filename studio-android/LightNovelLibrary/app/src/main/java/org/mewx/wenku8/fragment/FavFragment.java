@@ -34,16 +34,16 @@ import org.mewx.wenku8.global.GlobalConfig;
 import org.mewx.wenku8.global.api.NovelItemInfoUpdate;
 import org.mewx.wenku8.global.api.NovelItemMeta;
 import org.mewx.wenku8.global.api.VolumeList;
-import org.mewx.wenku8.global.api.Wenku8API;
-import org.mewx.wenku8.global.api.Wenku8Error;
+import org.mewx.wenku8.api.Wenku8API;
+import org.mewx.wenku8.api.Wenku8Error;
 import org.mewx.wenku8.global.api.Wenku8Parser;
 import org.mewx.wenku8.listener.MyItemClickListener;
 import org.mewx.wenku8.listener.MyItemLongClickListener;
 import org.mewx.wenku8.listener.MyOptionClickListener;
 import org.mewx.wenku8.util.LightCache;
-import org.mewx.wenku8.util.LightNetwork;
+import org.mewx.wenku8.network.LightNetwork;
 import org.mewx.wenku8.util.LightTool;
-import org.mewx.wenku8.util.LightUserSession;
+import org.mewx.wenku8.network.LightUserSession;
 
 import java.io.File;
 import java.io.UnsupportedEncodingException;
@@ -199,7 +199,7 @@ public class FavFragment extends Fragment implements MyItemClickListener, MyItem
     private void cleanVolumesCache(List<VolumeList> listVolume) {
         // remove from local bookshelf, already in bookshelf
         for (VolumeList vl : listVolume) {
-            vl.cleanLocalCache();
+            LightCache.cleanLocalCache(vl);
         }
     }
 
@@ -319,7 +319,7 @@ public class FavFragment extends Fragment implements MyItemClickListener, MyItem
             if(LightTool.isInteger(new String(b))) {
                 if(Wenku8Error.getSystemDefinedErrorCode(Integer.parseInt(new String(b))) == Wenku8Error.ErrorCode.SYSTEM_4_NOT_LOGGED_IN) {
                     // do log in
-                    Wenku8Error.ErrorCode temp = LightUserSession.doLoginFromFile();
+                    Wenku8Error.ErrorCode temp = LightUserSession.doLoginFromFile(GlobalConfig::loadUserInfoSet);
                     if(temp != Wenku8Error.ErrorCode.SYSTEM_1_SUCCEEDED) return temp; // return an error code
 
                     // request again

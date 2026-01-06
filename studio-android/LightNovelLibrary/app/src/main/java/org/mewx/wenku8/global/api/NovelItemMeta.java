@@ -1,6 +1,6 @@
 package org.mewx.wenku8.global.api;
 
-import org.mewx.wenku8.global.GlobalConfig;
+import org.mewx.wenku8.api.Wenku8API;
 
 /**
  * Created by MewX on 2015/5/13.
@@ -25,17 +25,17 @@ public class NovelItemMeta {
     NovelItemMeta() {
         aid = 1;
         title = Integer.toString(aid);
-        author = GlobalConfig.UNKNOWN;
+        author = Wenku8API.UNKNOWN;
         dayHitsCount = 0;
         totalHitsCount = 0;
         pushCount = 0;
         favCount = 0;
-        pressId = GlobalConfig.UNKNOWN;
-        bookStatus = GlobalConfig.UNKNOWN;
+        pressId = Wenku8API.UNKNOWN;
+        bookStatus = Wenku8API.UNKNOWN;
         bookLength = 0;
-        lastUpdate = GlobalConfig.UNKNOWN;
+        lastUpdate = Wenku8API.UNKNOWN;
         latestSectionCid = 0;
-        latestSectionName = GlobalConfig.UNKNOWN;
-        fullIntro = GlobalConfig.UNKNOWN;
+        latestSectionName = Wenku8API.UNKNOWN;
+        fullIntro = Wenku8API.UNKNOWN;
     }
 }

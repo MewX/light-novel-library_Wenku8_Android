@@ -29,8 +29,8 @@ import org.mewx.wenku8.activity.MenuBackgroundSelectorActivity;
 import org.mewx.wenku8.async.CheckAppNewVersion;
 import org.mewx.wenku8.global.GlobalConfig;
 import org.mewx.wenku8.global.api.OldNovelContentParser;
-import org.mewx.wenku8.global.api.Wenku8API;
-import org.mewx.wenku8.global.api.Wenku8Error;
+import org.mewx.wenku8.api.Wenku8API;
+import org.mewx.wenku8.api.Wenku8Error;
 import org.mewx.wenku8.util.LightCache;
 import org.mewx.wenku8.util.LightTool;
 

@@ -49,7 +49,7 @@ import org.mewx.wenku8.activity.UserLoginActivity;
 import org.mewx.wenku8.global.GlobalConfig;
 import org.mewx.wenku8.util.LightCache;
 import org.mewx.wenku8.util.LightTool;
-import org.mewx.wenku8.util.LightUserSession;
+import org.mewx.wenku8.network.LightUserSession;
 
 public class NavigationDrawerFragment extends Fragment {
 
@@ -156,7 +156,13 @@ public class NavigationDrawerFragment extends Fragment {
                     // show dialog to login, error to jump to login activity
                     if(LightUserSession.aiui.getStatus() == AsyncTask.Status.FINISHED) {
                         Toast.makeText(getActivity(), "Relogged.", Toast.LENGTH_SHORT).show();
-                        LightUserSession.aiui = new LightUserSession.AsyncInitUserInfo();
+                        LightUserSession.aiui = new LightUserSession.AsyncInitUserInfo(getContext(),/* failureCallback= */ () -> {
+                            if (!LightCache.deleteFile(GlobalConfig.getFirstFullUserAccountSaveFilePath()))
+                                LightCache.deleteFile(GlobalConfig.getSecondFullUserAccountSaveFilePath());
+                            if (!LightCache.deleteFile(GlobalConfig.getFirstUserAvatarSaveFilePath()))
+                                LightCache.deleteFile(GlobalConfig.getSecondUserAvatarSaveFilePath());
+                            Toast.makeText(getContext(), getContext().getResources().getString(R.string.system_log_info_outofdate), Toast.LENGTH_SHORT).show();
+                        }, GlobalConfig::loadUserInfoSet);
                         LightUserSession.aiui.execute();
                     }
                 }

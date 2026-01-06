@@ -15,7 +15,7 @@ import com.afollestad.materialdialogs.Theme;
 import org.mewx.wenku8.BuildConfig;
 import org.mewx.wenku8.R;
 import org.mewx.wenku8.global.GlobalConfig;
-import org.mewx.wenku8.util.LightNetwork;
+import org.mewx.wenku8.network.LightNetwork;
 
 import java.lang.ref.WeakReference;
 

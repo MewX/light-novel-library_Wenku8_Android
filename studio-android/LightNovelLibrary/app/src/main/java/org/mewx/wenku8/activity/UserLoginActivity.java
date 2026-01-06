@@ -19,11 +19,11 @@ import com.google.firebase.analytics.FirebaseAnalytics;
 import org.mewx.wenku8.MyApp;
 import org.mewx.wenku8.R;
 import org.mewx.wenku8.global.GlobalConfig;
-import org.mewx.wenku8.global.api.Wenku8API;
-import org.mewx.wenku8.global.api.Wenku8Error;
+import org.mewx.wenku8.api.Wenku8API;
+import org.mewx.wenku8.api.Wenku8Error;
 import org.mewx.wenku8.util.LightCache;
-import org.mewx.wenku8.util.LightNetwork;
-import org.mewx.wenku8.util.LightUserSession;
+import org.mewx.wenku8.network.LightNetwork;
+import org.mewx.wenku8.network.LightUserSession;
 
 import java.io.ByteArrayOutputStream;
 
@@ -108,7 +108,7 @@ public class UserLoginActivity extends BaseMaterialActivity {
                 e.printStackTrace();
             }
 
-            we = LightUserSession.doLoginFromGiven(params[0], params[1]);
+            we = LightUserSession.doLoginFromGiven(params[0], params[1], GlobalConfig::saveUserInfoSet);
             if(we == Wenku8Error.ErrorCode.SYSTEM_1_SUCCEEDED) {
                 // fetch avatar
                 byte[] b = LightNetwork.LightHttpPostConnection(Wenku8API.BASE_URL, Wenku8API.getUserAvatar());

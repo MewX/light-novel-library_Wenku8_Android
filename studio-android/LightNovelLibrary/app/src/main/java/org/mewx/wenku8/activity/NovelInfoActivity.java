@@ -37,12 +37,12 @@ import org.mewx.wenku8.global.api.NovelItemMeta;
 import org.mewx.wenku8.global.api.OldNovelContentParser;
 import org.mewx.wenku8.global.api.OldNovelContentParser.NovelContentType;
 import org.mewx.wenku8.global.api.VolumeList;
-import org.mewx.wenku8.global.api.Wenku8API;
-import org.mewx.wenku8.global.api.Wenku8Error;
+import org.mewx.wenku8.api.Wenku8API;
+import org.mewx.wenku8.api.Wenku8Error;
 import org.mewx.wenku8.global.api.Wenku8Parser;
 import org.mewx.wenku8.reader.activity.Wenku8ReaderActivityV1;
 import org.mewx.wenku8.util.LightCache;
-import org.mewx.wenku8.util.LightNetwork;
+import org.mewx.wenku8.network.LightNetwork;
 import org.mewx.wenku8.util.LightTool;
 
 import java.io.File;
@@ -722,7 +722,7 @@ public class NovelInfoActivity extends BaseMaterialActivity {
           new MaterialDialog.Builder(NovelInfoActivity.this)
               .theme(Theme.LIGHT)
               .onPositive((ignored1, ignored2) -> {
-                vl.cleanLocalCache();
+                LightCache.cleanLocalCache(vl);
                 ((TextView) rl.findViewById(R.id.chapter_status)).setText("");
               })
               .content(R.string.dialog_sure_to_clear_cache)

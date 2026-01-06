@@ -18,9 +18,10 @@ import com.nostra13.universalimageloader.core.display.FadeInBitmapDisplayer;
 
 import org.mewx.wenku8.MyApp;
 import org.mewx.wenku8.R;
-import org.mewx.wenku8.global.api.Wenku8API;
+import org.mewx.wenku8.api.Wenku8API;
+import org.mewx.wenku8.network.LightUserSession;
 import org.mewx.wenku8.util.LightCache;
-import org.mewx.wenku8.util.LightNetwork;
+import org.mewx.wenku8.network.LightNetwork;
 import org.mewx.wenku8.util.LightTool;
 import org.mewx.wenku8.util.SaveFileMigration;
 
@@ -59,9 +60,6 @@ public class GlobalConfig {
     private static final String saveUserAvatarFileName = "avatar.jpg";
     private static final String saveNoticeString = "notice.wk8"; // the notice cache from online
     private static int maxSearchHistory = 20; // default
-
-    // reserved constants
-    public static final String UNKNOWN = "Unknown";
 
     // vars
     private static boolean lookupInternalStorageOnly = false;
@@ -111,6 +109,8 @@ public class GlobalConfig {
     // sets and gets
     public static void setCurrentLang(Wenku8API.LANG l) {
         currentLang = l;
+        // FIXME
+        Wenku8API.CurrentLang = currentLang;
         setToAllSetting(SettingItems.language, currentLang.toString());
     }
 
@@ -127,6 +127,8 @@ public class GlobalConfig {
             else
                 currentLang = Wenku8API.LANG.SC;
         }
+        // FIXME
+        Wenku8API.CurrentLang = currentLang;
         return currentLang;
     }
 
@@ -841,5 +843,38 @@ public class GlobalConfig {
 
     public static void writeTheNotice(@NonNull String noticeStr) {
         writeFullSaveFileContent(saveNoticeString, noticeStr);
+    }
+
+    public static boolean loadUserInfoSet() {
+        byte[] bytes;
+        if(LightCache.testFileExist(getFirstFullUserAccountSaveFilePath())) {
+            bytes = LightCache.loadFile(getFirstFullUserAccountSaveFilePath());
+        }
+        else if(LightCache.testFileExist(getSecondFullUserAccountSaveFilePath())) {
+            bytes = LightCache.loadFile(getSecondFullUserAccountSaveFilePath());
+        }
+        else {
+            return false; // file read failed
+        }
+
+        try {
+            Log.d("MewX", new String(bytes, "UTF-8"));
+            // TODO: decouple
+            LightUserSession.decAndSetUserFile(new String(bytes, "UTF-8"));
+        } catch (Exception e) {
+            e.printStackTrace();
+            return false; // exception
+        }
+
+        return true;
+    }
+
+    public static boolean saveUserInfoSet() {
+        LightCache.saveFile(getFirstFullUserAccountSaveFilePath(), LightUserSession.encUserFile().getBytes(), true);
+        if (!LightCache.testFileExist(getFirstFullUserAccountSaveFilePath())) {
+            LightCache.saveFile(getSecondFullUserAccountSaveFilePath(), LightUserSession.encUserFile().getBytes(), true);
+            return LightCache.testFileExist(getSecondFullUserAccountSaveFilePath());
+        }
+        return true;
     }
 }
