@@ -39,6 +39,12 @@ const SCREENSHOTS = [
 // Complete list converted from microblog.xml
 const BLOG_POSTS = [
     {
+        id: 39,
+        author: 'MewX',
+        date: '2025-01-04 16:30',
+        content: '花了一个多小时更新了网页，感觉AI真是生产力工具，旧版网页哼哧哼哧弄了好几天才弄完。之后会先优先更新API的加密，然后加入一个不影响使用的广告（因为服务器支出实在是呈指数级上升）。不知道从哪来的三方工具在访问我的服务器，但是为了保证旧版兼容，又没法大概接口（也许可以？）。Anyway，走一步是一步，如果广告能大幅cover服务器支出，我可能会多花些时间来维护一下，毕竟有AI了。'
+    },
+    {
         id: 38,
         author: 'MewX',
         date: '2018-06-12 23:13',
