@@ -7,7 +7,6 @@ import {
     X,
     Moon,
     Sun,
-    Smartphone,
     User,
     Calendar,
     ExternalLink,
@@ -16,7 +15,8 @@ import {
     Globe,
     History,
     ArrowRight,
-    MessageSquare
+    MessageSquare,
+    Archive
 } from 'lucide-react';
 
 // --- Data Constants ---
@@ -368,16 +368,6 @@ const Hero = ({ darkMode }) => {
 
                 <div className="mt-10 flex justify-center gap-4 flex-wrap">
                     <a
-                        href="https://buymeacoffee.com/mewx"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-center px-8 py-3 rounded-lg bg-yellow-400 hover:bg-yellow-300 text-yellow-900 font-bold shadow-lg shadow-yellow-400/30 transition-all hover:scale-105"
-                    >
-                        <Coffee className="mr-2" size={20} />
-                        赞助服务器
-                    </a>
-
-                    <a
                         href="https://play.google.com/store/apps/details?id=org.mewx.wenku8"
                         target="_blank"
                         rel="noopener noreferrer"
@@ -385,6 +375,15 @@ const Hero = ({ darkMode }) => {
                     >
                         <Download className="mr-2" size={20} />
                         从 Play Store 安装
+                    </a>
+                    <a
+                        href="https://buymeacoffee.com/mewx"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center px-8 py-3 rounded-lg bg-yellow-400 hover:bg-yellow-300 text-yellow-900 font-bold shadow-lg shadow-yellow-400/30 transition-all hover:scale-105"
+                    >
+                        <Coffee className="mr-2" size={20} />
+                        赞助服务器
                     </a>
                 </div>
 
@@ -409,9 +408,17 @@ const Hero = ({ darkMode }) => {
                         href="https://github.com/MewX/light-novel-library_Wenku8_Android"
                         target="_blank"
                         rel="noopener noreferrer"
-                        className={`flex items-center gap-2 px-4 py-2 rounded-full border transition-colors ${darkMode ? 'border-slate-700 bg-slate-800/50 hover:bg-slate-700 text-gray-300' : 'border-gray-200 bg-white/50 hover:bg-white text-gray-600'}`}
+                        className={`flex items-center gap-2 px-4 py-2 rounded-full border transition-colors ${darkMode ? 'border-blue-500 bg-blue-600 text-white hover:bg-blue-500' : 'border-blue-600 bg-blue-600 text-white hover:bg-blue-700'}`}
                     >
                         <Github size={16} /> 查看源码
+                    </a>
+                    <a
+                        href="https://web.archive.org/web/*/wenku8.mewx.org"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className={`flex items-center gap-2 px-4 py-2 rounded-full border transition-colors ${darkMode ? 'border-slate-700 bg-slate-800/50 hover:bg-slate-700 text-gray-300' : 'border-gray-200 bg-white/50 hover:bg-white text-gray-600'}`}
+                    >
+                        <Archive size={16} /> 旧版网页
                     </a>
                 </div>
 
