@@ -133,6 +133,46 @@ public class NovelChapterActivity extends BaseMaterialActivity {
                 return true;
             });
 
+            rl.findViewById(R.id.novel_option).setOnClickListener(ignored -> {
+                new MaterialDialog.Builder(NovelChapterActivity.this)
+                    .theme(Theme.LIGHT)
+                    .title(R.string.system_choose_reader_engine)
+                    .items(R.array.reader_engine_option)
+                    .itemsCallback((ignored1, ignored2, which, ignored3) -> {
+                        Class readerClass = Wenku8ReaderActivityV1.class;
+                        switch (which) {
+                            case 0:
+                                // V1
+                                readerClass = Wenku8ReaderActivityV1.class;
+                                break;
+
+                            case 1:
+                                // old
+                                readerClass = VerticalReaderActivity.class;
+                                break;
+                        }
+
+                        Intent intent = new Intent(NovelChapterActivity.this, readerClass);
+                        intent.putExtra("aid", aid);
+                        intent.putExtra("volume", volumeList);
+                        intent.putExtra("cid", ci.cid);
+
+                        // test does file exist
+                        if (from.equals(FromLocal)
+                            && !LightCache.testFileExist(GlobalConfig.getDefaultStoragePath() + GlobalConfig.saveFolderName + File.separator + "novel" + File.separator + ci.cid + ".xml")
+                            && !LightCache.testFileExist(GlobalConfig.getBackupStoragePath() + GlobalConfig.saveFolderName + File.separator + "novel" + File.separator + ci.cid + ".xml")) {
+                            // jump to reader activity
+                            intent.putExtra("from", "cloud"); // from cloud
+                        } else {
+                            intent.putExtra("from", from); // from "fav"
+                        }
+
+                        startActivity(intent);
+                        overridePendingTransition(R.anim.fade_in, R.anim.hold); // fade in animation
+                    })
+                    .show();
+            });
+
             // add to scroll view
             mLinearLayout.addView(rl);
         }

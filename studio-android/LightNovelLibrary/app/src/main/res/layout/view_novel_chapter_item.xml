@@ -56,8 +56,19 @@
                 android:singleLine="true"
                 android:textColor="@color/myAccentColor"
                 android:layout_alignParentTop="true"
+                android:layout_toLeftOf="@+id/novel_option" />
+
+            <ImageButton
+                android:id="@+id/novel_option"
+                android:layout_width="32dp"
+                android:layout_height="32dp"
+                android:src="@drawable/ic_option"
+                android:background="@drawable/btn_menu_item_boardless"
+                android:clickable="true"
+                android:focusable="true"
                 android:layout_alignParentRight="true"
-                android:layout_alignParentEnd="true" />
+                android:layout_alignParentEnd="true"
+                android:layout_centerVertical="true" />
         </RelativeLayout>
     </androidx.cardview.widget.CardView>
 </RelativeLayout>
