@@ -471,7 +471,6 @@ public class NavigationDrawerFragment extends Fragment {
         AdLoader.Builder builder = new AdLoader.Builder(getContext(),
                 BuildConfig.DEBUG ? "ca-app-pub-3940256099942544/2247696110" /* test ID */ :
                         "ca-app-pub-7333757578973883/7014476152" /* real ID */);
-
         builder.withNativeAdOptions(new NativeAdOptions.Builder()
                 .setVideoOptions(new VideoOptions.Builder().setStartMuted(true).build())
                 .build());
