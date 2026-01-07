@@ -7,7 +7,7 @@ import androidx.annotation.Nullable;
 @SuppressWarnings("unused")
 public class Wenku8API {
     public static final String UNKNOWN = "Unknown";
-    public static LANG CurrentLang = LANG.SC;
+    public static AppLanguage CurrentLang = AppLanguage.SC;
     public static String AppVer = UNKNOWN;
     public static String NoticeString = UNKNOWN;
     public static final String REGISTER_URL = UNKNOWN;
@@ -19,7 +19,7 @@ public class Wenku8API {
 
     public static final int MIN_REPLY_TEXT = -1;
 
-    public enum LANG {
+    public enum AppLanguage {
         SC, TC
     }
 
@@ -56,35 +56,35 @@ public class Wenku8API {
         throw new UnsupportedOperationException("stub");
     }
 
-    public static ContentValues getNovelShortInfo(int aid, LANG l) {
+    public static ContentValues getNovelShortInfo(int aid, AppLanguage l) {
         throw new UnsupportedOperationException("stub");
     }
 
-    public static ContentValues getNovelShortInfoUpdate_CV(int aid, LANG l) {
+    public static ContentValues getNovelShortInfoUpdate_CV(int aid, AppLanguage l) {
         throw new UnsupportedOperationException("stub");
     }
 
-    public static ContentValues getNovelFullIntro(int aid, LANG l) {
+    public static ContentValues getNovelFullIntro(int aid, AppLanguage l) {
         throw new UnsupportedOperationException("stub");
     }
 
-    public static ContentValues getNovelFullMeta(int aid, LANG l) {
+    public static ContentValues getNovelFullMeta(int aid, AppLanguage l) {
         throw new UnsupportedOperationException("stub");
     }
 
-    public static ContentValues getNovelIndex(int aid, LANG l) {
+    public static ContentValues getNovelIndex(int aid, AppLanguage l) {
         throw new UnsupportedOperationException("stub");
     }
 
-    public static ContentValues getNovelContent(int aid, int cid, LANG l) {
+    public static ContentValues getNovelContent(int aid, int cid, AppLanguage l) {
         throw new UnsupportedOperationException("stub");
     }
 
-    public static ContentValues searchNovelByNovelName(String novelName, LANG l) {
+    public static ContentValues searchNovelByNovelName(String novelName, AppLanguage l) {
         throw new UnsupportedOperationException("stub");
     }
 
-    public static ContentValues searchNovelByAuthorName(String authorName, LANG l) {
+    public static ContentValues searchNovelByAuthorName(String authorName, AppLanguage l) {
         throw new UnsupportedOperationException("stub");
     }
 
@@ -92,7 +92,7 @@ public class Wenku8API {
         throw new UnsupportedOperationException("stub");
     }
 
-    public static ContentValues getNovelListWithInfo(NovelSortedBy n, int page, LANG l) {
+    public static ContentValues getNovelListWithInfo(NovelSortedBy n, int page, AppLanguage l) {
         throw new UnsupportedOperationException("stub");
     }
 
@@ -104,7 +104,7 @@ public class Wenku8API {
         throw new UnsupportedOperationException("stub");
     }
 
-    public static ContentValues getNovelListByLibraryWithInfo(int sortId, int page, LANG l) {
+    public static ContentValues getNovelListByLibraryWithInfo(int sortId, int page, AppLanguage l) {
         throw new UnsupportedOperationException("stub");
     }
 
@@ -136,11 +136,11 @@ public class Wenku8API {
         throw new UnsupportedOperationException("stub");
     }
 
-    public static ContentValues getBookshelfListAid(LANG l) {
+    public static ContentValues getBookshelfListAid(AppLanguage l) {
         throw new UnsupportedOperationException("stub");
     }
 
-    public static ContentValues getBookshelfListParams(LANG l) {
+    public static ContentValues getBookshelfListParams(AppLanguage l) {
         throw new UnsupportedOperationException("stub");
     }
 
