@@ -8,6 +8,7 @@ import android.graphics.Point;
 import android.os.AsyncTask;
 import android.os.Build;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -37,12 +38,12 @@ import com.google.android.gms.ads.AdLoader;
 import com.google.android.gms.ads.AdRequest;
 import com.google.android.gms.ads.LoadAdError;
 import com.google.android.gms.ads.MobileAds;
-import com.google.android.gms.ads.nativead.MediaView;
 import com.google.android.gms.ads.nativead.NativeAd;
 import com.google.android.gms.ads.nativead.NativeAdView;
 import com.google.firebase.analytics.FirebaseAnalytics;
 import com.makeramen.roundedimageview.RoundedImageView;
 
+import org.mewx.wenku8.BuildConfig;
 import org.mewx.wenku8.R;
 import org.mewx.wenku8.activity.MainActivity;
 import org.mewx.wenku8.activity.UserInfoActivity;
@@ -53,6 +54,7 @@ import org.mewx.wenku8.util.LightTool;
 import org.mewx.wenku8.network.LightUserSession;
 
 public class NavigationDrawerFragment extends Fragment {
+    private static final String TAG = NavigationDrawerFragment.class.getSimpleName();
 
     private FirebaseAnalytics mFirebaseAnalytics;
     private View mFragmentContainerView;
@@ -457,26 +459,22 @@ public class NavigationDrawerFragment extends Fragment {
     }
 
     private void refreshAd() {
-        AdLoader.Builder builder = new AdLoader.Builder(getContext(), "ca-app-pub-7333757578973883/7014476152");
-
+        AdLoader.Builder builder = new AdLoader.Builder(getContext(),
+                BuildConfig.DEBUG ? "ca-app-pub-3940256099942544/2247696110" /* test ID */ :
+                        "ca-app-pub-7333757578973883/7014476152" /* real ID */);
         builder.forNativeAd(nativeAd -> {
-            // OnLoadedListener implementation.
-            // If this callback occurs after the activity is destroyed, you must call
-            // destroy and return or you may get a memory leak.
-            boolean isDestroyed = false;
+            // If this callback occurs after the activity is destroyed, we must destroy and return;
+            // or we may get a memory leak.
             if (getActivity() == null) {
                 nativeAd.destroy();
                 return;
             }
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1) {
-                isDestroyed = getActivity().isDestroyed();
-            }
+            boolean isDestroyed = getActivity().isDestroyed();
             if (isDestroyed || getActivity().isFinishing() || getActivity().isChangingConfigurations()) {
                 nativeAd.destroy();
                 return;
             }
-            // You must call destroy on old ads when you are done with them,
-            // otherwise you will have a memory leak.
+            // Must call destroy on old ads when you are done with them, otherwise memory leak.
             if (mNativeAd != null) {
                 mNativeAd.destroy();
             }
@@ -492,8 +490,9 @@ public class NavigationDrawerFragment extends Fragment {
 
         AdLoader adLoader = builder.withAdListener(new AdListener() {
             @Override
-            public void onAdFailedToLoad(LoadAdError loadAdError) {
-                // Handle the failure by logging, altering the UI, and so on.
+            public void onAdFailedToLoad(@NonNull LoadAdError loadAdError) {
+                // Handle the failure by logging, altering the UI, or else.
+                Log.e(TAG,loadAdError.toString());
             }
         }).build();
 

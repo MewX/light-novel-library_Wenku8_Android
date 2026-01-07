@@ -234,7 +234,9 @@
                 app:layout_constraintTop_toBottomOf="@id/main_menu_table_layout"
                 app:layout_constraintStart_toStartOf="parent"
                 app:layout_constraintEnd_toEndOf="parent"
-                android:layout_marginTop="16dp"
+                android:paddingLeft="16dp"
+                android:paddingTop="0dp"
+                android:paddingRight="16dp"
                 android:paddingBottom="16dp"/>
 
         </androidx.constraintlayout.widget.ConstraintLayout>
