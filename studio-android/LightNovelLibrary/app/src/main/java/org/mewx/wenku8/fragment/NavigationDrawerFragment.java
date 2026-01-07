@@ -293,6 +293,7 @@ public class NavigationDrawerFragment extends Fragment {
     @SuppressLint("NewApi")
     private void setHighLightButton(int iconId, int textId, int backgroundId) {
         if (mainActivity == null) return;
+
         ImageButton icon = mainActivity.findViewById(iconId);
         if (icon != null) {
             icon.setColorFilter(getResources().getColor(R.color.menu_text_color_selected));
@@ -340,6 +341,7 @@ public class NavigationDrawerFragment extends Fragment {
      */
     private void openOrCloseDarkMode() {
         if (mainActivity == null) return;
+
         TextView darkModeSwitcherText = mainActivity.findViewById(R.id.main_menu_dark_mode_switcher);
         if (darkModeSwitcherText != null) {
             // Set view background color (only works for API 16+).
@@ -357,6 +359,7 @@ public class NavigationDrawerFragment extends Fragment {
 
     private void updateNavigationBar() {
         if (mainActivity == null) return;
+
         // test navigation bar exist
         FragmentActivity activity = getActivity();
         Point navBar = LightTool.getNavigationBarSize(getActivity());
