@@ -108,7 +108,7 @@ public class NavigationDrawerFragment extends Fragment {
         MobileAds.initialize(getContext(), initializationStatus -> {});
         refreshAd();
 
-        // Ensure mainActivity is initialized
+        // Ensure mainActivity is initialized.
         if (mainActivity == null && getActivity() instanceof MainActivity) {
             mainActivity = (MainActivity) getActivity();
         }
@@ -257,6 +257,7 @@ public class NavigationDrawerFragment extends Fragment {
 
     private void clearOneButtonColor(int iconId, int textId, int backgroundId) {
         if (mainActivity == null) return;
+
         // Clear icon color.
         ImageButton imageButton = mainActivity.findViewById(iconId);
         if (imageButton != null) {
@@ -409,6 +410,7 @@ public class NavigationDrawerFragment extends Fragment {
 
     private void updateMenuBackground() {
         if (bgImage == null) return;
+
         String settingMenuBgId = GlobalConfig.getFromAllSetting(GlobalConfig.SettingItems.menu_bg_id);
         if(settingMenuBgId != null) {
             switch (settingMenuBgId) {
