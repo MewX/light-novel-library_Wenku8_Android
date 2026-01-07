@@ -14,6 +14,7 @@ import android.util.Log;
 import android.view.Menu;
 import android.widget.Toast;
 
+import androidx.activity.OnBackPressedCallback;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.core.app.ActivityCompat;
@@ -310,6 +311,21 @@ public class MainActivity extends BaseMaterialActivity {
             }
             return true;
         });
+
+        // Register the new Back Press Callback
+        getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
+            @Override
+            public void handleOnBackPressed() {
+                // Close the Drawer if it's open.
+                if (mNavigationDrawerFragment != null && mNavigationDrawerFragment.isDrawerOpen()) {
+                    mNavigationDrawerFragment.closeDrawer();
+                }
+                // Otherwise, trigger double-click exit.
+                else {
+                    exitBy2Click();
+                }
+            }
+        });
     }
 
 
@@ -456,14 +472,6 @@ public class MainActivity extends BaseMaterialActivity {
             SaveFileMigration.overrideExternalPath(wenku8Uri);
             runExternalSaveMigration();
         }
-    }
-
-    @Override
-    public void onBackPressed() {
-        if (mNavigationDrawerFragment.isDrawerOpen())
-            mNavigationDrawerFragment.closeDrawer();
-        else
-            exitBy2Click();
     }
 
     private void exitBy2Click() {
