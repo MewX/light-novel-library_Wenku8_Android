@@ -72,25 +72,12 @@ public class MenuBackgroundSelectorActivity extends BaseMaterialActivity {
     public boolean onOptionsItemSelected(MenuItem menuItem) {
         if (menuItem.getItemId() == android.R.id.home) {
             onBackPressed();
-        }
-        else if (menuItem.getItemId() == R.id.action_find) {
-            if (Build.VERSION.SDK_INT >= 19) {
-                Intent intent = new Intent();
-                intent.setAction(Intent.ACTION_OPEN_DOCUMENT);
-                intent.addCategory(Intent.CATEGORY_OPENABLE);
-                intent.setType("image/*");
-                startActivityForResult(intent, 1);
-            } else {
-                // load custom image
-                Intent i = new Intent(this, FilePickerActivity.class);
-                i.putExtra(FilePickerActivity.EXTRA_ALLOW_MULTIPLE, false);
-                i.putExtra(FilePickerActivity.EXTRA_ALLOW_CREATE_DIR, true);
-                i.putExtra(FilePickerActivity.EXTRA_MODE, FilePickerActivity.MODE_FILE);
-                i.putExtra(FilePickerActivity.EXTRA_START_PATH,
-                        GlobalConfig.pathPickedSave == null || GlobalConfig.pathPickedSave.isEmpty() ?
-                                Environment.getExternalStorageDirectory().getPath() : GlobalConfig.pathPickedSave);
-                startActivityForResult(i, 0);
-            }
+        } else if (menuItem.getItemId() == R.id.action_find) {
+            Intent intent = new Intent();
+            intent.setAction(Intent.ACTION_OPEN_DOCUMENT);
+            intent.addCategory(Intent.CATEGORY_OPENABLE);
+            intent.setType("image/*");
+            startActivityForResult(intent, 1);
         }
         return super.onOptionsItemSelected(menuItem);
     }

@@ -153,9 +153,6 @@ public class WenkuReaderPageView extends View {
         // load bitmap
         if(forceMode || !isBackgroundSet) {
             screenSize = LightTool.getRealScreenSize(MyApp.getContext());
-            if(Build.VERSION.SDK_INT < 19) {
-                screenSize.y -= LightTool.getStatusBarHeightValue(MyApp.getContext());
-            }
 
             if(mSetting.getPageBackgroundType() == WenkuReaderSettingV1.PAGE_BACKGROUND_TYPE.CUSTOM) {
                 try {
@@ -209,13 +206,6 @@ public class WenkuReaderPageView extends View {
         int left = pxPageEdgeDistance + cutout.left;
         int right = pxPageEdgeDistance + cutout.right;
         int bottom = pxPageEdgeDistance + pxWidgetHeight + cutout.bottom;
-
-        if (Build.VERSION.SDK_INT < 19) {
-            // Status bar didn't support transparent.
-            top -= statusBarHeight;
-            // Navigation bar didn't support transparent.
-            bottom += navBarHeight;
-        }
 
         Point topLeft = new Point(left, top);
         Point bottomRight = new Point(screenSize.x - right, screenSize.y - bottom);

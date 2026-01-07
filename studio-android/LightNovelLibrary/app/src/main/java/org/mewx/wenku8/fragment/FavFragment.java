@@ -114,15 +114,10 @@ public class FavFragment extends Fragment implements MyItemClickListener, MyItem
         intent.putExtra("title", ((TextView) view.findViewById(R.id.novel_title)).getText());
         GlobalConfig.moveBookToTheTopOfBookshelf(listNovelItemAid.get(position)); // sort event
 
-        if(Build.VERSION.SDK_INT < 21) {
-            startActivity(intent);
-        }
-        else {
-            ActivityOptionsCompat options = ActivityOptionsCompat.makeSceneTransitionAnimation(getActivity(),
-                    Pair.create(view.findViewById(R.id.novel_cover), "novel_cover"),
-                    Pair.create(view.findViewById(R.id.novel_title), "novel_title"));
-            ActivityCompat.startActivity(getActivity(), intent, options.toBundle());
-        }
+        ActivityOptionsCompat options = ActivityOptionsCompat.makeSceneTransitionAnimation(getActivity(),
+                Pair.create(view.findViewById(R.id.novel_cover), "novel_cover"),
+                Pair.create(view.findViewById(R.id.novel_title), "novel_title"));
+        ActivityCompat.startActivity(getActivity(), intent, options.toBundle());
     }
 
     @Override

@@ -94,7 +94,7 @@ public class BaseMaterialActivity extends AppCompatActivity {
         tintManager.setTintColor(getResources().getColor(android.R.color.black));
 
         // set Navigation bar color
-        if (Build.VERSION.SDK_INT >= 21 && statusBarColor != StatusBarColor.DARK) {
+        if (statusBarColor != StatusBarColor.DARK) {
             final int statusBarColorId = statusBarColor == StatusBarColor.PRIMARY ?
                     R.color.myNavigationColor : R.color.myNavigationColorWhite;
             getWindow().setNavigationBarColor(getResources().getColor(statusBarColorId));

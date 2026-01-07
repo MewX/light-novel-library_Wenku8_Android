@@ -148,15 +148,10 @@ public class LatestFragment extends Fragment implements MyItemClickListener, MyI
         intent.putExtra("aid", listNovelItemInfo.get(position).aid);
         intent.putExtra("from", "latest");
         intent.putExtra("title", listNovelItemInfo.get(position).title);
-        if(Build.VERSION.SDK_INT < 21) {
-            startActivity(intent);
-        }
-        else {
-            ActivityOptionsCompat options = ActivityOptionsCompat.makeSceneTransitionAnimation(getActivity(),
-                    Pair.create(view.findViewById(R.id.novel_cover), "novel_cover"),
-                    Pair.create(view.findViewById(R.id.novel_title), "novel_title"));
-            ActivityCompat.startActivity(getActivity(), intent, options.toBundle());
-        }
+        ActivityOptionsCompat options = ActivityOptionsCompat.makeSceneTransitionAnimation(getActivity(),
+                Pair.create(view.findViewById(R.id.novel_cover), "novel_cover"),
+                Pair.create(view.findViewById(R.id.novel_title), "novel_title"));
+        ActivityCompat.startActivity(getActivity(), intent, options.toBundle());
     }
 
     @Override

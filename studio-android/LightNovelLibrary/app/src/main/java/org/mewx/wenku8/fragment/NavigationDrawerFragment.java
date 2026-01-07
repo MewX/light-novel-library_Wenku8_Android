@@ -347,11 +347,6 @@ public class NavigationDrawerFragment extends Fragment {
     }
 
     private void updateNavigationBar() {
-        if (Build.VERSION.SDK_INT < 19) {
-            // Transparency is not supported in below KitKat.
-            return;
-        }
-
         // test navigation bar exist
         FragmentActivity activity = getActivity();
         Point navBar = LightTool.getNavigationBarSize(getActivity());

@@ -467,12 +467,8 @@ public class NovelInfoActivity extends BaseMaterialActivity {
     @Override
     public boolean onOptionsItemSelected(MenuItem menuItem) {
         if (menuItem.getItemId() == android.R.id.home) {
-            if(Build.VERSION.SDK_INT < 21)
-                finish();
-            else
-                finishAfterTransition(); // end directly
-        }
-        else if (menuItem.getItemId() == R.id.action_continue_read_progress) {
+            finishAfterTransition(); // end directly
+        } else if (menuItem.getItemId() == R.id.action_continue_read_progress) {
             if (runLoadingChecker()) return true;
 
             // show dialog, jump to last read position
@@ -555,10 +551,7 @@ public class NovelInfoActivity extends BaseMaterialActivity {
         }
 
         // normal exit
-        if(Build.VERSION.SDK_INT < 21)
-            finish();
-        else
-            finishAfterTransition(); // end directly
+        finishAfterTransition();
     }
 
     private class FetchInfoAsyncTask extends AsyncTask<Integer, Integer, Integer> {

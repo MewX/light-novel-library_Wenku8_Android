@@ -420,10 +420,6 @@ public class MainActivity extends BaseMaterialActivity {
     protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
         if (requestCode == REQUEST_READ_EXTERNAL_SAVES && resultCode == Activity.RESULT_OK && data != null) {
-            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.KITKAT) {
-                return;
-            }
-
             Uri wenku8Uri = data.getData();
             String wenku8Path = wenku8Uri.getPath();
             if (!wenku8Uri.getLastPathSegment().endsWith("wenku8") || wenku8Path.contains("DCIM") || wenku8Path.contains("Picture")) {
