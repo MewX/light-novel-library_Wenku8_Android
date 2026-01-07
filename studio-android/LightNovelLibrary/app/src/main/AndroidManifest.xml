@@ -18,7 +18,7 @@
         android:maxSdkVersion="29" />
     <!-- This permission is used for reading images as reading backgrounds. -->
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
-    <uses-permission android:name="com.google.android.gms.permission.AD_ID" tools:node="remove"/>
+    <uses-permission android:name="com.google.android.gms.permission.AD_ID"/>
 
     <!-- Application Setting -->
     <application
