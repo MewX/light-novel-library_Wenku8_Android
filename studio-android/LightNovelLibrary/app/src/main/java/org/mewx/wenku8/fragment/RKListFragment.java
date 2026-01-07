@@ -98,35 +98,21 @@ public class RKListFragment extends Fragment {
         }
 
         public static int getNovelSortedByChsId(Wenku8API.NovelSortedBy n) {
-            switch (n) {
-                case allVisit:
-                    return R.string.tab_allvisit;
-                case monthVisit:
-                    return R.string.tab_monthvisit;
-                case monthVote:
-                    return R.string.tab_monthvote;
-                case weekVisit:
-                    return R.string.tab_weekvisit;
-                case weekVote:
-                    return R.string.tab_weekvote;
-                case dayVisit:
-                    return R.string.tab_dayvisit;
-                case dayVote:
-                    return R.string.tab_dayvote;
-                case postDate:
-                    return R.string.tab_postdate;
-                case lastUpdate:
-                    return R.string.tab_lastupdate;
-                case goodNum:
-                    return R.string.tab_goodnum;
-                case size:
-                    return R.string.tab_size;
-                case fullFlag:
-                    return R.string.tab_fullflag;
-                case allVote:
-                default:
-                    return R.string.tab_allvote; // default
-            }
+            return switch (n) {
+                case allVisit -> R.string.tab_allvisit;
+                case allVote -> R.string.tab_allvote;
+                case monthVisit -> R.string.tab_monthvisit;
+                case monthVote -> R.string.tab_monthvote;
+                case weekVisit -> R.string.tab_weekvisit;
+                case weekVote -> R.string.tab_weekvote;
+                case dayVisit -> R.string.tab_dayvisit;
+                case dayVote -> R.string.tab_dayvote;
+                case postDate -> R.string.tab_postdate;
+                case lastUpdate -> R.string.tab_lastupdate;
+                case goodNum -> R.string.tab_goodnum;
+                case size -> R.string.tab_size;
+                case fullFlag -> R.string.tab_fullflag;
+            };
         }
     }
 

@@ -83,16 +83,10 @@ public class MainActivity extends BaseMaterialActivity {
 
     private void initialApp() {
         // load language
-        Locale locale;
-        switch (GlobalConfig.getCurrentLang()) {
-            case TC:
-                locale = Locale.TRADITIONAL_CHINESE;
-                break;
-            case SC:
-            default:
-                locale = Locale.SIMPLIFIED_CHINESE;
-                break;
-        }
+        Locale locale = switch (GlobalConfig.getCurrentLang()) {
+            case TC -> Locale.TRADITIONAL_CHINESE;
+            case SC -> Locale.SIMPLIFIED_CHINESE;
+        };
         Configuration config = new Configuration();
         config.locale = locale;
         Locale.setDefault(locale);
