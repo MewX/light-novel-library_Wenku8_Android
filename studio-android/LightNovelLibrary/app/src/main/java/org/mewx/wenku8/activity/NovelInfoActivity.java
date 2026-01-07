@@ -49,6 +49,11 @@ import java.io.File;
 import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 import fr.castorflex.android.smoothprogressbar.SmoothProgressBar;
 
@@ -560,79 +565,90 @@ public class NovelInfoActivity extends BaseMaterialActivity {
         @Override
         protected Integer doInBackground(Integer... params) {
             // transfer '1' to this task represent loading from local
-            if(params != null && params.length == 1 && params[0] == 1)
+            if (params != null && params.length == 1 && params[0] == 1)
                 fromLocal = true;
 
-            // get novel full meta
-            try {
-                if(fromLocal) {
-                    novelFullMeta = GlobalConfig.loadFullFileFromSaveFolder("intro", aid + "-intro.xml");
-                    if(novelFullMeta.isEmpty()) return -9;
-                }
-                else {
+            ExecutorService executor = Executors.newFixedThreadPool(3);
+
+            // Task 1: get novel full meta
+            Callable<String> metaTask = () -> {
+                if (fromLocal) {
+                    String meta = GlobalConfig.loadFullFileFromSaveFolder("intro", aid + "-intro.xml");
+                    if (meta.isEmpty()) throw new Exception("Empty meta from local");
+                    return meta;
+                } else {
                     ContentValues cv = Wenku8API.getNovelFullMeta(aid, GlobalConfig.getCurrentLang());
-                    byte[] byteNovelFullMeta = LightNetwork.LightHttpPostConnection(Wenku8API.BASE_URL, cv);
-                    if (byteNovelFullMeta == null) return -1;
-                    novelFullMeta = new String(byteNovelFullMeta, "UTF-8"); // save
+                    byte[] byteMeta = LightNetwork.LightHttpPostConnection(Wenku8API.BASE_URL, cv);
+                    if (byteMeta == null) throw new Exception("Network error for meta");
+                    return new String(byteMeta, "UTF-8");
                 }
-                mNovelItemMeta = Wenku8Parser.parseNovelFullMeta(novelFullMeta);
-                if(mNovelItemMeta == null) return -1;
-            } catch (UnsupportedEncodingException e) {
-                e.printStackTrace();
-                return -2;
-            }
-            publishProgress(1); // procedure 1/3
+            };
 
-            // get novel full intro
-            try {
-                if(fromLocal) {
-                    novelFullIntro = GlobalConfig.loadFullFileFromSaveFolder("intro", aid + "-introfull.xml");
-                    if(novelFullIntro.isEmpty()) return -9;
+            // Task 2: get novel full intro
+            Callable<String> introTask = () -> {
+                if (fromLocal) {
+                    String intro = GlobalConfig.loadFullFileFromSaveFolder("intro", aid + "-introfull.xml");
+                    if (intro.isEmpty()) throw new Exception("Empty intro from local");
+                    return intro;
+                } else {
+                    ContentValues cv = Wenku8API.getNovelFullIntro(aid, GlobalConfig.getCurrentLang());
+                    byte[] byteIntro = LightNetwork.LightHttpPostConnection(Wenku8API.BASE_URL, cv);
+                    if (byteIntro == null) throw new Exception("Network error for intro");
+                    return new String(byteIntro, "UTF-8");
                 }
-                else {
-                    ContentValues cvFullIntroRequest = Wenku8API.getNovelFullIntro(aid, GlobalConfig.getCurrentLang());
-                    byte[] byteNovelFullInfo = LightNetwork.LightHttpPostConnection(Wenku8API.BASE_URL, cvFullIntroRequest);
-                    if (byteNovelFullInfo == null) return -1;
-                    novelFullIntro = new String(byteNovelFullInfo, "UTF-8"); // save
-                }
-                mNovelItemMeta.fullIntro = novelFullIntro;
-                if(mNovelItemMeta.fullIntro.isEmpty()) return -1;
-            } catch (UnsupportedEncodingException e) {
-                e.printStackTrace();
-                return -2;
-            }
-            publishProgress(2);
+            };
 
-            // get novel chapter list
-            try {
-                if(fromLocal) {
-                    novelFullVolume = GlobalConfig.loadFullFileFromSaveFolder("intro", aid + "-volume.xml");
-                    if(novelFullVolume.isEmpty()) return -9;
-                }
-                else {
+            // Task 3: get novel chapter list
+            Callable<String> volumeTask = () -> {
+                if (fromLocal) {
+                    String volume = GlobalConfig.loadFullFileFromSaveFolder("intro", aid + "-volume.xml");
+                    if (volume.isEmpty()) throw new Exception("Empty volume from local");
+                    return volume;
+                } else {
                     ContentValues cv = Wenku8API.getNovelIndex(aid, GlobalConfig.getCurrentLang());
-                    byte[] byteNovelChapterList = LightNetwork.LightHttpPostConnection(Wenku8API.BASE_URL, cv);
-                    if (byteNovelChapterList == null) return -1;
-                    novelFullVolume = new String(byteNovelChapterList, "UTF-8"); // save
+                    byte[] byteVolume = LightNetwork.LightHttpPostConnection(Wenku8API.BASE_URL, cv);
+                    if (byteVolume == null) throw new Exception("Network error for volume");
+                    return new String(byteVolume, "UTF-8");
                 }
+            };
 
-                // update the volume list
-                listVolume = Wenku8Parser.getVolumeList(novelFullVolume);
-                if(listVolume.isEmpty()) return -1;
-            } catch (UnsupportedEncodingException e) {
+            Future<String> metaFuture = executor.submit(metaTask);
+            Future<String> introFuture = executor.submit(introTask);
+            Future<String> volumeFuture = executor.submit(volumeTask);
+
+            try {
+                novelFullMeta = metaFuture.get();
+                novelFullIntro = introFuture.get();
+                novelFullVolume = volumeFuture.get();
+            } catch (InterruptedException | ExecutionException e) {
                 e.printStackTrace();
-                return -2;
+                String msg = e.getMessage();
+                if (msg != null && msg.contains("local")) return -9;
+                return -1;
+            } finally {
+                executor.shutdown();
             }
-            publishProgress(3); // procedure 3/3
+
+            // Parse Meta
+            mNovelItemMeta = Wenku8Parser.parseNovelFullMeta(novelFullMeta);
+            if (mNovelItemMeta == null) return -1;
+
+            // Assign Intro
+            mNovelItemMeta.fullIntro = novelFullIntro;
+            if (mNovelItemMeta.fullIntro.isEmpty()) return -1;
+
+            // Parse Volume
+            listVolume = Wenku8Parser.getVolumeList(novelFullVolume);
+            if (listVolume.isEmpty()) return -1;
 
             // Check local volume files exists, express in another color
-            for(VolumeList vl : listVolume) {
-                for(ChapterInfo ci : vl.chapterList) {
-                    if(!LightCache.testFileExist(GlobalConfig.getFirstFullSaveFilePath() + "novel" + File.separator + ci.cid + ".xml")
+            for (VolumeList vl : listVolume) {
+                for (ChapterInfo ci : vl.chapterList) {
+                    if (!LightCache.testFileExist(GlobalConfig.getFirstFullSaveFilePath() + "novel" + File.separator + ci.cid + ".xml")
                             && !LightCache.testFileExist(GlobalConfig.getSecondFullSaveFilePath() + "novel" + File.separator + ci.cid + ".xml"))
                         break;
 
-                    if(vl.chapterList.indexOf(ci) == vl.chapterList.size() - 1)
+                    if (vl.chapterList.indexOf(ci) == vl.chapterList.size() - 1)
                         vl.inLocal = true;
                 }
             }
@@ -641,52 +657,36 @@ public class NovelInfoActivity extends BaseMaterialActivity {
         }
 
         @Override
-        protected void onProgressUpdate(Integer... values) {
-            super.onProgressUpdate(values);
-
-            switch (values[0]) {
-                case 1:
-                    // update general info
-                    tvNovelAuthor.setPaintFlags(tvNovelAuthor.getPaintFlags() | Paint.UNDERLINE_TEXT_FLAG); // with hyperlink
-                    tvLatestChapter.setPaintFlags(tvLatestChapter.getPaintFlags() | Paint.UNDERLINE_TEXT_FLAG); // with hyperlink
-
-                    tvNovelTitle.setText(mNovelItemMeta.title);
-                    tvNovelAuthor.setText(mNovelItemMeta.author);
-                    tvNovelStatus.setText(mNovelItemMeta.bookStatus);
-                    tvNovelUpdate.setText(mNovelItemMeta.lastUpdate);
-                    tvLatestChapter.setText(mNovelItemMeta.latestSectionName);
-                    if(NovelInfoActivity.this.getSupportActionBar() != null)
-                        NovelInfoActivity.this.getSupportActionBar().setTitle(mNovelItemMeta.title); // set action bar title
-                    break;
-
-                case 2:
-                    //update novel info full
-                    tvNovelFullIntro.setText(mNovelItemMeta.fullIntro);
-                    break;
-
-                case 3:
-                    // let onPostExecute do
-                    break;
-            }
-        }
-
-        @Override
         protected void onPostExecute(Integer integer) {
             isLoading = false;
             spb.progressiveStop();
             super.onPostExecute(integer);
 
-            if( integer == -1 ) {
+            if (integer == -1) {
                 Toast.makeText(NovelInfoActivity.this, "FetchInfoAsyncTask:onPostExecute network error", Toast.LENGTH_SHORT).show();
                 return;
-            }
-            else if(integer == -9) {
+            } else if (integer == -9) {
                 Toast.makeText(NovelInfoActivity.this, getResources().getString(R.string.bookshelf_intro_load_failed), Toast.LENGTH_SHORT).show();
                 // TODO: a better fix with optionCheckUpdates(), but need to avoid recursive calls.
                 return;
-            }
-            else if(integer < 0)
+            } else if (integer < 0)
                 return; // ignore other exceptions
+
+            // update general info
+            tvNovelAuthor.setPaintFlags(tvNovelAuthor.getPaintFlags() | Paint.UNDERLINE_TEXT_FLAG); // with hyperlink
+            tvLatestChapter.setPaintFlags(tvLatestChapter.getPaintFlags() | Paint.UNDERLINE_TEXT_FLAG); // with hyperlink
+
+            tvNovelTitle.setText(mNovelItemMeta.title);
+            tvNovelAuthor.setText(mNovelItemMeta.author);
+            tvNovelStatus.setText(mNovelItemMeta.bookStatus);
+            tvNovelUpdate.setText(mNovelItemMeta.lastUpdate);
+            tvLatestChapter.setText(mNovelItemMeta.latestSectionName);
+            if (NovelInfoActivity.this.getSupportActionBar() != null)
+                NovelInfoActivity.this.getSupportActionBar().setTitle(mNovelItemMeta.title); // set action bar title
+
+            // update novel info full
+            tvNovelFullIntro.setText(mNovelItemMeta.fullIntro);
+
             buildVolumeList();
         }
     }
