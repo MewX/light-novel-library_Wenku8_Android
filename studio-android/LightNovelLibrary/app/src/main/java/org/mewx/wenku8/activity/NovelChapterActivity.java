@@ -93,7 +93,9 @@ public class NovelChapterActivity extends BaseMaterialActivity {
                 overridePendingTransition(R.anim.fade_in, R.anim.hold); // fade in animation
             });
 
-            rl.findViewById(R.id.novel_option).setOnClickListener(ignored -> {
+            View optionBtn = btn.findViewById(R.id.novel_option);
+            optionBtn.setVisibility(View.VISIBLE);
+            optionBtn.setOnClickListener(ignored -> {
                 new MaterialDialog.Builder(NovelChapterActivity.this)
                     .theme(Theme.LIGHT)
                     .title(R.string.system_choose_reader_engine)

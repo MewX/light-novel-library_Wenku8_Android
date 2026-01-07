@@ -30,7 +30,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:gravity="center_vertical"
-                android:layout_toLeftOf="@+id/chapter_status"
+                android:layout_toLeftOf="@+id/chapter_right_panel"
                 android:textSize="16sp"
                 android:paddingTop="12dp"
                 android:paddingBottom="12dp"
@@ -41,34 +41,41 @@
                 android:layout_alignParentLeft="true"
                 android:layout_alignParentStart="true" />
 
-
-            <TextView
-                android:id="@+id/chapter_status"
+            <LinearLayout
+                android:id="@+id/chapter_right_panel"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:gravity="center_vertical"
-                android:textSize="16sp"
-                android:paddingTop="12dp"
-                android:paddingBottom="12dp"
-                android:background="@android:color/transparent"
-                android:clickable="false"
-                android:text=""
-                android:singleLine="true"
-                android:textColor="@color/myAccentColor"
-                android:layout_alignParentTop="true"
-                android:layout_toLeftOf="@+id/novel_option" />
-
-            <ImageButton
-                android:id="@+id/novel_option"
-                android:layout_width="32dp"
-                android:layout_height="32dp"
-                android:src="@drawable/ic_option"
-                android:background="@drawable/btn_menu_item_boardless"
-                android:clickable="true"
-                android:focusable="true"
+                android:orientation="horizontal"
                 android:layout_alignParentRight="true"
                 android:layout_alignParentEnd="true"
-                android:layout_centerVertical="true" />
+                android:layout_centerVertical="true">
+
+                <TextView
+                    android:id="@+id/chapter_status"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
+                    android:layout_gravity="center_vertical"
+                    android:textSize="16sp"
+                    android:paddingTop="12dp"
+                    android:paddingBottom="12dp"
+                    android:background="@android:color/transparent"
+                    android:clickable="false"
+                    android:text=""
+                    android:singleLine="true"
+                    android:textColor="@color/myAccentColor" />
+
+                <ImageButton
+                    android:id="@+id/novel_option"
+                    android:layout_width="32dp"
+                    android:layout_height="32dp"
+                    android:layout_gravity="center_vertical"
+                    android:src="@drawable/ic_option"
+                    android:background="@drawable/btn_menu_item_boardless"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:visibility="gone" />
+            </LinearLayout>
         </RelativeLayout>
     </androidx.cardview.widget.CardView>
 </RelativeLayout>

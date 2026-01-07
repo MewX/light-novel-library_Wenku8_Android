@@ -704,16 +704,8 @@ public class NovelInfoActivity extends BaseMaterialActivity {
         TextView tv = rl.findViewById(R.id.chapter_title);
         tv.setText(vl.volumeName);
 
-        // hide the option button and adjust layout
-        rl.findViewById(R.id.novel_option).setVisibility(View.GONE);
-        TextView tvStatus = rl.findViewById(R.id.chapter_status);
-        RelativeLayout.LayoutParams params = (RelativeLayout.LayoutParams) tvStatus.getLayoutParams();
-        params.addRule(RelativeLayout.ALIGN_PARENT_RIGHT);
-        params.removeRule(RelativeLayout.LEFT_OF);
-        tvStatus.setLayoutParams(params);
-
         if(vl.inLocal)
-          tvStatus.setText(getResources().getString(R.string.bookshelf_inlocal));
+          ((TextView) rl.findViewById(R.id.chapter_status)).setText(getResources().getString(R.string.bookshelf_inlocal));
 
         final RelativeLayout btn = rl.findViewById(R.id.chapter_btn);
         // added indicator for last read volume
