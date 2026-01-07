@@ -38,7 +38,9 @@ import com.google.android.gms.ads.AdLoader;
 import com.google.android.gms.ads.AdRequest;
 import com.google.android.gms.ads.LoadAdError;
 import com.google.android.gms.ads.MobileAds;
+import com.google.android.gms.ads.VideoOptions;
 import com.google.android.gms.ads.nativead.NativeAd;
+import com.google.android.gms.ads.nativead.NativeAdOptions;
 import com.google.android.gms.ads.nativead.NativeAdView;
 import com.google.firebase.analytics.FirebaseAnalytics;
 import com.makeramen.roundedimageview.RoundedImageView;
@@ -99,33 +101,38 @@ public class NavigationDrawerFragment extends Fragment {
     }
 
     @Override
-    public void onActivityCreated(Bundle savedInstanceState) {
-        super.onActivityCreated(savedInstanceState);
+    public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
+        super.onViewCreated(view, savedInstanceState);
 
         // Initialize Mobile Ads SDK
         MobileAds.initialize(getContext(), initializationStatus -> {});
         refreshAd();
 
+        // Ensure mainActivity is initialized
+        if (mainActivity == null && getActivity() instanceof MainActivity) {
+            mainActivity = (MainActivity) getActivity();
+        }
+
         // set button clicked listener, mainly working on change fragment in MainActivity.
         try {
-            mainActivity.findViewById(R.id.main_menu_rklist).setOnClickListener(
+            view.findViewById(R.id.main_menu_rklist).setOnClickListener(
                     generateNavigationButtonOnClickListener(
                             MainActivity.FragmentMenuOption.RKLIST, new RKListFragment())
             );
-            mainActivity.findViewById(R.id.main_menu_latest).setOnClickListener(
+            view.findViewById(R.id.main_menu_latest).setOnClickListener(
                     generateNavigationButtonOnClickListener(
                             MainActivity.FragmentMenuOption.LATEST, new LatestFragment())
             );
-            mainActivity.findViewById(R.id.main_menu_fav).setOnClickListener(
+            view.findViewById(R.id.main_menu_fav).setOnClickListener(
                     generateNavigationButtonOnClickListener(
                             MainActivity.FragmentMenuOption.FAV, new FavFragment())
             );
-            mainActivity.findViewById(R.id.main_menu_config).setOnClickListener(
+            view.findViewById(R.id.main_menu_config).setOnClickListener(
                     generateNavigationButtonOnClickListener(
                             MainActivity.FragmentMenuOption.CONFIG, new ConfigFragment())
             );
 
-            mainActivity.findViewById(R.id.main_menu_open_source).setOnClickListener(v -> {
+            view.findViewById(R.id.main_menu_open_source).setOnClickListener(v -> {
                         FragmentActivity fragmentActivity = getActivity();
                         if (fragmentActivity == null) return;
                         new MaterialDialog.Builder(fragmentActivity)
@@ -139,19 +146,16 @@ public class NavigationDrawerFragment extends Fragment {
                     }
             );
 
-            mainActivity.findViewById(R.id.main_menu_dark_mode_switcher).setOnClickListener(v -> openOrCloseDarkMode());
+            view.findViewById(R.id.main_menu_dark_mode_switcher).setOnClickListener(v -> openOrCloseDarkMode());
 
         } catch (NullPointerException e) {
-            Toast.makeText(mainActivity, "NullPointerException in onActivityCreated();", Toast.LENGTH_SHORT).show();
+            Toast.makeText(getContext(), "NullPointerException in onViewCreated();", Toast.LENGTH_SHORT).show();
             e.printStackTrace();
         }
 
         // User Account
-        FragmentActivity activity = getActivity();
-        if (activity != null) {
-            rivUserAvatar = activity.findViewById(R.id.user_avatar);
-            tvUserName = activity.findViewById(R.id.user_name);
-        }
+        rivUserAvatar = view.findViewById(R.id.user_avatar);
+        tvUserName = view.findViewById(R.id.user_name);
 
         View.OnClickListener ocl = v -> {
             if(!LightUserSession.getLogStatus() && GlobalConfig.isNetworkAvailable(getActivity())) {
@@ -189,24 +193,26 @@ public class NavigationDrawerFragment extends Fragment {
 
         // Initial: set color states here ...
         // get net work status, no net -> FAV
-        if(activity != null && !GlobalConfig.isNetworkAvailable(activity)) {
+        if(getActivity() != null && !GlobalConfig.isNetworkAvailable(getActivity())) {
             clearAllButtonColor();
             setHighLightButton(MainActivity.FragmentMenuOption.FAV);
-            mainActivity.setCurrentFragment(MainActivity.FragmentMenuOption.FAV);
-            mainActivity.changeFragment(new FavFragment());
+            if (mainActivity != null) {
+                mainActivity.setCurrentFragment(MainActivity.FragmentMenuOption.FAV);
+                mainActivity.changeFragment(new FavFragment());
+            }
         }
         else {
             clearAllButtonColor();
-            setHighLightButton(mainActivity.getCurrentFragment());
-            mainActivity.changeFragment(new LatestFragment());
+            if (mainActivity != null) {
+                setHighLightButton(mainActivity.getCurrentFragment());
+                mainActivity.changeFragment(new LatestFragment());
+            }
         }
         // TODO: need to track the initial fragment.
 
         // set menu background
-        if (activity != null) {
-            bgImage = activity.findViewById(R.id.bg_img);
-            updateMenuBackground();
-        }
+        bgImage = view.findViewById(R.id.bg_img);
+        updateMenuBackground();
     }
 
     @Override
@@ -250,6 +256,7 @@ public class NavigationDrawerFragment extends Fragment {
     }
 
     private void clearOneButtonColor(int iconId, int textId, int backgroundId) {
+        if (mainActivity == null) return;
         // Clear icon color.
         ImageButton imageButton = mainActivity.findViewById(iconId);
         if (imageButton != null) {
@@ -285,6 +292,7 @@ public class NavigationDrawerFragment extends Fragment {
 
     @SuppressLint("NewApi")
     private void setHighLightButton(int iconId, int textId, int backgroundId) {
+        if (mainActivity == null) return;
         ImageButton icon = mainActivity.findViewById(iconId);
         if (icon != null) {
             icon.setColorFilter(getResources().getColor(R.color.menu_text_color_selected));
@@ -331,6 +339,7 @@ public class NavigationDrawerFragment extends Fragment {
      * Judge whether the dark mode is open. If is open, close it; else open it.
      */
     private void openOrCloseDarkMode() {
+        if (mainActivity == null) return;
         TextView darkModeSwitcherText = mainActivity.findViewById(R.id.main_menu_dark_mode_switcher);
         if (darkModeSwitcherText != null) {
             // Set view background color (only works for API 16+).
@@ -347,6 +356,7 @@ public class NavigationDrawerFragment extends Fragment {
     }
 
     private void updateNavigationBar() {
+        if (mainActivity == null) return;
         // test navigation bar exist
         FragmentActivity activity = getActivity();
         Point navBar = LightTool.getNavigationBarSize(getActivity());
@@ -395,6 +405,7 @@ public class NavigationDrawerFragment extends Fragment {
     }
 
     private void updateMenuBackground() {
+        if (bgImage == null) return;
         String settingMenuBgId = GlobalConfig.getFromAllSetting(GlobalConfig.SettingItems.menu_bg_id);
         if(settingMenuBgId != null) {
             switch (settingMenuBgId) {
@@ -454,9 +465,20 @@ public class NavigationDrawerFragment extends Fragment {
     }
 
     private void refreshAd() {
+        VideoOptions videoOptions = new VideoOptions.Builder()
+                .setStartMuted(true)
+                .build();
+
+        NativeAdOptions adOptions = new NativeAdOptions.Builder()
+                .setVideoOptions(videoOptions)
+                .build();
+
         AdLoader.Builder builder = new AdLoader.Builder(getContext(),
                 BuildConfig.DEBUG ? "ca-app-pub-3940256099942544/2247696110" /* test ID */ :
                         "ca-app-pub-7333757578973883/7014476152" /* real ID */);
+
+        builder.withNativeAdOptions(adOptions);
+
         builder.forNativeAd(nativeAd -> {
             // If this callback occurs after the activity is destroyed, we must destroy and return;
             // or we may get a memory leak.
@@ -474,7 +496,11 @@ public class NavigationDrawerFragment extends Fragment {
                 mNativeAd.destroy();
             }
             mNativeAd = nativeAd;
-            FrameLayout frameLayout = mainActivity.findViewById(R.id.ad_container);
+
+            View view = getView();
+            if (view == null) return;
+            FrameLayout frameLayout = view.findViewById(R.id.ad_container);
+
             if (frameLayout != null) {
                 NativeAdView adView = (NativeAdView) getLayoutInflater().inflate(R.layout.ad_unified, null);
                 populateNativeAdView(nativeAd, adView);
