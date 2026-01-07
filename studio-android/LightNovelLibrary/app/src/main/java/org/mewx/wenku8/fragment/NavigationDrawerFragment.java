@@ -474,7 +474,6 @@ public class NavigationDrawerFragment extends Fragment {
         builder.withNativeAdOptions(new NativeAdOptions.Builder()
                 .setVideoOptions(new VideoOptions.Builder().setStartMuted(true).build())
                 .build());
-
         builder.forNativeAd(nativeAd -> {
             // If this callback occurs after the activity is destroyed, we must destroy and return;
             // or we may get a memory leak.
