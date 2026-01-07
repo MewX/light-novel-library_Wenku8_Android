@@ -302,7 +302,7 @@ public class NovelItemListFragment extends Fragment implements MyItemClickListen
             currentPage = params[0];
 
             // params[0] is current page number
-            ContentValues cv = Wenku8API.getNovelList(Wenku8API.getNOVELSORTBY(listType), currentPage);
+            ContentValues cv = Wenku8API.getNovelList(Wenku8API.getNovelSortedBy(listType), currentPage);
             byte[] temp = LightNetwork.LightHttpPostConnection( Wenku8API.BASE_URL, cv);
             if (temp == null) {
                 return -1;

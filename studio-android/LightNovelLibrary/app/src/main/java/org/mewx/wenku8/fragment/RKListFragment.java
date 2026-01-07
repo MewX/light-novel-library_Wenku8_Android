@@ -61,19 +61,19 @@ public class RKListFragment extends Fragment {
 
     public class MyPagerAdapter extends FragmentPagerAdapter {
 
-        private final Wenku8API.NOVELSORTBY[] TITLELIST = {
-            Wenku8API.NOVELSORTBY.allVisit,
-            Wenku8API.NOVELSORTBY.allVote,
-            Wenku8API.NOVELSORTBY.monthVisit,
-            Wenku8API.NOVELSORTBY.monthVote,
-            Wenku8API.NOVELSORTBY.weekVisit,
-            Wenku8API.NOVELSORTBY.weekVote,
-            Wenku8API.NOVELSORTBY.dayVisit,
-            Wenku8API.NOVELSORTBY.dayVote,
-            Wenku8API.NOVELSORTBY.postDate,
-            Wenku8API.NOVELSORTBY.goodNum,
-            Wenku8API.NOVELSORTBY.size,
-            Wenku8API.NOVELSORTBY.fullFlag,
+        private final Wenku8API.NovelSortedBy[] TITLELIST = {
+            Wenku8API.NovelSortedBy.allVisit,
+            Wenku8API.NovelSortedBy.allVote,
+            Wenku8API.NovelSortedBy.monthVisit,
+            Wenku8API.NovelSortedBy.monthVote,
+            Wenku8API.NovelSortedBy.weekVisit,
+            Wenku8API.NovelSortedBy.weekVote,
+            Wenku8API.NovelSortedBy.dayVisit,
+            Wenku8API.NovelSortedBy.dayVote,
+            Wenku8API.NovelSortedBy.postDate,
+            Wenku8API.NovelSortedBy.goodNum,
+            Wenku8API.NovelSortedBy.size,
+            Wenku8API.NovelSortedBy.fullFlag,
         };
 
         public MyPagerAdapter(FragmentManager fm) {
@@ -93,11 +93,11 @@ public class RKListFragment extends Fragment {
         @Override
         public Fragment getItem(int type) {
             Bundle bundle = new Bundle();
-            bundle.putString("type", Wenku8API.getNOVELSORTBY(TITLELIST[type]));
+            bundle.putString("type", Wenku8API.getNovelSortedBy(TITLELIST[type]));
             return NovelItemListFragment.newInstance(bundle);
         }
 
-        public static int getNOVELSORTBY_ChsId(Wenku8API.NOVELSORTBY n) {
+        public static int getNOVELSORTBY_ChsId(Wenku8API.NovelSortedBy n) {
             switch (n) {
                 case allVisit:
                     return R.string.tab_allvisit;
