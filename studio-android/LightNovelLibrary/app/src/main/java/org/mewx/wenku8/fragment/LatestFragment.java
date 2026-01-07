@@ -122,7 +122,7 @@ public class LatestFragment extends Fragment implements MyItemClickListener, MyI
 
     private void loadNovelList(int page) {
         // In fact, I don't need to know what it really is.
-        // I just need to get the NOVELSORTBY
+        // I just need to get the NovelSortedBy
         if (!isLoading.compareAndSet(false, true)) {
             // Is loading already.
             return;

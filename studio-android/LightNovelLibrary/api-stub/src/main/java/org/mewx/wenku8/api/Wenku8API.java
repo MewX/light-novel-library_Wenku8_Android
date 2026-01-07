@@ -23,31 +23,31 @@ public class Wenku8API {
         SC, TC
     }
 
-    public enum STATUS {
+    public enum NovelPublicationStatus {
         FINISHED, NOT_FINISHED
     }
 
-    public static STATUS getSTATUSByInt(int i) {
+    public static NovelPublicationStatus getNovelPublicationStatusByInt(int i) {
         throw new UnsupportedOperationException("stub");
     }
 
-    public static STATUS getSTATUSByString(String s) {
+    public static NovelPublicationStatus getNovelPublicationStatusByString(String s) {
         throw new UnsupportedOperationException("stub");
     }
 
-    public static String getStatusBySTATUS(STATUS s) {
+    public static String getStatusByNovelPublicationStatus(NovelPublicationStatus s) {
         throw new UnsupportedOperationException("stub");
     }
 
-    public enum NOVELSORTBY {
+    public enum NovelSortedBy {
         allVisit, allVote, monthVisit, monthVote, weekVisit, weekVote, dayVisit, dayVote, postDate, lastUpdate, goodNum, size, fullFlag
     }
 
-    public static NOVELSORTBY getNOVELSORTBY(String n) {
+    public static NovelSortedBy getNovelSortedBy(String n) {
         throw new UnsupportedOperationException("stub");
     }
 
-    public static String getNOVELSORTBY(NOVELSORTBY n) {
+    public static String getNovelSortedBy(NovelSortedBy n) {
         throw new UnsupportedOperationException("stub");
     }
 
@@ -88,11 +88,11 @@ public class Wenku8API {
         throw new UnsupportedOperationException("stub");
     }
 
-    public static ContentValues getNovelList(NOVELSORTBY n, int page) {
+    public static ContentValues getNovelList(NovelSortedBy n, int page) {
         throw new UnsupportedOperationException("stub");
     }
 
-    public static ContentValues getNovelListWithInfo(NOVELSORTBY n, int page, LANG l) {
+    public static ContentValues getNovelListWithInfo(NovelSortedBy n, int page, LANG l) {
         throw new UnsupportedOperationException("stub");
     }
 

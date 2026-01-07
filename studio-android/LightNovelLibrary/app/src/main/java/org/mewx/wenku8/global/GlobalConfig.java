@@ -67,7 +67,7 @@ public class GlobalConfig {
     private static boolean isInLatest = false;
     private static boolean doLoadImage = true;
     private static boolean externalStoragePathAvailable = true;
-    private static Wenku8API.LANG currentLang = Wenku8API.LANG.SC;
+    private static Wenku8API.AppLanguage currentLang = Wenku8API.AppLanguage.SC;
     public static String pathPickedSave; // dir picker save path
 
     // static variables
@@ -107,25 +107,25 @@ public class GlobalConfig {
     }
 
     // sets and gets
-    public static void setCurrentLang(Wenku8API.LANG l) {
+    public static void setCurrentLang(Wenku8API.AppLanguage l) {
         currentLang = l;
         // FIXME
         Wenku8API.CurrentLang = currentLang;
         setToAllSetting(SettingItems.language, currentLang.toString());
     }
 
-    public static Wenku8API.LANG getCurrentLang() {
+    public static Wenku8API.AppLanguage getCurrentLang() {
         String temp = getFromAllSetting(SettingItems.language);
         if(temp == null) {
             setToAllSetting(SettingItems.language, currentLang.toString());
         }
         else if(!temp.equals(currentLang.toString())) {
-            if(temp.equals(Wenku8API.LANG.SC.toString()))
-                currentLang = Wenku8API.LANG.SC;
-            else if(temp.equals(Wenku8API.LANG.TC.toString()))
-                currentLang = Wenku8API.LANG.TC;
+            if(temp.equals(Wenku8API.AppLanguage.SC.toString()))
+                currentLang = Wenku8API.AppLanguage.SC;
+            else if(temp.equals(Wenku8API.AppLanguage.TC.toString()))
+                currentLang = Wenku8API.AppLanguage.TC;
             else
-                currentLang = Wenku8API.LANG.SC;
+                currentLang = Wenku8API.AppLanguage.SC;
         }
         // FIXME
         Wenku8API.CurrentLang = currentLang;

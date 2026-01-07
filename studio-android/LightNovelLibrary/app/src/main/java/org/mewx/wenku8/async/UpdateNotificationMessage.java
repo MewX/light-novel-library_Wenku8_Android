@@ -14,7 +14,7 @@ public class UpdateNotificationMessage extends AsyncTask<Void, Void, String> {
     @Override
     protected String doInBackground(Void... voids) {
         byte[] codeByte = LightNetwork.LightHttpDownload(
-                GlobalConfig.getCurrentLang() != Wenku8API.LANG.SC ?
+                GlobalConfig.getCurrentLang() != Wenku8API.AppLanguage.SC ?
                         GlobalConfig.noticeCheckTc : GlobalConfig.noticeCheckSc
         );
 

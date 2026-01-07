@@ -82,7 +82,7 @@ public class RKListFragment extends Fragment {
 
         @Override
         public CharSequence getPageTitle(int position) {
-            return getResources().getString(getNOVELSORTBY_ChsId(TITLELIST[position]));
+            return getResources().getString(getNovelSortedByChsId(TITLELIST[position]));
         }
 
         @Override
@@ -97,7 +97,7 @@ public class RKListFragment extends Fragment {
             return NovelItemListFragment.newInstance(bundle);
         }
 
-        public static int getNOVELSORTBY_ChsId(Wenku8API.NovelSortedBy n) {
+        public static int getNovelSortedByChsId(Wenku8API.NovelSortedBy n) {
             switch (n) {
                 case allVisit:
                     return R.string.tab_allvisit;
