@@ -468,19 +468,13 @@ public class NavigationDrawerFragment extends Fragment {
     }
 
     private void refreshAd() {
-        VideoOptions videoOptions = new VideoOptions.Builder()
-                .setStartMuted(true)
-                .build();
-
-        NativeAdOptions adOptions = new NativeAdOptions.Builder()
-                .setVideoOptions(videoOptions)
-                .build();
-
         AdLoader.Builder builder = new AdLoader.Builder(getContext(),
                 BuildConfig.DEBUG ? "ca-app-pub-3940256099942544/2247696110" /* test ID */ :
                         "ca-app-pub-7333757578973883/7014476152" /* real ID */);
 
-        builder.withNativeAdOptions(adOptions);
+        builder.withNativeAdOptions(new NativeAdOptions.Builder()
+                .setVideoOptions(new VideoOptions.Builder().setStartMuted(true).build())
+                .build());
 
         builder.forNativeAd(nativeAd -> {
             // If this callback occurs after the activity is destroyed, we must destroy and return;
