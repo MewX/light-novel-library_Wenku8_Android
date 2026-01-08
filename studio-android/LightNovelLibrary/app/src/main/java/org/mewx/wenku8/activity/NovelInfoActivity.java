@@ -703,6 +703,7 @@ public class NovelInfoActivity extends BaseMaterialActivity {
         // set text and listeners
         TextView tv = rl.findViewById(R.id.chapter_title);
         tv.setText(vl.volumeName);
+
         if(vl.inLocal)
           ((TextView) rl.findViewById(R.id.chapter_status)).setText(getResources().getString(R.string.bookshelf_inlocal));
 

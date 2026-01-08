@@ -5,6 +5,7 @@ import android.graphics.Color;
 import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.MenuItem;
+import android.view.View;
 import android.widget.LinearLayout;
 import android.widget.RelativeLayout;
 import android.widget.TextView;
@@ -92,7 +93,10 @@ public class NovelChapterActivity extends BaseMaterialActivity {
                 startActivity(intent);
                 overridePendingTransition(R.anim.fade_in, R.anim.hold); // fade in animation
             });
-            btn.setOnLongClickListener(ignored -> {
+
+            View optionBtn = btn.findViewById(R.id.novel_option);
+            optionBtn.setVisibility(View.VISIBLE);
+            optionBtn.setOnClickListener(ignored -> {
                 new MaterialDialog.Builder(NovelChapterActivity.this)
                     .theme(Theme.LIGHT)
                     .title(R.string.system_choose_reader_engine)
@@ -130,7 +134,6 @@ public class NovelChapterActivity extends BaseMaterialActivity {
                         overridePendingTransition(R.anim.fade_in, R.anim.hold); // fade in animation
                     })
                     .show();
-                return true;
             });
 
             // add to scroll view
