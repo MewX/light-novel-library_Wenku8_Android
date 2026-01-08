@@ -65,6 +65,7 @@
             android:gravity="center"
             android:text="@string/config_check_update"
             android:textColor="@color/default_text_color_black"
+            android:textStyle="bold"
             android:visibility="gone" />
 
     </LinearLayout>
