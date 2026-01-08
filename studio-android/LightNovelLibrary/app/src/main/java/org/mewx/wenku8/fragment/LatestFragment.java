@@ -28,6 +28,7 @@ import org.mewx.wenku8.R;
 import org.mewx.wenku8.activity.MainActivity;
 import org.mewx.wenku8.activity.NovelInfoActivity;
 import org.mewx.wenku8.adapter.NovelItemAdapter;
+import org.mewx.wenku8.async.CheckAppNewVersion;
 import org.mewx.wenku8.global.GlobalConfig;
 import org.mewx.wenku8.global.api.NovelItemInfoUpdate;
 import org.mewx.wenku8.global.api.NovelListWithInfoParser;
@@ -110,6 +111,8 @@ public class LatestFragment extends Fragment implements MyItemClickListener, MyI
                 loadNovelList(currentPage);
             }
         });
+
+        rootView.findViewById(R.id.btn_check_update).setOnClickListener(v -> new CheckAppNewVersion(getActivity(), true).execute());
 
         // fetch initial novel list and reset isLoading
         currentPage = 1;
@@ -304,6 +307,7 @@ public class LatestFragment extends Fragment implements MyItemClickListener, MyI
         ((TextView) mainActivity.findViewById(R.id.btn_loading)).setText(getResources().getString(R.string.task_retry));
         mainActivity.findViewById(R.id.google_progress).setVisibility(View.GONE);
         mainActivity.findViewById(R.id.btn_loading).setVisibility(View.VISIBLE);
+        mainActivity.findViewById(R.id.btn_check_update).setVisibility(View.VISIBLE);
     }
 
     /**
@@ -317,6 +321,7 @@ public class LatestFragment extends Fragment implements MyItemClickListener, MyI
         mTextView.setText(getResources().getString(R.string.list_loading));
         mainActivity.findViewById(R.id.google_progress).setVisibility(View.VISIBLE);
         mainActivity.findViewById(R.id.btn_loading).setVisibility(View.GONE);
+        mainActivity.findViewById(R.id.btn_check_update).setVisibility(View.GONE);
     }
 
 
