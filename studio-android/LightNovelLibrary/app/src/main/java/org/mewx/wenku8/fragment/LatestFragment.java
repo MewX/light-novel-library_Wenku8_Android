@@ -112,7 +112,8 @@ public class LatestFragment extends Fragment implements MyItemClickListener, MyI
             }
         });
 
-        rootView.findViewById(R.id.btn_check_update).setOnClickListener(v -> new CheckAppNewVersion(getActivity(), true).execute());
+        rootView.findViewById(R.id.btn_check_update_home).setOnClickListener(
+                v -> new CheckAppNewVersion(getActivity(), true).execute());
 
         // fetch initial novel list and reset isLoading
         currentPage = 1;
@@ -307,7 +308,7 @@ public class LatestFragment extends Fragment implements MyItemClickListener, MyI
         ((TextView) mainActivity.findViewById(R.id.btn_loading)).setText(getResources().getString(R.string.task_retry));
         mainActivity.findViewById(R.id.google_progress).setVisibility(View.GONE);
         mainActivity.findViewById(R.id.btn_loading).setVisibility(View.VISIBLE);
-        mainActivity.findViewById(R.id.btn_check_update).setVisibility(View.VISIBLE);
+        mainActivity.findViewById(R.id.btn_check_update_home).setVisibility(View.VISIBLE);
     }
 
     /**

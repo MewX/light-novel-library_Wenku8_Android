@@ -56,7 +56,7 @@
             android:visibility="gone" />
 
         <TextView
-            android:id="@+id/btn_check_update"
+            android:id="@+id/btn_check_update_home"
             android:layout_width="match_parent"
             android:layout_height="60dp"
             android:background="@drawable/btn_menu_item"
