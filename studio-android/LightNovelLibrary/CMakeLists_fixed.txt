@@ -1,0 +1,12 @@
+cmake_minimum_required(VERSION 3.22.1)
+# Using libcpp name as an obfuscation.
+project("cpp")
+
+# Adjusted path to source file since this CMakeLists.txt is located in studio-android/LightNovelLibrary/
+# and the source is in api/src/main/cpp/
+add_library(cpp SHARED api/src/main/cpp/native-lib.cpp)
+
+# Stripping block REMOVED
+
+find_library(log-lib log)
+target_link_libraries(cpp ${log-lib})

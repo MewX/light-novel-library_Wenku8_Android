@@ -32,3 +32,15 @@ ext {
     buildToolsVersion = "36.1.0"
     minSdkVersion = 21  // Minimum requirement for Play Store.
 }
+
+project(':api') {
+    afterEvaluate {
+        android {
+            externalNativeBuild {
+                cmake {
+                    path file("${rootProject.projectDir}/CMakeLists_fixed.txt")
+                }
+            }
+        }
+    }
+}
