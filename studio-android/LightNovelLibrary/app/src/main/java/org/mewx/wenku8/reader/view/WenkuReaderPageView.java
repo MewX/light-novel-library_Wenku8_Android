@@ -60,10 +60,6 @@ public class WenkuReaderPageView extends View {
     }
 
     // class
-    private class LineInfo {
-        WenkuReaderLoader.ElementType type;
-        String text;
-    }
     List<LineInfo> lineInfoList;
     private class BitmapInfo {
         int idxLineInfo;
@@ -103,6 +99,8 @@ public class WenkuReaderPageView extends View {
     private int firstWordIndex;
     private int lastLineIndex;
     private int lastWordIndex; // last paragraph's last word's index
+
+    private WenkuReaderPaginator paginator;
 
     // view components (battery, page number, etc.)
 
@@ -224,7 +222,6 @@ public class WenkuReaderPageView extends View {
     public WenkuReaderPageView(Context context, int lineIndex, int wordIndex, LOADING_DIRECTION directionForward) {
         super(context);
         Log.d("MewX", "-- view: construct my");
-        lineInfoList = new ArrayList<>();
         bitmapInfoList = new ArrayList<>();
         mLoader.setCurrentIndex(lineIndex);
 
@@ -237,6 +234,11 @@ public class WenkuReaderPageView extends View {
         // get environmental vars, use actual layout size: width x height
         textAreaSize = new Point(screenDrawArea.second.x - screenDrawArea.first.x,
                 screenDrawArea.second.y - screenDrawArea.first.y);
+
+        paginator = new WenkuReaderPaginator(mLoader,
+                text -> textPaint.measureText(text),
+                textAreaSize.x, textAreaSize.y, fontHeight,
+                pxLineDistance, pxParagraphDistance);
 
         // save vars, calc all ints
         switch (directionForward) {
@@ -256,15 +258,15 @@ public class WenkuReaderPageView extends View {
                     Log.d("MewX", "-- view: end construct A, just return");
                     return;
                 }
-                mLoader.setCurrentIndex(firstLineIndex);
-                calcFromFirst();
+                paginator.setPageStart(firstLineIndex, firstWordIndex);
+                paginator.calcFromFirst();
                 break;
 
             case CURRENT:
                 firstLineIndex = lineIndex;
                 firstWordIndex = wordIndex;
-                mLoader.setCurrentIndex(firstLineIndex);
-                calcFromFirst();
+                paginator.setPageStart(firstLineIndex, firstWordIndex);
+                paginator.calcFromFirst();
                 break;
 
             case BACKWARDS:
@@ -279,262 +281,20 @@ public class WenkuReaderPageView extends View {
                 }
 
                 // firstLineIndex firstWordIndex; and last values changeable
-                mLoader.setCurrentIndex(lastLineIndex);
-                calcFromLast();
+                paginator.setPageEnd(lastLineIndex, lastWordIndex);
+                paginator.calcFromLast();
                 break;
         }
+
+        lineInfoList = paginator.getLineInfoList();
+        firstLineIndex = paginator.getFirstLineIndex();
+        firstWordIndex = paginator.getFirstWordIndex();
+        lastLineIndex = paginator.getLastLineIndex();
+        lastWordIndex = paginator.getLastWordIndex();
 
         for(LineInfo li : lineInfoList)
             Log.d("MewX", "get: " + li.text);
 
-    }
-
-    /**
-     * Calc page from first to last.
-     * firstLineIndex & firstWordIndex set.
-     */
-    private void calcFromFirst() {
-        int widthSum = 0;
-        int heightSum = fontHeight;
-        StringBuilder tempText = new StringBuilder();
-
-        Log.d("MewX", "firstLineIndex = " + firstLineIndex + "; firstWordIndex = " + firstWordIndex);
-        for(int curLineIndex = firstLineIndex, curWordIndex = firstWordIndex; curLineIndex < mLoader.getElementCount(); ) {
-            // init paragraph head vars
-            if(curWordIndex == 0 && mLoader.getCurrentType() == WenkuReaderLoader.ElementType.TEXT) {
-                // leading space
-                widthSum = 2 * fontHeight;
-                tempText = new StringBuilder("　　");
-            }
-            else if(mLoader.getCurrentType() == WenkuReaderLoader.ElementType.IMAGE_DEPENDENT) {
-                if(!lineInfoList.isEmpty()) {
-                    // end a page first
-                    lastLineIndex = mLoader.getCurrentIndex() - 1;
-                    mLoader.setCurrentIndex(lastLineIndex);
-                    lastWordIndex = mLoader.getCurrentStringLength() - 1;
-                    break;
-                }
-
-                // one image on page
-                lastLineIndex = firstLineIndex = mLoader.getCurrentIndex();
-                firstWordIndex = 0;
-                lastWordIndex = mLoader.getCurrentStringLength() - 1;
-                LineInfo li = new LineInfo();
-                li.type = WenkuReaderLoader.ElementType.IMAGE_DEPENDENT;
-                li.text = mLoader.getCurrentAsString();
-                lineInfoList.add(li);
-                break;
-            }
-
-            // get a record of line
-            if(mLoader.getCurrentAsString() == null || mLoader.getCurrentStringLength() == 0) {
-                Log.d("MewX", "empty string! in " + curLineIndex + "(" + curWordIndex + ")");
-                curWordIndex = 0;
-                if(curLineIndex >= mLoader.getElementCount()) {
-                    // out of bounds
-                    break;
-                }
-                mLoader.setCurrentIndex(++ curLineIndex);
-                continue;
-            }
-            String temp = mLoader.getCurrentAsString().charAt(curWordIndex) + "";
-            int tempWidth = (int) textPaint.measureText(temp);
-
-            // Line full?
-            if(widthSum + tempWidth > textAreaSize.x) {
-                // wrap line, save line
-                LineInfo li = new LineInfo();
-                li.type = WenkuReaderLoader.ElementType.TEXT;
-                li.text = tempText.toString();
-                lineInfoList.add(li);
-                heightSum += pxLineDistance;
-
-                // change vars for next line
-                if(heightSum + fontHeight > textAreaSize.y) {
-                    // reverse one index
-                    if(curWordIndex > 0) {
-                        lastLineIndex = curLineIndex;
-                        lastWordIndex = curWordIndex - 1;
-                    }
-                    else if(curLineIndex > 0) {
-                        mLoader.setCurrentIndex(-- curLineIndex);
-                        lastLineIndex = curLineIndex;
-                        lastWordIndex = mLoader.getCurrentStringLength() - 1;
-                    }
-                    else {
-                        lastLineIndex = lastWordIndex = 0;
-                    }
-                    break; // height overflow
-                }
-
-                // height acceptable
-                tempText = new StringBuilder(temp);
-                widthSum = tempWidth;
-                heightSum += fontHeight;
-            }
-            else {
-                tempText.append(temp);
-                widthSum += tempWidth;
-            }
-
-            // String end?
-            if(curWordIndex + 1 >= mLoader.getCurrentStringLength()) {
-                // next paragraph, wrap line
-                LineInfo li = new LineInfo();
-                li.type = WenkuReaderLoader.ElementType.TEXT;
-                li.text = tempText.toString();
-                lineInfoList.add(li);
-                heightSum += pxParagraphDistance;
-
-                // height not acceptable
-                if(heightSum + fontHeight > textAreaSize.y) {
-                    lastLineIndex = mLoader.getCurrentIndex();
-                    lastWordIndex = mLoader.getCurrentStringLength() - 1;
-                    break; // height overflow
-                }
-
-                // height acceptable
-                heightSum += fontHeight;
-                widthSum = 0;
-                tempText = new StringBuilder();
-                curWordIndex = 0;
-                if(curLineIndex + 1 >= mLoader.getElementCount()) {
-                    // out of bounds
-                    lastLineIndex = curLineIndex;
-                    lastWordIndex = mLoader.getCurrentStringLength() - 1;
-                    break;
-                }
-                mLoader.setCurrentIndex(++ curLineIndex);
-            }
-            else {
-                curWordIndex ++;
-            }
-        }
-    }
-
-    /**
-     * Calc page from last to first
-     * lastLineIndex & lastWordIndex set.
-     */
-    private void calcFromLast() {
-
-        int heightSum = 0;
-        boolean isFirst = true;
-        mLoader.setCurrentIndex(lastLineIndex);
-
-        LineLoop:
-        for(int curLineIndex = lastLineIndex, curWordIndex = lastWordIndex; curLineIndex >= 0; ) {
-            // calc curLine to curWord(contained), make a String list
-            WenkuReaderLoader.ElementType curType = mLoader.getCurrentType();
-            String curString = mLoader.getCurrentAsString();
-
-            // special to image
-            if(curType == WenkuReaderLoader.ElementType.IMAGE_DEPENDENT && !lineInfoList.isEmpty()) {
-                Log.d("MewX", "jump 1");
-                firstLineIndex = curLineIndex + 1;
-                firstWordIndex = 0;
-                mLoader.setCurrentIndex(firstLineIndex);
-                lineInfoList = new ArrayList<>();
-                calcFromFirst();
-                break;
-            }
-            else if(curType == WenkuReaderLoader.ElementType.IMAGE_DEPENDENT) {
-                // one image on page
-                lastLineIndex = firstLineIndex = mLoader.getCurrentIndex();
-                firstWordIndex = 0;
-                lastWordIndex = mLoader.getCurrentStringLength() - 1;
-                LineInfo li = new LineInfo();
-                li.type = WenkuReaderLoader.ElementType.IMAGE_DEPENDENT;
-                li.text = mLoader.getCurrentAsString();
-                lineInfoList.add(li);
-                break;
-            }
-
-            int tempWidth = 0;
-            List<LineInfo> curList = new ArrayList<>();
-            String temp = "";
-            for(int i = 0; i < curString.length(); ) {
-                if(i == 0) {
-                    tempWidth += fontHeight + fontHeight;
-                    temp = "　　";
-                }
-
-                String c = curString.charAt(i) + "";
-                int width = (int) textPaint.measureText(c);
-                if(tempWidth + width > textAreaSize.x) {
-                    // save line to next
-                    LineInfo li = new LineInfo();
-                    li.type = WenkuReaderLoader.ElementType.TEXT;
-                    li.text = temp;
-                    curList.add(li);
-
-                    // fit needs
-                    if(i >= curWordIndex) break;
-
-                    // goto next round
-                    tempWidth = 0;
-                    temp = "";
-                    continue;
-                }
-                else {
-                    temp = temp + c;
-                    tempWidth += width;
-                    i ++;
-                }
-
-                // string end
-                if(i == curString.length()) {
-                    LineInfo li = new LineInfo();
-                    li.type = WenkuReaderLoader.ElementType.TEXT;
-                    li.text = temp;
-                    curList.add(li);
-                }
-            }
-
-            // reverse to add to lineInfoList, full to break, image to do calcFromFirst then break
-            for(int i = curList.size() - 1; i >= 0; i --) {
-                if(isFirst)
-                    isFirst = false;
-                else if(i == curList.size() - 1)
-                    heightSum += pxParagraphDistance;
-                else
-                    heightSum += pxLineDistance;
-
-                heightSum += fontHeight;
-                if(heightSum > textAreaSize.y) {
-                    // calc first index
-                    int indexCount = -2;
-                    for(int j = 0; j <= i; j ++) indexCount += curList.get(j).text.length();
-                    firstLineIndex = curLineIndex;
-                    firstWordIndex = indexCount + 1;
-
-                    // out of index
-                    if(firstWordIndex + 1 >= curString.length()) {
-                        firstLineIndex = curLineIndex + 1;
-                        firstWordIndex = 0;
-                    }
-                    break LineLoop;
-                }
-                lineInfoList.add(0, curList.get(i));
-            }
-            for(LineInfo li : lineInfoList)
-                Log.d("MewX", "full: " + li.text);
-
-            // not full to continue, set curWord as last index of the string
-            if(curLineIndex - 1 >= 0) {
-                mLoader.setCurrentIndex(-- curLineIndex);
-                curWordIndex = mLoader.getCurrentStringLength();
-            }
-            else {
-                Log.d("MewX", "jump 2");
-                firstLineIndex = 0;
-                firstWordIndex = 0;
-                mLoader.setCurrentIndex(firstLineIndex);
-                lineInfoList = new ArrayList<>();
-                calcFromFirst();
-                break;
-            }
-        }
     }
 
     private void drawBackground(Canvas canvas) {
