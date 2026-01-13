@@ -25,7 +25,8 @@ public class WenkuReaderSettingV1 {
     }
 
     // global settings
-    public final int fontColorLight = Color.parseColor("#32414E"); // for dark background (ARGB)
+    // Useful tool: https://www.w3schools.com/colors/colors_picker.asp
+    public final int fontColorLight = Color.parseColor("#A2B4C3"); // for dark background (ARGB)
     public final int fontColorDark = Color.parseColor("#444444"); // for light background
     public final int bgColorLight = Color.parseColor("#CFBEB6");
     public final int bgColorDark = Color.parseColor("#090C13");
