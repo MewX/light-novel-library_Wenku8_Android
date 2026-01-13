@@ -56,8 +56,6 @@ public class OldNovelContentParser {
                 // update progress
                 setMaxProgress.accept(result.size());
             } else {
-                Log.d(TAG, "img index = " + temp);
-
                 // one line contains more than one images
                 temp = 0;
                 while (true) {
