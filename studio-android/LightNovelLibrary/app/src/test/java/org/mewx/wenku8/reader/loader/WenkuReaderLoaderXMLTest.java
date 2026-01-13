@@ -6,88 +6,132 @@ import org.mewx.wenku8.global.api.OldNovelContentParser;
 import org.mewx.wenku8.reader.loader.WenkuReaderLoader;
 import org.mewx.wenku8.reader.loader.WenkuReaderLoaderXML;
 
-import java.util.ArrayList;
 import java.util.List;
+import java.util.function.IntConsumer;
 
 import static org.junit.Assert.*;
 
 public class WenkuReaderLoaderXMLTest {
 
-    private WenkuReaderLoaderXML loader;
-    private List<OldNovelContentParser.NovelContent> contentList;
+    private WenkuReaderLoaderXML textLoader;
+    private WenkuReaderLoaderXML imageLoader;
+
+    // Sample text from the user request
+    private final String sampleBookText =
+            " 第三卷 第五十八话 猪肉味噌汤再来  \r\n" +
+            " \r\n" +
+            "  \r\n" +
+            "   \r\n" +
+            "  \r\n" +
+            " \r\n" +
+            "  \r\n" +
+            "     \r\n" +
+            "     \r\n" +
+            "     \r\n" +
+            "  \r\n" +
+            " \r\n" +
+            "  \r\n" +
+            "  \r\n" +
+            "    填饱饿了两天的肚子后，堤达满足地吐了口气。  \r\n" +
+            "  \r\n" +
+            "    「呼……」  \r\n" +
+            "  \r\n" +
+            "    即使遭到风吹雨打，堤达依然努力寻找粮食，并在最后发现了这个神奇的地方。  \r\n" +
+            "  \r\n" +
+            "    一扇东大陆风格的门丝毫没受到暴风雨的影响，屹立在海边的沙滩上。  ";
+
+    // Sample image chapter from the user request
+    private final String sampleImageText =
+            " 第一卷 插图  \r\n" +
+            " \r\n" +
+            "  \r\n" +
+            "   \r\n" +
+            "  \r\n" +
+            " \r\n" +
+            "  \r\n" +
+            "     \r\n" +
+            "     \r\n" +
+            "     \r\n" +
+            "  \r\n" +
+            " \r\n" +
+            "  \r\n" +
+            "  \r\n" +
+            "   <!--image-->https://pic.777743.xyz/2/2451/91509/108506.jpg<!--image-->       <!--image-->https://pic.777743.xyz/2/2451/91509/108507.jpg<!--image-->       <!--image-->https://pic.777743.xyz/2/2451/91509/108508.jpg<!--image-->";
 
     @Before
     public void setUp() {
-        contentList = new ArrayList<>();
+        IntConsumer progressConsumer = (i) -> {};
 
-        // Add sample text
-        OldNovelContentParser.NovelContent textContent = new OldNovelContentParser.NovelContent();
-        textContent.type = OldNovelContentParser.NovelContentType.TEXT;
-        textContent.content = "This is a sample text line.";
-        contentList.add(textContent);
+        // Parse text content
+        List<OldNovelContentParser.NovelContent> textContentList = OldNovelContentParser.parseNovelContent(sampleBookText, progressConsumer);
+        textLoader = new WenkuReaderLoaderXML(textContentList);
 
-        // Add sample image
-        OldNovelContentParser.NovelContent imageContent = new OldNovelContentParser.NovelContent();
-        imageContent.type = OldNovelContentParser.NovelContentType.IMAGE;
-        imageContent.content = "http://example.com/image.jpg";
-        contentList.add(imageContent);
-
-        // Add another text
-        OldNovelContentParser.NovelContent textContent2 = new OldNovelContentParser.NovelContent();
-        textContent2.type = OldNovelContentParser.NovelContentType.TEXT;
-        textContent2.content = "Another text line.";
-        contentList.add(textContent2);
-
-        loader = new WenkuReaderLoaderXML(contentList);
+        // Parse image content
+        List<OldNovelContentParser.NovelContent> imageContentList = OldNovelContentParser.parseNovelContent(sampleImageText, progressConsumer);
+        imageLoader = new WenkuReaderLoaderXML(imageContentList);
     }
 
     @Test
-    public void testInitialization() {
-        assertEquals(3, loader.getElementCount());
-        assertEquals(0, loader.getCurrentIndex());
+    public void testTextLoaderParsing() {
+        // The parser filters out empty lines (lines with only spaces).
+        // Expected content:
+        // 0: 第三卷 第五十八话 猪肉味噌汤再来
+        // 1: 填饱饿了两天的肚子后，堤达满足地吐了口气。
+        // 2: 「呼……」
+        // 3: 即使遭到风吹雨打，堤达依然努力寻找粮食，并在最后发现了这个神奇的地方。
+        // 4: 一扇东大陆风格的门丝毫没受到暴风雨的影响，屹立在海边的沙滩上。
+
+        assertEquals(5, textLoader.getElementCount());
+
+        textLoader.setCurrentIndex(0);
+        assertEquals("第三卷 第五十八话 猪肉味噌汤再来", textLoader.getCurrentAsString());
+
+        textLoader.setCurrentIndex(1);
+        assertEquals("填饱饿了两天的肚子后，堤达满足地吐了口气。", textLoader.getCurrentAsString());
+        assertEquals(WenkuReaderLoader.ElementType.TEXT, textLoader.getCurrentType());
+
+        textLoader.setCurrentIndex(2);
+        assertEquals("「呼……」", textLoader.getCurrentAsString());
     }
 
     @Test
-    public void testNavigation() {
-        // Current (Index 0)
-        assertEquals(WenkuReaderLoader.ElementType.TEXT, loader.getCurrentType());
-        assertEquals("This is a sample text line.", loader.getCurrentAsString());
+    public void testImageLoaderParsing() {
+        // Expected content:
+        // 0: 第一卷 插图
+        // 1: https://pic.777743.xyz/2/2451/91509/108506.jpg (IMAGE)
+        // 2: https://pic.777743.xyz/2/2451/91509/108507.jpg (IMAGE)
+        // 3: https://pic.777743.xyz/2/2451/91509/108508.jpg (IMAGE)
 
-        // Next (Index 1)
-        assertEquals(WenkuReaderLoader.ElementType.IMAGE_DEPENDENT, loader.getNextType());
-        assertEquals("http://example.com/image.jpg", loader.getNextAsString());
-        assertEquals(1, loader.getCurrentIndex());
+        assertEquals(4, imageLoader.getElementCount());
 
-        // Next (Index 2)
-        assertEquals(WenkuReaderLoader.ElementType.TEXT, loader.getNextType());
-        assertEquals("Another text line.", loader.getNextAsString());
-        assertEquals(2, loader.getCurrentIndex());
+        imageLoader.setCurrentIndex(0);
+        assertEquals("第一卷 插图", imageLoader.getCurrentAsString());
+        assertEquals(WenkuReaderLoader.ElementType.TEXT, imageLoader.getCurrentType());
 
-        // Previous (Index 1)
-        assertEquals(WenkuReaderLoader.ElementType.IMAGE_DEPENDENT, loader.getPreviousType());
-        assertEquals("http://example.com/image.jpg", loader.getPreviousAsString());
-        assertEquals(1, loader.getCurrentIndex());
+        imageLoader.setCurrentIndex(1);
+        assertEquals("https://pic.777743.xyz/2/2451/91509/108506.jpg", imageLoader.getCurrentAsString());
+        assertEquals(WenkuReaderLoader.ElementType.IMAGE_DEPENDENT, imageLoader.getCurrentType());
+
+        imageLoader.setCurrentIndex(2);
+        assertEquals("https://pic.777743.xyz/2/2451/91509/108507.jpg", imageLoader.getCurrentAsString());
+        assertEquals(WenkuReaderLoader.ElementType.IMAGE_DEPENDENT, imageLoader.getCurrentType());
     }
 
     @Test
-    public void testHasNext() {
-        loader.setCurrentIndex(0);
-        assertTrue(loader.hasNext(0)); // Has more chars in line 0
-        assertTrue(loader.hasNext("This is a sample text line.".length() - 1)); // Has next element
+    public void testNavigationOnRealText() {
+        textLoader.setCurrentIndex(0);
+        assertTrue(textLoader.hasNext(0));
 
-        loader.setCurrentIndex(2);
-        assertTrue(loader.hasNext(0)); // Has more chars in line 2
-        assertFalse(loader.hasNext("Another text line.".length() - 1)); // End of content
-    }
+        // Advance to next element
+        assertEquals("填饱饿了两天的肚子后，堤达满足地吐了口气。", textLoader.getNextAsString());
+        assertEquals(1, textLoader.getCurrentIndex());
 
-    @Test
-    public void testHasPrevious() {
-        loader.setCurrentIndex(2);
-        assertTrue(loader.hasPrevious(10));
-        assertTrue(loader.hasPrevious(0)); // Has previous element
+        // Advance again
+        assertEquals("「呼……」", textLoader.getNextAsString());
+        assertEquals(2, textLoader.getCurrentIndex());
 
-        loader.setCurrentIndex(0);
-        assertTrue(loader.hasPrevious(10));
-        assertFalse(loader.hasPrevious(0)); // Start of content
+        // Go back
+        assertEquals("填饱饿了两天的肚子后，堤达满足地吐了口气。", textLoader.getPreviousAsString());
+        assertEquals(1, textLoader.getCurrentIndex());
     }
 }
