@@ -57,7 +57,6 @@ public class MainActivity extends BaseMaterialActivity {
     // Below request codes can be any value.
     private static final int REQUEST_WRITE_EXTERNAL = 100;
     private static final int REQUEST_READ_EXTERNAL = 101;
-    private static final int REQUEST_READ_MEDIA_IMAGES = 102;
     private static final int REQUEST_READ_EXTERNAL_SAVES = 103;
 
     private static final AtomicBoolean NEW_VERSION_CHECKED = new AtomicBoolean(false);
@@ -104,13 +103,7 @@ public class MainActivity extends BaseMaterialActivity {
         }
 
         // Read permissions.
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            // FIXME: this doesn't work on the first launch yet (it works on the second+ launch somehow).
-            if (missingPermission(Manifest.permission.READ_MEDIA_IMAGES)) {
-                ActivityCompat.requestPermissions(this,
-                        new String[]{Manifest.permission.READ_MEDIA_IMAGES}, REQUEST_READ_MEDIA_IMAGES);
-            }
-        } else {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
             if (missingPermission(Manifest.permission.READ_EXTERNAL_STORAGE)) {
                 ActivityCompat.requestPermissions(this,
                         new String[]{Manifest.permission.READ_EXTERNAL_STORAGE}, REQUEST_READ_EXTERNAL);
@@ -406,12 +399,6 @@ public class MainActivity extends BaseMaterialActivity {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                     // The result will fall through.
                     break;
-                }
-            case REQUEST_READ_MEDIA_IMAGES:
-                if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                    reloadApp();
-                } else {
-                    Toast.makeText(this, getResources().getText(R.string.missing_permission), Toast.LENGTH_LONG).show();
                 }
         }
     }
