@@ -75,10 +75,7 @@ public class WenkuReaderPaginator {
                 lastLineIndex = firstLineIndex = mLoader.getCurrentIndex();
                 firstWordIndex = 0;
                 lastWordIndex = mLoader.getCurrentStringLength() - 1;
-                LineInfo li = new LineInfo();
-                li.type = WenkuReaderLoader.ElementType.IMAGE_DEPENDENT;
-                li.text = mLoader.getCurrentAsString();
-                lineInfoList.add(li);
+                lineInfoList.add(new LineInfo(WenkuReaderLoader.ElementType.IMAGE_DEPENDENT, mLoader.getCurrentAsString()));
                 break;
             }
 
@@ -99,10 +96,7 @@ public class WenkuReaderPaginator {
             // Line full?
             if(widthSum + tempWidth > textAreaWidth) {
                 // wrap line, save line
-                LineInfo li = new LineInfo();
-                li.type = WenkuReaderLoader.ElementType.TEXT;
-                li.text = tempText.toString();
-                lineInfoList.add(li);
+                lineInfoList.add(new LineInfo(WenkuReaderLoader.ElementType.TEXT, tempText.toString()));
                 heightSum += pxLineDistance;
 
                 // change vars for next line
@@ -136,10 +130,7 @@ public class WenkuReaderPaginator {
             // String end?
             if(curWordIndex + 1 >= mLoader.getCurrentStringLength()) {
                 // next paragraph, wrap line
-                LineInfo li = new LineInfo();
-                li.type = WenkuReaderLoader.ElementType.TEXT;
-                li.text = tempText.toString();
-                lineInfoList.add(li);
+                lineInfoList.add(new LineInfo(WenkuReaderLoader.ElementType.TEXT, tempText.toString()));
                 heightSum += pxParagraphDistance;
 
                 // height not acceptable
@@ -200,10 +191,7 @@ public class WenkuReaderPaginator {
                 lastLineIndex = firstLineIndex = mLoader.getCurrentIndex();
                 firstWordIndex = 0;
                 lastWordIndex = mLoader.getCurrentStringLength() - 1;
-                LineInfo li = new LineInfo();
-                li.type = WenkuReaderLoader.ElementType.IMAGE_DEPENDENT;
-                li.text = mLoader.getCurrentAsString();
-                lineInfoList.add(li);
+                lineInfoList.add(new LineInfo( WenkuReaderLoader.ElementType.IMAGE_DEPENDENT, mLoader.getCurrentAsString()));
                 break;
             }
 
@@ -220,10 +208,7 @@ public class WenkuReaderPaginator {
                 int width = (int) mTextMeasurer.measureText(c);
                 if(tempWidth + width > textAreaWidth) {
                     // save line to next
-                    LineInfo li = new LineInfo();
-                    li.type = WenkuReaderLoader.ElementType.TEXT;
-                    li.text = temp;
-                    curList.add(li);
+                    curList.add(new LineInfo(WenkuReaderLoader.ElementType.TEXT, temp));
 
                     // fit needs
                     if(i >= curWordIndex) break;
@@ -241,10 +226,7 @@ public class WenkuReaderPaginator {
 
                 // string end
                 if(i == curString.length()) {
-                    LineInfo li = new LineInfo();
-                    li.type = WenkuReaderLoader.ElementType.TEXT;
-                    li.text = temp;
-                    curList.add(li);
+                    curList.add(new LineInfo(WenkuReaderLoader.ElementType.TEXT, temp));
                 }
             }
 
@@ -261,7 +243,7 @@ public class WenkuReaderPaginator {
                 if(heightSum > textAreaHeight) {
                     // calc first index
                     int indexCount = -2;
-                    for(int j = 0; j <= i; j ++) indexCount += curList.get(j).text.length();
+                    for(int j = 0; j <= i; j ++) indexCount += curList.get(j).text().length();
                     firstLineIndex = curLineIndex;
                     firstWordIndex = indexCount + 1;
 

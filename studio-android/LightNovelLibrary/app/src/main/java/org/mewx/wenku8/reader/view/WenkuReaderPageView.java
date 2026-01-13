@@ -293,7 +293,7 @@ public class WenkuReaderPageView extends View {
         lastWordIndex = paginator.getLastWordIndex();
 
         for(LineInfo li : lineInfoList)
-            Log.d("MewX", "get: " + li.text);
+            Log.d("MewX", "get: " + li.text());
 
     }
 
@@ -326,7 +326,7 @@ public class WenkuReaderPageView extends View {
         for(int i = 0; i < lineInfoList.size(); i ++) {
             final LineInfo li = lineInfoList.get(i);
             if( i != 0 ) {
-                if(li.text.length() > 2 && li.text.substring(0, 2).equals("　　")) {
+                if(li.text().length() > 2 && li.text().substring(0, 2).equals("　　")) {
                     heightSum += pxParagraphDistance;
                 }
                 else {
@@ -334,14 +334,14 @@ public class WenkuReaderPageView extends View {
                 }
             }
 
-            Log.d(WenkuReaderPageView.class.getSimpleName(), "draw: " + li.text);
-            if(li.type == WenkuReaderLoader.ElementType.TEXT) {
-                canvas.drawText( li.text, (float) screenDrawArea.first.x, (float) heightSum, textPaint);
+            Log.d(WenkuReaderPageView.class.getSimpleName(), "draw: " + li.text());
+            if(li.type() == WenkuReaderLoader.ElementType.TEXT) {
+                canvas.drawText( li.text(), (float) screenDrawArea.first.x, (float) heightSum, textPaint);
                 heightSum += fontHeight;
-            } else if(li.type == WenkuReaderLoader.ElementType.IMAGE_DEPENDENT){
+            } else if(li.type() == WenkuReaderLoader.ElementType.IMAGE_DEPENDENT){
                 if (bitmapInfoList == null) {
                     // TODO: fix this magic number 21.
-                    canvas.drawText("Unexpected array: " + li.text.substring(21), (float) screenDrawArea.first.x, (float) heightSum, textPaint);
+                    canvas.drawText("Unexpected array: " + li.text().substring(21), (float) screenDrawArea.first.x, (float) heightSum, textPaint);
                     continue;
                 }
 
@@ -356,7 +356,7 @@ public class WenkuReaderPageView extends View {
                 if (bi == null) {
                     // not found, new load task
                     // TODO: fix this magic number 21.
-                    canvas.drawText("正在加载图片：" + li.text.substring(21), (float) screenDrawArea.first.x, (float) heightSum, textPaint);
+                    canvas.drawText("正在加载图片：" + li.text().substring(21), (float) screenDrawArea.first.x, (float) heightSum, textPaint);
                     bi = new BitmapInfo();
                     bi.idxLineInfo = i;
                     bi.x_beg = screenDrawArea.first.x;
@@ -370,7 +370,7 @@ public class WenkuReaderPageView extends View {
                 } else {
                     if (bi.bm == null) {
                         // TODO: fix this magic number 21.
-                        canvas.drawText("正在加载图片：" + li.text.substring(21), (float) screenDrawArea.first.x, (float) heightSum, textPaint);
+                        canvas.drawText("正在加载图片：" + li.text().substring(21), (float) screenDrawArea.first.x, (float) heightSum, textPaint);
                     } else {
                         int new_x = (screenDrawArea.second.x - screenDrawArea.first.x - bi.width) / 2 + bi.x_beg;
                         int new_y = (screenDrawArea.second.y - screenDrawArea.first.y - bi.height) / 2 + bi.y_beg;
@@ -379,7 +379,7 @@ public class WenkuReaderPageView extends View {
                 }
             } else {
                 // TODO: fix this magic number 21.
-                canvas.drawText("（！请先用旧引擎浏览）图片" + li.text.substring(21), (float) screenDrawArea.first.x, (float) heightSum, textPaint);
+                canvas.drawText("（！请先用旧引擎浏览）图片" + li.text().substring(21), (float) screenDrawArea.first.x, (float) heightSum, textPaint);
             }
         }
     }
@@ -419,9 +419,9 @@ public class WenkuReaderPageView extends View {
             // Make an alias for the bitmap info.
             BitmapInfo bitmapInfo = params[0];
 
-            String imgFileName = GlobalConfig.generateImageFileNameByURL(lineInfoList.get(bitmapInfo.idxLineInfo).text);
+            String imgFileName = GlobalConfig.generateImageFileNameByURL(lineInfoList.get(bitmapInfo.idxLineInfo).text());
             if(GlobalConfig.getAvailableNovelContentImagePath(imgFileName) == null) {
-                if (!GlobalConfig.saveNovelContentImage(lineInfoList.get(bitmapInfo.idxLineInfo).text)) {
+                if (!GlobalConfig.saveNovelContentImage(lineInfoList.get(bitmapInfo.idxLineInfo).text())) {
                     return Wenku8Error.ErrorCode.NETWORK_ERROR;
                 }
 
@@ -431,7 +431,7 @@ public class WenkuReaderPageView extends View {
                 }
 
                 // The image should be downloaded.
-                imgFileName = GlobalConfig.generateImageFileNameByURL(lineInfoList.get(bitmapInfo.idxLineInfo).text);
+                imgFileName = GlobalConfig.generateImageFileNameByURL(lineInfoList.get(bitmapInfo.idxLineInfo).text());
             }
 
             ImageSize targetSize = new ImageSize(bitmapInfo.width, bitmapInfo.height); // result Bitmap will be fit to this size
@@ -474,7 +474,7 @@ public class WenkuReaderPageView extends View {
         }
         else {
             Intent intent = new Intent(activity, ViewImageDetailActivity.class);
-            intent.putExtra("path", GlobalConfig.getAvailableNovelContentImagePath(GlobalConfig.generateImageFileNameByURL(lineInfoList.get(bitmapInfoList.get(0).idxLineInfo).text)));
+            intent.putExtra("path", GlobalConfig.getAvailableNovelContentImagePath(GlobalConfig.generateImageFileNameByURL(lineInfoList.get(bitmapInfoList.get(0).idxLineInfo).text())));
             activity.startActivity(intent);
             activity.overridePendingTransition(R.anim.fade_in, R.anim.hold); // fade in animation
         }

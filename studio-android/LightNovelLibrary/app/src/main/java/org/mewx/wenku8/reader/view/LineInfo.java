@@ -2,7 +2,11 @@ package org.mewx.wenku8.reader.view;
 
 import org.mewx.wenku8.reader.loader.WenkuReaderLoader;
 
-public class LineInfo {
-    public WenkuReaderLoader.ElementType type;
-    public String text;
+import java.util.Objects;
+
+public record LineInfo(WenkuReaderLoader.ElementType type, String text) {
+    public LineInfo {
+        Objects.requireNonNull(type);
+        Objects.requireNonNull(text);
+    }
 }

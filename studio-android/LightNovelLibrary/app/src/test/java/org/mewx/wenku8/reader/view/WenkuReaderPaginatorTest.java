@@ -57,7 +57,7 @@ public class WenkuReaderPaginatorTest {
         // But logic adds indentation "　　" if it's the first word of paragraph and type TEXT.
         // Wait, the loader parses "第三卷..." as TEXT.
         // The paginator logic:
-        // if(curWordIndex == 0 && mLoader.getCurrentType() == WenkuReaderLoader.ElementType.TEXT) {
+        // if(curWordIndex == 0 && mLoader.getCurrentType() == WenkuReaderLoader.ElementType.text()) {
         //     widthSum = 2 * fontHeight; // 60px
         //     tempText = new StringBuilder("　　");
         // }
@@ -66,7 +66,7 @@ public class WenkuReaderPaginatorTest {
         // Total width: 60px + 17 * 20px = 60 + 340 = 400px.
         // Matches exactly 400px.
 
-        assertEquals("　　第三卷 第五十八话 猪肉味噌汤再来", lines.get(0).text);
+        assertEquals("　　第三卷 第五十八话 猪肉味噌汤再来", lines.get(0).text());
 
         // Next paragraph: "填饱饿了两天的肚子后，堤达满足地吐了口气。"
         // Length 21 chars.
@@ -76,8 +76,8 @@ public class WenkuReaderPaginatorTest {
         // Line 3: "了口气。" (remaining 4 chars)
 
         assertTrue(lines.size() > 2);
-        assertEquals("　　填饱饿了两天的肚子后，堤达满足地吐", lines.get(1).text);
-        assertEquals("了口气。", lines.get(2).text);
+        assertEquals("　　填饱饿了两天的肚子后，堤达满足地吐", lines.get(1).text());
+        assertEquals("了口气。", lines.get(2).text());
     }
 
     @Test
@@ -98,13 +98,13 @@ public class WenkuReaderPaginatorTest {
         List<LineInfo> lines = paginator.getLineInfoList();
 
         // Line 0: "　　填饱饿了两天的肚子后，堤达满足地吐"
-        assertEquals("　　填饱饿了两天的肚子后，堤达满足地吐", lines.get(0).text);
+        assertEquals("　　填饱饿了两天的肚子后，堤达满足地吐", lines.get(0).text());
 
         // Line 1: "了口气。"
-        assertEquals("了口气。", lines.get(1).text);
+        assertEquals("了口气。", lines.get(1).text());
 
         // Next Paragraph: "「呼……」"
         // Line 2: "　　「呼……」"
-        assertEquals("　　「呼……」", lines.get(2).text);
+        assertEquals("　　「呼……」", lines.get(2).text());
     }
 }
