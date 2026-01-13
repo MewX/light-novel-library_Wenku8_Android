@@ -6,7 +6,6 @@ import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Point;
 import android.os.AsyncTask;
-import android.os.Build;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.LayoutInflater;
@@ -104,14 +103,18 @@ public class NavigationDrawerFragment extends Fragment {
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
 
-        // Initialize Mobile Ads SDK
-        MobileAds.initialize(getContext(), initializationStatus -> {});
-        refreshAd();
-
         // Ensure mainActivity is initialized.
         if (mainActivity == null && getActivity() instanceof MainActivity) {
             mainActivity = (MainActivity) getActivity();
         }
+
+        // Loading ads asynchronously.
+        new Thread(() -> {
+            MobileAds.initialize(getContext(),
+                    initializationStatus -> {
+                    });
+            refreshAd();
+        }).start();
 
         // set button clicked listener, mainly working on change fragment in MainActivity.
         try {
