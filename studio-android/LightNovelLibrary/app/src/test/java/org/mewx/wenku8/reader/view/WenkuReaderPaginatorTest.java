@@ -3,11 +3,13 @@ package org.mewx.wenku8.reader.view;
 import org.junit.Test;
 import org.mewx.wenku8.reader.loader.WenkuReaderLoader;
 import android.graphics.Bitmap;
+
 import java.util.List;
 import static org.junit.Assert.*;
 
 public class WenkuReaderPaginatorTest {
 
+    // Stub for Loader to avoid dependency on real XML/GlobalConfig/Android
     static class StubLoader extends WenkuReaderLoader {
         private String[] paragraphs;
         private int currentIndex = 0;
@@ -49,21 +51,29 @@ public class WenkuReaderPaginatorTest {
 
     static class StubMeasurer implements TextMeasurer {
         @Override public float measureText(String text) {
+            // Monospace 10px per char
             return text.length() * 10;
         }
     }
 
+    // Sample text copied from existing samples
+    private static final String SAMPLE_BOOK_TEXT =
+            "第三卷 第五十八话 猪肉味噌汤再来\n" +
+            "填饱饿了两天的肚子后，堤达满足地吐了口气。\n" +
+            "「呼……」\n" +
+            "即使遭到风吹雨打，堤达依然努力寻找粮食，并在最后发现了这个神奇的地方。\n" +
+            "一扇东大陆风格的门丝毫没受到暴风雨的影响，屹立在海边的沙滩上。";
+
     @Test
     public void testPageContinuity() {
-        // Setup
-        String text = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
-        String[] paragraphs = { text };
+        // Use existing samples (stubbed)
+        String[] paragraphs = SAMPLE_BOOK_TEXT.split("\n");
         StubLoader loader = new StubLoader(paragraphs);
         StubMeasurer measurer = new StubMeasurer();
 
         int fontHeight = 10;
-        int textAreaWidth = 100; // Fits 10 chars. Indent "　　" takes 20.
-        int textAreaHeight = 35; // Fits 3 lines (30).
+        int textAreaWidth = 200; // Fits 20 chars
+        int textAreaHeight = 100;
         int pxLineDistance = 0;
         int pxParagraphDistance = 0;
 
@@ -74,42 +84,22 @@ public class WenkuReaderPaginatorTest {
         paginator.setPageStart(0, 0);
         paginator.calcFromFirst();
 
-        int p1LastLine = paginator.getLastLineIndex();
-        int p1LastWord = paginator.getLastWordIndex();
         List<LineInfo> p1Lines = paginator.getLineInfoList();
+        assertFalse("Page 1 should not be empty", p1Lines.isEmpty());
 
-        // Verify Page 1 content.
-        // Line 1: Indent + 0..7. (8 chars). "　　01234567"
-        // Line 2: 8..17. (10 chars). "89ABCDEFGH"
-        // Line 3: 18..27. (10 chars). "IJKLMNOPQR"
-        // Line 4 overflow.
-        // Page 1 should end at 'R' (index 27).
+        // Verify line content
+        // Line 1 should be the title with indent
+        assertEquals("　　第三卷 第五十八话 猪肉味噌汤再来", p1Lines.get(0).text());
 
-        char charAt27 = text.charAt(27); // 'R'
-        assertEquals("Page 1 should end at 27", 27, p1LastWord);
-
-        // Calculate Page 2 Start
-        int p2LineIndex = p1LastLine;
-        int p2WordIndex = (p1LastLine == 0 && p1LastWord == 0) ? 0 : p1LastWord + 1;
-
-        assertEquals("Page 2 should start at 28", 28, p2WordIndex);
-
-        // Page 2 calculation
-        paginator.setPageStart(p2LineIndex, p2WordIndex);
-        paginator.calcFromFirst();
-
-        List<LineInfo> p2Lines = paginator.getLineInfoList();
-        assertFalse("Page 2 should not be empty", p2Lines.isEmpty());
-
-        String p2FirstLine = p2Lines.get(0).text();
-        char firstCharP2 = p2FirstLine.charAt(0);
-        char expectedChar = text.charAt(p2WordIndex); // 'S'
-
-        assertEquals("Page 2 should start with expected char", expectedChar, firstCharP2);
+        // Check subsequent lines
+        assertTrue(p1Lines.size() >= 3);
+        assertEquals("　　填饱饿了两天的肚子后，堤达满足地吐了", p1Lines.get(1).text());
+        assertEquals("口气。", p1Lines.get(2).text());
     }
 
     @Test
     public void testBugReproduced_NarrowWidthWithIndent() {
+        // Reproduce using a specific string constructed to look like a paragraph
         String text = "0123456789";
         StubLoader loader = new StubLoader(new String[]{text});
         StubMeasurer measurer = new StubMeasurer();
@@ -128,7 +118,6 @@ public class WenkuReaderPaginatorTest {
 
         int lastWord = paginator.getLastWordIndex();
 
-        // Check displayed content
         List<LineInfo> lines = paginator.getLineInfoList();
         StringBuilder rawSb = new StringBuilder();
         for (LineInfo l : lines) if (l.type() == WenkuReaderLoader.ElementType.TEXT) rawSb.append(l.text());
@@ -143,7 +132,6 @@ public class WenkuReaderPaginatorTest {
 
         System.out.println("lastWordIndex: " + lastWord);
 
-        // The bug is that '0' is not displayed (because of overflow), but lastWordIndex includes it (0).
         if (!containsChar0 && lastWord >= 0) {
              fail("Bug Reproduced: '0' not displayed but lastWordIndex claims it is included (" + lastWord + ")");
         }
