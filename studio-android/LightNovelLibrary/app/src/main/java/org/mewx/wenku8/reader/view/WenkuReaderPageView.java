@@ -13,7 +13,6 @@ import android.graphics.Shader;
 import android.graphics.Typeface;
 import android.graphics.drawable.BitmapDrawable;
 import android.os.AsyncTask;
-import android.os.Build;
 import android.text.TextPaint;
 import android.util.Log;
 import android.util.Pair;
@@ -156,12 +155,12 @@ public class WenkuReaderPageView extends View {
 
             if(mSetting.getPageBackgroundType() == WenkuReaderSettingV1.PAGE_BACKGROUND_TYPE.CUSTOM) {
                 try {
-                    bmBackgroundYellow = BitmapFactory.decodeFile(mSetting.getPageBackgrounCustomPath());
+                    bmBackgroundYellow = BitmapFactory.decodeFile(mSetting.getPageBackgroundCustomPath());
                 } catch (OutOfMemoryError oome) {
                     try {
                         BitmapFactory.Options options = new BitmapFactory.Options();
                         options.inSampleSize = 2;
-                        bmBackgroundYellow = BitmapFactory.decodeFile(mSetting.getPageBackgrounCustomPath(), options);
+                        bmBackgroundYellow = BitmapFactory.decodeFile(mSetting.getPageBackgroundCustomPath(), options);
                     } catch(Exception e) {
                         e.printStackTrace();
                         return;

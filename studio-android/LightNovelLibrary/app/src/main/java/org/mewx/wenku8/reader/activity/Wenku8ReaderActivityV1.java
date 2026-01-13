@@ -105,6 +105,7 @@ public class Wenku8ReaderActivityV1 extends BaseMaterialActivity {
         forcejump = getIntent().getStringExtra("forcejump");
         if(forcejump == null || forcejump.isEmpty()) forcejump = "no";
 //        tempNavBarHeight = LightTool.getNavigationBarSize(this).y;
+        setting = new WenkuReaderSettingV1();
 
         // Analysis.
         Bundle readerParams = new Bundle();
@@ -440,7 +441,6 @@ public class Wenku8ReaderActivityV1 extends BaseMaterialActivity {
 
             // init components
             loader = new WenkuReaderLoaderXML(nc);
-            setting = new WenkuReaderSettingV1();
             loader.setCurrentIndex(0);
             for(ChapterInfo ci : volumeList.chapterList) {
                 // get chapter name

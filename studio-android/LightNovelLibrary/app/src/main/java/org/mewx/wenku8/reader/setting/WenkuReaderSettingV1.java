@@ -44,7 +44,7 @@ public class WenkuReaderSettingV1 {
     // page setting
     private int pageEdgeDistance = 8; // in "dp", page edge distance
     private PAGE_BACKGROUND_TYPE pageBackgroundType = PAGE_BACKGROUND_TYPE.SYSTEM_DEFAULT;
-    private String pageBackgrounCustomPath = "";
+    private String pageBackgroundCustomPath = "";
 
 
     /**
@@ -91,7 +91,7 @@ public class WenkuReaderSettingV1 {
             }
             else if(LightCache.testFileExist(size)) {
                 pageBackgroundType = PAGE_BACKGROUND_TYPE.CUSTOM;
-                pageBackgrounCustomPath = size;
+                pageBackgroundCustomPath = size;
             }
         }
 
@@ -179,13 +179,12 @@ public class WenkuReaderSettingV1 {
     }
 
     public void setPageBackgroundCustomPath(String s) {
-        pageBackgrounCustomPath = s;
-        if(s.equals("0")) pageBackgroundType = PAGE_BACKGROUND_TYPE.SYSTEM_DEFAULT;
-        else pageBackgroundType = PAGE_BACKGROUND_TYPE.CUSTOM;
+        pageBackgroundCustomPath = s;
+        pageBackgroundType = s.equals("0") ? PAGE_BACKGROUND_TYPE.SYSTEM_DEFAULT : PAGE_BACKGROUND_TYPE.CUSTOM;
         GlobalConfig.setToAllSetting(GlobalConfig.SettingItems.reader_background_path, s);
     }
 
-    public String getPageBackgrounCustomPath() {
-        return pageBackgrounCustomPath;
+    public String getPageBackgroundCustomPath() {
+        return pageBackgroundCustomPath;
     }
 }
