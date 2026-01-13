@@ -322,7 +322,7 @@ public class LatestFragment extends Fragment implements MyItemClickListener, MyI
         mTextView.setText(getResources().getString(R.string.list_loading));
         mainActivity.findViewById(R.id.google_progress).setVisibility(View.VISIBLE);
         mainActivity.findViewById(R.id.btn_loading).setVisibility(View.GONE);
-        mainActivity.findViewById(R.id.btn_check_update).setVisibility(View.GONE);
+        mainActivity.findViewById(R.id.btn_check_update_home).setVisibility(View.GONE);
     }
 
 
