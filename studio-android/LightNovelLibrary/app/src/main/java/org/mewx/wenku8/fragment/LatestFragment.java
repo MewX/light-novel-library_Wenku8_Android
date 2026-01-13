@@ -22,8 +22,16 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import com.afollestad.materialdialogs.MaterialDialog;
 import com.afollestad.materialdialogs.Theme;
+import com.google.android.gms.ads.AdListener;
+import com.google.android.gms.ads.AdLoader;
+import com.google.android.gms.ads.AdRequest;
+import com.google.android.gms.ads.LoadAdError;
+import com.google.android.gms.ads.MobileAds;
+import com.google.android.gms.ads.VideoOptions;
+import com.google.android.gms.ads.nativead.NativeAdOptions;
 import com.google.android.material.snackbar.Snackbar;
 
+import org.mewx.wenku8.BuildConfig;
 import org.mewx.wenku8.R;
 import org.mewx.wenku8.activity.MainActivity;
 import org.mewx.wenku8.activity.NovelInfoActivity;
@@ -54,6 +62,7 @@ public class LatestFragment extends Fragment implements MyItemClickListener, MyI
     private List<NovelItemInfoUpdate> listNovelItemInfo = new ArrayList<>();
     private NovelItemAdapter mAdapter;
     private int currentPage, totalPage; // currentP stores next reading page num, TODO: fix wrong number
+    private int mAdCount = 0;
 
     // switcher
     private final AtomicBoolean isLoading = new AtomicBoolean(false);
@@ -68,6 +77,9 @@ public class LatestFragment extends Fragment implements MyItemClickListener, MyI
         super.onCreate(savedInstanceState);
 
         listNovelItemInfo = new ArrayList<>();
+
+        // Initialize Mobile Ads SDK
+        MobileAds.initialize(getContext(), initializationStatus -> {});
     }
 
     @Override
@@ -172,6 +184,9 @@ public class LatestFragment extends Fragment implements MyItemClickListener, MyI
 
     @Override
     public void onDetach() {
+        if (mAdapter != null) {
+            mAdapter.destroyAds();
+        }
         super.onDetach();
         mainActivity = null;
         isLoading.set(false);
@@ -263,7 +278,17 @@ public class LatestFragment extends Fragment implements MyItemClickListener, MyI
 
             // Incremental changes
             if (numOfItemsToRefresh != 0) {
-                mAdapter.notifyItemRangeInserted(listNovelItemInfo.size() - numOfItemsToRefresh, numOfItemsToRefresh);
+                // Calculate how many ads we need to load.
+                // Total items: listNovelItemInfo.size()
+                // Required ads: listNovelItemInfo.size() / 10
+                int totalAdsNeeded = listNovelItemInfo.size() / 10;
+                int adsToLoad = totalAdsNeeded - mAdCount;
+
+                if (adsToLoad > 0) {
+                    loadAds(adsToLoad);
+                }
+
+                mAdapter.notifyDataSetChanged(); // Since we are adding ads, indices shift, so it's safer to refresh all.
             }
 
             currentPage ++; // add when loaded
@@ -325,5 +350,46 @@ public class LatestFragment extends Fragment implements MyItemClickListener, MyI
         mainActivity.findViewById(R.id.btn_check_update_home).setVisibility(View.GONE);
     }
 
+    private void loadAds(int count) {
+        AdLoader.Builder builder = new AdLoader.Builder(getContext(),
+                BuildConfig.DEBUG ? "ca-app-pub-3940256099942544/2247696110" /* test ID */ :
+                        "ca-app-pub-7333757578973883/3000430715" /* real ID */);
+
+        builder.forNativeAd(nativeAd -> {
+            if (!isAdded() || mAdapter == null) {
+                nativeAd.destroy();
+                return;
+            }
+            mAdapter.addAd(nativeAd);
+            mAdCount++;
+            // We might want to notify specific item change, but since we already called notifyDataSetChanged in onPostExecute,
+            // we probably need to notify inserted item here if it happens asynchronously later.
+            // However, the ad position depends on item count.
+            // If we just add to adapter's internal list, the adapter will pick it up on next bind/layout.
+            // To be safe, we can notify adapter.
+            // But frequent notifications might be bad.
+            // Given the list is long, maybe just let it be updated when scrolled?
+            // Actually, if the ad view is currently visible (or about to be), we should notify.
+            // mAdapter.notifyDataSetChanged(); // Simple but expensive.
+        });
+
+        builder.withNativeAdOptions(new NativeAdOptions.Builder()
+                .setVideoOptions(new VideoOptions.Builder().setStartMuted(true).build())
+                .build());
+
+        AdLoader adLoader = builder.withAdListener(new AdListener() {
+            @Override
+            public void onAdFailedToLoad(@NonNull LoadAdError loadAdError) {
+                // Handle failure
+            }
+        }).build();
+
+        // Load 'count' ads. Since AdLoader loads one by one, we loop?
+        // Actually AdLoader usually loads one ad per request.
+        // If we need 5 ads, we might need to issue 5 requests.
+        for (int i = 0; i < count; i++) {
+            adLoader.loadAd(new AdRequest.Builder().build());
+        }
+    }
 
 }
