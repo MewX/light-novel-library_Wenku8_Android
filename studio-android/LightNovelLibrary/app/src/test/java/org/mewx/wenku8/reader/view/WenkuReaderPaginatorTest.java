@@ -1,9 +1,7 @@
 package org.mewx.wenku8.reader.view;
 
-import org.junit.Before;
 import org.junit.Test;
 import org.mewx.wenku8.global.api.OldNovelContentParser;
-import org.mewx.wenku8.reader.loader.WenkuReaderLoader;
 import org.mewx.wenku8.reader.loader.WenkuReaderLoaderXML;
 
 import java.util.List;
@@ -13,11 +11,9 @@ import static org.junit.Assert.*;
 
 public class WenkuReaderPaginatorTest {
 
-    private WenkuReaderPaginator paginator;
-    private WenkuReaderLoaderXML loader;
-    private TextMeasurer textMeasurer;
+    private static final IntConsumer PROGRESSIVE_CONSUMER = unused -> {};
 
-    private final String sampleBookText =
+    private static final String SAMPLE_BOOK_TEXT =
             " 第三卷 第五十八话 猪肉味噌汤再来  \r\n" +
             " \r\n" +
             "  \r\n" +
@@ -34,32 +30,21 @@ public class WenkuReaderPaginatorTest {
             "    一扇东大陆风格的门丝毫没受到暴风雨的影响，屹立在海边的沙滩上。  \r\n" +
             "  \r\n" +
             "    堤达穿过那扇门后，就来到异世界的餐厅。  ";
+    private static final List<OldNovelContentParser.NovelContent> SAMPLE_BOOK_TEXT_NOVEL_CONTENT =
+            OldNovelContentParser.parseNovelContent(SAMPLE_BOOK_TEXT, PROGRESSIVE_CONSUMER);
+    private static final WenkuReaderLoaderXML XML_LOADER = new WenkuReaderLoaderXML(SAMPLE_BOOK_TEXT_NOVEL_CONTENT);
 
-    @Before
-    public void setUp() {
-        IntConsumer progressConsumer = (i) -> {};
-        List<OldNovelContentParser.NovelContent> contentList = OldNovelContentParser.parseNovelContent(sampleBookText, progressConsumer);
-        loader = new WenkuReaderLoaderXML(contentList);
 
-        // Mock measurer: assume each character is 20px wide
-        textMeasurer = new TextMeasurer() {
-            @Override
-            public float measureText(String text) {
-                return text.length() * 20;
-            }
-        };
-
+    @Test
+    public void testFirstPagePagination() {
         // Screen Settings:
-        // Width: 400px (20 characters per line)
+        // Width: 400px (20 characters per line, assume each character is 20px wide)
         // Height: 800px
         // Font height: 30px
         // Line distance: 10px
         // Paragraph distance: 20px
-        paginator = new WenkuReaderPaginator(loader, textMeasurer, 400, 800, 30, 10, 20);
-    }
+        WenkuReaderPaginator paginator = new WenkuReaderPaginator(XML_LOADER, text -> text.length() * 20, 400, 800, 30, 10, 20);
 
-    @Test
-    public void testFirstPagePagination() {
         // Start from beginning
         paginator.setPageStart(0, 0);
         paginator.calcFromFirst();
@@ -97,6 +82,14 @@ public class WenkuReaderPaginatorTest {
 
     @Test
     public void testPaginationFlow() {
+        // Screen Settings:
+        // Width: 400px (20 characters per line, assume each character is 20px wide)
+        // Height: 800px
+        // Font height: 30px
+        // Line distance: 10px
+        // Paragraph distance: 20px
+        WenkuReaderPaginator paginator = new WenkuReaderPaginator(XML_LOADER, text -> text.length() * 20, 400, 800, 30, 10, 20);
+
         // Start from index 1 (First actual paragraph)
         // "填饱饿了两天的肚子后，堤达满足地吐了口气。"
         paginator.setPageStart(1, 0);
