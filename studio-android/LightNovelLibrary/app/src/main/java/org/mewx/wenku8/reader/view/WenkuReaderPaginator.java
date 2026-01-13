@@ -4,7 +4,7 @@ import org.mewx.wenku8.reader.loader.WenkuReaderLoader;
 import java.util.ArrayList;
 import java.util.List;
 
-public class WenkuReaderPaginator {
+class WenkuReaderPaginator {
     private final WenkuReaderLoader mLoader;
     private final TextMeasurer mTextMeasurer;
     private final int textAreaWidth;
@@ -19,7 +19,7 @@ public class WenkuReaderPaginator {
     private int lastWordIndex;
     private List<LineInfo> lineInfoList;
 
-    public WenkuReaderPaginator(WenkuReaderLoader loader, TextMeasurer textMeasurer,
+    WenkuReaderPaginator(WenkuReaderLoader loader, TextMeasurer textMeasurer,
                                 int textAreaWidth, int textAreaHeight, int fontHeight,
                                 int pxLineDistance, int pxParagraphDistance) {
         this.mLoader = loader;
@@ -32,13 +32,13 @@ public class WenkuReaderPaginator {
         this.lineInfoList = new ArrayList<>();
     }
 
-    public void setPageStart(int lineIndex, int wordIndex) {
+    void setPageStart(int lineIndex, int wordIndex) {
         this.firstLineIndex = lineIndex;
         this.firstWordIndex = wordIndex;
         mLoader.setCurrentIndex(firstLineIndex);
     }
 
-    public void setPageEnd(int lineIndex, int wordIndex) {
+    void setPageEnd(int lineIndex, int wordIndex) {
         this.lastLineIndex = lineIndex;
         this.lastWordIndex = wordIndex;
         mLoader.setCurrentIndex(lastLineIndex);
@@ -48,7 +48,7 @@ public class WenkuReaderPaginator {
      * Calc page from first to last.
      * firstLineIndex & firstWordIndex set.
      */
-    public void calcFromFirst() {
+    void calcFromFirst() {
         int widthSum = 0;
         int heightSum = fontHeight;
         StringBuilder tempText = new StringBuilder();
@@ -163,7 +163,7 @@ public class WenkuReaderPaginator {
      * Calc page from last to first
      * lastLineIndex & lastWordIndex set.
      */
-    public void calcFromLast() {
+    void calcFromLast() {
 
         int heightSum = 0;
         boolean isFirst = true;
@@ -276,12 +276,12 @@ public class WenkuReaderPaginator {
         }
     }
 
-    public List<LineInfo> getLineInfoList() {
+    List<LineInfo> getLineInfoList() {
         return lineInfoList;
     }
 
-    public int getFirstLineIndex() { return firstLineIndex; }
-    public int getFirstWordIndex() { return firstWordIndex; }
-    public int getLastLineIndex() { return lastLineIndex; }
-    public int getLastWordIndex() { return lastWordIndex; }
+    int getFirstLineIndex() { return firstLineIndex; }
+    int getFirstWordIndex() { return firstWordIndex; }
+    int getLastLineIndex() { return lastLineIndex; }
+    int getLastWordIndex() { return lastWordIndex; }
 }
