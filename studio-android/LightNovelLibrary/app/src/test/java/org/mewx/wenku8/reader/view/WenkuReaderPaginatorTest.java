@@ -90,9 +90,9 @@ public class WenkuReaderPaginatorTest {
     }
 
     @Test
-    public void testBugReproduced_StartOfChapter() {
+    public void testBugReproduced_startOfSecondPage() {
         // Reproduce "missing first character" bug.
-        // This happens at the Start of a Chapter (Line 0) when specific layout conditions are met.
+        // This simulates a "middle page" scenario which corresponds to the start of a loader segment (Line 0).
         // Condition: Indent + First Char > Width (Wrap) AND Wrapped Line > Remaining Height (Overflow).
 
         List<OldNovelContentParser.NovelContent> content = new ArrayList<>();
@@ -110,11 +110,11 @@ public class WenkuReaderPaginatorTest {
         // Line 1 (Indent) fits height (15px).
         // Line 2 ("一") needs 10px + 2px (dist) = 12px.
         // Total 22px > 15px. Overflow.
-        // The paginator hits overflow on the first character.
-        // Because it's Line 0, it falls into the `else { lastLineIndex = lastWordIndex = 0; }` block.
+        // The paginator hits overflow on the first character of the paragraph.
+        // It hits the `else { lastLineIndex = lastWordIndex = 0; }` block.
         // This sets the page end to Word 0 ("一").
         // But "一" was NOT displayed (it overflowed).
-        // So the user sees a page with only Indent (or just Indent).
+        // So the user sees a page with only Indent.
         // And the NEXT page starts at Word 1 ("二").
         // "一" is missing.
 
@@ -130,7 +130,7 @@ public class WenkuReaderPaginatorTest {
         WenkuReaderPaginator paginator = new WenkuReaderPaginator(loader, measurer,
                 width, height, fontHeight, lineDist, paraDist);
 
-        // Start at Line 0
+        // Start at Line 0 (Start of this segment/chapter)
         paginator.setPageStart(0, 0);
         paginator.calcFromFirst();
 
