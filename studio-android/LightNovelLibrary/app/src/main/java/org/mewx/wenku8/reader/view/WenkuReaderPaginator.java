@@ -101,6 +101,15 @@ class WenkuReaderPaginator {
 
                 // change vars for next line
                 if(heightSum + fontHeight > textAreaHeight) {
+                    // Force include if we are stuck at the start of the page/section to avoid infinite loop or skipping
+                    if (curLineIndex == firstLineIndex && curWordIndex == firstWordIndex) {
+                        tempText = new StringBuilder(temp);
+                        lineInfoList.add(new LineInfo(WenkuReaderLoader.ElementType.TEXT, tempText.toString()));
+                        lastLineIndex = curLineIndex;
+                        lastWordIndex = curWordIndex;
+                        break;
+                    }
+
                     // reverse one index
                     if(curWordIndex > 0) {
                         lastLineIndex = curLineIndex;

@@ -4,7 +4,6 @@ import org.junit.Test;
 import org.mewx.wenku8.global.api.OldNovelContentParser;
 import org.mewx.wenku8.reader.loader.WenkuReaderLoaderXML;
 import org.mewx.wenku8.reader.loader.WenkuReaderLoader;
-import android.graphics.Bitmap;
 
 import java.util.List;
 import java.util.ArrayList;
