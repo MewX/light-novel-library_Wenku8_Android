@@ -7,16 +7,12 @@ import android.graphics.BitmapFactory;
 import android.graphics.Point;
 import android.os.AsyncTask;
 import android.os.Bundle;
-import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
-import android.widget.Button;
-import android.widget.FrameLayout;
-import android.widget.RatingBar;
 import android.widget.TableRow;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -32,19 +28,9 @@ import androidx.fragment.app.FragmentActivity;
 import com.afollestad.materialdialogs.MaterialDialog;
 import com.afollestad.materialdialogs.StackingBehavior;
 import com.afollestad.materialdialogs.Theme;
-import com.google.android.gms.ads.AdListener;
-import com.google.android.gms.ads.AdLoader;
-import com.google.android.gms.ads.AdRequest;
-import com.google.android.gms.ads.LoadAdError;
-import com.google.android.gms.ads.MobileAds;
-import com.google.android.gms.ads.VideoOptions;
-import com.google.android.gms.ads.nativead.NativeAd;
-import com.google.android.gms.ads.nativead.NativeAdOptions;
-import com.google.android.gms.ads.nativead.NativeAdView;
 import com.google.firebase.analytics.FirebaseAnalytics;
 import com.makeramen.roundedimageview.RoundedImageView;
 
-import org.mewx.wenku8.BuildConfig;
 import org.mewx.wenku8.R;
 import org.mewx.wenku8.activity.MainActivity;
 import org.mewx.wenku8.activity.UserInfoActivity;
@@ -55,7 +41,6 @@ import org.mewx.wenku8.util.LightTool;
 import org.mewx.wenku8.network.LightUserSession;
 
 public class NavigationDrawerFragment extends Fragment {
-    private static final String TAG = NavigationDrawerFragment.class.getSimpleName();
 
     private FirebaseAnalytics mFirebaseAnalytics;
     private View mFragmentContainerView;
@@ -66,7 +51,6 @@ public class NavigationDrawerFragment extends Fragment {
     private TextView tvUserName;
     private RoundedImageView rivUserAvatar;
     private boolean fakeDarkSwitcher = false;
-    private NativeAd mNativeAd;
 
     public NavigationDrawerFragment() {
         // Required empty public constructor
@@ -107,9 +91,6 @@ public class NavigationDrawerFragment extends Fragment {
         if (mainActivity == null && getActivity() instanceof MainActivity) {
             mainActivity = (MainActivity) getActivity();
         }
-
-        // Loading ads asynchronously.
-        new Thread(this::refreshAd).start();
 
         // set button clicked listener, mainly working on change fragment in MainActivity.
         try {
@@ -465,138 +446,6 @@ public class NavigationDrawerFragment extends Fragment {
     @Override
     public void onSaveInstanceState(@NonNull Bundle outState) {
         super.onSaveInstanceState(outState);
-    }
-
-    private void refreshAd() {
-        AdLoader.Builder builder = new AdLoader.Builder(getContext(),
-                BuildConfig.DEBUG ? "ca-app-pub-3940256099942544/2247696110" /* test ID */ :
-                        "ca-app-pub-7333757578973883/7014476152" /* real ID */);
-        builder.withNativeAdOptions(new NativeAdOptions.Builder()
-                .setVideoOptions(new VideoOptions.Builder().setStartMuted(true).build())
-                .build());
-        builder.forNativeAd(nativeAd -> {
-            // If this callback occurs after the activity is destroyed, we must destroy and return;
-            // or we may get a memory leak.
-            if (getActivity() == null) {
-                nativeAd.destroy();
-                return;
-            }
-            boolean isDestroyed = getActivity().isDestroyed();
-            if (isDestroyed || getActivity().isFinishing() || getActivity().isChangingConfigurations()) {
-                nativeAd.destroy();
-                return;
-            }
-            // Must call destroy on old ads when you are done with them, otherwise memory leak.
-            if (mNativeAd != null) {
-                mNativeAd.destroy();
-            }
-            mNativeAd = nativeAd;
-
-            View view = getView();
-            if (view == null) return;
-            FrameLayout frameLayout = view.findViewById(R.id.ad_container);
-
-            if (frameLayout != null) {
-                NativeAdView adView = (NativeAdView) getLayoutInflater().inflate(R.layout.ad_unified, null);
-                populateNativeAdView(nativeAd, adView);
-                frameLayout.removeAllViews();
-                frameLayout.addView(adView);
-            }
-        });
-
-        AdLoader adLoader = builder.withAdListener(new AdListener() {
-            @Override
-            public void onAdFailedToLoad(@NonNull LoadAdError loadAdError) {
-                // Handle the failure by logging, altering the UI, or else.
-                Log.e(TAG,loadAdError.toString());
-            }
-        }).build();
-
-        adLoader.loadAd(new AdRequest.Builder().build());
-    }
-
-    private void populateNativeAdView(NativeAd nativeAd, NativeAdView adView) {
-        // Set the media view.
-        adView.setMediaView(adView.findViewById(R.id.ad_media));
-
-        // Set other ad assets.
-        adView.setHeadlineView(adView.findViewById(R.id.ad_headline));
-        adView.setBodyView(adView.findViewById(R.id.ad_body));
-        adView.setCallToActionView(adView.findViewById(R.id.ad_call_to_action));
-        adView.setIconView(adView.findViewById(R.id.ad_app_icon));
-        adView.setPriceView(adView.findViewById(R.id.ad_price));
-        adView.setStarRatingView(adView.findViewById(R.id.ad_stars));
-        adView.setStoreView(adView.findViewById(R.id.ad_store));
-        adView.setAdvertiserView(adView.findViewById(R.id.ad_advertiser));
-
-        // The headline and mediaContent are guaranteed to be in every NativeAd.
-        ((TextView) adView.getHeadlineView()).setText(nativeAd.getHeadline());
-        adView.getMediaView().setMediaContent(nativeAd.getMediaContent());
-
-        // These assets aren't guaranteed to be in every NativeAd, so it's important to
-        // check before trying to display them.
-        if (nativeAd.getBody() == null) {
-            adView.getBodyView().setVisibility(View.INVISIBLE);
-        } else {
-            adView.getBodyView().setVisibility(View.VISIBLE);
-            ((TextView) adView.getBodyView()).setText(nativeAd.getBody());
-        }
-
-        if (nativeAd.getCallToAction() == null) {
-            adView.getCallToActionView().setVisibility(View.INVISIBLE);
-        } else {
-            adView.getCallToActionView().setVisibility(View.VISIBLE);
-            ((Button) adView.getCallToActionView()).setText(nativeAd.getCallToAction());
-        }
-
-        if (nativeAd.getIcon() == null) {
-            adView.getIconView().setVisibility(View.GONE);
-        } else {
-            ((ImageView) adView.getIconView()).setImageDrawable(
-                    nativeAd.getIcon().getDrawable());
-            adView.getIconView().setVisibility(View.VISIBLE);
-        }
-
-        if (nativeAd.getPrice() == null) {
-            adView.getPriceView().setVisibility(View.INVISIBLE);
-        } else {
-            adView.getPriceView().setVisibility(View.VISIBLE);
-            ((TextView) adView.getPriceView()).setText(nativeAd.getPrice());
-        }
-
-        if (nativeAd.getStore() == null) {
-            adView.getStoreView().setVisibility(View.INVISIBLE);
-        } else {
-            adView.getStoreView().setVisibility(View.VISIBLE);
-            ((TextView) adView.getStoreView()).setText(nativeAd.getStore());
-        }
-
-        if (nativeAd.getStarRating() == null) {
-            adView.getStarRatingView().setVisibility(View.INVISIBLE);
-        } else {
-            ((RatingBar) adView.getStarRatingView())
-                    .setRating(nativeAd.getStarRating().floatValue());
-            adView.getStarRatingView().setVisibility(View.VISIBLE);
-        }
-
-        if (nativeAd.getAdvertiser() == null) {
-            adView.getAdvertiserView().setVisibility(View.INVISIBLE);
-        } else {
-            ((TextView) adView.getAdvertiserView()).setText(nativeAd.getAdvertiser());
-            adView.getAdvertiserView().setVisibility(View.VISIBLE);
-        }
-
-        // This method tells the Google Mobile Ads SDK that you have finished populating your
-        // native ad view with this native ad.
-        adView.setNativeAd(nativeAd);
-    }
-
-    @Override
-    public void onDestroy() {
-        if (mNativeAd != null) {
-            mNativeAd.destroy();
-        }
-        super.onDestroy();
     }
 
 }
