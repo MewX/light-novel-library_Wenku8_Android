@@ -39,29 +39,28 @@ public class WenkuReaderPaginatorTest {
         return new WenkuReaderLoaderXML(contentList);
     }
 
-    // Stub for parser logic
-    private List<OldNovelContentParser.NovelContent> parseSampleTextStub() {
+    // Parse the sample text similar to OldNovelContentParser
+    private List<OldNovelContentParser.NovelContent> parseSampleText(String text) {
         List<OldNovelContentParser.NovelContent> list = new ArrayList<>();
-        // Manually parsed sample (Simplified stub)
-        String[] lines = new String[] {
-            "第三卷 第五十八话 猪肉味噌汤再来",
-            "填饱饿了两天的肚子后，堤达满足地吐了口气。",
-            "「呼……」"
-        };
+        String[] lines = text.split("\r\n");
         for(String s : lines) {
+            String trimmed = s.trim();
+            if (trimmed.isEmpty()) continue;
+
             OldNovelContentParser.NovelContent nc = new OldNovelContentParser.NovelContent();
             nc.type = OldNovelContentParser.NovelContentType.TEXT;
-            nc.content = s;
+            nc.content = trimmed;
             list.add(nc);
         }
         return list;
     }
 
-    private final WenkuReaderLoaderXML XML_LOADER = createLoader(parseSampleTextStub());
-
     @Test
     public void testFirstPagePagination() {
-        WenkuReaderPaginator paginator = new WenkuReaderPaginator(XML_LOADER, text -> text.length() * 20, 400, 800, 30, 10, 20);
+        List<OldNovelContentParser.NovelContent> content = parseSampleText(SAMPLE_BOOK_TEXT);
+        WenkuReaderLoaderXML loader = createLoader(content);
+
+        WenkuReaderPaginator paginator = new WenkuReaderPaginator(loader, text -> text.length() * 20, 400, 800, 30, 10, 20);
 
         paginator.setPageStart(0, 0);
         paginator.calcFromFirst();
@@ -77,7 +76,10 @@ public class WenkuReaderPaginatorTest {
 
     @Test
     public void testPaginationFlow() {
-        WenkuReaderPaginator paginator = new WenkuReaderPaginator(XML_LOADER, text -> text.length() * 20, 400, 800, 30, 10, 20);
+        List<OldNovelContentParser.NovelContent> content = parseSampleText(SAMPLE_BOOK_TEXT);
+        WenkuReaderLoaderXML loader = createLoader(content);
+
+        WenkuReaderPaginator paginator = new WenkuReaderPaginator(loader, text -> text.length() * 20, 400, 800, 30, 10, 20);
 
         paginator.setPageStart(1, 0);
         paginator.calcFromFirst();
@@ -91,32 +93,25 @@ public class WenkuReaderPaginatorTest {
 
     @Test
     public void testBugReproduced_startOfSecondPage() {
-        // Reproduce "missing first character" bug.
-        // This simulates a "middle page" scenario which corresponds to the start of a loader segment (Line 0).
-        // Condition: Indent + First Char > Width (Wrap) AND Wrapped Line > Remaining Height (Overflow).
+        // Reproduce "missing first character" bug using the provided sample text.
+        // We target the second paragraph: "填饱饿了两天的肚子后，堤达满足地吐了口气。"
+        // To reproduce the bug (skipping char), we must treat this as the Start of the Loader (Line 0).
 
-        List<OldNovelContentParser.NovelContent> content = new ArrayList<>();
+        List<OldNovelContentParser.NovelContent> allContent = parseSampleText(SAMPLE_BOOK_TEXT);
+        // Index 0: Title
+        // Index 1: "填饱..."
 
-        OldNovelContentParser.NovelContent target = new OldNovelContentParser.NovelContent();
-        target.type = OldNovelContentParser.NovelContentType.TEXT;
-        target.content = "一二三四五";
-        content.add(target);
+        List<OldNovelContentParser.NovelContent> targetContent = new ArrayList<>();
+        targetContent.add(allContent.get(1)); // Add only the target paragraph
 
-        WenkuReaderLoaderXML loader = createLoader(content);
+        WenkuReaderLoaderXML loader = createLoader(targetContent);
 
         // Dimensions:
         // Width 23px. Indent (20px) fits.
-        // Char "一" (10px). Indent+Char = 30px > 23px. Wrap.
+        // First char "填" (10px). Indent+Char = 30px > 23px. Wrap.
         // Line 1 (Indent) fits height (15px).
-        // Line 2 ("一") needs 10px + 2px (dist) = 12px.
-        // Total 22px > 15px. Overflow.
-        // The paginator hits overflow on the first character of the paragraph.
-        // It hits the `else { lastLineIndex = lastWordIndex = 0; }` block.
-        // This sets the page end to Word 0 ("一").
-        // But "一" was NOT displayed (it overflowed).
-        // So the user sees a page with only Indent.
-        // And the NEXT page starts at Word 1 ("二").
-        // "一" is missing.
+        // Line 2 ("填") needs 10px + 2px (dist) = 12px. Total 22px > 15px. Overflow.
+        // "填" is skipped.
 
         int fontHeight = 10;
         int width = 23;
@@ -130,7 +125,7 @@ public class WenkuReaderPaginatorTest {
         WenkuReaderPaginator paginator = new WenkuReaderPaginator(loader, measurer,
                 width, height, fontHeight, lineDist, paraDist);
 
-        // Start at Line 0 (Start of this segment/chapter)
+        // Start at Line 0
         paginator.setPageStart(0, 0);
         paginator.calcFromFirst();
 
@@ -144,11 +139,11 @@ public class WenkuReaderPaginatorTest {
         System.out.println("Page Content: '" + raw + "'");
         System.out.println("Last Word Index: " + lastWord);
 
-        boolean containsFirstChar = raw.contains("一");
+        boolean containsFirstChar = raw.contains("填");
 
-        // Failure: '一' is not in display list, but lastWordIndex includes it (0).
+        // Failure: '填' is not in display list, but lastWordIndex includes it (0).
         if (!containsFirstChar && lastWord >= 0) {
-             fail("Bug Reproduced: First Chinese character '一' not displayed but lastWordIndex claims it is included (" + lastWord + ")");
+             fail("Bug Reproduced: First character '填' not displayed but lastWordIndex claims it is included (" + lastWord + ")");
         }
     }
 }
