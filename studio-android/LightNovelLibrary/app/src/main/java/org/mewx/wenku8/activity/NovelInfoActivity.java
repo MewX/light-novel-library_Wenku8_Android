@@ -27,6 +27,9 @@ import com.afollestad.materialdialogs.MaterialDialog;
 import com.afollestad.materialdialogs.Theme;
 import com.getbase.floatingactionbutton.FloatingActionButton;
 import com.getbase.floatingactionbutton.FloatingActionsMenu;
+import com.google.android.gms.ads.AdRequest;
+import com.google.android.gms.ads.AdView;
+import com.google.android.gms.ads.MobileAds;
 import com.google.firebase.analytics.FirebaseAnalytics;
 import com.nostra13.universalimageloader.core.ImageLoader;
 
@@ -95,6 +98,9 @@ public class NovelInfoActivity extends BaseMaterialActivity {
         // Init Firebase Analytics on GA4.
         mFirebaseAnalytics = FirebaseAnalytics.getInstance(this);
 
+        // Init AdMob
+        MobileAds.initialize(this, initializationStatus -> {});
+
         // fetch values
         aid = getIntent().getIntExtra("aid", 1);
         from = getIntent().getStringExtra("from");
@@ -129,6 +135,11 @@ public class NovelInfoActivity extends BaseMaterialActivity {
         FloatingActionButton fabDownload = findViewById(R.id.fab_download);
         famMenu = findViewById(R.id.multiple_actions);
         spb = findViewById(R.id.spb);
+
+        // AdMob
+        AdView mAdView = findViewById(R.id.adView);
+        AdRequest adRequest = new AdRequest.Builder().build();
+        mAdView.loadAd(adRequest);
 
         // hide view and set colors
         tvNovelTitle.setText(title);
