@@ -106,16 +106,30 @@ public class WenkuReaderPaginatorTest {
 
         WenkuReaderLoaderXML loader = createLoader(targetContent);
 
-        // Dimensions:
-        // Width 23px. Indent (20px) fits.
-        // First char "填" (10px). Indent+Char = 30px > 23px. Wrap.
-        // Line 1 (Indent) fits height (15px).
-        // Line 2 ("填") needs 10px + 2px (dist) = 12px. Total 22px > 15px. Overflow.
+        // Dimensions to satisfy "Width can contain 3 characters":
+        // CharWidth = 10. Width = 30. (Can contain 3 chars).
+        // FontHeight = 15. Indent = 2 * 15 = 30.
+        // Indent (30) fits exactly in Width (30).
+        // But Indent + FirstChar ("填" = 10) = 40 > 30. Wraps.
+
+        // Height = 30.
+        // Line 1 (Indent): 15px. Fits (15 < 30).
+        // Line 2 ("填"): 15px.
+        // Line Distance: 2px.
+        // Needed for Line 2: 15 (L1) + 2 (Dist) + 15 (L2) = 32.
+        // 32 > 30. Overflow.
+
+        // Result:
+        // Paginator adds Indent. Wraps "填". Checks height. Overflows.
+        // Logic hits `else { lastLineIndex = lastWordIndex = 0; }`.
+        // Page ends at Word 0 ("填").
+        // Displayed: Only Indent.
+        // Next page starts at Word 1 ("饱").
         // "填" is skipped.
 
-        int fontHeight = 10;
-        int width = 23;
-        int height = 15;
+        int fontHeight = 15;
+        int width = 30;
+        int height = 30;
         int lineDist = 2;
         int paraDist = 4;
 
