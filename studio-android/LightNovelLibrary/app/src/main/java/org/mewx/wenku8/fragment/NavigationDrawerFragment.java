@@ -109,12 +109,7 @@ public class NavigationDrawerFragment extends Fragment {
         }
 
         // Loading ads asynchronously.
-        new Thread(() -> {
-            MobileAds.initialize(getContext(),
-                    initializationStatus -> {
-                    });
-            refreshAd();
-        }).start();
+        new Thread(this::refreshAd).start();
 
         // set button clicked listener, mainly working on change fragment in MainActivity.
         try {
