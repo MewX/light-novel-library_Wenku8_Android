@@ -4,6 +4,10 @@ import android.annotation.SuppressLint;
 import android.app.Application;
 import android.content.Context;
 
+import com.google.android.gms.ads.MobileAds;
+
+import org.mewx.wenku8.api.Wenku8API;
+
 /**
  * The class is for getting context everywhere
  */
@@ -15,6 +19,12 @@ public class MyApp extends Application {
     public void onCreate() {
         super.onCreate();
         context = getApplicationContextLocal();
+
+        // TODO: use a better dependency injection for this value.
+        Wenku8API.AppVer = BuildConfig.VERSION_NAME;
+
+        // Init AdMob
+        new Thread(() -> MobileAds.initialize(this, initializationStatus -> {})).start();
     }
 
     /**

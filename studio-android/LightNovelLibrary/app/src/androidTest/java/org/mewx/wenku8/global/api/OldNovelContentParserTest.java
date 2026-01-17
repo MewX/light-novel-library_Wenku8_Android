@@ -4,9 +4,8 @@ import org.junit.Test;
 
 import java.util.List;
 
-import static org.mewx.wenku8.global.api.OldNovelContentParser.NovelContentType.*;
-
 import static org.junit.Assert.assertEquals;
+import static org.mewx.wenku8.global.api.OldNovelContentParser.NovelContentType.*;
 
 public class OldNovelContentParserTest {
     private static final String NOVEL_CONTENT = "line 1\r\n" +
@@ -23,7 +22,7 @@ public class OldNovelContentParserTest {
 
     @Test
     public void parseNovelContent() {
-        List<OldNovelContentParser.NovelContent> contents = OldNovelContentParser.parseNovelContent(NOVEL_CONTENT, null);
+        List<OldNovelContentParser.NovelContent> contents = OldNovelContentParser.parseNovelContent(NOVEL_CONTENT, unused -> {});
         assertEquals(5, contents.size());
 
         OldNovelContentParser.NovelContent tempContent = contents.get(0);
@@ -49,7 +48,7 @@ public class OldNovelContentParserTest {
 
     @Test
     public void parseNovelContentWithIncompleteImageTag() {
-        List<OldNovelContentParser.NovelContent> contents = OldNovelContentParser.parseNovelContent(NOVEL_CONTENt_BROKEN_IMAGE, null);
+        List<OldNovelContentParser.NovelContent> contents = OldNovelContentParser.parseNovelContent(NOVEL_CONTENt_BROKEN_IMAGE, unused -> {});
         assertEquals(5, contents.size());
 
         OldNovelContentParser.NovelContent tempContent = contents.get(0);

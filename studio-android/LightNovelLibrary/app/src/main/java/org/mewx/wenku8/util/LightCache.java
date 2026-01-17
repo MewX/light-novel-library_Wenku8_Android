@@ -12,6 +12,11 @@ import android.util.Log;
 
 import androidx.documentfile.provider.DocumentFile;
 
+import org.mewx.wenku8.global.api.ChapterInfo;
+import org.mewx.wenku8.global.api.OldNovelContentParser;
+import org.mewx.wenku8.global.api.VolumeList;
+import org.mewx.wenku8.global.GlobalConfig;
+
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.File;
@@ -196,8 +201,7 @@ public class LightCache {
     public static String getFilePath(Context context, Uri uri) {
         String selection = null;
         String[] selectionArgs = null;
-        // Uri is different in versions after KITKAT (Android 4.4), we need to
-        if (Build.VERSION.SDK_INT >= 19 && DocumentsContract.isDocumentUri(context.getApplicationContext(), uri)) {
+        if (DocumentsContract.isDocumentUri(context.getApplicationContext(), uri)) {
             if (isExternalStorageDocument(uri)) {
                 final String docId = DocumentsContract.getDocumentId(uri);
                 final String[] split = docId.split(":");
@@ -314,5 +318,29 @@ public class LightCache {
             }
         }
         return paths;
+    }
+
+    public static void cleanLocalCache(VolumeList volumeList) {
+        for (ChapterInfo tempCi : volumeList.chapterList) {
+            String xml = GlobalConfig.loadFullFileFromSaveFolder("novel", tempCi.cid + ".xml");
+            if (xml.isEmpty()) {
+                return;
+            }
+            List<OldNovelContentParser.NovelContent> nc = OldNovelContentParser.NovelContentParser_onlyImage(xml);
+            for (int i = 0; i < nc.size(); i++) {
+                if (nc.get(i).type == OldNovelContentParser.NovelContentType.IMAGE) {
+                    String imgFileName = GlobalConfig.generateImageFileNameByURL(nc.get(i).content);
+                    deleteFile(
+                            GlobalConfig.getFirstFullSaveFilePath() +
+                                    GlobalConfig.imgsSaveFolderName + File.separator + imgFileName);
+                    deleteFile(
+                            GlobalConfig.getSecondFullSaveFilePath() +
+                                    GlobalConfig.imgsSaveFolderName + File.separator + imgFileName);
+                }
+            }
+            deleteFile(GlobalConfig.getFirstFullSaveFilePath(), "novel" + File.separator + tempCi.cid + ".xml");
+            deleteFile(GlobalConfig.getSecondFullSaveFilePath(), "novel" + File.separator + tempCi.cid + ".xml");
+        }
+        volumeList.inLocal = false;
     }
 }

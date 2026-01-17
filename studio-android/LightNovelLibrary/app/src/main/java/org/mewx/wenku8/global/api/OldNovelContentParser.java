@@ -1,13 +1,12 @@
 package org.mewx.wenku8.global.api;
 
 import androidx.annotation.NonNull;
-import androidx.annotation.Nullable;
-import android.util.Log;
 
-import com.afollestad.materialdialogs.MaterialDialog;
+import android.util.Log;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.IntConsumer;
 
 /**
  * Created by MewX on 2015/6/6.
@@ -28,7 +27,7 @@ public class OldNovelContentParser {
     private static final String IMAGE_ENTRY = "<!--image-->";
 
     @NonNull
-    public static List<NovelContent> parseNovelContent(@NonNull String raw, @Nullable MaterialDialog pDialog) {
+    public static List<NovelContent> parseNovelContent(@NonNull String raw, @NonNull IntConsumer setMaxProgress) {
         List<NovelContent> result = new ArrayList<>();
 
         // use split
@@ -55,11 +54,8 @@ public class OldNovelContentParser {
                 result.add(nc);
 
                 // update progress
-                if (pDialog != null)
-                    pDialog.setMaxProgress(result.size());
+                setMaxProgress.accept(result.size());
             } else {
-                Log.d(TAG, "img index = " + temp);
-
                 // one line contains more than one images
                 temp = 0;
                 while (true) {
@@ -83,9 +79,7 @@ public class OldNovelContentParser {
                     temp = t2 + IMAGE_ENTRY.length();
 
                     // update progress
-                    if (pDialog != null)
-                        pDialog.setMaxProgress(result.size());
-
+                    setMaxProgress.accept(result.size());
                 }
             }
         }

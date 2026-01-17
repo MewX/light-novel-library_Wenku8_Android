@@ -41,8 +41,8 @@ import org.mewx.wenku8.global.GlobalConfig;
 import org.mewx.wenku8.global.api.ChapterInfo;
 import org.mewx.wenku8.global.api.OldNovelContentParser;
 import org.mewx.wenku8.global.api.VolumeList;
-import org.mewx.wenku8.global.api.Wenku8API;
-import org.mewx.wenku8.global.api.Wenku8Error;
+import org.mewx.wenku8.api.Wenku8API;
+import org.mewx.wenku8.api.Wenku8Error;
 import org.mewx.wenku8.reader.loader.WenkuReaderLoader;
 import org.mewx.wenku8.reader.loader.WenkuReaderLoaderXML;
 import org.mewx.wenku8.reader.setting.WenkuReaderSettingV1;
@@ -51,7 +51,7 @@ import org.mewx.wenku8.reader.slider.SlidingLayout;
 import org.mewx.wenku8.reader.slider.base.OverlappedSlider;
 import org.mewx.wenku8.reader.view.WenkuReaderPageView;
 import org.mewx.wenku8.util.LightCache;
-import org.mewx.wenku8.util.LightNetwork;
+import org.mewx.wenku8.network.LightNetwork;
 import org.mewx.wenku8.util.LightTool;
 
 import java.io.File;
@@ -105,6 +105,7 @@ public class Wenku8ReaderActivityV1 extends BaseMaterialActivity {
         forcejump = getIntent().getStringExtra("forcejump");
         if(forcejump == null || forcejump.isEmpty()) forcejump = "no";
 //        tempNavBarHeight = LightTool.getNavigationBarSize(this).y;
+        setting = new WenkuReaderSettingV1();
 
         // Analysis.
         Bundle readerParams = new Bundle();
@@ -175,26 +176,23 @@ public class Wenku8ReaderActivityV1 extends BaseMaterialActivity {
     }
 
     private void hideNavigationBar() {
-        // This work only for android 4.4+
-        if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
-            // set navigation bar status, remember to disable "setNavigationBarTintEnabled"
-            final int flags = View.SYSTEM_UI_FLAG_LAYOUT_STABLE
-                    | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
-                    | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
-                    | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
-                    | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY;
-            getWindow().getDecorView().setSystemUiVisibility(flags);
+        // set navigation bar status, remember to disable "setNavigationBarTintEnabled"
+        final int flags = View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+                | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+                | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY;
+        getWindow().getDecorView().setSystemUiVisibility(flags);
 
-            // Code below is to handle presses of Volume up or Volume down.
-            // Without this, after pressing volume buttons, the navigation bar will
-            // show up and won't hide
-            final View decorView = getWindow().getDecorView();
-            decorView.setOnSystemUiVisibilityChangeListener(visibility -> {
-                if((visibility & View.SYSTEM_UI_FLAG_FULLSCREEN) == 0) {
-                    decorView.setSystemUiVisibility(flags);
-                }
-            });
-        }
+        // Code below is to handle presses of Volume up or Volume down.
+        // Without this, after pressing volume buttons, the navigation bar will
+        // show up and won't hide
+        final View decorView = getWindow().getDecorView();
+        decorView.setOnSystemUiVisibilityChangeListener(visibility -> {
+            if ((visibility & View.SYSTEM_UI_FLAG_FULLSCREEN) == 0) {
+                decorView.setSystemUiVisibility(flags);
+            }
+        });
     }
 
     private void showNavigationBar() {
@@ -203,20 +201,17 @@ public class Wenku8ReaderActivityV1 extends BaseMaterialActivity {
                 | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
                 | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
                 | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY;
-        // This work only for android 4.4+
-        if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
-            getWindow().getDecorView().setSystemUiVisibility(flags);
+        getWindow().getDecorView().setSystemUiVisibility(flags);
 
-            // Code below is to handle presses of Volume up or Volume down.
-            // Without this, after pressing volume buttons, the navigation bar will
-            // show up and won't hide
-            final View decorView = getWindow().getDecorView();
-            decorView.setOnSystemUiVisibilityChangeListener(visibility -> {
-                if((visibility & View.SYSTEM_UI_FLAG_FULLSCREEN) == 0) {
-                    decorView.setSystemUiVisibility(flags);
-                }
-            });
-        }
+        // Code below is to handle presses of Volume up or Volume down.
+        // Without this, after pressing volume buttons, the navigation bar will
+        // show up and won't hide
+        final View decorView = getWindow().getDecorView();
+        decorView.setOnSystemUiVisibilityChangeListener(visibility -> {
+            if ((visibility & View.SYSTEM_UI_FLAG_FULLSCREEN) == 0) {
+                decorView.setSystemUiVisibility(flags);
+            }
+        });
     }
 
     @Override
@@ -423,7 +418,7 @@ public class Wenku8ReaderActivityV1 extends BaseMaterialActivity {
                     xml = new String(tempXml, "UTF-8");
                 }
 
-                nc = OldNovelContentParser.parseNovelContent(xml, null);
+                nc = OldNovelContentParser.parseNovelContent(xml, unused -> {});
                 if (nc.isEmpty())
                     return xml.isEmpty() ? Wenku8Error.ErrorCode.SERVER_RETURN_NOTHING : Wenku8Error.ErrorCode.XML_PARSE_FAILED;
 
@@ -446,7 +441,6 @@ public class Wenku8ReaderActivityV1 extends BaseMaterialActivity {
 
             // init components
             loader = new WenkuReaderLoaderXML(nc);
-            setting = new WenkuReaderSettingV1();
             loader.setCurrentIndex(0);
             for(ChapterInfo ci : volumeList.chapterList) {
                 // get chapter name
@@ -656,22 +650,11 @@ public class Wenku8ReaderActivityV1 extends BaseMaterialActivity {
                                                             break;
                                                         case 1:
                                                             // choose a ttf/otf file
-                                                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
-                                                                Intent intent = new Intent();
-                                                                intent.setAction(Intent.ACTION_OPEN_DOCUMENT);
-                                                                intent.addCategory(Intent.CATEGORY_OPENABLE);
-                                                                intent.setType("font/*");
-                                                                startActivityForResult(intent, REQUEST_FONT_PICKER);
-                                                            } else {
-                                                                Intent i = new Intent(Wenku8ReaderActivityV1.this, FilePickerActivity.class);
-                                                                i.putExtra(FilePickerActivity.EXTRA_ALLOW_MULTIPLE, false);
-                                                                i.putExtra(FilePickerActivity.EXTRA_ALLOW_CREATE_DIR, true);
-                                                                i.putExtra(FilePickerActivity.EXTRA_MODE, FilePickerActivity.MODE_FILE);
-                                                                i.putExtra(FilePickerActivity.EXTRA_START_PATH,
-                                                                        GlobalConfig.pathPickedSave == null || GlobalConfig.pathPickedSave.isEmpty() ?
-                                                                                Environment.getExternalStorageDirectory().getPath() : GlobalConfig.pathPickedSave);
-                                                                startActivityForResult(i, REQUEST_FONT_PICKER_LEGACY);
-                                                            }
+                                                            Intent intent = new Intent();
+                                                            intent.setAction(Intent.ACTION_OPEN_DOCUMENT);
+                                                            intent.addCategory(Intent.CATEGORY_OPENABLE);
+                                                            intent.setType("font/*");
+                                                            startActivityForResult(intent, REQUEST_FONT_PICKER);
                                                             break;
                                                     }
                                                 })
@@ -692,22 +675,11 @@ public class Wenku8ReaderActivityV1 extends BaseMaterialActivity {
                                                             break;
                                                         case 1:
                                                             // choose a image file
-                                                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
-                                                                Intent intent = new Intent();
-                                                                intent.setAction(Intent.ACTION_OPEN_DOCUMENT);
-                                                                intent.addCategory(Intent.CATEGORY_OPENABLE);
-                                                                intent.setType("image/*");
-                                                                startActivityForResult(intent, REQUEST_IMAGE_PICKER);
-                                                            } else {
-                                                                Intent i = new Intent(Wenku8ReaderActivityV1.this, FilePickerActivity.class);
-                                                                i.putExtra(FilePickerActivity.EXTRA_ALLOW_MULTIPLE, false);
-                                                                i.putExtra(FilePickerActivity.EXTRA_ALLOW_CREATE_DIR, true);
-                                                                i.putExtra(FilePickerActivity.EXTRA_MODE, FilePickerActivity.MODE_FILE);
-                                                                i.putExtra(FilePickerActivity.EXTRA_START_PATH,
-                                                                        GlobalConfig.pathPickedSave == null || GlobalConfig.pathPickedSave.isEmpty() ?
-                                                                                Environment.getExternalStorageDirectory().getPath() : GlobalConfig.pathPickedSave);
-                                                                startActivityForResult(i, REQUEST_IMAGE_PICKER_LEGACY);
-                                                            }
+                                                            Intent intent = new Intent();
+                                                            intent.setAction(Intent.ACTION_OPEN_DOCUMENT);
+                                                            intent.addCategory(Intent.CATEGORY_OPENABLE);
+                                                            intent.setType("image/*");
+                                                            startActivityForResult(intent, REQUEST_IMAGE_PICKER);
                                                             break;
                                                     }
                                                 })

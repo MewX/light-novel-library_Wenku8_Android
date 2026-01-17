@@ -28,13 +28,14 @@ import org.mewx.wenku8.R;
 import org.mewx.wenku8.activity.MainActivity;
 import org.mewx.wenku8.activity.NovelInfoActivity;
 import org.mewx.wenku8.adapter.NovelItemAdapter;
+import org.mewx.wenku8.async.CheckAppNewVersion;
 import org.mewx.wenku8.global.GlobalConfig;
 import org.mewx.wenku8.global.api.NovelItemInfoUpdate;
 import org.mewx.wenku8.global.api.NovelListWithInfoParser;
-import org.mewx.wenku8.global.api.Wenku8API;
+import org.mewx.wenku8.api.Wenku8API;
 import org.mewx.wenku8.listener.MyItemClickListener;
 import org.mewx.wenku8.listener.MyItemLongClickListener;
-import org.mewx.wenku8.util.LightNetwork;
+import org.mewx.wenku8.network.LightNetwork;
 
 import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
@@ -111,6 +112,9 @@ public class LatestFragment extends Fragment implements MyItemClickListener, MyI
             }
         });
 
+        rootView.findViewById(R.id.btn_check_update_home).setOnClickListener(
+                v -> new CheckAppNewVersion(getActivity(), true).execute());
+
         // fetch initial novel list and reset isLoading
         currentPage = 1;
         totalPage = 1;
@@ -122,7 +126,7 @@ public class LatestFragment extends Fragment implements MyItemClickListener, MyI
 
     private void loadNovelList(int page) {
         // In fact, I don't need to know what it really is.
-        // I just need to get the NOVELSORTBY
+        // I just need to get the NovelSortedBy
         if (!isLoading.compareAndSet(false, true)) {
             // Is loading already.
             return;
@@ -131,7 +135,7 @@ public class LatestFragment extends Fragment implements MyItemClickListener, MyI
 
         // fetch list
         AsyncLoadLatestList ast = new AsyncLoadLatestList();
-        ast.execute(Wenku8API.getNovelListWithInfo(Wenku8API.NOVELSORTBY.lastUpdate, page,
+        ast.execute(Wenku8API.getNovelListWithInfo(Wenku8API.NovelSortedBy.lastUpdate, page,
                 GlobalConfig.getCurrentLang()));
     }
 
@@ -148,15 +152,10 @@ public class LatestFragment extends Fragment implements MyItemClickListener, MyI
         intent.putExtra("aid", listNovelItemInfo.get(position).aid);
         intent.putExtra("from", "latest");
         intent.putExtra("title", listNovelItemInfo.get(position).title);
-        if(Build.VERSION.SDK_INT < 21) {
-            startActivity(intent);
-        }
-        else {
-            ActivityOptionsCompat options = ActivityOptionsCompat.makeSceneTransitionAnimation(getActivity(),
-                    Pair.create(view.findViewById(R.id.novel_cover), "novel_cover"),
-                    Pair.create(view.findViewById(R.id.novel_title), "novel_title"));
-            ActivityCompat.startActivity(getActivity(), intent, options.toBundle());
-        }
+        ActivityOptionsCompat options = ActivityOptionsCompat.makeSceneTransitionAnimation(getActivity(),
+                Pair.create(view.findViewById(R.id.novel_cover), "novel_cover"),
+                Pair.create(view.findViewById(R.id.novel_title), "novel_title"));
+        ActivityCompat.startActivity(getActivity(), intent, options.toBundle());
     }
 
     @Override
@@ -309,6 +308,7 @@ public class LatestFragment extends Fragment implements MyItemClickListener, MyI
         ((TextView) mainActivity.findViewById(R.id.btn_loading)).setText(getResources().getString(R.string.task_retry));
         mainActivity.findViewById(R.id.google_progress).setVisibility(View.GONE);
         mainActivity.findViewById(R.id.btn_loading).setVisibility(View.VISIBLE);
+        mainActivity.findViewById(R.id.btn_check_update_home).setVisibility(View.VISIBLE);
     }
 
     /**
@@ -322,6 +322,7 @@ public class LatestFragment extends Fragment implements MyItemClickListener, MyI
         mTextView.setText(getResources().getString(R.string.list_loading));
         mainActivity.findViewById(R.id.google_progress).setVisibility(View.VISIBLE);
         mainActivity.findViewById(R.id.btn_loading).setVisibility(View.GONE);
+        mainActivity.findViewById(R.id.btn_check_update_home).setVisibility(View.GONE);
     }
 
 

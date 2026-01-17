@@ -55,6 +55,19 @@
             android:textColor="@color/default_text_color_black"
             android:visibility="gone" />
 
+        <TextView
+            android:id="@+id/btn_check_update_home"
+            android:layout_width="match_parent"
+            android:layout_height="60dp"
+            android:background="@drawable/btn_menu_item"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center"
+            android:text="@string/config_check_update"
+            android:textColor="@color/default_text_color_black"
+            android:textStyle="bold"
+            android:visibility="gone" />
+
     </LinearLayout>
 
     <TextView

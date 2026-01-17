@@ -1,1 +1,15 @@
 include ':app'
+
+// Include the API module.
+include ':api'
+// Check if the private submodule is populated (Author Mode).
+// We check for 'build.gradle' because an uninitialized submodule is just an empty folder.
+def privateModuleDir = file('api')
+def isPrivateAvailable = new File(privateModuleDir, 'build.gradle').exists()
+if (isPrivateAvailable) {
+    println "GRADLE: Private API Core detected. Using Real Implementation."
+} else {
+    println "GRADLE: Private API Core missing. Falling back to Public Stub."
+    // Point the module to the stub folder.
+    project(':api').projectDir = new File('api-stub')
+}

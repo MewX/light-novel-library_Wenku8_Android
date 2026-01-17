@@ -18,9 +18,10 @@ import com.nostra13.universalimageloader.core.display.FadeInBitmapDisplayer;
 
 import org.mewx.wenku8.MyApp;
 import org.mewx.wenku8.R;
-import org.mewx.wenku8.global.api.Wenku8API;
+import org.mewx.wenku8.api.Wenku8API;
+import org.mewx.wenku8.network.LightUserSession;
 import org.mewx.wenku8.util.LightCache;
-import org.mewx.wenku8.util.LightNetwork;
+import org.mewx.wenku8.network.LightNetwork;
 import org.mewx.wenku8.util.LightTool;
 import org.mewx.wenku8.util.SaveFileMigration;
 
@@ -60,16 +61,13 @@ public class GlobalConfig {
     private static final String saveNoticeString = "notice.wk8"; // the notice cache from online
     private static int maxSearchHistory = 20; // default
 
-    // reserved constants
-    public static final String UNKNOWN = "Unknown";
-
     // vars
     private static boolean lookupInternalStorageOnly = false;
     private static boolean isInBookshelf = false;
     private static boolean isInLatest = false;
     private static boolean doLoadImage = true;
     private static boolean externalStoragePathAvailable = true;
-    private static Wenku8API.LANG currentLang = Wenku8API.LANG.SC;
+    private static Wenku8API.AppLanguage currentLang = Wenku8API.AppLanguage.SC;
     public static String pathPickedSave; // dir picker save path
 
     // static variables
@@ -109,24 +107,28 @@ public class GlobalConfig {
     }
 
     // sets and gets
-    public static void setCurrentLang(Wenku8API.LANG l) {
+    public static void setCurrentLang(Wenku8API.AppLanguage l) {
         currentLang = l;
+        // FIXME
+        Wenku8API.CurrentLang = currentLang;
         setToAllSetting(SettingItems.language, currentLang.toString());
     }
 
-    public static Wenku8API.LANG getCurrentLang() {
+    public static Wenku8API.AppLanguage getCurrentLang() {
         String temp = getFromAllSetting(SettingItems.language);
         if(temp == null) {
             setToAllSetting(SettingItems.language, currentLang.toString());
         }
         else if(!temp.equals(currentLang.toString())) {
-            if(temp.equals(Wenku8API.LANG.SC.toString()))
-                currentLang = Wenku8API.LANG.SC;
-            else if(temp.equals(Wenku8API.LANG.TC.toString()))
-                currentLang = Wenku8API.LANG.TC;
+            if(temp.equals(Wenku8API.AppLanguage.SC.toString()))
+                currentLang = Wenku8API.AppLanguage.SC;
+            else if(temp.equals(Wenku8API.AppLanguage.TC.toString()))
+                currentLang = Wenku8API.AppLanguage.TC;
             else
-                currentLang = Wenku8API.LANG.SC;
+                currentLang = Wenku8API.AppLanguage.SC;
         }
+        // FIXME
+        Wenku8API.CurrentLang = currentLang;
         return currentLang;
     }
 
@@ -841,5 +843,38 @@ public class GlobalConfig {
 
     public static void writeTheNotice(@NonNull String noticeStr) {
         writeFullSaveFileContent(saveNoticeString, noticeStr);
+    }
+
+    public static boolean loadUserInfoSet() {
+        byte[] bytes;
+        if(LightCache.testFileExist(getFirstFullUserAccountSaveFilePath())) {
+            bytes = LightCache.loadFile(getFirstFullUserAccountSaveFilePath());
+        }
+        else if(LightCache.testFileExist(getSecondFullUserAccountSaveFilePath())) {
+            bytes = LightCache.loadFile(getSecondFullUserAccountSaveFilePath());
+        }
+        else {
+            return false; // file read failed
+        }
+
+        try {
+            Log.d("MewX", new String(bytes, "UTF-8"));
+            // TODO: decouple
+            LightUserSession.decAndSetUserFile(new String(bytes, "UTF-8"));
+        } catch (Exception e) {
+            e.printStackTrace();
+            return false; // exception
+        }
+
+        return true;
+    }
+
+    public static boolean saveUserInfoSet() {
+        LightCache.saveFile(getFirstFullUserAccountSaveFilePath(), LightUserSession.encUserFile().getBytes(), true);
+        if (!LightCache.testFileExist(getFirstFullUserAccountSaveFilePath())) {
+            LightCache.saveFile(getSecondFullUserAccountSaveFilePath(), LightUserSession.encUserFile().getBytes(), true);
+            return LightCache.testFileExist(getSecondFullUserAccountSaveFilePath());
+        }
+        return true;
     }
 }

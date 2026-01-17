@@ -14,6 +14,7 @@ import android.util.Log;
 import android.view.Menu;
 import android.widget.Toast;
 
+import androidx.activity.OnBackPressedCallback;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.core.app.ActivityCompat;
@@ -26,14 +27,15 @@ import com.afollestad.materialdialogs.Theme;
 import com.google.firebase.analytics.FirebaseAnalytics;
 import com.nostra13.universalimageloader.core.ImageLoader;
 
+import org.mewx.wenku8.MyApp;
 import org.mewx.wenku8.R;
 import org.mewx.wenku8.async.CheckAppNewVersion;
 import org.mewx.wenku8.async.UpdateNotificationMessage;
 import org.mewx.wenku8.fragment.NavigationDrawerFragment;
 import org.mewx.wenku8.global.GlobalConfig;
-import org.mewx.wenku8.global.api.Wenku8API;
+import org.mewx.wenku8.api.Wenku8API;
 import org.mewx.wenku8.util.LightCache;
-import org.mewx.wenku8.util.LightUserSession;
+import org.mewx.wenku8.network.LightUserSession;
 import org.mewx.wenku8.util.SaveFileMigration;
 
 import java.io.File;
@@ -55,7 +57,6 @@ public class MainActivity extends BaseMaterialActivity {
     // Below request codes can be any value.
     private static final int REQUEST_WRITE_EXTERNAL = 100;
     private static final int REQUEST_READ_EXTERNAL = 101;
-    private static final int REQUEST_READ_MEDIA_IMAGES = 102;
     private static final int REQUEST_READ_EXTERNAL_SAVES = 103;
 
     private static final AtomicBoolean NEW_VERSION_CHECKED = new AtomicBoolean(false);
@@ -81,16 +82,10 @@ public class MainActivity extends BaseMaterialActivity {
 
     private void initialApp() {
         // load language
-        Locale locale;
-        switch (GlobalConfig.getCurrentLang()) {
-            case TC:
-                locale = Locale.TRADITIONAL_CHINESE;
-                break;
-            case SC:
-            default:
-                locale = Locale.SIMPLIFIED_CHINESE;
-                break;
-        }
+        Locale locale = switch (GlobalConfig.getCurrentLang()) {
+            case TC -> Locale.TRADITIONAL_CHINESE;
+            case SC -> Locale.SIMPLIFIED_CHINESE;
+        };
         Configuration config = new Configuration();
         config.locale = locale;
         Locale.setDefault(locale);
@@ -108,13 +103,7 @@ public class MainActivity extends BaseMaterialActivity {
         }
 
         // Read permissions.
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            // FIXME: this doesn't work on the first launch yet (it works on the second+ launch somehow).
-            if (missingPermission(Manifest.permission.READ_MEDIA_IMAGES)) {
-                ActivityCompat.requestPermissions(this,
-                        new String[]{Manifest.permission.READ_MEDIA_IMAGES}, REQUEST_READ_MEDIA_IMAGES);
-            }
-        } else {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
             if (missingPermission(Manifest.permission.READ_EXTERNAL_STORAGE)) {
                 ActivityCompat.requestPermissions(this,
                         new String[]{Manifest.permission.READ_EXTERNAL_STORAGE}, REQUEST_READ_EXTERNAL);
@@ -138,7 +127,14 @@ public class MainActivity extends BaseMaterialActivity {
         }
 
         // execute background action
-        LightUserSession.aiui = new LightUserSession.AsyncInitUserInfo();
+        LightUserSession.aiui = new LightUserSession.AsyncInitUserInfo(getApplicationContext(),
+                /* failureCallback= */ () -> {
+            if (!LightCache.deleteFile(GlobalConfig.getFirstFullUserAccountSaveFilePath()))
+                LightCache.deleteFile(GlobalConfig.getSecondFullUserAccountSaveFilePath());
+            if (!LightCache.deleteFile(GlobalConfig.getFirstUserAvatarSaveFilePath()))
+                LightCache.deleteFile(GlobalConfig.getSecondUserAvatarSaveFilePath());
+            Toast.makeText(getApplicationContext(), getApplicationContext().getResources().getString(R.string.system_log_info_outofdate), Toast.LENGTH_SHORT).show();
+        }, GlobalConfig::loadUserInfoSet);
         LightUserSession.aiui.execute();
         GlobalConfig.loadAllSetting();
 
@@ -302,6 +298,21 @@ public class MainActivity extends BaseMaterialActivity {
             }
             return true;
         });
+
+        // Register the new Back Press Callback
+        getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
+            @Override
+            public void handleOnBackPressed() {
+                // Close the Drawer if it's open.
+                if (mNavigationDrawerFragment != null && mNavigationDrawerFragment.isDrawerOpen()) {
+                    mNavigationDrawerFragment.closeDrawer();
+                }
+                // Otherwise, trigger double-click exit.
+                else {
+                    exitBy2Click();
+                }
+            }
+        });
     }
 
 
@@ -389,12 +400,6 @@ public class MainActivity extends BaseMaterialActivity {
                     // The result will fall through.
                     break;
                 }
-            case REQUEST_READ_MEDIA_IMAGES:
-                if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                    reloadApp();
-                } else {
-                    Toast.makeText(this, getResources().getText(R.string.missing_permission), Toast.LENGTH_LONG).show();
-                }
         }
     }
 
@@ -402,10 +407,6 @@ public class MainActivity extends BaseMaterialActivity {
     protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
         if (requestCode == REQUEST_READ_EXTERNAL_SAVES && resultCode == Activity.RESULT_OK && data != null) {
-            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.KITKAT) {
-                return;
-            }
-
             Uri wenku8Uri = data.getData();
             String wenku8Path = wenku8Uri.getPath();
             if (!wenku8Uri.getLastPathSegment().endsWith("wenku8") || wenku8Path.contains("DCIM") || wenku8Path.contains("Picture")) {
@@ -448,14 +449,6 @@ public class MainActivity extends BaseMaterialActivity {
             SaveFileMigration.overrideExternalPath(wenku8Uri);
             runExternalSaveMigration();
         }
-    }
-
-    @Override
-    public void onBackPressed() {
-        if (mNavigationDrawerFragment.isDrawerOpen())
-            mNavigationDrawerFragment.closeDrawer();
-        else
-            exitBy2Click();
     }
 
     private void exitBy2Click() {

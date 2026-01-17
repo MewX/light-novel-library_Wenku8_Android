@@ -4,8 +4,8 @@ import android.os.AsyncTask;
 import android.util.Log;
 
 import org.mewx.wenku8.global.GlobalConfig;
-import org.mewx.wenku8.global.api.Wenku8API;
-import org.mewx.wenku8.util.LightNetwork;
+import org.mewx.wenku8.api.Wenku8API;
+import org.mewx.wenku8.network.LightNetwork;
 
 /**
  * This async task is used for checking new notification texts.
@@ -14,7 +14,7 @@ public class UpdateNotificationMessage extends AsyncTask<Void, Void, String> {
     @Override
     protected String doInBackground(Void... voids) {
         byte[] codeByte = LightNetwork.LightHttpDownload(
-                GlobalConfig.getCurrentLang() != Wenku8API.LANG.SC ?
+                GlobalConfig.getCurrentLang() != Wenku8API.AppLanguage.SC ?
                         GlobalConfig.noticeCheckTc : GlobalConfig.noticeCheckSc
         );
 

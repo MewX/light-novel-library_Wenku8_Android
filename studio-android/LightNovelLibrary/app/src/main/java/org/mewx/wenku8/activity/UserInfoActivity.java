@@ -20,12 +20,12 @@ import com.makeramen.roundedimageview.RoundedImageView;
 import org.mewx.wenku8.R;
 import org.mewx.wenku8.global.GlobalConfig;
 import org.mewx.wenku8.global.api.UserInfo;
-import org.mewx.wenku8.global.api.Wenku8API;
-import org.mewx.wenku8.global.api.Wenku8Error;
+import org.mewx.wenku8.api.Wenku8API;
+import org.mewx.wenku8.api.Wenku8Error;
 import org.mewx.wenku8.util.LightCache;
-import org.mewx.wenku8.util.LightNetwork;
+import org.mewx.wenku8.network.LightNetwork;
 import org.mewx.wenku8.util.LightTool;
-import org.mewx.wenku8.util.LightUserSession;
+import org.mewx.wenku8.network.LightUserSession;
 
 import java.io.UnsupportedEncodingException;
 
@@ -110,7 +110,7 @@ public class UserInfoActivity extends BaseMaterialActivity {
                 if(LightTool.isInteger(xml)) {
                     if(Wenku8Error.getSystemDefinedErrorCode(Integer.valueOf(xml)) == Wenku8Error.ErrorCode.SYSTEM_4_NOT_LOGGED_IN) {
                         // do log in
-                        Wenku8Error.ErrorCode temp = LightUserSession.doLoginFromFile();
+                        Wenku8Error.ErrorCode temp = LightUserSession.doLoginFromFile(GlobalConfig::loadUserInfoSet);
                         if(temp != Wenku8Error.ErrorCode.SYSTEM_1_SUCCEEDED) return temp; // return an error code
 
                         // rquest again
@@ -242,7 +242,16 @@ public class UserInfoActivity extends BaseMaterialActivity {
             super.onPostExecute(errorCode);
 
             if(errorCode == Wenku8Error.ErrorCode.SYSTEM_1_SUCCEEDED || errorCode == Wenku8Error.ErrorCode.SYSTEM_4_NOT_LOGGED_IN) {
-                LightUserSession.logOut();
+                LightUserSession.logOut(() -> {
+                    // TODO: extract this to a util.
+                    // delete files
+                    if(!LightCache.deleteFile(GlobalConfig.getFirstFullUserAccountSaveFilePath())) {
+                        LightCache.deleteFile(GlobalConfig.getSecondFullUserAccountSaveFilePath());
+                    }
+                    if(!LightCache.deleteFile(GlobalConfig.getFirstUserAvatarSaveFilePath())) {
+                        LightCache.deleteFile(GlobalConfig.getSecondUserAvatarSaveFilePath());
+                    }
+                });
                 Toast.makeText(UserInfoActivity.this, "Logged out!", Toast.LENGTH_SHORT).show();
             }
             else

@@ -72,6 +72,7 @@
                 app:layout_constraintLeft_toLeftOf="@id/bg_img" />
 
             <TableLayout
+                android:id="@+id/main_menu_table_layout"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:background="@color/menu_background"
@@ -225,6 +226,7 @@
                         android:textSize="16sp" />
                 </TableRow>
             </TableLayout>
+
         </androidx.constraintlayout.widget.ConstraintLayout>
     </ScrollView>
 

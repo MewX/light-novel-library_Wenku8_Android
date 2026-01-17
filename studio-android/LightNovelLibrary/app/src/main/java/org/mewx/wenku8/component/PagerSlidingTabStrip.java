@@ -309,14 +309,8 @@ public class PagerSlidingTabStrip extends HorizontalScrollView {
                 if (tabTextColor != null) {
                     tab_title.setTextColor(tabTextColor);
                 }
-                // setAllCaps() is only available from API 14, so the upper case is made manually if we are on a
-                // pre-ICS-build
                 if (textAllCaps) {
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.ICE_CREAM_SANDWICH) {
-                        tab_title.setAllCaps(true);
-                    } else {
-                        tab_title.setText(tab_title.getText().toString().toUpperCase(locale));
-                    }
+                    tab_title.setAllCaps(true);
                 }
             }
         }

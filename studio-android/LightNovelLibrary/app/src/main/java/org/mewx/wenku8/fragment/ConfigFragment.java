@@ -29,8 +29,8 @@ import org.mewx.wenku8.activity.MenuBackgroundSelectorActivity;
 import org.mewx.wenku8.async.CheckAppNewVersion;
 import org.mewx.wenku8.global.GlobalConfig;
 import org.mewx.wenku8.global.api.OldNovelContentParser;
-import org.mewx.wenku8.global.api.Wenku8API;
-import org.mewx.wenku8.global.api.Wenku8Error;
+import org.mewx.wenku8.api.Wenku8API;
+import org.mewx.wenku8.api.Wenku8Error;
 import org.mewx.wenku8.util.LightCache;
 import org.mewx.wenku8.util.LightTool;
 
@@ -102,7 +102,7 @@ public class ConfigFragment extends Fragment {
                 .items(R.array.choose_language_option)
                 .itemsCallback((dialog, view, which, text) -> {
                     // 0 means Simplified Chinese; 1 means Traditional Chinese.
-                    Wenku8API.LANG selected = which == 0 ? Wenku8API.LANG.SC : Wenku8API.LANG.TC;
+                    Wenku8API.AppLanguage selected = which == 0 ? Wenku8API.AppLanguage.SC : Wenku8API.AppLanguage.TC;
                     if (selected == GlobalConfig.getCurrentLang()) {
                         Toast.makeText(getActivity(), "Already in.", Toast.LENGTH_SHORT).show();
                         return;

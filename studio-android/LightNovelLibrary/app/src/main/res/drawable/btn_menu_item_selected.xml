@@ -1,14 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
-<selector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:exitFadeDuration="@android:integer/config_shortAnimTime">
-
-    <!-- focused -->
-    <item android:drawable="@color/menu_item_blue" android:state_focused="true" />
-    <!-- focused and pressed -->
-    <item android:drawable="@color/menu_item_blue_dark" android:state_focused="true" android:state_pressed="true" />
-    <!-- pressed -->
-    <item android:drawable="@color/menu_item_blue_dark" android:state_pressed="true" />
-    <!-- default -->
-    <item android:drawable="@color/menu_item_blue" />
-
-</selector>
+<ripple xmlns:android="http://schemas.android.com/apk/res/android"
+    android:color="@color/menu_item_blue_dark">
+    <item>
+        <shape android:shape="rectangle">
+            <solid android:color="@color/menu_item_blue" />
+        </shape>
+    </item>
+</ripple>

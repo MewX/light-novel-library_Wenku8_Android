@@ -15,7 +15,7 @@ import android.view.ViewGroup;
 import org.mewx.wenku8.component.PagerSlidingTabStrip;
 
 import org.mewx.wenku8.R;
-import org.mewx.wenku8.global.api.Wenku8API;
+import org.mewx.wenku8.api.Wenku8API;
 
 /**
  * This fragment is the parent fragment to hold all specific fragment.
@@ -61,19 +61,19 @@ public class RKListFragment extends Fragment {
 
     public class MyPagerAdapter extends FragmentPagerAdapter {
 
-        private final Wenku8API.NOVELSORTBY[] TITLELIST = {
-            Wenku8API.NOVELSORTBY.allVisit,
-            Wenku8API.NOVELSORTBY.allVote,
-            Wenku8API.NOVELSORTBY.monthVisit,
-            Wenku8API.NOVELSORTBY.monthVote,
-            Wenku8API.NOVELSORTBY.weekVisit,
-            Wenku8API.NOVELSORTBY.weekVote,
-            Wenku8API.NOVELSORTBY.dayVisit,
-            Wenku8API.NOVELSORTBY.dayVote,
-            Wenku8API.NOVELSORTBY.postDate,
-            Wenku8API.NOVELSORTBY.goodNum,
-            Wenku8API.NOVELSORTBY.size,
-            Wenku8API.NOVELSORTBY.fullFlag,
+        private final Wenku8API.NovelSortedBy[] TITLELIST = {
+            Wenku8API.NovelSortedBy.allVisit,
+            Wenku8API.NovelSortedBy.allVote,
+            Wenku8API.NovelSortedBy.monthVisit,
+            Wenku8API.NovelSortedBy.monthVote,
+            Wenku8API.NovelSortedBy.weekVisit,
+            Wenku8API.NovelSortedBy.weekVote,
+            Wenku8API.NovelSortedBy.dayVisit,
+            Wenku8API.NovelSortedBy.dayVote,
+            Wenku8API.NovelSortedBy.postDate,
+            Wenku8API.NovelSortedBy.goodNum,
+            Wenku8API.NovelSortedBy.size,
+            Wenku8API.NovelSortedBy.fullFlag,
         };
 
         public MyPagerAdapter(FragmentManager fm) {
@@ -82,7 +82,7 @@ public class RKListFragment extends Fragment {
 
         @Override
         public CharSequence getPageTitle(int position) {
-            return getResources().getString(Wenku8API.getNOVELSORTBY_ChsId(TITLELIST[position]));
+            return getResources().getString(getNovelSortedByChsId(TITLELIST[position]));
         }
 
         @Override
@@ -93,8 +93,26 @@ public class RKListFragment extends Fragment {
         @Override
         public Fragment getItem(int type) {
             Bundle bundle = new Bundle();
-            bundle.putString("type", Wenku8API.getNOVELSORTBY(TITLELIST[type]));
+            bundle.putString("type", Wenku8API.getNovelSortedBy(TITLELIST[type]));
             return NovelItemListFragment.newInstance(bundle);
+        }
+
+        public static int getNovelSortedByChsId(Wenku8API.NovelSortedBy n) {
+            return switch (n) {
+                case allVisit -> R.string.tab_allvisit;
+                case allVote -> R.string.tab_allvote;
+                case monthVisit -> R.string.tab_monthvisit;
+                case monthVote -> R.string.tab_monthvote;
+                case weekVisit -> R.string.tab_weekvisit;
+                case weekVote -> R.string.tab_weekvote;
+                case dayVisit -> R.string.tab_dayvisit;
+                case dayVote -> R.string.tab_dayvote;
+                case postDate -> R.string.tab_postdate;
+                case lastUpdate -> R.string.tab_lastupdate;
+                case goodNum -> R.string.tab_goodnum;
+                case size -> R.string.tab_size;
+                case fullFlag -> R.string.tab_fullflag;
+            };
         }
     }
 

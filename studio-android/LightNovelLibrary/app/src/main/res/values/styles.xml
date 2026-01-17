@@ -3,16 +3,13 @@
     <style name="menu_labels_style">
         <item name="android:background">@drawable/fab_label_background</item>
         <item name="android:textColor">@color/default_text_color_black</item>
+        <item name="android:elevation">6dp</item>
     </style>
 
     <style name="reader_seeker" parent="android:TextAppearance.Small">
         <item name="android:textSize">12sp</item>
         <item name="android:textColor">@color/default_white</item>
     </style>
-
-    <!--<style name="edit_hint_text_style" parent="android:TextAppearance">-->
-        <!--<item name="android:textColor">@color/login_hint_text</item>-->
-    <!--</style>-->
 
     <!-- You can also inherit from NNF_BaseTheme.Light -->
     <style name="FilePickerTheme" parent="NNF_BaseTheme">
