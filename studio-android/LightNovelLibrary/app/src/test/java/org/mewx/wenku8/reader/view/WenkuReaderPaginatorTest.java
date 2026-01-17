@@ -107,10 +107,12 @@ public class WenkuReaderPaginatorTest {
         WenkuReaderLoaderXML loader = createLoader(targetContent);
 
         // Dimensions to satisfy "Width can contain 3 characters":
-        // CharWidth = 10. Width = 30. (Can contain 3 chars).
+        // CharWidth = 10.
         // FontHeight = 15. Indent = 2 * 15 = 30.
-        // Indent (30) fits exactly in Width (30).
-        // But Indent + FirstChar ("填" = 10) = 40 > 30. Wraps.
+        // Width = 35.
+        // 35 > 3 * 10 (30). Satisfies constraint.
+        // 35 > Indent (30). Indent fits.
+        // Indent + FirstChar ("填" = 10) = 40 > 35. Wraps.
 
         // Height = 30.
         // Line 1 (Indent): 15px. Fits (15 < 30).
@@ -128,7 +130,7 @@ public class WenkuReaderPaginatorTest {
         // "填" is skipped.
 
         int fontHeight = 15;
-        int width = 30;
+        int width = 35;
         int height = 30;
         int lineDist = 2;
         int paraDist = 4;
