@@ -92,8 +92,8 @@ public class WenkuReaderPaginatorTest {
     @Test
     public void testBugReproduced_startOfSecondPage() {
         // Reproduce "missing first character" bug using the provided sample text.
-        // Target paragraph: "填饱饿了两天的肚子后，堤达满足地吐了口气。"
-        // We isolate this paragraph to trigger the bug at the start of the Loader (Line 0).
+        // We target the second paragraph: "填饱饿了两天的肚子后，堤达满足地吐了口气。"
+        // To reproduce the bug (skipping char), we must treat this as the Start of the Loader (Line 0).
 
         List<OldNovelContentParser.NovelContent> allContent = parseSampleText(SAMPLE_BOOK_TEXT);
         List<OldNovelContentParser.NovelContent> targetContent = new ArrayList<>();
@@ -104,19 +104,26 @@ public class WenkuReaderPaginatorTest {
         // Dimensions Setup:
         // FontHeight = 15. Indent = 2 * 15 = 30px.
         // CharWidth = 10 (via StubMeasurer).
-        // Width = 39.
-        //   - Width > Indent (39 > 30). Indent fits alone.
-        //   - Width >= 3 * Char (39 > 30). Fits "3 characters".
-        //   - Indent + First Char = 30 + 10 = 40 > 39. Forces Wrap.
+        // Width = 35.
+        //   - Width > Indent (35 > 30). Indent fits alone.
+        //   - Width >= 3 * Char (35 > 30). Fits "3 characters".
+        //   - Indent + First Char = 30 + 10 = 40 > 35. Forces Wrap.
 
         // Height = 30.
         //   - Line 1 (Indent): 15px. Fits.
-        //   - Line 2 (First Char): 15px.
+        //   - Line 2 (First Char "填"): 15px.
         //   - Line Dist: 2px.
         //   - Total Height Needed: 15 + 2 + 15 = 32 > 30. Overflow.
 
+        // Paginator Behavior (Bug):
+        // 1. Adds Indent.
+        // 2. Wraps "填".
+        // 3. Overflow check fails.
+        // 4. Hits `else { lastLineIndex = lastWordIndex = 0; }` because curLineIndex=0.
+        // 5. Result: Page 1 contains only Indent. Paginator claims it processed up to index 0 ("填").
+
         int fontHeight = 15;
-        int width = 39;
+        int width = 35;
         int height = 30;
         int lineDist = 2;
         int paraDist = 4;
@@ -127,27 +134,48 @@ public class WenkuReaderPaginatorTest {
         WenkuReaderPaginator paginator = new WenkuReaderPaginator(loader, measurer,
                 width, height, fontHeight, lineDist, paraDist);
 
+        // --- Page 1 ---
         paginator.setPageStart(0, 0);
         paginator.calcFromFirst();
 
         List<LineInfo> lines = paginator.getLineInfoList();
         StringBuilder rawSb = new StringBuilder();
         for (LineInfo l : lines) if (l.type() == WenkuReaderLoader.ElementType.TEXT) rawSb.append(l.text());
-        String raw = rawSb.toString();
+        String page1Text = rawSb.toString();
 
+        int lastLine = paginator.getLastLineIndex();
         int lastWord = paginator.getLastWordIndex();
 
-        System.out.println("Page Content: '" + raw + "'");
+        System.out.println("Page 1 Content: '" + page1Text + "'");
         System.out.println("Last Word Index: " + lastWord);
 
-        // Assert that the page content contains ONLY the indent ("　　")
-        // because the first character wrapped and overflowed.
-        assertEquals("Page content should only contain indent due to overflow", "　　", raw);
+        // --- Page 2 ---
+        // Calculate next start based on Paginator's output.
+        // Paginator claims lastWord = 0. So next word is 1.
+        int p2Line = lastLine;
+        int p2Word = lastWord + 1;
 
-        // Assert that the Paginator incorrectly claims to have processed word 0 ("填").
-        // This is the bug: lastWordIndex=0 means next page starts at 1, skipping 0.
-        if (lastWord >= 0) {
-             fail("Bug Reproduced: First character '填' was not displayed (overflowed) but lastWordIndex claims it is included (" + lastWord + ")");
+        paginator.setPageStart(p2Line, p2Word);
+        paginator.calcFromFirst();
+
+        List<LineInfo> lines2 = paginator.getLineInfoList();
+        StringBuilder rawSb2 = new StringBuilder();
+        for (LineInfo l : lines2) if (l.type() == WenkuReaderLoader.ElementType.TEXT) rawSb2.append(l.text());
+        String page2Text = rawSb2.toString();
+
+        System.out.println("Page 2 Content: '" + page2Text + "'");
+
+        // Assertions
+        // 1. Page 2 should not be empty (it should contain "饱...").
+        assertFalse("Page 2 should not be empty", page2Text.isEmpty());
+        assertTrue("Page 2 should contain content (e.g. '饱')", page2Text.contains("饱"));
+
+        // 2. The first character "填" should be missing from BOTH pages.
+        boolean p1HasChar = page1Text.contains("填");
+        boolean p2HasChar = page2Text.contains("填");
+
+        if (!p1HasChar && !p2HasChar) {
+             fail("Bug Reproduced: First character '填' is missing from both Page 1 and Page 2.");
         }
     }
 }
