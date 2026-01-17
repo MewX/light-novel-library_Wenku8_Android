@@ -24,7 +24,7 @@ public class MyApp extends Application {
         Wenku8API.AppVer = BuildConfig.VERSION_NAME;
 
         // Init AdMob
-        MobileAds.initialize(this, initializationStatus -> {});
+        new Thread(() -> MobileAds.initialize(this, initializationStatus -> {})).start();
     }
 
     /**
