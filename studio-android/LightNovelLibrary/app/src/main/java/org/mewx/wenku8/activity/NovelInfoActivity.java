@@ -133,7 +133,7 @@ public class NovelInfoActivity extends BaseMaterialActivity {
         spb = findViewById(R.id.spb);
 
         // AdMob
-        AdView mAdView = findViewById(R.id.adView);
+        AdView mAdView = findViewById(R.id.ad_view);
         AdRequest adRequest = new AdRequest.Builder().build();
         mAdView.loadAd(adRequest);
 
