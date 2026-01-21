@@ -190,6 +190,7 @@ public class NovelInfoActivity extends BaseMaterialActivity {
         tvLatestChapter.setBackground(getResources().getDrawable(R.drawable.btn_menu_item));
         tvNovelTitle.setOnClickListener(v -> {
             if (runLoadingChecker()) return;
+            if (mNovelItemMeta == null) return;
 
             // show aid: title
             new MaterialDialog.Builder(NovelInfoActivity.this)
@@ -206,6 +207,7 @@ public class NovelInfoActivity extends BaseMaterialActivity {
         });
         tvNovelAuthor.setOnClickListener(v -> {
             if (runLoadingChecker()) return;
+            if (mNovelItemMeta == null) return;
 
             new MaterialDialog.Builder(NovelInfoActivity.this)
                     .theme(Theme.LIGHT)
