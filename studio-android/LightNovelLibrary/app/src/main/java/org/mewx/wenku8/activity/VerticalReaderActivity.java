@@ -170,7 +170,6 @@ public class VerticalReaderActivity extends AppCompatActivity {
         ContentValues cv = Wenku8API.getNovelContent(aid, cid, GlobalConfig.getCurrentLang());
 
         final asyncNovelContentTask ast = new asyncNovelContentTask();
-        ast.execute(cv);
 
         pDialog = new MaterialDialog.Builder(this)
                 .theme(Theme.LIGHT)
@@ -189,6 +188,8 @@ public class VerticalReaderActivity extends AppCompatActivity {
         pDialog.setProgress(0);
         pDialog.setMaxProgress(1);
         pDialog.show();
+
+        ast.execute(cv);
     }
 
     class asyncNovelContentTask extends AsyncTask<ContentValues, Integer, Integer> {
@@ -208,7 +209,10 @@ public class VerticalReaderActivity extends AppCompatActivity {
                     xml = new String(tempXml, "UTF-8");
                 }
 
-                nc = OldNovelContentParser.parseNovelContent(xml, size -> pDialog.setMaxProgress(size));
+                nc = OldNovelContentParser.parseNovelContent(xml, size -> {
+                    if (pDialog != null)
+                        pDialog.setMaxProgress(size);
+                });
                 if (nc.isEmpty()) {
                     Log.e("MewX-Main", "getNullFromParser (NovelContentParser.parseNovelContent(xml);)");
 
