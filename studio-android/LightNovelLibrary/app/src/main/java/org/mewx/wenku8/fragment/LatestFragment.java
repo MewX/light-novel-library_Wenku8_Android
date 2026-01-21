@@ -47,8 +47,13 @@ public class LatestFragment extends Fragment implements MyItemClickListener, MyI
     // components
     private MainActivity mainActivity = null;
     private LinearLayoutManager mLayoutManager;
-    private RecyclerView mRecyclerView;
-    private TextView mTextView;
+    private RecyclerView mNovelItemListView;
+    private TextView mLoadingStatusTextView;
+    private View mLoadingProgressBar;
+    private TextView mReloadButton;
+    private View mCheckUpdateButton;
+    private View mListLoadingView;
+    private View mRelayWarningView;
 
     // Novel Item info
     private List<NovelItemInfoUpdate> listNovelItemInfo = new ArrayList<>();
@@ -76,8 +81,17 @@ public class LatestFragment extends Fragment implements MyItemClickListener, MyI
         // Inflate the layout for this fragment
         View rootView = inflater.inflate(R.layout.fragment_latest, container, false);
 
+        // get views
+        mNovelItemListView = rootView.findViewById(R.id.novel_item_list);
+        mLoadingStatusTextView = rootView.findViewById(R.id.list_loading_status);
+        mLoadingProgressBar = rootView.findViewById(R.id.google_progress);
+        mReloadButton = rootView.findViewById(R.id.btn_loading);
+        mCheckUpdateButton = rootView.findViewById(R.id.btn_check_update_home);
+        mListLoadingView = rootView.findViewById(R.id.list_loading);
+        mRelayWarningView = rootView.findViewById(R.id.relay_warning);
+
         // Set warning message.
-        rootView.findViewById(R.id.relay_warning).setOnClickListener(view -> new MaterialDialog.Builder(getContext())
+        mRelayWarningView.setOnClickListener(view -> new MaterialDialog.Builder(getContext())
                 .theme(Theme.LIGHT)
                 .backgroundColorRes(R.color.dlgBackgroundColor)
                 .contentColorRes(R.color.dlgContentColor)
@@ -88,20 +102,16 @@ public class LatestFragment extends Fragment implements MyItemClickListener, MyI
                 .positiveText(R.string.dialog_positive_ok)
                 .show());
 
-        // get views
-        mRecyclerView = rootView.findViewById(R.id.novel_item_list);
-        mTextView = rootView.findViewById(R.id.list_loading_status);
-
-        mRecyclerView.setHasFixedSize(true);
+        mNovelItemListView.setHasFixedSize(true);
         // use a linear layout manager
         mLayoutManager = new LinearLayoutManager(getActivity());
-        mRecyclerView.setLayoutManager(mLayoutManager);
+        mNovelItemListView.setLayoutManager(mLayoutManager);
 
         // Listener
-        mRecyclerView.addOnScrollListener(new MyOnScrollListener());
+        mNovelItemListView.addOnScrollListener(new MyOnScrollListener());
 
         // set click event
-        rootView.findViewById(R.id.btn_loading).setOnClickListener(v -> {
+        mReloadButton.setOnClickListener(v -> {
             // To prepare for a loading, need to set the loading status to false.
             // If it's already loading, then do nothing.
             if (!isLoading.compareAndSet(true, false)) {
@@ -112,7 +122,7 @@ public class LatestFragment extends Fragment implements MyItemClickListener, MyI
             }
         });
 
-        rootView.findViewById(R.id.btn_check_update_home).setOnClickListener(
+        mCheckUpdateButton.setOnClickListener(
                 v -> new CheckAppNewVersion(getActivity(), true).execute());
 
         // fetch initial novel list and reset isLoading
@@ -189,7 +199,7 @@ public class LatestFragment extends Fragment implements MyItemClickListener, MyI
             // 滚动到一半的时候加载，即：剩余3个元素的时候就加载
             if (!isLoading.get() && visibleItemCount + pastVisibleItems + 3 >= totalItemCount) {
                 // load more toast
-                Snackbar.make(mRecyclerView, getResources().getString(R.string.list_loading)
+                Snackbar.make(mNovelItemListView, getResources().getString(R.string.list_loading)
                                 + "(" + currentPage + "/" + totalPage + ")",
                         Snackbar.LENGTH_SHORT).show();
 
@@ -197,7 +207,7 @@ public class LatestFragment extends Fragment implements MyItemClickListener, MyI
                 if (currentPage <= totalPage) {
                     loadNovelList(currentPage);
                 } else {
-                    Snackbar.make(mRecyclerView, getResources().getText(R.string.loading_done), Snackbar.LENGTH_SHORT).show();
+                    Snackbar.make(mNovelItemListView, getResources().getText(R.string.loading_done), Snackbar.LENGTH_SHORT).show();
                 }
             }
         }
@@ -244,7 +254,7 @@ public class LatestFragment extends Fragment implements MyItemClickListener, MyI
                 if(!isAdded())
                     return; // detached
 
-                mTextView.setText(getResources().getString(R.string.system_parse_failed));
+                mLoadingStatusTextView.setText(getResources().getString(R.string.system_parse_failed));
                 showRetryButton();
                 isLoading.set(false);
                 return;
@@ -254,11 +264,11 @@ public class LatestFragment extends Fragment implements MyItemClickListener, MyI
             // add imageView, only here can fetch the layout2 id!!!
             // hide loading layout
             // Note that after switching between fragments, the adapter has a chance to disappear. So, we need to attach it back.
-            if (mAdapter == null || mRecyclerView.getAdapter() == null) {
+            if (mAdapter == null || mNovelItemListView.getAdapter() == null) {
                 mAdapter = new NovelItemAdapter(listNovelItemInfo);
                 mAdapter.setOnItemClickListener(LatestFragment.this);
                 mAdapter.setOnItemLongClickListener(LatestFragment.this);
-                mRecyclerView.setAdapter(mAdapter);
+                mNovelItemListView.setAdapter(mAdapter);
             }
 
             // Incremental changes
@@ -275,15 +285,13 @@ public class LatestFragment extends Fragment implements MyItemClickListener, MyI
                 return;
             }
 
-            View listLoadingView = mainActivity.findViewById(R.id.list_loading);
-            if (listLoadingView != null) {
-                listLoadingView.setVisibility(View.GONE);
+            if (mListLoadingView != null) {
+                mListLoadingView.setVisibility(View.GONE);
             }
 
             // TODO: remove this warning view because all traffic will come from the relay.
-            View relayWarningView = mainActivity.findViewById(R.id.relay_warning);
-            if (relayWarningView != null) {
-                relayWarningView.setVisibility(usingWenku8Relay ? View.VISIBLE : View.GONE);
+            if (mRelayWarningView != null) {
+                mRelayWarningView.setVisibility(usingWenku8Relay ? View.VISIBLE : View.GONE);
             }
         }
     }
@@ -301,28 +309,47 @@ public class LatestFragment extends Fragment implements MyItemClickListener, MyI
     }
 
     private void showRetryButton() {
-        if (mainActivity == null || mainActivity.findViewById(R.id.btn_loading) == null || !isAdded()) {
+        if (!isAdded()) {
             return;
         }
 
-        ((TextView) mainActivity.findViewById(R.id.btn_loading)).setText(getResources().getString(R.string.task_retry));
-        mainActivity.findViewById(R.id.google_progress).setVisibility(View.GONE);
-        mainActivity.findViewById(R.id.btn_loading).setVisibility(View.VISIBLE);
-        mainActivity.findViewById(R.id.btn_check_update_home).setVisibility(View.VISIBLE);
+        if (mReloadButton != null) {
+            mReloadButton.setText(getResources().getString(R.string.task_retry));
+            mReloadButton.setVisibility(View.VISIBLE);
+        }
+
+        if (mLoadingProgressBar != null) {
+            mLoadingProgressBar.setVisibility(View.GONE);
+        }
+
+        if (mCheckUpdateButton != null) {
+            mCheckUpdateButton.setVisibility(View.VISIBLE);
+        }
     }
 
     /**
      * After button pressed, should hide the "retry" button
      */
     private void hideRetryButton() {
-        if (mainActivity == null || mainActivity.findViewById(R.id.btn_loading) == null) {
+        if (!isAdded()) {
             return;
         }
 
-        mTextView.setText(getResources().getString(R.string.list_loading));
-        mainActivity.findViewById(R.id.google_progress).setVisibility(View.VISIBLE);
-        mainActivity.findViewById(R.id.btn_loading).setVisibility(View.GONE);
-        mainActivity.findViewById(R.id.btn_check_update_home).setVisibility(View.GONE);
+        if (mLoadingStatusTextView != null) {
+            mLoadingStatusTextView.setText(getResources().getString(R.string.list_loading));
+        }
+
+        if (mLoadingProgressBar != null) {
+            mLoadingProgressBar.setVisibility(View.VISIBLE);
+        }
+
+        if (mReloadButton != null) {
+            mReloadButton.setVisibility(View.GONE);
+        }
+
+        if (mCheckUpdateButton != null) {
+            mCheckUpdateButton.setVisibility(View.GONE);
+        }
     }
 
 
