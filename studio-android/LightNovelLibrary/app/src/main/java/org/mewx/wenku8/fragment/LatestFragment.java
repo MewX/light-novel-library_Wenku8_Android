@@ -49,6 +49,11 @@ public class LatestFragment extends Fragment implements MyItemClickListener, MyI
     private LinearLayoutManager mLayoutManager;
     private RecyclerView mRecyclerView;
     private TextView mTextView;
+    private View mGoogleProgress;
+    private TextView mBtnLoading;
+    private View mBtnCheckUpdateHome;
+    private View mListLoadingView;
+    private View mRelayWarningView;
 
     // Novel Item info
     private List<NovelItemInfoUpdate> listNovelItemInfo = new ArrayList<>();
@@ -76,8 +81,17 @@ public class LatestFragment extends Fragment implements MyItemClickListener, MyI
         // Inflate the layout for this fragment
         View rootView = inflater.inflate(R.layout.fragment_latest, container, false);
 
+        // get views
+        mRecyclerView = rootView.findViewById(R.id.novel_item_list);
+        mTextView = rootView.findViewById(R.id.list_loading_status);
+        mGoogleProgress = rootView.findViewById(R.id.google_progress);
+        mBtnLoading = rootView.findViewById(R.id.btn_loading);
+        mBtnCheckUpdateHome = rootView.findViewById(R.id.btn_check_update_home);
+        mListLoadingView = rootView.findViewById(R.id.list_loading);
+        mRelayWarningView = rootView.findViewById(R.id.relay_warning);
+
         // Set warning message.
-        rootView.findViewById(R.id.relay_warning).setOnClickListener(view -> new MaterialDialog.Builder(getContext())
+        mRelayWarningView.setOnClickListener(view -> new MaterialDialog.Builder(getContext())
                 .theme(Theme.LIGHT)
                 .backgroundColorRes(R.color.dlgBackgroundColor)
                 .contentColorRes(R.color.dlgContentColor)
@@ -88,10 +102,6 @@ public class LatestFragment extends Fragment implements MyItemClickListener, MyI
                 .positiveText(R.string.dialog_positive_ok)
                 .show());
 
-        // get views
-        mRecyclerView = rootView.findViewById(R.id.novel_item_list);
-        mTextView = rootView.findViewById(R.id.list_loading_status);
-
         mRecyclerView.setHasFixedSize(true);
         // use a linear layout manager
         mLayoutManager = new LinearLayoutManager(getActivity());
@@ -101,7 +111,7 @@ public class LatestFragment extends Fragment implements MyItemClickListener, MyI
         mRecyclerView.addOnScrollListener(new MyOnScrollListener());
 
         // set click event
-        rootView.findViewById(R.id.btn_loading).setOnClickListener(v -> {
+        mBtnLoading.setOnClickListener(v -> {
             // To prepare for a loading, need to set the loading status to false.
             // If it's already loading, then do nothing.
             if (!isLoading.compareAndSet(true, false)) {
@@ -112,7 +122,7 @@ public class LatestFragment extends Fragment implements MyItemClickListener, MyI
             }
         });
 
-        rootView.findViewById(R.id.btn_check_update_home).setOnClickListener(
+        mBtnCheckUpdateHome.setOnClickListener(
                 v -> new CheckAppNewVersion(getActivity(), true).execute());
 
         // fetch initial novel list and reset isLoading
@@ -275,15 +285,13 @@ public class LatestFragment extends Fragment implements MyItemClickListener, MyI
                 return;
             }
 
-            View listLoadingView = mainActivity.findViewById(R.id.list_loading);
-            if (listLoadingView != null) {
-                listLoadingView.setVisibility(View.GONE);
+            if (mListLoadingView != null) {
+                mListLoadingView.setVisibility(View.GONE);
             }
 
             // TODO: remove this warning view because all traffic will come from the relay.
-            View relayWarningView = mainActivity.findViewById(R.id.relay_warning);
-            if (relayWarningView != null) {
-                relayWarningView.setVisibility(usingWenku8Relay ? View.VISIBLE : View.GONE);
+            if (mRelayWarningView != null) {
+                mRelayWarningView.setVisibility(usingWenku8Relay ? View.VISIBLE : View.GONE);
             }
         }
     }
@@ -301,28 +309,28 @@ public class LatestFragment extends Fragment implements MyItemClickListener, MyI
     }
 
     private void showRetryButton() {
-        if (mainActivity == null || mainActivity.findViewById(R.id.btn_loading) == null || !isAdded()) {
+        if (mBtnLoading == null || !isAdded()) {
             return;
         }
 
-        ((TextView) mainActivity.findViewById(R.id.btn_loading)).setText(getResources().getString(R.string.task_retry));
-        mainActivity.findViewById(R.id.google_progress).setVisibility(View.GONE);
-        mainActivity.findViewById(R.id.btn_loading).setVisibility(View.VISIBLE);
-        mainActivity.findViewById(R.id.btn_check_update_home).setVisibility(View.VISIBLE);
+        mBtnLoading.setText(getResources().getString(R.string.task_retry));
+        mGoogleProgress.setVisibility(View.GONE);
+        mBtnLoading.setVisibility(View.VISIBLE);
+        mBtnCheckUpdateHome.setVisibility(View.VISIBLE);
     }
 
     /**
      * After button pressed, should hide the "retry" button
      */
     private void hideRetryButton() {
-        if (mainActivity == null || mainActivity.findViewById(R.id.btn_loading) == null) {
+        if (mBtnLoading == null) {
             return;
         }
 
         mTextView.setText(getResources().getString(R.string.list_loading));
-        mainActivity.findViewById(R.id.google_progress).setVisibility(View.VISIBLE);
-        mainActivity.findViewById(R.id.btn_loading).setVisibility(View.GONE);
-        mainActivity.findViewById(R.id.btn_check_update_home).setVisibility(View.GONE);
+        mGoogleProgress.setVisibility(View.VISIBLE);
+        mBtnLoading.setVisibility(View.GONE);
+        mBtnCheckUpdateHome.setVisibility(View.GONE);
     }
 
 
