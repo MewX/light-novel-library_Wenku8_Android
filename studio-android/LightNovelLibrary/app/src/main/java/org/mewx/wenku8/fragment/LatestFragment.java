@@ -331,6 +331,10 @@ public class LatestFragment extends Fragment implements MyItemClickListener, MyI
      * After button pressed, should hide the "retry" button
      */
     private void hideRetryButton() {
+        if (!isAdded()) {
+            return;
+        }
+
         if (mLoadingStatusTextView != null) {
             mLoadingStatusTextView.setText(getResources().getString(R.string.list_loading));
         }
