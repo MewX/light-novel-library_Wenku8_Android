@@ -438,8 +438,6 @@ public class Wenku8ReaderActivityV1 extends BaseMaterialActivity {
                 if (md != null && md.isShowing()) {
                     try {
                         md.dismiss();
-                    } catch (final IllegalArgumentException e) {
-                        // Do nothing.
                     } catch (final Exception e) {
                         // Do nothing.
                     }
@@ -802,8 +800,6 @@ public class Wenku8ReaderActivityV1 extends BaseMaterialActivity {
             if (md != null && md.isShowing()) {
                 try {
                     md.dismiss();
-                } catch (final IllegalArgumentException e) {
-                    // Do nothing.
                 } catch (final Exception e) {
                     // Do nothing.
                 }
