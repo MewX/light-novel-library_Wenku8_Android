@@ -138,6 +138,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_alignParentBottom="true"
+            android:background="@color/myWindowBackground"
             ads:adSize="BANNER"
             ads:adUnitId="ca-app-pub-7333757578973883/9658350163" />
     </RelativeLayout>
