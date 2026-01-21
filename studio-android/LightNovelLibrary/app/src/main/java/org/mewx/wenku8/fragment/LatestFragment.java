@@ -309,28 +309,43 @@ public class LatestFragment extends Fragment implements MyItemClickListener, MyI
     }
 
     private void showRetryButton() {
-        if (mReloadButton == null || !isAdded()) {
+        if (!isAdded()) {
             return;
         }
 
-        mReloadButton.setText(getResources().getString(R.string.task_retry));
-        mLoadingProgressBar.setVisibility(View.GONE);
-        mReloadButton.setVisibility(View.VISIBLE);
-        mCheckUpdateButton.setVisibility(View.VISIBLE);
+        if (mReloadButton != null) {
+            mReloadButton.setText(getResources().getString(R.string.task_retry));
+            mReloadButton.setVisibility(View.VISIBLE);
+        }
+
+        if (mLoadingProgressBar != null) {
+            mLoadingProgressBar.setVisibility(View.GONE);
+        }
+
+        if (mCheckUpdateButton != null) {
+            mCheckUpdateButton.setVisibility(View.VISIBLE);
+        }
     }
 
     /**
      * After button pressed, should hide the "retry" button
      */
     private void hideRetryButton() {
-        if (mReloadButton == null) {
-            return;
+        if (mLoadingStatusTextView != null) {
+            mLoadingStatusTextView.setText(getResources().getString(R.string.list_loading));
         }
 
-        mLoadingStatusTextView.setText(getResources().getString(R.string.list_loading));
-        mLoadingProgressBar.setVisibility(View.VISIBLE);
-        mReloadButton.setVisibility(View.GONE);
-        mCheckUpdateButton.setVisibility(View.GONE);
+        if (mLoadingProgressBar != null) {
+            mLoadingProgressBar.setVisibility(View.VISIBLE);
+        }
+
+        if (mReloadButton != null) {
+            mReloadButton.setVisibility(View.GONE);
+        }
+
+        if (mCheckUpdateButton != null) {
+            mCheckUpdateButton.setVisibility(View.GONE);
+        }
     }
 
 
