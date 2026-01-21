@@ -22,6 +22,9 @@ import android.widget.RelativeLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.core.view.GravityCompat;
+import androidx.drawerlayout.widget.DrawerLayout;
+
 import com.afollestad.materialdialogs.GravityEnum;
 import com.afollestad.materialdialogs.MaterialDialog;
 import com.afollestad.materialdialogs.Theme;
@@ -75,6 +78,9 @@ public class NovelInfoActivity extends BaseMaterialActivity {
     private boolean isLoading = true;
     private RelativeLayout rlMask = null; // mask layout
     private LinearLayout mLinearLayout = null;
+    private DrawerLayout mDrawerLayout;
+    private LinearLayout mChapterListLayout;
+    private TextView mSideSheetHeader;
     private TextView tvNovelTitle = null;
     private TextView tvNovelAuthor = null;
     private TextView tvNovelStatus = null;
@@ -115,6 +121,10 @@ public class NovelInfoActivity extends BaseMaterialActivity {
         }
 
         // get views
+        mDrawerLayout = findViewById(R.id.drawer_layout);
+        mDrawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_LOCKED_CLOSED);
+        mChapterListLayout = findViewById(R.id.novel_chapter_scroll);
+        mSideSheetHeader = findViewById(R.id.side_sheet_header);
         rlMask = findViewById(R.id.white_mask);
         mLinearLayout = findViewById(R.id.novel_info_scroll);
         LinearLayout llCardLayout = findViewById(R.id.item_card);
@@ -558,6 +568,11 @@ public class NovelInfoActivity extends BaseMaterialActivity {
 
     @Override
     public void onBackPressed() {
+        if (mDrawerLayout.isDrawerOpen(GravityCompat.END)) {
+            mDrawerLayout.closeDrawer(GravityCompat.END);
+            return;
+        }
+
         // end famMenu first
         if(famMenu.isExpanded()) {
             famMenu.collapse();
@@ -735,17 +750,98 @@ public class NovelInfoActivity extends BaseMaterialActivity {
           return true;
         });
         btn.setOnClickListener(v -> {
-          // jump to chapter select activity
-          Intent intent = new Intent(NovelInfoActivity.this, NovelChapterActivity.class);
-          intent.putExtra("aid", aid);
-          intent.putExtra("volume", vl);
-          intent.putExtra("from", from);
-          startActivity(intent);
+            buildChapterList(vl);
+            mDrawerLayout.openDrawer(GravityCompat.END);
         });
 
         // add to scroll view
         mLinearLayout.addView(rl);
       }
+    }
+
+    private void buildChapterList(final VolumeList volumeList) {
+        mSideSheetHeader.setText(volumeList.volumeName);
+        mChapterListLayout.removeAllViews();
+
+        final GlobalConfig.ReadSavesV1 rs = GlobalConfig.getReadSavesRecordV1(aid);
+        for(final ChapterInfo ci : volumeList.chapterList) {
+            // get view
+            RelativeLayout rl = (RelativeLayout) LayoutInflater.from(NovelInfoActivity.this).inflate(R.layout.view_novel_chapter_item, null);
+
+            TextView tv = rl.findViewById(R.id.chapter_title);
+            tv.setText(ci.chapterName);
+
+            final RelativeLayout btn = rl.findViewById(R.id.chapter_btn);
+            // added indicator for last read chapter
+            if (rs != null && rs.cid == ci.cid) {
+                btn.setBackgroundColor(Color.LTGRAY);
+            }
+            btn.setOnClickListener(ignored -> {
+                // jump to reader activity
+                Intent intent = new Intent(NovelInfoActivity.this, Wenku8ReaderActivityV1.class);
+                intent.putExtra("aid", aid);
+                intent.putExtra("volume", volumeList);
+                intent.putExtra("cid", ci.cid);
+
+                // test does file exist
+                if (from.equals(FromLocal)
+                    && !LightCache.testFileExist(GlobalConfig.getDefaultStoragePath() + GlobalConfig.saveFolderName + File.separator + "novel" + File.separator + ci.cid + ".xml")
+                    && !LightCache.testFileExist(GlobalConfig.getBackupStoragePath() + GlobalConfig.saveFolderName + File.separator + "novel" + File.separator + ci.cid + ".xml")) {
+                    intent.putExtra("from", "cloud"); // from cloud
+                }
+                else {
+                    intent.putExtra("from", from); // from "fav"
+                }
+
+                startActivity(intent);
+                overridePendingTransition(R.anim.fade_in, R.anim.hold); // fade in animation
+            });
+
+            View optionBtn = btn.findViewById(R.id.novel_option);
+            optionBtn.setVisibility(View.VISIBLE);
+            optionBtn.setOnClickListener(ignored -> {
+                new MaterialDialog.Builder(NovelInfoActivity.this)
+                    .theme(Theme.LIGHT)
+                    .title(R.string.system_choose_reader_engine)
+                    .items(R.array.reader_engine_option)
+                    .itemsCallback((ignored1, ignored2, which, ignored3) -> {
+                        Class readerClass = Wenku8ReaderActivityV1.class;
+                        switch (which) {
+                            case 0:
+                                // V1
+                                readerClass = Wenku8ReaderActivityV1.class;
+                                break;
+
+                            case 1:
+                                // old
+                                readerClass = VerticalReaderActivity.class;
+                                break;
+                        }
+
+                        Intent intent = new Intent(NovelInfoActivity.this, readerClass);
+                        intent.putExtra("aid", aid);
+                        intent.putExtra("volume", volumeList);
+                        intent.putExtra("cid", ci.cid);
+
+                        // test does file exist
+                        if (from.equals(FromLocal)
+                            && !LightCache.testFileExist(GlobalConfig.getDefaultStoragePath() + GlobalConfig.saveFolderName + File.separator + "novel" + File.separator + ci.cid + ".xml")
+                            && !LightCache.testFileExist(GlobalConfig.getBackupStoragePath() + GlobalConfig.saveFolderName + File.separator + "novel" + File.separator + ci.cid + ".xml")) {
+                            // jump to reader activity
+                            intent.putExtra("from", "cloud"); // from cloud
+                        } else {
+                            intent.putExtra("from", from); // from "fav"
+                        }
+
+                        startActivity(intent);
+                        overridePendingTransition(R.anim.fade_in, R.anim.hold); // fade in animation
+                    })
+                    .show();
+            });
+
+            // add to scroll view
+            mChapterListLayout.addView(rl);
+        }
     }
 
     class AsyncUpdateCacheTask extends AsyncTask<Integer, Integer, Wenku8Error.ErrorCode> {

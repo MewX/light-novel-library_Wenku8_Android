@@ -62,12 +62,6 @@
             android:screenOrientation="unspecified">
         </activity>
 
-        <!-- Novel Chapter List Activity -->
-        <activity android:name="org.mewx.wenku8.activity.NovelChapterActivity"
-            android:label="@string/action_chapter_list"
-            android:screenOrientation="unspecified">
-        </activity>
-
         <!-- Novel Review List Activity -->
         <activity android:name="org.mewx.wenku8.activity.NovelReviewListActivity"
             android:label="@string/action_review_list"

@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/myWindowBackground"
+    android:clickable="true"
+    android:focusable="true">
+
+    <TextView
+        android:id="@+id/side_sheet_header"
+        android:layout_width="match_parent"
+        android:layout_height="?android:attr/actionBarSize"
+        android:background="@color/myPrimaryColor"
+        android:gravity="center_vertical"
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp"
+        android:text="@string/action_chapter_list"
+        android:textColor="@color/default_white"
+        android:textSize="20sp"
+        android:textStyle="bold" />
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_below="@id/side_sheet_header">
+
+        <LinearLayout
+            android:id="@+id/novel_chapter_scroll"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <!-- Here add all chapter icons -->
+
+        </LinearLayout>
+    </ScrollView>
+</RelativeLayout>
