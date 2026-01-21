@@ -431,9 +431,19 @@ public class Wenku8ReaderActivityV1 extends BaseMaterialActivity {
 
         @Override
         protected void onPostExecute(Wenku8Error.ErrorCode result) {
+            if (isFinishing() || isDestroyed()) return;
+
             if (result != Wenku8Error.ErrorCode.SYSTEM_1_SUCCEEDED) {
                 Toast.makeText(Wenku8ReaderActivityV1.this, result.toString(), Toast.LENGTH_LONG).show();
-                if (md != null) md.dismiss();
+                if (md != null && md.isShowing()) {
+                    try {
+                        md.dismiss();
+                    } catch (final IllegalArgumentException e) {
+                        // Do nothing.
+                    } catch (final Exception e) {
+                        // Do nothing.
+                    }
+                }
                 Wenku8ReaderActivityV1.this.finish(); // return friendly
                 return;
             }
@@ -789,8 +799,15 @@ public class Wenku8ReaderActivityV1 extends BaseMaterialActivity {
             Log.d("MewX", "-- slider创建完毕");
 
             // end loading dialog
-            if (md != null)
-                md.dismiss();
+            if (md != null && md.isShowing()) {
+                try {
+                    md.dismiss();
+                } catch (final IllegalArgumentException e) {
+                    // Do nothing.
+                } catch (final Exception e) {
+                    // Do nothing.
+                }
+            }
 
             // show dialog, jump to last read position
             if (GlobalConfig.getReadSavesRecordV1(aid) != null) {
