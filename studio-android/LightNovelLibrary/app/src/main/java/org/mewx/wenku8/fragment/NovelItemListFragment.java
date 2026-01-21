@@ -323,6 +323,11 @@ public class NovelItemListFragment extends Fragment implements MyItemClickListen
 
         @Override
         protected void onPostExecute(Integer integer) {
+            // Updating the results only when the fragment is attached correctly.
+            if (!isAdded() || getActivity() == null) {
+                return;
+            }
+
             if (integer == -1) {
                 // network error
                 return;
@@ -336,11 +341,9 @@ public class NovelItemListFragment extends Fragment implements MyItemClickListen
             isLoading.set(false);
 
             // TODO: remove this warning view because all traffic will come from the relay.
-            if (getActivity() != null) {
-                View relayWarningView = getActivity().findViewById(R.id.relay_warning);
-                if (relayWarningView != null) {
-                    relayWarningView.setVisibility(usingWenku8Relay ? View.VISIBLE : View.GONE);
-                }
+            View relayWarningView = getActivity().findViewById(R.id.relay_warning);
+            if (relayWarningView != null) {
+                relayWarningView.setVisibility(usingWenku8Relay ? View.VISIBLE : View.GONE);
             }
         }
     }
@@ -397,6 +400,11 @@ public class NovelItemListFragment extends Fragment implements MyItemClickListen
         @Override
         protected void onPostExecute(Integer integer) {
             super.onPostExecute(integer);
+
+            // Updating the results only when the fragment is attached correctly.
+            if (!isAdded() || getActivity() == null) {
+                return;
+            }
 
             spb.progressiveStop();
             if(integer == -1) {
