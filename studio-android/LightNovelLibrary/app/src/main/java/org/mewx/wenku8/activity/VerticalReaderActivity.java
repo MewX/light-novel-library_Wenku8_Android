@@ -210,8 +210,9 @@ public class VerticalReaderActivity extends AppCompatActivity {
                 }
 
                 nc = OldNovelContentParser.parseNovelContent(xml, size -> {
-                    if (pDialog != null)
+                    if (pDialog != null) {
                         pDialog.setMaxProgress(size);
+                    }
                 });
                 if (nc.isEmpty()) {
                     Log.e("MewX-Main", "getNullFromParser (NovelContentParser.parseNovelContent(xml);)");
