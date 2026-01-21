@@ -323,7 +323,7 @@ public class NovelItemListFragment extends Fragment implements MyItemClickListen
 
         @Override
         protected void onPostExecute(Integer integer) {
-            // updating the results only when the fragment is attached correctly
+            // Updating the results only when the fragment is attached correctly.
             if (!isAdded() || getActivity() == null) {
                 return;
             }
@@ -401,7 +401,7 @@ public class NovelItemListFragment extends Fragment implements MyItemClickListen
         protected void onPostExecute(Integer integer) {
             super.onPostExecute(integer);
 
-            // updating the results only when the fragment is attached correctly
+            // Updating the results only when the fragment is attached correctly.
             if (!isAdded() || getActivity() == null) {
                 return;
             }
