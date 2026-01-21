@@ -1,138 +1,153 @@
 <?xml version="1.0" encoding="utf-8"?>
-<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.drawerlayout.widget.DrawerLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:spb="http://schemas.android.com/apk/res-auto"
     xmlns:card-view="http://schemas.android.com/apk/res-auto"
     xmlns:fab="http://schemas.android.com/apk/res-auto"
+    xmlns:ads="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/drawer_layout"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/myPrimaryColor"
-    android:fitsSystemWindows="true"
-    android:animateLayoutChanges="true">
+    android:fitsSystemWindows="true">
 
-    <ScrollView
+    <RelativeLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:layout_below="@id/toolbar_actionbar"
-        android:layout_above="@+id/ad_view"
-        android:background="@color/myWindowBackground">
+        android:background="@color/myPrimaryColor"
+        android:animateLayoutChanges="true">
 
-        <LinearLayout
-            android:id="@+id/novel_info_scroll"
+        <ScrollView
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:clickable="true">
+            android:layout_height="match_parent"
+            android:layout_below="@id/toolbar_actionbar"
+            android:layout_above="@+id/ad_view"
+            android:background="@color/myWindowBackground">
 
-            <include layout="@layout/view_novel_item" />
-
-            <RelativeLayout
-                android:layout_width="wrap_content"
+            <LinearLayout
+                android:id="@+id/novel_info_scroll"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:paddingLeft="6dp"
-                android:paddingRight="6dp"
-                android:paddingTop="2dp">
+                android:orientation="vertical"
+                android:clickable="true">
 
-                <androidx.cardview.widget.CardView
-                    android:layout_width="match_parent"
+                <include layout="@layout/view_novel_item" />
+
+                <RelativeLayout
+                    android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:clickable="true"
-                    card-view:cardBackgroundColor="@color/novel_item_white"
-                    card-view:cardElevation="2dp"
-                    card-view:cardUseCompatPadding="true"
-                    card-view:cardMaxElevation="2dp">
+                    android:paddingLeft="6dp"
+                    android:paddingRight="6dp"
+                    android:paddingTop="2dp">
 
-                    <TextView
-                        android:id="@+id/novel_intro_full"
+                    <androidx.cardview.widget.CardView
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:textSize="12sp"
-                        android:paddingTop="8dp"
-                        android:paddingBottom="8dp"
-                        android:paddingLeft="8dp"
-                        android:paddingRight="8dp"
-                        android:background="@color/menu_transparent"
-                        android:text="@string/na"
-                        android:textColor="@color/menu_text_color" />
+                        android:clickable="true"
+                        card-view:cardBackgroundColor="@color/novel_item_white"
+                        card-view:cardElevation="2dp"
+                        card-view:cardUseCompatPadding="true"
+                        card-view:cardMaxElevation="2dp">
 
-                </androidx.cardview.widget.CardView>
-            </RelativeLayout>
+                        <TextView
+                            android:id="@+id/novel_intro_full"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:textSize="12sp"
+                            android:paddingTop="8dp"
+                            android:paddingBottom="8dp"
+                            android:paddingLeft="8dp"
+                            android:paddingRight="8dp"
+                            android:background="@color/menu_transparent"
+                            android:text="@string/na"
+                            android:textColor="@color/menu_text_color" />
 
-            <!-- Here add all chapter icons -->
+                    </androidx.cardview.widget.CardView>
+                </RelativeLayout>
 
-        </LinearLayout>
-    </ScrollView>
+                <!-- Here add all chapter icons -->
 
-    <!-- White Mask -->
-    <RelativeLayout
-        android:id="@+id/white_mask"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:layout_above="@+id/ad_view"
-        android:background="@color/default_mask_background_white"
-        android:clickable="true"
-        android:visibility="invisible"/>
+            </LinearLayout>
+        </ScrollView>
 
-    <!-- Here to set below mask layer -->
-    <include layout="@layout/toolbar_pure" />
+        <!-- White Mask -->
+        <RelativeLayout
+            android:id="@+id/white_mask"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:layout_above="@+id/ad_view"
+            android:background="@color/default_mask_background_white"
+            android:clickable="true"
+            android:visibility="invisible"/>
 
-    <fr.castorflex.android.smoothprogressbar.SmoothProgressBar
-        android:id="@+id/spb"
-        android:layout_width="match_parent"
-        android:layout_height="4dp"
-        android:layout_below="@id/toolbar_actionbar"
-        android:indeterminate="true"
-        spb:spb_stroke_separator_length="4dp"
-        spb:spb_sections_count="4"
-        spb:spb_speed="1.0"
-        spb:spb_stroke_width="4dp"
-        spb:spb_interpolator="spb_interpolator_acceleratedecelerate"
-        spb:spb_colors="@array/gplus_colors"/>
+        <!-- Here to set below mask layer -->
+        <include layout="@layout/toolbar_pure" />
 
-    <!-- Floating action button -->
-    <com.getbase.floatingactionbutton.FloatingActionsMenu
-        android:id="@+id/multiple_actions"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:layout_above="@+id/ad_view"
-        android:layout_alignParentRight="true"
-        android:layout_alignParentEnd="true"
-        fab:fab_addButtonColorNormal="@color/fabRed"
-        fab:fab_addButtonColorPressed="@color/fabRedPressed"
-        fab:fab_addButtonPlusIconColor="@color/myTextPrimaryColor"
-        fab:fab_labelStyle="@style/menu_labels_style"
-        android:layout_marginBottom="0dp"
-        android:layout_marginRight="0dp"
-        android:layout_marginEnd="0dp">
+        <fr.castorflex.android.smoothprogressbar.SmoothProgressBar
+            android:id="@+id/spb"
+            android:layout_width="match_parent"
+            android:layout_height="4dp"
+            android:layout_below="@id/toolbar_actionbar"
+            android:indeterminate="true"
+            spb:spb_stroke_separator_length="4dp"
+            spb:spb_sections_count="4"
+            spb:spb_speed="1.0"
+            spb:spb_stroke_width="4dp"
+            spb:spb_interpolator="spb_interpolator_acceleratedecelerate"
+            spb:spb_colors="@array/gplus_colors"/>
 
-        <com.getbase.floatingactionbutton.FloatingActionButton
-            android:id="@+id/fab_favorate"
-            android:layout_width="wrap_content"
+        <!-- Floating action button -->
+        <com.getbase.floatingactionbutton.FloatingActionsMenu
+            android:id="@+id/multiple_actions"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:layout_above="@+id/ad_view"
+            android:layout_alignParentRight="true"
+            android:layout_alignParentEnd="true"
+            fab:fab_addButtonColorNormal="@color/fabRed"
+            fab:fab_addButtonColorPressed="@color/fabRedPressed"
+            fab:fab_addButtonPlusIconColor="@color/myTextPrimaryColor"
+            fab:fab_labelStyle="@style/menu_labels_style"
+            android:layout_marginBottom="0dp"
+            android:layout_marginRight="0dp"
+            android:layout_marginEnd="0dp">
+
+            <com.getbase.floatingactionbutton.FloatingActionButton
+                android:id="@+id/fab_favorate"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                fab:fab_size="mini"
+                fab:fab_icon="@drawable/ic_favorate"
+                fab:fab_plusIconColor="@color/myTextPrimaryColor"
+                fab:fab_title="@string/fab_favorate"
+                fab:fab_colorNormal="@color/fabYellow"
+                fab:fab_colorPressed="@color/fabYellowPressed"/>
+
+            <com.getbase.floatingactionbutton.FloatingActionButton
+                android:id="@+id/fab_download"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                fab:fab_size="mini"
+                fab:fab_icon="@drawable/ic_download"
+                fab:fab_plusIconColor="@color/myTextPrimaryColor"
+                fab:fab_title="@string/fab_download"
+                fab:fab_colorNormal="@color/fabGreen"
+                fab:fab_colorPressed="@color/fabGreenPressed"/>
+        </com.getbase.floatingactionbutton.FloatingActionsMenu>
+
+        <com.google.android.gms.ads.AdView
+            android:id="@+id/ad_view"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            fab:fab_size="mini"
-            fab:fab_icon="@drawable/ic_favorate"
-            fab:fab_plusIconColor="@color/myTextPrimaryColor"
-            fab:fab_title="@string/fab_favorate"
-            fab:fab_colorNormal="@color/fabYellow"
-            fab:fab_colorPressed="@color/fabYellowPressed"/>
+            android:layout_alignParentBottom="true"
+            ads:adSize="BANNER"
+            ads:adUnitId="ca-app-pub-7333757578973883/9658350163" />
+    </RelativeLayout>
 
-        <com.getbase.floatingactionbutton.FloatingActionButton
-            android:id="@+id/fab_download"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            fab:fab_size="mini"
-            fab:fab_icon="@drawable/ic_download"
-            fab:fab_plusIconColor="@color/myTextPrimaryColor"
-            fab:fab_title="@string/fab_download"
-            fab:fab_colorNormal="@color/fabGreen"
-            fab:fab_colorPressed="@color/fabGreenPressed"/>
-    </com.getbase.floatingactionbutton.FloatingActionsMenu>
+    <include
+        android:id="@+id/side_sheet"
+        layout="@layout/layout_novel_chapter_sidesheet"
+        android:layout_width="300dp"
+        android:layout_height="match_parent"
+        android:layout_gravity="end"
+        android:background="@color/myWindowBackground" />
 
-    <com.google.android.gms.ads.AdView
-        xmlns:ads="http://schemas.android.com/apk/res-auto"
-        android:id="@+id/ad_view"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_alignParentBottom="true"
-        ads:adSize="BANNER"
-        ads:adUnitId="ca-app-pub-7333757578973883/9658350163" />
-</RelativeLayout>
+</androidx.drawerlayout.widget.DrawerLayout>
