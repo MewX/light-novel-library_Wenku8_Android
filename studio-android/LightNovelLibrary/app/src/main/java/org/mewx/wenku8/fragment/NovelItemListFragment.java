@@ -323,6 +323,10 @@ public class NovelItemListFragment extends Fragment implements MyItemClickListen
 
         @Override
         protected void onPostExecute(Integer integer) {
+            if (!isAdded() || getActivity() == null) {
+                return;
+            }
+
             if (integer == -1) {
                 // network error
                 return;
@@ -397,6 +401,10 @@ public class NovelItemListFragment extends Fragment implements MyItemClickListen
         @Override
         protected void onPostExecute(Integer integer) {
             super.onPostExecute(integer);
+
+            if (!isAdded() || getActivity() == null) {
+                return;
+            }
 
             spb.progressiveStop();
             if(integer == -1) {
