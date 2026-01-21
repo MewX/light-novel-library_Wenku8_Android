@@ -190,9 +190,9 @@ public class NovelInfoActivity extends BaseMaterialActivity {
         tvLatestChapter.setBackground(getResources().getDrawable(R.drawable.btn_menu_item));
         tvNovelTitle.setOnClickListener(v -> {
             if (runLoadingChecker()) return;
-            if (mNovelItemMeta == null) return; // only when mNovelItemMeta is not null
+            if (mNovelItemMeta == null) return;
 
-            // show aid: title
+            // show aid: title (only when mNovelItemMeta is not null)
             new MaterialDialog.Builder(NovelInfoActivity.this)
                     .theme(Theme.LIGHT)
                     .titleColorRes(R.color.dlgTitleColor)
@@ -207,7 +207,7 @@ public class NovelInfoActivity extends BaseMaterialActivity {
         });
         tvNovelAuthor.setOnClickListener(v -> {
             if (runLoadingChecker()) return;
-            if (mNovelItemMeta == null) return; // only when mNovelItemMeta is not null
+            if (mNovelItemMeta == null) return;
 
             new MaterialDialog.Builder(NovelInfoActivity.this)
                     .theme(Theme.LIGHT)
