@@ -22,6 +22,7 @@ import android.widget.RelativeLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.activity.OnBackPressedCallback;
 import androidx.core.view.GravityCompat;
 import androidx.drawerlayout.widget.DrawerLayout;
 
@@ -81,6 +82,7 @@ public class NovelInfoActivity extends BaseMaterialActivity {
     private DrawerLayout mDrawerLayout;
     private LinearLayout mChapterListLayout;
     private TextView mSideSheetHeader;
+    private VolumeList mCurrentSelectedVolume = null;
     private TextView tvNovelTitle = null;
     private TextView tvNovelAuthor = null;
     private TextView tvNovelStatus = null;
@@ -99,6 +101,20 @@ public class NovelInfoActivity extends BaseMaterialActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         initMaterialStyle(R.layout.layout_novel_info);
+
+        getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
+            @Override
+            public void handleOnBackPressed() {
+                if (mDrawerLayout.isDrawerOpen(GravityCompat.END)) {
+                    mDrawerLayout.closeDrawer(GravityCompat.END);
+                } else if (famMenu.isExpanded()) {
+                    famMenu.collapse();
+                } else {
+                    // Normal exit
+                    finishAfterTransition();
+                }
+            }
+        });
 
         // Init Firebase Analytics on GA4.
         mFirebaseAnalytics = FirebaseAnalytics.getInstance(this);
@@ -566,22 +582,6 @@ public class NovelInfoActivity extends BaseMaterialActivity {
                 .show();
     }
 
-    @Override
-    public void onBackPressed() {
-        if (mDrawerLayout.isDrawerOpen(GravityCompat.END)) {
-            mDrawerLayout.closeDrawer(GravityCompat.END);
-            return;
-        }
-
-        // end famMenu first
-        if(famMenu.isExpanded()) {
-            famMenu.collapse();
-            return;
-        }
-
-        // normal exit
-        finishAfterTransition();
-    }
 
     private class FetchInfoAsyncTask extends AsyncTask<Integer, Integer, Integer> {
         boolean fromLocal = false;
@@ -760,6 +760,7 @@ public class NovelInfoActivity extends BaseMaterialActivity {
     }
 
     private void buildChapterList(final VolumeList volumeList) {
+        mCurrentSelectedVolume = volumeList;
         mSideSheetHeader.setText(volumeList.volumeName);
         mChapterListLayout.removeAllViews();
 
@@ -1234,6 +1235,9 @@ public class NovelInfoActivity extends BaseMaterialActivity {
 
         // refresh when back from reader activity
         buildVolumeList();
+        if (mCurrentSelectedVolume != null) {
+            buildChapterList(mCurrentSelectedVolume);
+        }
     }
 
     private void refreshInfoFromLocal() {

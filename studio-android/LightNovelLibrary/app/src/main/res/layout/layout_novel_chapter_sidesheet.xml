@@ -17,7 +17,9 @@
         android:text="@string/action_chapter_list"
         android:textColor="@color/default_white"
         android:textSize="20sp"
-        android:textStyle="bold" />
+        android:textStyle="bold"
+        android:maxLines="1"
+        android:ellipsize="end" />
 
     <ScrollView
         android:layout_width="match_parent"
