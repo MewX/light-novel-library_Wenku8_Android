@@ -34,6 +34,7 @@ import org.mewx.wenku8.api.Wenku8API;
 import org.mewx.wenku8.global.api.Wenku8Parser;
 import org.mewx.wenku8.listener.MyItemLongClickListener;
 import org.mewx.wenku8.network.LightNetwork;
+import org.mewx.wenku8.network.LightUserSession;
 
 import java.lang.ref.WeakReference;
 import java.nio.charset.Charset;
@@ -106,6 +107,10 @@ public class NovelReviewReplyListActivity extends BaseMaterialActivity implement
         mSwipeRefreshLayout.setOnRefreshListener(this::refreshReviewReplyList);
 
         llReplyButton.setOnClickListener(ignored -> {
+            if (!LightUserSession.getLogStatus()) {
+                Toast.makeText(this, R.string.system_not_logged_in, Toast.LENGTH_SHORT).show();
+                return;
+            }
             String temp = etReplyText.getText().toString();
             String badWord = Wenku8API.searchBadWords(temp);
             if (badWord != null) {
