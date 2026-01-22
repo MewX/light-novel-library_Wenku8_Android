@@ -362,23 +362,25 @@ public class NavigationDrawerFragment extends Fragment {
         super.onResume();
 
         // user info update
-        if(LightUserSession.isUserInfoSet() && !tvUserName.getText().toString().equals(LightUserSession.getUsernameOrEmail())
-                && (LightCache.testFileExist(GlobalConfig.getFirstUserAvatarSaveFilePath())
-                || LightCache.testFileExist(GlobalConfig.getSecondUserAvatarSaveFilePath()))) {
-            tvUserName.setText(LightUserSession.getUsernameOrEmail());
+        if(LightUserSession.isUserInfoSet()) {
+            if(!tvUserName.getText().toString().equals(LightUserSession.getUsernameOrEmail()))
+                tvUserName.setText(LightUserSession.getUsernameOrEmail());
 
-            String avatarPath;
-            if(LightCache.testFileExist(GlobalConfig.getFirstUserAvatarSaveFilePath()))
-                avatarPath = GlobalConfig.getFirstUserAvatarSaveFilePath();
-            else
-                avatarPath = GlobalConfig.getSecondUserAvatarSaveFilePath();
-            BitmapFactory.Options options = new BitmapFactory.Options();
-            options.inSampleSize = 2;
-            Bitmap bm = BitmapFactory.decodeFile(avatarPath, options);
-            if(bm != null)
-                rivUserAvatar.setImageBitmap(bm);
+            if(LightCache.testFileExist(GlobalConfig.getFirstUserAvatarSaveFilePath())
+                    || LightCache.testFileExist(GlobalConfig.getSecondUserAvatarSaveFilePath())) {
+                String avatarPath;
+                if(LightCache.testFileExist(GlobalConfig.getFirstUserAvatarSaveFilePath()))
+                    avatarPath = GlobalConfig.getFirstUserAvatarSaveFilePath();
+                else
+                    avatarPath = GlobalConfig.getSecondUserAvatarSaveFilePath();
+                BitmapFactory.Options options = new BitmapFactory.Options();
+                options.inSampleSize = 2;
+                Bitmap bm = BitmapFactory.decodeFile(avatarPath, options);
+                if(bm != null)
+                    rivUserAvatar.setImageBitmap(bm);
+            }
         }
-        else if(!LightUserSession.isUserInfoSet()) {
+        else {
             tvUserName.setText(getResources().getString(R.string.main_menu_not_login));
             rivUserAvatar.setImageDrawable(getResources().getDrawable(R.drawable.ic_noavatar));
         }
