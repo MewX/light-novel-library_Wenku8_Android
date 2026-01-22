@@ -9,6 +9,7 @@ import android.view.MenuItem;
 import android.view.View;
 import android.widget.LinearLayout;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.LinearLayoutManager;
@@ -25,6 +26,7 @@ import org.mewx.wenku8.api.Wenku8API;
 import org.mewx.wenku8.global.api.Wenku8Parser;
 import org.mewx.wenku8.listener.MyItemClickListener;
 import org.mewx.wenku8.network.LightNetwork;
+import org.mewx.wenku8.network.LightUserSession;
 
 import java.lang.ref.WeakReference;
 import java.nio.charset.Charset;
@@ -106,6 +108,10 @@ public class NovelReviewListActivity extends BaseMaterialActivity implements MyI
             onBackPressed();
         }
         else if (menuItem.getItemId() == R.id.action_new) {
+            if (!LightUserSession.getLogStatus()) {
+                Toast.makeText(this, R.string.system_not_logged_in, Toast.LENGTH_SHORT).show();
+                return true;
+            }
             Intent intent = new Intent(NovelReviewListActivity.this, NovelReviewNewPostActivity.class);
             intent.putExtra("aid", aid);
             startActivity(intent);
