@@ -239,5 +239,6 @@
     <string name="dialog_positive_retry">重試一下？</string>
     <string name="dialog_negative_pass_for_now">暫時不要</string>
     <string name="dialog_positive_upgrade">昇級</string>
+    <string name="system_not_logged_in">您尚未登錄，請登錄後重試。</string>
     <string name="ad">廣告</string>
 </resources>

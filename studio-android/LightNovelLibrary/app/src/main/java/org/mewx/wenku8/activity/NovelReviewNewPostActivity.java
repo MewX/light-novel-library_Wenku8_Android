@@ -18,6 +18,7 @@ import com.google.firebase.analytics.FirebaseAnalytics;
 import org.mewx.wenku8.R;
 import org.mewx.wenku8.api.Wenku8API;
 import org.mewx.wenku8.network.LightNetwork;
+import org.mewx.wenku8.network.LightUserSession;
 
 import java.lang.ref.WeakReference;
 import java.nio.charset.Charset;
@@ -84,6 +85,10 @@ public class NovelReviewNewPostActivity extends BaseMaterialActivity {
         if (menuItem.getItemId() == android.R.id.home) {
             onBackPressed();
         } else if (menuItem.getItemId() == R.id.action_submit) {
+            if (!LightUserSession.getLogStatus()) {
+                Toast.makeText(this, R.string.system_not_logged_in, Toast.LENGTH_SHORT).show();
+                return true;
+            }
             String title = etTitle.getText().toString();
             String content = etContent.getText().toString();
             if (noBadWords(title) && noBadWords(content)) {
