@@ -41,6 +41,13 @@ public class NovelReviewNewPostActivity extends BaseMaterialActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
+        if (!org.mewx.wenku8.network.LightUserSession.getLogStatus()) {
+            Toast.makeText(this, getResources().getString(R.string.error_04), Toast.LENGTH_SHORT).show();
+            finish();
+            return;
+        }
+
         initMaterialStyle(R.layout.layout_novel_review_new_post);
 
         // Init Firebase Analytics on GA4.
@@ -84,6 +91,11 @@ public class NovelReviewNewPostActivity extends BaseMaterialActivity {
         if (menuItem.getItemId() == android.R.id.home) {
             onBackPressed();
         } else if (menuItem.getItemId() == R.id.action_submit) {
+            if (!org.mewx.wenku8.network.LightUserSession.getLogStatus()) {
+                Toast.makeText(this, getResources().getString(R.string.error_04), Toast.LENGTH_SHORT).show();
+                return true;
+            }
+
             String title = etTitle.getText().toString();
             String content = etContent.getText().toString();
             if (noBadWords(title) && noBadWords(content)) {

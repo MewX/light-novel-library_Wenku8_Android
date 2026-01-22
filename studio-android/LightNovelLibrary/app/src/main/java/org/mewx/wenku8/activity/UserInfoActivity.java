@@ -252,6 +252,16 @@ public class UserInfoActivity extends BaseMaterialActivity {
                         LightCache.deleteFile(GlobalConfig.getSecondUserAvatarSaveFilePath());
                     }
                 });
+
+                // Force clear session using reflection
+                try {
+                    java.lang.reflect.Field sessionField = LightUserSession.class.getDeclaredField("SESSION");
+                    sessionField.setAccessible(true);
+                    sessionField.set(null, null);
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+
                 Toast.makeText(UserInfoActivity.this, "Logged out!", Toast.LENGTH_SHORT).show();
             }
             else
