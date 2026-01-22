@@ -363,21 +363,24 @@ public class NavigationDrawerFragment extends Fragment {
 
         // user info update
         if(LightUserSession.isUserInfoSet()) {
-            if(!tvUserName.getText().toString().equals(LightUserSession.getUsernameOrEmail()))
+            if(!tvUserName.getText().toString().equals(LightUserSession.getUsernameOrEmail())) {
                 tvUserName.setText(LightUserSession.getUsernameOrEmail());
+            }
 
             if(LightCache.testFileExist(GlobalConfig.getFirstUserAvatarSaveFilePath())
                     || LightCache.testFileExist(GlobalConfig.getSecondUserAvatarSaveFilePath())) {
                 String avatarPath;
-                if(LightCache.testFileExist(GlobalConfig.getFirstUserAvatarSaveFilePath()))
+                if(LightCache.testFileExist(GlobalConfig.getFirstUserAvatarSaveFilePath())) {
                     avatarPath = GlobalConfig.getFirstUserAvatarSaveFilePath();
-                else
+                } else {
                     avatarPath = GlobalConfig.getSecondUserAvatarSaveFilePath();
+                }
                 BitmapFactory.Options options = new BitmapFactory.Options();
                 options.inSampleSize = 2;
                 Bitmap bm = BitmapFactory.decodeFile(avatarPath, options);
-                if(bm != null)
+                if(bm != null) {
                     rivUserAvatar.setImageBitmap(bm);
+                }
             }
         }
         else {
