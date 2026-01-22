@@ -106,9 +106,13 @@ public class NovelReviewListActivity extends BaseMaterialActivity implements MyI
             onBackPressed();
         }
         else if (menuItem.getItemId() == R.id.action_new) {
-            Intent intent = new Intent(NovelReviewListActivity.this, NovelReviewNewPostActivity.class);
-            intent.putExtra("aid", aid);
-            startActivity(intent);
+            if (!org.mewx.wenku8.network.LightUserSession.getLogStatus()) {
+                Snackbar.make(mRecyclerView, getResources().getString(R.string.error_04), Snackbar.LENGTH_SHORT).show();
+            } else {
+                Intent intent = new Intent(NovelReviewListActivity.this, NovelReviewNewPostActivity.class);
+                intent.putExtra("aid", aid);
+                startActivity(intent);
+            }
         }
         return super.onOptionsItemSelected(menuItem);
     }

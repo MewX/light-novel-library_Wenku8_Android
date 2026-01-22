@@ -252,6 +252,10 @@ public class UserInfoActivity extends BaseMaterialActivity {
                         LightCache.deleteFile(GlobalConfig.getSecondUserAvatarSaveFilePath());
                     }
                 });
+
+                // Force invalidate session by setting a dummy value
+                LightUserSession.setSession("logged_out");
+
                 Toast.makeText(UserInfoActivity.this, "Logged out!", Toast.LENGTH_SHORT).show();
             }
             else

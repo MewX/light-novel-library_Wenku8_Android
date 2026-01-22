@@ -106,6 +106,10 @@ public class NovelReviewReplyListActivity extends BaseMaterialActivity implement
         mSwipeRefreshLayout.setOnRefreshListener(this::refreshReviewReplyList);
 
         llReplyButton.setOnClickListener(ignored -> {
+            if (!org.mewx.wenku8.network.LightUserSession.getLogStatus()) {
+                Toast.makeText(NovelReviewReplyListActivity.this, getResources().getString(R.string.error_04), Toast.LENGTH_SHORT).show();
+                return;
+            }
             String temp = etReplyText.getText().toString();
             String badWord = Wenku8API.searchBadWords(temp);
             if (badWord != null) {
