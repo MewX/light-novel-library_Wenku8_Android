@@ -1,0 +1,25 @@
+Starting a Gradle Daemon (subsequent builds will be faster)
+Calculating task graph as no cached configuration is available for tasks: compileDebugJavaWithJavac
+GRADLE: Private API Core detected. Using Real Implementation.
+> Task :api:preBuild UP-TO-DATE
+> Task :api:preDebugBuild UP-TO-DATE
+> Task :api:generateDebugResValues UP-TO-DATE
+> Task :api:javaPreCompileDebug UP-TO-DATE
+> Task :api:processDebugNavigationResources UP-TO-DATE
+> Task :api:generateDebugResources UP-TO-DATE
+> Task :api:packageDebugResources UP-TO-DATE
+> Task :api:parseDebugLocalResources UP-TO-DATE
+> Task :api:generateDebugRFile UP-TO-DATE
+> Task :api:compileDebugJavaWithJavac UP-TO-DATE
+
+[Incubating] Problems report is available at: file:///app/studio-android/LightNovelLibrary/build/reports/problems/problems-report.html
+
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 9.0.
+
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
+
+For more on this, please refer to https://docs.gradle.org/8.13/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+
+BUILD SUCCESSFUL in 16s
+8 actionable tasks: 8 up-to-date
+Configuration cache entry stored.

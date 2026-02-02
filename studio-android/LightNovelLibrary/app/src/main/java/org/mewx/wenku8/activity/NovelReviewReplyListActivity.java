@@ -44,7 +44,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * Created by MewX on 2018/7/12.
  * Novel Review Activity.
  */
-public class NovelReviewReplyListActivity extends BaseMaterialActivity implements MyItemLongClickListener {
+public class NovelReviewReplyListActivity extends BaseMD3Activity implements MyItemLongClickListener {
     // private vars
     private int rid = 1;
     private String reviewTitle = "";

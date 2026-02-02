@@ -65,19 +65,22 @@
         <!-- Novel Review List Activity -->
         <activity android:name="org.mewx.wenku8.activity.NovelReviewListActivity"
             android:label="@string/action_review_list"
-            android:screenOrientation="unspecified">
+            android:screenOrientation="unspecified"
+            android:theme="@style/Theme.Wenku8.MD3">
         </activity>
 
         <!-- Novel Review New Post Activity -->
         <activity android:name="org.mewx.wenku8.activity.NovelReviewNewPostActivity"
             android:label="@string/action_review_new_post"
-            android:screenOrientation="unspecified">
+            android:screenOrientation="unspecified"
+            android:theme="@style/Theme.Wenku8.MD3">
         </activity>
 
         <!-- Novel Review Reply List Activity -->
         <activity android:name="org.mewx.wenku8.activity.NovelReviewReplyListActivity"
             android:label="@string/action_review_reply_list"
-            android:screenOrientation="unspecified">
+            android:screenOrientation="unspecified"
+            android:theme="@style/Theme.Wenku8.MD3">
         </activity>
 
         <!-- Novel Content Activity (Vertical Old Engine) -->

@@ -36,7 +36,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * Created by MewX on 2018/7/12.
  * Novel Review Activity.
  */
-public class NovelReviewListActivity extends BaseMaterialActivity implements MyItemClickListener {
+public class NovelReviewListActivity extends BaseMD3Activity implements MyItemClickListener {
     // private vars
     private int aid = 1;
 

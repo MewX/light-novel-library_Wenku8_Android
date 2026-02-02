@@ -28,7 +28,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * Created by MewX on 2020/7/5.
  * Novel Review New Post Activity.
  */
-public class NovelReviewNewPostActivity extends BaseMaterialActivity {
+public class NovelReviewNewPostActivity extends BaseMD3Activity {
     // private vars
     private static int aid = 1;
 

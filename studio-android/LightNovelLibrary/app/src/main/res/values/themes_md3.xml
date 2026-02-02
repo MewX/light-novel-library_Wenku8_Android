@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.Wenku8.MD3" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="colorPrimary">@color/myPrimaryColor</item>
+        <item name="colorPrimaryContainer">@color/myPrimaryDarkColor</item>
+        <item name="colorOnPrimary">@color/myTextPrimaryColor</item>
+
+        <item name="colorSecondary">@color/myAccentColor</item>
+        <item name="colorOnSecondary">@color/default_white</item>
+        <item name="colorSecondaryContainer">@color/myAccentColor</item>
+        <item name="colorOnSecondaryContainer">@color/default_white</item>
+
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">true</item>
+    </style>
+</resources>
