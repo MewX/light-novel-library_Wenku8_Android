@@ -82,7 +82,7 @@ public class NovelReviewListActivity extends BaseMaterialActivity implements MyI
         mRecyclerView.addOnScrollListener(new MyOnScrollListener());
 
         // set click event for retry and cancel loading
-        mLoadingButton.setOnClickListener(v -> new AsyncReviewListLoader(this, mSwipeRefreshLayout, aid, reviewList).execute()); // retry loading
+        mLoadingButton.setOnClickListener(v -> new AsyncReviewListLoader(this, mSwipeRefreshLayout, aid, reviewList, false).execute()); // retry loading
 
         mSwipeRefreshLayout.setColorSchemeColors(getResources().getColor(R.color.myAccentColor));
 
@@ -92,8 +92,7 @@ public class NovelReviewListActivity extends BaseMaterialActivity implements MyI
     }
 
     private void reloadAllReviews() {
-        reviewList.resetList();
-        new AsyncReviewListLoader(this, mSwipeRefreshLayout, aid, reviewList).execute();
+        new AsyncReviewListLoader(this, mSwipeRefreshLayout, aid, reviewList, true).execute();
     }
 
     @Override
@@ -172,26 +171,28 @@ public class NovelReviewListActivity extends BaseMaterialActivity implements MyI
                                     + "(" + (reviewList.getCurrentPage() + 1) + "/" + reviewList.getTotalPage() + ")",
                             Snackbar.LENGTH_SHORT).show();
 
-                    new AsyncReviewListLoader(NovelReviewListActivity.this, mSwipeRefreshLayout, aid, reviewList).execute();
+                    new AsyncReviewListLoader(NovelReviewListActivity.this, mSwipeRefreshLayout, aid, reviewList, false).execute();
                 }
             }
         }
     }
 
-    private static class AsyncReviewListLoader extends AsyncTask<Void, Void, Void> {
+    private static class AsyncReviewListLoader extends AsyncTask<Void, Void, ReviewList> {
         private WeakReference<NovelReviewListActivity> novelReviewListActivityWeakReference;
         private WeakReference<SwipeRefreshLayout> swipeRefreshLayoutWeakReference;
         private final int aid;
         private ReviewList reviewList;
+        private final boolean isReload;
 
         private boolean runOrNot = true; // by default, run it
         private boolean metNetworkIssue = false;
 
-        AsyncReviewListLoader(@NonNull NovelReviewListActivity novelReviewListActivity, @NonNull SwipeRefreshLayout swipeRefreshLayout, int aid, @NonNull ReviewList reviewList) {
+        AsyncReviewListLoader(@NonNull NovelReviewListActivity novelReviewListActivity, @NonNull SwipeRefreshLayout swipeRefreshLayout, int aid, @NonNull ReviewList reviewList, boolean isReload) {
             this.novelReviewListActivityWeakReference = new WeakReference<>(novelReviewListActivity);
             this.swipeRefreshLayoutWeakReference = new WeakReference<>(swipeRefreshLayout);
             this.aid = aid;
             this.reviewList = reviewList;
+            this.isReload = isReload;
         }
 
         @Override
@@ -210,33 +211,45 @@ public class NovelReviewListActivity extends BaseMaterialActivity implements MyI
         }
 
         @Override
-        protected Void doInBackground(Void... v) {
-            if (!runOrNot || reviewList.getCurrentPage() + 1 > reviewList.getTotalPage()) return null;
+        protected ReviewList doInBackground(Void... v) {
+            int targetPage = isReload ? 1 : reviewList.getCurrentPage() + 1;
+            if (!runOrNot || (!isReload && targetPage > reviewList.getTotalPage())) return null;
 
             // load current page + 1
-            byte[] tempXml = LightNetwork.LightHttpPostConnection(Wenku8API.BASE_URL, Wenku8API.getCommentListParams(aid, reviewList.getCurrentPage() + 1));
+            byte[] tempXml = LightNetwork.LightHttpPostConnection(Wenku8API.BASE_URL, Wenku8API.getCommentListParams(aid, targetPage));
             if (tempXml == null) {
                 metNetworkIssue = true;
                 return null; // network issue
             }
             String xml = new String(tempXml, Charset.forName("UTF-8"));
             Log.d(NovelReviewListActivity.class.getSimpleName(), xml);
-            Wenku8Parser.parseReviewList(reviewList, xml);
-            return null;
+            return Wenku8Parser.parseReviewList(xml);
         }
 
         @Override
-        protected void onPostExecute(Void v) {
+        protected void onPostExecute(ReviewList result) {
             // refresh everything when required
             if (!runOrNot) return;
 
             NovelReviewListActivity tempActivity = novelReviewListActivityWeakReference.get();
-            if (metNetworkIssue) {
+            if (metNetworkIssue || result == null) {
                 // met net work issue, show retry button
-                if (tempActivity != null) tempActivity.showRetryButton();
+                if (metNetworkIssue && tempActivity != null) tempActivity.showRetryButton();
             } else if (tempActivity != null) {
                 // all good, update list
-                tempActivity.getAdapter().notifyItemRangeChanged(0, reviewList.getList().size());
+                if (isReload) {
+                    reviewList.resetList();
+                    reviewList.setCurrentPage(1);
+                    reviewList.setTotalPage(result.getTotalPage());
+                    reviewList.getList().addAll(result.getList());
+                    tempActivity.getAdapter().notifyDataSetChanged();
+                } else {
+                    reviewList.setCurrentPage(reviewList.getCurrentPage() + 1);
+                    reviewList.setTotalPage(result.getTotalPage());
+                    int oldSize = reviewList.getList().size();
+                    reviewList.getList().addAll(result.getList());
+                    tempActivity.getAdapter().notifyItemRangeInserted(oldSize, result.getList().size());
+                }
                 tempActivity.hideListLoading();
             }
 
