@@ -65,12 +65,14 @@
         <!-- Novel Review List Activity -->
         <activity android:name="org.mewx.wenku8.activity.NovelReviewListActivity"
             android:label="@string/action_review_list"
+            android:theme="@style/AppTheme.MD3"
             android:screenOrientation="unspecified">
         </activity>
 
         <!-- Novel Review New Post Activity -->
         <activity android:name="org.mewx.wenku8.activity.NovelReviewNewPostActivity"
             android:label="@string/action_review_new_post"
+            android:theme="@style/AppTheme.MD3"
             android:screenOrientation="unspecified">
         </activity>
 

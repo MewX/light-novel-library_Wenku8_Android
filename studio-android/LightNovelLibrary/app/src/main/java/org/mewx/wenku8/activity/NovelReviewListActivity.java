@@ -16,6 +16,7 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 
+import com.google.android.material.button.MaterialButton;
 import com.google.android.material.snackbar.Snackbar;
 import com.google.firebase.analytics.FirebaseAnalytics;
 
@@ -46,7 +47,7 @@ public class NovelReviewListActivity extends BaseMaterialActivity implements MyI
     private LinearLayout mLoadingLayout;
     private RecyclerView mRecyclerView;
     private TextView mLoadingStatusTextView;
-    private TextView mLoadingButton;
+    private MaterialButton mLoadingButton;
 
     // switcher
     private final ReviewList reviewList = new ReviewList();
@@ -93,6 +94,7 @@ public class NovelReviewListActivity extends BaseMaterialActivity implements MyI
 
     private void reloadAllReviews() {
         reviewList.resetList();
+        mAdapter.notifyDataSetChanged();
         new AsyncReviewListLoader(this, mSwipeRefreshLayout, aid, reviewList).execute();
     }
 
@@ -178,11 +180,11 @@ public class NovelReviewListActivity extends BaseMaterialActivity implements MyI
         }
     }
 
-    private static class AsyncReviewListLoader extends AsyncTask<Void, Void, Void> {
+    private static class AsyncReviewListLoader extends AsyncTask<Void, Void, ReviewList> {
         private WeakReference<NovelReviewListActivity> novelReviewListActivityWeakReference;
         private WeakReference<SwipeRefreshLayout> swipeRefreshLayoutWeakReference;
         private final int aid;
-        private ReviewList reviewList;
+        private ReviewList mainReviewList;
 
         private boolean runOrNot = true; // by default, run it
         private boolean metNetworkIssue = false;
@@ -191,7 +193,7 @@ public class NovelReviewListActivity extends BaseMaterialActivity implements MyI
             this.novelReviewListActivityWeakReference = new WeakReference<>(novelReviewListActivity);
             this.swipeRefreshLayoutWeakReference = new WeakReference<>(swipeRefreshLayout);
             this.aid = aid;
-            this.reviewList = reviewList;
+            this.mainReviewList = reviewList;
         }
 
         @Override
@@ -210,23 +212,27 @@ public class NovelReviewListActivity extends BaseMaterialActivity implements MyI
         }
 
         @Override
-        protected Void doInBackground(Void... v) {
-            if (!runOrNot || reviewList.getCurrentPage() + 1 > reviewList.getTotalPage()) return null;
+        protected ReviewList doInBackground(Void... v) {
+            if (!runOrNot || mainReviewList.getCurrentPage() + 1 > mainReviewList.getTotalPage()) return null;
 
             // load current page + 1
-            byte[] tempXml = LightNetwork.LightHttpPostConnection(Wenku8API.BASE_URL, Wenku8API.getCommentListParams(aid, reviewList.getCurrentPage() + 1));
+            byte[] tempXml = LightNetwork.LightHttpPostConnection(Wenku8API.BASE_URL, Wenku8API.getCommentListParams(aid, mainReviewList.getCurrentPage() + 1));
             if (tempXml == null) {
                 metNetworkIssue = true;
                 return null; // network issue
             }
             String xml = new String(tempXml, Charset.forName("UTF-8"));
             Log.d(NovelReviewListActivity.class.getSimpleName(), xml);
-            Wenku8Parser.parseReviewList(reviewList, xml);
-            return null;
+
+            // Parse into a temporary list to avoid thread inconsistency
+            ReviewList tempReviewList = new ReviewList();
+            tempReviewList.setCurrentPage(mainReviewList.getCurrentPage()); // Start from current page
+            Wenku8Parser.parseReviewList(tempReviewList, xml);
+            return tempReviewList;
         }
 
         @Override
-        protected void onPostExecute(Void v) {
+        protected void onPostExecute(ReviewList tempReviewList) {
             // refresh everything when required
             if (!runOrNot) return;
 
@@ -234,9 +240,15 @@ public class NovelReviewListActivity extends BaseMaterialActivity implements MyI
             if (metNetworkIssue) {
                 // met net work issue, show retry button
                 if (tempActivity != null) tempActivity.showRetryButton();
-            } else if (tempActivity != null) {
-                // all good, update list
-                tempActivity.getAdapter().notifyItemRangeChanged(0, reviewList.getList().size());
+            } else if (tempActivity != null && tempReviewList != null) {
+                // Merge temporary list into main list on UI thread
+                int startPos = mainReviewList.getList().size();
+                mainReviewList.getList().addAll(tempReviewList.getList());
+                mainReviewList.setCurrentPage(tempReviewList.getCurrentPage());
+                mainReviewList.setTotalPage(tempReviewList.getTotalPage());
+
+                // Notify adapter
+                tempActivity.getAdapter().notifyItemRangeInserted(startPos, tempReviewList.getList().size());
                 tempActivity.hideListLoading();
             }
 

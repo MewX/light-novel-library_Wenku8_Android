@@ -32,4 +32,23 @@
         <item name="theme">@style/ThemeOverlay.AppCompat.Dark.ActionBar</item>
     </style>
 
+    <!-- Material 3 Theme for Review Activities -->
+    <style name="AppTheme.MD3" parent="Theme.Material3.Light.NoActionBar">
+        <item name="colorPrimary">@color/myPrimaryColor</item>
+        <item name="colorOnPrimary">@color/default_white</item>
+        <item name="colorSecondary">@color/myAccentColor</item>
+        <item name="colorOnSecondary">@color/default_white</item>
+        <item name="android:windowBackground">@color/myWindowBackground</item>
+        <item name="android:navigationBarColor">@color/myNavigationColor</item>
+        <item name="android:windowDrawsSystemBarBackgrounds">true</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:windowTranslucentStatus">true</item>
+        <item name="android:windowTranslucentNavigation">true</item>
+        <item name="android:windowContentTransitions">true</item>
+        <item name="android:windowAllowEnterTransitionOverlap">true</item>
+        <item name="android:windowAllowReturnTransitionOverlap">true</item>
+        <item name="android:windowSharedElementEnterTransition">@android:transition/move</item>
+        <item name="android:windowSharedElementExitTransition">@android:transition/move</item>
+    </style>
+
 </resources>
