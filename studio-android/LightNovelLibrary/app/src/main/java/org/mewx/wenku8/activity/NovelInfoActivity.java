@@ -988,27 +988,41 @@ public class NovelInfoActivity extends BaseMaterialActivity {
 
         protected void onPostExecute(Wenku8Error.ErrorCode result)
         {
+            if (isFinishing() || isDestroyed()) return;
+
             if (result == Wenku8Error.ErrorCode.USER_CANCELLED_TASK) {
                 // user cancelled
                 Toast.makeText(NovelInfoActivity.this, R.string.system_manually_cancelled, Toast.LENGTH_LONG).show();
-                if (pDialog != null)
-                    pDialog.dismiss();
-                onResume();
+                try {
+                    if (pDialog != null && pDialog.isShowing())
+                        pDialog.dismiss();
+                } catch (IllegalArgumentException e) {
+                    // ignored
+                }
+                updateUI();
                 isLoading = false;
                 return;
             } else if (result == Wenku8Error.ErrorCode.NETWORK_ERROR) {
                 Toast.makeText(NovelInfoActivity.this, getResources().getString(R.string.system_network_error), Toast.LENGTH_LONG).show();
-                if (pDialog != null)
-                    pDialog.dismiss();
-                onResume();
+                try {
+                    if (pDialog != null && pDialog.isShowing())
+                        pDialog.dismiss();
+                } catch (IllegalArgumentException e) {
+                    // ignored
+                }
+                updateUI();
                 isLoading = false;
                 return;
             } else if (result == Wenku8Error.ErrorCode.XML_PARSE_FAILED
                     || result == Wenku8Error.ErrorCode.SERVER_RETURN_NOTHING) {
                 Toast.makeText(NovelInfoActivity.this, "Server returned strange data! (copyright reason?)", Toast.LENGTH_LONG).show();
-                if (pDialog != null)
-                    pDialog.dismiss();
-                onResume();
+                try {
+                    if (pDialog != null && pDialog.isShowing())
+                        pDialog.dismiss();
+                } catch (IllegalArgumentException e) {
+                    // ignored
+                }
+                updateUI();
                 isLoading = false;
                 return;
             }
@@ -1016,8 +1030,12 @@ public class NovelInfoActivity extends BaseMaterialActivity {
             // cache successfully
             Toast.makeText(NovelInfoActivity.this, "OK", Toast.LENGTH_LONG).show();
             isLoading = false;
-            if (pDialog != null)
-                pDialog.dismiss();
+            try {
+                if (pDialog != null && pDialog.isShowing())
+                    pDialog.dismiss();
+            } catch (IllegalArgumentException e) {
+                // ignored
+            }
 
             refreshInfoFromLocal();
         }
@@ -1086,8 +1104,14 @@ public class NovelInfoActivity extends BaseMaterialActivity {
         @Override
         protected void onPostExecute(Wenku8Error.ErrorCode err) {
             super.onPostExecute(err);
+            if (isFinishing() || isDestroyed()) return;
 
-            md.dismiss();
+            try {
+                if (md != null && md.isShowing()) md.dismiss();
+            } catch (IllegalArgumentException e) {
+                // ignored
+            }
+
             if(err == Wenku8Error.ErrorCode.SYSTEM_1_SUCCEEDED) {
                 Toast.makeText(NovelInfoActivity.this, getResources().getString(R.string.bookshelf_removed), Toast.LENGTH_SHORT).show();
                 if(fabFavorite != null) {
@@ -1196,24 +1220,38 @@ public class NovelInfoActivity extends BaseMaterialActivity {
         @Override
         protected void onPostExecute(Wenku8Error.ErrorCode errorCode) {
             super.onPostExecute(errorCode);
+            if (isFinishing() || isDestroyed()) return;
+
             if (errorCode == Wenku8Error.ErrorCode.USER_CANCELLED_TASK) {
                 // user cancelled
                 Toast.makeText(NovelInfoActivity.this, R.string.system_manually_cancelled, Toast.LENGTH_LONG).show();
-                if (md != null) md.dismiss();
-                onResume();
+                try {
+                    if (md != null && md.isShowing()) md.dismiss();
+                } catch (IllegalArgumentException e) {
+                    // ignored
+                }
+                updateUI();
                 loading = false;
                 return;
             } else if (errorCode == Wenku8Error.ErrorCode.NETWORK_ERROR) {
                 Toast.makeText(NovelInfoActivity.this, getResources().getString(R.string.system_network_error), Toast.LENGTH_LONG).show();
-                if (md != null) md.dismiss();
-                onResume();
+                try {
+                    if (md != null && md.isShowing()) md.dismiss();
+                } catch (IllegalArgumentException e) {
+                    // ignored
+                }
+                updateUI();
                 loading = false;
                 return;
             } else if (errorCode == Wenku8Error.ErrorCode.XML_PARSE_FAILED
                     || errorCode == Wenku8Error.ErrorCode.SERVER_RETURN_NOTHING) {
                 Toast.makeText(NovelInfoActivity.this, "Server returned strange data! (copyright reason?)", Toast.LENGTH_LONG).show();
-                if (md != null) md.dismiss();
-                onResume();
+                try {
+                    if (md != null && md.isShowing()) md.dismiss();
+                } catch (IllegalArgumentException e) {
+                    // ignored
+                }
+                updateUI();
                 loading = false;
                 return;
             }
@@ -1221,7 +1259,11 @@ public class NovelInfoActivity extends BaseMaterialActivity {
             // cache successfully
             Toast.makeText(NovelInfoActivity.this, "OK", Toast.LENGTH_LONG).show();
             loading = false;
-            if (md != null) md.dismiss();
+            try {
+                if (md != null && md.isShowing()) md.dismiss();
+            } catch (IllegalArgumentException e) {
+                // ignored
+            }
             refreshInfoFromLocal();
         }
     }
@@ -1229,7 +1271,10 @@ public class NovelInfoActivity extends BaseMaterialActivity {
     @Override
     protected void onResume() {
         super.onResume();
+        updateUI();
+    }
 
+    private void updateUI() {
         // return from search activity
         final Drawable upArrow = getResources().getDrawable(R.drawable.ic_svg_back);
         if(getSupportActionBar() != null && upArrow != null) {
