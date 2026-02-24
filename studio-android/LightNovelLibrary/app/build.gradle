@@ -11,8 +11,8 @@ android {
         applicationId "org.mewx.wenku8"
         minSdkVersion rootProject.minSdkVersion
         targetSdkVersion rootProject.targetSdkVersion
-        versionCode 71
-        versionName "1.28"
+        versionCode 72
+        versionName "1.29"
         testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner'
         multiDexEnabled true
     }
