@@ -2,6 +2,7 @@
 /local.properties
 .idea/
 .vscode/
+.kiro/
 .DS_Store
 /build
 
