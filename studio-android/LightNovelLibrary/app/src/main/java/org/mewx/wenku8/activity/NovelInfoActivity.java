@@ -20,8 +20,11 @@ import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.RelativeLayout;
+import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
+
+import com.google.android.material.button.MaterialButton;
 
 import androidx.activity.OnBackPressedCallback;
 import androidx.core.view.GravityCompat;
@@ -101,6 +104,11 @@ public class NovelInfoActivity extends BaseMaterialActivity {
     private NovelItemMeta mNovelItemMeta = null;
     private List<VolumeList> listVolume = new ArrayList<>();
     private String novelFullMeta = null, novelFullIntro = null, novelFullVolume = null;
+    private LinearLayout llError;
+    private TextView tvErrorMsg;
+    private MaterialButton btnRetry;
+    private ScrollView novelInfoScrollView;
+    private LinearLayout fabContainer;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -168,6 +176,13 @@ public class NovelInfoActivity extends BaseMaterialActivity {
         fabDownload = findViewById(R.id.fab_download);
         fabMenu = findViewById(R.id.multiple_actions);
         spb = findViewById(R.id.spb);
+        llError = findViewById(R.id.ll_error);
+        tvErrorMsg = findViewById(R.id.tv_error_msg);
+        btnRetry = findViewById(R.id.btn_retry);
+        novelInfoScrollView = findViewById(R.id.novel_info_scroll_view);
+        fabContainer = findViewById(R.id.fab_container);
+
+        btnRetry.setOnClickListener(v -> refreshInfo());
 
         // AdMob
         AdView mAdView = findViewById(R.id.ad_view);
@@ -196,11 +211,8 @@ public class NovelInfoActivity extends BaseMaterialActivity {
         spb.setVisibility(View.INVISIBLE); // wait for runnable
         Handler handler = new Handler();
         handler.postDelayed(() -> {
-            spb.setVisibility(View.VISIBLE);
-            if (from.equals(FromLocal))
-                refreshInfoFromLocal();
-            else
-                refreshInfoFromCloud();
+            isLoading = false; // Reset to allow initial load
+            refreshInfo();
         }, 500);
 
         // set on click listeners
@@ -663,14 +675,32 @@ public class NovelInfoActivity extends BaseMaterialActivity {
             super.onPostExecute(integer);
 
             if (integer == -1) {
-                Toast.makeText(NovelInfoActivity.this, "FetchInfoAsyncTask:onPostExecute network error", Toast.LENGTH_SHORT).show();
+                // Network error or parse error
+                llError.setVisibility(View.VISIBLE);
+                novelInfoScrollView.setVisibility(View.GONE);
+                fabContainer.setVisibility(View.GONE);
+                tvErrorMsg.setText(R.string.system_network_error);
                 return;
             } else if (integer == -9) {
-                Toast.makeText(NovelInfoActivity.this, getResources().getString(R.string.bookshelf_intro_load_failed), Toast.LENGTH_SHORT).show();
+                // Local file error
+                llError.setVisibility(View.VISIBLE);
+                novelInfoScrollView.setVisibility(View.GONE);
+                fabContainer.setVisibility(View.GONE);
+                tvErrorMsg.setText(R.string.bookshelf_intro_load_failed);
                 // TODO: a better fix with optionCheckUpdates(), but need to avoid recursive calls.
                 return;
-            } else if (integer < 0)
+            } else if (integer < 0) {
+                llError.setVisibility(View.VISIBLE);
+                novelInfoScrollView.setVisibility(View.GONE);
+                fabContainer.setVisibility(View.GONE);
+                tvErrorMsg.setText("Unknown error occurred");
                 return; // ignore other exceptions
+            }
+
+            // Success
+            llError.setVisibility(View.GONE);
+            novelInfoScrollView.setVisibility(View.VISIBLE);
+            fabContainer.setVisibility(View.VISIBLE);
 
             // update general info
             tvNovelAuthor.setPaintFlags(tvNovelAuthor.getPaintFlags() | Paint.UNDERLINE_TEXT_FLAG); // with hyperlink
@@ -1260,15 +1290,26 @@ public class NovelInfoActivity extends BaseMaterialActivity {
         }
     }
 
+    private void refreshInfo() {
+        if (from.equals(FromLocal))
+            refreshInfoFromLocal();
+        else
+            refreshInfoFromCloud();
+    }
+
     private void refreshInfoFromLocal() {
+        if (isLoading) return;
         isLoading = true;
+        llError.setVisibility(View.GONE);
         spb.setVisibility(View.VISIBLE);
         FetchInfoAsyncTask fetchInfoAsyncTask = new FetchInfoAsyncTask();
         fetchInfoAsyncTask.execute(1); // load from local
     }
 
     private void refreshInfoFromCloud() {
+        if (isLoading) return;
         isLoading = true;
+        llError.setVisibility(View.GONE);
         spb.setVisibility(View.VISIBLE);
         FetchInfoAsyncTask fetchInfoAsyncTask = new FetchInfoAsyncTask();
         fetchInfoAsyncTask.execute();
