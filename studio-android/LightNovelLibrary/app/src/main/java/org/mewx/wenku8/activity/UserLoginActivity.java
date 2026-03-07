@@ -63,7 +63,7 @@ public class UserLoginActivity extends BaseMaterialActivity {
             alt.execute(etUserNameOrEmail.getText().toString(), etPassword.getText().toString());
         });
 
-        tvRegister.setOnClickListener(v -> new MaterialAlertDialogBuilder(UserLoginActivity.this, R.style.CustomMaterialAlertDialog)
+        tvRegister.setOnClickListener(v -> new MaterialAlertDialogBuilder(UserLoginActivity.this)
                 .setMessage(R.string.dialog_content_verify_register)
                 .setPositiveButton(R.string.dialog_positive_ok, (dialog, which) -> {
                     // show browser list

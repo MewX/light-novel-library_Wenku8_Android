@@ -79,15 +79,15 @@ public class ViewImageDetailActivity extends BaseMaterialActivity {
                     hideNavigationBar();
                     findViewById(R.id.toolbar_actionbar).setVisibility(View.INVISIBLE);
                     findViewById(R.id.image_detail_bot).setVisibility(View.INVISIBLE);
-                    getTintManager().setStatusBarAlpha(0.0f);
-                    getTintManager().setNavigationBarAlpha(0.0f);
+                    setStatusBarAlpha(0.0f);
+                    setNavigationBarAlpha(0.0f);
                 } else {
                     shown = true;
                     showNavigationBar();
                     findViewById(R.id.toolbar_actionbar).setVisibility(View.VISIBLE);
                     findViewById(R.id.image_detail_bot).setVisibility(View.VISIBLE);
-                    getTintManager().setStatusBarAlpha(0.9f);
-                    getTintManager().setNavigationBarAlpha(0.8f);
+                    setStatusBarAlpha(0.9f);
+                    setNavigationBarAlpha(0.8f);
                 }
             }
         });

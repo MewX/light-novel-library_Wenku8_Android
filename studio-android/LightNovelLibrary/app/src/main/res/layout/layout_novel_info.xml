@@ -85,7 +85,8 @@
             android:layout_height="4dp"
             android:layout_below="@id/toolbar_actionbar"
             android:indeterminate="true"
-            app:indeterminateAnimationType="disjoint" />
+            app:indicatorColor="@array/google_progress_colors"
+            app:indeterminateAnimationType="contiguous" />
 
         <!-- Floating action button -->
         <LinearLayout

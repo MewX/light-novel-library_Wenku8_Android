@@ -116,7 +116,7 @@ public class NavigationDrawerFragment extends Fragment {
             view.findViewById(R.id.main_menu_open_source).setOnClickListener(v -> {
                         FragmentActivity fragmentActivity = getActivity();
                         if (fragmentActivity == null) return;
-                        new MaterialAlertDialogBuilder(fragmentActivity, R.style.CustomMaterialAlertDialog)
+                        new MaterialAlertDialogBuilder(fragmentActivity)
                                 .setTitle(R.string.main_menu_statement)
                                 .setMessage(GlobalConfig.getOpensourceLicense())
                                 .setPositiveButton(R.string.dialog_positive_known, null)

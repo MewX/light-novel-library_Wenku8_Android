@@ -1,13 +1,12 @@
 package org.mewx.wenku8.activity;
 
+import android.graphics.Color;
 import android.graphics.PorterDuff;
 import android.graphics.drawable.Drawable;
-import android.os.Build;
 
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.Toolbar;
-
-import com.readystatesoftware.systembartint.SystemBarTintManager;
+import androidx.core.content.ContextCompat;
 
 import org.mewx.wenku8.R;
 
@@ -27,18 +26,10 @@ public class BaseMaterialActivity extends AppCompatActivity {
         DARK,
     }
 
-    private SystemBarTintManager tintManager;
     private Toolbar toolbar;
 
     public BaseMaterialActivity() {
         super();
-    }
-
-    protected SystemBarTintManager getTintManager() {
-        if (tintManager == null) {
-            tintManager = new SystemBarTintManager(this);
-        }
-        return tintManager;
     }
 
     protected Toolbar getToolbar() {
@@ -46,6 +37,20 @@ public class BaseMaterialActivity extends AppCompatActivity {
             toolbar = findViewById(R.id.toolbar_actionbar);
         }
         return toolbar;
+    }
+
+    /**
+     * Sets the status bar color to black with the given alpha (0.0 = transparent, 1.0 = opaque).
+     */
+    protected void setStatusBarAlpha(float alpha) {
+        getWindow().setStatusBarColor(Color.argb((int) (alpha * 255), 0, 0, 0));
+    }
+
+    /**
+     * Sets the navigation bar color to black with the given alpha (0.0 = transparent, 1.0 = opaque).
+     */
+    protected void setNavigationBarAlpha(float alpha) {
+        getWindow().setNavigationBarColor(Color.argb((int) (alpha * 255), 0, 0, 0));
     }
 
     protected void initMaterialStyle(int layoutId) {
@@ -74,30 +79,25 @@ public class BaseMaterialActivity extends AppCompatActivity {
 
             // Default indicator is hamburger.
             if (indicatorStyle == HomeIndicatorStyle.ARROW) {
-                final Drawable upArrow = getResources().getDrawable(R.drawable.ic_svg_back);
+                final Drawable upArrow = ContextCompat.getDrawable(this, R.drawable.ic_svg_back);
                 if (upArrow != null) {
-                    upArrow.setColorFilter(getResources().getColor(R.color.default_white), PorterDuff.Mode.SRC_ATOP);
+                    upArrow.setColorFilter(ContextCompat.getColor(this, R.color.default_white), PorterDuff.Mode.SRC_ATOP);
                 }
                 getSupportActionBar().setHomeAsUpIndicator(upArrow);
             }
         }
 
-        // change status bar color tint, and this require SDK16
-        // Android API 22 has more effects on status bar, so ignore
-        // create our manager instance after the content view is set
-        tintManager = getTintManager();
-        tintManager.setStatusBarTintEnabled(true);
-        tintManager.setNavigationBarTintEnabled(true);
-        tintManager.setTintAlpha(statusBarColor == StatusBarColor.DARK ? 0.9f : 0.15f);
-        tintManager.setNavigationBarAlpha(statusBarColor == StatusBarColor.DARK ? 0.8f : 0.0f);
-        // set all color
-        tintManager.setTintColor(getResources().getColor(android.R.color.black));
+        // Set status bar color with a black tint overlay.
+        float statusBarAlpha = statusBarColor == StatusBarColor.DARK ? 0.9f : 0.15f;
+        setStatusBarAlpha(statusBarAlpha);
 
-        // set Navigation bar color
-        if (statusBarColor != StatusBarColor.DARK) {
-            final int statusBarColorId = statusBarColor == StatusBarColor.PRIMARY ?
+        // Set navigation bar color.
+        if (statusBarColor == StatusBarColor.DARK) {
+            setNavigationBarAlpha(0.8f);
+        } else {
+            final int navBarColorId = statusBarColor == StatusBarColor.PRIMARY ?
                     R.color.myNavigationColor : R.color.myNavigationColorWhite;
-            getWindow().setNavigationBarColor(getResources().getColor(statusBarColorId));
+            getWindow().setNavigationBarColor(ContextCompat.getColor(this, navBarColorId));
         }
     }
 

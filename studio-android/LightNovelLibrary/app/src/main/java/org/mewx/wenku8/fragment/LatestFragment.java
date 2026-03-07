@@ -89,7 +89,7 @@ public class LatestFragment extends Fragment implements MyItemClickListener, MyI
         mRelayWarningView = rootView.findViewById(R.id.relay_warning);
 
         // Set warning message.
-        mRelayWarningView.setOnClickListener(view -> new MaterialAlertDialogBuilder(getContext(), R.style.CustomMaterialAlertDialog)
+        mRelayWarningView.setOnClickListener(view -> new MaterialAlertDialogBuilder(getContext())
                 .setTitle(getResources().getString(R.string.system_warning))
                 .setMessage(getResources().getString(R.string.relay_warning_full))
                 .setPositiveButton(R.string.dialog_positive_ok, null)

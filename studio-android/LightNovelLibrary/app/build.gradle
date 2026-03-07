@@ -98,7 +98,6 @@ android {
 
 dependencies {
     // external libraries
-    implementation 'com.readystatesoftware.systembartint:systembartint:1.0.3'
     implementation 'com.nostra13.universalimageloader:universal-image-loader:1.9.3'
     implementation 'com.makeramen:roundedimageview:2.0.1'
     implementation 'com.davemorrissey.labs:subsampling-scale-image-view-androidx:3.10.0'

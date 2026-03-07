@@ -218,7 +218,7 @@ public class NovelInfoActivity extends BaseMaterialActivity {
             if (mNovelItemMeta == null) return;
 
             // show aid: title (only when mNovelItemMeta is not null)
-            new MaterialAlertDialogBuilder(NovelInfoActivity.this, R.style.CustomMaterialAlertDialog)
+            new MaterialAlertDialogBuilder(NovelInfoActivity.this)
                     .setTitle(R.string.dialog_content_novel_title)
                     .setMessage(aid + ": " + mNovelItemMeta.title)
                     .setPositiveButton(R.string.dialog_positive_known, null)
@@ -228,7 +228,7 @@ public class NovelInfoActivity extends BaseMaterialActivity {
             if (runLoadingChecker()) return;
             if (mNovelItemMeta == null) return;
 
-            new MaterialAlertDialogBuilder(NovelInfoActivity.this, R.style.CustomMaterialAlertDialog)
+            new MaterialAlertDialogBuilder(NovelInfoActivity.this)
                     .setMessage(R.string.dialog_content_search_author)
                     .setPositiveButton(R.string.dialog_positive_ok, (ignored1, ignored2) -> {
                         // search author name
@@ -245,7 +245,7 @@ public class NovelInfoActivity extends BaseMaterialActivity {
 
             // add to favorite
             if(GlobalConfig.testInLocalBookshelf(aid)) {
-                new MaterialAlertDialogBuilder(NovelInfoActivity.this, R.style.CustomMaterialAlertDialog)
+                new MaterialAlertDialogBuilder(NovelInfoActivity.this)
                         .setMessage(R.string.dialog_content_sure_to_unfav)
                         .setPositiveButton(R.string.dialog_positive_yes, (ignored1, ignored2) -> {
                             // delete from cloud first, if succeed then delete from local
@@ -293,7 +293,7 @@ public class NovelInfoActivity extends BaseMaterialActivity {
 
             // download / update activity or verify downloading action (add to queue)
             // use list dialog to provide more functions
-            new MaterialAlertDialogBuilder(NovelInfoActivity.this, R.style.CustomMaterialAlertDialog)
+            new MaterialAlertDialogBuilder(NovelInfoActivity.this)
                     .setTitle(R.string.dialog_title_choose_download_option)
                     .setNegativeButton(R.string.dialog_negative_pass, null)
                     .setItems(R.array.download_option, (dialog, which) -> {
@@ -341,7 +341,7 @@ public class NovelInfoActivity extends BaseMaterialActivity {
         mSideSheetHeader.setOnClickListener(v -> {
             if (mCurrentSelectedVolume == null) return;
 
-            new MaterialAlertDialogBuilder(NovelInfoActivity.this, R.style.CustomMaterialAlertDialog)
+            new MaterialAlertDialogBuilder(NovelInfoActivity.this)
                     .setTitle(R.string.dialog_content_volume_title)
                     .setMessage(mCurrentSelectedVolume.volumeName)
                     .setPositiveButton(R.string.dialog_positive_known, null)
@@ -412,7 +412,7 @@ public class NovelInfoActivity extends BaseMaterialActivity {
      * 2 <string name="dialog_option_force_update_all">覆盖下载</string>
      */
     private void optionDownloadOverride() {
-        new MaterialAlertDialogBuilder(NovelInfoActivity.this, R.style.CustomMaterialAlertDialog)
+        new MaterialAlertDialogBuilder(NovelInfoActivity.this)
                 .setMessage(R.string.dialog_content_verify_force_update)
                 .setPositiveButton(R.string.dialog_positive_likethis, (ignored1, ignored2) -> {
                     // async task
@@ -447,7 +447,7 @@ public class NovelInfoActivity extends BaseMaterialActivity {
         for(int i = 0; i < listVolume.size(); i ++)
             volumes[i] = listVolume.get(i).volumeName;
 
-        new MaterialAlertDialogBuilder(NovelInfoActivity.this, R.style.CustomMaterialAlertDialog)
+        new MaterialAlertDialogBuilder(NovelInfoActivity.this)
                 .setTitle(R.string.dialog_option_select_and_update)
                 .setMultiChoiceItems(volumes, null, (dialog, which, isChecked) -> {
                     // Do nothing on choice click, we handle it in positive button
@@ -532,7 +532,7 @@ public class NovelInfoActivity extends BaseMaterialActivity {
         }
         final VolumeList volumeList_bak = savedVolumeList;
 
-        new MaterialAlertDialogBuilder(this, R.style.CustomMaterialAlertDialog)
+        new MaterialAlertDialogBuilder(this)
                 .setTitle(R.string.reader_v1_notice)
                 .setMessage(getResources().getString(R.string.reader_jump_last) + "\n" + title + "\n" + savedVolumeList.volumeName + "\n" + chapterInfo.chapterName)
                 .setPositiveButton(R.string.dialog_positive_sure, (ignored1, ignored2) -> {
@@ -754,7 +754,7 @@ public class NovelInfoActivity extends BaseMaterialActivity {
           btn.setBackgroundColor(Color.LTGRAY);
         }
         btn.setOnLongClickListener(v -> {
-          new MaterialAlertDialogBuilder(NovelInfoActivity.this, R.style.CustomMaterialAlertDialog)
+          new MaterialAlertDialogBuilder(NovelInfoActivity.this)
               .setMessage(R.string.dialog_sure_to_clear_cache)
               .setPositiveButton(R.string.dialog_positive_want, (ignored1, ignored2) -> {
                 LightCache.cleanLocalCache(vl);
@@ -816,7 +816,7 @@ public class NovelInfoActivity extends BaseMaterialActivity {
             View optionBtn = btn.findViewById(R.id.novel_option);
             optionBtn.setVisibility(View.VISIBLE);
             optionBtn.setOnClickListener(ignored -> {
-                new MaterialAlertDialogBuilder(NovelInfoActivity.this, R.style.CustomMaterialAlertDialog)
+                new MaterialAlertDialogBuilder(NovelInfoActivity.this)
                     .setTitle(R.string.system_choose_reader_engine)
                     .setItems(R.array.reader_engine_option, (ignored1, which) -> {
                         Class readerClass = Wenku8ReaderActivityV1.class;

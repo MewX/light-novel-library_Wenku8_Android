@@ -98,7 +98,7 @@ public class ConfigFragment extends Fragment {
             tvNotice.setMovementMethod(LinkMovementMethod.getInstance());
         }
 
-        getActivity().findViewById(R.id.btn_choose_language).setOnClickListener(v -> new MaterialAlertDialogBuilder(getActivity(), R.style.CustomMaterialAlertDialog)
+        getActivity().findViewById(R.id.btn_choose_language).setOnClickListener(v -> new MaterialAlertDialogBuilder(getActivity())
                 .setTitle(R.string.config_choose_language)
                 .setItems(R.array.choose_language_option, (dialog, which) -> {
                     // 0 means Simplified Chinese; 1 means Traditional Chinese.
@@ -117,7 +117,7 @@ public class ConfigFragment extends Fragment {
                     getActivity().finish(); // destroy itself
                 })
                 .show());
-        getActivity().findViewById(R.id.btn_clear_cache).setOnClickListener(v -> new MaterialAlertDialogBuilder(getActivity(), R.style.CustomMaterialAlertDialog)
+        getActivity().findViewById(R.id.btn_clear_cache).setOnClickListener(v -> new MaterialAlertDialogBuilder(getActivity())
                 .setTitle(R.string.config_clear_cache)
                 .setItems(R.array.wipe_cache_option, (dialog, which) -> {
                     if (which == 0) {

@@ -104,7 +104,7 @@ public class NovelReviewNewPostActivity extends BaseMaterialActivity {
 
         if (!etTitle.getText().toString().trim().isEmpty() ||
                 !etContent.getText().toString().trim().isEmpty()) {
-            new MaterialAlertDialogBuilder(this, R.style.CustomMaterialAlertDialog)
+            new MaterialAlertDialogBuilder(this)
                     .setTitle(R.string.system_warning)
                     .setMessage(R.string.system_review_draft_will_be_lost)
                     .setPositiveButton(R.string.dialog_positive_ok, (dialog, which) -> {

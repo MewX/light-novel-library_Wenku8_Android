@@ -171,7 +171,7 @@ public class UserInfoActivity extends BaseMaterialActivity {
                 tvLogout.setOnClickListener(new View.OnClickListener() {
                     @Override
                     public void onClick(View v) {
-                        new MaterialAlertDialogBuilder(UserInfoActivity.this, R.style.CustomMaterialAlertDialog)
+                        new MaterialAlertDialogBuilder(UserInfoActivity.this)
                                 .setMessage(R.string.dialog_content_sure_to_logout)
                                 .setPositiveButton(R.string.dialog_positive_ok, (dialog, which) -> {
                                     AsyncLogout al = new AsyncLogout();

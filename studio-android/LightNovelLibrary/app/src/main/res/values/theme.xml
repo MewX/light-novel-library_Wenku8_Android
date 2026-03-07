@@ -1,29 +1,49 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Base application theme. -->
-    <!-- TODO: Change to Theme.MaterialComponents.Light.NoActionBar at some point. -->
-    <style name="AppTheme" parent="Theme.AppCompat.Light.NoActionBar">
-        <!-- Customize your theme here. -->
+    <!-- Base application theme (Material 3). -->
+    <style name="AppTheme" parent="Theme.Material3.Light.NoActionBar">
+        <!-- Primary colors -->
         <item name="colorPrimary">@color/myPrimaryColor</item>
-        <item name="colorPrimaryVariant">@color/myPrimaryColor</item>
+        <item name="colorPrimaryContainer">@color/myPrimaryColor</item>
         <item name="colorOnPrimary">@color/default_white</item>
+        <item name="colorOnPrimaryContainer">@color/default_white</item>
+
+        <!-- Secondary colors -->
         <item name="colorSecondary">@color/myAccentColor</item>
-        <item name="colorSecondaryVariant">@color/myAccentColor</item>
+        <item name="colorSecondaryContainer">@color/myAccentColor</item>
         <item name="colorOnSecondary">@color/default_white</item>
-        <item name="android:colorBackground">@color/myWindowBackground</item>
-        <item name="colorOnBackground">@color/myTextPrimaryColor</item>
+        <item name="colorOnSecondaryContainer">@color/default_white</item>
+
+        <!-- Tertiary colors -->
+        <item name="colorTertiary">@color/myAccentColor</item>
+        <item name="colorOnTertiary">@color/default_white</item>
+
+        <!-- Surface colors -->
         <item name="colorSurface">@color/default_white</item>
-        <item name="colorOnSurface">@color/myPrimaryColor</item>
+        <item name="colorOnSurface">@color/default_text_color_black</item>
+        <item name="colorOnSurfaceVariant">@color/default_text_color_black</item>
+
+        <!-- Background colors -->
+        <item name="android:colorBackground">@color/myWindowBackground</item>
+        <item name="colorOnBackground">@color/default_text_color_black</item>
+
+        <!-- Error colors -->
         <item name="colorError">@color/myAccentColor</item>
         <item name="colorOnError">@color/default_white</item>
-        <item name="colorPrimaryDark">@color/myPrimaryColor</item>
-        <item name="colorAccent">@color/myAccentColor</item>
-        <item name="android:textColorPrimary">@color/myTextPrimaryColor</item>
+
+        <!-- Disable M3 elevation overlay tinting to keep flat surfaces -->
+        <item name="elevationOverlayEnabled">false</item>
+
+        <!-- System bars -->
         <item name="android:navigationBarColor">@color/myNavigationColor</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+
+        <!-- Drawer arrow -->
         <item name="drawerArrowStyle">@style/DrawerArrowStyle</item>
+
+        <!-- Window configuration -->
         <item name="android:windowContentOverlay">@null</item>
         <item name="android:windowDrawsSystemBarBackgrounds">true</item>
-        <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:windowBackground">@color/myWindowBackground</item>
         <item name="android:windowTranslucentStatus">true</item>
         <item name="android:windowTranslucentNavigation">true</item>
@@ -32,6 +52,41 @@
         <item name="android:windowAllowReturnTransitionOverlap">true</item>
         <item name="android:windowSharedElementEnterTransition">@android:transition/move</item>
         <item name="android:windowSharedElementExitTransition">@android:transition/move</item>
+        <item name="materialSwitchStyle">@style/Widget.App.MaterialSwitch</item>
+        <item name="materialAlertDialogTheme">@style/CustomMaterialAlertDialog</item>
+        <item name="toolbarStyle">@style/AppTheme.Toolbar</item>
+        <item name="sliderStyle">@style/AppTheme.Slider</item>
+    </style>
+
+    <style name="CustomMaterialAlertDialog" parent="ThemeOverlay.Material3.MaterialAlertDialog">
+        <item name="colorPrimary">@color/dlgPositiveButtonColor</item>
+        <item name="colorSurface">@color/default_white</item>
+        <item name="android:backgroundTint">@color/default_white</item>
+        <item name="colorControlHighlight">#20000000</item> 
+        <item name="colorOnSurface">@color/default_text_color_black</item>
+        <item name="android:backgroundDimAmount">0.5</item>
+
+        <item name="materialAlertDialogTitleTextStyle">@style/CustomMaterialAlertDialogTitleText</item>
+        <item name="buttonBarPositiveButtonStyle">@style/CustomMaterialAlertDialog.Button.Positive</item>
+        <item name="buttonBarNegativeButtonStyle">@style/CustomMaterialAlertDialog.Button.Negative</item>
+        <item name="buttonBarNeutralButtonStyle">@style/CustomMaterialAlertDialog.Button.Neutral</item>
+    </style>
+
+    <style name="CustomMaterialAlertDialog.Button.Positive" parent="Widget.Material3.Button.TextButton.Dialog">
+        <item name="android:textColor">@color/myAccentColor</item>
+    </style>
+
+    <style name="CustomMaterialAlertDialog.Button.Negative" parent="Widget.Material3.Button.TextButton.Dialog">
+        <item name="android:textColor">@color/dlgTitleColor</item>
+    </style>
+
+    <style name="CustomMaterialAlertDialog.Button.Neutral" parent="Widget.Material3.Button.TextButton.Dialog">
+        <item name="android:textColor">@color/myPrimaryColor</item>
+    </style>
+
+    <style name="CustomMaterialAlertDialogTitleText" parent="MaterialAlertDialog.Material3.Title.Text">
+        <item name="android:textColor">@color/dlgTitleColor</item>
+        <item name="android:textSize">20sp</item>
     </style>
 
     <style name="DrawerArrowStyle" parent="Widget.AppCompat.DrawerArrowToggle">
@@ -39,14 +94,34 @@
         <item name="color">#fff</item>
     </style>
 
-    <style name="ToolBarStyle" parent="">
-        <item name="popupTheme">@style/ThemeOverlay.AppCompat.Light</item>
-        <item name="theme">@style/ThemeOverlay.AppCompat.Dark.ActionBar</item>
+    <style name="AppTheme.Toolbar" parent="Widget.Material3.Toolbar">
+        <item name="popupTheme">@style/ThemeOverlay.Material3.Light</item>
+        <item name="theme">@style/ThemeOverlay.Material3.Dark.ActionBar</item>
+        <item name="titleTextColor">@color/default_white</item>
+        <item name="subtitleTextColor">@color/default_white</item>
     </style>
 
-    <style name="RedTooltipStyle" parent="Widget.MaterialComponents.Tooltip">
+    <style name="AppTheme.Slider" parent="Widget.MaterialComponents.Slider">
+        <item name="labelStyle">@style/AppTheme.Tooltip</item>
+    </style>
+
+    <style name="AppTheme.Tooltip" parent="Widget.Material3.Tooltip">
         <item name="backgroundTint">@color/myAccentColor</item>
         <item name="android:textColor">@color/default_white</item>
+    </style>
+
+    <style name="Widget.App.MaterialSwitch" parent="Widget.Material3.CompoundButton.MaterialSwitch">
+        <item name="materialThemeOverlay">@style/ThemeOverlay.App.MaterialSwitch</item>
+        <item name="trackDecorationTint">@color/dlgTitleColor</item>
+        <item name="useMaterialThemeColors">false</item> 
+    </style>
+
+    <style name="ThemeOverlay.App.MaterialSwitch" parent="">
+        <item name="colorPrimary">@color/myPrimaryColor</item>
+        <item name="colorSurfaceVariant">@color/myWindowBackground</item>
+        <item name="colorOutline">@color/dlgTitleColor</item>
+        <item name="colorOnSurface">@color/dlgTitleColor</item>
+        <item name="android:backgroundTint">@android:color/transparent</item>
     </style>
 
 </resources>

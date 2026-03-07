@@ -156,7 +156,7 @@ public class MainActivity extends BaseMaterialActivity {
         // The permission issue for Android API 33+.
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && SaveFileMigration.migrationEligible()) {
             Log.d(TAG, "startOldSaveMigration: Eligible");
-            new MaterialAlertDialogBuilder(MainActivity.this, R.style.CustomMaterialAlertDialog)
+            new MaterialAlertDialogBuilder(MainActivity.this)
                     .setMessage(R.string.system_save_need_to_migrate)
                     .setPositiveButton(R.string.dialog_positive_upgrade, (unused1, unused2) -> {
                         Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
@@ -240,7 +240,7 @@ public class MainActivity extends BaseMaterialActivity {
                 SaveFileMigration.markMigrationCompleted();
                 progressDialog.dismiss();
 
-                new MaterialAlertDialogBuilder(MainActivity.this, R.style.CustomMaterialAlertDialog)
+                new MaterialAlertDialogBuilder(MainActivity.this)
                         .setMessage(getString(R.string.system_save_migrated, filesToCopy.size(), finalFailedFiles))
                         .setPositiveButton(R.string.dialog_positive_sure, (unused1, unused2) -> reloadApp())
                         .setCancelable(false)
@@ -402,7 +402,7 @@ public class MainActivity extends BaseMaterialActivity {
                 saveMigrationParams.putString("valid_path", "false");
                 GoogleServicesHelper.logEvent(mFirebaseAnalytics, "save_migration_path_selection", saveMigrationParams);
 
-                new MaterialAlertDialogBuilder(MainActivity.this, R.style.CustomMaterialAlertDialog)
+                new MaterialAlertDialogBuilder(MainActivity.this)
                         .setMessage(getString(R.string.dialog_content_wrong_path, wenku8Path.replace("/tree/primary:", "/")))
                         .setPositiveButton(R.string.dialog_positive_retry, (unused1, unused2) -> reloadApp())
                         .setNeutralButton(R.string.dialog_negative_pass_for_now, null)

@@ -4,8 +4,6 @@ buildscript {
     repositories {
         mavenCentral()
         google()
-        maven { url 'https://mvnrepository.com' }
-        // maven { url "https://plugins.gradle.org/m2/" }
     }
     dependencies {
         classpath 'com.android.tools.build:gradle:9.0.1'
@@ -22,8 +20,6 @@ allprojects {
     repositories {
         mavenCentral()
         google()
-        maven { url 'https://jitpack.io' }
-        maven { url 'https://mvnrepository.com' }
     }
 }
 

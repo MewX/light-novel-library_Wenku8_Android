@@ -127,7 +127,7 @@ public class SearchActivity extends BaseMaterialActivity implements MyItemClickL
 
     @Override
     public void onItemLongClick(View view, final int position) {
-        new MaterialAlertDialogBuilder(this, R.style.CustomMaterialAlertDialog)
+        new MaterialAlertDialogBuilder(this)
                 .setTitle(getResources().getString(R.string.dialog_content_delete_one_search_record))
                 .setMessage(historyList.get(position))
                 .setPositiveButton(R.string.dialog_positive_likethis, (ignored1, ignored2) -> {

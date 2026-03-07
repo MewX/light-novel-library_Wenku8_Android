@@ -36,4 +36,11 @@
         <item>@string/dialog_option_choose_simpified_chinese</item>
         <item>@string/dialog_option_choose_traditional_chinese</item>
     </string-array>
+
+    <array name="google_progress_colors">
+        <item>@color/blue</item>
+        <item>@color/green</item>
+        <item>@color/red</item>
+        <item>@color/yellow</item>
+    </array>
 </resources>
