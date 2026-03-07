@@ -35,6 +35,7 @@ import com.google.android.material.floatingactionbutton.FloatingActionButton;
 import com.google.android.gms.ads.AdRequest;
 import com.google.android.gms.ads.AdView;
 import com.google.firebase.analytics.FirebaseAnalytics;
+import org.mewx.wenku8.util.GoogleServicesHelper;
 import com.nostra13.universalimageloader.core.ImageLoader;
 
 import org.mewx.wenku8.R;
@@ -127,7 +128,7 @@ public class NovelInfoActivity extends BaseMaterialActivity {
         });
 
         // Init Firebase Analytics on GA4.
-        mFirebaseAnalytics = FirebaseAnalytics.getInstance(this);
+        mFirebaseAnalytics = GoogleServicesHelper.initFirebase(this);
 
         // fetch values
         aid = getIntent().getIntExtra("aid", 1);
@@ -139,7 +140,7 @@ public class NovelInfoActivity extends BaseMaterialActivity {
         viewItemParams.putString(FirebaseAnalytics.Param.ITEM_ID, "" + aid);
         viewItemParams.putString(FirebaseAnalytics.Param.ITEM_NAME, title);
         viewItemParams.putString("from", from);
-        mFirebaseAnalytics.logEvent(FirebaseAnalytics.Event.VIEW_ITEM, viewItemParams);
+        GoogleServicesHelper.logEvent(mFirebaseAnalytics, FirebaseAnalytics.Event.VIEW_ITEM, viewItemParams);
 
         // UIL setting
         if(ImageLoader.getInstance() == null || !ImageLoader.getInstance().isInited()) {
@@ -202,7 +203,6 @@ public class NovelInfoActivity extends BaseMaterialActivity {
                 refreshInfoFromCloud();
         }, 500);
 
-
         // set on click listeners
         fabMenu.setOnClickListener(v -> toggleMenu());
         rlMask.setOnClickListener(v -> {
@@ -264,7 +264,7 @@ public class NovelInfoActivity extends BaseMaterialActivity {
                     if (novelFullVolume == null) nullStuff.add("volume");
                     Bundle somethingIsNull = new Bundle();
                     somethingIsNull.putStringArrayList("novel_info_save_null", nullStuff);
-                    mFirebaseAnalytics.logEvent(FirebaseAnalytics.Event.VIEW_ITEM, somethingIsNull);
+                    GoogleServicesHelper.logEvent(mFirebaseAnalytics, FirebaseAnalytics.Event.VIEW_ITEM, somethingIsNull);
 
                     Toast.makeText(NovelInfoActivity.this, getResources().getString(R.string.system_loading_please_wait), Toast.LENGTH_SHORT).show();
                 } else {
@@ -558,7 +558,6 @@ public class NovelInfoActivity extends BaseMaterialActivity {
                 .setNegativeButton(R.string.dialog_negative_biao, null)
                 .show();
     }
-
 
     private class FetchInfoAsyncTask extends AsyncTask<Integer, Integer, Integer> {
         boolean fromLocal = false;

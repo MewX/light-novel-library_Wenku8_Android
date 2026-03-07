@@ -13,6 +13,7 @@ import android.widget.Toast;
 
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.google.firebase.analytics.FirebaseAnalytics;
+import org.mewx.wenku8.util.GoogleServicesHelper;
 import com.makeramen.roundedimageview.RoundedImageView;
 
 import org.mewx.wenku8.R;
@@ -42,14 +43,13 @@ public class UserInfoActivity extends BaseMaterialActivity {
     private UserInfo ui;
     private AsyncGetUserInfo agui;
 
-
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         initMaterialStyle(R.layout.layout_account_info);
 
         // Init Firebase Analytics on GA4.
-        mFirebaseAnalytics = FirebaseAnalytics.getInstance(this);
+        mFirebaseAnalytics = GoogleServicesHelper.initFirebase(this);
 
         // get views
         rivAvatar = findViewById(R.id.user_avatar);
@@ -139,7 +139,7 @@ public class UserInfoActivity extends BaseMaterialActivity {
                 // Analysis.
                 Bundle checkInParams = new Bundle();
                 checkInParams.putString("effective_click", "" + (errorCode != Wenku8Error.ErrorCode.SYSTEM_9_SIGN_FAILED));
-                mFirebaseAnalytics.logEvent("daily_check_in", checkInParams);
+                GoogleServicesHelper.logEvent(mFirebaseAnalytics, "daily_check_in", checkInParams);
 
                 // fetch from sign
                 if(errorCode == Wenku8Error.ErrorCode.SYSTEM_9_SIGN_FAILED)

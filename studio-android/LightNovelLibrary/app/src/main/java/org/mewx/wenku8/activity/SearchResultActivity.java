@@ -9,6 +9,7 @@ import android.widget.TextView;
 import androidx.fragment.app.FragmentTransaction;
 
 import com.google.firebase.analytics.FirebaseAnalytics;
+import org.mewx.wenku8.util.GoogleServicesHelper;
 import com.nostra13.universalimageloader.core.ImageLoader;
 
 import org.mewx.wenku8.R;
@@ -29,7 +30,7 @@ public class SearchResultActivity extends BaseMaterialActivity {
         initMaterialStyle(R.layout.layout_search_result, StatusBarColor.WHITE);
 
         // Init Firebase Analytics on GA4.
-        mFirebaseAnalytics = FirebaseAnalytics.getInstance(this);
+        mFirebaseAnalytics = GoogleServicesHelper.initFirebase(this);
 
         // get arguments
         String searchKey = getIntent().getStringExtra("key");
@@ -37,7 +38,7 @@ public class SearchResultActivity extends BaseMaterialActivity {
         // Analysis.
         Bundle searchParams = new Bundle();
         searchParams.putString(FirebaseAnalytics.Param.SEARCH_TERM, searchKey);
-        mFirebaseAnalytics.logEvent(FirebaseAnalytics.Event.SEARCH, searchParams);
+        GoogleServicesHelper.logEvent(mFirebaseAnalytics, FirebaseAnalytics.Event.SEARCH, searchParams);
 
         // set action bat title
         TextView mTextView = (TextView) findViewById(R.id.search_result_title);

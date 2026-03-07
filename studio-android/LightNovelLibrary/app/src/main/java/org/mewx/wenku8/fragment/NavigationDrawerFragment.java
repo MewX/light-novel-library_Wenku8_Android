@@ -30,6 +30,7 @@ import androidx.core.graphics.Insets;
 
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.google.firebase.analytics.FirebaseAnalytics;
+import org.mewx.wenku8.util.GoogleServicesHelper;
 import com.makeramen.roundedimageview.RoundedImageView;
 
 import org.mewx.wenku8.R;
@@ -80,7 +81,7 @@ public class NavigationDrawerFragment extends Fragment {
             Bundle bundle = new Bundle();
             bundle.putString(FirebaseAnalytics.Param.SCREEN_NAME, fragment.getClass().getSimpleName());
             bundle.putString(FirebaseAnalytics.Param.SCREEN_CLASS, fragment.getClass().getSimpleName());
-            mFirebaseAnalytics.logEvent(FirebaseAnalytics.Event.SCREEN_VIEW, bundle);
+            GoogleServicesHelper.logEvent(mFirebaseAnalytics, FirebaseAnalytics.Event.SCREEN_VIEW, bundle);
         };
     }
 
@@ -214,7 +215,7 @@ public class NavigationDrawerFragment extends Fragment {
             Toast.makeText(getActivity(), "mainActivity == null !!! in setup()", Toast.LENGTH_SHORT).show();
 
         // Init Firebase Analytics on GA4.
-        mFirebaseAnalytics = FirebaseAnalytics.getInstance(mainActivity);
+        mFirebaseAnalytics = GoogleServicesHelper.initFirebase(mainActivity);
 
         mFragmentContainerView = mainActivity.findViewById(fragmentId);
         mDrawerLayout = drawerLayout;

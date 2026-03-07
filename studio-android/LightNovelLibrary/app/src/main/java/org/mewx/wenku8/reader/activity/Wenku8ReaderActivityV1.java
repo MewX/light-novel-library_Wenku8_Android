@@ -30,6 +30,7 @@ import androidx.annotation.NonNull;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import org.mewx.wenku8.util.ProgressDialogHelper;
 import com.google.firebase.analytics.FirebaseAnalytics;
+import org.mewx.wenku8.util.GoogleServicesHelper;
 import com.nostra13.universalimageloader.core.ImageLoader;
 
 import com.google.android.material.slider.Slider;
@@ -92,7 +93,7 @@ public class Wenku8ReaderActivityV1 extends BaseMaterialActivity {
         initMaterialStyle(R.layout.layout_reader_swipe_temp, BaseMaterialActivity.StatusBarColor.DARK);
 
         // Init Firebase Analytics on GA4.
-        mFirebaseAnalytics = FirebaseAnalytics.getInstance(this);
+        mFirebaseAnalytics = GoogleServicesHelper.initFirebase(this);
 
         // fetch values
         aid = getIntent().getIntExtra("aid", 1);
@@ -110,7 +111,7 @@ public class Wenku8ReaderActivityV1 extends BaseMaterialActivity {
         readerParams.putString("chapter_id", "" + cid);
         readerParams.putString("from", from);
         readerParams.putString("jump_to_saved_page", forcejump);
-        mFirebaseAnalytics.logEvent("reader_v1", readerParams);
+        GoogleServicesHelper.logEvent(mFirebaseAnalytics, "reader_v1", readerParams);
 
 
         getTintManager().setTintAlpha(0.0f);
@@ -393,7 +394,6 @@ public class Wenku8ReaderActivityV1 extends BaseMaterialActivity {
             Log.d("MewX", "saved index: " + firstLineIndex + "(" + firstWordIndex + ") -> " + lastLineIndex + "(" + lastWordIndex + ") | Total: " + loader.getCurrentIndex() + " of " + (loader.getElementCount()-1) );
         }
     }
-
 
     class AsyncNovelContentTask extends AsyncTask<ContentValues, Integer, Wenku8Error.ErrorCode> {
         private ProgressDialogHelper md;

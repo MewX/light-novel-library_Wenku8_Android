@@ -25,7 +25,7 @@ import androidx.recyclerview.widget.RecyclerView;
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 
 import com.google.android.material.snackbar.Snackbar;
-import com.google.firebase.analytics.FirebaseAnalytics;
+import org.mewx.wenku8.util.GoogleServicesHelper;
 
 import org.mewx.wenku8.R;
 import org.mewx.wenku8.adapter.ReviewReplyItemAdapter;
@@ -70,7 +70,7 @@ public class NovelReviewReplyListActivity extends BaseMaterialActivity implement
         initMaterialStyle(R.layout.layout_novel_review_reply_list);
 
         // Init Firebase Analytics on GA4.
-        FirebaseAnalytics.getInstance(this);
+        GoogleServicesHelper.initFirebase(this);
 
         // fetch values
         rid = getIntent().getIntExtra("rid", 1);
@@ -306,7 +306,6 @@ public class NovelReviewReplyListActivity extends BaseMaterialActivity implement
             isLoading.set(false);
         }
     }
-
 
     private static class AsyncPublishReply extends AsyncTask<String, Void, Integer> {
         private static AtomicBoolean isLoading = new AtomicBoolean(false);

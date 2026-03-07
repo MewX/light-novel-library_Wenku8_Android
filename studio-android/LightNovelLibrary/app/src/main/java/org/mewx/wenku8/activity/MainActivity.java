@@ -35,6 +35,7 @@ import org.mewx.wenku8.global.GlobalConfig;
 import org.mewx.wenku8.api.Wenku8API;
 import org.mewx.wenku8.util.LightCache;
 import org.mewx.wenku8.network.LightUserSession;
+import org.mewx.wenku8.util.GoogleServicesHelper;
 import org.mewx.wenku8.util.ProgressDialogHelper;
 import org.mewx.wenku8.util.SaveFileMigration;
 
@@ -190,7 +191,7 @@ public class MainActivity extends BaseMaterialActivity {
             // Analysis.
             Bundle saveMigrationFilesTotalParams = new Bundle();
             saveMigrationFilesTotalParams.putString("count", "" + filesToCopy.size());
-            mFirebaseAnalytics.logEvent("save_migration_files_total", saveMigrationFilesTotalParams);
+            GoogleServicesHelper.logEvent(mFirebaseAnalytics, "save_migration_files_total", saveMigrationFilesTotalParams);
 
             if (filesToCopy.isEmpty()) {
                 Log.d(TAG, "Empty list of files to copy");
@@ -233,7 +234,7 @@ public class MainActivity extends BaseMaterialActivity {
             // Analysis.
             Bundle saveMigrationFilesFailedParams = new Bundle();
             saveMigrationFilesFailedParams.putString("failed", "" + finalFailedFiles);
-            mFirebaseAnalytics.logEvent("save_migration_files_failed", saveMigrationFilesFailedParams);
+            GoogleServicesHelper.logEvent(mFirebaseAnalytics, "save_migration_files_failed", saveMigrationFilesFailedParams);
 
             handler.post(() -> {
                 SaveFileMigration.markMigrationCompleted();
@@ -255,7 +256,7 @@ public class MainActivity extends BaseMaterialActivity {
         initialApp();
 
         // Init Firebase Analytics on GA4.
-        mFirebaseAnalytics = FirebaseAnalytics.getInstance(this);
+        mFirebaseAnalytics = GoogleServicesHelper.initFirebase(this);
 
         // UIL setting
         if (ImageLoader.getInstance() == null || !ImageLoader.getInstance().isInited()) {
@@ -399,7 +400,7 @@ public class MainActivity extends BaseMaterialActivity {
                 Bundle saveMigrationParams = new Bundle();
                 saveMigrationParams.putString("path", wenku8Path);
                 saveMigrationParams.putString("valid_path", "false");
-                mFirebaseAnalytics.logEvent("save_migration_path_selection", saveMigrationParams);
+                GoogleServicesHelper.logEvent(mFirebaseAnalytics, "save_migration_path_selection", saveMigrationParams);
 
                 new MaterialAlertDialogBuilder(MainActivity.this, R.style.CustomMaterialAlertDialog)
                         .setMessage(getString(R.string.dialog_content_wrong_path, wenku8Path.replace("/tree/primary:", "/")))
@@ -413,7 +414,7 @@ public class MainActivity extends BaseMaterialActivity {
                 Bundle saveMigrationParams = new Bundle();
                 saveMigrationParams.putString("path", wenku8Path);
                 saveMigrationParams.putString("valid_path", "true");
-                mFirebaseAnalytics.logEvent("save_migration_path_selection", saveMigrationParams);
+                GoogleServicesHelper.logEvent(mFirebaseAnalytics, "save_migration_path_selection", saveMigrationParams);
             }
 
             getContentResolver().takePersistableUriPermission(wenku8Uri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
