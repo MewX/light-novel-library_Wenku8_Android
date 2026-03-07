@@ -130,10 +130,10 @@ public class MainActivity extends BaseMaterialActivity {
         // execute background action
         LightUserSession.aiui = new LightUserSession.AsyncInitUserInfo(getApplicationContext(),
                 /* failureCallback= */ () -> {
-            if (!LightCache.deleteFile(GlobalConfig.getFirstFullUserAccountSaveFilePath()))
-                LightCache.deleteFile(GlobalConfig.getSecondFullUserAccountSaveFilePath());
-            if (!LightCache.deleteFile(GlobalConfig.getFirstUserAvatarSaveFilePath()))
-                LightCache.deleteFile(GlobalConfig.getSecondUserAvatarSaveFilePath());
+            LightCache.deleteFile(GlobalConfig.getFirstFullUserAccountSaveFilePath());
+            LightCache.deleteFile(GlobalConfig.getSecondFullUserAccountSaveFilePath());
+            LightCache.deleteFile(GlobalConfig.getFirstUserAvatarSaveFilePath());
+            LightCache.deleteFile(GlobalConfig.getSecondUserAvatarSaveFilePath());
             Toast.makeText(getApplicationContext(), getApplicationContext().getResources().getString(R.string.system_log_info_outofdate), Toast.LENGTH_SHORT).show();
         }, GlobalConfig::loadUserInfoSet);
         LightUserSession.aiui.execute();

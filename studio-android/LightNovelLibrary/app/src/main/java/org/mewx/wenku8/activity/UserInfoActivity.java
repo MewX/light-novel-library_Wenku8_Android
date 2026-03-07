@@ -121,6 +121,13 @@ public class UserInfoActivity extends BaseMaterialActivity {
                 ui = UserInfo.parseUserInfo(xml);
                 if(ui == null) return Wenku8Error.ErrorCode.XML_PARSE_FAILED;
 
+                // Re-fetch avatar to pick up any changes made on the website.
+                byte[] avatarBytes = LightNetwork.LightHttpPostConnection(Wenku8API.BASE_URL, Wenku8API.getUserAvatar());
+                if (avatarBytes != null) {
+                    if (!LightCache.saveFile(GlobalConfig.getFirstUserAvatarSaveFilePath(), avatarBytes, true))
+                        LightCache.saveFile(GlobalConfig.getSecondUserAvatarSaveFilePath(), avatarBytes, true);
+                }
+
                 return Wenku8Error.ErrorCode.SYSTEM_1_SUCCEEDED;
             } catch (Exception e) {
                 e.printStackTrace();
@@ -226,12 +233,10 @@ public class UserInfoActivity extends BaseMaterialActivity {
                 LightUserSession.logOut(() -> {
                     // TODO: extract this to a util.
                     // delete files
-                    if(!LightCache.deleteFile(GlobalConfig.getFirstFullUserAccountSaveFilePath())) {
-                        LightCache.deleteFile(GlobalConfig.getSecondFullUserAccountSaveFilePath());
-                    }
-                    if(!LightCache.deleteFile(GlobalConfig.getFirstUserAvatarSaveFilePath())) {
-                        LightCache.deleteFile(GlobalConfig.getSecondUserAvatarSaveFilePath());
-                    }
+                    LightCache.deleteFile(GlobalConfig.getFirstFullUserAccountSaveFilePath());
+                    LightCache.deleteFile(GlobalConfig.getSecondFullUserAccountSaveFilePath());
+                    LightCache.deleteFile(GlobalConfig.getFirstUserAvatarSaveFilePath());
+                    LightCache.deleteFile(GlobalConfig.getSecondUserAvatarSaveFilePath());
                 });
                 Toast.makeText(UserInfoActivity.this, "Logged out!", Toast.LENGTH_SHORT).show();
             }
