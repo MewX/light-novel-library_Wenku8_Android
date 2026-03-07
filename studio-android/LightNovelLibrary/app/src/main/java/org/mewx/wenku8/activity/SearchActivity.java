@@ -15,7 +15,7 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
-import com.google.firebase.analytics.FirebaseAnalytics;
+import org.mewx.wenku8.util.GoogleServicesHelper;
 
 import org.mewx.wenku8.R;
 import org.mewx.wenku8.adapter.SearchHistoryAdapter;
@@ -42,7 +42,7 @@ public class SearchActivity extends BaseMaterialActivity implements MyItemClickL
         initMaterialStyle(R.layout.layout_search, StatusBarColor.WHITE);
 
         // Init Firebase Analytics on GA4.
-        FirebaseAnalytics.getInstance(this);
+        GoogleServicesHelper.initFirebase(this);
 
         // bind views
         toolbarSearchView = findViewById(R.id.search_view);
@@ -127,7 +127,7 @@ public class SearchActivity extends BaseMaterialActivity implements MyItemClickL
 
     @Override
     public void onItemLongClick(View view, final int position) {
-        new MaterialAlertDialogBuilder(this, R.style.CustomMaterialAlertDialog)
+        new MaterialAlertDialogBuilder(this)
                 .setTitle(getResources().getString(R.string.dialog_content_delete_one_search_record))
                 .setMessage(historyList.get(position))
                 .setPositiveButton(R.string.dialog_positive_likethis, (ignored1, ignored2) -> {

@@ -13,6 +13,8 @@
         android:layout_height="?android:attr/actionBarSize"
         android:elevation="4dp"
         android:background="@color/myPrimaryColor"
+        android:textColor="@color/default_white"
+        android:textColorPrimary="@color/default_white"
         app:pstsTabBackground="@drawable/btn_menu_item_boardless"/>
 
     <androidx.viewpager.widget.ViewPager

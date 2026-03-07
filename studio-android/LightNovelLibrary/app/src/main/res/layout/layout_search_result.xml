@@ -29,6 +29,7 @@
         android:layout_height="4dp"
         android:layout_below="@id/divider"
         android:indeterminate="true"
-        spb:indeterminateAnimationType="disjoint" />
+        spb:indicatorColor="@array/google_progress_colors"
+        spb:indeterminateAnimationType="contiguous" />
 
 </RelativeLayout>

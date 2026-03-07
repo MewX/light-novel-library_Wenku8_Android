@@ -12,7 +12,7 @@ import android.widget.EditText;
 import android.widget.Toast;
 
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
-import com.google.firebase.analytics.FirebaseAnalytics;
+import org.mewx.wenku8.util.GoogleServicesHelper;
 
 import org.mewx.wenku8.R;
 import org.mewx.wenku8.api.Wenku8API;
@@ -44,7 +44,7 @@ public class NovelReviewNewPostActivity extends BaseMaterialActivity {
         initMaterialStyle(R.layout.layout_novel_review_new_post);
 
         // Init Firebase Analytics on GA4.
-        FirebaseAnalytics.getInstance(this);
+        GoogleServicesHelper.initFirebase(this);
 
         // fetch values
         aid = getIntent().getIntExtra("aid", 1);
@@ -104,7 +104,7 @@ public class NovelReviewNewPostActivity extends BaseMaterialActivity {
 
         if (!etTitle.getText().toString().trim().isEmpty() ||
                 !etContent.getText().toString().trim().isEmpty()) {
-            new MaterialAlertDialogBuilder(this, R.style.CustomMaterialAlertDialog)
+            new MaterialAlertDialogBuilder(this)
                     .setTitle(R.string.system_warning)
                     .setMessage(R.string.system_review_draft_will_be_lost)
                     .setPositiveButton(R.string.dialog_positive_ok, (dialog, which) -> {

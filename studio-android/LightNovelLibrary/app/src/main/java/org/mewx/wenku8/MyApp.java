@@ -4,9 +4,8 @@ import android.annotation.SuppressLint;
 import android.app.Application;
 import android.content.Context;
 
-import com.google.android.gms.ads.MobileAds;
-
 import org.mewx.wenku8.api.Wenku8API;
+import org.mewx.wenku8.util.GoogleServicesHelper;
 
 /**
  * The class is for getting context everywhere
@@ -24,7 +23,7 @@ public class MyApp extends Application {
         Wenku8API.AppVer = BuildConfig.VERSION_NAME;
 
         // Init AdMob
-        new Thread(() -> MobileAds.initialize(this, initializationStatus -> {})).start();
+        GoogleServicesHelper.initAdMob(this);
     }
 
     /**

@@ -15,7 +15,7 @@ import android.view.Menu;
 import android.view.MenuItem;
 import android.widget.Toast;
 
-import com.google.firebase.analytics.FirebaseAnalytics;
+import org.mewx.wenku8.util.GoogleServicesHelper;
 
 import org.mewx.wenku8.R;
 import org.mewx.wenku8.global.GlobalConfig;
@@ -45,7 +45,7 @@ public class MenuBackgroundSelectorActivity extends BaseMaterialActivity {
         initMaterialStyle(R.layout.layout_menu_background_selector);
 
         // Init Firebase Analytics on GA4.
-        FirebaseAnalytics.getInstance(this);
+        GoogleServicesHelper.initFirebase(this);
 
         // Init listeners.
         for (Integer id : viewIdToSettingItemMap.keySet()) {

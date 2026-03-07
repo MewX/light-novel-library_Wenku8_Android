@@ -24,7 +24,7 @@ import androidx.core.content.ContextCompat;
 
 import com.davemorrissey.labs.subscaleview.ImageSource;
 import com.davemorrissey.labs.subscaleview.SubsamplingScaleImageView;
-import com.google.firebase.analytics.FirebaseAnalytics;
+import org.mewx.wenku8.util.GoogleServicesHelper;
 
 import org.mewx.wenku8.R;
 import org.mewx.wenku8.global.GlobalConfig;
@@ -53,7 +53,7 @@ public class ViewImageDetailActivity extends BaseMaterialActivity {
         initMaterialStyle(R.layout.layout_view_image_detail, StatusBarColor.DARK);
 
         // Init Firebase Analytics on GA4.
-        FirebaseAnalytics.getInstance(this);
+        GoogleServicesHelper.initFirebase(this);
 
         // fetch value
         path = getIntent().getStringExtra("path");
@@ -79,15 +79,15 @@ public class ViewImageDetailActivity extends BaseMaterialActivity {
                     hideNavigationBar();
                     findViewById(R.id.toolbar_actionbar).setVisibility(View.INVISIBLE);
                     findViewById(R.id.image_detail_bot).setVisibility(View.INVISIBLE);
-                    getTintManager().setStatusBarAlpha(0.0f);
-                    getTintManager().setNavigationBarAlpha(0.0f);
+                    setStatusBarAlpha(0.0f);
+                    setNavigationBarAlpha(0.0f);
                 } else {
                     shown = true;
                     showNavigationBar();
                     findViewById(R.id.toolbar_actionbar).setVisibility(View.VISIBLE);
                     findViewById(R.id.image_detail_bot).setVisibility(View.VISIBLE);
-                    getTintManager().setStatusBarAlpha(0.9f);
-                    getTintManager().setNavigationBarAlpha(0.8f);
+                    setStatusBarAlpha(0.9f);
+                    setNavigationBarAlpha(0.8f);
                 }
             }
         });
@@ -126,7 +126,6 @@ public class ViewImageDetailActivity extends BaseMaterialActivity {
             return true;
         });
     }
-
 
     @Override
     protected void onResume() {

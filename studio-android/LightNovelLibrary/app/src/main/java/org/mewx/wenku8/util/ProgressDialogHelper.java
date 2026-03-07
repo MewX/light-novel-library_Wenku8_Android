@@ -78,7 +78,7 @@ public class ProgressDialogHelper {
             updateProgressText(percentView, numberView, 0, 1);
         }
 
-        MaterialAlertDialogBuilder builder = new MaterialAlertDialogBuilder(context, R.style.CustomMaterialAlertDialog)
+        MaterialAlertDialogBuilder builder = new MaterialAlertDialogBuilder(context)
                 .setView(view)
                 .setCancelable(cancelable);
 

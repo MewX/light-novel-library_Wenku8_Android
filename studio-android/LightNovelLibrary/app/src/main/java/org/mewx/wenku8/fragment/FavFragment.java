@@ -125,7 +125,7 @@ public class FavFragment extends Fragment implements MyItemClickListener, MyItem
 
     @Override
     public void onOptionButtonClick(View view, final int position) {
-        new MaterialAlertDialogBuilder(getActivity(), R.style.CustomMaterialAlertDialog)
+        new MaterialAlertDialogBuilder(getActivity())
                 .setTitle(R.string.dialog_title_choose_delete_option)
                 .setNegativeButton(R.string.dialog_negative_pass, null)
                 .setItems(R.array.cleanup_option, (dialog, which) -> {
@@ -135,7 +135,7 @@ public class FavFragment extends Fragment implements MyItemClickListener, MyItem
                      */
                     switch (which) {
                         case 0:
-                            new MaterialAlertDialogBuilder(getActivity(), R.style.CustomMaterialAlertDialog)
+                            new MaterialAlertDialogBuilder(getActivity())
                                     .setMessage(R.string.dialog_sure_to_clear_cache)
                                     .setPositiveButton(R.string.dialog_positive_sure, (d, w) -> {
                                         int aid = listNovelItemAid.get(position);
@@ -149,7 +149,7 @@ public class FavFragment extends Fragment implements MyItemClickListener, MyItem
                                     .show();
                             break;
                         case 1:
-                            new MaterialAlertDialogBuilder(getActivity(), R.style.CustomMaterialAlertDialog)
+                            new MaterialAlertDialogBuilder(getActivity())
                                     .setMessage(R.string.dialog_content_want_to_delete)
                                     .setPositiveButton(R.string.dialog_positive_sure, (d, w) -> {
                                         // Delete operation: delete from in-memory index and cloud first.

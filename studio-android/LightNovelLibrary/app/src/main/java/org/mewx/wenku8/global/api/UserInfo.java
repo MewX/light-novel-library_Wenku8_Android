@@ -20,6 +20,7 @@ public class UserInfo {
      * <metadata>
      * <item name="uname"><![CDATA[apptest]]></item>
      * <item name="nickname"><![CDATA[apptest]]></item>
+     * <item name="uid">123</item>
      * <item name="score">10</item>
      * <item name="experience">10</item>
      * <item name="rank"><![CDATA[新手上路]]></item>
@@ -28,6 +29,7 @@ public class UserInfo {
 
     public String username;
     public String nickyname;
+    public int uid;
     public int score; // 现有积分
     public int experience; // 经验值
     public String rank;
@@ -57,6 +59,9 @@ public class UserInfo {
                             } else if ("nickname".equals(xmlPullParser.getAttributeValue(0))) {
                                 ui.nickyname = xmlPullParser.nextText();
                                 Log.d("MewX", ui.nickyname.isEmpty() ? Wenku8API.UNKNOWN : ui.nickyname);
+                            } else if ("uid".equals(xmlPullParser.getAttributeValue(0))) {
+                                ui.uid = Integer.valueOf(xmlPullParser.nextText());
+                                Log.d("MewX", "uid:" + ui.uid);
                             } else if ("score".equals(xmlPullParser.getAttributeValue(0))) {
                                 ui.score = Integer.valueOf(xmlPullParser.nextText());
                                 Log.d("MewX", "score:" + ui.score);

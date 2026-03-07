@@ -11,10 +11,9 @@ android {
         applicationId "org.mewx.wenku8"
         minSdkVersion rootProject.minSdkVersion
         targetSdkVersion rootProject.targetSdkVersion
-        versionCode 71
-        versionName "1.28"
+        versionCode 72
+        versionName "1.29"
         testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner'
-        multiDexEnabled true
     }
     buildTypes {
         debug {
@@ -98,7 +97,6 @@ android {
 
 dependencies {
     // external libraries
-    implementation 'com.readystatesoftware.systembartint:systembartint:1.0.3'
     implementation 'com.nostra13.universalimageloader:universal-image-loader:1.9.3'
     implementation 'com.makeramen:roundedimageview:2.0.1'
     implementation 'com.davemorrissey.labs:subsampling-scale-image-view-androidx:3.10.0'
@@ -106,7 +104,6 @@ dependencies {
     implementation 'androidx.cardview:cardview:1.0.0'
     implementation 'com.google.android.material:material:1.13.0'
     implementation 'androidx.swiperefreshlayout:swiperefreshlayout:1.1.0'
-    implementation 'com.android.support:multidex:1.0.3'
 
     implementation project(':api')
     coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.1.5'

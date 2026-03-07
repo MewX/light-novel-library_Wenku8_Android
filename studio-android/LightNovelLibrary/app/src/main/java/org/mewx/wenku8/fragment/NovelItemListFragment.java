@@ -96,7 +96,7 @@ public class NovelItemListFragment extends Fragment implements MyItemClickListen
         rootView.setTag(listType); // set TAG
 
         // Set warning message.
-        rootView.findViewById(R.id.relay_warning).setOnClickListener(view -> new MaterialAlertDialogBuilder(getContext(), R.style.CustomMaterialAlertDialog)
+        rootView.findViewById(R.id.relay_warning).setOnClickListener(view -> new MaterialAlertDialogBuilder(getContext())
                 .setTitle(getResources().getString(R.string.system_warning))
                 .setMessage(getResources().getString(R.string.relay_warning_full))
                 .setPositiveButton(R.string.dialog_positive_ok, null)

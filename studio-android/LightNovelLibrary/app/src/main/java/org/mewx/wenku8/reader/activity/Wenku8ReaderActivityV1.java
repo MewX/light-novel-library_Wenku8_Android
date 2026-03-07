@@ -30,6 +30,7 @@ import androidx.annotation.NonNull;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import org.mewx.wenku8.util.ProgressDialogHelper;
 import com.google.firebase.analytics.FirebaseAnalytics;
+import org.mewx.wenku8.util.GoogleServicesHelper;
 import com.nostra13.universalimageloader.core.ImageLoader;
 
 import com.google.android.material.slider.Slider;
@@ -92,7 +93,7 @@ public class Wenku8ReaderActivityV1 extends BaseMaterialActivity {
         initMaterialStyle(R.layout.layout_reader_swipe_temp, BaseMaterialActivity.StatusBarColor.DARK);
 
         // Init Firebase Analytics on GA4.
-        mFirebaseAnalytics = FirebaseAnalytics.getInstance(this);
+        mFirebaseAnalytics = GoogleServicesHelper.initFirebase(this);
 
         // fetch values
         aid = getIntent().getIntExtra("aid", 1);
@@ -110,10 +111,11 @@ public class Wenku8ReaderActivityV1 extends BaseMaterialActivity {
         readerParams.putString("chapter_id", "" + cid);
         readerParams.putString("from", from);
         readerParams.putString("jump_to_saved_page", forcejump);
-        mFirebaseAnalytics.logEvent("reader_v1", readerParams);
+        GoogleServicesHelper.logEvent(mFirebaseAnalytics, "reader_v1", readerParams);
 
 
-        getTintManager().setTintAlpha(0.0f);
+        setStatusBarAlpha(0.0f);
+        setNavigationBarAlpha(0.0f);
         if(getSupportActionBar() != null) {
             getSupportActionBar().setTitle(volumeList.volumeName);
         }
@@ -394,7 +396,6 @@ public class Wenku8ReaderActivityV1 extends BaseMaterialActivity {
         }
     }
 
-
     class AsyncNovelContentTask extends AsyncTask<ContentValues, Integer, Wenku8Error.ErrorCode> {
         private ProgressDialogHelper md;
 
@@ -485,8 +486,8 @@ public class Wenku8ReaderActivityV1 extends BaseMaterialActivity {
                             findViewById(R.id.reader_top).setVisibility(View.VISIBLE);
                             findViewById(R.id.reader_bot).setVisibility(View.VISIBLE);
 
-                            getTintManager().setStatusBarAlpha(0.90f);
-                            getTintManager().setNavigationBarAlpha(0.80f); // TODO: fix bug
+                            setStatusBarAlpha(0.90f);
+                            setNavigationBarAlpha(0.80f);
 
                             barStatus = true;
 
@@ -630,7 +631,7 @@ public class Wenku8ReaderActivityV1 extends BaseMaterialActivity {
                                             }
                                         });
 
-                                        findViewById(R.id.btn_custom_font).setOnClickListener(v1 -> new MaterialAlertDialogBuilder(Wenku8ReaderActivityV1.this, R.style.CustomMaterialAlertDialog)
+                                        findViewById(R.id.btn_custom_font).setOnClickListener(v1 -> new MaterialAlertDialogBuilder(Wenku8ReaderActivityV1.this)
                                                 .setTitle(R.string.reader_custom_font)
                                                 .setItems(R.array.reader_font_option, (dialog, which) -> {
                                                     switch (which) {
@@ -653,7 +654,7 @@ public class Wenku8ReaderActivityV1 extends BaseMaterialActivity {
                                                 })
                                                 .show());
 
-                                        findViewById(R.id.btn_custom_background).setOnClickListener(v12 -> new MaterialAlertDialogBuilder(Wenku8ReaderActivityV1.this, R.style.CustomMaterialAlertDialog)
+                                        findViewById(R.id.btn_custom_background).setOnClickListener(v12 -> new MaterialAlertDialogBuilder(Wenku8ReaderActivityV1.this)
                                                 .setTitle(R.string.reader_custom_background)
                                                 .setItems(R.array.reader_background_option, (dialog, which) -> {
                                                     switch (which) {
@@ -693,7 +694,7 @@ public class Wenku8ReaderActivityV1 extends BaseMaterialActivity {
                                             } else {
                                                 // jump to previous
                                                 final int i_bak = i;
-                                                new MaterialAlertDialogBuilder(Wenku8ReaderActivityV1.this, R.style.CustomMaterialAlertDialog)
+                                                new MaterialAlertDialogBuilder(Wenku8ReaderActivityV1.this)
                                                         .setTitle(R.string.dialog_sure_to_jump_chapter)
                                                         .setMessage(volumeList.chapterList.get(i_bak - 1).chapterName)
                                                         .setPositiveButton(R.string.dialog_positive_yes, (dialog, which) -> {
@@ -725,7 +726,7 @@ public class Wenku8ReaderActivityV1 extends BaseMaterialActivity {
                                             } else {
                                                 // jump to previous
                                                 final int i_bak = i;
-                                                new MaterialAlertDialogBuilder(Wenku8ReaderActivityV1.this, R.style.CustomMaterialAlertDialog)
+                                                new MaterialAlertDialogBuilder(Wenku8ReaderActivityV1.this)
                                                         .setTitle(R.string.dialog_sure_to_jump_chapter)
                                                         .setMessage(volumeList.chapterList.get(i_bak + 1).chapterName)
                                                         .setPositiveButton(R.string.dialog_positive_yes, (dialog, which) -> {
@@ -755,8 +756,8 @@ public class Wenku8ReaderActivityV1 extends BaseMaterialActivity {
                             findViewById(R.id.reader_bot_seeker).setVisibility(View.INVISIBLE);
                             findViewById(R.id.reader_bot_settings).setVisibility(View.INVISIBLE);
 
-                            getTintManager().setStatusBarAlpha(0.0f);
-                            getTintManager().setNavigationBarAlpha(0.0f);
+                            setStatusBarAlpha(0.0f);
+                            setNavigationBarAlpha(0.0f);
 
                             barStatus = false;
                         }
@@ -805,7 +806,7 @@ public class Wenku8ReaderActivityV1 extends BaseMaterialActivity {
                     } else if (mSlidingPageAdapter.getCurrentFirstLineIndex() != rs.lineId ||
                             mSlidingPageAdapter.getCurrentFirstWordIndex() != rs.wordId) {
                         // Popping up jump dialog only when the user didn't exist at the first page.
-                        new MaterialAlertDialogBuilder(Wenku8ReaderActivityV1.this, R.style.CustomMaterialAlertDialog)
+                        new MaterialAlertDialogBuilder(Wenku8ReaderActivityV1.this)
                                 .setTitle(R.string.reader_v1_notice)
                                 .setMessage(R.string.reader_jump_last)
                                 .setPositiveButton(R.string.dialog_positive_sure, (dialog, which) -> {
@@ -833,7 +834,7 @@ public class Wenku8ReaderActivityV1 extends BaseMaterialActivity {
                     } else {
                         // jump to previous
                         final int i_bak = i;
-                        new MaterialAlertDialogBuilder(Wenku8ReaderActivityV1.this, R.style.CustomMaterialAlertDialog)
+                        new MaterialAlertDialogBuilder(Wenku8ReaderActivityV1.this)
                                 .setTitle(R.string.dialog_sure_to_jump_chapter)
                                 .setMessage(volumeList.chapterList.get(i_bak + 1).chapterName)
                                 .setPositiveButton(R.string.dialog_positive_yes, (dialog, which) -> {
@@ -871,7 +872,7 @@ public class Wenku8ReaderActivityV1 extends BaseMaterialActivity {
                     } else {
                         // jump to previous
                         final int i_bak = i;
-                        new MaterialAlertDialogBuilder(Wenku8ReaderActivityV1.this, R.style.CustomMaterialAlertDialog)
+                        new MaterialAlertDialogBuilder(Wenku8ReaderActivityV1.this)
                                 .setTitle(R.string.dialog_sure_to_jump_chapter)
                                 .setMessage(volumeList.chapterList.get(i_bak - 1).chapterName)
                                 .setPositiveButton(R.string.dialog_positive_yes, (dialog, which) -> {

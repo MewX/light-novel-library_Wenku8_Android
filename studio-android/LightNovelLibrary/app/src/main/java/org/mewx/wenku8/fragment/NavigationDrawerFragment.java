@@ -30,6 +30,7 @@ import androidx.core.graphics.Insets;
 
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.google.firebase.analytics.FirebaseAnalytics;
+import org.mewx.wenku8.util.GoogleServicesHelper;
 import com.makeramen.roundedimageview.RoundedImageView;
 
 import org.mewx.wenku8.R;
@@ -80,7 +81,7 @@ public class NavigationDrawerFragment extends Fragment {
             Bundle bundle = new Bundle();
             bundle.putString(FirebaseAnalytics.Param.SCREEN_NAME, fragment.getClass().getSimpleName());
             bundle.putString(FirebaseAnalytics.Param.SCREEN_CLASS, fragment.getClass().getSimpleName());
-            mFirebaseAnalytics.logEvent(FirebaseAnalytics.Event.SCREEN_VIEW, bundle);
+            GoogleServicesHelper.logEvent(mFirebaseAnalytics, FirebaseAnalytics.Event.SCREEN_VIEW, bundle);
         };
     }
 
@@ -115,7 +116,7 @@ public class NavigationDrawerFragment extends Fragment {
             view.findViewById(R.id.main_menu_open_source).setOnClickListener(v -> {
                         FragmentActivity fragmentActivity = getActivity();
                         if (fragmentActivity == null) return;
-                        new MaterialAlertDialogBuilder(fragmentActivity, R.style.CustomMaterialAlertDialog)
+                        new MaterialAlertDialogBuilder(fragmentActivity)
                                 .setTitle(R.string.main_menu_statement)
                                 .setMessage(GlobalConfig.getOpensourceLicense())
                                 .setPositiveButton(R.string.dialog_positive_known, null)
@@ -145,10 +146,10 @@ public class NavigationDrawerFragment extends Fragment {
                     if(LightUserSession.aiui.getStatus() == AsyncTask.Status.FINISHED) {
                         Toast.makeText(getActivity(), "Relogged.", Toast.LENGTH_SHORT).show();
                         LightUserSession.aiui = new LightUserSession.AsyncInitUserInfo(getContext(),/* failureCallback= */ () -> {
-                            if (!LightCache.deleteFile(GlobalConfig.getFirstFullUserAccountSaveFilePath()))
-                                LightCache.deleteFile(GlobalConfig.getSecondFullUserAccountSaveFilePath());
-                            if (!LightCache.deleteFile(GlobalConfig.getFirstUserAvatarSaveFilePath()))
-                                LightCache.deleteFile(GlobalConfig.getSecondUserAvatarSaveFilePath());
+                            LightCache.deleteFile(GlobalConfig.getFirstFullUserAccountSaveFilePath());
+                            LightCache.deleteFile(GlobalConfig.getSecondFullUserAccountSaveFilePath());
+                            LightCache.deleteFile(GlobalConfig.getFirstUserAvatarSaveFilePath());
+                            LightCache.deleteFile(GlobalConfig.getSecondUserAvatarSaveFilePath());
                             Toast.makeText(getContext(), getContext().getResources().getString(R.string.system_log_info_outofdate), Toast.LENGTH_SHORT).show();
                         }, GlobalConfig::loadUserInfoSet);
                         LightUserSession.aiui.execute();
@@ -214,7 +215,7 @@ public class NavigationDrawerFragment extends Fragment {
             Toast.makeText(getActivity(), "mainActivity == null !!! in setup()", Toast.LENGTH_SHORT).show();
 
         // Init Firebase Analytics on GA4.
-        mFirebaseAnalytics = FirebaseAnalytics.getInstance(mainActivity);
+        mFirebaseAnalytics = GoogleServicesHelper.initFirebase(mainActivity);
 
         mFragmentContainerView = mainActivity.findViewById(fragmentId);
         mDrawerLayout = drawerLayout;

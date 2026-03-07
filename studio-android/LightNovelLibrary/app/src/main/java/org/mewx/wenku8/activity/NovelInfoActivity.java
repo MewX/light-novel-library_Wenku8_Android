@@ -20,8 +20,11 @@ import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.RelativeLayout;
+import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
+
+import com.google.android.material.button.MaterialButton;
 
 import androidx.activity.OnBackPressedCallback;
 import androidx.core.view.GravityCompat;
@@ -35,6 +38,7 @@ import com.google.android.material.floatingactionbutton.FloatingActionButton;
 import com.google.android.gms.ads.AdRequest;
 import com.google.android.gms.ads.AdView;
 import com.google.firebase.analytics.FirebaseAnalytics;
+import org.mewx.wenku8.util.GoogleServicesHelper;
 import com.nostra13.universalimageloader.core.ImageLoader;
 
 import org.mewx.wenku8.R;
@@ -100,6 +104,11 @@ public class NovelInfoActivity extends BaseMaterialActivity {
     private NovelItemMeta mNovelItemMeta = null;
     private List<VolumeList> listVolume = new ArrayList<>();
     private String novelFullMeta = null, novelFullIntro = null, novelFullVolume = null;
+    private LinearLayout llError;
+    private TextView tvErrorMsg;
+    private MaterialButton btnRetry;
+    private ScrollView novelInfoScrollView;
+    private LinearLayout fabContainer;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -127,7 +136,7 @@ public class NovelInfoActivity extends BaseMaterialActivity {
         });
 
         // Init Firebase Analytics on GA4.
-        mFirebaseAnalytics = FirebaseAnalytics.getInstance(this);
+        mFirebaseAnalytics = GoogleServicesHelper.initFirebase(this);
 
         // fetch values
         aid = getIntent().getIntExtra("aid", 1);
@@ -139,7 +148,7 @@ public class NovelInfoActivity extends BaseMaterialActivity {
         viewItemParams.putString(FirebaseAnalytics.Param.ITEM_ID, "" + aid);
         viewItemParams.putString(FirebaseAnalytics.Param.ITEM_NAME, title);
         viewItemParams.putString("from", from);
-        mFirebaseAnalytics.logEvent(FirebaseAnalytics.Event.VIEW_ITEM, viewItemParams);
+        GoogleServicesHelper.logEvent(mFirebaseAnalytics, FirebaseAnalytics.Event.VIEW_ITEM, viewItemParams);
 
         // UIL setting
         if(ImageLoader.getInstance() == null || !ImageLoader.getInstance().isInited()) {
@@ -167,6 +176,13 @@ public class NovelInfoActivity extends BaseMaterialActivity {
         fabDownload = findViewById(R.id.fab_download);
         fabMenu = findViewById(R.id.multiple_actions);
         spb = findViewById(R.id.spb);
+        llError = findViewById(R.id.ll_error);
+        tvErrorMsg = findViewById(R.id.tv_error_msg);
+        btnRetry = findViewById(R.id.btn_retry);
+        novelInfoScrollView = findViewById(R.id.novel_info_scroll_view);
+        fabContainer = findViewById(R.id.fab_container);
+
+        btnRetry.setOnClickListener(v -> refreshInfo());
 
         // AdMob
         AdView mAdView = findViewById(R.id.ad_view);
@@ -195,13 +211,9 @@ public class NovelInfoActivity extends BaseMaterialActivity {
         spb.setVisibility(View.INVISIBLE); // wait for runnable
         Handler handler = new Handler();
         handler.postDelayed(() -> {
-            spb.setVisibility(View.VISIBLE);
-            if (from.equals(FromLocal))
-                refreshInfoFromLocal();
-            else
-                refreshInfoFromCloud();
+            isLoading = false; // Reset to allow initial load
+            refreshInfo();
         }, 500);
-
 
         // set on click listeners
         fabMenu.setOnClickListener(v -> toggleMenu());
@@ -218,7 +230,7 @@ public class NovelInfoActivity extends BaseMaterialActivity {
             if (mNovelItemMeta == null) return;
 
             // show aid: title (only when mNovelItemMeta is not null)
-            new MaterialAlertDialogBuilder(NovelInfoActivity.this, R.style.CustomMaterialAlertDialog)
+            new MaterialAlertDialogBuilder(NovelInfoActivity.this)
                     .setTitle(R.string.dialog_content_novel_title)
                     .setMessage(aid + ": " + mNovelItemMeta.title)
                     .setPositiveButton(R.string.dialog_positive_known, null)
@@ -228,7 +240,7 @@ public class NovelInfoActivity extends BaseMaterialActivity {
             if (runLoadingChecker()) return;
             if (mNovelItemMeta == null) return;
 
-            new MaterialAlertDialogBuilder(NovelInfoActivity.this, R.style.CustomMaterialAlertDialog)
+            new MaterialAlertDialogBuilder(NovelInfoActivity.this)
                     .setMessage(R.string.dialog_content_search_author)
                     .setPositiveButton(R.string.dialog_positive_ok, (ignored1, ignored2) -> {
                         // search author name
@@ -245,7 +257,7 @@ public class NovelInfoActivity extends BaseMaterialActivity {
 
             // add to favorite
             if(GlobalConfig.testInLocalBookshelf(aid)) {
-                new MaterialAlertDialogBuilder(NovelInfoActivity.this, R.style.CustomMaterialAlertDialog)
+                new MaterialAlertDialogBuilder(NovelInfoActivity.this)
                         .setMessage(R.string.dialog_content_sure_to_unfav)
                         .setPositiveButton(R.string.dialog_positive_yes, (ignored1, ignored2) -> {
                             // delete from cloud first, if succeed then delete from local
@@ -264,7 +276,7 @@ public class NovelInfoActivity extends BaseMaterialActivity {
                     if (novelFullVolume == null) nullStuff.add("volume");
                     Bundle somethingIsNull = new Bundle();
                     somethingIsNull.putStringArrayList("novel_info_save_null", nullStuff);
-                    mFirebaseAnalytics.logEvent(FirebaseAnalytics.Event.VIEW_ITEM, somethingIsNull);
+                    GoogleServicesHelper.logEvent(mFirebaseAnalytics, FirebaseAnalytics.Event.VIEW_ITEM, somethingIsNull);
 
                     Toast.makeText(NovelInfoActivity.this, getResources().getString(R.string.system_loading_please_wait), Toast.LENGTH_SHORT).show();
                 } else {
@@ -293,7 +305,7 @@ public class NovelInfoActivity extends BaseMaterialActivity {
 
             // download / update activity or verify downloading action (add to queue)
             // use list dialog to provide more functions
-            new MaterialAlertDialogBuilder(NovelInfoActivity.this, R.style.CustomMaterialAlertDialog)
+            new MaterialAlertDialogBuilder(NovelInfoActivity.this)
                     .setTitle(R.string.dialog_title_choose_download_option)
                     .setNegativeButton(R.string.dialog_negative_pass, null)
                     .setItems(R.array.download_option, (dialog, which) -> {
@@ -341,7 +353,7 @@ public class NovelInfoActivity extends BaseMaterialActivity {
         mSideSheetHeader.setOnClickListener(v -> {
             if (mCurrentSelectedVolume == null) return;
 
-            new MaterialAlertDialogBuilder(NovelInfoActivity.this, R.style.CustomMaterialAlertDialog)
+            new MaterialAlertDialogBuilder(NovelInfoActivity.this)
                     .setTitle(R.string.dialog_content_volume_title)
                     .setMessage(mCurrentSelectedVolume.volumeName)
                     .setPositiveButton(R.string.dialog_positive_known, null)
@@ -412,7 +424,7 @@ public class NovelInfoActivity extends BaseMaterialActivity {
      * 2 <string name="dialog_option_force_update_all">覆盖下载</string>
      */
     private void optionDownloadOverride() {
-        new MaterialAlertDialogBuilder(NovelInfoActivity.this, R.style.CustomMaterialAlertDialog)
+        new MaterialAlertDialogBuilder(NovelInfoActivity.this)
                 .setMessage(R.string.dialog_content_verify_force_update)
                 .setPositiveButton(R.string.dialog_positive_likethis, (ignored1, ignored2) -> {
                     // async task
@@ -447,7 +459,7 @@ public class NovelInfoActivity extends BaseMaterialActivity {
         for(int i = 0; i < listVolume.size(); i ++)
             volumes[i] = listVolume.get(i).volumeName;
 
-        new MaterialAlertDialogBuilder(NovelInfoActivity.this, R.style.CustomMaterialAlertDialog)
+        new MaterialAlertDialogBuilder(NovelInfoActivity.this)
                 .setTitle(R.string.dialog_option_select_and_update)
                 .setMultiChoiceItems(volumes, null, (dialog, which, isChecked) -> {
                     // Do nothing on choice click, we handle it in positive button
@@ -532,7 +544,7 @@ public class NovelInfoActivity extends BaseMaterialActivity {
         }
         final VolumeList volumeList_bak = savedVolumeList;
 
-        new MaterialAlertDialogBuilder(this, R.style.CustomMaterialAlertDialog)
+        new MaterialAlertDialogBuilder(this)
                 .setTitle(R.string.reader_v1_notice)
                 .setMessage(getResources().getString(R.string.reader_jump_last) + "\n" + title + "\n" + savedVolumeList.volumeName + "\n" + chapterInfo.chapterName)
                 .setPositiveButton(R.string.dialog_positive_sure, (ignored1, ignored2) -> {
@@ -558,7 +570,6 @@ public class NovelInfoActivity extends BaseMaterialActivity {
                 .setNegativeButton(R.string.dialog_negative_biao, null)
                 .show();
     }
-
 
     private class FetchInfoAsyncTask extends AsyncTask<Integer, Integer, Integer> {
         boolean fromLocal = false;
@@ -664,14 +675,32 @@ public class NovelInfoActivity extends BaseMaterialActivity {
             super.onPostExecute(integer);
 
             if (integer == -1) {
-                Toast.makeText(NovelInfoActivity.this, "FetchInfoAsyncTask:onPostExecute network error", Toast.LENGTH_SHORT).show();
+                // Network error or parse error
+                llError.setVisibility(View.VISIBLE);
+                novelInfoScrollView.setVisibility(View.GONE);
+                fabContainer.setVisibility(View.GONE);
+                tvErrorMsg.setText(R.string.system_network_error);
                 return;
             } else if (integer == -9) {
-                Toast.makeText(NovelInfoActivity.this, getResources().getString(R.string.bookshelf_intro_load_failed), Toast.LENGTH_SHORT).show();
+                // Local file error
+                llError.setVisibility(View.VISIBLE);
+                novelInfoScrollView.setVisibility(View.GONE);
+                fabContainer.setVisibility(View.GONE);
+                tvErrorMsg.setText(R.string.bookshelf_intro_load_failed);
                 // TODO: a better fix with optionCheckUpdates(), but need to avoid recursive calls.
                 return;
-            } else if (integer < 0)
+            } else if (integer < 0) {
+                llError.setVisibility(View.VISIBLE);
+                novelInfoScrollView.setVisibility(View.GONE);
+                fabContainer.setVisibility(View.GONE);
+                tvErrorMsg.setText("Unknown error occurred");
                 return; // ignore other exceptions
+            }
+
+            // Success
+            llError.setVisibility(View.GONE);
+            novelInfoScrollView.setVisibility(View.VISIBLE);
+            fabContainer.setVisibility(View.VISIBLE);
 
             // update general info
             tvNovelAuthor.setPaintFlags(tvNovelAuthor.getPaintFlags() | Paint.UNDERLINE_TEXT_FLAG); // with hyperlink
@@ -755,7 +784,7 @@ public class NovelInfoActivity extends BaseMaterialActivity {
           btn.setBackgroundColor(Color.LTGRAY);
         }
         btn.setOnLongClickListener(v -> {
-          new MaterialAlertDialogBuilder(NovelInfoActivity.this, R.style.CustomMaterialAlertDialog)
+          new MaterialAlertDialogBuilder(NovelInfoActivity.this)
               .setMessage(R.string.dialog_sure_to_clear_cache)
               .setPositiveButton(R.string.dialog_positive_want, (ignored1, ignored2) -> {
                 LightCache.cleanLocalCache(vl);
@@ -817,7 +846,7 @@ public class NovelInfoActivity extends BaseMaterialActivity {
             View optionBtn = btn.findViewById(R.id.novel_option);
             optionBtn.setVisibility(View.VISIBLE);
             optionBtn.setOnClickListener(ignored -> {
-                new MaterialAlertDialogBuilder(NovelInfoActivity.this, R.style.CustomMaterialAlertDialog)
+                new MaterialAlertDialogBuilder(NovelInfoActivity.this)
                     .setTitle(R.string.system_choose_reader_engine)
                     .setItems(R.array.reader_engine_option, (ignored1, which) -> {
                         Class readerClass = Wenku8ReaderActivityV1.class;
@@ -1261,15 +1290,26 @@ public class NovelInfoActivity extends BaseMaterialActivity {
         }
     }
 
+    private void refreshInfo() {
+        if (from.equals(FromLocal))
+            refreshInfoFromLocal();
+        else
+            refreshInfoFromCloud();
+    }
+
     private void refreshInfoFromLocal() {
+        if (isLoading) return;
         isLoading = true;
+        llError.setVisibility(View.GONE);
         spb.setVisibility(View.VISIBLE);
         FetchInfoAsyncTask fetchInfoAsyncTask = new FetchInfoAsyncTask();
         fetchInfoAsyncTask.execute(1); // load from local
     }
 
     private void refreshInfoFromCloud() {
+        if (isLoading) return;
         isLoading = true;
+        llError.setVisibility(View.GONE);
         spb.setVisibility(View.VISIBLE);
         FetchInfoAsyncTask fetchInfoAsyncTask = new FetchInfoAsyncTask();
         fetchInfoAsyncTask.execute();

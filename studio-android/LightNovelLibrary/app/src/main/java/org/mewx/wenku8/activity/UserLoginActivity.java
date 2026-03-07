@@ -12,7 +12,7 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
-import com.google.firebase.analytics.FirebaseAnalytics;
+import org.mewx.wenku8.util.GoogleServicesHelper;
 
 import org.mewx.wenku8.MyApp;
 import org.mewx.wenku8.R;
@@ -42,7 +42,7 @@ public class UserLoginActivity extends BaseMaterialActivity {
         initMaterialStyle(R.layout.layout_user_login);
 
         // Init Firebase Analytics on GA4.
-        FirebaseAnalytics.getInstance(this);
+        GoogleServicesHelper.initFirebase(this);
 
         // get views
         etUserNameOrEmail = findViewById(R.id.edit_username_or_email);
@@ -63,7 +63,7 @@ public class UserLoginActivity extends BaseMaterialActivity {
             alt.execute(etUserNameOrEmail.getText().toString(), etPassword.getText().toString());
         });
 
-        tvRegister.setOnClickListener(v -> new MaterialAlertDialogBuilder(UserLoginActivity.this, R.style.CustomMaterialAlertDialog)
+        tvRegister.setOnClickListener(v -> new MaterialAlertDialogBuilder(UserLoginActivity.this)
                 .setMessage(R.string.dialog_content_verify_register)
                 .setPositiveButton(R.string.dialog_positive_ok, (dialog, which) -> {
                     // show browser list

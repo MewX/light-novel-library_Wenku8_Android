@@ -35,6 +35,7 @@ import org.mewx.wenku8.global.GlobalConfig;
 import org.mewx.wenku8.api.Wenku8API;
 import org.mewx.wenku8.util.LightCache;
 import org.mewx.wenku8.network.LightUserSession;
+import org.mewx.wenku8.util.GoogleServicesHelper;
 import org.mewx.wenku8.util.ProgressDialogHelper;
 import org.mewx.wenku8.util.SaveFileMigration;
 
@@ -129,10 +130,10 @@ public class MainActivity extends BaseMaterialActivity {
         // execute background action
         LightUserSession.aiui = new LightUserSession.AsyncInitUserInfo(getApplicationContext(),
                 /* failureCallback= */ () -> {
-            if (!LightCache.deleteFile(GlobalConfig.getFirstFullUserAccountSaveFilePath()))
-                LightCache.deleteFile(GlobalConfig.getSecondFullUserAccountSaveFilePath());
-            if (!LightCache.deleteFile(GlobalConfig.getFirstUserAvatarSaveFilePath()))
-                LightCache.deleteFile(GlobalConfig.getSecondUserAvatarSaveFilePath());
+            LightCache.deleteFile(GlobalConfig.getFirstFullUserAccountSaveFilePath());
+            LightCache.deleteFile(GlobalConfig.getSecondFullUserAccountSaveFilePath());
+            LightCache.deleteFile(GlobalConfig.getFirstUserAvatarSaveFilePath());
+            LightCache.deleteFile(GlobalConfig.getSecondUserAvatarSaveFilePath());
             Toast.makeText(getApplicationContext(), getApplicationContext().getResources().getString(R.string.system_log_info_outofdate), Toast.LENGTH_SHORT).show();
         }, GlobalConfig::loadUserInfoSet);
         LightUserSession.aiui.execute();
@@ -155,7 +156,7 @@ public class MainActivity extends BaseMaterialActivity {
         // The permission issue for Android API 33+.
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && SaveFileMigration.migrationEligible()) {
             Log.d(TAG, "startOldSaveMigration: Eligible");
-            new MaterialAlertDialogBuilder(MainActivity.this, R.style.CustomMaterialAlertDialog)
+            new MaterialAlertDialogBuilder(MainActivity.this)
                     .setMessage(R.string.system_save_need_to_migrate)
                     .setPositiveButton(R.string.dialog_positive_upgrade, (unused1, unused2) -> {
                         Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
@@ -190,7 +191,7 @@ public class MainActivity extends BaseMaterialActivity {
             // Analysis.
             Bundle saveMigrationFilesTotalParams = new Bundle();
             saveMigrationFilesTotalParams.putString("count", "" + filesToCopy.size());
-            mFirebaseAnalytics.logEvent("save_migration_files_total", saveMigrationFilesTotalParams);
+            GoogleServicesHelper.logEvent(mFirebaseAnalytics, "save_migration_files_total", saveMigrationFilesTotalParams);
 
             if (filesToCopy.isEmpty()) {
                 Log.d(TAG, "Empty list of files to copy");
@@ -233,13 +234,13 @@ public class MainActivity extends BaseMaterialActivity {
             // Analysis.
             Bundle saveMigrationFilesFailedParams = new Bundle();
             saveMigrationFilesFailedParams.putString("failed", "" + finalFailedFiles);
-            mFirebaseAnalytics.logEvent("save_migration_files_failed", saveMigrationFilesFailedParams);
+            GoogleServicesHelper.logEvent(mFirebaseAnalytics, "save_migration_files_failed", saveMigrationFilesFailedParams);
 
             handler.post(() -> {
                 SaveFileMigration.markMigrationCompleted();
                 progressDialog.dismiss();
 
-                new MaterialAlertDialogBuilder(MainActivity.this, R.style.CustomMaterialAlertDialog)
+                new MaterialAlertDialogBuilder(MainActivity.this)
                         .setMessage(getString(R.string.system_save_migrated, filesToCopy.size(), finalFailedFiles))
                         .setPositiveButton(R.string.dialog_positive_sure, (unused1, unused2) -> reloadApp())
                         .setCancelable(false)
@@ -255,7 +256,7 @@ public class MainActivity extends BaseMaterialActivity {
         initialApp();
 
         // Init Firebase Analytics on GA4.
-        mFirebaseAnalytics = FirebaseAnalytics.getInstance(this);
+        mFirebaseAnalytics = GoogleServicesHelper.initFirebase(this);
 
         // UIL setting
         if (ImageLoader.getInstance() == null || !ImageLoader.getInstance().isInited()) {
@@ -399,9 +400,9 @@ public class MainActivity extends BaseMaterialActivity {
                 Bundle saveMigrationParams = new Bundle();
                 saveMigrationParams.putString("path", wenku8Path);
                 saveMigrationParams.putString("valid_path", "false");
-                mFirebaseAnalytics.logEvent("save_migration_path_selection", saveMigrationParams);
+                GoogleServicesHelper.logEvent(mFirebaseAnalytics, "save_migration_path_selection", saveMigrationParams);
 
-                new MaterialAlertDialogBuilder(MainActivity.this, R.style.CustomMaterialAlertDialog)
+                new MaterialAlertDialogBuilder(MainActivity.this)
                         .setMessage(getString(R.string.dialog_content_wrong_path, wenku8Path.replace("/tree/primary:", "/")))
                         .setPositiveButton(R.string.dialog_positive_retry, (unused1, unused2) -> reloadApp())
                         .setNeutralButton(R.string.dialog_negative_pass_for_now, null)
@@ -413,7 +414,7 @@ public class MainActivity extends BaseMaterialActivity {
                 Bundle saveMigrationParams = new Bundle();
                 saveMigrationParams.putString("path", wenku8Path);
                 saveMigrationParams.putString("valid_path", "true");
-                mFirebaseAnalytics.logEvent("save_migration_path_selection", saveMigrationParams);
+                GoogleServicesHelper.logEvent(mFirebaseAnalytics, "save_migration_path_selection", saveMigrationParams);
             }
 
             getContentResolver().takePersistableUriPermission(wenku8Uri, Intent.FLAG_GRANT_READ_URI_PERMISSION);

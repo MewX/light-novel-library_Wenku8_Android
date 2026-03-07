@@ -83,7 +83,7 @@ public class CheckAppNewVersion extends AsyncTask<Void, Void, Integer> {
                 // Note that checking window focus is needed: https://stackoverflow.com/a/41118674/4206925
 
                 // Update to new version.
-                new MaterialAlertDialogBuilder(activity, R.style.CustomMaterialAlertDialog)
+                new MaterialAlertDialogBuilder(activity)
                         .setTitle(R.string.system_update_found_new)
                         .setMessage(R.string.system_update_jump_to_page)
                         .setPositiveButton(R.string.dialog_positive_sure, (dialog, which) -> {

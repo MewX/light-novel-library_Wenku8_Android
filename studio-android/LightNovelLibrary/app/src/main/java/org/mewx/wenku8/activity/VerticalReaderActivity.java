@@ -21,7 +21,7 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import org.mewx.wenku8.util.ProgressDialogHelper;
-import com.google.firebase.analytics.FirebaseAnalytics;
+import org.mewx.wenku8.util.GoogleServicesHelper;
 import com.nostra13.universalimageloader.core.ImageLoader;
 
 import org.mewx.wenku8.R;
@@ -68,7 +68,7 @@ public class VerticalReaderActivity extends AppCompatActivity {
         setContentView(R.layout.layout_vertical_reader_temp);
 
         // Init Firebase Analytics on GA4.
-        FirebaseAnalytics.getInstance(this);
+        GoogleServicesHelper.initFirebase(this);
 
         // fetch values
         aid = getIntent().getIntExtra("aid", 1);
