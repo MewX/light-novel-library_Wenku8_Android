@@ -17,6 +17,10 @@ public class Wenku8API {
         throw new UnsupportedOperationException("stub");
     }
 
+    public static String getAvatarURL(int uid) {
+        throw new UnsupportedOperationException("stub");
+    }
+
     public static final int MIN_REPLY_TEXT = -1;
 
     public enum AppLanguage {
