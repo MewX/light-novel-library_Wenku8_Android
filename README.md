@@ -8,6 +8,8 @@
 如果您想打赏我用爱发电的代码，可以点击这个链接帮我充电 ❤️：
 [!["充电按钮"](https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png)](https://www.buymeacoffee.com/mewx)
 
+如果你走失了，可以来TG群：https://t.me/wk8app
+
 文档目录
 ==========
 
