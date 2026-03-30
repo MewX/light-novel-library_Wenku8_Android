@@ -16,7 +16,8 @@ import {
     History,
     ArrowRight,
     MessageSquare,
-    Archive
+    Archive,
+    Send
 } from 'lucide-react';
 
 // --- Data Constants ---
@@ -411,6 +412,14 @@ const Hero = ({ darkMode }) => {
                         className={`flex items-center gap-2 px-4 py-2 rounded-full border transition-colors ${darkMode ? 'border-blue-500 bg-blue-600 text-white hover:bg-blue-500' : 'border-blue-600 bg-blue-600 text-white hover:bg-blue-700'}`}
                     >
                         <Github size={16} /> 查看源码
+                    </a>
+                    <a
+                        href="https://t.me/wk8app"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className={`flex items-center gap-2 px-4 py-2 rounded-full border transition-colors ${darkMode ? 'border-[#2AABEE] bg-[#2AABEE]/90 text-white hover:bg-[#2AABEE]' : 'border-[#2AABEE] bg-[#2AABEE] text-white hover:bg-[#2392CB]'}`}
+                    >
+                        <Send size={16} /> Telegram群组
                     </a>
                     <a
                         href="https://web.archive.org/web/*/wenku8.mewx.org"
