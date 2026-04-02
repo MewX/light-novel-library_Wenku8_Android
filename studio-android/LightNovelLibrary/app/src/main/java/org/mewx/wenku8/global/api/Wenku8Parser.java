@@ -230,11 +230,11 @@ public class Wenku8Parser {
 
     /**
      * save the new xsl into an existing review list
-     * @param reviewList the existing review list object
      * @param xml the fetched xml
+     * @return the parsed review list
      */
-    static public void parseReviewList(ReviewList reviewList, String xml) {
-        reviewList.setCurrentPage(reviewList.getCurrentPage() + 1);
+    static public ReviewList parseReviewList(String xml) {
+        ReviewList reviewList = new ReviewList();
 
         try {
             XmlPullParserFactory factory = XmlPullParserFactory.newInstance();
@@ -299,6 +299,7 @@ public class Wenku8Parser {
         } catch (Exception e) {
             e.printStackTrace();
         }
+        return reviewList;
     }
 
     /**
