@@ -24,6 +24,7 @@ import org.mewx.wenku8.util.LightCache;
 import org.mewx.wenku8.network.LightNetwork;
 import org.mewx.wenku8.util.LightTool;
 import org.mewx.wenku8.util.SaveFileMigration;
+import org.mewx.wenku8.util.CrashReporter;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -167,12 +168,12 @@ public class GlobalConfig {
                 sb.append(line).append("\n");
             }
         } catch (IOException e) {
-            e.printStackTrace();
+            CrashReporter.recordException("GlobalConfig.getOpensourceLicense", e);
         } finally {
             try {
                 is.close();
             } catch (IOException e) {
-                e.printStackTrace();
+                CrashReporter.recordException("GlobalConfig.getOpensourceLicense", e);
             }
         }
         return sb.toString();
@@ -285,7 +286,7 @@ public class GlobalConfig {
                 if(b == null) return "";
                 h = new String(b, "UTF-8");
             } catch (UnsupportedEncodingException e) {
-                e.printStackTrace();
+                CrashReporter.recordException("GlobalConfig.loadFullSaveFileContent", e);
             }
 
         } else if (LightCache.testFileExist(getBackupStoragePath() + saveFolderName + File.separator + FileName)) {
@@ -294,7 +295,7 @@ public class GlobalConfig {
                 if(b == null) return "";
                 h = new String(b, "UTF-8");
             } catch (UnsupportedEncodingException e) {
-                e.printStackTrace();
+                CrashReporter.recordException("GlobalConfig.loadFullSaveFileContent", e);
             }
 
         }
@@ -880,7 +881,7 @@ public class GlobalConfig {
             // TODO: decouple
             LightUserSession.decAndSetUserFile(new String(bytes, "UTF-8"));
         } catch (Exception e) {
-            e.printStackTrace();
+            CrashReporter.recordException("GlobalConfig.loadUserInfoSet", e);
             return false; // exception
         }
 

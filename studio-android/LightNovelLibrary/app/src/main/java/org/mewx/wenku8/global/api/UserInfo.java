@@ -5,6 +5,7 @@ import androidx.annotation.Nullable;
 import android.util.Log;
 
 import org.mewx.wenku8.api.Wenku8API;
+import org.mewx.wenku8.util.CrashReporter;
 import org.xmlpull.v1.XmlPullParser;
 import org.xmlpull.v1.XmlPullParserFactory;
 
@@ -79,7 +80,7 @@ public class UserInfo {
             }
             return ui;
         } catch (Exception e) {
-            e.printStackTrace();
+            CrashReporter.recordException("UserInfo.parseUserInfo", e);
             return null;
         }
     }

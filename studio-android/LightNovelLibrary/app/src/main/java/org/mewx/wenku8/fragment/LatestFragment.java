@@ -34,6 +34,7 @@ import org.mewx.wenku8.api.Wenku8API;
 import org.mewx.wenku8.listener.MyItemClickListener;
 import org.mewx.wenku8.listener.MyItemLongClickListener;
 import org.mewx.wenku8.network.LightNetwork;
+import org.mewx.wenku8.util.CrashReporter;
 
 import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
@@ -232,7 +233,7 @@ public class LatestFragment extends Fragment implements MyItemClickListener, MyI
                 totalPage = result.pageNum;
                 newItems.addAll(result.items);
             } catch (UnsupportedEncodingException e) {
-                e.printStackTrace();
+                CrashReporter.recordException("LatestFragment.doInBackground", e);
             }
             return newItems;
         }

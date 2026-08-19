@@ -43,6 +43,7 @@ import org.mewx.wenku8.network.LightNetwork;
 import org.mewx.wenku8.util.ProgressDialogHelper;
 import org.mewx.wenku8.util.LightTool;
 import org.mewx.wenku8.network.LightUserSession;
+import org.mewx.wenku8.util.CrashReporter;
 
 import java.io.File;
 import java.io.UnsupportedEncodingException;
@@ -312,7 +313,7 @@ public class FavFragment extends Fragment implements MyItemClickListener, MyItem
                     }
                 }
             } catch (UnsupportedEncodingException e) {
-                e.printStackTrace();
+                CrashReporter.recordException("FavFragment.AsyncLoadAllFromCloud", e);
             }
 
             // calc difference
@@ -418,7 +419,7 @@ public class FavFragment extends Fragment implements MyItemClickListener, MyItem
                     GlobalConfig.writeFullFileIntoSaveFolder("intro", aid + "-intro.xml", introXml);
 
                 } catch (Exception e) {
-                    e.printStackTrace();
+                    CrashReporter.recordException("FavFragment.AsyncLoadAllFromCloud.cloudToLocal", e);
                 }
 
                 // last, add to local
@@ -443,7 +444,7 @@ public class FavFragment extends Fragment implements MyItemClickListener, MyItem
                         }
                     }
                 } catch (UnsupportedEncodingException e) {
-                    e.printStackTrace();
+                    CrashReporter.recordException("FavFragment.AsyncLoadAllFromCloud.localToCloud", e);
                 }
             }
 

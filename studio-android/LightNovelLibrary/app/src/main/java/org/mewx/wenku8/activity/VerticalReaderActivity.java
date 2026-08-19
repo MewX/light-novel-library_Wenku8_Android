@@ -31,6 +31,7 @@ import org.mewx.wenku8.global.api.OldNovelContentParser;
 import org.mewx.wenku8.global.api.VolumeList;
 import org.mewx.wenku8.api.Wenku8API;
 import org.mewx.wenku8.network.LightNetwork;
+import org.mewx.wenku8.util.CrashReporter;
 
 import java.io.UnsupportedEncodingException;
 import java.util.List;
@@ -211,7 +212,7 @@ public class VerticalReaderActivity extends AppCompatActivity {
 
                 return 0;
             } catch (UnsupportedEncodingException e) {
-                e.printStackTrace();
+                CrashReporter.recordException("VerticalReaderActivity.doInBackground", e);
             }
             return -1;
         }

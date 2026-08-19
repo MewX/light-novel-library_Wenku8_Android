@@ -25,6 +25,7 @@ import org.mewx.wenku8.listener.MyOptionClickListener;
 import org.mewx.wenku8.util.LightCache;
 import org.mewx.wenku8.network.LightNetwork;
 import org.mewx.wenku8.global.api.NovelItemInfoUpdate;
+import org.mewx.wenku8.util.CrashReporter;
 
 import java.io.File;
 import java.io.UnsupportedEncodingException;
@@ -249,7 +250,7 @@ public class NovelItemAdapterUpdate extends RecyclerView.Adapter<NovelItemAdapte
                 novelIntro = new String(res, "UTF-8");
                 return Wenku8Error.ErrorCode.SYSTEM_1_SUCCEEDED;
             } catch (UnsupportedEncodingException e) {
-                e.printStackTrace();
+                CrashReporter.recordException("NovelItemAdapterUpdate.doInBackground", e);
                 return Wenku8Error.ErrorCode.ERROR_DEFAULT;
             }
         }

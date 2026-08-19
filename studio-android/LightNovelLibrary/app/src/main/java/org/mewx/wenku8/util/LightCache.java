@@ -16,6 +16,7 @@ import org.mewx.wenku8.global.api.ChapterInfo;
 import org.mewx.wenku8.global.api.OldNovelContentParser;
 import org.mewx.wenku8.global.api.VolumeList;
 import org.mewx.wenku8.global.GlobalConfig;
+import org.mewx.wenku8.util.CrashReporter;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
@@ -75,7 +76,7 @@ public class LightCache {
             try {
                 return loadStream(new FileInputStream(file));
             } catch (FileNotFoundException e) {
-                e.printStackTrace();
+                CrashReporter.recordException("LightCache.loadFile", e);
             }
         }
         return null;
@@ -96,7 +97,7 @@ public class LightCache {
             inputStream.close();
             return bs;
         } catch (IOException e) {
-            e.printStackTrace();
+            CrashReporter.recordException("LightCache.loadStream", e);
         }
         return null;
     }
@@ -135,7 +136,7 @@ public class LightCache {
                 out.close();
                 Log.d(TAG, "Write successfully");
             } catch (IOException e) {
-                e.printStackTrace();
+                CrashReporter.recordException("LightCache.saveFile", e);
                 return false;
             }
         }
@@ -170,7 +171,7 @@ public class LightCache {
             java.io.FileInputStream fosFrom = new java.io.FileInputStream(fromFile);
             copyFile(fosFrom, to, forceWrite);
         } catch (Exception ex) {
-            ex.printStackTrace();
+            CrashReporter.recordException("LightCache.copyFile", ex);
         }
     }
 
@@ -193,7 +194,7 @@ public class LightCache {
             from.close();
             fosTo.close();
         } catch (Exception ex) {
-            ex.printStackTrace();
+            CrashReporter.recordException("LightCache.copyFile", ex);
         }
     }
 
@@ -244,7 +245,7 @@ public class LightCache {
                     return cursor.getString(column_index);
                 }
             } catch (Exception e) {
-                e.printStackTrace();
+                CrashReporter.recordException("LightCache.getFilePath", e);
             }
         } else if ("file".equalsIgnoreCase(uri.getScheme())) {
             return uri.getPath();

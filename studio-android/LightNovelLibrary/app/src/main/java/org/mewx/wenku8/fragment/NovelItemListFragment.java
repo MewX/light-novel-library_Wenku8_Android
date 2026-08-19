@@ -37,6 +37,7 @@ import org.mewx.wenku8.global.api.Wenku8Parser;
 import org.mewx.wenku8.listener.MyItemClickListener;
 import org.mewx.wenku8.listener.MyItemLongClickListener;
 import org.mewx.wenku8.network.LightNetwork;
+import org.mewx.wenku8.util.CrashReporter;
 
 import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
@@ -307,7 +308,7 @@ public class NovelItemListFragment extends Fragment implements MyItemClickListen
                 tempNovelList = Wenku8Parser.parseNovelItemList(new String(temp, "UTF-8"));
             }
             catch (UnsupportedEncodingException e) {
-                e.printStackTrace();
+                CrashReporter.recordException("NovelItemListFragment.AsyncGetNovelItemList", e);
             }
 
             // judge result
@@ -369,7 +370,7 @@ public class NovelItemListFragment extends Fragment implements MyItemClickListen
                 while (m.find())
                     listResultList.add(Integer.valueOf(m.group(1)));
             } catch (UnsupportedEncodingException e) {
-                e.printStackTrace();
+                CrashReporter.recordException("NovelItemListFragment.AsyncGetSearchResultList", e);
             }
 
             // get search result by author name
@@ -388,7 +389,7 @@ public class NovelItemListFragment extends Fragment implements MyItemClickListen
                     Log.d("MewX", listResultList2.get(listResultList2.size()-1).toString());
                 }
             } catch (UnsupportedEncodingException e) {
-                e.printStackTrace();
+                CrashReporter.recordException("NovelItemListFragment.AsyncGetSearchResultList", e);
             }
 
             // set migrate

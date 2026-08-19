@@ -45,6 +45,7 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import org.mewx.wenku8.R;
+import org.mewx.wenku8.util.CrashReporter;
 
 import java.util.Locale;
 
@@ -546,7 +547,7 @@ public class PagerSlidingTabStrip extends HorizontalScrollView {
                     pager.getAdapter().unregisterDataSetObserver(adapterObserver);
                 }
                 catch (IllegalStateException e) {
-                    e.printStackTrace();
+                    CrashReporter.recordException("PagerSlidingTabStrip.onDetachedFromWindow", e);
                 }
                 adapterObserver.setAttached(false);
             }

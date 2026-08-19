@@ -4,6 +4,7 @@ import androidx.annotation.NonNull;
 import android.util.Log;
 
 import org.mewx.wenku8.util.LightTool;
+import org.mewx.wenku8.util.CrashReporter;
 import org.xmlpull.v1.XmlPullParser;
 import org.xmlpull.v1.XmlPullParserFactory;
 
@@ -147,7 +148,7 @@ public class Wenku8Parser {
             }
             return nfi;
         } catch (Exception e) {
-            e.printStackTrace();
+            CrashReporter.recordException("Wenku8Parser.parseNovelFullMeta", e);
             return null;
         }
     }
@@ -223,7 +224,7 @@ public class Wenku8Parser {
                     break;
             }
         } catch (Exception e) {
-            e.printStackTrace();
+            CrashReporter.recordException("Wenku8Parser.getVolumeList", e);
         }
         return l;
     }
@@ -297,7 +298,7 @@ public class Wenku8Parser {
                 eventType = xmlPullParser.next();
             }
         } catch (Exception e) {
-            e.printStackTrace();
+            CrashReporter.recordException("Wenku8Parser.parseReviewList", e);
         }
     }
 
@@ -356,7 +357,7 @@ public class Wenku8Parser {
                 eventType = xmlPullParser.next();
             }
         } catch (Exception e) {
-            e.printStackTrace();
+            CrashReporter.recordException("Wenku8Parser.parseReviewReplyList", e);
         }
     }
 

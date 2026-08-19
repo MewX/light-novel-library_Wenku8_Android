@@ -55,6 +55,7 @@ import org.mewx.wenku8.reader.activity.Wenku8ReaderActivityV1;
 import org.mewx.wenku8.util.LightCache;
 import org.mewx.wenku8.network.LightNetwork;
 import org.mewx.wenku8.util.LightTool;
+import org.mewx.wenku8.util.CrashReporter;
 
 import java.io.File;
 import java.io.UnsupportedEncodingException;
@@ -633,7 +634,7 @@ public class NovelInfoActivity extends BaseMaterialActivity {
                 novelFullIntro = introFuture.get();
                 novelFullVolume = volumeFuture.get();
             } catch (InterruptedException | ExecutionException e) {
-                e.printStackTrace();
+                CrashReporter.recordException("NovelInfoActivity.FetchInfoAsyncTask", e);
                 String msg = e.getMessage();
                 if (msg != null && msg.contains("local")) return -9;
                 return -1;
@@ -937,7 +938,7 @@ public class NovelInfoActivity extends BaseMaterialActivity {
                 GlobalConfig.writeFullFileIntoSaveFolder("intro", taskAid + "-volume.xml", volumeXml);
 
             } catch (UnsupportedEncodingException e) {
-                e.printStackTrace();
+                CrashReporter.recordException("NovelInfoActivity.AsyncUpdateCacheTask", e);
                 return Wenku8Error.ErrorCode.SERVER_RETURN_NOTHING;
             }
             if(operationType == 0) return Wenku8Error.ErrorCode.SYSTEM_1_SUCCEEDED; // update info
@@ -1004,7 +1005,7 @@ public class NovelInfoActivity extends BaseMaterialActivity {
                         publishProgress(++current); // update progress
 
                     } catch (UnsupportedEncodingException e) {
-                        e.printStackTrace();
+                        CrashReporter.recordException("NovelInfoActivity.AsyncUpdateCacheTask.saveChapter", e);
                     }
                 }
             }
@@ -1111,7 +1112,7 @@ public class NovelInfoActivity extends BaseMaterialActivity {
                     }
                 }
             } catch (UnsupportedEncodingException e) {
-                e.printStackTrace();
+                CrashReporter.recordException("NovelInfoActivity.AsyncRemoveBookFromCloud", e);
                 return Wenku8Error.ErrorCode.BYTE_TO_STRING_EXCEPTION;
             }
         }
@@ -1211,7 +1212,7 @@ public class NovelInfoActivity extends BaseMaterialActivity {
                         publishProgress(++current); // update progress
 
                     } catch (UnsupportedEncodingException e) {
-                        e.printStackTrace();
+                        CrashReporter.recordException("NovelInfoActivity.AsyncDownloadVolumes", e);
                     }
                 }
             }

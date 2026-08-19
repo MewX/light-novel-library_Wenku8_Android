@@ -29,6 +29,7 @@ import org.mewx.wenku8.util.GoogleServicesHelper;
 import org.mewx.wenku8.R;
 import org.mewx.wenku8.global.GlobalConfig;
 import org.mewx.wenku8.util.LightCache;
+import org.mewx.wenku8.util.CrashReporter;
 
 import java.io.File;
 import java.io.IOException;
@@ -222,7 +223,7 @@ public class ViewImageDetailActivity extends BaseMaterialActivity {
                 outputStream.write(data);
                 return true;
             } catch (IOException e) {
-                e.printStackTrace();
+                CrashReporter.recordException("ViewImageDetailActivity.saveImageToGallery", e);
                 return false;
             }
         } else {

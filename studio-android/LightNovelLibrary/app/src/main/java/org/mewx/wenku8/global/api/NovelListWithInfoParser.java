@@ -10,6 +10,7 @@ import org.xmlpull.v1.XmlPullParserFactory;
 import java.io.StringReader;
 import java.util.ArrayList;
 import java.util.List;
+import org.mewx.wenku8.util.CrashReporter;
 
 /** Novel List With Info for improve loading speed.
  * Created by MewX on 2015/10/20.
@@ -49,7 +50,7 @@ public class NovelListWithInfoParser {
                 eventType = xmlPullParser.next();
             }
         } catch (Exception e) {
-            e.printStackTrace();
+            CrashReporter.recordException("NovelListWithInfoParser.getNovelListWithInfoPageNum", e);
         }
         return 0; // default
     }
@@ -93,7 +94,7 @@ public class NovelListWithInfoParser {
                 eventType = xmlPullParser.next();
             }
         } catch (Exception e) {
-            e.printStackTrace();
+            CrashReporter.recordException("NovelListWithInfoParser.getNovelListWithInfo", e);
         }
         return l;
     }

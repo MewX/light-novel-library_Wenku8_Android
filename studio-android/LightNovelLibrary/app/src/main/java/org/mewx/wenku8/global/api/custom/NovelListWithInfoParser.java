@@ -10,6 +10,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.mewx.wenku8.global.api.NovelItemInfoUpdate;
+import org.mewx.wenku8.util.CrashReporter;
 
 public class NovelListWithInfoParser {
     public static class Result {
@@ -60,7 +61,7 @@ public class NovelListWithInfoParser {
             return result;
 
         } catch (JSONException e) {
-            e.printStackTrace();
+            CrashReporter.recordException("NovelListWithInfoParser.parse", e);
             return null;
         }
     }

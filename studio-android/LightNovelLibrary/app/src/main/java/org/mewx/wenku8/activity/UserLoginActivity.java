@@ -23,6 +23,7 @@ import org.mewx.wenku8.util.LightCache;
 import org.mewx.wenku8.network.LightNetwork;
 import org.mewx.wenku8.util.ProgressDialogHelper;
 import org.mewx.wenku8.network.LightUserSession;
+import org.mewx.wenku8.util.CrashReporter;
 
 import java.io.ByteArrayOutputStream;
 
@@ -95,7 +96,7 @@ public class UserLoginActivity extends BaseMaterialActivity {
             try {
                 Thread.sleep(500);
             } catch (InterruptedException e) {
-                e.printStackTrace();
+                CrashReporter.recordException("UserLoginActivity.doInBackground", e);
             }
 
             we = LightUserSession.doLoginFromGiven(params[0], params[1], GlobalConfig::saveUserInfoSet);

@@ -26,6 +26,7 @@ import org.mewx.wenku8.network.LightNetwork;
 import org.mewx.wenku8.util.LightTool;
 import org.mewx.wenku8.network.LightUserSession;
 import org.mewx.wenku8.util.ProgressDialogHelper;
+import org.mewx.wenku8.util.CrashReporter;
 
 import java.io.UnsupportedEncodingException;
 
@@ -175,7 +176,7 @@ public class UserInfoActivity extends BaseMaterialActivity {
                 return new Object[]{Wenku8Error.ErrorCode.SYSTEM_1_SUCCEEDED, parsedUi, decodedAvatar};
 
             } catch (Exception e) {
-                e.printStackTrace();
+                CrashReporter.recordException("UserInfoActivity.AsyncGetUserInfo", e);
                 return new Object[]{Wenku8Error.ErrorCode.NETWORK_ERROR, null, null};
             }
         }
@@ -252,7 +253,7 @@ public class UserInfoActivity extends BaseMaterialActivity {
 
                 return Wenku8Error.getSystemDefinedErrorCode(new Integer(result)); // get 1 or 4 exceptions
             } catch (UnsupportedEncodingException e) {
-                e.printStackTrace();
+                CrashReporter.recordException("UserInfoActivity.AsyncLogout", e);
                 return Wenku8Error.ErrorCode.BYTE_TO_STRING_EXCEPTION;
             }
         }

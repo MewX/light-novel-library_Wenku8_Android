@@ -52,6 +52,7 @@ import org.mewx.wenku8.reader.view.WenkuReaderPageView;
 import org.mewx.wenku8.util.LightCache;
 import org.mewx.wenku8.network.LightNetwork;
 import org.mewx.wenku8.util.LightTool;
+import org.mewx.wenku8.util.CrashReporter;
 
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -426,7 +427,7 @@ public class Wenku8ReaderActivityV1 extends BaseMaterialActivity {
 
                 return Wenku8Error.ErrorCode.SYSTEM_1_SUCCEEDED;
             } catch (UnsupportedEncodingException e) {
-                e.printStackTrace();
+                CrashReporter.recordException("Wenku8ReaderActivityV1.AsyncNovelContentTask", e);
                 return Wenku8Error.ErrorCode.STRING_CONVERSION_ERROR;
             }
         }
@@ -909,7 +910,7 @@ public class Wenku8ReaderActivityV1 extends BaseMaterialActivity {
                 LightCache.copyFile(getApplicationContext().getContentResolver().openInputStream(fontUri), copiedFilePath, true);
                 runSaveCustomFontPath(copiedFilePath.replaceAll("file://", ""));
             } catch (FileNotFoundException e) {
-                e.printStackTrace();
+                CrashReporter.recordException("Wenku8ReaderActivityV1.onActivityResult", e);
                 Toast.makeText(this, "Exception: " + e, Toast.LENGTH_SHORT).show();
                 // Failed to copy. Just ignore it.
             }
@@ -920,7 +921,7 @@ public class Wenku8ReaderActivityV1 extends BaseMaterialActivity {
                 LightCache.copyFile(getApplicationContext().getContentResolver().openInputStream(mediaUri), copiedFilePath, true);
                 runSaveCustomBackgroundPath(copiedFilePath.replaceAll("file://", ""));
             } catch (FileNotFoundException e) {
-                e.printStackTrace();
+                CrashReporter.recordException("Wenku8ReaderActivityV1.onActivityResult", e);
                 Toast.makeText(this, "Exception: " + e, Toast.LENGTH_SHORT).show();
                 // Failed to copy. Just ignore it.
             }
@@ -944,7 +945,7 @@ public class Wenku8ReaderActivityV1 extends BaseMaterialActivity {
                 Bitmap bitmap = BitmapFactory.decodeFile(path, options);
                 if (bitmap == null) throw new Exception("PictureDecodeFailedException");
             } catch (Exception e) {
-                e.printStackTrace();
+                CrashReporter.recordException("Wenku8ReaderActivityV1.runSaveCustomBackgroundPath", e);
                 Toast.makeText(this, "Exception: " + e + "\n可能的原因有：图片不在内置SD卡；图片格式不正确；图片像素尺寸太大，请使用小一点的图，谢谢，此功能为试验性功能；", Toast.LENGTH_LONG).show();
                 return;
             }

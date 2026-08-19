@@ -9,6 +9,7 @@ import org.xmlpull.v1.XmlPullParser;
 import org.xmlpull.v1.XmlPullParserFactory;
 
 import java.io.StringReader;
+import org.mewx.wenku8.util.CrashReporter;
 
 /**
  * Created by MewX on 2015/1/20.
@@ -97,7 +98,7 @@ public class NovelItemInfoUpdate {
             }
             return niiu;
         } catch (Exception e) {
-            e.printStackTrace();
+            CrashReporter.recordException("NovelItemInfoUpdate.parse", e);
             return null;
         }
     }

@@ -38,6 +38,7 @@ import org.mewx.wenku8.network.LightUserSession;
 import org.mewx.wenku8.util.GoogleServicesHelper;
 import org.mewx.wenku8.util.ProgressDialogHelper;
 import org.mewx.wenku8.util.SaveFileMigration;
+import org.mewx.wenku8.util.CrashReporter;
 
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -214,7 +215,7 @@ public class MainActivity extends BaseMaterialActivity {
                     }
                 } catch (FileNotFoundException e) {
                     failedFiles++;
-                    e.printStackTrace();
+                    CrashReporter.recordException("MainActivity.migrateFiles", e);
                 }
                 progress++;
 
