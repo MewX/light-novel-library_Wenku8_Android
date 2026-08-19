@@ -1,9 +1,16 @@
 package org.mewx.wenku8.global.api;
 
 import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.robolectric.RobolectricTestRunner;
+import org.robolectric.annotation.Config;
 
 import static org.junit.Assert.*;
 
+// Robolectric is required: this exercises XmlPullParser-based parsing and android.util.LruCache,
+// both of which are no-op stubs under the plain JVM test runtime.
+@RunWith(RobolectricTestRunner.class)
+@Config(manifest = Config.NONE)
 public class NovelItemInfoUpdateTest {
 
     @Test

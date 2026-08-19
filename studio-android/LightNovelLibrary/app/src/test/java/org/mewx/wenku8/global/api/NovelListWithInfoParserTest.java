@@ -1,11 +1,18 @@
 package org.mewx.wenku8.global.api;
 
 import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.robolectric.RobolectricTestRunner;
+import org.robolectric.annotation.Config;
 
 import java.util.List;
 
 import static org.junit.Assert.*;
 
+// Robolectric is required: this parser uses XmlPullParser, which is a no-op stub under the
+// plain JVM test runtime and makes every parse silently return null.
+@RunWith(RobolectricTestRunner.class)
+@Config(manifest = Config.NONE)
 public class NovelListWithInfoParserTest {
     private static final String XML = "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n" +
             "<result>\n" +

@@ -1,8 +1,9 @@
 package org.mewx.wenku8.global.api;
 
-import androidx.test.filters.SmallTest;
-
 import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.robolectric.RobolectricTestRunner;
+import org.robolectric.annotation.Config;
 
 import java.util.Arrays;
 import java.util.Calendar;
@@ -11,7 +12,10 @@ import java.util.List;
 
 import static org.junit.Assert.*;
 
-@SmallTest
+// Robolectric is required: these parsers use XmlPullParser, which is a no-op stub under the
+// plain JVM test runtime and makes every parse silently return null.
+@RunWith(RobolectricTestRunner.class)
+@Config(manifest = Config.NONE)
 public class Wenku8ParserTest {
     private final String REVIEW_LIST_XML = "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n" +
             "<metadata>\n" +

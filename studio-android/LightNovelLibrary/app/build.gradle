@@ -124,6 +124,13 @@ dependencies {
     testImplementation 'junit:junit:4.13.2'
     testImplementation 'org.json:json:20231013'
     testImplementation 'org.mockito:mockito-core:5.4.0'
+    // Robolectric runs JVM tests against real Android framework code. Needed by the XML
+    // parser tests: the android.jar stub returns default values (see
+    // testOptions.unitTests.returnDefaultValues), so XmlPullParserFactory.newInstance()
+    // fails silently and every parser returns null. A standalone kxml2 makes them run but
+    // is NOT behaviour-faithful -- it does not throw on malformed input the way Android's
+    // parser does, which silently inverts the malformed-input test cases.
+    testImplementation 'org.robolectric:robolectric:4.13'
 }
 
 //jacocoTestReport {

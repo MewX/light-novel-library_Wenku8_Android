@@ -1,12 +1,14 @@
 package org.mewx.wenku8.global.api;
 
-import androidx.test.filters.SmallTest;
-
 import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.robolectric.RobolectricTestRunner;
+import org.robolectric.annotation.Config;
 
 import static org.junit.Assert.*;
 
-@SmallTest
+@RunWith(RobolectricTestRunner.class)
+@Config(manifest = Config.NONE)
 public class UserInfoTest {
     private static final String USER_INFO_XML = "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n" +
             "<metadata>\n" +
