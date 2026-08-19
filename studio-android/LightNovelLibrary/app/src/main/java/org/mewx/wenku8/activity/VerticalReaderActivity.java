@@ -20,6 +20,7 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import org.mewx.wenku8.util.CrashReporter;
 import org.mewx.wenku8.util.ProgressDialogHelper;
 import org.mewx.wenku8.util.GoogleServicesHelper;
 import com.nostra13.universalimageloader.core.ImageLoader;
@@ -31,7 +32,6 @@ import org.mewx.wenku8.global.api.OldNovelContentParser;
 import org.mewx.wenku8.global.api.VolumeList;
 import org.mewx.wenku8.api.Wenku8API;
 import org.mewx.wenku8.network.LightNetwork;
-import org.mewx.wenku8.util.CrashReporter;
 
 import java.io.UnsupportedEncodingException;
 import java.util.List;
@@ -65,6 +65,10 @@ public class VerticalReaderActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        // This is the one Activity that does not extend BaseMaterialActivity, so it does not
+        // inherit the breadcrumbs and has to record them itself.
+        CrashReporter.setScreen(getClass().getSimpleName(),
+                savedInstanceState == null ? "onCreate" : "onCreate(restored)");
         getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN, WindowManager.LayoutParams.FLAG_FULLSCREEN);
         setContentView(R.layout.layout_vertical_reader_temp);
 
@@ -76,6 +80,15 @@ public class VerticalReaderActivity extends AppCompatActivity {
         volumeList = (VolumeList) getIntent().getSerializableExtra("volume");
         cid = getIntent().getIntExtra("cid",1);
         from = getIntent().getStringExtra("from");
+
+        // Crash report context; see the equivalent block in Wenku8ReaderActivityV1.
+        CrashReporter.setKey(CrashReporter.Keys.READER_MODE, "vertical");
+        CrashReporter.setKey(CrashReporter.Keys.NOVEL_AID, aid);
+        CrashReporter.setKey(CrashReporter.Keys.CHAPTER_CID, cid);
+        if (volumeList == null) {
+            CrashReporter.log("Vertical reader started without a 'volume' extra (aid=" + aid
+                    + ", cid=" + cid + ", from=" + from + ")");
+        }
 
         // UIL setting
         if(ImageLoader.getInstance() == null || !ImageLoader.getInstance().isInited()) {
@@ -145,6 +158,7 @@ public class VerticalReaderActivity extends AppCompatActivity {
     @Override
     protected void onResume() {
         super.onResume();
+        CrashReporter.setScreen(getClass().getSimpleName(), "onResume");
 
         // set navigation bar status, remember to disable "setNavigationBarTintEnabled"
         final int flags = View.SYSTEM_UI_FLAG_LAYOUT_STABLE

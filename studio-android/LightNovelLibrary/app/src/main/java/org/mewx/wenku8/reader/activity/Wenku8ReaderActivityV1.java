@@ -114,6 +114,25 @@ public class Wenku8ReaderActivityV1 extends BaseMaterialActivity {
         readerParams.putString("jump_to_saved_page", forcejump);
         GoogleServicesHelper.logEvent(mFirebaseAnalytics, "reader_v1", readerParams);
 
+        // Crash report context. Which novel and chapter matters because the crashes we are
+        // chasing are content-dependent: long series produce big Intent payloads and big
+        // chapter XML.
+        CrashReporter.setKey(CrashReporter.Keys.READER_MODE, "v1");
+        CrashReporter.setKey(CrashReporter.Keys.NOVEL_AID, aid);
+        CrashReporter.setKey(CrashReporter.Keys.CHAPTER_CID, cid);
+        if (volumeList == null) {
+            // Deliberately only a breadcrumb, not a guard: the NPE two statements below is
+            // reported as a fatal already, and this records why the extra was missing. The guard
+            // itself is Phase 1 of STABILITY_PLAN.md, kept separate so the before/after counts
+            // for this line are comparable.
+            CrashReporter.log("Reader started without a 'volume' extra (aid=" + aid
+                    + ", cid=" + cid + ", from=" + from + ")");
+        } else {
+            CrashReporter.log("Reader volume has "
+                    + (volumeList.chapterList == null ? "null" : volumeList.chapterList.size())
+                    + " chapters");
+        }
+
 
         setStatusBarAlpha(0.0f);
         setNavigationBarAlpha(0.0f);

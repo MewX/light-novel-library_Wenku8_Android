@@ -20,11 +20,11 @@ import org.mewx.wenku8.MyApp;
 import org.mewx.wenku8.R;
 import org.mewx.wenku8.api.Wenku8API;
 import org.mewx.wenku8.network.LightUserSession;
+import org.mewx.wenku8.util.CrashReporter;
 import org.mewx.wenku8.util.LightCache;
 import org.mewx.wenku8.network.LightNetwork;
 import org.mewx.wenku8.util.LightTool;
 import org.mewx.wenku8.util.SaveFileMigration;
-import org.mewx.wenku8.util.CrashReporter;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -114,6 +114,7 @@ public class GlobalConfig {
         // FIXME
         Wenku8API.CurrentLang = currentLang;
         setToAllSetting(SettingItems.language, currentLang.toString());
+        CrashReporter.setKey(CrashReporter.Keys.LANGUAGE, currentLang.toString());
     }
 
     public static Wenku8API.AppLanguage getCurrentLang() {
@@ -758,6 +759,15 @@ public class GlobalConfig {
             setToAllSetting(SettingItems.version, "1");
         }
         // Else, reserved for future settings migration.
+
+        // Crash report context. Both of these change which files get read and which parser path
+        // runs, so a report without them is hard to reproduce. Read straight out of allSetting
+        // rather than via getCurrentLang(), which writes the settings file back on first run.
+        String lang = allSetting.getAsString(SettingItems.language.toString());
+        CrashReporter.setKey(CrashReporter.Keys.LANGUAGE, lang == null ? currentLang.toString() : lang);
+        CrashReporter.setKey(CrashReporter.Keys.STORAGE_MODE,
+                lookupInternalStorageOnly || !externalStoragePathAvailable ? "internal" : "external");
+        CrashReporter.log("GlobalConfig#loadAllSetting completed");
     }
 
     public static void saveAllSetting() {

@@ -20,6 +20,9 @@ public class GoogleServicesHelper {
                     .isGooglePlayServicesAvailable(context.getApplicationContext());
             isGmsAvailable = (resultCode == ConnectionResult.SUCCESS);
             Log.d(TAG, "GMS Availability: " + isGmsAvailable + " (Code: " + resultCode + ")");
+            // Recorded here rather than at startup because this is where the value is resolved,
+            // and it gates AdMob and Analytics -- worth knowing when triaging a report.
+            CrashReporter.setKey(CrashReporter.Keys.GMS_AVAILABLE, isGmsAvailable);
         }
         return isGmsAvailable;
     }

@@ -144,6 +144,10 @@ public class NovelInfoActivity extends BaseMaterialActivity {
         from = getIntent().getStringExtra("from");
         title = getIntent().getStringExtra("title");
 
+        // Crash report context. This screen owns four AsyncTasks that all touch views in
+        // onPostExecute, so knowing which novel was open narrows down a report a lot.
+        CrashReporter.setKey(CrashReporter.Keys.NOVEL_AID, aid);
+
         // Analysis.
         Bundle viewItemParams = new Bundle();
         viewItemParams.putString(FirebaseAnalytics.Param.ITEM_ID, "" + aid);

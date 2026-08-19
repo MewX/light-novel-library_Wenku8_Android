@@ -90,8 +90,21 @@ public class LightCache {
 
             // read all
             byte[] bs = new byte[fileSize];
-            if (dis.read(bs, 0, fileSize) == -1)
+            int read = dis.read(bs, 0, fileSize);
+            if (read == -1)
                 return null;
+
+            // Instrumentation only -- the behaviour below is deliberately unchanged. available()
+            // is an estimate of what can be read without blocking rather than the file length,
+            // and a single read() is not obliged to fill the buffer, so this can silently hand
+            // back a truncated, zero-padded array. That array becomes novel XML and fails to
+            // parse much later, which is why it has never been traceable from a crash report.
+            // Reporting it here says whether that is actually happening in the wild before
+            // Phase 1 changes the read into a loop.
+            if (read != fileSize) {
+                CrashReporter.recordException("LightCache.loadStream.truncated",
+                        new IOException("Short read: got " + read + " of " + fileSize + " bytes"));
+            }
 
             dis.close();
             inputStream.close();
