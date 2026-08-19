@@ -2,9 +2,10 @@
 
 Status: draft, derived from a read-through of `app/` and `api/` at commit `5e00d42`.
 
-**Progress:** "Testing strategy" step 1 (move device-independent tests to the JVM) is
-implemented. Everything else below is still proposed, not done. Phase 0 has not been started,
-so the prioritisation here remains inference from reading the code rather than from crash data.
+**Progress:** "Testing strategy" step 1 (move device-independent tests to the JVM) and **Phase 0
+(instrumentation) are implemented**. Phase 0 has not yet *collected* anything — the ranking below
+is still inference from reading the code, and stays that way until a release ships and reports
+come back. Phases 1–4 are proposed, not done.
 
 ## Diagnosis
 
@@ -106,20 +107,42 @@ why it would be hard to trace from a crash report.
 Ordered by (crash volume eliminated) ÷ (risk of introducing new bugs). Phases 0–2 are the
 ones that matter; 3–4 are cleanup that can happen opportunistically.
 
-### Phase 0 — See the problem before fixing it (do this first, ship it alone)
+### Phase 0 — See the problem before fixing it — **implemented**
 
-Nothing else should be prioritised until real crash counts are visible. Right now
-Crashlytics catches only unhandled exceptions — there are **zero** `recordException`,
-`setCustomKey`, or `setUserId` calls in the codebase, so every report arrives with no
-breadcrumbs.
+Nothing else should be prioritised until real crash counts are visible. Before this, Crashlytics
+caught only unhandled exceptions — there were **zero** `recordException`, `setCustomKey`, or
+`setUserId` calls, so every report arrived with no breadcrumbs.
 
-1. Add custom keys at the points where crashes cluster: current `aid`/`cid`, screen name,
-   language, storage mode (internal vs external), logged-in state.
-2. Replace the `e.printStackTrace()` calls in `catch` blocks (28 of them) with
-   `FirebaseCrashlytics.getInstance().recordException(e)` — these are non-fatals that are
-   currently invisible. The empty/log-only catches in `LightCache`, `GlobalConfig`, and
-   `NovelItemListFragment` are the highest-value ones.
-3. Add a breadcrumb log on every Activity `onCreate`/`onResume`.
+Everything routes through `util/CrashReporter.java`, which degrades to a logcat write when
+Firebase is absent (JVM unit tests, non-GMS devices). That matters more than it sounds: these
+calls sit in `catch` blocks, so a reporter that could throw would turn a handled error into a
+crash. `CrashReporterTest` pins the degradation path.
+
+1. **Custom keys.** `screen`, `build_flavor`, `gms_available`, `language`, `storage_mode`,
+   `logged_in`, `novel_aid`, `chapter_cid`, `reader_mode`. Each is set where the value is
+   resolved rather than at startup, so none of them can go stale.
+2. **50 `printStackTrace()` calls → `CrashReporter.recordException(label, e)`,** across 23 files.
+   (The plan previously said 28; the real count was 50.) Each label is `Class.method`, or
+   `Class.AsyncTaskName` where a file holds several tasks — `NovelInfoActivity` alone has five,
+   and "doInBackground" would not have distinguished them.
+3. **Lifecycle breadcrumbs.** `BaseMaterialActivity` covers 13 of the 15 Activities;
+   `VerticalReaderActivity` does it directly because it does not extend that base. Fragments are
+   covered by one `FragmentLifecycleCallbacks` registration rather than per-Fragment overrides,
+   which also catches child fragments and any Fragment added later. `onDetach` is recorded
+   because "AsyncTask finished after the Fragment detached" is the crash shape being hunted.
+4. **Two silent failures made visible,** since these produce no signal at all today and no amount
+   of crash data would surface them:
+   - `LightCache.loadStream` now reports a non-fatal when `read()` returns fewer bytes than
+     `available()` promised (root cause 4). Behaviour is deliberately unchanged — this measures
+     whether the truncation actually happens in the wild before Phase 1 item 3 rewrites the read.
+   - Both readers log a breadcrumb when the `volume` Intent extra arrives null (root cause 3),
+     which distinguishes "extra absent" from "deserialisation failed" in the NPE that follows.
+     The guard itself is Phase 1 item 1, kept separate so before/after counts stay comparable.
+
+**Deliberately not done: `setUserId`.** The wenku8 account name identifies a real person to a
+third party, and Crashlytics already counts affected users via its own installation id, so
+sending it would add little beyond the privacy cost. `logged_in` is recorded as a boolean instead.
+Revisit only if a crash turns out to need per-account correlation.
 
 Ship this as a point release and let it collect for a week. It converts the rest of this
 plan from guesswork into a ranked list.
@@ -242,18 +265,26 @@ apply.
 
 ## Testing strategy
 
-The suite is 11 test classes in `app/` plus `api/src/test/.../Wenku8APITest.java` — more than it
+The suite is 12 test classes in `app/` plus `api/src/test/.../Wenku8APITest.java` — more than it
 appears at first glance. The problem was never the count, it was *where* they run:
 
-| Location | Before | After step 1 | Runs on |
+| Location | Before | Now | Runs on |
 |---|---|---|---|
-| `app/src/test` | 3 files / 10 tests | **9 files / 37 tests** | JVM, seconds |
+| `app/src/test` | 3 files / 10 tests | **10 files / 44 tests** | JVM, seconds |
 | `app/src/androidTest` | 8 files | **2 files** | emulator, minutes |
 | `api/src/test` | 1 file | 1 file | JVM |
+
+(37 of those tests came from step 1; `CrashReporterTest` added the other 7 in Phase 0.)
 
 CI (`.github/workflows/android-ci.yml`) runs both, but the instrumented set needs an API 21
 emulator, so the feedback loop is minutes and emulator-flaky. Tests that slow are not run
 during refactoring, which is exactly when they need to be run.
+
+**The emulator flakiness is no longer theoretical.** The run for commit `2525b3b` failed in the
+emulator step, and because that one step runs `assembleAlpha testAlphaDebugUnitTest
+connectedAlphaDebugAndroidTest` together, the 44 JVM tests never reported at all. Splitting the
+JVM job from the emulator job is the fix, and it is the whole payoff of having moved those tests
+off the device: an emulator that will not boot should cost 2 tests of signal, not 44.
 
 **The codebase already contains the answer.** `WenkuReaderPaginatorTest` injects the
 Android-dependent piece — text measurement — as a lambda:
