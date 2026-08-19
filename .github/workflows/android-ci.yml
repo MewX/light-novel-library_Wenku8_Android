@@ -11,14 +11,20 @@ defaults:
     working-directory: ./studio-android/LightNovelLibrary
 
 jobs:
-  build:
-
+  # Split out from the emulator job deliberately. These two run independently so that an
+  # emulator that will not boot costs 2 tests of signal rather than all 46: previously a
+  # single step ran assembleAlpha, the JVM tests and the instrumented tests together, so an
+  # emulator failure meant the JVM tests never reported at all.
+  build-and-test:
+    name: Build and JVM unit tests
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v3
+    # Deliberately no `submodules:` -- api/ is private, so CI falls back to api-stub
+    # via the check in settings.gradle.
+    - uses: actions/checkout@v4
     - name: Set up JDK 21
-      uses: actions/setup-java@v3
+      uses: actions/setup-java@v4
       with:
         java-version: '21'
         distribution: 'temurin'
@@ -27,12 +33,66 @@ jobs:
     - name: Grant execute permission for gradlew
       run: chmod +x gradlew
 
-    - name: Set up Android emulator, build, test and coverage reports
+    - name: Build and run JVM unit tests
+      run: ./gradlew assembleAlpha testAlphaDebugUnitTest
+
+    - name: Upload unit test report
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: unit-test-results
+        path: studio-android/LightNovelLibrary/app/build/reports/tests/
+        if-no-files-found: ignore
+
+  instrumented-test:
+    name: Instrumented tests (emulator)
+    runs-on: ubuntu-latest
+
+    steps:
+    # Deliberately no `submodules:` -- api/ is private, so CI falls back to api-stub
+    # via the check in settings.gradle.
+    - uses: actions/checkout@v4
+    - name: Set up JDK 21
+      uses: actions/setup-java@v4
+      with:
+        java-version: '21'
+        distribution: 'temurin'
+        cache: gradle
+
+    - name: Grant execute permission for gradlew
+      run: chmod +x gradlew
+
+    # Required on ubuntu-latest, and the likely cause of the earlier failure. Without it the
+    # emulator silently falls back to software emulation, and `pm install` of a debug APK this
+    # size (Firebase + play-services-ads) runs long enough that ddmlib gives up with
+    # ShellCommandUnresponsiveException during installCommit.
+    - name: Enable KVM
+      run: |
+        echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
+          | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+        sudo udevadm control --reload-rules
+        sudo udevadm trigger --name-match=kvm
+
+    # API 33 rather than the app's minSdk of 21. Every Build.VERSION branch in the app targets
+    # Q (29) or TIRAMISU (33) -- there are none for 21-22 -- so an API 21 emulator took the
+    # uninteresting side of every conditional while being by far the slowest and flakiest image
+    # to install onto. Neither remaining instrumented test is API-21-specific.
+    - name: Run instrumented tests
       uses: reactivecircus/android-emulator-runner@v2
       with:
-        api-level: 21
+        api-level: 33
         arch: x86_64
-        profile: Nexus 6
+        target: google_apis
+        profile: pixel_5
         working-directory: ./studio-android/LightNovelLibrary
-        # script: ./gradlew assembleAlpha connectedAlphaDebugAndroidTest jacocoTestReport coveralls
-        script: ./gradlew assembleAlpha testAlphaDebugUnitTest connectedAlphaDebugAndroidTest
+        emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot -camera-back none
+        disable-animations: true
+        script: ./gradlew connectedAlphaDebugAndroidTest
+
+    - name: Upload instrumented test report
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: instrumented-test-results
+        path: studio-android/LightNovelLibrary/app/build/reports/androidTests/
+        if-no-files-found: ignore

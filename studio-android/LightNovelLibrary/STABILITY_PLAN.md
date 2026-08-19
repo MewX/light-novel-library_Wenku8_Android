@@ -276,15 +276,27 @@ appears at first glance. The problem was never the count, it was *where* they ru
 
 (37 of those tests came from step 1; `CrashReporterTest` added the other 7 in Phase 0.)
 
-CI (`.github/workflows/android-ci.yml`) runs both, but the instrumented set needs an API 21
-emulator, so the feedback loop is minutes and emulator-flaky. Tests that slow are not run
-during refactoring, which is exactly when they need to be run.
+**The emulator flakiness was not theoretical, and CI has been restructured because of it.** The
+run for commit `2525b3b` failed in the emulator step, and because that one step ran
+`assembleAlpha testAlphaDebugUnitTest connectedAlphaDebugAndroidTest` together, the 44 JVM tests
+never reported at all. Three changes to `.github/workflows/android-ci.yml`:
 
-**The emulator flakiness is no longer theoretical.** The run for commit `2525b3b` failed in the
-emulator step, and because that one step runs `assembleAlpha testAlphaDebugUnitTest
-connectedAlphaDebugAndroidTest` together, the 44 JVM tests never reported at all. Splitting the
-JVM job from the emulator job is the fix, and it is the whole payoff of having moved those tests
-off the device: an emulator that will not boot should cost 2 tests of signal, not 44.
+1. **Split into two jobs.** JVM tests no longer depend on an emulator booting. This is the whole
+   payoff of having moved those tests off the device: an emulator that will not start now costs
+   2 tests of signal instead of 46.
+2. **Enable KVM.** The failure was `ShellCommandUnresponsiveException` during `installCommit`,
+   with the emulator console also failing to start — the signature of an emulator running
+   unaccelerated. `android-emulator-runner` needs an explicit udev rule on `ubuntu-latest`;
+   without it `pm install` of a debug APK this size (Firebase + play-services-ads, AOT-compiled
+   by dex2oat at install time on old ART) runs past ddmlib's timeout.
+3. **Emulator moved from API 21 to 33.** Counter-intuitive for a minSdk-21 app, but every
+   `Build.VERSION` branch in the app targets Q (29) or TIRAMISU (33) and none target 21–22, so
+   the API 21 emulator took the uninteresting side of every conditional while being the slowest
+   and least reliable image to install onto. Neither remaining instrumented test is
+   API-21-specific — `LightCacheTest` only uses `getFilesDir()`.
+
+Note this means the minSdk floor is no longer verified by CI. That is an accepted trade for two
+tests; if Phase 4 raises `minSdkVersion` anyway the question goes away.
 
 **The codebase already contains the answer.** `WenkuReaderPaginatorTest` injects the
 Android-dependent piece — text measurement — as a lambda:
