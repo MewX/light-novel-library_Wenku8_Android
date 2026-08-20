@@ -1,10 +1,16 @@
 name: Android CI
 
+# The pull_request trigger is deliberately unfiltered. It used to be limited to PRs based on
+# master, but development lands on the release branch (v1.30) first and only reaches master at
+# release time -- so a PR into v1.30 ran no checks at all and the post-merge push to v1.30 was
+# the first build of the change. That is the wrong order when the app cannot be built without
+# an Android SDK: contributors working without one (or in a sandbox that cannot reach
+# dl.google.com) have no local check either, which leaves nothing between an unbuilt commit and
+# the release branch.
 on:
   push:
     branches: [ "master", "v*" ]
   pull_request:
-    branches: [ "master" ]
 
 defaults:
   run:
@@ -12,8 +18,8 @@ defaults:
 
 jobs:
   # Split out from the emulator job deliberately. These two run independently so that an
-  # emulator that will not boot costs 2 tests of signal rather than all 46: previously a
-  # single step ran assembleAlpha, the JVM tests and the instrumented tests together, so an
+  # emulator that will not boot costs the 23 instrumented tests rather than all 91: previously
+  # a single step ran assembleAlpha, the JVM tests and the instrumented tests together, so an
   # emulator failure meant the JVM tests never reported at all.
   build-and-test:
     name: Build and JVM unit tests

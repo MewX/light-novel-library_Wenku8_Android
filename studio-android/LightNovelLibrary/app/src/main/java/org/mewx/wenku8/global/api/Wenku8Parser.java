@@ -59,9 +59,21 @@ public class Wenku8Parser {
             temp = str.indexOf(SEPARATOR, beg + 1);
             if (beg == -1 || temp == -1) break;
 
-            if(LightTool.isInteger(str.substring(beg + 1, temp)))
-                list.add(Integer.parseInt(str.substring(beg + 1, temp)));
-            Log.v("MewX", "Add novel aid: " + list.get(list.size() - 1));
+            // Two separate things make this branch load-bearing. The log reads back the
+            // element just added, so from outside the branch it indexed an empty list and
+            // threw out of this @NonNull method on any token that was not an integer. And a
+            // non-integer token is skipped rather than treated as the end of the response:
+            // rejecting at the first would empty out a valid list whose XML declaration uses
+            // single quotes, since <?xml version='1.0' encoding='utf-8'?> supplies two of
+            // them ahead of the first aid. See STABILITY_PLAN.md, Phase 1 item 8.
+            String token = str.substring(beg + 1, temp);
+            if (LightTool.isInteger(token)) {
+                // Not necessarily an aid: element 0 is the page count, and it is read here
+                // rather than above whenever the pre-loop read consumed a non-integer.
+                int value = Integer.parseInt(token);
+                list.add(value);
+                Log.v("MewX", "Add novel list value: " + value);
+            }
 
             beg = temp + 1; // prepare for next round
         }

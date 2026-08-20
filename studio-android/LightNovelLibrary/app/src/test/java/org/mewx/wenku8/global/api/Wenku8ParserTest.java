@@ -7,6 +7,7 @@ import org.robolectric.annotation.Config;
 
 import java.util.Arrays;
 import java.util.Calendar;
+import java.util.Collections;
 import java.util.GregorianCalendar;
 import java.util.List;
 
@@ -73,6 +74,48 @@ public class Wenku8ParserTest {
     public void testParseNovelItemListInvalid() {
         List<Integer> list = Wenku8Parser.parseNovelItemList("1234");
         assertTrue(list.isEmpty());
+    }
+
+    // Regression. "1234" above exercises the early return for input with no quotes at all; it
+    // never reached the loop. These do. Both used to throw IndexOutOfBoundsException instead
+    // of returning empty, because the log line that read back the just-added element sat
+    // outside the branch that added it -- so any input carrying two or more single-quoted
+    // values with no integer among them indexed an empty list. parseNovelItemList is @NonNull
+    // and NovelItemListFragment.AsyncGetNovelItemList catches UnsupportedEncodingException
+    // alone, so the throw escaped doInBackground and crashed the app instead of reaching the
+    // empty-list path that caller already handles.
+    @Test
+    public void testParseNovelItemListWellFormedNonResponse() {
+        assertTrue(Wenku8Parser.parseNovelItemList(
+                "<meta http-equiv='refresh' content='0;url=http://portal'/>").isEmpty());
+        assertTrue(Wenku8Parser.parseNovelItemList(
+                "<html><body class='error'><p id='msg'>maintenance</p></body></html>").isEmpty());
+    }
+
+    // The fix skips non-integer tokens rather than rejecting the whole response on the first
+    // one, and this is the case that decides between the two: a valid list whose declaration
+    // uses single quotes instead of double. Rejecting would return an empty list for a
+    // response that is entirely well-formed. This input threw before the fix.
+    @Test
+    public void testParseNovelItemListSingleQuotedXmlDeclaration() {
+        final String XML = "<?xml version='1.0' encoding='utf-8'?>\n" +
+                "<result>\n" +
+                "<page num='166'/>\n" +
+                "<item aid='1143'/>\n" +
+                "</result>";
+
+        assertEquals(Arrays.asList(166, 1143), Wenku8Parser.parseNovelItemList(XML));
+    }
+
+    // Characterization, not endorsement. The parser has no notion of which token is the page
+    // count -- it returns every integer it finds and the caller takes element 0 as the total
+    // page count. So a non-integer page number does not fail, it shifts: the first aid is
+    // consumed as the page count and that novel drops out of the list. Recorded so that
+    // changing it is a deliberate act rather than an accident.
+    @Test
+    public void testParseNovelItemListNonIntegerPageNumberShiftsTheList() {
+        assertEquals(Collections.singletonList(7),
+                Wenku8Parser.parseNovelItemList("<page num='x'/><item aid='7'/>"));
     }
 
     @Test
