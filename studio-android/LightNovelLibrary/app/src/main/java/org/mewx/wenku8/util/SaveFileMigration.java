@@ -1,6 +1,7 @@
 package org.mewx.wenku8.util;
 
 import android.annotation.TargetApi;
+import android.content.Context;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Environment;
@@ -78,7 +79,18 @@ public class SaveFileMigration {
 
     public static String getInternalSavePath() {
         if (savedInternalPath == null) {
-            savedInternalPath = MyApp.getContext().getFilesDir() + File.separator;
+            // Only cache a path that came from a real files dir. This used to be
+            // MyApp.getContext().getFilesDir() + File.separator, which turns into the literal
+            // string "null/" when either is null -- and then caches it for the life of the
+            // process, so every save afterwards goes to a relative "null/..." path that cannot
+            // be created. A transient null this early is enough to break storage permanently.
+            Context context = MyApp.getContext();
+            File filesDir = context == null ? null : context.getFilesDir();
+            if (filesDir == null) {
+                Log.d(TAG, "getInternalSavePath: no files dir yet, not caching");
+                return "";
+            }
+            savedInternalPath = filesDir + File.separator;
         }
         return savedInternalPath;
     }

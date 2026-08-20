@@ -489,6 +489,27 @@ which is now on the test classpath for that purpose.
 tests run, but its malformed-input behaviour differs from Android's parser, which silently
 inverts the negative test cases. See step 1.
 
+**A test used to break storage for every test that ran after it.** Worth knowing before writing
+any instrumented test that touches saved files, because the symptom appears in the wrong place
+entirely — the failing test is fine, and something that ran before it is not.
+
+`MyApp.context` is a process-wide static. `MyAppTest` sets it to a Mockito mock in one method
+and to `null` in the other, and used to leave it that way. `SaveFileMigration.getInternalSavePath`
+then asked `MyApp` for a context, got the mock, called `getFilesDir()` on it — `null`, as Mockito
+returns for an unstubbed method — and built the literal string `"null/"`, which it cached in a
+static for the rest of the process. Every save after that went to a relative `null/...` path that
+cannot be created, and the external fallback is unwritable on API 29+, so writes simply failed.
+
+Fixed at both ends, because either alone leaves a hole. `MyAppTest` restores the real application
+context in `@After`. `getInternalSavePath` no longer caches a path it could not resolve: it
+returns `""` for that call and tries again next time. The second half matters beyond the tests —
+a transient null context during startup would have had the same permanent effect on a real
+device, silently, and nothing would have reported it. `SaveFileMigrationTest` pins the invariant
+that the path really is under the app's files dir, and fails loudly if the ordering bug returns.
+
+This is root cause 2 reaching the test suite, and a reminder that a static cache holding a value
+derived from something that might not be ready yet is a trap wherever it appears.
+
 ---
 
 ## Suggested sequencing
