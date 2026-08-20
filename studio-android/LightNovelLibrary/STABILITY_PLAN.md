@@ -292,14 +292,20 @@ Four things turned out differently from the plan as written, and are worth recor
    relay rather than the site itself — would have injected non-existent novels into every list,
    failing one at a time rather than failing as a list.
 
-   The scan survives as a private fallback, reached only when the XML parse recognises nothing
-   at all. It is the one thing the scan does better: `XmlPullParser` stops at the first byte of
-   anything that is not the document, so a response that is well-formed only after some leading
-   noise — a PHP notice, a relay banner — parses to nothing, while the scan reads straight past
-   it. There is no way to tell from here how often that happens, so the fallback records a
-   breadcrumb when it fires. **Delete it, and the private method with it, if a release goes by
-   without that breadcrumb appearing.** This is the same measure-then-act shape Phase 0 used for
-   `loadStream`, applied to a tolerance nobody can currently justify or refute.
+   The scan is gone entirely, including as a fallback. It did do one thing better —
+   `XmlPullParser` stops at the first byte of anything that is not the document, so a response
+   that is well-formed only after some leading noise (a PHP notice, a relay banner) parses to
+   nothing, while the scan read straight past it — and the first version of this change kept it
+   for that case alone. Review caught the flaw: a fallback that returns the scan's output
+   reintroduces both the phantom novels and the shift, on exactly the responses nobody can
+   observe. The recovery is a **retry from the document start** instead, so the leading-noise
+   path reads attributes by name like every other path, and there is one parsing implementation
+   rather than two.
+
+   The retry records a breadcrumb when it fires, because there is no way to tell from here
+   whether leading noise is real. **Delete the retry and `indexOfDocumentStart` if a release
+   goes by without that breadcrumb appearing** — the same measure-then-act shape Phase 0 used
+   for `loadStream`, applied to a tolerance nobody can currently justify or refute.
 
 Expected outcome: this should remove the majority of crash *volume* without touching
 architecture. Phase 0's data will confirm — and because Phase 0 shipped first, the before/after

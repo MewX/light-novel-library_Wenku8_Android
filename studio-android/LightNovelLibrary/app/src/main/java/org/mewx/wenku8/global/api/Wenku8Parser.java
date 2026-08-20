@@ -39,6 +39,48 @@ public class Wenku8Parser {
      */
     @NonNull
     public static List<Integer> parseNovelItemList(@NonNull String str) {
+        List<Integer> list = parseNovelItemListAsXml(str);
+        if (!list.isEmpty()) return list;
+
+        // XmlPullParser stops at the first byte of anything that is not the document, so a
+        // response that is well-formed only after some leading noise -- a PHP notice, a relay
+        // banner -- parses to nothing, where the quoted-value scan this replaced read straight
+        // past it. Retry from the document start rather than keeping that scan as a fallback:
+        // it cannot tell an aid from any other quoted integer, so recovering the list that way
+        // would put the phantom novels back on exactly the responses nobody can see.
+        int documentStart = indexOfDocumentStart(str);
+        if (documentStart > 0) {
+            list = parseNovelItemListAsXml(str.substring(documentStart));
+            if (!list.isEmpty()) {
+                // How we find out whether this case is real. If a release goes by without this
+                // breadcrumb appearing, delete the retry and indexOfDocumentStart with it.
+                CrashReporter.log("parseNovelItemList: parsed after skipping " + documentStart
+                        + " leading bytes, length=" + str.length());
+            }
+        }
+        return list;
+    }
+
+    /**
+     * Parse a novel list response into (total page, aid, aid, ...), or an empty list if it is
+     * not a novel list response at all.
+     *
+     * Element 0 is the page count and the caller removes it; 0 means "unknown", which
+     * NovelItemListFragment already treats as "keep paging".
+     *
+     * <pre>
+     * &lt;?xml version="1.0" encoding="utf-8"?&gt;
+     * &lt;result&gt;
+     * &lt;page num='166'/&gt;
+     * &lt;item aid='1143'/&gt;
+     * &lt;item aid='1034'/&gt;
+     * &lt;/result&gt;
+     * </pre>
+     *
+     * gives { 166, 1143, 1034 }.
+     */
+    @NonNull
+    private static List<Integer> parseNovelItemListAsXml(@NonNull String xml) {
         int totalPage = 0;
         boolean foundPage = false;
         List<Integer> aids = new ArrayList<>();
@@ -53,7 +95,7 @@ public class Wenku8Parser {
         try {
             XmlPullParserFactory factory = XmlPullParserFactory.newInstance();
             XmlPullParser xmlPullParser = factory.newPullParser();
-            xmlPullParser.setInput(new StringReader(str));
+            xmlPullParser.setInput(new StringReader(xml));
             int eventType = xmlPullParser.getEventType();
 
             while (eventType != XmlPullParser.END_DOCUMENT) {
@@ -75,31 +117,16 @@ public class Wenku8Parser {
                 eventType = xmlPullParser.next();
             }
         } catch (Exception e) {
-            // Deliberately not rethrown and deliberately not discarding what was collected.
-            // A response truncated mid-list still yields the items ahead of the cut, which is
-            // what the scan this replaced did, and the caller renders a short list rather
-            // than an error. Anything unparseable from the first byte falls through to the
-            // legacy scan below with aids still empty.
+            // Deliberately not rethrown, and deliberately not discarding what was collected: a
+            // response truncated mid-list still yields the items ahead of the cut, as the scan
+            // did, so the caller renders a short list rather than an error. When nothing was
+            // collected the caller retries from the document start.
             CrashReporter.recordException("Wenku8Parser.parseNovelItemList", e);
         }
 
         if (aids.isEmpty() && !foundPage) {
-            // Nothing recognisable. Either this is genuinely not a novel-list response -- an
-            // HTML error page, a captive-portal interstitial -- in which case the scan
-            // returns empty too and nothing is lost, or the document is well-formed only
-            // after some leading noise (a PHP notice, a relay banner) that stops
-            // XmlPullParser at the first byte while the scan reads straight past it.
-            //
-            // Kept because there is no way to tell those apart from here without data. The
-            // breadcrumb is how that data arrives: if this never fires in the wild, delete
-            // parseNovelItemListByScanning and this block with it. If it does fire, the
-            // response shape that needs handling properly will be in the report.
-            List<Integer> scanned = parseNovelItemListByScanning(str);
-            if (!scanned.isEmpty()) {
-                CrashReporter.log("parseNovelItemList: XML found nothing, scan recovered "
-                        + scanned.size() + " value(s), length=" + str.length());
-                return scanned;
-            }
+            // Not a novel list response -- an HTML error page, a captive-portal interstitial,
+            // or a document that never started. Empty is what the caller already handles.
             return new ArrayList<>();
         }
 
@@ -110,45 +137,12 @@ public class Wenku8Parser {
     }
 
     /**
-     * The pre-XML implementation: collect every single-quoted integer in document order.
-     *
-     * Only reached when the XML parse recognised nothing at all, to preserve its tolerance of
-     * a response that is well-formed apart from leading noise. Retained under measurement --
-     * see the caller.
+     * Index of the first byte of the XML document within a response, or -1 if no start marker
+     * is present. Only used to skip leading noise ahead of an otherwise well-formed response.
      */
-    @NonNull
-    private static List<Integer> parseNovelItemListByScanning(@NonNull String str) {
-        List<Integer> list = new ArrayList<>();
-        final char SEPARATOR = '\''; // seperator
-
-        int beg, temp;
-        beg = str.indexOf(SEPARATOR);
-        temp = str.indexOf(SEPARATOR, beg + 1);
-        if (beg == -1 || temp == -1) return list; // empty, this is an exception
-        if (LightTool.isInteger(str.substring(beg + 1, temp)))
-            list.add(Integer.parseInt(str.substring(beg + 1, temp)));
-        beg = temp + 1; // prepare for loop
-
-        while (true) {
-            beg = str.indexOf(SEPARATOR, beg);
-            temp = str.indexOf(SEPARATOR, beg + 1);
-            if (beg == -1 || temp == -1) break;
-
-            // The log stays inside this branch: it reads back the element just added, so from
-            // outside it indexed an empty list and threw on any non-integer token. A
-            // non-integer token is skipped rather than ending the scan, which is what keeps a
-            // single-quoted XML declaration from emptying a valid list.
-            String token = str.substring(beg + 1, temp);
-            if (LightTool.isInteger(token)) {
-                int value = Integer.parseInt(token);
-                list.add(value);
-                Log.v("MewX", "Add novel list value: " + value);
-            }
-
-            beg = temp + 1; // prepare for next round
-        }
-
-        return list;
+    private static int indexOfDocumentStart(@NonNull String str) {
+        int declaration = str.indexOf("<?xml");
+        return declaration != -1 ? declaration : str.indexOf("<result");
     }
 
 

@@ -150,14 +150,12 @@ public class Wenku8ParserTest {
         assertTrue(list.contains(1143));
     }
 
-    // The one thing the scan did better, and why it is still in the file. XmlPullParser stops
-    // at the first byte of anything that is not the document, so a response that is
-    // well-formed only after some leading noise -- a PHP notice, a relay banner -- parses to
-    // nothing. Falling back to the scan there costs nothing when the response really is not a
-    // novel list (the scan returns empty too, as the two tests above show) and recovers the
-    // list when it is.
+    // XmlPullParser stops at the first byte of anything that is not the document, so a
+    // response that is well-formed only after some leading noise -- a PHP notice, a relay
+    // banner -- parses to nothing where the quoted-value scan read straight past it. Recovered
+    // by retrying from the document start, not by scanning: see the two tests below.
     @Test
-    public void testParseNovelItemListFallsBackToScanningPastLeadingNoise() {
+    public void testParseNovelItemListRetriesPastLeadingNoise() {
         final String XML = "PHP Notice: undefined index in /srv/api.php on line 12\n" +
                 "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n" +
                 "<result>\n" +
@@ -166,6 +164,29 @@ public class Wenku8ParserTest {
                 "</result>";
 
         assertEquals(Arrays.asList(166, 1143), Wenku8Parser.parseNovelItemList(XML));
+    }
+
+    // Why the recovery is a retry rather than a fallback to the old scan. Both of these are
+    // the leading-noise case, and the scan would have got both wrong in the way the rewrite
+    // exists to prevent -- [166, 2, 9, 1143] for the first, since it cannot tell an aid from
+    // any other quoted integer, and [7] for the second, dropping the novel because a
+    // non-integer page number shifts everything. Retrying reads attributes by name on this
+    // path too, so a response nobody can observe is parsed exactly like one that arrives clean.
+    @Test
+    public void testParseNovelItemListPastLeadingNoiseStillReadsAttributesByName() {
+        final String XML = "<!-- relay: cache MISS -->\n" +
+                "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n" +
+                "<result><page num='166' cached='2'/><item type='9' aid='1143'/></result>";
+
+        assertEquals(Arrays.asList(166, 1143), Wenku8Parser.parseNovelItemList(XML));
+    }
+
+    @Test
+    public void testParseNovelItemListPastLeadingNoiseKeepsTheNovelWithAnUnusablePageNumber() {
+        final String XML = "PHP Notice: undefined index in /srv/api.php on line 12\n" +
+                "<result><page num='x'/><item aid='7'/></result>";
+
+        assertEquals(Arrays.asList(0, 7), Wenku8Parser.parseNovelItemList(XML));
     }
 
     // A result page with no items is not an error: the page count still comes back, and the
