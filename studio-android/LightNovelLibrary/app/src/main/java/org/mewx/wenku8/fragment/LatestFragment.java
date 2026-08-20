@@ -241,18 +241,34 @@ public class LatestFragment extends Fragment implements MyItemClickListener, MyI
         @Override
         protected void onPostExecute(List<NovelItemInfoUpdate> result) {
             if (result == null) {
+                // Same ordering as the success path below: clear the flag before the
+                // lifecycle check, or a Fragment detached mid-request comes back stuck on
+                // "Loading..." with no way to retry.
+                isLoading.set(false);
                 if(!isAdded())
                     return; // detached
 
                 mLoadingStatusTextView.setText(getResources().getString(R.string.system_parse_failed));
                 showRetryButton();
-                isLoading.set(false);
                 return;
             }
 
-            // Update main list on UI thread.
+            // Data first: the fetched page is kept whatever the Fragment's state is, so that
+            // a detached-then-reattached Fragment does not re-request a page it already has.
             listNovelItemInfo.addAll(result);
             numOfItemsToRefresh = result.size();
+            currentPage ++; // add when loaded
+            isLoading.set(false);
+
+            // Exit early if it's not attached.
+            // Note that the null mainActivity used to cause many issues.
+            // This check used to sit below the adapter work, which left mNovelItemListView and
+            // mAdapter -- both null once the view is destroyed -- reachable from a task that
+            // finished after the Fragment went away. Reattaching rebuilds the adapter from the
+            // full listNovelItemInfo below, so nothing is lost by returning here.
+            if (!isAdded() || mainActivity == null) {
+                return;
+            }
 
             // result:
             // add imageView, only here can fetch the layout2 id!!!
@@ -268,15 +284,6 @@ public class LatestFragment extends Fragment implements MyItemClickListener, MyI
             // Incremental changes
             if (numOfItemsToRefresh != 0) {
                 mAdapter.notifyItemRangeInserted(listNovelItemInfo.size() - numOfItemsToRefresh, numOfItemsToRefresh);
-            }
-
-            currentPage ++; // add when loaded
-            isLoading.set(false);
-
-            // Exit early if it's not attached.
-            // Note that the null mainActivity used to cause many issues.
-            if (!isAdded() || mainActivity == null) {
-                return;
             }
 
             if (mListLoadingView != null) {

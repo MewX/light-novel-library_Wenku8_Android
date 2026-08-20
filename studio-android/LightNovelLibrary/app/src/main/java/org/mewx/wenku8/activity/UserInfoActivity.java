@@ -184,7 +184,12 @@ public class UserInfoActivity extends BaseMaterialActivity {
         @Override
         protected void onPostExecute(Object[] result) {
             super.onPostExecute(result);
+
+            // Dismissed ahead of the guard: ProgressDialogHelper.dismiss() is already safe on
+            // a gone window, and skipping it would leak the dialog rather than crash on it.
             if (md != null) md.dismiss();
+
+            if (isFinishing() || isDestroyed()) return;
 
             Wenku8Error.ErrorCode errorCode = (Wenku8Error.ErrorCode) result[0];
             UserInfo fetchedUi = (UserInfo) result[1];
@@ -262,7 +267,15 @@ public class UserInfoActivity extends BaseMaterialActivity {
         protected void onPostExecute(Wenku8Error.ErrorCode errorCode) {
             super.onPostExecute(errorCode);
 
-            if(errorCode == Wenku8Error.ErrorCode.SYSTEM_1_SUCCEEDED || errorCode == Wenku8Error.ErrorCode.SYSTEM_4_NOT_LOGGED_IN) {
+            final boolean loggedOut = errorCode == Wenku8Error.ErrorCode.SYSTEM_1_SUCCEEDED
+                    || errorCode == Wenku8Error.ErrorCode.SYSTEM_4_NOT_LOGGED_IN;
+
+            // Deliberately ahead of the lifecycle guard, and the reason this method is not
+            // simply guarded at the top: clearing the session and the stored credentials is
+            // the whole point of the task. Skipping it because the user rotated or navigated
+            // away would leave them logged in with credentials still on disk -- a worse
+            // outcome than the crash the guard prevents.
+            if (loggedOut) {
                 LightUserSession.logOut(() -> {
                     // TODO: extract this to a util.
                     // delete files
@@ -271,15 +284,20 @@ public class UserInfoActivity extends BaseMaterialActivity {
                     LightCache.deleteFile(GlobalConfig.getFirstUserAvatarSaveFilePath());
                     LightCache.deleteFile(GlobalConfig.getSecondUserAvatarSaveFilePath());
                 });
-                Toast.makeText(UserInfoActivity.this, "Logged out!", Toast.LENGTH_SHORT).show();
             }
-            else
-                Toast.makeText(UserInfoActivity.this, errorCode.toString(), Toast.LENGTH_SHORT).show();
 
-            // terminate this activity
+            // Dismissed ahead of the guard; see AsyncGetUserInfo above.
             if (md != null) {
                 md.dismiss();
             }
+
+            if (isFinishing() || isDestroyed()) return;
+
+            Toast.makeText(UserInfoActivity.this,
+                    loggedOut ? "Logged out!" : errorCode.toString(),
+                    Toast.LENGTH_SHORT).show();
+
+            // terminate this activity
             UserInfoActivity.this.finish();
         }
 

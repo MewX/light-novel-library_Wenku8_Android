@@ -7,6 +7,7 @@ import android.graphics.Shader;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.Handler;
+import android.os.Looper;
 import androidx.appcompat.app.AppCompatActivity;
 import android.util.Log;
 import android.util.TypedValue;
@@ -237,6 +238,15 @@ public class VerticalReaderActivity extends AppCompatActivity {
 
         @Override
         protected void onPostExecute(Integer result) {
+            // This task inflates the whole chapter into the layout below. It is exactly as
+            // slow as the network is, so leaving the reader mid-fetch used to land here on a
+            // destroyed Activity. The dialog is dismissed first because
+            // ProgressDialogHelper.dismiss() is safe on a gone window and skipping it would
+            // leak the dialog.
+            if (pDialog != null) pDialog.dismiss();
+
+            if (isFinishing() || isDestroyed()) return;
+
             if (result == -100) {
                     Toast.makeText(VerticalReaderActivity.this,
                             getResources().getString(R.string.system_network_error),
@@ -311,6 +321,11 @@ public class VerticalReaderActivity extends AppCompatActivity {
 
                                 @Override
                                 protected void onPostExecute(final String result) {
+                                    // The image is already saved to disk by doInBackground, so
+                                    // nothing is lost by skipping the display when the reader
+                                    // has gone.
+                                    if (isFinishing() || isDestroyed()) return;
+
                                     ImageLoader.getInstance().displayImage(
                                             "file://" + result, tempIV);
 
@@ -339,7 +354,7 @@ public class VerticalReaderActivity extends AppCompatActivity {
             // show dialog
             if (GlobalConfig.getReadSavesRecord(cid, TextListLayout.getMeasuredHeight()) > 100) {
                 // set scroll view
-                Handler handler = new Handler();
+                Handler handler = new Handler(Looper.getMainLooper());
                 handler.postDelayed(runnableScroll, 200);
                 Log.d(VerticalReaderActivity.class.getSimpleName(), "Scroll to = " + GlobalConfig.getReadSavesRecord(cid, TextListLayout.getMeasuredHeight()));
             }

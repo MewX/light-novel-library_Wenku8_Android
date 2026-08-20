@@ -10,6 +10,7 @@ import android.graphics.drawable.Drawable;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.Handler;
+import android.os.Looper;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.Menu;
@@ -214,7 +215,7 @@ public class NovelInfoActivity extends BaseMaterialActivity {
         // fetch all info
         getSupportActionBar().setTitle(R.string.action_novel_info);
         spb.setVisibility(View.INVISIBLE); // wait for runnable
-        Handler handler = new Handler();
+        Handler handler = new Handler(Looper.getMainLooper());
         handler.postDelayed(() -> {
             isLoading = false; // Reset to allow initial load
             refreshInfo();
@@ -675,9 +676,17 @@ public class NovelInfoActivity extends BaseMaterialActivity {
 
         @Override
         protected void onPostExecute(Integer integer) {
+            // The loading flag is Activity state rather than view state, so it is reset
+            // regardless -- same ordering as AsyncGetNovelItemList in NovelItemListFragment.
             isLoading = false;
-            spb.setVisibility(View.INVISIBLE);
             super.onPostExecute(integer);
+
+            // Everything below touches views. onPostExecute runs whether or not the Activity
+            // is still alive, and this task is as slow as the network is, so a rotation or a
+            // back press during the fetch used to land here on a destroyed Activity.
+            if (isFinishing() || isDestroyed()) return;
+
+            spb.setVisibility(View.INVISIBLE);
 
             if (integer == -1) {
                 // Network error or parse error
@@ -1026,6 +1035,16 @@ public class NovelInfoActivity extends BaseMaterialActivity {
 
         protected void onPostExecute(Wenku8Error.ErrorCode result)
         {
+            // Cleared regardless: a stuck flag outlives the views it guards.
+            isLoading = false;
+            // The dialog is dismissed before the guard, not after: ProgressDialogHelper
+            // .dismiss() is already safe on a gone window, and skipping it would leak the
+            // dialog instead of crashing on it.
+            if (pDialog != null) pDialog.dismiss();
+
+            // The toasts and refreshVolumeListUI() below need a live Activity.
+            if (isFinishing() || isDestroyed()) return;
+
             if (result == Wenku8Error.ErrorCode.USER_CANCELLED_TASK) {
                 // user cancelled
                 Toast.makeText(NovelInfoActivity.this, R.string.system_manually_cancelled, Toast.LENGTH_LONG).show();
@@ -1125,7 +1144,11 @@ public class NovelInfoActivity extends BaseMaterialActivity {
         protected void onPostExecute(Wenku8Error.ErrorCode err) {
             super.onPostExecute(err);
 
-            md.dismiss();
+            // Dismissed before the guard; see AsyncUpdateCacheTask above.
+            if (md != null) md.dismiss();
+
+            if (isFinishing() || isDestroyed()) return;
+
             if(err == Wenku8Error.ErrorCode.SYSTEM_1_SUCCEEDED) {
                 Toast.makeText(NovelInfoActivity.this, getResources().getString(R.string.bookshelf_removed), Toast.LENGTH_SHORT).show();
                 if(fabFavorite != null) {
@@ -1234,6 +1257,13 @@ public class NovelInfoActivity extends BaseMaterialActivity {
         @Override
         protected void onPostExecute(Wenku8Error.ErrorCode errorCode) {
             super.onPostExecute(errorCode);
+
+            // loading is this task's own field, so it dies with the task -- nothing to reset
+            // here. The dialog is dismissed before the guard; see AsyncUpdateCacheTask above.
+            if (md != null) md.dismiss();
+
+            if (isFinishing() || isDestroyed()) return;
+
             if (errorCode == Wenku8Error.ErrorCode.USER_CANCELLED_TASK) {
                 // user cancelled
                 Toast.makeText(NovelInfoActivity.this, R.string.system_manually_cancelled, Toast.LENGTH_LONG).show();

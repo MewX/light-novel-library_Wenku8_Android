@@ -461,12 +461,20 @@ public class FavFragment extends Fragment implements MyItemClickListener, MyItem
         protected void onPostExecute(Wenku8Error.ErrorCode errorCode) {
             super.onPostExecute(errorCode);
 
+            // Cleared regardless of Fragment state; the rest of this method is view work.
             isLoading = false;
-            try {
-                md.dismiss();
-            } catch (Exception e) {
-                // Ignore the NullPointerException due to dialog is null or IllegalArgumentException due to View not attached to window manager.
-            }
+
+            // This replaces the try/catch that used to wrap md.dismiss(). That catch was the
+            // root cause being suppressed rather than fixed -- "View not attached to window
+            // manager" is precisely the detached-Fragment case -- and it also swallowed any
+            // genuine failure. The dismiss itself stays ahead of the lifecycle check, since
+            // ProgressDialogHelper.dismiss() already handles a gone window and skipping it
+            // would leak the dialog; the null check covers the case the catch was really
+            // hiding, which is md never having been assigned.
+            if (md != null) md.dismiss();
+
+            if (!isAdded() || getActivity() == null) return;
+
             if(errorCode != Wenku8Error.ErrorCode.SYSTEM_1_SUCCEEDED) {
                 Toast.makeText(MyApp.getContext(), errorCode.toString(), Toast.LENGTH_SHORT).show();
                 refreshList(timecount ++);
@@ -542,11 +550,13 @@ public class FavFragment extends Fragment implements MyItemClickListener, MyItem
         protected void onPostExecute(Wenku8Error.ErrorCode err) {
             super.onPostExecute(err);
 
-            try {
-                md.dismiss();
-            } catch (Exception e) {
-                // Ignore the NullPointerException due to dialog is null or IllegalArgumentException due to View not attached to window manager.
-            }
+            // See AsyncLoadAllFromCloud above: the suppressing try/catch is replaced by a
+            // null check plus a lifecycle check, in that order. The removal itself already
+            // happened in doInBackground.
+            if (md != null) md.dismiss();
+
+            if (!isAdded() || getActivity() == null) return;
+
             if (err == Wenku8Error.ErrorCode.SYSTEM_1_SUCCEEDED) {
                 Toast.makeText(getActivity(), getResources().getString(R.string.bookshelf_removed), Toast.LENGTH_SHORT).show();
                 loadAllLocal();
