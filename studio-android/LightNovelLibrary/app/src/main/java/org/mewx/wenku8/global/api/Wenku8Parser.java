@@ -59,9 +59,26 @@ public class Wenku8Parser {
             temp = str.indexOf(SEPARATOR, beg + 1);
             if (beg == -1 || temp == -1) break;
 
-            if(LightTool.isInteger(str.substring(beg + 1, temp)))
-                list.add(Integer.parseInt(str.substring(beg + 1, temp)));
-            Log.v("MewX", "Add novel aid: " + list.get(list.size() - 1));
+            // The log line below used to sit outside this branch, where it read back the
+            // element that had just been added -- so on a quoted token that is not an
+            // integer, nothing was added and it indexed an empty list. Any well-formed
+            // response holding two or more single-quoted values with no integer among them
+            // therefore threw IndexOutOfBoundsException out of this @NonNull method: a
+            // captive-portal or proxy interstitial, an HTML error page, and also a perfectly
+            // valid list whose XML declaration happens to use single quotes
+            // (<?xml version='1.0' encoding='utf-8'?>). The only caller runs this inside
+            // doInBackground and catches UnsupportedEncodingException alone, so it crashed
+            // the app rather than reaching the empty-list path it already handles.
+            //
+            // Non-integer tokens are skipped rather than rejected outright, which is what
+            // keeps that single-quoted declaration parsing into the right list instead of an
+            // empty one.
+            String token = str.substring(beg + 1, temp);
+            if (LightTool.isInteger(token)) {
+                int aid = Integer.parseInt(token);
+                list.add(aid);
+                Log.v("MewX", "Add novel aid: " + aid);
+            }
 
             beg = temp + 1; // prepare for next round
         }
