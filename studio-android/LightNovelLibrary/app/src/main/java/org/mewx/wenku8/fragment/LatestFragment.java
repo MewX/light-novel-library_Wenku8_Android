@@ -34,6 +34,7 @@ import org.mewx.wenku8.api.Wenku8API;
 import org.mewx.wenku8.listener.MyItemClickListener;
 import org.mewx.wenku8.listener.MyItemLongClickListener;
 import org.mewx.wenku8.network.LightNetwork;
+import org.mewx.wenku8.util.AsyncTaskTracker;
 import org.mewx.wenku8.util.CrashReporter;
 
 import java.io.UnsupportedEncodingException;
@@ -73,6 +74,8 @@ public class LatestFragment extends Fragment implements MyItemClickListener, MyI
 
         listNovelItemInfo = new ArrayList<>();
     }
+
+    private final AsyncTaskTracker tracker = new AsyncTaskTracker();
 
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, ViewGroup container,
@@ -138,9 +141,20 @@ public class LatestFragment extends Fragment implements MyItemClickListener, MyI
         hideRetryButton();
 
         // fetch list
-        AsyncLoadLatestList ast = new AsyncLoadLatestList();
+        AsyncLoadLatestList ast = tracker.track(new AsyncLoadLatestList());
         ast.execute(Wenku8API.getMewxNovelList(Wenku8API.NovelSortedBy.lastUpdate, page,
                 GlobalConfig.getCurrentLang()));
+    }
+
+
+    @Override
+    public void onDestroy() {
+        // onDestroy, deliberately not onDestroyView. The Fragment outlives its view in a
+        // ViewPager, and its isLoading flag with it; cancelling on view destruction would skip
+        // the onPostExecute that clears that flag and leave the list stuck on "Loading..." --
+        // the bug 723e93d patched. By onDestroy the flag is going away too.
+        tracker.cancelAll();
+        super.onDestroy();
     }
 
     @Override
@@ -241,18 +255,34 @@ public class LatestFragment extends Fragment implements MyItemClickListener, MyI
         @Override
         protected void onPostExecute(List<NovelItemInfoUpdate> result) {
             if (result == null) {
+                // Same ordering as the success path below: clear the flag before the
+                // lifecycle check, or a Fragment detached mid-request comes back stuck on
+                // "Loading..." with no way to retry.
+                isLoading.set(false);
                 if(!isAdded())
                     return; // detached
 
                 mLoadingStatusTextView.setText(getResources().getString(R.string.system_parse_failed));
                 showRetryButton();
-                isLoading.set(false);
                 return;
             }
 
-            // Update main list on UI thread.
+            // Data first: the fetched page is kept whatever the Fragment's state is, so that
+            // a detached-then-reattached Fragment does not re-request a page it already has.
             listNovelItemInfo.addAll(result);
             numOfItemsToRefresh = result.size();
+            currentPage ++; // add when loaded
+            isLoading.set(false);
+
+            // Exit early if it's not attached.
+            // Note that the null mainActivity used to cause many issues.
+            // This check used to sit below the adapter work, which left mNovelItemListView and
+            // mAdapter -- both null once the view is destroyed -- reachable from a task that
+            // finished after the Fragment went away. Reattaching rebuilds the adapter from the
+            // full listNovelItemInfo below, so nothing is lost by returning here.
+            if (!isAdded() || mainActivity == null) {
+                return;
+            }
 
             // result:
             // add imageView, only here can fetch the layout2 id!!!
@@ -268,15 +298,6 @@ public class LatestFragment extends Fragment implements MyItemClickListener, MyI
             // Incremental changes
             if (numOfItemsToRefresh != 0) {
                 mAdapter.notifyItemRangeInserted(listNovelItemInfo.size() - numOfItemsToRefresh, numOfItemsToRefresh);
-            }
-
-            currentPage ++; // add when loaded
-            isLoading.set(false);
-
-            // Exit early if it's not attached.
-            // Note that the null mainActivity used to cause many issues.
-            if (!isAdded() || mainActivity == null) {
-                return;
             }
 
             if (mListLoadingView != null) {

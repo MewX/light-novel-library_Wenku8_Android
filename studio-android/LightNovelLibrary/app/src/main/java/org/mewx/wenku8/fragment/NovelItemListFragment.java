@@ -37,6 +37,7 @@ import org.mewx.wenku8.global.api.Wenku8Parser;
 import org.mewx.wenku8.listener.MyItemClickListener;
 import org.mewx.wenku8.listener.MyItemLongClickListener;
 import org.mewx.wenku8.network.LightNetwork;
+import org.mewx.wenku8.util.AsyncTaskTracker;
 import org.mewx.wenku8.util.CrashReporter;
 
 import java.io.UnsupportedEncodingException;
@@ -81,14 +82,27 @@ public class NovelItemListFragment extends Fragment implements MyItemClickListen
         return fragment;
     }
 
+    private final AsyncTaskTracker tracker = new AsyncTaskTracker();
+
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        listType = getArguments().getString("type");
+        final Bundle args = getArguments();
+        listType = args == null ? "" : args.getString("type", "");
         // judge if is 'search'
-        searchKey = listType.equals(SEARCH_TYPE) ? getArguments().getString("key") : "";
+        searchKey = args != null && SEARCH_TYPE.equals(listType) ? args.getString("key", "") : "";
 
         actionBar = ((AppCompatActivity) getActivity()).getSupportActionBar();
+    }
+
+    @Override
+    public void onDestroy() {
+        // onDestroy, deliberately not onDestroyView. The Fragment outlives its view in a
+        // ViewPager, and its isLoading flag with it; cancelling on view destruction would skip
+        // the onPostExecute that clears that flag and leave the list stuck on "Loading..." --
+        // the bug 723e93d patched. By onDestroy the flag is going away too.
+        tracker.cancelAll();
+        super.onDestroy();
     }
 
     @Override
@@ -129,14 +143,14 @@ public class NovelItemListFragment extends Fragment implements MyItemClickListen
     
                 // execute task
                 Toast.makeText(getActivity(),"search",Toast.LENGTH_SHORT).show();
-                AsyncGetSearchResultList asyncGetSearchResultList = new AsyncGetSearchResultList();
+                AsyncGetSearchResultList asyncGetSearchResultList = tracker.track(new AsyncGetSearchResultList());
                 asyncGetSearchResultList.execute(searchKey);
             }
             else {
                 // Listener
                 mRecyclerView.addOnScrollListener(new MyOnScrollListener());
                 mRecyclerView.addOnScrollListener(new OnHidingScrollListener());
-                AsyncGetNovelItemList asyncGetNovelItemList = new AsyncGetNovelItemList();
+                AsyncGetNovelItemList asyncGetNovelItemList = tracker.track(new AsyncGetNovelItemList());
                 asyncGetNovelItemList.execute(currentPage);
             }
         }
@@ -269,7 +283,7 @@ public class NovelItemListFragment extends Fragment implements MyItemClickListen
                             Snackbar.LENGTH_SHORT).show();
 
                     // load more thread
-                    new AsyncGetNovelItemList().execute(currentPage + 1);
+                    tracker.track(new AsyncGetNovelItemList()).execute(currentPage + 1);
                 }
             }
         }

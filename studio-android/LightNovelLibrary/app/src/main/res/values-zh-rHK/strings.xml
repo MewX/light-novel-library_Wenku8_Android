@@ -181,6 +181,7 @@
     <string name="dialog_option_choose_simpified_chinese">簡體中文</string>
     <string name="dialog_option_choose_traditional_chinese">繁體中文</string>
     <string name="reader_please_wait">請稍候……</string>
+    <string name="reader_load_failed">章節信息讀取失敗，請返回重試。</string>
     <string name="reader_engine_v1_parsing">V1引擎正在獲取並解析文本內容</string>
     <string name="reader_already_first_chapter">已是第壹章</string>
     <string name="reader_already_last_chapter">已是最後壹章</string>

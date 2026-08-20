@@ -18,6 +18,7 @@ import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 
 import com.google.android.material.snackbar.Snackbar;
 import org.mewx.wenku8.util.GoogleServicesHelper;
+import org.mewx.wenku8.util.LightTool;
 
 import org.mewx.wenku8.R;
 import org.mewx.wenku8.adapter.ReviewItemAdapter;
@@ -230,7 +231,12 @@ public class NovelReviewListActivity extends BaseMaterialActivity implements MyI
             // refresh everything when required
             if (!runOrNot) return;
 
+            // A live reference is not the same as a live Activity: the WeakReference stays
+            // reachable while anything else holds the Activity, so it can hand back one that
+            // is already destroyed. Treat that as gone.
             NovelReviewListActivity tempActivity = novelReviewListActivityWeakReference.get();
+            if (!LightTool.isAlive(tempActivity)) tempActivity = null;
+
             if (metNetworkIssue) {
                 // met net work issue, show retry button
                 if (tempActivity != null) tempActivity.showRetryButton();

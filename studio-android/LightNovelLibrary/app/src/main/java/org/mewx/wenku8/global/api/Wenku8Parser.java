@@ -93,6 +93,10 @@ public class Wenku8Parser {
             XmlPullParserFactory factory = XmlPullParserFactory.newInstance();
             XmlPullParser xmlPullParser = factory.newPullParser();
             NovelItemMeta nfi = new NovelItemMeta();
+            // Tracked explicitly rather than by inspecting nfi afterwards: NovelItemMeta's
+            // constructor pre-fills every field (title defaults to "1", author to UNKNOWN),
+            // so a never-populated object is indistinguishable from a populated one by value.
+            boolean foundTitle = false;
             xmlPullParser.setInput(new StringReader(xml));
             int eventType = xmlPullParser.getEventType();
 
@@ -109,6 +113,7 @@ public class Wenku8Parser {
                             if ("Title".equals(xmlPullParser.getAttributeValue(0))) {
                                 nfi.aid = Integer.valueOf(xmlPullParser.getAttributeValue(1));
                                 nfi.title = xmlPullParser.nextText();
+                                foundTitle = true;
                             } else if ("Author".equals(xmlPullParser
                                     .getAttributeValue(0))) {
                                 nfi.author = xmlPullParser.getAttributeValue(1);
@@ -145,6 +150,16 @@ public class Wenku8Parser {
                         break;
                 }
                 eventType = xmlPullParser.next();
+            }
+
+            // See UserInfo.parseUserInfo: well-formed XML that is not a novel-metadata
+            // response used to come back as a default-constructed NovelItemMeta rather than
+            // as null, which reaches the UI as a novel titled "1" by an unknown author. aid is
+            // read in the same branch as the title, so this one flag covers both.
+            if (!foundTitle) {
+                CrashReporter.log("parseNovelFullMeta: well-formed XML with no Title data, "
+                        + "length=" + (xml == null ? -1 : xml.length()));
+                return null;
             }
             return nfi;
         } catch (Exception e) {

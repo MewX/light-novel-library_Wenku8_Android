@@ -7,6 +7,7 @@ import android.graphics.Shader;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.Handler;
+import android.os.Looper;
 import androidx.appcompat.app.AppCompatActivity;
 import android.util.Log;
 import android.util.TypedValue;
@@ -20,6 +21,7 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import org.mewx.wenku8.util.AsyncTaskTracker;
 import org.mewx.wenku8.util.CrashReporter;
 import org.mewx.wenku8.util.ProgressDialogHelper;
 import org.mewx.wenku8.util.GoogleServicesHelper;
@@ -49,6 +51,7 @@ public class VerticalReaderActivity extends AppCompatActivity {
     private int aid, cid;
     private VolumeList volumeList= null; // for extended function
     private ProgressDialogHelper pDialog = null;
+    private final AsyncTaskTracker tracker = new AsyncTaskTracker();
     private ScrollViewNoFling svTextListLayout = null;
     private LinearLayout TextListLayout = null;
     private List<OldNovelContentParser.NovelContent> nc = null;
@@ -86,6 +89,10 @@ public class VerticalReaderActivity extends AppCompatActivity {
         CrashReporter.setKey(CrashReporter.Keys.NOVEL_AID, aid);
         CrashReporter.setKey(CrashReporter.Keys.CHAPTER_CID, cid);
         if (volumeList == null) {
+            // Unlike Wenku8ReaderActivityV1 this stays a breadcrumb rather than becoming a
+            // finish(): volumeList is only ever assigned here and never dereferenced -- this
+            // screen renders from aid/cid alone -- so bailing out would break a case that
+            // currently works. Kept so the two readers' counts stay comparable.
             CrashReporter.log("Vertical reader started without a 'volume' extra (aid=" + aid
                     + ", cid=" + cid + ", from=" + from + ")");
         }
@@ -182,7 +189,7 @@ public class VerticalReaderActivity extends AppCompatActivity {
     private void getNovelContent() {
         ContentValues cv = Wenku8API.getNovelContent(aid, cid, GlobalConfig.getCurrentLang());
 
-        final asyncNovelContentTask ast = new asyncNovelContentTask();
+        final asyncNovelContentTask ast = tracker.track(new asyncNovelContentTask());
         ast.execute(cv);
 
         pDialog = ProgressDialogHelper.show(this,
@@ -233,6 +240,16 @@ public class VerticalReaderActivity extends AppCompatActivity {
 
         @Override
         protected void onPostExecute(Integer result) {
+            // This task inflates the whole chapter into the layout below. It is exactly as
+            // slow as the network is, so leaving the reader mid-fetch used to land here on a
+            // destroyed Activity.
+            //
+            // No dialog dismissal is hoisted above this guard, unlike the other screens: the
+            // inflation loop below drives pDialog.setProgress(), so dismissing it up here
+            // would blank the progress display for the whole of it. onDestroy() already
+            // dismisses pDialog, so returning early cannot leak it.
+            if (isFinishing() || isDestroyed()) return;
+
             if (result == -100) {
                     Toast.makeText(VerticalReaderActivity.this,
                             getResources().getString(R.string.system_network_error),
@@ -307,6 +324,11 @@ public class VerticalReaderActivity extends AppCompatActivity {
 
                                 @Override
                                 protected void onPostExecute(final String result) {
+                                    // The image is already saved to disk by doInBackground, so
+                                    // nothing is lost by skipping the display when the reader
+                                    // has gone.
+                                    if (isFinishing() || isDestroyed()) return;
+
                                     ImageLoader.getInstance().displayImage(
                                             "file://" + result, tempIV);
 
@@ -319,7 +341,7 @@ public class VerticalReaderActivity extends AppCompatActivity {
                                 }
 
                             }
-                            asyncDownloadImage async = new asyncDownloadImage();
+                            asyncDownloadImage async = tracker.track(new asyncDownloadImage());
                             async.execute(nc.get(i).content);
                         }
 
@@ -335,7 +357,7 @@ public class VerticalReaderActivity extends AppCompatActivity {
             // show dialog
             if (GlobalConfig.getReadSavesRecord(cid, TextListLayout.getMeasuredHeight()) > 100) {
                 // set scroll view
-                Handler handler = new Handler();
+                Handler handler = new Handler(Looper.getMainLooper());
                 handler.postDelayed(runnableScroll, 200);
                 Log.d(VerticalReaderActivity.class.getSimpleName(), "Scroll to = " + GlobalConfig.getReadSavesRecord(cid, TextListLayout.getMeasuredHeight()));
             }
@@ -357,6 +379,9 @@ public class VerticalReaderActivity extends AppCompatActivity {
 
     @Override
     protected void onDestroy() {
+        // Before super, so nothing is still able to deliver into a half-torn-down Activity.
+        // The image downloads finish writing their files regardless; see AsyncTaskTracker.
+        tracker.cancelAll();
         super.onDestroy();
 
         if (pDialog != null)
