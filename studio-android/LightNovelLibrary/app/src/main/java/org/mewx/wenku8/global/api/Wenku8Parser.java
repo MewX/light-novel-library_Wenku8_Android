@@ -20,65 +20,119 @@ import java.util.List;
  */
 public class Wenku8Parser {
 
+    /**
+     * Parses a novel list response into (total page, aid, aid, ...).
+     *
+     * <p>Element 0 is the page count and the caller removes it; 0 means "unknown", which
+     * {@code NovelItemListFragment} already treats as "keep paging".
+     *
+     * <p>So the response below parses to {@code [166, 1143, 1034]}:
+     *
+     * <pre>{@code
+     * <?xml version="1.0" encoding="utf-8"?>
+     * <result>
+     * <page num='166'/>
+     * <item aid='1143'/>
+     * <item aid='1034'/>
+     * </result>
+     * }</pre>
+     */
     @NonNull
     public static List<Integer> parseNovelItemList(@NonNull String str) {
-        List<Integer> list = new ArrayList<>();
+        List<Integer> list = parseNovelItemListAsXml(str);
+        if (!list.isEmpty()) return list;
 
-        // <?xml version="1.0" encoding="utf-8"?>
-        // <result>
-        // <page num='166'/>
-        // <item aid='1143'/>
-        // <item aid='1034'/>
-        // <item aid='1213'/>
-        // <item aid='1'/>
-        // <item aid='1011'/>
-        // <item aid='1192'/>
-        // <item aid='433'/>
-        // <item aid='47'/>
-        // <item aid='7'/>
-        // <item aid='374'/>
-        // </result>
-
-        // The returning list of this xml is: (total page, aids)
-        // { 166, 1143, 1034, 1213, 1, 1011, 1192, 433, 47, 7, 374 }
-
-        final char SEPARATOR = '\''; // seperator
-
-        // get total page
-        int beg, temp;
-        beg = str.indexOf(SEPARATOR);
-        temp = str.indexOf(SEPARATOR, beg + 1);
-        if (beg == -1 || temp == -1) return list; // empty, this is an exception
-        if(LightTool.isInteger(str.substring(beg + 1, temp)))
-            list.add(Integer.parseInt(str.substring(beg + 1, temp)));
-        beg = temp + 1; // prepare for loop
-
-        // init array
-        while (true) {
-            beg = str.indexOf(SEPARATOR, beg);
-            temp = str.indexOf(SEPARATOR, beg + 1);
-            if (beg == -1 || temp == -1) break;
-
-            // Two separate things make this branch load-bearing. The log reads back the
-            // element just added, so from outside the branch it indexed an empty list and
-            // threw out of this @NonNull method on any token that was not an integer. And a
-            // non-integer token is skipped rather than treated as the end of the response:
-            // rejecting at the first would empty out a valid list whose XML declaration uses
-            // single quotes, since <?xml version='1.0' encoding='utf-8'?> supplies two of
-            // them ahead of the first aid. See STABILITY_PLAN.md, Phase 1 item 8.
-            String token = str.substring(beg + 1, temp);
-            if (LightTool.isInteger(token)) {
-                // Not necessarily an aid: element 0 is the page count, and it is read here
-                // rather than above whenever the pre-loop read consumed a non-integer.
-                int value = Integer.parseInt(token);
-                list.add(value);
-                Log.v("MewX", "Add novel list value: " + value);
+        // XmlPullParser stops at the first byte of anything that is not the document, so a
+        // response that is well-formed only after some leading noise -- a PHP notice, a relay
+        // banner -- parses to nothing, where the quoted-value scan this replaced read straight
+        // past it. Retry from the document start rather than keeping that scan as a fallback:
+        // it cannot tell an aid from any other quoted integer, so recovering the list that way
+        // would put the phantom novels back on exactly the responses nobody can see.
+        int documentStart = indexOfDocumentStart(str);
+        if (documentStart > 0) {
+            list = parseNovelItemListAsXml(str.substring(documentStart));
+            if (!list.isEmpty()) {
+                // How we find out whether this case is real. If a release goes by without this
+                // breadcrumb appearing, delete the retry and indexOfDocumentStart with it.
+                CrashReporter.log("parseNovelItemList: parsed after skipping " + documentStart
+                        + " leading bytes, length=" + str.length());
             }
+        }
+        return list;
+    }
 
-            beg = temp + 1; // prepare for next round
+    /**
+     * Parses one candidate document into the list {@link #parseNovelItemList} describes.
+     *
+     * <p>Returns an empty list when the document holds no {@code page} and no {@code item} tag,
+     * which is what tells the caller the parse recognised nothing and a retry is worth trying.
+     */
+    @NonNull
+    private static List<Integer> parseNovelItemListAsXml(@NonNull String xml) {
+        int totalPage = 0;
+        boolean foundPage = false;
+        List<Integer> aids = new ArrayList<>();
+
+        // Read by attribute name rather than by scanning for quoted values. The scan this
+        // replaced took any single-quoted value in document order, so it could not tell an
+        // aid from anything else quoted: <page num='166' cached='2'/> yielded a phantom novel
+        // 2, and <item type='9' aid='1143'/> a phantom novel 9. Since the API now sits behind
+        // a relay, an added attribute is a live possibility rather than a hypothetical, and
+        // it would have been invisible -- phantom aids fail to load one by one rather than
+        // failing as a list.
+        try {
+            XmlPullParserFactory factory = XmlPullParserFactory.newInstance();
+            XmlPullParser xmlPullParser = factory.newPullParser();
+            xmlPullParser.setInput(new StringReader(xml));
+            int eventType = xmlPullParser.getEventType();
+
+            while (eventType != XmlPullParser.END_DOCUMENT) {
+                if (eventType == XmlPullParser.START_TAG) {
+                    if ("page".equals(xmlPullParser.getName())) {
+                        foundPage = true;
+                        String num = xmlPullParser.getAttributeValue(null, "num");
+                        if (num != null && LightTool.isInteger(num)) {
+                            totalPage = Integer.parseInt(num);
+                        }
+                    } else if ("item".equals(xmlPullParser.getName())) {
+                        String aid = xmlPullParser.getAttributeValue(null, "aid");
+                        if (aid != null && LightTool.isInteger(aid)) {
+                            aids.add(Integer.parseInt(aid));
+                            Log.v("MewX", "Add novel aid: " + aid);
+                        }
+                    }
+                }
+                eventType = xmlPullParser.next();
+            }
+        } catch (Exception e) {
+            // Deliberately not rethrown, and deliberately not discarding what was collected: a
+            // response truncated mid-list still yields the items ahead of the cut, as the scan
+            // did, so the caller renders a short list rather than an error. When nothing was
+            // collected the caller retries from the document start.
+            CrashReporter.recordException("Wenku8Parser.parseNovelItemList", e);
         }
 
+        if (aids.isEmpty() && !foundPage) {
+            // Not a novel list response -- an HTML error page, a captive-portal interstitial,
+            // or a document that never started. Empty is what the caller already handles.
+            return new ArrayList<>();
+        }
+
+        List<Integer> list = new ArrayList<>();
+        list.add(totalPage);
+        list.addAll(aids);
         return list;
+    }
+
+    /**
+     * Returns the index of the first byte of the XML document within a response, or -1 when no
+     * start marker is present.
+     *
+     * <p>Only used to skip leading noise ahead of an otherwise well-formed response.
+     */
+    private static int indexOfDocumentStart(@NonNull String str) {
+        int declaration = str.indexOf("<?xml");
+        return declaration != -1 ? declaration : str.indexOf("<result");
     }
 
 
