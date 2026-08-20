@@ -3,18 +3,36 @@
 Status: draft, derived from a read-through of `app/` and `api/` at commit `5e00d42`.
 
 **Progress:** "Testing strategy" step 1 (move device-independent tests to the JVM), **Phase 0
-(instrumentation)** and **Phase 1 (items 1–7)** are implemented. Phase 0 has not yet *collected*
+(instrumentation)** and **Phase 1 (items 1–8)** are implemented. Phase 0 has not yet *collected*
 anything — the ranking below is still inference from reading the code, and stays that way until a
 release ships and reports come back. Phase 1 was written to be safe to land without that data;
 Phase 2's ordering still needs it. Phases 2–4 are proposed, not done.
 
-**Caveat on the Phase 1 commits:** they were written in an environment with no Android SDK and no
-emulator, so `./gradlew assembleAlpha testAlphaDebugUnitTest` has never been run against them.
-The JVM read-loop tests in `LightCacheStreamTest` were executed by extracting the method into a
-standalone harness (8 tests pass; 6 of them fail against the previous implementation), and
-`AsyncTaskTracker`'s logic likewise against a stub AsyncTask. Everything else — every guard
-clause, and the Robolectric tests for the parser validation — is unexecuted. **CI is the first
-real check.**
+**The Phase 1 caveat is discharged.** Those commits were written with no Android SDK and no
+emulator, so this section used to warn that `./gradlew assembleAlpha testAlphaDebugUnitTest` had
+never been run against them and that CI would be the first real check. It has now run: CI is
+green on `3bc1827` (the merge of #185) on both jobs — the build and the JVM suite, and the
+instrumented tests, which confirms the emulator repair below as well. Items 1–7 are compiled and
+tested code.
+
+**What can still be checked without a device, and what cannot.** Nothing here builds without an
+Android SDK, and the SDK is not always fetchable: `dl.google.com` is blocked in the sandbox these
+changes are written in, which rules out Robolectric locally too — it needs
+`androidx.test:monitor`, published only on Google's Maven, which redirects to the same blocked
+host. `repo1.maven.org` and `maven.google.com` itself are reachable; the artifacts behind them
+are not. The loop that does work for a change made without a device:
+
+1. **Extract the pure-logic method into a standalone `javac`/`java` harness** with hand-written
+   stubs for the Android calls it makes, and run the old and new implementations side by side on
+   the same inputs. The read loop in item 3 was checked this way (8 tests pass; 6 fail against
+   the previous implementation), `AsyncTaskTracker` against a stub `AsyncTask`, and item 8 below
+   against nine inputs, three of which throw on the previous implementation.
+2. **Open the PR and let CI build it.** CI now runs on *every* pull request rather than only
+   ones based on master (see "Testing strategy"), so the first build of a change happens before
+   it merges instead of after.
+
+Guard clauses, anything touching a view, and the Robolectric tests still cannot be executed
+anywhere but CI and a device.
 
 ## Diagnosis
 
@@ -235,6 +253,34 @@ Four things turned out differently from the plan as written, and are worth recor
    otherwise. Cheap, and it is exactly the kind of silent failure Phase 0 instrumentation
    cannot see.
 
+8. **Stop `parseNovelItemList` throwing on a non-response.** Not in the original plan — found
+   while auditing the list parsers item 7 deliberately left alone. They were left alone because
+   "they already return empty collections, which callers distinguish", which is true of every
+   list parser except this one: it is the only parser in `global/api/` with no `try`/`catch`
+   around its body, so anything it throws reaches its caller.
+
+   Its per-item log line read back the element just added — `list.get(list.size() - 1)` — from
+   *outside* the branch that added it. On a quoted token that is not an integer nothing was
+   added, so it indexed an empty list and threw `IndexOutOfBoundsException` out of a `@NonNull`
+   method. `NovelItemListFragment.AsyncGetNovelItemList` calls it inside `doInBackground` and
+   catches `UnsupportedEncodingException` alone, so the throw escaped the task and crashed the
+   app instead of reaching the empty-list path that caller already handles.
+
+   Reachable two ways. The expected one is root cause 4's server-side twin: any well-formed
+   non-response carrying two or more single-quoted values with no integer among them — a
+   captive-portal interstitial, an HTML error page. The unexpected one decided the fix: a
+   **valid** novel list whose XML declaration uses single quotes rather than double,
+   `<?xml version='1.0' encoding='utf-8'?>`, supplies two non-integer tokens ahead of the first
+   `aid` and crashed on the second. Rejecting the response at the first non-integer token — the
+   shape item 7 used for the single-object parsers — would have turned that good list into an
+   empty one. Non-integer tokens are skipped instead, and only the log line moved inside the
+   branch.
+
+   Three tests were added, plus one characterization test recording a quirk found alongside it
+   and deliberately left in place: the parser has no notion of *which* token is the page count,
+   the caller simply takes element 0, so a non-integer page number does not fail — it shifts,
+   and the first novel silently drops out of the list.
+
 Expected outcome: this should remove the majority of crash *volume* without touching
 architecture. Phase 0's data will confirm — and because Phase 0 shipped first, the before/after
 comparison is actually available this time.
@@ -248,6 +294,16 @@ effect of each change is measurable.
    `vid` and re-read the volume from the local cache on the receiving side. Kills
    `TransactionTooLargeException` permanently and makes the reader survive process death for
    free, since ints in an Intent always restore. This is the highest-value item in the plan.
+
+   **Check the cache assumption first — it does not currently hold.** "Re-read the volume from
+   the local cache" assumes `intro/<aid>-volume.xml` is on disk by the time the reader starts.
+   It is written only by `NovelInfoActivity.AsyncUpdateCacheTask`, the explicit download/refresh
+   action. The ordinary online load (`FetchInfoAsyncTask`'s `volumeTask`) fetches exactly the
+   same XML and never writes it, so for any novel the user has merely opened, the receiving
+   Activity would find nothing to read and the reader would fail to open — a worse bug than the
+   one being fixed. Persisting that response in the sender is a prerequisite, not a detail, and
+   it is worth doing on its own: it is also what lets the reader rebuild itself after process
+   death, which is Phase 3's problem for these screens.
 2. **Retire `AsyncTask`.** Do not rewrite all 24 at once. Introduce one small helper
    (`ExecutorService` + main-thread `Handler`, or `androidx.lifecycle` if you are open to
    adding it) and migrate screen by screen, starting with whichever Phase 0 shows is
@@ -321,20 +377,21 @@ appears at first glance. The problem was never the count, it was *where* they ru
 
 | Location | Before | Now | Runs on |
 |---|---|---|---|
-| `app/src/test` | 3 files / 10 tests | **10 files / 44 tests** | JVM, seconds |
-| `app/src/androidTest` | 8 files | **2 files** | emulator, minutes |
+| `app/src/test` | 3 files / 10 tests | **12 files / 68 tests** | JVM, seconds |
+| `app/src/androidTest` | 8 files / 31 tests | **2 files / 23 tests** | emulator, minutes |
 | `api/src/test` | 1 file | 1 file | JVM |
 
-(37 of those tests came from step 1; `CrashReporterTest` added the other 7 in Phase 0.)
+(Step 1 moved the JVM count from 10 to 37; `CrashReporterTest` took it to 44 in Phase 0; Phase 1
+added the rest, mostly `LightCacheStreamTest` and `AsyncTaskTrackerTest`.)
 
 **The emulator flakiness was not theoretical, and CI has been restructured because of it.** The
 run for commit `2525b3b` failed in the emulator step, and because that one step ran
 `assembleAlpha testAlphaDebugUnitTest connectedAlphaDebugAndroidTest` together, the 44 JVM tests
-never reported at all. Three changes to `.github/workflows/android-ci.yml`:
+never reported at all. Four changes to `.github/workflows/android-ci.yml`:
 
 1. **Split into two jobs.** JVM tests no longer depend on an emulator booting. This is the whole
    payoff of having moved those tests off the device: an emulator that will not start now costs
-   2 tests of signal instead of 46.
+   the 23 instrumented tests instead of all 91.
 2. **Enable KVM.** The failure was `ShellCommandUnresponsiveException` during `installCommit`,
    with the emulator console also failing to start — the signature of an emulator running
    unaccelerated. `android-emulator-runner` needs an explicit udev rule on `ubuntu-latest`;
@@ -345,9 +402,15 @@ never reported at all. Three changes to `.github/workflows/android-ci.yml`:
    the API 21 emulator took the uninteresting side of every conditional while being the slowest
    and least reliable image to install onto. Neither remaining instrumented test is
    API-21-specific — `LightCacheTest` only uses `getFilesDir()`.
+4. **Run on every pull request.** The trigger was `pull_request: branches: [master]`, but
+   development lands on the release branch and only reaches master at release time — so a PR
+   into `v1.30` ran no checks at all, and the post-merge push to `v1.30` was the first build of
+   the change. #185 merged that way. For a project that cannot be built without an Android SDK,
+   and whose contributors may not have one, a first check that arrives after the merge is the
+   wrong order; the `pull_request` filter is now removed so the build gates the merge.
 
-Note this means the minSdk floor is no longer verified by CI. That is an accepted trade for two
-tests; if Phase 4 raises `minSdkVersion` anyway the question goes away.
+Note the API 21 → 33 move means the minSdk floor is no longer verified by CI. That is an accepted
+trade for two test classes; if Phase 4 raises `minSdkVersion` anyway the question goes away.
 
 **The codebase already contains the answer.** `WenkuReaderPaginatorTest` injects the
 Android-dependent piece — text measurement — as a lambda:
@@ -407,7 +470,7 @@ inverts the negative test cases. See step 1.
 | Ship | Contents | Risk |
 |---|---|---|
 | v1.30.0 | Phase 0 instrumentation only | none |
-| v1.30.1 | Phase 1 items 1–7 — **implemented, unbuilt** | low, mechanical |
+| v1.30.1 | Phase 1 items 1–7 — **implemented, CI green**; item 8 pending its first CI run | low, mechanical |
 | v1.31 | Phase 2.1 (Intent payloads) + highest-crash screen from 2.2 | medium |
 | v1.32+ | Remainder of Phase 2, Phase 3 | medium |
 
