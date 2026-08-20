@@ -116,6 +116,39 @@ public class Wenku8ParserTest {
     }
 
     @Test
+    public void testParseNovelFullMetaRejectsAWellFormedNonResponse() {
+        // This used to return a NovelItemMeta rather than null, because null only ever came
+        // from XmlPullParser.next() throwing. NovelItemMeta's constructor pre-fills every
+        // field, so the caller got a novel titled "1" by an unknown author instead of an
+        // error -- and NovelInfoActivity's "meta == null" check never fired.
+        assertNull(Wenku8Parser.parseNovelFullMeta(
+                "<html><head><title>503 Service Unavailable</title></head>"
+                        + "<body><p>Under maintenance.</p></body></html>"));
+    }
+
+    @Test
+    public void testParseNovelFullMetaRejectsMetadataWithoutATitle() {
+        assertNull(Wenku8Parser.parseNovelFullMeta("<?xml version=\"1.0\" encoding=\"utf-8\"?>\n" +
+                "<metadata>\n" +
+                "<data name=\"Author\" value=\"小木君人\"/>\n" +
+                "<data name=\"BookStatus\" value=\"已完成\"/>\n" +
+                "</metadata>"));
+    }
+
+    @Test
+    public void testParseNovelFullMetaAcceptsATitleAlone() {
+        // Only the Title is required; the rest keep their constructor defaults.
+        NovelItemMeta meta = Wenku8Parser.parseNovelFullMeta(
+                "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n" +
+                "<metadata>\n" +
+                "<data name=\"Title\" aid=\"1306\"><![CDATA[向森之魔物献上花束]]></data>\n" +
+                "</metadata>");
+        assertNotNull(meta);
+        assertEquals(1306, meta.aid);
+        assertEquals("向森之魔物献上花束", meta.title);
+    }
+
+    @Test
     public void testGetVolumeList() {
         final String XML = "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n" +
                 "<package>\n" +

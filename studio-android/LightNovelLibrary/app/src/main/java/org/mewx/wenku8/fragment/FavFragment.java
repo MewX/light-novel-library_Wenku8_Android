@@ -50,7 +50,6 @@ import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Objects;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -219,13 +218,18 @@ public class FavFragment extends Fragment implements MyItemClickListener, MyItem
             // Not found.
             final String xml = GlobalConfig.loadFullFileFromSaveFolder("intro", aid + "-intro.xml");
             NovelItemInfoUpdate info;
-            if (xml.isEmpty()) {
-                // the intro file was deleted
+            final NovelItemMeta meta = xml.isEmpty() ? null : Wenku8Parser.parseNovelFullMeta(xml);
+            if (meta == null) {
+                // The intro file was deleted, or it is present but does not parse into a
+                // novel -- a truncated or half-written cache file reads as the latter. Both
+                // mean the same thing to the user, and retValue == -1 raises the
+                // "sync the novel info again" toast below. This used to be
+                // Objects.requireNonNull(), which turned a corrupt cache file into a crash.
                 retValue = -1;
                 info = new NovelItemInfoUpdate(aid);
             }
             else {
-                info = NovelItemInfoUpdate.convertFromMeta(Objects.requireNonNull(Wenku8Parser.parseNovelFullMeta(xml)));
+                info = NovelItemInfoUpdate.convertFromMeta(meta);
             }
             datasetChanged = true;
             listNovelItemInfo.add(j, info);
