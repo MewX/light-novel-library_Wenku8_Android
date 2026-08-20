@@ -242,11 +242,12 @@ public class VerticalReaderActivity extends AppCompatActivity {
         protected void onPostExecute(Integer result) {
             // This task inflates the whole chapter into the layout below. It is exactly as
             // slow as the network is, so leaving the reader mid-fetch used to land here on a
-            // destroyed Activity. The dialog is dismissed first because
-            // ProgressDialogHelper.dismiss() is safe on a gone window and skipping it would
-            // leak the dialog.
-            if (pDialog != null) pDialog.dismiss();
-
+            // destroyed Activity.
+            //
+            // No dialog dismissal is hoisted above this guard, unlike the other screens: the
+            // inflation loop below drives pDialog.setProgress(), so dismissing it up here
+            // would blank the progress display for the whole of it. onDestroy() already
+            // dismisses pDialog, so returning early cannot leak it.
             if (isFinishing() || isDestroyed()) return;
 
             if (result == -100) {
