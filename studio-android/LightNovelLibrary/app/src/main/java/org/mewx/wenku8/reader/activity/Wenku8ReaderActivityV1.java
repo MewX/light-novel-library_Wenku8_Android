@@ -121,12 +121,14 @@ public class Wenku8ReaderActivityV1 extends BaseMaterialActivity {
         CrashReporter.setKey(CrashReporter.Keys.NOVEL_AID, aid);
         CrashReporter.setKey(CrashReporter.Keys.CHAPTER_CID, cid);
         if (volumeList == null) {
-            // Deliberately only a breadcrumb, not a guard: the NPE two statements below is
-            // reported as a fatal already, and this records why the extra was missing. The guard
-            // itself is Phase 1 of STABILITY_PLAN.md, kept separate so the before/after counts
-            // for this line are comparable.
+            // The breadcrumb still distinguishes "extra absent" from "deserialisation failed",
+            // but the dereference below is no longer reached: bail out instead of NPE-ing.
+            // Phase 2 removes the cause by passing aid/vid rather than the object itself.
             CrashReporter.log("Reader started without a 'volume' extra (aid=" + aid
                     + ", cid=" + cid + ", from=" + from + ")");
+            Toast.makeText(this, R.string.reader_load_failed, Toast.LENGTH_SHORT).show();
+            finish();
+            return;
         } else {
             CrashReporter.log("Reader volume has "
                     + (volumeList.chapterList == null ? "null" : volumeList.chapterList.size())

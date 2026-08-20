@@ -84,9 +84,10 @@ public class NovelItemListFragment extends Fragment implements MyItemClickListen
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        listType = getArguments().getString("type");
+        final Bundle args = getArguments();
+        listType = args == null ? "" : args.getString("type", "");
         // judge if is 'search'
-        searchKey = listType.equals(SEARCH_TYPE) ? getArguments().getString("key") : "";
+        searchKey = args != null && SEARCH_TYPE.equals(listType) ? args.getString("key", "") : "";
 
         actionBar = ((AppCompatActivity) getActivity()).getSupportActionBar();
     }

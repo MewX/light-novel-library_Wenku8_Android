@@ -86,6 +86,10 @@ public class VerticalReaderActivity extends AppCompatActivity {
         CrashReporter.setKey(CrashReporter.Keys.NOVEL_AID, aid);
         CrashReporter.setKey(CrashReporter.Keys.CHAPTER_CID, cid);
         if (volumeList == null) {
+            // Unlike Wenku8ReaderActivityV1 this stays a breadcrumb rather than becoming a
+            // finish(): volumeList is only ever assigned here and never dereferenced -- this
+            // screen renders from aid/cid alone -- so bailing out would break a case that
+            // currently works. Kept so the two readers' counts stay comparable.
             CrashReporter.log("Vertical reader started without a 'volume' extra (aid=" + aid
                     + ", cid=" + cid + ", from=" + from + ")");
         }

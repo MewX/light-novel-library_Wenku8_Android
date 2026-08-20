@@ -18,7 +18,7 @@ import org.mewx.wenku8.global.api.VolumeList;
 import org.mewx.wenku8.global.GlobalConfig;
 import org.mewx.wenku8.util.CrashReporter;
 
-import java.io.DataInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
@@ -39,6 +39,7 @@ import java.util.Queue;
  */
 public class LightCache {
     private static final String TAG = LightCache.class.getSimpleName();
+    private static final int DEFAULT_READ_BUFFER_SIZE = 8192;
 
     /**
      * Test whether file exists
@@ -82,33 +83,29 @@ public class LightCache {
         return null;
     }
 
+    /**
+     * Read a stream to its end.
+     *
+     * <p>This used to size a single {@code read()} from {@link InputStream#available()}.
+     * available() is an estimate of what can be read without blocking rather than the length
+     * of the stream, and one read() is not obliged to fill the buffer it is given, so that
+     * silently handed back a truncated, zero-padded array whenever the source was buffered or
+     * larger than the readahead window. The array became novel XML and failed to parse much
+     * later, which is why the failure was never traceable from a crash report.
+     *
+     * @param inputStream the stream to drain; closed before returning
+     * @return the full stream content, or null if it could not be read
+     */
     public static byte[] loadStream(InputStream inputStream) {
-        try {
-            // Hopefully to get the file size.
-            int fileSize = inputStream.available();
-            DataInputStream dis = new DataInputStream(inputStream);
-
-            // read all
-            byte[] bs = new byte[fileSize];
-            int read = dis.read(bs, 0, fileSize);
-            if (read == -1)
-                return null;
-
-            // Instrumentation only -- the behaviour below is deliberately unchanged. available()
-            // is an estimate of what can be read without blocking rather than the file length,
-            // and a single read() is not obliged to fill the buffer, so this can silently hand
-            // back a truncated, zero-padded array. That array becomes novel XML and fails to
-            // parse much later, which is why it has never been traceable from a crash report.
-            // Reporting it here says whether that is actually happening in the wild before
-            // Phase 1 changes the read into a loop.
-            if (read != fileSize) {
-                CrashReporter.recordException("LightCache.loadStream.truncated",
-                        new IOException("Short read: got " + read + " of " + fileSize + " bytes"));
+        try (InputStream in = inputStream) {
+            ByteArrayOutputStream buffer = new ByteArrayOutputStream(
+                    Math.max(in.available(), DEFAULT_READ_BUFFER_SIZE));
+            byte[] chunk = new byte[DEFAULT_READ_BUFFER_SIZE];
+            int read;
+            while ((read = in.read(chunk)) != -1) {
+                buffer.write(chunk, 0, read);
             }
-
-            dis.close();
-            inputStream.close();
-            return bs;
+            return buffer.toByteArray();
         } catch (IOException e) {
             CrashReporter.recordException("LightCache.loadStream", e);
         }
@@ -249,13 +246,15 @@ public class LightCache {
             String[] projection = {
                     MediaStore.Images.Media.DATA
             };
-            Cursor cursor;
-            try {
-                cursor = context.getContentResolver()
-                        .query(uri, projection, selection, selectionArgs, null);
-                int column_index = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DATA);
-                if (cursor.moveToFirst()) {
-                    return cursor.getString(column_index);
+            // try-with-resources: the cursor was previously leaked on every path, including
+            // the one that returns a result.
+            try (Cursor cursor = context.getContentResolver()
+                    .query(uri, projection, selection, selectionArgs, null)) {
+                if (cursor != null) {
+                    int column_index = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DATA);
+                    if (cursor.moveToFirst()) {
+                        return cursor.getString(column_index);
+                    }
                 }
             } catch (Exception e) {
                 CrashReporter.recordException("LightCache.getFilePath", e);
