@@ -37,6 +37,39 @@ are not. The loop that does work for a change made without a device:
 Guard clauses, anything touching a view, and the Robolectric tests still cannot be executed
 anywhere but CI and a device.
 
+### Picking this up on a machine with an SDK
+
+Everything above describes working *without* one. On a normal development machine none of it
+applies, and there is work waiting that only that machine can do.
+
+**Run what CI runs, plus the part CI cannot judge.**
+
+```
+./gradlew assembleAlpha testAlphaDebugUnitTest      # 78 JVM tests, seconds
+./gradlew connectedAlphaDebugAndroidTest            # 23 tests, needs a device or emulator
+```
+
+**Then the manual pass, which nothing automated covers.** The reader flow has no test above the
+storage layer — not in the JVM suite, not in the instrumented one — so Phase 2.1 is compiled and
+unit-tested but has never been *run*. On a device:
+
+1. A novel **not** in the bookshelf: open it, read a chapter. This is the path that had no
+   cached index before Phase 2.1 and the one most likely to be wrong.
+2. Next and previous chapter, including across a volume boundary.
+3. The resume dialog ("jump to last read").
+4. The vertical reader, via the engine picker.
+5. A bookshelf novel with the network off.
+6. Developer Options → **Don't keep activities**, while reading. This is what Phase 2.1 was for,
+   and it is the same switch Phase 3 needs, so it is worth leaving on for a while.
+
+A long series matters for 1 and 2: the crash Phase 2.1 removes was size-dependent, so a novel
+with hundreds of chapters is the one that used to fail.
+
+**What that machine unblocks beyond this.** Phase 2.2 onwards wants crash data and so is still
+gated on a release. But Phase 3 (`onSaveInstanceState`) and Phase 4's OOM/bitmap question are
+both device work that no amount of CI substitutes for, and "Don't keep activities" is the tool
+for the first of them.
+
 ## Diagnosis
 
 The app is ~18k lines and structurally sound at the feature level. The instability is not
@@ -360,11 +393,13 @@ effect of each change is measurable.
    a cache miss puts a network round trip in front of the reader's startup, and an in-memory
    handoff would be root cause 2 all over again.
 
-   **What CI cannot check here.** The reader flow is not covered by the JVM suite or by the two
-   instrumented tests, so the smoke test is manual: open a novel *not* in the bookshelf and read
-   a chapter; next/previous chapter across a volume boundary; the resume dialog; the vertical
-   reader from the engine picker; then a bookshelf novel offline. Developer Options → **Don't
-   keep activities** while reading is the one that exercises what this item was for.
+   **What is tested, and what is not.** `findVolumeByVid` is pure and has JVM tests. Nothing
+   else here does: neither the cache the readers now depend on nor the reader flow itself has
+   automated coverage, so Phase 2.1 is compiled and unit-tested but has never been run. See
+   "Picking this up on a machine with an SDK" for the manual pass it needs.
+
+   Device coverage for `cacheVolumeIndex` and `loadCachedVolume` is a follow-up, and has to be:
+   writing it turned up two storage bugs that have to be fixed before any such test can pass.
 2. **Retire `AsyncTask`.** Do not rewrite all 24 at once. Introduce one small helper
    (`ExecutorService` + main-thread `Handler`, or `androidx.lifecycle` if you are open to
    adding it) and migrate screen by screen, starting with whichever Phase 0 shows is
@@ -438,7 +473,7 @@ appears at first glance. The problem was never the count, it was *where* they ru
 
 | Location | Before | Now | Runs on |
 |---|---|---|---|
-| `app/src/test` | 3 files / 10 tests | **12 files / 68 tests** | JVM, seconds |
+| `app/src/test` | 3 files / 10 tests | **12 files / 78 tests** | JVM, seconds |
 | `app/src/androidTest` | 8 files / 31 tests | **2 files / 23 tests** | emulator, minutes |
 | `api/src/test` | 1 file | 1 file | JVM |
 
@@ -452,7 +487,7 @@ never reported at all. Four changes to `.github/workflows/android-ci.yml`:
 
 1. **Split into two jobs.** JVM tests no longer depend on an emulator booting. This is the whole
    payoff of having moved those tests off the device: an emulator that will not start now costs
-   the 23 instrumented tests instead of all 91.
+   the 23 instrumented tests instead of all 101.
 2. **Enable KVM.** The failure was `ShellCommandUnresponsiveException` during `installCommit`,
    with the emulator console also failing to start — the signature of an emulator running
    unaccelerated. `android-emulator-runner` needs an explicit udev rule on `ubuntu-latest`;
