@@ -81,9 +81,9 @@ public class Wenku8ParserTest {
     // of returning empty, because the log line that read back the just-added element sat
     // outside the branch that added it -- so any input carrying two or more single-quoted
     // values with no integer among them indexed an empty list. parseNovelItemList is @NonNull
-    // and its only caller (NovelItemListFragment.AsyncGetNovelItemList) catches
-    // UnsupportedEncodingException alone, so the throw escaped doInBackground and crashed the
-    // app instead of reaching the empty-list path that caller already handles.
+    // and NovelItemListFragment.AsyncGetNovelItemList catches UnsupportedEncodingException
+    // alone, so the throw escaped doInBackground and crashed the app instead of reaching the
+    // empty-list path that caller already handles.
     @Test
     public void testParseNovelItemListWellFormedNonResponse() {
         assertTrue(Wenku8Parser.parseNovelItemList(
