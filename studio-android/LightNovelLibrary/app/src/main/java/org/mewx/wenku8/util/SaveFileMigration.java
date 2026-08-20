@@ -29,11 +29,27 @@ public class SaveFileMigration {
     private static Uri overrideExternalPathUrl = null;
 
     public static void markMigrationCompleted() {
-        LightCache.saveFile(getInternalSavePath(), SIGNAL_FILE_NAME, "".getBytes(), false);
+        String path = getInternalSavePath();
+        if (path.isEmpty()) {
+            // See getInternalSavePath: empty means the files dir was not resolvable yet. These
+            // two are the only callers that hand the path straight to LightCache as a directory
+            // rather than concatenating onto it, and those helpers index path.charAt(length - 1)
+            // without checking, so an empty one throws StringIndexOutOfBoundsException. Skipping
+            // is the honest outcome: there is nowhere to write the signal file yet, and the next
+            // call resolves the path again.
+            Log.d(TAG, "markMigrationCompleted: no internal save path yet, skipping");
+            return;
+        }
+        LightCache.saveFile(path, SIGNAL_FILE_NAME, "".getBytes(), false);
     }
 
     public static void revertMigrationStatus() {
-        LightCache.deleteFile(getInternalSavePath(), SIGNAL_FILE_NAME);
+        String path = getInternalSavePath();
+        if (path.isEmpty()) {
+            Log.d(TAG, "revertMigrationStatus: no internal save path yet, skipping");
+            return;
+        }
+        LightCache.deleteFile(path, SIGNAL_FILE_NAME);
     }
 
     /**
