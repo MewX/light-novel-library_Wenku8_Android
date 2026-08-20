@@ -564,7 +564,7 @@ public class NovelInfoActivity extends BaseMaterialActivity {
                     // jump to reader activity
                     Intent intent = new Intent(NovelInfoActivity.this, Wenku8ReaderActivityV1.class);
                     intent.putExtra("aid", aid);
-                    intent.putExtra("volume", volumeList_bak);
+                    intent.putExtra("vid", volumeList_bak.vid);
                     intent.putExtra("cid", cid);
 
                     // test does file exist
@@ -665,6 +665,22 @@ public class NovelInfoActivity extends BaseMaterialActivity {
             // Parse Volume
             listVolume = Wenku8Parser.getVolumeList(novelFullVolume);
             if (listVolume.isEmpty()) return -1;
+
+            // The readers are started with aid + vid and rebuild the volume from this file, so
+            // it has to exist for any novel that can reach a reader -- not just the ones added
+            // to the bookshelf or downloaded, which were the only writers before. Written after
+            // the parse rather than straight off the wire so a response that does not parse
+            // cannot overwrite a good cached index with a broken one.
+            //
+            // Recorded when it fails because this is the one case the change makes worse: a
+            // device whose storage cannot be written could previously still read a novel, since
+            // the volume travelled in the Intent, and now cannot open the reader at all. Every
+            // other write in the app fails silently the same way, so without this there would
+            // be no way to tell that story apart from a reader that simply refuses to open.
+            if (!fromLocal && !GlobalConfig.cacheVolumeIndex(aid, novelFullVolume)) {
+                CrashReporter.log("Failed to cache the volume index (aid=" + aid
+                        + ", length=" + novelFullVolume.length() + "); readers cannot open");
+            }
 
             // Check local volume files exists, express in another color
             for (VolumeList vl : listVolume) {
@@ -847,7 +863,7 @@ public class NovelInfoActivity extends BaseMaterialActivity {
                 // jump to reader activity
                 Intent intent = new Intent(NovelInfoActivity.this, Wenku8ReaderActivityV1.class);
                 intent.putExtra("aid", aid);
-                intent.putExtra("volume", volumeList);
+                intent.putExtra("vid", volumeList.vid);
                 intent.putExtra("cid", ci.cid);
 
                 // test does file exist
@@ -885,7 +901,7 @@ public class NovelInfoActivity extends BaseMaterialActivity {
 
                         Intent intent = new Intent(NovelInfoActivity.this, readerClass);
                         intent.putExtra("aid", aid);
-                        intent.putExtra("volume", volumeList);
+                        intent.putExtra("vid", volumeList.vid);
                         intent.putExtra("cid", ci.cid);
 
                         // test does file exist

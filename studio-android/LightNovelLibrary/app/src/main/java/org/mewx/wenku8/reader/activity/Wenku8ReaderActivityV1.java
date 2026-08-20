@@ -75,7 +75,7 @@ public class Wenku8ReaderActivityV1 extends BaseMaterialActivity {
     // vars
     private FirebaseAnalytics mFirebaseAnalytics;
     private String from = "";
-    private int aid, cid;
+    private int aid, cid, vid;
     private String forcejump;
     private VolumeList volumeList= null;
     private List<OldNovelContentParser.NovelContent> nc = new ArrayList<>();
@@ -100,7 +100,13 @@ public class Wenku8ReaderActivityV1 extends BaseMaterialActivity {
 
         // fetch values
         aid = getIntent().getIntExtra("aid", 1);
-        volumeList = (VolumeList) getIntent().getSerializableExtra("volume");
+        // Rebuilt from the cached novel index rather than arriving as a Serializable extra. A
+        // VolumeList carries every ChapterInfo in the volume, so a long series could overflow
+        // the ~1MB Binder transaction buffer on the way in; ints cannot. It also means the
+        // volume survives process death, because the system restores these extras and the
+        // reader can load the rest again from disk.
+        vid = getIntent().getIntExtra("vid", -1);
+        volumeList = GlobalConfig.loadCachedVolume(aid, vid);
         cid = getIntent().getIntExtra("cid", 1);
         from = getIntent().getStringExtra("from");
         forcejump = getIntent().getStringExtra("forcejump");
@@ -123,10 +129,11 @@ public class Wenku8ReaderActivityV1 extends BaseMaterialActivity {
         CrashReporter.setKey(CrashReporter.Keys.NOVEL_AID, aid);
         CrashReporter.setKey(CrashReporter.Keys.CHAPTER_CID, cid);
         if (volumeList == null) {
-            // The breadcrumb still distinguishes "extra absent" from "deserialisation failed",
-            // but the dereference below is no longer reached: bail out instead of NPE-ing.
-            // Phase 2 removes the cause by passing aid/vid rather than the object itself.
-            CrashReporter.log("Reader started without a 'volume' extra (aid=" + aid
+            // Now means the cached index is missing, unparseable, or holds no such vid, rather
+            // than an Intent extra that failed to deserialise. Reachable in ordinary use: the
+            // index is deleted when a novel leaves the bookshelf, so a reader the system
+            // restores long afterwards can find nothing left to read.
+            CrashReporter.log("Reader found no cached volume (aid=" + aid + ", vid=" + vid
                     + ", cid=" + cid + ", from=" + from + ")");
             Toast.makeText(this, R.string.reader_load_failed, Toast.LENGTH_SHORT).show();
             finish();
@@ -733,7 +740,7 @@ public class Wenku8ReaderActivityV1 extends BaseMaterialActivity {
                                                         .setPositiveButton(R.string.dialog_positive_yes, (dialog, which) -> {
                                                             Intent intent = new Intent(Wenku8ReaderActivityV1.this, Wenku8ReaderActivityV1.class);
                                                             intent.putExtra("aid", aid);
-                                                            intent.putExtra("volume", volumeList);
+                                                            intent.putExtra("vid", volumeList.vid);
                                                             intent.putExtra("cid", volumeList.chapterList.get(i_bak - 1).cid);
                                                             intent.putExtra("from", from); // from cloud
                                                             startActivity(intent);
@@ -765,7 +772,7 @@ public class Wenku8ReaderActivityV1 extends BaseMaterialActivity {
                                                         .setPositiveButton(R.string.dialog_positive_yes, (dialog, which) -> {
                                                             Intent intent = new Intent(Wenku8ReaderActivityV1.this, Wenku8ReaderActivityV1.class);
                                                             intent.putExtra("aid", aid);
-                                                            intent.putExtra("volume", volumeList);
+                                                            intent.putExtra("vid", volumeList.vid);
                                                             intent.putExtra("cid", volumeList.chapterList.get(i_bak + 1).cid);
                                                             intent.putExtra("from", from); // from cloud
                                                             startActivity(intent);
@@ -873,7 +880,7 @@ public class Wenku8ReaderActivityV1 extends BaseMaterialActivity {
                                 .setPositiveButton(R.string.dialog_positive_yes, (dialog, which) -> {
                                     Intent intent = new Intent(Wenku8ReaderActivityV1.this, Wenku8ReaderActivityV1.class);
                                     intent.putExtra("aid", aid);
-                                    intent.putExtra("volume", volumeList);
+                                    intent.putExtra("vid", volumeList.vid);
                                     intent.putExtra("cid", volumeList.chapterList.get(i_bak + 1).cid);
                                     intent.putExtra("from", from); // from cloud
                                     startActivity(intent);
@@ -911,7 +918,7 @@ public class Wenku8ReaderActivityV1 extends BaseMaterialActivity {
                                 .setPositiveButton(R.string.dialog_positive_yes, (dialog, which) -> {
                                     Intent intent = new Intent(Wenku8ReaderActivityV1.this, Wenku8ReaderActivityV1.class);
                                     intent.putExtra("aid", aid);
-                                    intent.putExtra("volume", volumeList);
+                                    intent.putExtra("vid", volumeList.vid);
                                     intent.putExtra("cid", volumeList.chapterList.get(i_bak - 1).cid);
                                     intent.putExtra("from", from); // from cloud
                                     startActivity(intent);

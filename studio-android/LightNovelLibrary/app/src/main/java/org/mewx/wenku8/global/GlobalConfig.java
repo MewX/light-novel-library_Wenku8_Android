@@ -19,6 +19,8 @@ import com.nostra13.universalimageloader.core.display.FadeInBitmapDisplayer;
 import org.mewx.wenku8.MyApp;
 import org.mewx.wenku8.R;
 import org.mewx.wenku8.api.Wenku8API;
+import org.mewx.wenku8.global.api.VolumeList;
+import org.mewx.wenku8.global.api.Wenku8Parser;
 import org.mewx.wenku8.network.LightUserSession;
 import org.mewx.wenku8.util.CrashReporter;
 import org.mewx.wenku8.util.LightCache;
@@ -329,6 +331,43 @@ public class GlobalConfig {
         // input no separator
         return writeFullSaveFileContent(subFolderName + File.separator
                 + fileName, s);
+    }
+
+    /** Name of the cached chapter index for a novel, relative to the "intro" save subfolder. */
+    @NonNull
+    public static String getVolumeIndexFileName(int aid) {
+        return aid + "-volume.xml";
+    }
+
+    /**
+     * Caches the chapter index of a novel so a reader started later can rebuild it from
+     * {@code aid} and {@code vid} alone.
+     *
+     * <p>The readers take the volume as ids rather than as a serialized object, which is what
+     * keeps a long series from overflowing the Binder transaction buffer and what lets a reader
+     * restore itself after process death. Both depend on this file being present, so it is
+     * written whenever a novel index arrives from the network, not only when the novel is
+     * added to the bookshelf or downloaded.
+     */
+    public static boolean cacheVolumeIndex(int aid, @NonNull String volumeXml) {
+        return writeFullFileIntoSaveFolder("intro", getVolumeIndexFileName(aid), volumeXml);
+    }
+
+    /**
+     * Loads one volume of a novel out of the index cached by {@link #cacheVolumeIndex}, or null
+     * when the index is missing, unparseable, or holds no volume with that {@code vid}.
+     *
+     * <p>Null is an ordinary outcome here rather than an error: the cache is deleted when a
+     * novel leaves the bookshelf, so a reader restored by the system long after the fact can
+     * legitimately find nothing to read.
+     */
+    @Nullable
+    public static VolumeList loadCachedVolume(int aid, int vid) {
+        String xml = loadFullFileFromSaveFolder("intro", getVolumeIndexFileName(aid));
+        if (xml.isEmpty()) {
+            return null;
+        }
+        return Wenku8Parser.findVolumeByVid(Wenku8Parser.getVolumeList(xml), vid);
     }
 
     /** Book shelf */
