@@ -276,10 +276,30 @@ Four things turned out differently from the plan as written, and are worth recor
    empty one. Non-integer tokens are skipped instead, and only the log line moved inside the
    branch.
 
-   Three tests were added, plus one characterization test recording a quirk found alongside it
-   and deliberately left in place: the parser has no notion of *which* token is the page count,
-   the caller simply takes element 0, so a non-integer page number does not fail — it shifts,
-   and the first novel silently drops out of the list.
+   Three tests were added, plus one characterization test recording a quirk found alongside it:
+   the scan had no notion of *which* token was the page count, the caller simply takes element
+   0, so a non-integer page number did not fail — it shifted, and the first novel silently
+   dropped out of the list.
+
+   **Then the scan was replaced outright**, in the follow-up PR, and that characterization test
+   was the thing that made the replacement legible: `parseNovelItemList` reads `page/@num` and
+   `item/@aid` by name through `XmlPullParser`, like every other parser in the file, so the
+   shift quirk is gone rather than recorded and the test now asserts that the novel stays in
+   the list. What decided it was not tidiness but a fragility the scan could not be patched out
+   of: it took *any* single-quoted value in document order, so `<page num='166' cached='2'/>`
+   yielded a phantom novel 2 and `<item type='9' aid='1143'/>` a phantom novel 9. One added
+   attribute on either tag — a live possibility now the API sits behind a Cloudflare Worker
+   relay rather than the site itself — would have injected non-existent novels into every list,
+   failing one at a time rather than failing as a list.
+
+   The scan survives as a private fallback, reached only when the XML parse recognises nothing
+   at all. It is the one thing the scan does better: `XmlPullParser` stops at the first byte of
+   anything that is not the document, so a response that is well-formed only after some leading
+   noise — a PHP notice, a relay banner — parses to nothing, while the scan reads straight past
+   it. There is no way to tell from here how often that happens, so the fallback records a
+   breadcrumb when it fires. **Delete it, and the private method with it, if a release goes by
+   without that breadcrumb appearing.** This is the same measure-then-act shape Phase 0 used for
+   `loadStream`, applied to a tolerance nobody can currently justify or refute.
 
 Expected outcome: this should remove the majority of crash *volume* without touching
 architecture. Phase 0's data will confirm — and because Phase 0 shipped first, the before/after

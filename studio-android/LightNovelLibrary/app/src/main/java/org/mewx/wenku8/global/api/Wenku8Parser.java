@@ -20,56 +20,126 @@ import java.util.List;
  */
 public class Wenku8Parser {
 
+    /**
+     * Parse a novel list response into (total page, aid, aid, ...).
+     *
+     * Element 0 is the page count and the caller removes it; 0 means "unknown", which
+     * NovelItemListFragment already treats as "keep paging".
+     *
+     * <pre>
+     * &lt;?xml version="1.0" encoding="utf-8"?&gt;
+     * &lt;result&gt;
+     * &lt;page num='166'/&gt;
+     * &lt;item aid='1143'/&gt;
+     * &lt;item aid='1034'/&gt;
+     * &lt;/result&gt;
+     * </pre>
+     *
+     * gives { 166, 1143, 1034 }.
+     */
     @NonNull
     public static List<Integer> parseNovelItemList(@NonNull String str) {
+        int totalPage = 0;
+        boolean foundPage = false;
+        List<Integer> aids = new ArrayList<>();
+
+        // Read by attribute name rather than by scanning for quoted values. The scan this
+        // replaced took any single-quoted value in document order, so it could not tell an
+        // aid from anything else quoted: <page num='166' cached='2'/> yielded a phantom novel
+        // 2, and <item type='9' aid='1143'/> a phantom novel 9. Since the API now sits behind
+        // a relay, an added attribute is a live possibility rather than a hypothetical, and
+        // it would have been invisible -- phantom aids fail to load one by one rather than
+        // failing as a list.
+        try {
+            XmlPullParserFactory factory = XmlPullParserFactory.newInstance();
+            XmlPullParser xmlPullParser = factory.newPullParser();
+            xmlPullParser.setInput(new StringReader(str));
+            int eventType = xmlPullParser.getEventType();
+
+            while (eventType != XmlPullParser.END_DOCUMENT) {
+                if (eventType == XmlPullParser.START_TAG) {
+                    if ("page".equals(xmlPullParser.getName())) {
+                        foundPage = true;
+                        String num = xmlPullParser.getAttributeValue(null, "num");
+                        if (num != null && LightTool.isInteger(num)) {
+                            totalPage = Integer.parseInt(num);
+                        }
+                    } else if ("item".equals(xmlPullParser.getName())) {
+                        String aid = xmlPullParser.getAttributeValue(null, "aid");
+                        if (aid != null && LightTool.isInteger(aid)) {
+                            aids.add(Integer.parseInt(aid));
+                            Log.v("MewX", "Add novel aid: " + aid);
+                        }
+                    }
+                }
+                eventType = xmlPullParser.next();
+            }
+        } catch (Exception e) {
+            // Deliberately not rethrown and deliberately not discarding what was collected.
+            // A response truncated mid-list still yields the items ahead of the cut, which is
+            // what the scan this replaced did, and the caller renders a short list rather
+            // than an error. Anything unparseable from the first byte falls through to the
+            // legacy scan below with aids still empty.
+            CrashReporter.recordException("Wenku8Parser.parseNovelItemList", e);
+        }
+
+        if (aids.isEmpty() && !foundPage) {
+            // Nothing recognisable. Either this is genuinely not a novel-list response -- an
+            // HTML error page, a captive-portal interstitial -- in which case the scan
+            // returns empty too and nothing is lost, or the document is well-formed only
+            // after some leading noise (a PHP notice, a relay banner) that stops
+            // XmlPullParser at the first byte while the scan reads straight past it.
+            //
+            // Kept because there is no way to tell those apart from here without data. The
+            // breadcrumb is how that data arrives: if this never fires in the wild, delete
+            // parseNovelItemListByScanning and this block with it. If it does fire, the
+            // response shape that needs handling properly will be in the report.
+            List<Integer> scanned = parseNovelItemListByScanning(str);
+            if (!scanned.isEmpty()) {
+                CrashReporter.log("parseNovelItemList: XML found nothing, scan recovered "
+                        + scanned.size() + " value(s), length=" + str.length());
+                return scanned;
+            }
+            return new ArrayList<>();
+        }
+
         List<Integer> list = new ArrayList<>();
+        list.add(totalPage);
+        list.addAll(aids);
+        return list;
+    }
 
-        // <?xml version="1.0" encoding="utf-8"?>
-        // <result>
-        // <page num='166'/>
-        // <item aid='1143'/>
-        // <item aid='1034'/>
-        // <item aid='1213'/>
-        // <item aid='1'/>
-        // <item aid='1011'/>
-        // <item aid='1192'/>
-        // <item aid='433'/>
-        // <item aid='47'/>
-        // <item aid='7'/>
-        // <item aid='374'/>
-        // </result>
-
-        // The returning list of this xml is: (total page, aids)
-        // { 166, 1143, 1034, 1213, 1, 1011, 1192, 433, 47, 7, 374 }
-
+    /**
+     * The pre-XML implementation: collect every single-quoted integer in document order.
+     *
+     * Only reached when the XML parse recognised nothing at all, to preserve its tolerance of
+     * a response that is well-formed apart from leading noise. Retained under measurement --
+     * see the caller.
+     */
+    @NonNull
+    private static List<Integer> parseNovelItemListByScanning(@NonNull String str) {
+        List<Integer> list = new ArrayList<>();
         final char SEPARATOR = '\''; // seperator
 
-        // get total page
         int beg, temp;
         beg = str.indexOf(SEPARATOR);
         temp = str.indexOf(SEPARATOR, beg + 1);
         if (beg == -1 || temp == -1) return list; // empty, this is an exception
-        if(LightTool.isInteger(str.substring(beg + 1, temp)))
+        if (LightTool.isInteger(str.substring(beg + 1, temp)))
             list.add(Integer.parseInt(str.substring(beg + 1, temp)));
         beg = temp + 1; // prepare for loop
 
-        // init array
         while (true) {
             beg = str.indexOf(SEPARATOR, beg);
             temp = str.indexOf(SEPARATOR, beg + 1);
             if (beg == -1 || temp == -1) break;
 
-            // Two separate things make this branch load-bearing. The log reads back the
-            // element just added, so from outside the branch it indexed an empty list and
-            // threw out of this @NonNull method on any token that was not an integer. And a
-            // non-integer token is skipped rather than treated as the end of the response:
-            // rejecting at the first would empty out a valid list whose XML declaration uses
-            // single quotes, since <?xml version='1.0' encoding='utf-8'?> supplies two of
-            // them ahead of the first aid. See STABILITY_PLAN.md, Phase 1 item 8.
+            // The log stays inside this branch: it reads back the element just added, so from
+            // outside it indexed an empty list and threw on any non-integer token. A
+            // non-integer token is skipped rather than ending the scan, which is what keeps a
+            // single-quoted XML declaration from emptying a valid list.
             String token = str.substring(beg + 1, temp);
             if (LightTool.isInteger(token)) {
-                // Not necessarily an aid: element 0 is the page count, and it is read here
-                // rather than above whenever the pre-loop read consumed a non-integer.
                 int value = Integer.parseInt(token);
                 list.add(value);
                 Log.v("MewX", "Add novel list value: " + value);

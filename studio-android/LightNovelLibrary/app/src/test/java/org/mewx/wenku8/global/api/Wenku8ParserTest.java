@@ -107,15 +107,81 @@ public class Wenku8ParserTest {
         assertEquals(Arrays.asList(166, 1143), Wenku8Parser.parseNovelItemList(XML));
     }
 
-    // Characterization, not endorsement. The parser has no notion of which token is the page
-    // count -- it returns every integer it finds and the caller takes element 0 as the total
-    // page count. So a non-integer page number does not fail, it shifts: the first aid is
-    // consumed as the page count and that novel drops out of the list. Recorded so that
-    // changing it is a deliberate act rather than an accident.
+    // This was the characterization test for the shift quirk: the scan had no notion of which
+    // token was the page count, so a non-integer page number consumed the first aid in its
+    // place and that novel dropped out of the list, and the assertion here was the bare
+    // singleton [7]. Reading by attribute name removes the quirk rather than recording it --
+    // an unusable page count now leaves element 0 at its "unknown" default of 0, which
+    // NovelItemListFragment already handles, and the novel stays in the list.
     @Test
-    public void testParseNovelItemListNonIntegerPageNumberShiftsTheList() {
-        assertEquals(Collections.singletonList(7),
-                Wenku8Parser.parseNovelItemList("<page num='x'/><item aid='7'/>"));
+    public void testParseNovelItemListKeepsTheNovelWhenThePageNumberIsUnusable() {
+        assertEquals(Arrays.asList(0, 7),
+                Wenku8Parser.parseNovelItemList("<result><page num='x'/><item aid='7'/></result>"));
+    }
+
+    // The reason for reading by attribute name rather than scanning quoted values. The scan
+    // took any single-quoted value in document order, so it could not tell an aid from
+    // anything else quoted: this input gave [166, 2, 9, 1143] -- novels 2 and 9 do not exist
+    // and would have failed to load one at a time rather than failing as a list. An added
+    // attribute on either tag is a live possibility now the API sits behind a relay.
+    @Test
+    public void testParseNovelItemListIgnoresAttributesThatAreNotNumOrAid() {
+        final String XML = "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n" +
+                "<result>\n" +
+                "<page num='166' cached='2'/>\n" +
+                "<item type='9' aid='1143'/>\n" +
+                "</result>";
+
+        assertEquals(Arrays.asList(166, 1143), Wenku8Parser.parseNovelItemList(XML));
+    }
+
+    // A response cut off mid-list keeps the items ahead of the cut instead of collapsing to
+    // empty, which is what the scan did. The user gets a short list rather than an error.
+    @Test
+    public void testParseNovelItemListKeepsWhatItReadBeforeATruncation() {
+        final String XML = "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n" +
+                "<result>\n" +
+                "<page num='166'/>\n" +
+                "<item aid='1143'/>\n" +
+                "<item aid='10";
+
+        List<Integer> list = Wenku8Parser.parseNovelItemList(XML);
+        assertFalse(list.isEmpty());
+        assertTrue(list.contains(1143));
+    }
+
+    // The one thing the scan did better, and why it is still in the file. XmlPullParser stops
+    // at the first byte of anything that is not the document, so a response that is
+    // well-formed only after some leading noise -- a PHP notice, a relay banner -- parses to
+    // nothing. Falling back to the scan there costs nothing when the response really is not a
+    // novel list (the scan returns empty too, as the two tests above show) and recovers the
+    // list when it is.
+    @Test
+    public void testParseNovelItemListFallsBackToScanningPastLeadingNoise() {
+        final String XML = "PHP Notice: undefined index in /srv/api.php on line 12\n" +
+                "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n" +
+                "<result>\n" +
+                "<page num='166'/>\n" +
+                "<item aid='1143'/>\n" +
+                "</result>";
+
+        assertEquals(Arrays.asList(166, 1143), Wenku8Parser.parseNovelItemList(XML));
+    }
+
+    // A result page with no items is not an error: the page count still comes back, and the
+    // caller shows an empty list rather than a failure.
+    @Test
+    public void testParseNovelItemListPageWithNoItems() {
+        assertEquals(Collections.singletonList(1),
+                Wenku8Parser.parseNovelItemList("<result><page num='1'/></result>"));
+    }
+
+    // Items with no page tag: the page count defaults to 0, which the caller reads as
+    // "unknown" and keeps paging on.
+    @Test
+    public void testParseNovelItemListItemsWithNoPageTag() {
+        assertEquals(Arrays.asList(0, 5),
+                Wenku8Parser.parseNovelItemList("<result><item aid='5'/></result>"));
     }
 
     @Test
