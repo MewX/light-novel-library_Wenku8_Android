@@ -52,6 +52,7 @@ import org.mewx.wenku8.reader.view.WenkuReaderPageView;
 import org.mewx.wenku8.util.LightCache;
 import org.mewx.wenku8.network.LightNetwork;
 import org.mewx.wenku8.util.LightTool;
+import org.mewx.wenku8.util.AsyncTaskTracker;
 import org.mewx.wenku8.util.CrashReporter;
 
 import java.io.File;
@@ -87,6 +88,7 @@ public class Wenku8ReaderActivityV1 extends BaseMaterialActivity {
     private SlidingPageAdapter mSlidingPageAdapter;
     private WenkuReaderLoader loader;
     private WenkuReaderSettingV1 setting;
+    private final AsyncTaskTracker tracker = new AsyncTaskTracker();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -152,7 +154,7 @@ public class Wenku8ReaderActivityV1 extends BaseMaterialActivity {
 
         // async tasks
         ContentValues cv = Wenku8API.getNovelContent(aid, cid, GlobalConfig.getCurrentLang());
-        AsyncNovelContentTask ast = new AsyncNovelContentTask();
+        AsyncNovelContentTask ast = tracker.track(new AsyncNovelContentTask());
         ast.execute(cv);
     }
 
@@ -240,6 +242,15 @@ public class Wenku8ReaderActivityV1 extends BaseMaterialActivity {
                 decorView.setSystemUiVisibility(flags);
             }
         });
+    }
+
+    @Override
+    protected void onDestroy() {
+        // The chapter fetch is as slow as the network is, so leaving the reader mid-fetch used
+        // to deliver onPostExecute into a dead Activity. See AsyncTaskTracker: the background
+        // work still finishes, only the UI callback is dropped.
+        tracker.cancelAll();
+        super.onDestroy();
     }
 
     @Override

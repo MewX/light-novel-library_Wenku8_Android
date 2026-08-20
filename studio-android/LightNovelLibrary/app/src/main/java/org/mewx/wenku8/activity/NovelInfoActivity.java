@@ -56,6 +56,7 @@ import org.mewx.wenku8.reader.activity.Wenku8ReaderActivityV1;
 import org.mewx.wenku8.util.LightCache;
 import org.mewx.wenku8.network.LightNetwork;
 import org.mewx.wenku8.util.LightTool;
+import org.mewx.wenku8.util.AsyncTaskTracker;
 import org.mewx.wenku8.util.CrashReporter;
 
 import java.io.File;
@@ -85,6 +86,12 @@ public class NovelInfoActivity extends BaseMaterialActivity {
     private int aid = 1;
     private String from = "", title = "";
     private boolean isLoading = true;
+
+    // Only the read-only info fetches are tracked. The tasks that change something --
+    // downloading volumes, adding to or removing from the cloud bookshelf -- are left to run:
+    // their onPostExecute is already lifecycle-guarded, and cancelling them would abandon work
+    // the user explicitly asked for.
+    private final AsyncTaskTracker tracker = new AsyncTaskTracker();
     private RelativeLayout rlMask = null; // mask layout
     private LinearLayout mLinearLayout = null;
     private DrawerLayout mDrawerLayout;
@@ -1295,6 +1302,15 @@ public class NovelInfoActivity extends BaseMaterialActivity {
     }
 
     @Override
+    protected void onDestroy() {
+        // Suppresses the callbacks of anything still in flight. The guards inside those
+        // callbacks make a late delivery survivable; this stops it being delivered at all,
+        // and drops the task's implicit reference back to this Activity.
+        tracker.cancelAll();
+        super.onDestroy();
+    }
+
+    @Override
     protected void onResume() {
         super.onResume();
 
@@ -1337,7 +1353,7 @@ public class NovelInfoActivity extends BaseMaterialActivity {
         isLoading = true;
         llError.setVisibility(View.GONE);
         spb.setVisibility(View.VISIBLE);
-        FetchInfoAsyncTask fetchInfoAsyncTask = new FetchInfoAsyncTask();
+        FetchInfoAsyncTask fetchInfoAsyncTask = tracker.track(new FetchInfoAsyncTask());
         fetchInfoAsyncTask.execute(1); // load from local
     }
 
@@ -1346,7 +1362,7 @@ public class NovelInfoActivity extends BaseMaterialActivity {
         isLoading = true;
         llError.setVisibility(View.GONE);
         spb.setVisibility(View.VISIBLE);
-        FetchInfoAsyncTask fetchInfoAsyncTask = new FetchInfoAsyncTask();
+        FetchInfoAsyncTask fetchInfoAsyncTask = tracker.track(new FetchInfoAsyncTask());
         fetchInfoAsyncTask.execute();
     }
 

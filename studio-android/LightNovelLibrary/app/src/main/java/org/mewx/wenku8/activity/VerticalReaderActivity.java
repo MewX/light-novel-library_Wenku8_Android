@@ -21,6 +21,7 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import org.mewx.wenku8.util.AsyncTaskTracker;
 import org.mewx.wenku8.util.CrashReporter;
 import org.mewx.wenku8.util.ProgressDialogHelper;
 import org.mewx.wenku8.util.GoogleServicesHelper;
@@ -50,6 +51,7 @@ public class VerticalReaderActivity extends AppCompatActivity {
     private int aid, cid;
     private VolumeList volumeList= null; // for extended function
     private ProgressDialogHelper pDialog = null;
+    private final AsyncTaskTracker tracker = new AsyncTaskTracker();
     private ScrollViewNoFling svTextListLayout = null;
     private LinearLayout TextListLayout = null;
     private List<OldNovelContentParser.NovelContent> nc = null;
@@ -187,7 +189,7 @@ public class VerticalReaderActivity extends AppCompatActivity {
     private void getNovelContent() {
         ContentValues cv = Wenku8API.getNovelContent(aid, cid, GlobalConfig.getCurrentLang());
 
-        final asyncNovelContentTask ast = new asyncNovelContentTask();
+        final asyncNovelContentTask ast = tracker.track(new asyncNovelContentTask());
         ast.execute(cv);
 
         pDialog = ProgressDialogHelper.show(this,
@@ -338,7 +340,7 @@ public class VerticalReaderActivity extends AppCompatActivity {
                                 }
 
                             }
-                            asyncDownloadImage async = new asyncDownloadImage();
+                            asyncDownloadImage async = tracker.track(new asyncDownloadImage());
                             async.execute(nc.get(i).content);
                         }
 
@@ -376,6 +378,9 @@ public class VerticalReaderActivity extends AppCompatActivity {
 
     @Override
     protected void onDestroy() {
+        // Before super, so nothing is still able to deliver into a half-torn-down Activity.
+        // The image downloads finish writing their files regardless; see AsyncTaskTracker.
+        tracker.cancelAll();
         super.onDestroy();
 
         if (pDialog != null)

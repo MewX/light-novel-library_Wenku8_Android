@@ -2,10 +2,19 @@
 
 Status: draft, derived from a read-through of `app/` and `api/` at commit `5e00d42`.
 
-**Progress:** "Testing strategy" step 1 (move device-independent tests to the JVM) and **Phase 0
-(instrumentation) are implemented**. Phase 0 has not yet *collected* anything — the ranking below
-is still inference from reading the code, and stays that way until a release ships and reports
-come back. Phases 1–4 are proposed, not done.
+**Progress:** "Testing strategy" step 1 (move device-independent tests to the JVM), **Phase 0
+(instrumentation)** and **Phase 1 (items 1–7)** are implemented. Phase 0 has not yet *collected*
+anything — the ranking below is still inference from reading the code, and stays that way until a
+release ships and reports come back. Phase 1 was written to be safe to land without that data;
+Phase 2's ordering still needs it. Phases 2–4 are proposed, not done.
+
+**Caveat on the Phase 1 commits:** they were written in an environment with no Android SDK and no
+emulator, so `./gradlew assembleAlpha testAlphaDebugUnitTest` has never been run against them.
+The JVM read-loop tests in `LightCacheStreamTest` were executed by extracting the method into a
+standalone harness (8 tests pass; 6 of them fail against the previous implementation), and
+`AsyncTaskTracker`'s logic likewise against a stub AsyncTask. Everything else — every guard
+clause, and the Robolectric tests for the parser validation — is unexecuted. **CI is the first
+real check.**
 
 ## Diagnosis
 
@@ -147,15 +156,40 @@ Revisit only if a crash turns out to need per-account correlation.
 Ship this as a point release and let it collect for a week. It converts the rest of this
 plan from guesswork into a ranked list.
 
-### Phase 1 — Stop the bleeding (small, surgical, low risk)
+### Phase 1 — Stop the bleeding (small, surgical, low risk) — **implemented**
 
 These are individually tiny and each kills a known crash class. None require architectural
 change, so they can land incrementally without destabilising v1.30.
 
+Four things turned out differently from the plan as written, and are worth recording:
+
+- **`VerticalReaderActivity:75` did not need item 1's guard.** It reads the `volume` extra and
+  never dereferences it — the screen renders from `aid`/`cid` alone — so finishing the Activity
+  there would have broken a case that works today. The breadcrumb stays; the guard did not go in.
+  Two reads elsewhere did need it and were not in the plan: `ViewImageDetailActivity:60`
+  (`path.contains("/")` on the next line) and `NovelItemListFragment:87`.
+- **Ordering inside the guarded callbacks matters more than the guards.** A bare
+  `if (isFinishing()) return;` at the top of `onPostExecute` introduces two new bugs where it
+  removes one. Loading flags have to clear *before* the guard, or a screen comes back stuck on
+  "Loading..." — bug `723e93d` again. Progress dialogs have to be dismissed *before* it, because
+  `ProgressDialogHelper.dismiss()` already tolerates a gone window, so guarding above it leaks
+  the dialog rather than crashing on it. And `UserInfoActivity.AsyncLogout` does its session
+  teardown before the guard: skipping the logout because the user navigated away would leave
+  them logged in with credentials on disk, which is worse than the crash.
+- **The `WeakReference<Activity>` tasks were only half safe.** The reference stays reachable for
+  as long as anything else holds the Activity, so it hands back destroyed Activities;
+  `LightTool.isAlive()` covers that. `NovelReviewReplyListActivity` was also missing its null
+  check outright on one branch while having it on the branch next to it.
+- **Item 7 makes `null` reachable for callers that could not previously see it.** Most already
+  handled it. `FavFragment`'s local bookshelf load did not — it wrapped the parse in
+  `Objects.requireNonNull()`, which would have turned a corrupt cached intro file into a crash.
+  It now treats an unparseable intro as a missing one. *Any* future parser hardening needs the
+  same caller audit.
+
 1. **Null-guard every Intent extra read.** Specifically `Wenku8ReaderActivityV1:100` and
    `VerticalReaderActivity:75` — if `volumeList` is null, finish the Activity with a toast
    instead of dereferencing it. ~10 lines, removes a guaranteed NPE.
-2. **Add lifecycle guards to the 20 unguarded `onPostExecute` bodies.** Mechanical:
+2. **Add lifecycle guards to the unguarded `onPostExecute` bodies.** Mechanical:
    `if (isFinishing() || isDestroyed()) return;` for Activities, `if (!isAdded() || getActivity() == null) return;`
    for Fragments. Matches the pattern already used correctly in `Wenku8ReaderActivityV1:436`.
    Then remove the suppressing `try/catch` in `FavFragment:464` so real failures surface.
@@ -168,6 +202,22 @@ change, so they can land incrementally without destabilising v1.30.
    `new Handler(Looper.getMainLooper())`. The no-arg constructor is deprecated and throws if
    the calling thread has no Looper.
 6. **Cancel in-flight tasks in `onDestroy`.** Only 4 of 24 tasks are ever cancelled.
+
+   Implemented as `util/AsyncTaskTracker`, wired into the read-only fetch screens
+   (`NovelInfoActivity`, both readers, `NovelItemListFragment`, `LatestFragment`). Two decisions
+   are load-bearing and are commented at the call sites:
+
+   - **Cancellation is non-interrupting** (`cancel(false)`). AsyncTask routes the result to
+     `onCancelled` instead of `onPostExecute` either way, so the unsafe UI callback is dropped
+     while background work finishes its writes. `cancel(true)` would interrupt mid-write and
+     trade a crash for a corrupt cache file — the very thing item 3 exists to stop.
+   - **Fragments cancel in `onDestroy`, not `onDestroyView`.** A Fragment outlives its view in a
+     ViewPager, and its `isLoading` flag with it; cancelling on view destruction skips the
+     `onPostExecute` that clears that flag and leaves the list stuck on "Loading...".
+
+   Tasks that *change* something — downloading volumes, cloud bookshelf add/remove, logout, post
+   submission — are deliberately not tracked: their callbacks are lifecycle-guarded already, and
+   cancelling would abandon work the user asked for.
 7. **Make the XML parsers validate instead of relying on the parser throwing.**
    Found while migrating the tests (see "Testing strategy"). `UserInfo.parseUserInfo`
    (`global/api/UserInfo.java:38`) builds a `UserInfo`, populates whatever fields it happens to
@@ -186,7 +236,8 @@ change, so they can land incrementally without destabilising v1.30.
    cannot see.
 
 Expected outcome: this should remove the majority of crash *volume* without touching
-architecture. Phase 0's data will confirm.
+architecture. Phase 0's data will confirm — and because Phase 0 shipped first, the before/after
+comparison is actually available this time.
 
 ### Phase 2 — Remove the generators (the actual refactor)
 
@@ -356,7 +407,7 @@ inverts the negative test cases. See step 1.
 | Ship | Contents | Risk |
 |---|---|---|
 | v1.30.0 | Phase 0 instrumentation only | none |
-| v1.30.1 | Phase 1 items 1–7 | low, mechanical |
+| v1.30.1 | Phase 1 items 1–7 — **implemented, unbuilt** | low, mechanical |
 | v1.31 | Phase 2.1 (Intent payloads) + highest-crash screen from 2.2 | medium |
 | v1.32+ | Remainder of Phase 2, Phase 3 | medium |
 

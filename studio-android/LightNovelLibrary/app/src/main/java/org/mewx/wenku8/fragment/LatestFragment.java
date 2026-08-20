@@ -34,6 +34,7 @@ import org.mewx.wenku8.api.Wenku8API;
 import org.mewx.wenku8.listener.MyItemClickListener;
 import org.mewx.wenku8.listener.MyItemLongClickListener;
 import org.mewx.wenku8.network.LightNetwork;
+import org.mewx.wenku8.util.AsyncTaskTracker;
 import org.mewx.wenku8.util.CrashReporter;
 
 import java.io.UnsupportedEncodingException;
@@ -73,6 +74,8 @@ public class LatestFragment extends Fragment implements MyItemClickListener, MyI
 
         listNovelItemInfo = new ArrayList<>();
     }
+
+    private final AsyncTaskTracker tracker = new AsyncTaskTracker();
 
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, ViewGroup container,
@@ -138,9 +141,20 @@ public class LatestFragment extends Fragment implements MyItemClickListener, MyI
         hideRetryButton();
 
         // fetch list
-        AsyncLoadLatestList ast = new AsyncLoadLatestList();
+        AsyncLoadLatestList ast = tracker.track(new AsyncLoadLatestList());
         ast.execute(Wenku8API.getMewxNovelList(Wenku8API.NovelSortedBy.lastUpdate, page,
                 GlobalConfig.getCurrentLang()));
+    }
+
+
+    @Override
+    public void onDestroy() {
+        // onDestroy, deliberately not onDestroyView. The Fragment outlives its view in a
+        // ViewPager, and its isLoading flag with it; cancelling on view destruction would skip
+        // the onPostExecute that clears that flag and leave the list stuck on "Loading..." --
+        // the bug 723e93d patched. By onDestroy the flag is going away too.
+        tracker.cancelAll();
+        super.onDestroy();
     }
 
     @Override
