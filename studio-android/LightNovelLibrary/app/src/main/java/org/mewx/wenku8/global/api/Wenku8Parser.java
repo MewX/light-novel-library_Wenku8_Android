@@ -1,6 +1,7 @@
 package org.mewx.wenku8.global.api;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import android.util.Log;
 
 import org.mewx.wenku8.util.LightTool;
@@ -308,6 +309,23 @@ public class Wenku8Parser {
             CrashReporter.recordException("Wenku8Parser.getVolumeList", e);
         }
         return l;
+    }
+
+    /**
+     * Returns the volume carrying {@code vid}, or null when the list holds no such volume.
+     *
+     * <p>Null entries in the list are skipped rather than dereferenced: {@link #getVolumeList}
+     * appends on the closing tag, so a stray closing tag with no opening one puts a null in
+     * there.
+     */
+    @Nullable
+    public static VolumeList findVolumeByVid(@NonNull List<VolumeList> volumes, int vid) {
+        for (VolumeList volume : volumes) {
+            if (volume != null && volume.vid == vid) {
+                return volume;
+            }
+        }
+        return null;
     }
 
     /**

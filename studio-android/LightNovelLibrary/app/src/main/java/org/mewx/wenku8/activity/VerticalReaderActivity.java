@@ -31,7 +31,6 @@ import org.mewx.wenku8.R;
 import org.mewx.wenku8.component.ScrollViewNoFling;
 import org.mewx.wenku8.global.GlobalConfig;
 import org.mewx.wenku8.global.api.OldNovelContentParser;
-import org.mewx.wenku8.global.api.VolumeList;
 import org.mewx.wenku8.api.Wenku8API;
 import org.mewx.wenku8.network.LightNetwork;
 
@@ -49,7 +48,8 @@ public class VerticalReaderActivity extends AppCompatActivity {
     // private vars
     private String from = "";
     private int aid, cid;
-    private VolumeList volumeList= null; // for extended function
+    // No volume here. This screen renders from aid/cid alone -- the field it used to keep was
+    // assigned from the Intent and never read -- so it takes no vid and loads no index.
     private ProgressDialogHelper pDialog = null;
     private final AsyncTaskTracker tracker = new AsyncTaskTracker();
     private ScrollViewNoFling svTextListLayout = null;
@@ -80,7 +80,6 @@ public class VerticalReaderActivity extends AppCompatActivity {
 
         // fetch values
         aid = getIntent().getIntExtra("aid", 1);
-        volumeList = (VolumeList) getIntent().getSerializableExtra("volume");
         cid = getIntent().getIntExtra("cid",1);
         from = getIntent().getStringExtra("from");
 
@@ -88,14 +87,6 @@ public class VerticalReaderActivity extends AppCompatActivity {
         CrashReporter.setKey(CrashReporter.Keys.READER_MODE, "vertical");
         CrashReporter.setKey(CrashReporter.Keys.NOVEL_AID, aid);
         CrashReporter.setKey(CrashReporter.Keys.CHAPTER_CID, cid);
-        if (volumeList == null) {
-            // Unlike Wenku8ReaderActivityV1 this stays a breadcrumb rather than becoming a
-            // finish(): volumeList is only ever assigned here and never dereferenced -- this
-            // screen renders from aid/cid alone -- so bailing out would break a case that
-            // currently works. Kept so the two readers' counts stay comparable.
-            CrashReporter.log("Vertical reader started without a 'volume' extra (aid=" + aid
-                    + ", cid=" + cid + ", from=" + from + ")");
-        }
 
         // UIL setting
         if(ImageLoader.getInstance() == null || !ImageLoader.getInstance().isInited()) {

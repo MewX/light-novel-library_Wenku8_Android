@@ -3,10 +3,13 @@
 Status: draft, derived from a read-through of `app/` and `api/` at commit `5e00d42`.
 
 **Progress:** "Testing strategy" step 1 (move device-independent tests to the JVM), **Phase 0
-(instrumentation)** and **Phase 1 (items 1–8)** are implemented. Phase 0 has not yet *collected*
-anything — the ranking below is still inference from reading the code, and stays that way until a
-release ships and reports come back. Phase 1 was written to be safe to land without that data;
-Phase 2's ordering still needs it. Phases 2–4 are proposed, not done.
+(instrumentation)**, **Phase 1 (items 1–8)** and **Phase 2 item 1 (Intent payloads)** are
+implemented. Phase 0 has not yet *collected* anything — the ranking below is still inference from
+reading the code, and stays that way until a release ships and reports come back. Phase 1 was
+written to be safe to land without that data, and so was Phase 2.1: it fixes a size-dependent
+crash that does not need crash counts to rank. **The rest of Phase 2 does need them** — 2.2 asks
+which screen to migrate first, and that is exactly the question the data answers. Phases 3–4 are
+proposed, not done.
 
 **The Phase 1 caveat is discharged.** Those commits were written with no Android SDK and no
 emulator, so this section used to warn that `./gradlew assembleAlpha testAlphaDebugUnitTest` had
@@ -316,20 +319,52 @@ comparison is actually available this time.
 Only worth doing once Phase 1 has landed and the crash rate has visibly dropped, so the
 effect of each change is measurable.
 
-1. **Pass IDs, not objects, through Intents.** Replace the `VolumeList` extra with `aid` +
-   `vid` and re-read the volume from the local cache on the receiving side. Kills
-   `TransactionTooLargeException` permanently and makes the reader survive process death for
-   free, since ints in an Intent always restore. This is the highest-value item in the plan.
+1. **Pass IDs, not objects, through Intents — implemented, unverified on a device.** The
+   `VolumeList` extra is gone: the readers take `aid` + `vid` and rebuild the volume from the
+   cached novel index. Kills `TransactionTooLargeException` permanently and makes the reader
+   survive process death for free, since ints in an Intent always restore.
 
-   **Check the cache assumption first — it does not currently hold.** "Re-read the volume from
-   the local cache" assumes `intro/<aid>-volume.xml` is on disk by the time the reader starts.
-   It is written only by `NovelInfoActivity.AsyncUpdateCacheTask`, the explicit download/refresh
-   action. The ordinary online load (`FetchInfoAsyncTask`'s `volumeTask`) fetches exactly the
-   same XML and never writes it, so for any novel the user has merely opened, the receiving
-   Activity would find nothing to read and the reader would fail to open — a worse bug than the
-   one being fixed. Persisting that response in the sender is a prerequisite, not a detail, and
-   it is worth doing on its own: it is also what lets the reader rebuild itself after process
-   death, which is Phase 3's problem for these screens.
+   **The cache assumption did not hold, and a correction to an earlier note here.** That note
+   said `intro/<aid>-volume.xml` was written "only by `AsyncUpdateCacheTask`, the explicit
+   download action". Wrong — there are three writers: adding a novel to the bookshelf
+   (`NovelInfoActivity:299`), the download/refresh task (`:958`), and bookshelf cloud sync
+   (`FavFragment:421`). All three are bookshelf paths, so the file is present for anything in
+   the user's bookshelf, which is most of what anyone reads. The real gap was narrower than
+   stated: a novel *browsed and opened* from a list or search without ever being favourited.
+   Narrower, but still fatal to this item, since that novel can reach a reader.
+
+   `FetchInfoAsyncTask` now writes the index whenever one arrives from the network, after the
+   parse rather than straight off the wire so an unparseable response cannot overwrite a good
+   cached index with a broken one. That also refreshes a stale bookshelf copy, which previously
+   only happened on explicit sync or download.
+
+   The rest of the item:
+
+   - `GlobalConfig.cacheVolumeIndex` / `loadCachedVolume` own the file, so the `"intro"` folder
+     and `<aid>-volume.xml` filename stop being spelled out at each call site.
+   - `Wenku8Parser.findVolumeByVid` is the lookup, and is pure logic with JVM tests. It skips
+     null entries: `getVolumeList` appends on the closing tag, so a stray closing tag with no
+     opening one leaves a null in the list, and the lookup must not be what turns a malformed
+     index into a crash.
+   - **`VolumeList` and `ChapterInfo` are no longer `Serializable`.** Nothing else serialized
+     them. Dropping the interface is what makes this permanent rather than a convention — the
+     shortcut is now a compile error, not a code review.
+   - `VerticalReaderActivity` takes no volume at all. Phase 1 found it read the extra and never
+     dereferenced it; the field and its Phase 1 breadcrumb are deleted rather than migrated.
+
+   **One case this makes worse, deliberately.** A device whose storage cannot be written could
+   previously still read a novel, because the volume travelled in the Intent. Now the reader
+   cannot open at all. Every other write in the app fails silently the same way, so a failed
+   cache write is recorded — without it there would be no way to tell that story apart from a
+   reader that simply refuses to open. The alternative fixes are worse: re-fetching the index on
+   a cache miss puts a network round trip in front of the reader's startup, and an in-memory
+   handoff would be root cause 2 all over again.
+
+   **What CI cannot check here.** The reader flow is not covered by the JVM suite or by the two
+   instrumented tests, so the smoke test is manual: open a novel *not* in the bookshelf and read
+   a chapter; next/previous chapter across a volume boundary; the resume dialog; the vertical
+   reader from the engine picker; then a bookshelf novel offline. Developer Options → **Don't
+   keep activities** while reading is the one that exercises what this item was for.
 2. **Retire `AsyncTask`.** Do not rewrite all 24 at once. Introduce one small helper
    (`ExecutorService` + main-thread `Handler`, or `androidx.lifecycle` if you are open to
    adding it) and migrate screen by screen, starting with whichever Phase 0 shows is
@@ -496,9 +531,12 @@ inverts the negative test cases. See step 1.
 | Ship | Contents | Risk |
 |---|---|---|
 | v1.30.0 | Phase 0 instrumentation only | none |
-| v1.30.1 | Phase 1 items 1–7 — **implemented, CI green**; item 8 pending its first CI run | low, mechanical |
-| v1.31 | Phase 2.1 (Intent payloads) + highest-crash screen from 2.2 | medium |
+| v1.30.1 | Phase 1 items 1–8 — **implemented, CI green** | low, mechanical |
+| v1.31 | Phase 2.1 (Intent payloads) — **implemented, needs a device smoke test**; then highest-crash screen from 2.2 | medium |
 | v1.32+ | Remainder of Phase 2, Phase 3 | medium |
+
+Nothing has shipped yet, so Phase 0 is still collecting nothing and the ordering below 2.1
+remains inference. That is a deliberate choice for now, not an oversight.
 
 The important structural point: **Phase 0 before Phase 1**. Without crash data the ranking
 above is inference from reading code, and inference will misallocate effort.

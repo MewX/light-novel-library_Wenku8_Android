@@ -399,6 +399,52 @@ public class Wenku8ParserTest {
         assertTrue(volumeLists.isEmpty());
     }
 
+    /**
+     * The lookup a reader performs on startup, now that it is given a vid rather than a volume.
+     */
+    @Test
+    public void testFindVolumeByVid() {
+        VolumeList first = new VolumeList();
+        first.vid = 41748;
+        VolumeList second = new VolumeList();
+        second.vid = 41749;
+
+        assertSame(second, Wenku8Parser.findVolumeByVid(Arrays.asList(first, second), 41749));
+    }
+
+    /**
+     * A vid that is not in the list is an ordinary outcome, not an error.
+     *
+     * <p>It is what a reader sees when the cached index is for a different novel, or when the
+     * novel's chapter list changed under it, and it is why the reader treats null as "show the
+     * failure toast and finish" rather than as something to assert against.
+     */
+    @Test
+    public void testFindVolumeByVidNotPresent() {
+        VolumeList only = new VolumeList();
+        only.vid = 41748;
+
+        assertNull(Wenku8Parser.findVolumeByVid(Collections.singletonList(only), 999));
+        assertNull(Wenku8Parser.findVolumeByVid(Collections.emptyList(), 41748));
+    }
+
+    /**
+     * Null entries are skipped rather than dereferenced.
+     *
+     * <p>{@link Wenku8Parser#getVolumeList} appends on the closing tag, so a stray closing tag
+     * with no opening one leaves a null in the list it returns. Looking a vid up in that list
+     * must not be the thing that turns a malformed index into a crash.
+     */
+    @Test
+    public void testFindVolumeByVidSkipsNullEntries() {
+        VolumeList present = new VolumeList();
+        present.vid = 41748;
+
+        assertSame(present,
+                Wenku8Parser.findVolumeByVid(Arrays.asList(null, present, null), 41748));
+        assertNull(Wenku8Parser.findVolumeByVid(Arrays.asList(null, present), 999));
+    }
+
     @Test
     public void testParseReviewList() {
         ReviewList reviewList = new ReviewList();
