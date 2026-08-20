@@ -21,21 +21,21 @@ import java.util.List;
 public class Wenku8Parser {
 
     /**
-     * Parse a novel list response into (total page, aid, aid, ...).
+     * Parses a novel list response into (total page, aid, aid, ...).
      *
-     * Element 0 is the page count and the caller removes it; 0 means "unknown", which
-     * NovelItemListFragment already treats as "keep paging".
+     * <p>Element 0 is the page count and the caller removes it; 0 means "unknown", which
+     * {@code NovelItemListFragment} already treats as "keep paging".
      *
-     * <pre>
-     * &lt;?xml version="1.0" encoding="utf-8"?&gt;
-     * &lt;result&gt;
-     * &lt;page num='166'/&gt;
-     * &lt;item aid='1143'/&gt;
-     * &lt;item aid='1034'/&gt;
-     * &lt;/result&gt;
-     * </pre>
+     * <p>So the response below parses to {@code [166, 1143, 1034]}:
      *
-     * gives { 166, 1143, 1034 }.
+     * <pre>{@code
+     * <?xml version="1.0" encoding="utf-8"?>
+     * <result>
+     * <page num='166'/>
+     * <item aid='1143'/>
+     * <item aid='1034'/>
+     * </result>
+     * }</pre>
      */
     @NonNull
     public static List<Integer> parseNovelItemList(@NonNull String str) {
@@ -62,22 +62,10 @@ public class Wenku8Parser {
     }
 
     /**
-     * Parse a novel list response into (total page, aid, aid, ...), or an empty list if it is
-     * not a novel list response at all.
+     * Parses one candidate document into the list {@link #parseNovelItemList} describes.
      *
-     * Element 0 is the page count and the caller removes it; 0 means "unknown", which
-     * NovelItemListFragment already treats as "keep paging".
-     *
-     * <pre>
-     * &lt;?xml version="1.0" encoding="utf-8"?&gt;
-     * &lt;result&gt;
-     * &lt;page num='166'/&gt;
-     * &lt;item aid='1143'/&gt;
-     * &lt;item aid='1034'/&gt;
-     * &lt;/result&gt;
-     * </pre>
-     *
-     * gives { 166, 1143, 1034 }.
+     * <p>Returns an empty list when the document holds no {@code page} and no {@code item} tag,
+     * which is what tells the caller the parse recognised nothing and a retry is worth trying.
      */
     @NonNull
     private static List<Integer> parseNovelItemListAsXml(@NonNull String xml) {
@@ -137,8 +125,10 @@ public class Wenku8Parser {
     }
 
     /**
-     * Index of the first byte of the XML document within a response, or -1 if no start marker
-     * is present. Only used to skip leading noise ahead of an otherwise well-formed response.
+     * Returns the index of the first byte of the XML document within a response, or -1 when no
+     * start marker is present.
+     *
+     * <p>Only used to skip leading noise ahead of an otherwise well-formed response.
      */
     private static int indexOfDocumentStart(@NonNull String str) {
         int declaration = str.indexOf("<?xml");

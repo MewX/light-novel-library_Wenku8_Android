@@ -76,14 +76,20 @@ public class Wenku8ParserTest {
         assertTrue(list.isEmpty());
     }
 
-    // Regression. "1234" above exercises the early return for input with no quotes at all; it
-    // never reached the loop. These do. Both used to throw IndexOutOfBoundsException instead
-    // of returning empty, because the log line that read back the just-added element sat
-    // outside the branch that added it -- so any input carrying two or more single-quoted
-    // values with no integer among them indexed an empty list. parseNovelItemList is @NonNull
-    // and NovelItemListFragment.AsyncGetNovelItemList catches UnsupportedEncodingException
-    // alone, so the throw escaped doInBackground and crashed the app instead of reaching the
-    // empty-list path that caller already handles.
+    /**
+     * Regression: input that reaches the loop carrying no integer among its quoted values.
+     *
+     * <p>{@code "1234"} above exercises the early return for input with no quotes at all; it
+     * never reached the loop. These do. Both used to throw {@code IndexOutOfBoundsException}
+     * instead of returning empty, because the log line that read back the just-added element
+     * sat outside the branch that added it, so any input carrying two or more single-quoted
+     * values with no integer among them indexed an empty list.
+     *
+     * <p>{@code parseNovelItemList} is {@code @NonNull} and
+     * {@code NovelItemListFragment.AsyncGetNovelItemList} catches
+     * {@code UnsupportedEncodingException} alone, so the throw escaped {@code doInBackground}
+     * and crashed the app instead of reaching the empty-list path that caller already handles.
+     */
     @Test
     public void testParseNovelItemListWellFormedNonResponse() {
         assertTrue(Wenku8Parser.parseNovelItemList(
@@ -92,10 +98,14 @@ public class Wenku8ParserTest {
                 "<html><body class='error'><p id='msg'>maintenance</p></body></html>").isEmpty());
     }
 
-    // The fix skips non-integer tokens rather than rejecting the whole response on the first
-    // one, and this is the case that decides between the two: a valid list whose declaration
-    // uses single quotes instead of double. Rejecting would return an empty list for a
-    // response that is entirely well-formed. This input threw before the fix.
+    /**
+     * A valid list whose XML declaration uses single quotes rather than double.
+     *
+     * <p>Worth keeping across the rewrite. This input threw before #186, and under the scan
+     * #186 left in place it was the case that decided against rejecting a response at its first
+     * non-integer token. The parser handles the declaration natively, so it is now
+     * unremarkable, which is the point.
+     */
     @Test
     public void testParseNovelItemListSingleQuotedXmlDeclaration() {
         final String XML = "<?xml version='1.0' encoding='utf-8'?>\n" +
@@ -107,23 +117,29 @@ public class Wenku8ParserTest {
         assertEquals(Arrays.asList(166, 1143), Wenku8Parser.parseNovelItemList(XML));
     }
 
-    // This was the characterization test for the shift quirk: the scan had no notion of which
-    // token was the page count, so a non-integer page number consumed the first aid in its
-    // place and that novel dropped out of the list, and the assertion here was the bare
-    // singleton [7]. Reading by attribute name removes the quirk rather than recording it --
-    // an unusable page count now leaves element 0 at its "unknown" default of 0, which
-    // NovelItemListFragment already handles, and the novel stays in the list.
+    /**
+     * An unusable page number leaves element 0 at 0 instead of consuming the first novel.
+     *
+     * <p>This was the characterization test for the shift quirk: the scan had no notion of
+     * which token was the page count, so a non-integer page number consumed the first aid in
+     * its place and that novel dropped out of the list, and the assertion here was the bare
+     * singleton {@code [7]}. Reading by attribute name removes the quirk rather than recording
+     * it, and 0 is the "unknown" default {@code NovelItemListFragment} already handles.
+     */
     @Test
     public void testParseNovelItemListKeepsTheNovelWhenThePageNumberIsUnusable() {
         assertEquals(Arrays.asList(0, 7),
                 Wenku8Parser.parseNovelItemList("<result><page num='x'/><item aid='7'/></result>"));
     }
 
-    // The reason for reading by attribute name rather than scanning quoted values. The scan
-    // took any single-quoted value in document order, so it could not tell an aid from
-    // anything else quoted: this input gave [166, 2, 9, 1143] -- novels 2 and 9 do not exist
-    // and would have failed to load one at a time rather than failing as a list. An added
-    // attribute on either tag is a live possibility now the API sits behind a relay.
+    /**
+     * The reason for reading by attribute name rather than scanning quoted values.
+     *
+     * <p>The scan took any single-quoted value in document order, so it could not tell an aid
+     * from anything else quoted: this input gave {@code [166, 2, 9, 1143]}. Novels 2 and 9 do
+     * not exist and would have failed to load one at a time rather than failing as a list. An
+     * added attribute on either tag is a live possibility now the API sits behind a relay.
+     */
     @Test
     public void testParseNovelItemListIgnoresAttributesThatAreNotNumOrAid() {
         final String XML = "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n" +
@@ -135,8 +151,12 @@ public class Wenku8ParserTest {
         assertEquals(Arrays.asList(166, 1143), Wenku8Parser.parseNovelItemList(XML));
     }
 
-    // A response cut off mid-list keeps the items ahead of the cut instead of collapsing to
-    // empty, which is what the scan did. The user gets a short list rather than an error.
+    /**
+     * A response cut off mid-list keeps the items ahead of the cut.
+     *
+     * <p>Collapsing to empty would be a regression against the scan: the user gets a short list
+     * rather than an error.
+     */
     @Test
     public void testParseNovelItemListKeepsWhatItReadBeforeATruncation() {
         final String XML = "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n" +
@@ -150,10 +170,13 @@ public class Wenku8ParserTest {
         assertTrue(list.contains(1143));
     }
 
-    // XmlPullParser stops at the first byte of anything that is not the document, so a
-    // response that is well-formed only after some leading noise -- a PHP notice, a relay
-    // banner -- parses to nothing where the quoted-value scan read straight past it. Recovered
-    // by retrying from the document start, not by scanning: see the two tests below.
+    /**
+     * A response that is well-formed only after some leading noise still parses.
+     *
+     * <p>{@code XmlPullParser} stops at the first byte of anything that is not the document,
+     * where the quoted-value scan read straight past it. Recovered by retrying from the
+     * document start, not by scanning: see the two tests below.
+     */
     @Test
     public void testParseNovelItemListRetriesPastLeadingNoise() {
         final String XML = "PHP Notice: undefined index in /srv/api.php on line 12\n" +
@@ -166,12 +189,16 @@ public class Wenku8ParserTest {
         assertEquals(Arrays.asList(166, 1143), Wenku8Parser.parseNovelItemList(XML));
     }
 
-    // Why the recovery is a retry rather than a fallback to the old scan. Both of these are
-    // the leading-noise case, and the scan would have got both wrong in the way the rewrite
-    // exists to prevent -- [166, 2, 9, 1143] for the first, since it cannot tell an aid from
-    // any other quoted integer, and [7] for the second, dropping the novel because a
-    // non-integer page number shifts everything. Retrying reads attributes by name on this
-    // path too, so a response nobody can observe is parsed exactly like one that arrives clean.
+    /**
+     * Why the recovery is a retry rather than a fallback to the old scan.
+     *
+     * <p>This and the test below are both the leading-noise case, and the scan would have got
+     * both wrong in the way the rewrite exists to prevent: {@code [166, 2, 9, 1143]} here,
+     * since it cannot tell an aid from any other quoted integer, and {@code [7]} below,
+     * dropping the novel because a non-integer page number shifts everything. Retrying reads
+     * attributes by name on this path too, so a response nobody can observe is parsed exactly
+     * like one that arrives clean.
+     */
     @Test
     public void testParseNovelItemListPastLeadingNoiseStillReadsAttributesByName() {
         final String XML = "<!-- relay: cache MISS -->\n" +
@@ -189,16 +216,23 @@ public class Wenku8ParserTest {
         assertEquals(Arrays.asList(0, 7), Wenku8Parser.parseNovelItemList(XML));
     }
 
-    // A result page with no items is not an error: the page count still comes back, and the
-    // caller shows an empty list rather than a failure.
+    /**
+     * A result page with no items is not an error.
+     *
+     * <p>The page count still comes back, and the caller shows an empty list rather than a
+     * failure.
+     */
     @Test
     public void testParseNovelItemListPageWithNoItems() {
         assertEquals(Collections.singletonList(1),
                 Wenku8Parser.parseNovelItemList("<result><page num='1'/></result>"));
     }
 
-    // Items with no page tag: the page count defaults to 0, which the caller reads as
-    // "unknown" and keeps paging on.
+    /**
+     * Items with no page tag: the page count defaults to 0.
+     *
+     * <p>The caller reads 0 as "unknown" and keeps paging on.
+     */
     @Test
     public void testParseNovelItemListItemsWithNoPageTag() {
         assertEquals(Arrays.asList(0, 5),
