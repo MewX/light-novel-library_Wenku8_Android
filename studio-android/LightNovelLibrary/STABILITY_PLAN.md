@@ -1178,8 +1178,16 @@ without the base path Coveralls cannot match a single file against the git tree.
 
 `enableAndroidTestCoverage` instruments the app's classes, which was the risk in doing this: the
 emulator job is the fragile one. It was gated on a local run before being pushed — all 105
-instrumented tests pass with instrumentation active (18.2s), and the APK grows from ~20 MB to
-24.9 MB with `pm install` taking 7.3s. Neither is close to the margin that broke this job before.
+instrumented tests pass with instrumentation active (18.2s), and `pm install` takes 7.3s. Neither is
+close to the margin that broke this job before.
+
+**Both coverage flags are scoped to the `debug` build type, and the release APK is provably
+unaffected.** Measured on 2026-08-22, alpha flavour: debug **22.1 MB → 24.9 MB** once
+`enableAndroidTestCoverage` is on, i.e. **+2.8 MB (+13%)**; release **10.8 MB** either way. Grepping
+the packaged dex for `jacoco` gives **241 hits in debug and 0 in release**. (An earlier note in this
+file put the debug baseline at "~20 MB" and the growth at 25%; that baseline was carried over from a
+prior session rather than measured, and the figures here replace it.)
+
 The flag is deliberately not hidden behind a CI-only property: that would mean CI building an
 artifact nobody builds locally, which is exactly how the api-stub failures stayed invisible.
 
