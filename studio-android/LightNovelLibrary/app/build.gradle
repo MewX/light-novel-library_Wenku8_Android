@@ -104,6 +104,22 @@ android {
     }
     testOptions {
         unitTests.returnDefaultValues = true
+
+        // Without this, every class a Robolectric test touches reports zero coverage while the
+        // tests themselves pass. Robolectric loads classes through its own sandbox classloader,
+        // and those classes arrive with no source location attached; JaCoCo drops such classes by
+        // default, so the execution data never mentions them. `Wenku8Parser` showed the symptom
+        // exactly -- 24 passing tests across all six of its public methods, 0/229 lines reported,
+        // while `ChapterNavigator` (plain JUnit, no Robolectric) reported 28/28.
+        //
+        // The jdk.internal exclusion goes with it: those classes cannot be instrumented on a
+        // modern JDK and produce a warning per class without it.
+        unitTests.all {
+            jacoco {
+                includeNoLocationClasses = true
+                excludes = ['jdk.internal.*']
+            }
+        }
     }
 }
 
