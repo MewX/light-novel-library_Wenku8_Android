@@ -46,8 +46,82 @@ applies, and there is work waiting that only that machine can do.
 
 ```
 ./gradlew assembleAlpha testAlphaDebugUnitTest      # 78 JVM tests, seconds
-./gradlew connectedAlphaDebugAndroidTest            # 23 tests, needs a device or emulator
+./gradlew connectedAlphaDebugAndroidTest            # 25 tests, needs a device or emulator
 ```
+
+**Both have now been run on a real device** — a Pixel 10 Pro Fold on API 37, i.e. above the
+API 33 CI emulator and above `targetSdk 36`. 78 JVM tests and 25 instrumented tests, no failures.
+That is the first execution of the instrumented suite on hardware rather than an emulator, and it
+says the storage tests hold on a current device as well as on API 33.
+
+Getting there cost most of a session, almost none of it spent on the app. The traps below are
+environmental, they are not obvious from the failure messages, and each one burned real time.
+
+#### Device setup traps
+
+**1. Two `adb` binaries fight over port 5037.** On Ubuntu, `/usr/bin/adb` is version 1.0.39 —
+packaged from the Android 8.1 era — while the SDK ships 1.0.41 in `platform-tools`. They share
+one daemon port, so whichever runs last kills the other's server and replaces it:
+`adb server version (41) doesn't match this client (39); killing...`. Gradle always uses the SDK
+one, so a stray `adb` from the shell silently downgrades the daemon underneath a build.
+**Always invoke `~/Android/Sdk/platform-tools/adb` by absolute path, or put it ahead of
+`/usr/bin` on `PATH`.** This was not the cause of the install failure below, but it is a real
+hazard and it muddied the diagnosis for several runs.
+
+**2. `connectedAndroidTest` install stalls under WSL2, intermittently.** The symptom is
+`com.android.ddmlib.InstallException: Failed to install-write all apks`, reported as
+`Failed to install split APK(s)`. It is worth being precise about what this is *not*, because
+two plausible readings are both wrong:
+
+- Not a signature clash with an installed release build. It reproduces with nothing at all
+  installed, verified against `pm list packages` for every user on the device.
+- Not a slow transfer. Every failure lands at 4m18s–4m25s, which is ddmlib's four-minute install
+  timeout; every success lands at 24–29s. The transfer either completes in seconds or hangs
+  outright. Installing the identical APK from the identical fresh state with
+  `adb install-multiple` takes **9 seconds** and has never failed.
+
+So the device, the cable, the APK and the package manager are all fine — only AGP's ddmlib
+install path stalls, and only sometimes. Across eight runs it succeeded twice. The suspect is
+WSL2's `usbipd` USB passthrough, on the grounds that a bulk transfer stalling while an
+identical one through a different code path succeeds is characteristic of it; that is inference
+from the timing signature, not a proven root cause.
+
+*A dead end, recorded so it is not re-run:* the two successes both had an `adb logcat` streaming
+alongside, which suggested a keepalive against an idling USB link. A third run with logcat
+running failed, which kills the theory. The tally is 2 pass / 1 fail with logcat against 5 fail
+without — flaky, not causal. Do not build a workaround on it.
+
+**Until this is understood, retry the Gradle task; it succeeds within a few attempts.** The
+faster path is to bypass AGP's install step entirely, since the manual install is reliable:
+
+```
+adb install-multiple -r -t app/build/outputs/apk/alpha/debug/app-alpha-debug.apk
+adb install-multiple -r -t app/build/outputs/apk/androidTest/alpha/debug/app-alpha-debug-androidTest.apk
+adb shell am instrument -w org.mewx.wenku8.test/androidx.test.runner.AndroidJUnitRunner
+```
+
+Note that `connectedAndroidTest` uninstalls both packages when it finishes, so a manual
+pre-install does not survive into a subsequent Gradle run — it has to be the runner above.
+
+**3. Do not run `adb tcpip`.** Switching `adbd` to TCP restarts it and drops the USB transport,
+and under WSL2 the device does not come back on its own: it needs re-attaching with
+`usbipd attach` from Windows. On Android 11+ this is a bad trade anyway, since wireless
+debugging uses a random port and a pairing code that only the device screen shows, so
+`adb connect <ip>:5555` will not reach it. Recovering costs a replug.
+
+#### A packaging hazard found while diagnosing the above
+
+`app/build.gradle:11` sets `applicationId "org.mewx.wenku8"`, and **no flavor and neither build
+type applies an `applicationIdSuffix`.** Alpha, baidu, playstore, debug and release therefore all
+install under one package name. A debug build from this repo replaces an installed release copy
+of the app, and `connectedAndroidTest` then uninstalls it on the way out — so running the
+instrumented suite on a personal device removes the real app, and its local bookshelf with it.
+
+The fix is a suffix on the debug build type, but it is not a one-liner: `app/google-services.json`
+declares exactly one client, `org.mewx.wenku8`, and the `com.google.gms.google-services` plugin
+fails the build for any package name missing from it. Adding a suffix means adding a matching
+client to the Firebase project first. Worth doing — until then, back up before testing on a
+device that carries a real install.
 
 **Then the manual pass, which nothing automated covers.** The reader flow has no test above the
 storage layer — not in the JVM suite, not in the instrumented one — so Phase 2.1 is compiled and
@@ -474,7 +548,7 @@ appears at first glance. The problem was never the count, it was *where* they ru
 | Location | Before | Now | Runs on |
 |---|---|---|---|
 | `app/src/test` | 3 files / 10 tests | **12 files / 78 tests** | JVM, seconds |
-| `app/src/androidTest` | 8 files / 31 tests | **2 files / 23 tests** | emulator, minutes |
+| `app/src/androidTest` | 8 files / 31 tests | **3 files / 25 tests** | emulator or device, minutes |
 | `api/src/test` | 1 file | 1 file | JVM |
 
 (Step 1 moved the JVM count from 10 to 37; `CrashReporterTest` took it to 44 in Phase 0; Phase 1
@@ -487,7 +561,8 @@ never reported at all. Four changes to `.github/workflows/android-ci.yml`:
 
 1. **Split into two jobs.** JVM tests no longer depend on an emulator booting. This is the whole
    payoff of having moved those tests off the device: an emulator that will not start now costs
-   the 23 instrumented tests instead of all 101.
+   the 25 instrumented tests instead of all 103. The same split pays off again on a local device,
+   where the emulator's flakiness is replaced by the install stall documented above.
 2. **Enable KVM.** The failure was `ShellCommandUnresponsiveException` during `installCommit`,
    with the emulator console also failing to start — the signature of an emulator running
    unaccelerated. `android-emulator-runner` needs an explicit udev rule on `ubuntu-latest`;
