@@ -31,16 +31,24 @@ Two clarifications, because this rule is easy to over-apply:
 
 The gaps worth attacking, in order:
 
-1. **The reader flow.** Two decisions live here, and only one now has a seam.
-   - *Which chapter to move to* — **done.** `ChapterNavigator` (12 JVM tests). The logic was
-     copy-pasted four times inside `Wenku8ReaderActivityV1`: once each for the previous/next
-     buttons and once each for paging off an end. Extracting it deleted 120 lines from the
-     Activity and moved the boundary behaviour into the fast suite.
-   - *Whether to load a chapter from cache or the network* — **still uncovered**, which is why
-     Phase 1 item 10's fix shipped unverified and why item 12 is still deferred. Both readers'
-     chapter-loading bodies are `doInBackground` inside Activity inner classes calling static
-     helpers; extracting that decision into something injectable remains the highest-value seam
-     in the codebase.
+1. ~~**The reader flow.**~~ **Both decisions now have seams.** This was the largest gap in the
+   codebase and it is closed.
+   - *Which chapter to move to* — `ChapterNavigator` (12 JVM tests). The logic was copy-pasted
+     four times inside `Wenku8ReaderActivityV1`: once each for the previous/next buttons and once
+     each for paging off an end. Extracting it deleted 120 lines from the Activity and moved the
+     boundary behaviour into the fast suite.
+   - *Whether to load a chapter from cache or the network* — `ChapterContentLoader` (9 JVM tests).
+     Both readers ran their own copy inside an `AsyncTask.doInBackground`, which is why item 10's
+     fix shipped unverified. The I/O is injected, so the decision is testable with no filesystem
+     and no network, and **item 12 is no longer blocked**.
+
+   The outcome type is deliberately neutral rather than a `Wenku8Error.ErrorCode`: the two readers
+   map failures differently — `Wenku8ReaderActivityV1` separates an empty response from a parse
+   failure, `VerticalReaderActivity` collapses both to `-100` — and a shared seam must not quietly
+   change either. It also keeps the seam and its tests free of any `api/` dependency.
+
+   What is still uncovered is the *plumbing* around both: that the buttons are wired, the dialogs
+   appear, and the Intent reopens the reader. The decisions are tested; the wiring is not.
 2. **Lifecycle guards.** Phase 1 item 2 added guards to ~20 `onPostExecute` bodies against root
    cause 1, the largest single crash source, and not one of them is exercised by a test.
 3. **`GlobalConfig`'s remaining save/load surface.** ~30 methods; the bookshelf and volume index
@@ -84,12 +92,12 @@ applies, and there is work waiting that only that machine can do.
 **Run what CI runs, plus the part CI cannot judge.**
 
 ```
-./gradlew assembleAlpha testAlphaDebugUnitTest      # 90 JVM tests, seconds
+./gradlew assembleAlpha testAlphaDebugUnitTest      # 99 JVM tests, seconds
 ./gradlew connectedAlphaDebugAndroidTest            # 44 tests, needs a device or emulator
 ```
 
 **Both have now been run on a real device** — a Pixel 10 Pro Fold on API 37, i.e. above the
-API 33 CI emulator and above `targetSdk 36`. 90 JVM tests and 44 instrumented tests, no failures.
+API 33 CI emulator and above `targetSdk 36`. 99 JVM tests and 44 instrumented tests, no failures.
 That is the first execution of the instrumented suite on hardware rather than an emulator, and it
 says the storage tests hold on a current device as well as on API 33.
 
@@ -199,7 +207,7 @@ un-automated, which is a different claim. What is actually missing is listed aft
 | 4 | Vertical reader. | **Not applicable** — see below. | — |
 | 5 | Network off, open a downloaded bookshelf novel. | **Pass.** Reads from cache. Uncached chapters report `NETWORK_ERROR`, which is correct. | Needs airplane mode toggled around a UI flow. |
 | 6 | Developer Options → **Don't keep activities** on, then read, leave to another screen, and return. | **Pass**, on the reading that the option was enabled — "no difference" is exactly the pass condition, since the Activity is destroyed and rebuilt invisibly. | **Closest to automatable today** — `androidx.test:core` is already on the classpath via `androidx.test.ext:junit`, so `ActivityScenario.recreate()` covers the recreation half with no new dependency. Full process death needs more. |
-| 7 | Interrupt a chapter download, then open that chapter. | **Pass.** Refetches and reads instead of reporting `SERVER_RETURN_NOTHING` and closing. Verifies item 10. | Needs fault injection into the write path plus a UI flow. Nothing today can force a partial write. |
+| 7 | Interrupt a chapter download, then open that chapter. | **Pass.** Refetches and reads instead of reporting `SERVER_RETURN_NOTHING` and closing. Verifies item 10. | **Now covered at the decision level** by `ChapterContentLoaderTest` — an empty and a truncated download both fall through to the network. Only the end-to-end flow is still manual: nothing today can force a partial write. |
 
 **Phase 2.1 is therefore verified on a device.** Its caveat — "compiled and unit-tested but never
 run" — is discharged. Case 1 was the specific risk it carried, a novel that reaches a reader
@@ -225,10 +233,10 @@ with hundreds of chapters is the one that used to fail.
 localized strings. The behaviour is right and the message is not — same defect that showed
 `SERVER_RETURN_NOTHING` to a user, and it is now the most visible thing left in the reader.
 
-**What would replace this list.** Three things, in order of what they unblock: a seam in the
-readers' load-a-chapter decision (covers 1, 4, 7 on the JVM); `ActivityScenario` tests for
-recreation (covers most of 6 with no new dependency); and an Espresso dependency plus a stubbable
-`LightNetwork` (covers the rest, and is the largest piece).
+**What would replace this list.** ~~A seam in the readers' load-a-chapter decision~~ **done** —
+`ChapterContentLoader` covers the decision behind 1, 4 and 7 on the JVM. Two remain:
+`ActivityScenario` tests for recreation (covers most of 6 with no new dependency), and an Espresso
+dependency plus a stubbable `LightNetwork` (covers the rest, and is the largest piece).
 
 **Case 2 is the first one struck off.** `ChapterNavigator` now covers the volume-boundary
 decision — both `已是最后一章` and `已是第一章`, plus a single-chapter volume, which is both ends
@@ -591,13 +599,19 @@ Four things turned out differently from the plan as written, and are worth recor
     the refetch would otherwise hide how often downloads produce unusable files — the same
     measure-while-fixing shape as item 9.
 
-    **Not covered by any test, and honestly not coverable as written.** Both bodies are
-    `doInBackground` inside an Activity inner class, calling static storage and network helpers,
-    so there is no seam to inject through. The instrumented suite passing after this change is a
-    regression check, not evidence the fix works; that needs the manual scenario that found it —
-    break a download, then page into that chapter. Extracting the load-a-chapter decision into
-    something injectable is the natural Phase 2.2 byproduct, per the testing strategy's rule that
-    seams should fall out of refactors rather than precede them.
+    **Now covered.** This originally read "not covered by any test, and honestly not coverable as
+    written" — both bodies were `doInBackground` inside an Activity inner class calling static
+    storage and network helpers, with no seam to inject through, so the fix shipped on the
+    strength of one manual scenario. `ChapterContentLoader` closed that: the empty-cache and
+    truncated-cache fallthroughs are now JVM tests, including the case where the refetch itself
+    fails, and the two causes are reported distinctly so they stay separable in Crashlytics.
+
+    Worth noting how the order came out. The plan's own rule says seams should fall out of
+    refactors rather than precede them, and this one did the opposite — the fix went first,
+    unverified, and the seam was cut afterwards to cover it. That worked here because the
+    extraction was behaviour-preserving and the fix was small, but it is the more expensive
+    order: the fix spent a release unverified, and the manual pass that stood in for tests had to
+    be run by hand.
 
     Two things deliberately left alone. A successful refetch is **not** written back to the cache,
     so a broken chapter refetches on every visit rather than repairing itself — correct but
@@ -671,12 +685,16 @@ Four things turned out differently from the plan as written, and are worth recor
     metadata path untouched. Since item 10 the network fallthrough already exists, so this is a
     condition change rather than new machinery.
 
-    **Deliberately not implemented yet.** It is a discretionary improvement to the code path that
-    opens every chapter, and under the standing priority at the top of this document that means it
-    waits for the seam that lets it be tested. Once the reader's load-a-chapter decision is
-    injectable, this becomes a four-case table — cache good, cache empty, cache corrupt, no cache
-    — verifiable on the JVM in milliseconds. Doing it before then would be shipping a second
-    unverified change through the same path as item 10.
+    **No longer blocked.** This waited on a seam, and `ChapterContentLoader` is that seam: the
+    decision is now a parameter (`preferCache`) with the I/O injected, and the four-case table —
+    cache good, cache empty, cache corrupt, no cache — is already written and passing on the JVM.
+
+    What remains is one line at each of the two call sites: the readers pass
+    `from.equals(FromLocal)` today, and the change is to pass `true` unconditionally so a usable
+    downloaded copy is preferred whichever way the reader was opened. The fallthrough it depends
+    on already exists, and the tests that would catch a mistake in it already run. Left for v1.31
+    because it is a behaviour change rather than coverage work, so it should ship on its own
+    rather than riding along with the refactor that made it safe.
 
 Expected outcome: this should remove the majority of crash *volume* without touching
 architecture. Phase 0's data will confirm — and because Phase 0 shipped first, the before/after
@@ -825,13 +843,14 @@ appears at first glance. The problem was never the count, it was *where* they ru
 
 | Location | Before | Now | Runs on |
 |---|---|---|---|
-| `app/src/test` | 3 files / 10 tests | **13 files / 90 tests** | JVM, seconds |
+| `app/src/test` | 3 files / 10 tests | **14 files / 99 tests** | JVM, seconds |
 | `app/src/androidTest` | 8 files / 31 tests | **5 files / 44 tests** | emulator or device, minutes |
 | `api/src/test` | 1 file | 1 file | JVM |
 
 (Step 1 moved the JVM count from 10 to 37; `CrashReporterTest` took it to 44 in Phase 0; Phase 1
 added the rest, mostly `LightCacheStreamTest` and `AsyncTaskTrackerTest`; `ChapterNavigatorTest`
-took it from 78 to 90 when the reader's chapter navigation gained a seam.)
+took it from 78 to 90 when the reader's chapter navigation gained a seam, and
+`ChapterContentLoaderTest` to 99 when the cache-or-network decision gained one.)
 
 **The emulator flakiness was not theoretical, and CI has been restructured because of it.** The
 run for commit `2525b3b` failed in the emulator step, and because that one step ran
@@ -840,7 +859,7 @@ never reported at all. Four changes to `.github/workflows/android-ci.yml`:
 
 1. **Split into two jobs.** JVM tests no longer depend on an emulator booting. This is the whole
    payoff of having moved those tests off the device: an emulator that will not start now costs
-   the 44 instrumented tests instead of all 134. The same split pays off again on a local device,
+   the 44 instrumented tests instead of all 143. The same split pays off again on a local device,
    where the emulator's flakiness is replaced by the install stall documented above.
 2. **Enable KVM.** The failure was `ShellCommandUnresponsiveException` during `installCommit`,
    with the emulator console also failing to start — the signature of an emulator running
@@ -963,9 +982,10 @@ derived from something that might not be ready yet is a trap wherever it appears
 | Ship | Contents | Risk |
 |---|---|---|
 | — | ~~Chapter-navigation seam~~ **done** (`ChapterNavigator`, 12 JVM tests) | shipped |
-| — | **Coverage work: the load-a-chapter seam, then `ActivityScenario` recreation tests** | low, additive |
+| — | ~~Load-a-chapter seam~~ **done** (`ChapterContentLoader`, 9 JVM tests, both readers) | shipped |
+| — | **Coverage work: `ActivityScenario` recreation tests** | low, additive |
 | v1.30.0 | Phase 0 instrumentation + Phase 1 items 1–10 + Phase 2.1 | low, CI-green, device-tested, manual pass complete |
-| v1.31 | Phase 1 item 12 (prefer cached content), then highest-crash screen from 2.2 | medium |
+| v1.31 | Phase 1 item 12 (prefer cached content — **now unblocked**, one line per reader), then highest-crash screen from 2.2 | medium |
 | v1.32+ | Remainder of Phase 2, Phase 3, storage migration step 0 | medium |
 
 **The release now waits on coverage, by decision rather than by drift.** The original plan shipped

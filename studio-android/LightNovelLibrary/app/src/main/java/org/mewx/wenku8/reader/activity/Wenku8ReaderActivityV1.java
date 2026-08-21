@@ -42,6 +42,7 @@ import org.mewx.wenku8.global.api.OldNovelContentParser;
 import org.mewx.wenku8.global.api.VolumeList;
 import org.mewx.wenku8.api.Wenku8API;
 import org.mewx.wenku8.api.Wenku8Error;
+import org.mewx.wenku8.reader.ChapterContentLoader;
 import org.mewx.wenku8.reader.ChapterNavigator;
 import org.mewx.wenku8.reader.loader.WenkuReaderLoader;
 import org.mewx.wenku8.reader.loader.WenkuReaderLoaderXML;
@@ -451,45 +452,46 @@ public class Wenku8ReaderActivityV1 extends BaseMaterialActivity {
 
         @Override
         protected Wenku8Error.ErrorCode doInBackground(ContentValues... params) {
-            try {
-                // The cache is an optimisation, not the only source. A downloaded chapter can be
-                // empty or truncated -- an interrupted download, or the short read root cause 4
-                // describes -- and reading it used to be the end of the story: the reader
-                // reported SERVER_RETURN_NOTHING for a server it had never contacted, closed
-                // itself, and left the bad file in place, so every later attempt failed
-                // identically. Navigating to the next chapter of a partly-downloaded novel was a
-                // permanent dead end. The original `// or exist` comment here wanted this.
-                if (from.equals(FromLocal)) {
-                    String cached = GlobalConfig.loadFullFileFromSaveFolder("novel", cid + ".xml");
-                    if (!cached.isEmpty()) {
-                        nc = OldNovelContentParser.parseNovelContent(cached, unused -> {});
-                        if (!nc.isEmpty()) {
-                            return Wenku8Error.ErrorCode.SYSTEM_1_SUCCEEDED;
-                        }
-                    }
+            // The cache-or-network decision lives in ChapterContentLoader, where it is covered by
+            // JVM tests. What stays here is the mapping onto this reader's error codes, which
+            // differs from the vertical reader's.
+            ChapterContentLoader.Result result = ChapterContentLoader.load(
+                    from.equals(FromLocal),
+                    () -> GlobalConfig.loadFullFileFromSaveFolder("novel", cid + ".xml"),
+                    () -> LightNetwork.LightHttpPostConnection(Wenku8API.BASE_URL, params[0]),
+                    unused -> {},
+                    this::reportUnusableCache);
 
-                    // Reported rather than silently retried: this is the only signal that a
-                    // download produced an unusable file, and the refetch below would otherwise
-                    // hide how often that happens.
-                    CrashReporter.recordException("Wenku8ReaderActivityV1.cachedChapterUnusable",
-                            new FileNotFoundException("Cached chapter " + cid + " was "
-                                    + (cached.isEmpty() ? "missing or empty" : "unparseable")
-                                    + "; refetching from the network"));
-                }
+            nc = result.content;
 
-                byte[] tempXml = LightNetwork.LightHttpPostConnection(Wenku8API.BASE_URL, params[0]);
-                if (tempXml == null) return Wenku8Error.ErrorCode.NETWORK_ERROR;
-                String xml = new String(tempXml, "UTF-8");
-
-                nc = OldNovelContentParser.parseNovelContent(xml, unused -> {});
-                if (nc.isEmpty())
-                    return xml.isEmpty() ? Wenku8Error.ErrorCode.SERVER_RETURN_NOTHING : Wenku8Error.ErrorCode.XML_PARSE_FAILED;
-
-                return Wenku8Error.ErrorCode.SYSTEM_1_SUCCEEDED;
-            } catch (UnsupportedEncodingException e) {
-                CrashReporter.recordException("Wenku8ReaderActivityV1.AsyncNovelContentTask", e);
-                return Wenku8Error.ErrorCode.STRING_CONVERSION_ERROR;
+            switch (result.outcome) {
+                case LOADED_FROM_CACHE:
+                case LOADED_FROM_NETWORK:
+                    return Wenku8Error.ErrorCode.SYSTEM_1_SUCCEEDED;
+                case NETWORK_UNAVAILABLE:
+                    return Wenku8Error.ErrorCode.NETWORK_ERROR;
+                case EMPTY_RESPONSE:
+                    return Wenku8Error.ErrorCode.SERVER_RETURN_NOTHING;
+                case ENCODING_UNSUPPORTED:
+                    CrashReporter.recordException("Wenku8ReaderActivityV1.AsyncNovelContentTask",
+                            new UnsupportedEncodingException("UTF-8"));
+                    return Wenku8Error.ErrorCode.STRING_CONVERSION_ERROR;
+                case PARSE_FAILED:
+                default:
+                    return Wenku8Error.ErrorCode.XML_PARSE_FAILED;
             }
+        }
+
+        /**
+         * Reported rather than silently retried: this is the only signal that a download produced
+         * an unusable file, and the refetch would otherwise hide how often that happens.
+         */
+        private void reportUnusableCache(ChapterContentLoader.CacheProblem problem) {
+            CrashReporter.recordException("Wenku8ReaderActivityV1.cachedChapterUnusable",
+                    new FileNotFoundException("Cached chapter " + cid + " was "
+                            + (problem == ChapterContentLoader.CacheProblem.MISSING_OR_EMPTY
+                                    ? "missing or empty" : "unparseable")
+                            + "; refetching from the network"));
         }
 
         @Override

@@ -31,6 +31,7 @@ import org.mewx.wenku8.R;
 import org.mewx.wenku8.component.ScrollViewNoFling;
 import org.mewx.wenku8.global.GlobalConfig;
 import org.mewx.wenku8.global.api.OldNovelContentParser;
+import org.mewx.wenku8.reader.ChapterContentLoader;
 import org.mewx.wenku8.api.Wenku8API;
 import org.mewx.wenku8.network.LightNetwork;
 
@@ -199,54 +200,47 @@ public class VerticalReaderActivity extends AppCompatActivity {
         @Override
         protected Integer doInBackground(ContentValues... params) {
 
-            try {
-                // Same fix as Wenku8ReaderActivityV1: a chapter whose download was interrupted
-                // leaves an empty or truncated file, and treating the cache as the only source
-                // turned that into a permanent dead end -- the reader failed identically on
-                // every later attempt and never tried the network. The cache is now preferred
-                // but not required.
-                if (from.equals(FromLocal)) {
-                    String cached = GlobalConfig.loadFullFileFromSaveFolder("novel", cid + ".xml");
-                    if (!cached.isEmpty()) {
-                        nc = OldNovelContentParser.parseNovelContent(cached, size -> {
-                            if (pDialog != null) {
-                                pDialog.setMaxProgress(size);
-                            }
-                        });
-                        if (!nc.isEmpty()) {
-                            return 0;
+            // Shares the cache-or-network decision with Wenku8ReaderActivityV1 via
+            // ChapterContentLoader, where it has JVM tests. This reader keeps its own coarser
+            // mapping: an empty response and an unparseable one are both -100 here.
+            ChapterContentLoader.Result result = ChapterContentLoader.load(
+                    from.equals(FromLocal),
+                    () -> GlobalConfig.loadFullFileFromSaveFolder("novel", cid + ".xml"),
+                    () -> LightNetwork.LightHttpPostConnection(Wenku8API.BASE_URL, params[0]),
+                    size -> {
+                        if (pDialog != null) {
+                            pDialog.setMaxProgress(size);
                         }
-                    }
+                    },
+                    this::reportUnusableCache);
 
-                    CrashReporter.recordException("VerticalReaderActivity.cachedChapterUnusable",
-                            new FileNotFoundException("Cached chapter " + cid + " was "
-                                    + (cached.isEmpty() ? "missing or empty" : "unparseable")
-                                    + "; refetching from the network"));
-                }
+            nc = result.content;
 
-                byte[] tempXml = LightNetwork.LightHttpPostConnection(
-                        Wenku8API.BASE_URL, params[0]);
-                if (tempXml == null)
-                    return -100;
-                String xml = new String(tempXml, "UTF-8");
-
-                nc = OldNovelContentParser.parseNovelContent(xml, size -> {
-                    if (pDialog != null) {
-                        pDialog.setMaxProgress(size);
-                    }
-                });
-                if (nc.isEmpty()) {
+            switch (result.outcome) {
+                case LOADED_FROM_CACHE:
+                case LOADED_FROM_NETWORK:
+                    return 0;
+                case ENCODING_UNSUPPORTED:
+                    CrashReporter.recordException("VerticalReaderActivity.doInBackground",
+                            new UnsupportedEncodingException("UTF-8"));
+                    return -1;
+                case EMPTY_RESPONSE:
+                case PARSE_FAILED:
                     Log.e("MewX-Main", "getNullFromParser (NovelContentParser.parseNovelContent(xml);)");
-
                     // network error or parse failed
                     return -100;
-                }
-
-                return 0;
-            } catch (UnsupportedEncodingException e) {
-                CrashReporter.recordException("VerticalReaderActivity.doInBackground", e);
+                case NETWORK_UNAVAILABLE:
+                default:
+                    return -100;
             }
-            return -1;
+        }
+
+        private void reportUnusableCache(ChapterContentLoader.CacheProblem problem) {
+            CrashReporter.recordException("VerticalReaderActivity.cachedChapterUnusable",
+                    new FileNotFoundException("Cached chapter " + cid + " was "
+                            + (problem == ChapterContentLoader.CacheProblem.MISSING_OR_EMPTY
+                                    ? "missing or empty" : "unparseable")
+                            + "; refetching from the network"));
         }
 
         @Override
