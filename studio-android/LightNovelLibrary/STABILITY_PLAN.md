@@ -93,11 +93,11 @@ applies, and there is work waiting that only that machine can do.
 
 ```
 ./gradlew assembleAlpha testAlphaDebugUnitTest      # 99 JVM tests, seconds
-./gradlew connectedAlphaDebugAndroidTest            # 44 tests, needs a device or emulator
+./gradlew connectedAlphaDebugAndroidTest            # 50 tests, needs an awake, unlocked device
 ```
 
 **Both have now been run on a real device** — a Pixel 10 Pro Fold on API 37, i.e. above the
-API 33 CI emulator and above `targetSdk 36`. 99 JVM tests and 44 instrumented tests, no failures.
+API 33 CI emulator and above `targetSdk 36`. 99 JVM tests and 50 instrumented tests, no failures.
 That is the first execution of the instrumented suite on hardware rather than an emulator, and it
 says the storage tests hold on a current device as well as on API 33.
 
@@ -150,7 +150,24 @@ adb shell am instrument -w org.mewx.wenku8.test/androidx.test.runner.AndroidJUni
 Note that `connectedAndroidTest` uninstalls both packages when it finishes, so a manual
 pre-install does not survive into a subsequent Gradle run — it has to be the runner above.
 
-**3. Do not run `adb tcpip`.** Switching `adbd` to TCP restarts it and drops the USB transport,
+**3. Lifecycle tests need the screen awake and unlocked.** `ActivityScenario` cannot reach
+`RESUMED` on a dozing device — the system parks activities at STOPPED — so every test using
+`launch` or `recreate` fails with `Activity never becomes requested state "[RESUMED]" (last
+lifecycle transition = "STOPPED")` after a **45-second** timeout. That message reads exactly like
+the Activity failing to start, which is the trap: the first instinct is to debug `onCreate`, and
+five tests failed this way before the cause was found.
+
+Tell it apart from a real defect by the device, not the app: `dumpsys power` shows
+`mWakefulness=Dozing`, `dumpsys window` shows `isKeyguardShowing=true`, and the `TaskInfo` in
+logcat around the failure carries `isSleeping=true isInteractive=false`.
+
+`adb shell input keyevent KEYCODE_WAKEUP` wakes the screen. `adb shell wm dismiss-keyguard` only
+works with **no** secure lock; where `dumpsys trust` reports `deviceLocked=1` it must be unlocked
+by hand. `ReaderRecreationTest` asserts both conditions in `@Before`, so this now fails in ~0.03s
+with an actionable message instead of 45s of ambiguity — worth copying into any future lifecycle
+test.
+
+**4. Do not run `adb tcpip`.** Switching `adbd` to TCP restarts it and drops the USB transport,
 and under WSL2 the device does not come back on its own: it needs re-attaching with
 `usbipd attach` from Windows. On Android 11+ this is a bad trade anyway, since wireless
 debugging uses a random port and a pairing code that only the device screen shows, so
@@ -206,7 +223,7 @@ un-automated, which is a different claim. What is actually missing is listed aft
 | 3 | Reopen a previously read novel and accept "jump to last read". | **Pass.** | Same as 1, plus it depends on persisted state from an earlier run. |
 | 4 | Vertical reader. | **Not applicable** — see below. | — |
 | 5 | Network off, open a downloaded bookshelf novel. | **Pass.** Reads from cache. Uncached chapters report `NETWORK_ERROR`, which is correct. | Needs airplane mode toggled around a UI flow. |
-| 6 | Developer Options → **Don't keep activities** on, then read, leave to another screen, and return. | **Pass**, on the reading that the option was enabled — "no difference" is exactly the pass condition, since the Activity is destroyed and rebuilt invisibly. | **Closest to automatable today** — `androidx.test:core` is already on the classpath via `androidx.test.ext:junit`, so `ActivityScenario.recreate()` covers the recreation half with no new dependency. Full process death needs more. |
+| 6 | Developer Options → **Don't keep activities** on, then read, leave to another screen, and return. | **Pass**, on the reading that the option was enabled — "no difference" is exactly the pass condition, since the Activity is destroyed and rebuilt invisibly. | **Now automated.** `ReaderRecreationTest` covers the recreation half with `ActivityScenario.recreate()` and no new dependency, as predicted. Full process death still needs more. |
 | 7 | Interrupt a chapter download, then open that chapter. | **Pass.** Refetches and reads instead of reporting `SERVER_RETURN_NOTHING` and closing. Verifies item 10. | **Now covered at the decision level** by `ChapterContentLoaderTest` — an empty and a truncated download both fall through to the network. Only the end-to-end flow is still manual: nothing today can force a partial write. |
 
 **Phase 2.1 is therefore verified on a device.** Its caveat — "compiled and unit-tested but never
@@ -233,10 +250,10 @@ with hundreds of chapters is the one that used to fail.
 localized strings. The behaviour is right and the message is not — same defect that showed
 `SERVER_RETURN_NOTHING` to a user, and it is now the most visible thing left in the reader.
 
-**What would replace this list.** ~~A seam in the readers' load-a-chapter decision~~ **done** —
-`ChapterContentLoader` covers the decision behind 1, 4 and 7 on the JVM. Two remain:
-`ActivityScenario` tests for recreation (covers most of 6 with no new dependency), and an Espresso
-dependency plus a stubbable `LightNetwork` (covers the rest, and is the largest piece).
+**What would replace this list.** Two of the three are done. `ChapterContentLoader` covers the
+decision behind 1, 4 and 7 on the JVM, and `ReaderRecreationTest` covers 6 on a device. What
+remains is an Espresso dependency plus a stubbable `LightNetwork` — the largest piece, and the
+only one that reaches the wiring rather than the decisions.
 
 **Case 2 is the first one struck off.** `ChapterNavigator` now covers the volume-boundary
 decision — both `已是最后一章` and `已是第一章`, plus a single-chapter volume, which is both ends
@@ -844,7 +861,7 @@ appears at first glance. The problem was never the count, it was *where* they ru
 | Location | Before | Now | Runs on |
 |---|---|---|---|
 | `app/src/test` | 3 files / 10 tests | **14 files / 99 tests** | JVM, seconds |
-| `app/src/androidTest` | 8 files / 31 tests | **5 files / 44 tests** | emulator or device, minutes |
+| `app/src/androidTest` | 8 files / 31 tests | **6 files / 50 tests** | emulator or device, minutes |
 | `api/src/test` | 1 file | 1 file | JVM |
 
 (Step 1 moved the JVM count from 10 to 37; `CrashReporterTest` took it to 44 in Phase 0; Phase 1
@@ -859,7 +876,7 @@ never reported at all. Four changes to `.github/workflows/android-ci.yml`:
 
 1. **Split into two jobs.** JVM tests no longer depend on an emulator booting. This is the whole
    payoff of having moved those tests off the device: an emulator that will not start now costs
-   the 44 instrumented tests instead of all 143. The same split pays off again on a local device,
+   the 50 instrumented tests instead of all 149. The same split pays off again on a local device,
    where the emulator's flakiness is replaced by the install stall documented above.
 2. **Enable KVM.** The failure was `ShellCommandUnresponsiveException` during `installCommit`,
    with the emulator console also failing to start — the signature of an emulator running
@@ -983,7 +1000,7 @@ derived from something that might not be ready yet is a trap wherever it appears
 |---|---|---|
 | — | ~~Chapter-navigation seam~~ **done** (`ChapterNavigator`, 12 JVM tests) | shipped |
 | — | ~~Load-a-chapter seam~~ **done** (`ChapterContentLoader`, 9 JVM tests, both readers) | shipped |
-| — | **Coverage work: `ActivityScenario` recreation tests** | low, additive |
+| — | ~~`ActivityScenario` recreation tests~~ **done** (`ReaderRecreationTest`, 6 device tests) | shipped |
 | v1.30.0 | Phase 0 instrumentation + Phase 1 items 1–10 + Phase 2.1 | low, CI-green, device-tested, manual pass complete |
 | v1.31 | Phase 1 item 12 (prefer cached content — **now unblocked**, one line per reader), then highest-crash screen from 2.2 | medium |
 | v1.32+ | Remainder of Phase 2, Phase 3, storage migration step 0 | medium |
