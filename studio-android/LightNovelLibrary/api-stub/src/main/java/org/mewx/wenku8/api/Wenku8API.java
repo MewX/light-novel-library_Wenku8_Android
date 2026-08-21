@@ -160,8 +160,17 @@ public class Wenku8API {
         throw new UnsupportedOperationException("stub");
     }
 
+    /**
+     * Inert rather than throwing, and for a different reason than the builders above -- here the
+     * throw was not even loud. {@code UserInfoActivity.AsyncGetUserInfo} wraps its whole body in
+     * {@code catch (Exception e)} and funnels it to {@code CrashReporter.recordException}, so on a
+     * stub build this method filed a non-fatal crash report on every launch of the account screen
+     * and then carried on to the same NETWORK_ERROR it reaches anyway. Throwing only pays for
+     * itself where it surfaces an unconsidered path; swallowed and reported as a real defect, it
+     * buries the reports that are.
+     */
     public static ContentValues getUserInfoParams() {
-        throw new UnsupportedOperationException("stub");
+        return new ContentValues();
     }
 
     public static ContentValues getUserSignParams() {
