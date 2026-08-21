@@ -46,11 +46,11 @@ applies, and there is work waiting that only that machine can do.
 
 ```
 ./gradlew assembleAlpha testAlphaDebugUnitTest      # 78 JVM tests, seconds
-./gradlew connectedAlphaDebugAndroidTest            # 44 tests, needs a device or emulator
+./gradlew connectedAlphaDebugAndroidTest            # 48 tests, needs a device or emulator
 ```
 
 **Both have now been run on a real device** — a Pixel 10 Pro Fold on API 37, i.e. above the
-API 33 CI emulator and above `targetSdk 36`. 78 JVM tests and 44 instrumented tests, no failures.
+API 33 CI emulator and above `targetSdk 36`. 78 JVM tests and 48 instrumented tests, no failures.
 That is the first execution of the instrumented suite on hardware rather than an emulator, and it
 says the storage tests hold on a current device as well as on API 33.
 
@@ -514,6 +514,37 @@ Four things turned out differently from the plan as written, and are worth recor
     And `onPostExecute` still toasts `result.toString()`, i.e. the raw enum name, which is how
     `SERVER_RETURN_NOTHING` reached a user as those words; the codes have no localized strings.
 
+11. **`LightCache.saveFile` destroyed the old file before writing the new one — fixed.** Item 10
+    fixed the reader's response to a corrupt cached chapter. This fixes the thing that *created*
+    one.
+
+    The write opened a `FileOutputStream` directly on the destination, which truncates it on open.
+    From that instant until the last byte lands there is no good copy of the file anywhere: an
+    interrupted write — killed process, full disk, `IOException` partway through — left an empty
+    or half-written file where working content had been. That is root cause 4's other half. Root
+    cause 4 as originally written was about *reading* fewer bytes than expected; this is the
+    writer manufacturing the same corruption directly, and it is the mechanism behind item 10's
+    permanently unreadable chapter.
+
+    Two smaller defects in the same eight lines: there was no `sync()`, so bytes could still be in
+    the page cache when the app believed the save had succeeded; and because the streams were
+    closed on the success path only rather than in a `finally`, a throwing `write()` leaked the
+    file descriptor.
+
+    Now written to a sibling `.tmp` and renamed into place, with a `flush()` and `getFD().sync()`
+    before the rename, in try-with-resources. `rename` is atomic within a filesystem and a sibling
+    is always on the same one, so a reader sees the whole old content or the whole new content and
+    never a partial. **This is the cheap half of what a transactional store would provide**, and
+    it was worth taking on its own terms — see "Should we move to platform storage?" below.
+
+    `LightCacheTest` gained four tests, and their limits should be understood: the property that
+    matters cannot be provoked without injecting a failure mid-write, so they pin the mechanism's
+    observable invariants — a shorter overwrite replaces the content wholesale, and no `.tmp`
+    survives either a success or a failure — rather than proving the atomicity itself. That rests
+    on `rename` semantics, not on the suite. Note also that all four would pass against the *old*
+    implementation, since it never created a temp file; they are regression protection for the new
+    mechanism, not evidence it is better than the old one.
+
 Expected outcome: this should remove the majority of crash *volume* without touching
 architecture. Phase 0's data will confirm — and because Phase 0 shipped first, the before/after
 comparison is actually available this time.
@@ -651,7 +682,7 @@ appears at first glance. The problem was never the count, it was *where* they ru
 | Location | Before | Now | Runs on |
 |---|---|---|---|
 | `app/src/test` | 3 files / 10 tests | **12 files / 78 tests** | JVM, seconds |
-| `app/src/androidTest` | 8 files / 31 tests | **5 files / 44 tests** | emulator or device, minutes |
+| `app/src/androidTest` | 8 files / 31 tests | **5 files / 48 tests** | emulator or device, minutes |
 | `api/src/test` | 1 file | 1 file | JVM |
 
 (Step 1 moved the JVM count from 10 to 37; `CrashReporterTest` took it to 44 in Phase 0; Phase 1
@@ -664,7 +695,7 @@ never reported at all. Four changes to `.github/workflows/android-ci.yml`:
 
 1. **Split into two jobs.** JVM tests no longer depend on an emulator booting. This is the whole
    payoff of having moved those tests off the device: an emulator that will not start now costs
-   the 44 instrumented tests instead of all 122. The same split pays off again on a local device,
+   the 48 instrumented tests instead of all 126. The same split pays off again on a local device,
    where the emulator's flakiness is replaced by the install stall documented above.
 2. **Enable KVM.** The failure was `ShellCommandUnresponsiveException` during `installCommit`,
    with the emulator console also failing to start — the signature of an emulator running
@@ -861,20 +892,56 @@ Constraints any implementation should be held to:
    bookshelf token, a partially downloaded chapter. Those all exist on real devices *today*, so
    the migration meets them on day one. The device tests written this session are the fixtures.
 
+### The actual blocker, measured
+
+An earlier draft of this section said the migration should wait for Phase 0's crash data. **That
+was the wrong precondition and is withdrawn.** Crash counts answer "which screen is crashiest",
+which is what Phase 2.2 needs. They are not needed here, because the evidence that storage is
+defective is already in hand and did not come from crash data at all: root cause 4, Phase 1 items
+9, 10 and 11, the `getInternalSavePath` caching bug, and the external-root trap. Six concrete
+defects, all found by reading and testing. Nothing is waiting to be learned about *whether*
+storage is a problem.
+
+The real precondition is containment, and measuring it gives a discouraging number:
+
+| | count |
+|---|---|
+| `LightCache.*` call sites in `app/` | ~104 |
+| files touching `LightCache` directly, outside `GlobalConfig`/`SaveFileMigration` | 13 |
+| worst single file (`NovelInfoActivity`) | 27 |
+
+`GlobalConfig` looks like a storage facade and is not one. Thirteen files reach past it into
+`LightCache` directly, so there is no single place a new backend could be installed. **Swapping
+the store today means editing every one of those call sites while simultaneously changing the
+storage format — a large, untestable change touching user data, which is the worst shape a change
+can have.**
+
+So the first step is not Room. It is making `GlobalConfig` genuinely the only door: move those 13
+files onto its API, leaving `LightCache` an implementation detail. That is mechanical, individually
+shippable, verifiable by the tests that already exist, and useful on its own — it is also what
+Phase 2.4 wants. Only once the door is single does replacing what is behind it become a contained
+change.
+
 ### Sequencing
 
-**After Phase 2, not before, and not instead of it.** The same reasoning as
-"Should we adopt modern architecture first?" applies with more force here, because this migration
-touches user data rather than control flow. It wants the crash data from Phase 0 to confirm
-storage is worth the investment, and it wants the seams from Phase 2 so the storage layer can be
-swapped behind an interface rather than at every call site.
+0. **Funnel all storage access through `GlobalConfig`.** The 13 files above, one at a time. No
+   behaviour change, no format change, no migration. This is the prerequisite everything else
+   depends on, and the step most likely to be skipped.
+1. **Atomic writes — done**, as Phase 1 item 11. Worth noting the ordering lesson: this delivered
+   a real part of the transactional benefit *before* any database existed, and would have been
+   worth doing even if the answer to this whole section were "no".
+2. **Settings to DataStore.** Smallest surface, no relational structure, easiest migration to
+   verify, and a genuine test of the migration machinery on data whose loss is an annoyance rather
+   than a disaster.
+3. **Bookshelf and reading positions to Room.** The highest-value records: small, structured,
+   frequently written, and the source of items 9 and 10.
+4. **Volume index to Room.** Larger and more relational; benefits most from the schema.
+5. **Chapter text stays on disk**, gaining a row that records whether the file is complete. Item
+   11 already supplied the atomic write this depends on.
 
-A reasonable order once that groundwork exists: settings to DataStore first — smallest, lowest
-risk, easiest to verify — then the bookshelf and reading positions to Room, then the volume index.
-Chapter text stays on disk, gaining atomic writes and a validity flag. Each step ships
-independently, and stalling after any of them still leaves the app better off, which is the
-property this document has asked for throughout.
+Each step ships independently, and stalling after any of them still leaves the app better off —
+the property this document has asked for throughout, and the reason step 0 is worth doing even if
+steps 2–5 never happen.
 
-**Not scheduled.** It is recorded so the option is evaluated deliberately rather than drifted
-into, and so the next person to ask "should this be a database?" finds the reasoning instead of
-re-deriving it.
+**Still not scheduled, but no longer blocked on evidence.** What it is blocked on is step 0, which
+can start whenever there is appetite, is low-risk, and needs no decision about databases at all.
