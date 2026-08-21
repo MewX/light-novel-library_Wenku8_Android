@@ -220,14 +220,47 @@ public class LocalBookshelfTest {
     }
 
     /**
-     * Characterization, not an endorsement. A non-numeric entry currently throws
-     * {@link NumberFormatException} out of {@code loadLocalBookShelf}, and every caller reaches
-     * that method lazily without a catch, so a bookshelf file corrupted by a partial write takes
-     * out the screen that reads it. Recorded here so the behaviour is pinned before it changes;
-     * see the note added to STABILITY_PLAN.md.
+     * This used to assert the opposite. A non-numeric entry threw {@link NumberFormatException}
+     * out of {@code loadLocalBookShelf}, and since every caller reaches that method lazily with
+     * no catch above it, a bookshelf file damaged by a partial write took out the app on the
+     * first screen that read it. Phase 1 item 9 changed it to drop the entry.
      */
-    @Test(expected = NumberFormatException.class)
-    public void testNonNumericEntryCurrentlyThrows() throws IOException {
+    @Test
+    public void testNonNumericEntryIsSkippedRatherThanThrowing() throws IOException {
         givenBookshelfFileContains("1306||not-an-aid||41748");
+
+        final List<Integer> shelf = GlobalConfig.getLocalBookshelfList();
+
+        // The corrupt entry is the only casualty: the novels either side of it are still there.
+        // Rejecting the whole file would have emptied the bookshelf instead.
+        assertEquals(2, shelf.size());
+        assertEquals(Integer.valueOf(1306), shelf.get(0));
+        assertEquals(Integer.valueOf(41748), shelf.get(1));
+    }
+
+    @Test
+    public void testAnEntirelyCorruptFileLoadsAnEmptyShelfWithoutThrowing() throws IOException {
+        // What a truncated or overwritten-with-something-else file looks like. An empty shelf is
+        // recoverable -- the user re-adds novels, or a cloud sync refills it. A crash on launch
+        // was not.
+        givenBookshelfFileContains("this is not a bookshelf at all");
+
+        assertTrue(GlobalConfig.getLocalBookshelfList().isEmpty());
+    }
+
+    @Test
+    public void testACorruptEntrySurvivesARewrite() throws IOException {
+        // The dropped entry must not come back when the shelf is written out again, and the
+        // rewrite must not carry the unparseable token with it.
+        givenBookshelfFileContains("1306||not-an-aid||41748");
+
+        GlobalConfig.addToLocalBookshelf(9);
+        GlobalConfig.loadLocalBookShelf();
+
+        final List<Integer> shelf = GlobalConfig.getLocalBookshelfList();
+        assertEquals(3, shelf.size());
+        assertEquals(Integer.valueOf(9), shelf.get(0));
+        assertTrue(GlobalConfig.testInLocalBookshelf(1306));
+        assertTrue(GlobalConfig.testInLocalBookshelf(41748));
     }
 }

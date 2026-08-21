@@ -382,7 +382,23 @@ public class GlobalConfig {
         for (String t : p) {
             if (t.isEmpty())
                 continue;
-            bookshelf.add(Integer.valueOf(t));
+
+            // A token that does not parse is dropped rather than thrown on. This method is
+            // reached lazily from getLocalBookshelfList and testInLocalBookshelf, with no catch
+            // anywhere above it, and the bookshelf tab is the first screen -- so throwing here
+            // meant a file damaged by a partial write took out the app on launch, with nothing
+            // the user could do but clear app data. This file is rewritten on every add and
+            // remove, so that is a reachable state rather than a hypothetical one.
+            //
+            // Dropping the entry rather than rejecting the file is deliberate: rejecting it
+            // would silently empty the bookshelf, which is a worse outcome than losing the one
+            // novel whose id was corrupted. Reported so the real frequency is visible, since
+            // until now this failed as a crash and afterwards it would fail silently.
+            try {
+                bookshelf.add(Integer.valueOf(t));
+            } catch (NumberFormatException e) {
+                CrashReporter.recordException("GlobalConfig.loadLocalBookShelf", e);
+            }
         }
     }
 
@@ -438,6 +454,13 @@ public class GlobalConfig {
     }
 
     public static void moveBookToTheTopOfBookshelf(int aid) {
+        // Every sibling loads lazily before touching the static; this one did not, so it was an
+        // NPE waiting for a caller that reached it first. Latent rather than live, but the
+        // cheapest possible fix for root cause 2 in miniature.
+        if (bookshelf == null) {
+            loadLocalBookShelf();
+        }
+
         int i = bookshelf.indexOf(aid);
         if (i == -1) {
             return;
