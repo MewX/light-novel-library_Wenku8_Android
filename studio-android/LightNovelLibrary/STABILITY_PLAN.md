@@ -51,8 +51,35 @@ The gaps worth attacking, in order:
    appear, and the Intent reopens the reader. The decisions are tested; the wiring is not.
 2. **Lifecycle guards.** Phase 1 item 2 added guards to ~20 `onPostExecute` bodies against root
    cause 1, the largest single crash source, and not one of them is exercised by a test.
-3. **`GlobalConfig`'s remaining save/load surface.** ~30 methods; the bookshelf and volume index
-   now have device coverage, the rest do not.
+3. **`GlobalConfig`'s remaining save/load surface.** ~30 methods. **Partly closed:** the bookshelf
+   and volume index already had device coverage, and reading positions (`ReadSavesV1Test`, 15) and
+   search history (`SearchHistoryTest`, 14) now do too. Still uncovered: `loadAllSetting` /
+   `saveAllSetting`, the deprecated V0 read saves, the notice, and the user-account pair — the last
+   of which nothing should test, for the reason given under "No test signs in".
+
+   Reading positions were the priority of that group because they are the only thing in the save
+   folder nobody can reconstruct: a bookshelf can be re-added and a chapter re-downloaded, but not
+   where someone was on page 300. The file is also rewritten every time the reader leaves a
+   chapter, so it is the one most often caught by item 11's truncating writer.
+
+   **Search history was where the defects were, and there are two.** Neither is fixed; both are
+   pinned by tests named `testKnownDefect…` so a later change has to state that it is changing
+   them. The format wraps each term in brackets and escapes nothing, and the scanner never advances
+   its cursor past a closing bracket — so a term containing `[` is re-scanned from inside itself and
+   its tail reappears as a phantom search nobody made, growing the list by one entry per round trip
+   until the cap evicts real searches. Separately, `addSearchHistory` and `deleteSearchHistory` both
+   open with `if (searchHistory.contains("[")) return;`, which asks whether the *list* holds a term
+   equal to `"["` — almost certainly meant as a check on the incoming `record`. One search for `[`
+   puts exactly that term in the list, and from then on the guard fires on every call: the history
+   stops recording and stops accepting deletions for the life of the install, with no way out but
+   clearing it and no indication to the user.
+
+   **Left unfixed on purpose, and this is the same judgement as item 11.** Both live in the
+   serialization format of a subsystem under a standing freeze; a patch here is a bandaid on code
+   scheduled for replacement, and the escaping fix in particular would need a migration for
+   histories already on disk. The cost of leaving them is small and bounded — a search history is
+   the one thing in the save folder a user can reconstruct by retyping. Recorded so the storage
+   migration inherits them as requirements rather than rediscovering them.
 
 Note this sits alongside the storage decision, which points the same way: `STORAGE_MIGRATION_PLAN.md`
 declines incremental fixes to persistence in favour of replacing it properly. Both rules trade
@@ -172,6 +199,22 @@ the setting back rather than assuming the write took, and always hash-check afte
 install left the *previous* test APK in place, so the suite would have run and passed against code
 that predated the change.
 
+*Second addendum, and it supersedes the settings knobs as the first thing to try.* The consent
+workaround above then failed too — `package_verifier_user_consent` read back `-1`, and
+`adb install` still burned a full ten-minute timeout with neither APK landing. The split
+diagnostic is what resolved it, and the result narrows the cause further than "verification":
+
+| Step | Time |
+| --- | --- |
+| `adb install` of the 20 MB APK, verification already disabled | hung; killed at 10 min |
+| `adb push` of the same APK | **0.33 s** (60 MB/s) |
+| `adb shell pm install` of the pushed file | **Success**, immediate |
+
+So the hang is not only on-device verification — it is in `adb install`'s own streaming
+`install-write` path, which pushing and installing separately bypasses entirely. **Prefer
+`push` + `pm install` unconditionally**; it is faster, it needs no global settings changed, and it
+has not yet failed. Reach for the verifier knobs only if `pm install` itself is what hangs.
+
 **3. Lifecycle tests need the screen awake and unlocked.** `ActivityScenario` cannot reach
 `RESUMED` on a dozing device — the system parks activities at STOPPED — so every test using
 `launch` or `recreate` fails with `Activity never becomes requested state "[RESUMED]" (last
@@ -262,6 +305,26 @@ a real login attempt. On a stub build that surfaced as trap 6 above; on a real b
 have gone to the wenku8 server. Two lessons: input-length guards behind a `maxLength` cannot be
 reached from the view layer at all (test the filter instead, which is the thing actually holding
 the line), and a test that fills a form is one bug away from submitting it.
+
+**8. A save-file test does not read the same storage root the running app does.**
+`GlobalConfig.getDefaultStoragePath()` returns the legacy external path
+(`/storage/emulated/0/wenku8/saves/`) unless `lookupInternalStorageOnly` is set — and that flag is
+assigned in exactly one place, `loadAllSetting()`. The app calls it during startup; an instrumented
+test that only touches the save methods never does. So in a test process the default root is the
+legacy external one, which is unwritable on API 29+, and **every write silently takes the fallback
+branch into internal storage** while the app under normal use writes straight there.
+
+The visible consequence is that assertions on where a file ends up, or on whether one exists at
+all, hold for the environment rather than the contract — a test can look correct and be pinning the
+fallback path. Assert what loads back, not what lands on disk; and if a test genuinely needs the
+on-disk shape, resolve the path through `GlobalConfig` at assertion time rather than assuming.
+`SaveFileFixture` probes both roots in the app's own order for this reason, and its `describe()`
+prints both paths, which is how this was found.
+
+A second-order effect worth knowing: because the first write always fails there,
+`LightCache.saveFile` catches an `IOException` and files a `CrashReporter.recordException` on
+essentially every save a test performs. Those reports are an artefact of the test environment, not
+defects.
 
 #### A packaging hazard found while diagnosing the above
 
@@ -951,7 +1014,7 @@ appears at first glance. The problem was never the count, it was *where* they ru
 | Location | Before | Now | Runs on |
 |---|---|---|---|
 | `app/src/test` | 3 files / 10 tests | **15 files / 114 tests** | JVM, seconds |
-| `app/src/androidTest` | 8 files / 31 tests | **10 files / 65 tests** | emulator or device, minutes |
+| `app/src/androidTest` | 8 files / 31 tests | **12 files / 94 tests** | emulator or device, minutes |
 | `api/src/test` | 1 file | 1 file | JVM |
 
 (Step 1 moved the JVM count from 10 to 37; `CrashReporterTest` took it to 44 in Phase 0; Phase 1
