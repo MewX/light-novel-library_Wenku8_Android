@@ -11,12 +11,16 @@ import android.view.View;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.google.firebase.analytics.FirebaseAnalytics;
 import org.mewx.wenku8.util.GoogleServicesHelper;
 import com.makeramen.roundedimageview.RoundedImageView;
 
 import org.mewx.wenku8.R;
+import org.mewx.wenku8.account.AccountInfoLoader;
 import org.mewx.wenku8.global.GlobalConfig;
 import org.mewx.wenku8.global.api.UserInfo;
 import org.mewx.wenku8.api.Wenku8API;
@@ -112,73 +116,81 @@ public class UserInfoActivity extends BaseMaterialActivity {
                     /* indeterminate= */ true, /* cancelable= */ false, /* cancelListener= */ null);
         }
 
+        /**
+         * The decision about what to show lives in {@link AccountInfoLoader}, which is covered by
+         * JVM tests; what stays here is the part that genuinely needs Android — decoding the
+         * avatar and writing it to the disk cache.
+         */
         @Override
         protected Object[] doInBackground(Integer... params) {
             isSignOperation = (params.length == 1 && params[0] == 1);  // 0 is fetch data, 1 is sign
-            Wenku8Error.ErrorCode signStatus = null;
 
             try {
-                // 1. Handle Signing (if requested)
-                if (isSignOperation) {
-                    byte[] signBytes = LightNetwork.LightHttpPostConnection(Wenku8API.BASE_URL, Wenku8API.getUserSignParams());
-                    if (signBytes == null) return new Object[]{Wenku8Error.ErrorCode.NETWORK_ERROR, null, null};
-                    
-                    String signResponse = new String(signBytes, "UTF-8");
-                    if (!LightTool.isInteger(signResponse)) {
-                        return new Object[]{Wenku8Error.ErrorCode.STRING_CONVERSION_ERROR, null, null};
-                    }
-                    
-                    signStatus = Wenku8Error.getSystemDefinedErrorCode(Integer.valueOf(signResponse));
-                    if (signStatus == Wenku8Error.ErrorCode.SYSTEM_9_SIGN_FAILED) {
-                        return new Object[]{signStatus, null, null}; // Return early if sign fails
-                    }
-                }
+                AccountInfoLoader.Result result =
+                        AccountInfoLoader.load(isSignOperation, new AccountInfoLoader.Backend() {
+                            @Nullable
+                            @Override
+                            public byte[] sendSignRequest() {
+                                return LightNetwork.LightHttpPostConnection(
+                                        Wenku8API.BASE_URL, Wenku8API.getUserSignParams());
+                            }
 
-                // 2. Fetch User Info
-                byte[] infoBytes = LightNetwork.LightHttpPostConnection(Wenku8API.BASE_URL, Wenku8API.getUserInfoParams());
-                if (infoBytes == null) return new Object[]{Wenku8Error.ErrorCode.NETWORK_ERROR, null, null};
+                            @Nullable
+                            @Override
+                            public byte[] sendInfoRequest() {
+                                return LightNetwork.LightHttpPostConnection(
+                                        Wenku8API.BASE_URL, Wenku8API.getUserInfoParams());
+                            }
 
-                String xml = new String(infoBytes, "UTF-8");
-                
-                // Handle auto-login if needed
-                if (LightTool.isInteger(xml) && Wenku8Error.getSystemDefinedErrorCode(Integer.valueOf(xml)) == Wenku8Error.ErrorCode.SYSTEM_4_NOT_LOGGED_IN) {
-                    Wenku8Error.ErrorCode loginTemp = LightUserSession.doLoginFromFile(GlobalConfig::loadUserInfoSet);
-                    if (loginTemp != Wenku8Error.ErrorCode.SYSTEM_1_SUCCEEDED) return new Object[]{loginTemp, null, null};
-                    
-                    infoBytes = LightNetwork.LightHttpPostConnection(Wenku8API.BASE_URL, Wenku8API.getUserInfoParams());
-                    if (infoBytes == null) return new Object[]{Wenku8Error.ErrorCode.NETWORK_ERROR, null, null};
-                    xml = new String(infoBytes, "UTF-8");
-                } else if (LightTool.isInteger(xml)) {
-                    return new Object[]{Wenku8Error.getSystemDefinedErrorCode(Integer.valueOf(xml)), null, null};
-                }
+                            @NonNull
+                            @Override
+                            public Wenku8Error.ErrorCode restoreSession() {
+                                return LightUserSession.doLoginFromFile(
+                                        GlobalConfig::loadUserInfoSet);
+                            }
 
-                UserInfo parsedUi = UserInfo.parseUserInfo(xml);
-                if (parsedUi == null) return new Object[]{Wenku8Error.ErrorCode.XML_PARSE_FAILED, null, null};
+                            @Nullable
+                            @Override
+                            public byte[] downloadAvatar(int uid) {
+                                return LightNetwork.LightHttpDownload(Wenku8API.getAvatarURL(uid));
+                            }
 
-                // 3. Force Fetch Avatar & Decode Directly from Memory
-                byte[] avatarBytes = LightNetwork.LightHttpDownload(Wenku8API.getAvatarURL(parsedUi.uid));
-                Bitmap decodedAvatar = null;
-                
-                if (avatarBytes != null && avatarBytes.length > 0) {
-                    // Decode straight from the byte array. This guarantees we show the fresh download.
-                    BitmapFactory.Options options = new BitmapFactory.Options();
-                    options.inSampleSize = 2; 
-                    decodedAvatar = BitmapFactory.decodeByteArray(avatarBytes, 0, avatarBytes.length, options);
+                            @NonNull
+                            @Override
+                            public Wenku8Error.ErrorCode serverCode(int raw) {
+                                return Wenku8Error.getSystemDefinedErrorCode(raw);
+                            }
+                        });
 
-                    // Save to disk cache for offline/future use
-                    String avatarPath = GlobalConfig.getFirstUserAvatarSaveFilePath();
-                    if (!LightCache.saveFile(avatarPath, avatarBytes, true)) {
-                        LightCache.saveFile(GlobalConfig.getSecondUserAvatarSaveFilePath(), avatarBytes, true);
-                    }
-                }
-
-                // Pass everything back to the UI thread cleanly
-                return new Object[]{Wenku8Error.ErrorCode.SYSTEM_1_SUCCEEDED, parsedUi, decodedAvatar};
+                return new Object[]{result.code, result.userInfo, cacheAndDecode(result.avatar)};
 
             } catch (Exception e) {
                 CrashReporter.recordException("UserInfoActivity.AsyncGetUserInfo", e);
                 return new Object[]{Wenku8Error.ErrorCode.NETWORK_ERROR, null, null};
             }
+        }
+
+        /**
+         * Decodes the freshly downloaded avatar and keeps a copy for the next offline launch.
+         * Decoding from the bytes rather than from the file that was just written is deliberate:
+         * it guarantees the screen shows what was downloaded even if the write failed.
+         */
+        @Nullable
+        private Bitmap cacheAndDecode(@Nullable byte[] avatarBytes) {
+            if (avatarBytes == null) {
+                return null;
+            }
+
+            BitmapFactory.Options options = new BitmapFactory.Options();
+            options.inSampleSize = 2;
+            Bitmap decoded = BitmapFactory.decodeByteArray(
+                    avatarBytes, 0, avatarBytes.length, options);
+
+            if (!LightCache.saveFile(GlobalConfig.getFirstUserAvatarSaveFilePath(), avatarBytes, true)) {
+                LightCache.saveFile(GlobalConfig.getSecondUserAvatarSaveFilePath(), avatarBytes, true);
+            }
+
+            return decoded;
         }
 
         @Override

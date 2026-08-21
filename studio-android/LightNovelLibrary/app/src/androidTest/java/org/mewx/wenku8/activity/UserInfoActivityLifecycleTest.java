@@ -26,8 +26,13 @@ import org.mewx.wenku8.InteractiveDevice;
  * session and a server exist, which differs between CI and a developer's device — so any assertion
  * about the final state would encode the environment rather than the contract. Launching is
  * nonetheless most of the value: startup is where the account screen has actually broken before,
- * and an exception on this path fails the run rather than passing quietly. The stronger tests this
- * screen deserves need a stubbable {@code LightNetwork}, which is already on the plan.
+ * and an exception on this path fails the run rather than passing quietly.
+ *
+ * <p><b>The logic this screen runs is tested elsewhere, and better.</b> The decision behind
+ * {@code AsyncGetUserInfo} — sign in, fetch, re-login and retry once on a lapsed session, or report
+ * one of four failures — now lives in {@code AccountInfoLoader} with its I/O injected, covered by
+ * JVM tests that run in milliseconds and can produce server behaviour no real server would produce
+ * on cue. Nothing is gained by trying to reproduce those cases through this Activity.
  *
  * <p><b>What this test will not do is log anybody out.</b> {@code AsyncLogout} deletes the stored
  * account and avatar files, and it is reachable only from a dialog behind a button tap. Nothing
