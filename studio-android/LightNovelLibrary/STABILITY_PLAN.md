@@ -686,6 +686,28 @@ never reported at all. Four changes to `.github/workflows/android-ci.yml`:
 Note the API 21 → 33 move means the minSdk floor is no longer verified by CI. That is an accepted
 trade for two test classes; if Phase 4 raises `minSdkVersion` anyway the question goes away.
 
+**The one test in `api/` does not run anywhere, and that is deliberate.** `api/src/test/.../
+Wenku8APITest.java` fails when invoked on a machine that has the private submodule:
+`testGetEncryptedMAP` calls through to `android.util.Base64.encodeToString`, and `api/build.gradle`
+sets no `testOptions` at all, so the un-mocked framework call throws rather than returning a
+default. It is the same trap `app` has, in reverse — `app` sets
+`unitTests.returnDefaultValues = true`, `api` sets nothing.
+
+Nobody noticed because CI cannot see it. CI has no submodule credentials, so it builds `api-stub`,
+where the test does not exist; and its task list is `assembleAlpha testAlphaDebugUnitTest`, which
+would not run `:api:` tests even if it could. So this test runs only for someone holding both the
+submodule and the intent to invoke it.
+
+**It is being left alone on purpose.** `api/` is a separate private repository, and CI must not
+depend on its implementation — that is the whole reason the stub fallback exists. Fixing the test
+means committing to another repo and would pull the public build toward needing the private one.
+Recorded here so the gap is known rather than rediscovered.
+
+For the record, `returnDefaultValues = true` would be the *wrong* fix if it is ever revisited:
+`Base64.encodeToString` would return `null` and the test would assert against a vacuous result —
+green while checking nothing, exactly the failure mode step 1 above describes. Robolectric is the
+answer there, as it was for the XML parsers.
+
 **The codebase already contains the answer.** `WenkuReaderPaginatorTest` injects the
 Android-dependent piece — text measurement — as a lambda:
 
@@ -774,3 +796,85 @@ remains inference. That is a deliberate choice for now, not an oversight.
 
 The important structural point: **Phase 0 before Phase 1**. Without crash data the ranking
 above is inference from reading code, and inference will misallocate effort.
+
+---
+
+## Should we move to platform storage? — proposed, not scheduled
+
+Everything the app persists is hand-rolled: novel indexes and chapters as XML files under two
+possible storage roots, the bookshelf as one line of `aid||aid||aid`, settings as a
+`ContentValues` blob, and `LightCache` doing the byte-level I/O. The question is whether to
+replace that with Room/SQLite plus DataStore.
+
+**Partly yes — and the split is the whole answer.** "Migrate everything" and "migrate nothing"
+are both worse than the line between structured records and bulk text.
+
+### The case for moving the structured data
+
+This is not modernisation for its own sake. Three of this document's findings are *generated* by
+hand-rolled storage, and a database removes the generator rather than patching the symptom:
+
+- **Root cause 4** exists because buffer sizing and short reads are hand-managed. SQLite does not
+  have that failure mode.
+- **Phase 1 item 9** — the bookshelf crash — existed only because a list of integers was stored as
+  text that something had to re-parse. A table of ids cannot produce `NumberFormatException` on
+  read.
+- **Phase 1 item 10** — the unreachable chapter — is a non-atomic write surfacing later as a
+  corrupt read. Transactions make a half-written record impossible rather than recoverable.
+
+There is a testing argument too, and for this codebase it may be the stronger one. Room runs
+against an in-memory database on the JVM, so storage logic that today can only be tested on a
+device — everything this session added under `androidTest` — would move into the fast suite.
+Migrations are versioned and independently testable, which is more than the current
+`SaveFileMigration` can offer.
+
+### The case against moving the chapter text
+
+Chapter content is bulk text, sometimes large, written once and read sequentially. That is what
+filesystems are for, and a database buys little for it beyond a transactional write — which can
+be had far more cheaply by writing to a temporary file and renaming it into place. **Rename is
+atomic on the same filesystem**, so a half-finished download cannot be observed as a valid file;
+that is most of item 10's class for a fraction of the effort and risk.
+
+The natural shape is therefore the conventional one: **records in the database, blobs on disk,
+with the database holding the path and a validity marker.** A chapter is only readable once its
+row says the file is complete.
+
+### What makes this genuinely hard, and it is not the code
+
+The migration is the project; the schema is the easy part. Twelve years of installed devices hold
+data in the current format, across two storage roots, with `SaveFileMigration` already performing
+one external-to-internal move. A migration that drops someone's bookshelf is worse than every bug
+in this document combined — those are recoverable, and lost data is not.
+
+Constraints any implementation should be held to:
+
+1. **Never delete the old files in the same release that stops reading them.** Migrate, then run
+   on the new store while the old one remains untouched, and reclaim the space a release later.
+2. **The migration must be idempotent and resumable.** It will be interrupted — that is precisely
+   the failure this document keeps finding — so a half-finished migration has to be safe to run
+   again rather than something that needs detecting.
+3. **Report on it.** A migration that silently drops entries is the worst possible version of
+   root cause 4. Counts in, counts out, and a non-fatal on any mismatch, in the shape Phase 0
+   established.
+4. **Test it against real corrupt inputs**, not just clean ones — a truncated index, a bad
+   bookshelf token, a partially downloaded chapter. Those all exist on real devices *today*, so
+   the migration meets them on day one. The device tests written this session are the fixtures.
+
+### Sequencing
+
+**After Phase 2, not before, and not instead of it.** The same reasoning as
+"Should we adopt modern architecture first?" applies with more force here, because this migration
+touches user data rather than control flow. It wants the crash data from Phase 0 to confirm
+storage is worth the investment, and it wants the seams from Phase 2 so the storage layer can be
+swapped behind an interface rather than at every call site.
+
+A reasonable order once that groundwork exists: settings to DataStore first — smallest, lowest
+risk, easiest to verify — then the bookshelf and reading positions to Room, then the volume index.
+Chapter text stays on disk, gaining atomic writes and a validity flag. Each step ships
+independently, and stalling after any of them still leaves the app better off, which is the
+property this document has asked for throughout.
+
+**Not scheduled.** It is recorded so the option is evaluated deliberately rather than drifted
+into, and so the next person to ask "should this be a database?" finds the reasoning instead of
+re-deriving it.
