@@ -178,7 +178,32 @@ obviously broken reader. It also turned up Phase 1 item 10: a broken download ma
 chapter permanently unreachable and reported a server error for a server that was never
 contacted. That bug was years old, sat in both readers, and no amount of test-writing had found
 it — which is the argument for doing the rest of this list rather than a reason to consider it
-done. It is not the list above. The scenarios that matter most are the ones ordinary use is
+done. It is not the list above.
+
+#### Exactly what to run, and why each is manual
+
+Being precise about this matters, because **almost none of it is genuinely un-automatable.** It is
+un-automated, which is a different claim. What is actually missing is listed after each case.
+
+| # | Steps | Expected | Why not automated |
+|---|---|---|---|
+| 1 | Find a novel with hundreds of chapters that is **not** in your bookshelf — search or browse to it, do **not** favourite it. Open chapter 1. | Opens and renders. | Needs a launched Activity driven through the UI. No Espresso dependency, and no seam to serve fixture data instead of the live server. |
+| 2 | From that novel, page forward to the next chapter, then back. Then do it **across a volume boundary** (last chapter of vol. 1 → first of vol. 2). | Both directions work; the volume title updates at the boundary. | Same as 1. The boundary is the interesting part because it re-reads the cached index. |
+| 3 | Reopen a novel you have read before and accept the "jump to last read" prompt. | Lands on the right chapter and scroll position. | Same as 1, plus it depends on persisted state from an earlier run. |
+| 4 | Switch to the vertical reader in the engine picker and repeat 1–2. | Same behaviour. | Same as 1; this is a second Activity with its own copy of the load path. |
+| 5 | Turn the network off and open a novel that **is** in your bookshelf and downloaded. | Reads from cache, no error. | Needs airplane mode toggled around a UI flow. |
+| 6 | Developer Options → **Don't keep activities** on, then read for a few minutes: rotate, background and restore, open a chapter. | No crash; position preserved. | **This one is the closest to automatable today** — `androidx.test:core` is already on the classpath via `androidx.test.ext:junit`, so `ActivityScenario.recreate()` covers the recreation half without any new dependency. Full process death still needs more. |
+| 7 | Verify item 10: interrupt a chapter download (kill the app or drop the network mid-download), then open that chapter. | It refetches and reads, rather than reporting `SERVER_RETURN_NOTHING` and closing. | Needs fault injection into the write path plus a UI flow. Nothing today can force a partial write. |
+
+A long series matters for 1 and 2 specifically: the crash Phase 2.1 removed was size-dependent, so
+a novel with hundreds of chapters is the one that used to fail.
+
+**What would replace this list.** Three things, in order of what they unblock: a seam in the
+readers' load-a-chapter decision (covers 1, 2, 4, 7 on the JVM); `ActivityScenario` tests for
+recreation (covers most of 6 with no new dependency); and an Espresso dependency plus a stubbable
+`LightNetwork` (covers the rest, and is the largest piece). Until then the table above is the only
+verification these paths get, which is the strongest available argument for the standing priority
+at the top of this document. The scenarios that matter most are the ones ordinary use is
 least likely to hit by accident — a long series that was never added to the bookshelf (1),
 a volume boundary (2), and *Don't keep activities* (6) — and the first of those is precisely the
 case Phase 2.1 identified as the one that could break it. Treat the list as outstanding until
@@ -582,6 +607,44 @@ Four things turned out differently from the plan as written, and are worth recor
     not an oversight. See "Should we move to platform storage?" below, and the separate storage
     migration plan for what replacing it involves.
 
+12. **The cache is only consulted when the novel came from the bookshelf — PROPOSED, deferred.**
+    Found by exercising item 10's fix on a device. Item 10 made an unusable cached chapter fall
+    through to the network; this is the opposite gap, and it costs performance rather than
+    correctness.
+
+    Only `"fav"` takes the cached path. The launch sites send four different values —
+    `FavFragment:116` sends `"fav"`, `NovelItemListFragment:178` sends `"list"`,
+    `LatestFragment:171` sends `"latest"`, and `NovelInfoActivity:574` sends `"cloud"` — so a
+    novel that is fully downloaded is re-fetched chapter by chapter whenever it is opened from
+    search, a list, the latest feed, or cloud sync. `NovelInfoActivity:574` sends `"cloud"` even
+    for a novel that *is* in the bookshelf, so the same book read by two routes behaves
+    differently.
+
+    **This applies to chapter content only, and the distinction is the whole design.** Content and
+    metadata want opposite caching rules:
+
+    - **Chapter text is effectively immutable** once published. A local copy is as good as a fresh
+      fetch, so it should be preferred whenever it exists, regardless of entry point. That is the
+      change proposed here, and it is what the `// or exist` comment meant.
+    - **Metadata changes** — new chapters get published, titles get corrected — so it *should*
+      follow whether this is a fresh read or a local copy, which is what it already does.
+      `NovelInfoActivity` gates its info fetch on `fromLocal` (`:588`–`:628`) and rewrites the
+      cached index whenever a fresh one arrives from the network (`:680`). The reader then reads
+      that cache unconditionally (`Wenku8ReaderActivityV1:109`, `loadCachedVolume`), which is
+      correct precisely *because* the freshness decision was already made upstream.
+
+    So the fix is narrow: widen the condition at the content load from `from.equals(FromLocal)` to
+    "a usable cached copy is present", making `from` irrelevant to **content** while leaving every
+    metadata path untouched. Since item 10 the network fallthrough already exists, so this is a
+    condition change rather than new machinery.
+
+    **Deliberately not implemented yet.** It is a discretionary improvement to the code path that
+    opens every chapter, and under the standing priority at the top of this document that means it
+    waits for the seam that lets it be tested. Once the reader's load-a-chapter decision is
+    injectable, this becomes a four-case table — cache good, cache empty, cache corrupt, no cache
+    — verifiable on the JVM in milliseconds. Doing it before then would be shipping a second
+    unverified change through the same path as item 10.
+
 Expected outcome: this should remove the majority of crash *volume* without touching
 architecture. Phase 0's data will confirm — and because Phase 0 shipped first, the before/after
 comparison is actually available this time.
@@ -854,13 +917,23 @@ derived from something that might not be ready yet is a trap wherever it appears
 
 | Ship | Contents | Risk |
 |---|---|---|
-| v1.30.0 | Phase 0 instrumentation only | none |
-| v1.30.1 | Phase 1 items 1–8 — **implemented, CI green** | low, mechanical |
-| v1.31 | Phase 2.1 (Intent payloads) — **implemented, needs a device smoke test**; then highest-crash screen from 2.2 | medium |
-| v1.32+ | Remainder of Phase 2, Phase 3 | medium |
+| — | **Coverage work: the reader seam, then `ActivityScenario` recreation tests** | low, additive |
+| v1.30.0 | Phase 0 instrumentation + Phase 1 items 1–10 + Phase 2.1 | low, all CI- and device-tested |
+| v1.31 | Phase 1 item 12 (prefer cached content), then highest-crash screen from 2.2 | medium |
+| v1.32+ | Remainder of Phase 2, Phase 3, storage migration step 0 | medium |
 
-Nothing has shipped yet, so Phase 0 is still collecting nothing and the ordering below 2.1
-remains inference. That is a deliberate choice for now, not an oversight.
+**The release now waits on coverage, by decision rather than by drift.** The original plan shipped
+Phase 0 alone and immediately, on the reasoning that crash data should arrive before anything else
+was ranked. That has been overtaken: Phases 1 and 2.1 are already implemented, CI-green and
+device-tested, so v1.30.0 is no longer "instrumentation only" and there is nothing to gain by
+splitting it. Meanwhile this session demonstrated twice that tests and use find defects that
+reading does not — so coverage first is expected to catch issues *before* Crashlytics has to,
+which is strictly cheaper than learning them from users. It also makes the storage migration
+safer, since that work needs a regression net more than anything else in either document.
+
+The cost is real and should be named: Phase 0 collects nothing while this work happens, so the
+ranking below 2.1 stays inference for longer. That is now a considered trade rather than an
+oversight.
 
 The important structural point: **Phase 0 before Phase 1**. Without crash data the ranking
 above is inference from reading code, and inference will misallocate effort.
