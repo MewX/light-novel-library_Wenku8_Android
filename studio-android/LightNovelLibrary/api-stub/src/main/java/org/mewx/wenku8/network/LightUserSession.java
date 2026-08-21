@@ -89,19 +89,34 @@ public class LightUserSession {
     }
 
 
+    /**
+     * Does nothing, successfully. MainActivity constructs and executes this during {@code onCreate}
+     * and NavigationDrawerFragment later calls {@code aiui.getStatus()} on it, so on a stub build
+     * it has to be a real, runnable AsyncTask that simply has no session to restore — a throwing
+     * constructor made the launcher Activity unstartable, and a null {@code aiui} would move the
+     * crash into the drawer instead.
+     *
+     * <p><b>Neither callback is invoked, and that is the important part.</b> {@code loadUserInfoSet}
+     * would announce a logged-in user this stub does not have. {@code failureCallback} is worse:
+     * at both call sites it <b>deletes the saved account and avatar files</b> and tells the user
+     * their login expired. That is the right response to credentials the server rejected, and the
+     * wrong response to a build with no server — reporting failure here would destroy real saved
+     * data every time the suite ran. Doing nothing leaves the app in the not-logged-in state that
+     * {@link #getLogStatus()} already reports, which is consistent and true.
+     */
     public static class AsyncInitUserInfo extends AsyncTask<Integer, Integer, Wenku8Error.ErrorCode> {
         public AsyncInitUserInfo(Context context, Runnable failureCallback, Runnable loadUserInfoSet) {
-            throw new UnsupportedOperationException("stub");
+            // Deliberately keeps no reference to either callback, so neither can fire by accident.
         }
 
         @Override
         protected Wenku8Error.ErrorCode doInBackground(Integer... params) {
-            throw new UnsupportedOperationException("stub");
+            return Wenku8Error.ErrorCode.USER_INFO_EMPTY;
         }
 
         @Override
         protected void onPostExecute(Wenku8Error.ErrorCode e) {
-            throw new UnsupportedOperationException("stub");
+            // No callback, by design. See the class comment.
         }
     }
 }

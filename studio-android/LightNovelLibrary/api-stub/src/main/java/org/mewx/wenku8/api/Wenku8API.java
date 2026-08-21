@@ -13,8 +13,16 @@ public class Wenku8API {
     public static final String REGISTER_URL = UNKNOWN;
     public static final String BASE_URL = UNKNOWN;
 
+    // The methods below build request parameters or URLs -- they do not talk to anything
+    // themselves, and LightNetwork refuses every request on a stub build anyway. Returning an
+    // inert value instead of throwing lets a screen reach its normal offline state, which is what
+    // an instrumented test on CI should be looking at. Anything that would have to invent a
+    // *result* still throws; see LightUserSession.
+    //
+    // NovelInfoActivity hands this straight to ImageLoader in onCreateView, so a throw made the
+    // whole screen unstartable. An empty URI loads no image, which is the truth here.
     public static String getCoverURL(int aid) {
-        throw new UnsupportedOperationException("stub");
+        return "";
     }
 
     public static String getAvatarURL(int uid) {
@@ -47,12 +55,18 @@ public class Wenku8API {
         allVisit, allVote, monthVisit, monthVote, weekVisit, weekVote, dayVisit, dayVote, postDate, lastUpdate, goodNum, size, fullFlag
     }
 
+    /**
+     * The enum constants are spelled exactly as the server's sort keys, so converting between the
+     * two is a rename rather than a lookup and the stub can do it honestly. An unrecognised key
+     * still throws out of {@code valueOf}, which is the loud behaviour a genuinely wrong sort
+     * order deserves.
+     */
     public static NovelSortedBy getNovelSortedBy(String n) {
-        throw new UnsupportedOperationException("stub");
+        return NovelSortedBy.valueOf(n);
     }
 
     public static String getNovelSortedBy(NovelSortedBy n) {
-        throw new UnsupportedOperationException("stub");
+        return n.name();
     }
 
 
@@ -103,12 +117,15 @@ public class Wenku8API {
         throw new UnsupportedOperationException("stub");
     }
 
+    // Reached from NovelItemListFragment and LatestFragment as they start loading, i.e. from the
+    // fragments MainActivity shows on launch. Empty parameters for a request that will return null
+    // anyway; the list then renders its empty/failed state, which is the point.
     public static ContentValues getNovelList(NovelSortedBy n, int page) {
-        throw new UnsupportedOperationException("stub");
+        return new ContentValues();
     }
 
     public static ContentValues getMewxNovelList(NovelSortedBy n, int page, AppLanguage l) {
-        throw new UnsupportedOperationException("stub");
+        return new ContentValues();
     }
 
     public static ContentValues getNovelListWithInfo(NovelSortedBy n, int page, AppLanguage l) {
