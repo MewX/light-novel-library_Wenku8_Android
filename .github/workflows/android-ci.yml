@@ -75,7 +75,6 @@ jobs:
     # github-token alone, but the repo token is what makes it work regardless of that.
     - name: Upload JVM coverage to Coveralls
       uses: coverallsapp/github-action@v2
-      continue-on-error: true
       with:
         file: studio-android/LightNovelLibrary/app/build/reports/jacoco/jacocoAlphaDebugUnitTestReport/jacocoAlphaDebugUnitTestReport.xml
         format: jacoco
@@ -174,9 +173,28 @@ jobs:
     # Both reports are generated from the same class set and the same source directory (see
     # applyCoverageScope in app/build.gradle), which is what makes them safe to merge: the two
     # differ only in which execution data they read.
+    # Guards against the exact failure that shipped the first time. A Gradle JacocoReport with no
+    # execution data is SKIPPED, not failed, so it writes no XML at all -- and the upload step then
+    # silently sends nothing while every step still reports green. This turns that into a red build
+    # with the .ec locations printed, because a coverage report that quietly measures nothing is
+    # worse than one that fails.
+    - name: Verify instrumented coverage report exists
+      run: |
+        echo "--- .ec execution data found on disk ---"
+        find app/build/outputs -name '*.ec' -printf '%p (%s bytes)\n' 2>/dev/null || echo "NONE"
+        XML=app/build/reports/jacoco/jacocoAlphaDebugAndroidTestReport/jacocoAlphaDebugAndroidTestReport.xml
+        if [ ! -s "$XML" ]; then
+          echo "::error::No instrumented coverage XML at $XML -- the report task was skipped, which means no .ec files were found."
+          exit 1
+        fi
+        echo "--- report line counter ---"
+        grep -o '<counter type="LINE"[^/]*/>' "$XML" | tail -1
+
+    # No `continue-on-error` here. Combined with `fail-on-error: false` below it made even a hard
+    # crash (a missing input file) report as success, which is how the broken upload went unnoticed.
+    # `fail-on-error: false` alone still keeps a Coveralls outage from turning the build red.
     - name: Upload instrumented coverage to Coveralls
       uses: coverallsapp/github-action@v2
-      continue-on-error: true
       with:
         file: studio-android/LightNovelLibrary/app/build/reports/jacoco/jacocoAlphaDebugAndroidTestReport/jacocoAlphaDebugAndroidTestReport.xml
         format: jacoco
@@ -207,7 +225,6 @@ jobs:
     steps:
     - name: Close the Coveralls parallel build
       uses: coverallsapp/github-action@v2
-      continue-on-error: true
       with:
         parallel-finished: true
         carryforward: jvm,instrumented

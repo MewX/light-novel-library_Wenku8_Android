@@ -213,10 +213,18 @@ tasks.register('jacocoAlphaDebugUnitTestReport', JacocoReport) {
  * that task has to have run for this one to have anything to read. It is not wired as a
  * `dependsOn`: on CI the connected run happens inside the emulator action's script block, and a
  * dependency here would try to start a second one.
+ *
+ * `mustRunAfter` is what keeps the order right, and it is not optional. Listing two tasks on the
+ * command line does NOT guarantee Gradle runs them in that order when neither depends on the other
+ * -- it is free to reorder them. Relying on the command line alone is what produced a silent
+ * failure the first time this shipped: with no .ec files present yet, a Gradle `JacocoReport` is
+ * SKIPPED rather than failed, so no XML is written, the upload step then has nothing to send, and
+ * the whole thing reports green while publishing JVM-only coverage.
  */
 tasks.register('jacocoAlphaDebugAndroidTestReport', JacocoReport) {
     group = 'verification'
     description = 'Generates JaCoCo XML/HTML coverage for the alphaDebug instrumented tests.'
+    mustRunAfter 'connectedAlphaDebugAndroidTest'
     applyCoverageScope(it)
 
     executionData.setFrom(fileTree(dir: layout.buildDirectory.get().asFile,
