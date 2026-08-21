@@ -42,6 +42,7 @@ import org.mewx.wenku8.global.api.OldNovelContentParser;
 import org.mewx.wenku8.global.api.VolumeList;
 import org.mewx.wenku8.api.Wenku8API;
 import org.mewx.wenku8.api.Wenku8Error;
+import org.mewx.wenku8.reader.ChapterNavigator;
 import org.mewx.wenku8.reader.loader.WenkuReaderLoader;
 import org.mewx.wenku8.reader.loader.WenkuReaderLoaderXML;
 import org.mewx.wenku8.reader.setting.WenkuReaderSettingV1;
@@ -743,69 +744,9 @@ public class Wenku8ReaderActivityV1 extends BaseMaterialActivity {
                                     return true;
                                 });
 
-                                findViewById(R.id.text_previous).setOnClickListener(v -> {
-                                    // goto previous chapter
-                                    for (int i = 0; i < volumeList.chapterList.size(); i++) {
-                                        if (cid == volumeList.chapterList.get(i).cid) {
-                                            // found self
-                                            if (i == 0) {
-                                                // no more previous
-                                                Toast.makeText(Wenku8ReaderActivityV1.this, getResources().getString(R.string.reader_already_first_chapter), Toast.LENGTH_SHORT).show();
-                                            } else {
-                                                // jump to previous
-                                                final int i_bak = i;
-                                                new MaterialAlertDialogBuilder(Wenku8ReaderActivityV1.this)
-                                                        .setTitle(R.string.dialog_sure_to_jump_chapter)
-                                                        .setMessage(volumeList.chapterList.get(i_bak - 1).chapterName)
-                                                        .setPositiveButton(R.string.dialog_positive_yes, (dialog, which) -> {
-                                                            Intent intent = new Intent(Wenku8ReaderActivityV1.this, Wenku8ReaderActivityV1.class);
-                                                            intent.putExtra("aid", aid);
-                                                            intent.putExtra("vid", volumeList.vid);
-                                                            intent.putExtra("cid", volumeList.chapterList.get(i_bak - 1).cid);
-                                                            intent.putExtra("from", from); // from cloud
-                                                            startActivity(intent);
-                                                            overridePendingTransition(R.anim.fade_in, R.anim.hold); // fade in animation
-                                                            Wenku8ReaderActivityV1.this.finish();
-                                                        })
-                                                        .setNegativeButton(R.string.dialog_negative_no, null)
-                                                        .show();
-                                            }
-                                            break;
-                                        }
-                                    }
-                                });
+                                findViewById(R.id.text_previous).setOnClickListener(v -> jumpToPreviousChapter());
 
-                                findViewById(R.id.text_next).setOnClickListener(v -> {
-                                    // goto next chapter
-                                    for (int i = 0; i < volumeList.chapterList.size(); i++) {
-                                        if (cid == volumeList.chapterList.get(i).cid) {
-                                            // found self
-                                            if (i + 1 >= volumeList.chapterList.size()) {
-                                                // no more previous
-                                                Toast.makeText(Wenku8ReaderActivityV1.this, getResources().getString(R.string.reader_already_last_chapter), Toast.LENGTH_SHORT).show();
-                                            } else {
-                                                // jump to previous
-                                                final int i_bak = i;
-                                                new MaterialAlertDialogBuilder(Wenku8ReaderActivityV1.this)
-                                                        .setTitle(R.string.dialog_sure_to_jump_chapter)
-                                                        .setMessage(volumeList.chapterList.get(i_bak + 1).chapterName)
-                                                        .setPositiveButton(R.string.dialog_positive_yes, (dialog, which) -> {
-                                                            Intent intent = new Intent(Wenku8ReaderActivityV1.this, Wenku8ReaderActivityV1.class);
-                                                            intent.putExtra("aid", aid);
-                                                            intent.putExtra("vid", volumeList.vid);
-                                                            intent.putExtra("cid", volumeList.chapterList.get(i_bak + 1).cid);
-                                                            intent.putExtra("from", from); // from cloud
-                                                            startActivity(intent);
-                                                            overridePendingTransition(R.anim.fade_in, R.anim.hold); // fade in animation
-                                                            Wenku8ReaderActivityV1.this.finish();
-                                                        })
-                                                        .setNegativeButton(R.string.dialog_negative_no, null)
-                                                        .show();
-                                            }
-                                            break;
-                                        }
-                                    }
-                                });
+                                findViewById(R.id.text_next).setOnClickListener(v -> jumpToNextChapter());
                             }
                         }
                         else {
@@ -884,35 +825,7 @@ public class Wenku8ReaderActivityV1 extends BaseMaterialActivity {
 
     private void gotoNextPage() {
         if(mSlidingPageAdapter != null && !mSlidingPageAdapter.hasNext()) {
-            // goto next chapter
-            for (int i = 0; i < volumeList.chapterList.size(); i++) {
-                if (cid == volumeList.chapterList.get(i).cid) {
-                    // found self
-                    if (i + 1 >= volumeList.chapterList.size()) {
-                        // no more previous
-                        Toast.makeText(Wenku8ReaderActivityV1.this, getResources().getString(R.string.reader_already_last_chapter), Toast.LENGTH_SHORT).show();
-                    } else {
-                        // jump to previous
-                        final int i_bak = i;
-                        new MaterialAlertDialogBuilder(Wenku8ReaderActivityV1.this)
-                                .setTitle(R.string.dialog_sure_to_jump_chapter)
-                                .setMessage(volumeList.chapterList.get(i_bak + 1).chapterName)
-                                .setPositiveButton(R.string.dialog_positive_yes, (dialog, which) -> {
-                                    Intent intent = new Intent(Wenku8ReaderActivityV1.this, Wenku8ReaderActivityV1.class);
-                                    intent.putExtra("aid", aid);
-                                    intent.putExtra("vid", volumeList.vid);
-                                    intent.putExtra("cid", volumeList.chapterList.get(i_bak + 1).cid);
-                                    intent.putExtra("from", from); // from cloud
-                                    startActivity(intent);
-                                    overridePendingTransition(R.anim.fade_in, R.anim.hold); // fade in animation
-                                    Wenku8ReaderActivityV1.this.finish();
-                                })
-                                .setNegativeButton(R.string.dialog_negative_no, null)
-                                .show();
-                    }
-                    break;
-                }
-            }
+            jumpToNextChapter();
         }
         else {
             if(sl != null)
@@ -922,40 +835,59 @@ public class Wenku8ReaderActivityV1 extends BaseMaterialActivity {
 
     private void gotoPreviousPage() {
         if(mSlidingPageAdapter != null && !mSlidingPageAdapter.hasPrevious()) {
-            // goto previous chapter
-            for (int i = 0; i < volumeList.chapterList.size(); i++) {
-                if (cid == volumeList.chapterList.get(i).cid) {
-                    // found self
-                    if (i == 0) {
-                        // no more previous
-                        Toast.makeText(Wenku8ReaderActivityV1.this, getResources().getString(R.string.reader_already_first_chapter), Toast.LENGTH_SHORT).show();
-                    } else {
-                        // jump to previous
-                        final int i_bak = i;
-                        new MaterialAlertDialogBuilder(Wenku8ReaderActivityV1.this)
-                                .setTitle(R.string.dialog_sure_to_jump_chapter)
-                                .setMessage(volumeList.chapterList.get(i_bak - 1).chapterName)
-                                .setPositiveButton(R.string.dialog_positive_yes, (dialog, which) -> {
-                                    Intent intent = new Intent(Wenku8ReaderActivityV1.this, Wenku8ReaderActivityV1.class);
-                                    intent.putExtra("aid", aid);
-                                    intent.putExtra("vid", volumeList.vid);
-                                    intent.putExtra("cid", volumeList.chapterList.get(i_bak - 1).cid);
-                                    intent.putExtra("from", from); // from cloud
-                                    startActivity(intent);
-                                    overridePendingTransition(R.anim.fade_in, R.anim.hold); // fade in animation
-                                    Wenku8ReaderActivityV1.this.finish();
-                                })
-                                .setNegativeButton(R.string.dialog_negative_no, null)
-                                .show();
-                    }
-                    break;
-                }
-            }
+            jumpToPreviousChapter();
         }
         else {
             if(sl != null)
                 sl.slidePrevious();
         }
+    }
+
+    private void jumpToNextChapter() {
+        jumpToChapter(ChapterNavigator.next(chapterList(), cid), R.string.reader_already_last_chapter);
+    }
+
+    private void jumpToPreviousChapter() {
+        jumpToChapter(ChapterNavigator.previous(chapterList(), cid), R.string.reader_already_first_chapter);
+    }
+
+    private List<ChapterInfo> chapterList() {
+        return volumeList == null ? null : volumeList.chapterList;
+    }
+
+    /**
+     * Confirms, then reopens this activity on the neighbouring chapter. Reached both from the
+     * previous/next buttons and from paging off either end of the chapter, which is why the four
+     * copies of this became one.
+     *
+     * @param atBoundaryMessage what to say when the volume has no chapter in that direction
+     */
+    private void jumpToChapter(ChapterNavigator.Target target, int atBoundaryMessage) {
+        if (!target.canMove()) {
+            if (target.outcome == ChapterNavigator.Outcome.AT_BOUNDARY) {
+                Toast.makeText(this, getResources().getString(atBoundaryMessage), Toast.LENGTH_SHORT).show();
+            }
+            // UNKNOWN_CHAPTER stays silent, as the original loops did by never matching: the
+            // reader disagreeing with the cached index is not something to explain to a reader.
+            return;
+        }
+
+        final ChapterInfo destination = target.chapter;
+        new MaterialAlertDialogBuilder(this)
+                .setTitle(R.string.dialog_sure_to_jump_chapter)
+                .setMessage(destination.chapterName)
+                .setPositiveButton(R.string.dialog_positive_yes, (dialog, which) -> {
+                    Intent intent = new Intent(Wenku8ReaderActivityV1.this, Wenku8ReaderActivityV1.class);
+                    intent.putExtra("aid", aid);
+                    intent.putExtra("vid", volumeList.vid);
+                    intent.putExtra("cid", destination.cid);
+                    intent.putExtra("from", from); // from cloud
+                    startActivity(intent);
+                    overridePendingTransition(R.anim.fade_in, R.anim.hold); // fade in animation
+                    Wenku8ReaderActivityV1.this.finish();
+                })
+                .setNegativeButton(R.string.dialog_negative_no, null)
+                .show();
     }
 
     @Override

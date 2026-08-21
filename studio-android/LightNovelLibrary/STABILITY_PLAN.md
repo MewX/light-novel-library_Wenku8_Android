@@ -31,10 +31,16 @@ Two clarifications, because this rule is easy to over-apply:
 
 The gaps worth attacking, in order:
 
-1. **The reader flow.** Nothing above storage is covered, which is why Phase 1 item 10's fix
-   shipped unverified. Both readers' chapter-loading bodies are `doInBackground` inside Activity
-   inner classes calling static helpers — extracting that decision into something injectable is
-   the highest-value seam in the codebase.
+1. **The reader flow.** Two decisions live here, and only one now has a seam.
+   - *Which chapter to move to* — **done.** `ChapterNavigator` (12 JVM tests). The logic was
+     copy-pasted four times inside `Wenku8ReaderActivityV1`: once each for the previous/next
+     buttons and once each for paging off an end. Extracting it deleted 120 lines from the
+     Activity and moved the boundary behaviour into the fast suite.
+   - *Whether to load a chapter from cache or the network* — **still uncovered**, which is why
+     Phase 1 item 10's fix shipped unverified and why item 12 is still deferred. Both readers'
+     chapter-loading bodies are `doInBackground` inside Activity inner classes calling static
+     helpers; extracting that decision into something injectable remains the highest-value seam
+     in the codebase.
 2. **Lifecycle guards.** Phase 1 item 2 added guards to ~20 `onPostExecute` bodies against root
    cause 1, the largest single crash source, and not one of them is exercised by a test.
 3. **`GlobalConfig`'s remaining save/load surface.** ~30 methods; the bookshelf and volume index
@@ -78,12 +84,12 @@ applies, and there is work waiting that only that machine can do.
 **Run what CI runs, plus the part CI cannot judge.**
 
 ```
-./gradlew assembleAlpha testAlphaDebugUnitTest      # 78 JVM tests, seconds
+./gradlew assembleAlpha testAlphaDebugUnitTest      # 90 JVM tests, seconds
 ./gradlew connectedAlphaDebugAndroidTest            # 44 tests, needs a device or emulator
 ```
 
 **Both have now been run on a real device** — a Pixel 10 Pro Fold on API 37, i.e. above the
-API 33 CI emulator and above `targetSdk 36`. 78 JVM tests and 44 instrumented tests, no failures.
+API 33 CI emulator and above `targetSdk 36`. 90 JVM tests and 44 instrumented tests, no failures.
 That is the first execution of the instrumented suite on hardware rather than an emulator, and it
 says the storage tests hold on a current device as well as on API 33.
 
@@ -220,9 +226,15 @@ localized strings. The behaviour is right and the message is not — same defect
 `SERVER_RETURN_NOTHING` to a user, and it is now the most visible thing left in the reader.
 
 **What would replace this list.** Three things, in order of what they unblock: a seam in the
-readers' load-a-chapter decision (covers 1, 2, 4, 7 on the JVM); `ActivityScenario` tests for
+readers' load-a-chapter decision (covers 1, 4, 7 on the JVM); `ActivityScenario` tests for
 recreation (covers most of 6 with no new dependency); and an Espresso dependency plus a stubbable
-`LightNetwork` (covers the rest, and is the largest piece). Until then the table above is the only
+`LightNetwork` (covers the rest, and is the largest piece).
+
+**Case 2 is the first one struck off.** `ChapterNavigator` now covers the volume-boundary
+decision — both `已是最后一章` and `已是第一章`, plus a single-chapter volume, which is both ends
+at once — as JVM tests that run in milliseconds. What stays manual is the wiring around it: that
+the buttons are connected, the confirm dialog appears, and the Intent reopens the reader. The
+decision is tested; the plumbing is not. Until then the table above is the only
 verification these paths get, which is the strongest available argument for the standing priority
 at the top of this document. The scenarios that matter most are the ones ordinary use is
 least likely to hit by accident — a long series that was never added to the bookshelf (1),
@@ -735,6 +747,11 @@ effect of each change is measurable.
    So Phase 2.1 is verified, but by a method that does not repeat itself. Every future change to
    this path costs another manual pass until the reader has a seam — which is why that seam is the
    first item under the standing coverage priority at the top of this document.
+
+   **Partly discharged since.** `ChapterNavigator` took the chapter-to-chapter navigation out of
+   the Activity, so the boundary behaviour this item depends on — that a volume's last chapter
+   has nothing after it — is now a JVM test rather than a tap on a device. The load-a-chapter
+   decision is still manual-only, so the paragraph above stands for that half.
 2. **Retire `AsyncTask`.** Do not rewrite all 24 at once. Introduce one small helper
    (`ExecutorService` + main-thread `Handler`, or `androidx.lifecycle` if you are open to
    adding it) and migrate screen by screen, starting with whichever Phase 0 shows is
@@ -808,12 +825,13 @@ appears at first glance. The problem was never the count, it was *where* they ru
 
 | Location | Before | Now | Runs on |
 |---|---|---|---|
-| `app/src/test` | 3 files / 10 tests | **12 files / 78 tests** | JVM, seconds |
+| `app/src/test` | 3 files / 10 tests | **13 files / 90 tests** | JVM, seconds |
 | `app/src/androidTest` | 8 files / 31 tests | **5 files / 44 tests** | emulator or device, minutes |
 | `api/src/test` | 1 file | 1 file | JVM |
 
 (Step 1 moved the JVM count from 10 to 37; `CrashReporterTest` took it to 44 in Phase 0; Phase 1
-added the rest, mostly `LightCacheStreamTest` and `AsyncTaskTrackerTest`.)
+added the rest, mostly `LightCacheStreamTest` and `AsyncTaskTrackerTest`; `ChapterNavigatorTest`
+took it from 78 to 90 when the reader's chapter navigation gained a seam.)
 
 **The emulator flakiness was not theoretical, and CI has been restructured because of it.** The
 run for commit `2525b3b` failed in the emulator step, and because that one step ran
@@ -822,7 +840,7 @@ never reported at all. Four changes to `.github/workflows/android-ci.yml`:
 
 1. **Split into two jobs.** JVM tests no longer depend on an emulator booting. This is the whole
    payoff of having moved those tests off the device: an emulator that will not start now costs
-   the 44 instrumented tests instead of all 122. The same split pays off again on a local device,
+   the 44 instrumented tests instead of all 134. The same split pays off again on a local device,
    where the emulator's flakiness is replaced by the install stall documented above.
 2. **Enable KVM.** The failure was `ShellCommandUnresponsiveException` during `installCommit`,
    with the emulator console also failing to start — the signature of an emulator running
@@ -944,7 +962,8 @@ derived from something that might not be ready yet is a trap wherever it appears
 
 | Ship | Contents | Risk |
 |---|---|---|
-| — | **Coverage work: the reader seam, then `ActivityScenario` recreation tests** | low, additive |
+| — | ~~Chapter-navigation seam~~ **done** (`ChapterNavigator`, 12 JVM tests) | shipped |
+| — | **Coverage work: the load-a-chapter seam, then `ActivityScenario` recreation tests** | low, additive |
 | v1.30.0 | Phase 0 instrumentation + Phase 1 items 1–10 + Phase 2.1 | low, CI-green, device-tested, manual pass complete |
 | v1.31 | Phase 1 item 12 (prefer cached content), then highest-crash screen from 2.2 | medium |
 | v1.32+ | Remainder of Phase 2, Phase 3, storage migration step 0 | medium |
