@@ -33,8 +33,17 @@ public class LightUserSession {
         throw new UnsupportedOperationException("stub");
     }
 
+    /**
+     * Reports "not logged in" rather than throwing. A stub holds no session, so false is the
+     * truthful answer and not a convenient pretence.
+     *
+     * <p>This one is load-bearing for every instrumented test in the project, not just the ones
+     * that care about accounts: {@code BaseMaterialActivity.onResume} samples it on every screen
+     * entry, and it is the base class of every Activity in the app. Throwing here meant no
+     * Activity could reach RESUMED on a stub build, which is what CI runs.
+     */
     public static boolean getLogStatus() {
-        throw new UnsupportedOperationException("stub");
+        return false;
     }
 
     public static Wenku8Error.ErrorCode doLoginFromFile(Runnable loadUserInfoSet) {
@@ -53,8 +62,14 @@ public class LightUserSession {
         throw new UnsupportedOperationException("stub");
     }
 
+    /**
+     * False for the same reason as {@link #getLogStatus()}: a stub has no stored credentials, so
+     * "no user info" is the honest answer. Everything below still throws — logging in, logging
+     * out and the user-file crypto have no truthful inert result, and a test that reaches them on
+     * a stub build should fail loudly rather than quietly succeed against a made-up one.
+     */
     public static boolean isUserInfoSet() {
-        throw new UnsupportedOperationException("stub");
+        return false;
     }
 
     public static void setUserInfo(String username, String password) {

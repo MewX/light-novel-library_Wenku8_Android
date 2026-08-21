@@ -80,8 +80,19 @@ public class Wenku8API {
         throw new UnsupportedOperationException("stub");
     }
 
+    /**
+     * Returns empty parameters rather than throwing, because the reader calls this from
+     * {@code onCreate} before it knows whether it needs the network at all — so a chapter being
+     * read straight off disk still passes through here, and a throw takes the Activity down with
+     * it. That is not hypothetical: it crashed the whole instrumentation run on CI while every
+     * developer machine, which builds against the real submodule, stayed green.
+     *
+     * <p>Empty is the honest value. These are POST parameters for a server this stub cannot
+     * reach, and {@link org.mewx.wenku8.network.LightNetwork} refuses every request anyway, so
+     * nothing downstream reads them.
+     */
     public static ContentValues getNovelContent(int aid, int cid, AppLanguage l) {
-        throw new UnsupportedOperationException("stub");
+        return new ContentValues();
     }
 
     public static ContentValues searchNovelByNovelName(String novelName, AppLanguage l) {
