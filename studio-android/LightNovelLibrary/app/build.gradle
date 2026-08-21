@@ -1,8 +1,7 @@
 apply plugin: 'com.android.application'
 apply plugin: 'com.google.gms.google-services'
 apply plugin: 'com.google.firebase.crashlytics'
-//apply plugin: "jacoco"
-//apply plugin: 'com.github.kt3k.coveralls'
+apply plugin: 'jacoco'
 
 android {
     compileSdkVersion rootProject.targetSdkVersion
@@ -19,7 +18,12 @@ android {
         debug {
             debuggable true
             minifyEnabled false
-            // testCoverageEnabled true
+            // Instruments the JVM unit tests so JaCoCo has execution data to report on. The old
+            // `testCoverageEnabled` spelling was removed in AGP 8; this is its replacement, and it
+            // covers `test<Variant>UnitTest` only. Instrumented coverage is a separate switch
+            // (`enableAndroidTestCoverage`) and is deliberately left off -- see the report task at
+            // the bottom of this file for why.
+            enableUnitTestCoverage true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
             firebaseCrashlytics {
                 mappingFileUploadEnabled false
@@ -133,17 +137,49 @@ dependencies {
     testImplementation 'org.robolectric:robolectric:4.13'
 }
 
-//jacocoTestReport {
-//    reports {
-//        xml.enabled = true // coveralls plugin depends on xml format report
-//        html.enabled = true
-//    }
-//}
-//
-//coveralls {
-//    jacocoReportPath = "${buildDir}/reports/coverage/alpha/debug/report.xml"
-//}
-//
-//tasks.coveralls {
-//    dependsOn 'connectedAlphaDebugAndroidTest'
-//}
+jacoco {
+    toolVersion = "0.8.12"
+}
+
+/**
+ * Coverage for the JVM unit tests, in the XML form Coveralls reads.
+ *
+ * This replaces a commented-out block that used the kt3k coveralls Gradle plugin and hung itself
+ * off `connectedAlphaDebugAndroidTest`, driven by Travis. None of that could be revived as-is: the
+ * plugin is unmaintained, `jacocoTestReport` is not a task the Android plugin creates, and Travis
+ * is gone. Uploading is now the CI workflow's job, so this task only has to produce the report.
+ *
+ * Scope, stated plainly because the number this produces will look low: it measures the 114 JVM
+ * tests and not the 94 instrumented ones. That is a deliberate first step rather than the end
+ * state. Instrumented coverage means `enableAndroidTestCoverage`, pulling .ec files off the
+ * emulator and merging them, and the two suites run in separate CI jobs -- so combining them needs
+ * artifact passing and a third job. Since the instrumented suite is where the Activity and storage
+ * coverage lives, expect the reported figure to understate the real one until that is done.
+ */
+tasks.register('jacocoAlphaDebugUnitTestReport', JacocoReport) {
+    dependsOn 'testAlphaDebugUnitTest'
+    group = 'verification'
+    description = 'Generates JaCoCo XML/HTML coverage for the alphaDebug JVM unit tests.'
+
+    reports {
+        xml.required = true   // the only format Coveralls consumes
+        html.required = true  // for reading locally
+    }
+
+    // Generated code nobody writes or tests: resource ids, the BuildConfig, manifest-derived
+    // classes, and the synthetic classes desugaring and data binding leave behind. Counting them
+    // would move the percentage without saying anything about the code.
+    def generatedCode = [
+            '**/R.class', '**/R$*.class', '**/BuildConfig.*', '**/Manifest*.*',
+            '**/*_Impl*.*', '**/*$$*', '**/*$Lambda$*.*', '**/*$inlined$*.*',
+    ]
+
+    classDirectories.setFrom(files([
+            fileTree(dir: layout.buildDirectory.dir(
+                    'intermediates/javac/alphaDebug/compileAlphaDebugJavaWithJavac/classes').get(),
+                    excludes: generatedCode),
+    ]))
+    sourceDirectories.setFrom(files(['src/main/java']))
+    executionData.setFrom(fileTree(dir: layout.buildDirectory.get().asFile,
+            includes: ['outputs/unit_test_code_coverage/**/*.exec']))
+}

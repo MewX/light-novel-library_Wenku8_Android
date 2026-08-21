@@ -18,7 +18,7 @@ defaults:
 
 jobs:
   # Split out from the emulator job deliberately. These two run independently so that an
-  # emulator that will not boot costs the 94 instrumented tests rather than all 208: previously
+  # emulator that will not boot costs the 105 instrumented tests rather than all 219: previously
   # a single step ran assembleAlpha, the JVM tests and the instrumented tests together, so an
   # emulator failure meant the JVM tests never reported at all.
   build-and-test:
@@ -39,8 +39,10 @@ jobs:
     - name: Grant execute permission for gradlew
       run: chmod +x gradlew
 
+    # jacocoAlphaDebugUnitTestReport depends on testAlphaDebugUnitTest, so the tests still run and
+    # still gate the job -- a failing test stops the report from being produced at all.
     - name: Build and run JVM unit tests
-      run: ./gradlew assembleAlpha testAlphaDebugUnitTest
+      run: ./gradlew assembleAlpha jacocoAlphaDebugUnitTestReport
 
     - name: Upload unit test report
       if: always()
@@ -49,6 +51,27 @@ jobs:
         name: unit-test-results
         path: studio-android/LightNovelLibrary/app/build/reports/tests/
         if-no-files-found: ignore
+
+    # Replaces the Travis-driven kt3k coveralls Gradle plugin, which has been commented out in
+    # app/build.gradle for years. Paths here are repo-relative on purpose: the `defaults.run`
+    # working-directory above applies only to `run:` steps, never to `uses:` ones.
+    #
+    # fail-on-error is false deliberately. Coverage reporting is informational, and a Coveralls
+    # outage or an unlinked repository must not turn a green build red -- the release is gated on
+    # tests passing, not on a third party being reachable.
+    # The repo token is read from repository secrets and must never be written into this file --
+    # anything committed here is public. Add it under Settings > Secrets and variables > Actions
+    # as COVERALLS_REPO_TOKEN. On a public repo the action can often authenticate with the built-in
+    # github-token alone, but the repo token is what makes it work regardless of that.
+    - name: Upload coverage to Coveralls
+      uses: coverallsapp/github-action@v2
+      continue-on-error: true
+      with:
+        file: studio-android/LightNovelLibrary/app/build/reports/jacoco/jacocoAlphaDebugUnitTestReport/jacocoAlphaDebugUnitTestReport.xml
+        format: jacoco
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        repo-token: ${{ secrets.COVERALLS_REPO_TOKEN }}
+        fail-on-error: false
 
   instrumented-test:
     name: Instrumented tests (emulator)

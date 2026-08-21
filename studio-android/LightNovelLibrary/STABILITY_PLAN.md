@@ -52,10 +52,11 @@ The gaps worth attacking, in order:
 2. **Lifecycle guards.** Phase 1 item 2 added guards to ~20 `onPostExecute` bodies against root
    cause 1, the largest single crash source, and not one of them is exercised by a test.
 3. **`GlobalConfig`'s remaining save/load surface.** ~30 methods. **Partly closed:** the bookshelf
-   and volume index already had device coverage, and reading positions (`ReadSavesV1Test`, 15) and
-   search history (`SearchHistoryTest`, 14) now do too. Still uncovered: `loadAllSetting` /
-   `saveAllSetting`, the deprecated V0 read saves, the notice, and the user-account pair — the last
-   of which nothing should test, for the reason given under "No test signs in".
+   and volume index already had device coverage, and reading positions (`ReadSavesV1Test`, 15),
+   search history (`SearchHistoryTest`, 14) and the superseded V0 positions (`ReadSavesV0Test`, 11)
+   now do too. Covering that last one found a live crash — see Phase 1 item 13. Still uncovered:
+   `loadAllSetting` / `saveAllSetting`, the notice, and the user-account pair — the last of which
+   nothing should test, for the reason given under "No test signs in".
 
    Reading positions were the priority of that group because they are the only thing in the save
    folder nobody can reconstruct: a bookshelf can be re-added and a chapter re-downloaded, but not
@@ -866,6 +867,33 @@ Four things turned out differently from the plan as written, and are worth recor
     because it is a behaviour change rather than coverage work, so it should ship on its own
     rather than riding along with the refactor that made it safe.
 
+13. **The V0 reading-position loader crashed the vertical reader on a corrupt file — fixed.**
+    Item 9 again, in a second location, and found the same way: by covering the code rather than
+    by reading it. `loadReadSaves` validated the field *count* of each record and then called
+    `Integer.valueOf` on all three fields regardless, while `loadReadSavesV1` — doing the identical
+    job fifty lines below — checks every field with `LightTool.isInteger` before parsing and skips
+    the record if any fails. The older loader never got that treatment.
+
+    **Reachable and fatal, on both directions of travel.** `VerticalReaderActivity` is the one
+    reader still on this format: it reads the position from a scroll-restore runnable at `:66` and
+    from an unguarded `onPostExecute` at `:363`, and writes it from `onPause` at `:381`. None of
+    those catch, and every one of them reaches `loadReadSaves` lazily. So a single damaged record
+    crashed that reader when opening a chapter *and* again when leaving one, permanently, with
+    nothing in the app that lets a user delete the file to escape it. Item 11's truncating writer
+    is the thing that produces such a record, and `onPause` is exactly when a write gets
+    interrupted.
+
+    The fix is item 9's: drop the record that cannot be parsed, keep every other chapter's
+    position, and report the drop so the real frequency is visible now that it fails silently
+    rather than loudly. `ReadSavesV0Test` covers it, and the failing case was written first — it
+    reproduced as `NumberFormatException: For input string: "not-a-position"` before the fix and
+    passes after, so the crash is evidence rather than inference.
+
+    **Worth generalising.** Two of this document's crash findings are now the same defect: a parser
+    that validates shape but not content, sitting under a lazy call reached from a screen with no
+    catch above it. `loadAllSetting` splits on `::::` and stores whatever it finds without parsing,
+    so it is safe by luck rather than design; it is also the last uncovered loader in the group.
+
 Expected outcome: this should remove the majority of crash *volume* without touching
 architecture. Phase 0's data will confirm — and because Phase 0 shipped first, the before/after
 comparison is actually available this time.
@@ -1014,7 +1042,7 @@ appears at first glance. The problem was never the count, it was *where* they ru
 | Location | Before | Now | Runs on |
 |---|---|---|---|
 | `app/src/test` | 3 files / 10 tests | **15 files / 114 tests** | JVM, seconds |
-| `app/src/androidTest` | 8 files / 31 tests | **12 files / 94 tests** | emulator or device, minutes |
+| `app/src/androidTest` | 8 files / 31 tests | **13 files / 105 tests** | emulator or device, minutes |
 | `api/src/test` | 1 file | 1 file | JVM |
 
 (Step 1 moved the JVM count from 10 to 37; `CrashReporterTest` took it to 44 in Phase 0; Phase 1
@@ -1112,6 +1140,24 @@ never reported at all. Four changes to `.github/workflows/android-ci.yml`:
 
 Note the API 21 → 33 move means the minSdk floor is no longer verified by CI. That is an accepted
 trade for two test classes; if Phase 4 raises `minSdkVersion` anyway the question goes away.
+
+**Coverage reporting is wired again, and the number it publishes needs reading carefully.** The
+README's Travis badge pointed at a service that no longer runs the build, and the Coveralls badge
+was fed by a `kt3k` Gradle plugin hooked to `connectedAlphaDebugAndroidTest` that has been
+commented out in `app/build.gradle` for years — neither could be revived as-is under AGP 9. The
+build badge is now the GitHub Actions workflow, and coverage comes from a `JacocoReport` task over
+the JVM unit tests, uploaded by `coverallsapp/github-action`.
+
+**It measures 114 of the 219 tests, and reports about 5% of lines.** That figure is honest but
+misleading if read as "this app is 5% tested": the JVM suite covers the pure-logic core, while the
+Activity, lifecycle and storage coverage all lives in the instrumented suite, which runs in a
+separate job and is not counted. Coveralls supports parallel builds — each job uploading its own
+report and the service merging them — which is the natural way to close that gap. It needs
+`enableAndroidTestCoverage`, which instruments the app APK, so it should be done deliberately
+rather than as a drive-by: the emulator job is the fragile one, and it currently passes.
+
+The upload is `continue-on-error` and `fail-on-error: false` on purpose. Coverage is informational;
+a Coveralls outage must not turn a green build red when the release is gated on tests passing.
 
 **The one test in `api/` does not run anywhere, and that is deliberate.** `api/src/test/.../
 Wenku8APITest.java` fails when invoked on a machine that has the private submodule:
