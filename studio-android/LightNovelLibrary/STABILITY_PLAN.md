@@ -1141,23 +1141,51 @@ never reported at all. Four changes to `.github/workflows/android-ci.yml`:
 Note the API 21 → 33 move means the minSdk floor is no longer verified by CI. That is an accepted
 trade for two test classes; if Phase 4 raises `minSdkVersion` anyway the question goes away.
 
-**Coverage reporting is wired again, and the number it publishes needs reading carefully.** The
-README's Travis badge pointed at a service that no longer runs the build, and the Coveralls badge
-was fed by a `kt3k` Gradle plugin hooked to `connectedAlphaDebugAndroidTest` that has been
+**Coverage reporting is wired again, and it now measures all 219 tests rather than half of them.**
+The README's Travis badge pointed at a service that no longer runs the build, and the Coveralls
+badge was fed by a `kt3k` Gradle plugin hooked to `connectedAlphaDebugAndroidTest` that has been
 commented out in `app/build.gradle` for years — neither could be revived as-is under AGP 9. The
-build badge is now the GitHub Actions workflow, and coverage comes from a `JacocoReport` task over
-the JVM unit tests, uploaded by `coverallsapp/github-action`.
+build badge is now the GitHub Actions workflow, and coverage comes from two `JacocoReport` tasks,
+uploaded by `coverallsapp/github-action`.
 
-**It measures 114 of the 219 tests, and reports about 5% of lines.** That figure is honest but
-misleading if read as "this app is 5% tested": the JVM suite covers the pure-logic core, while the
-Activity, lifecycle and storage coverage all lives in the instrumented suite, which runs in a
-separate job and is not counted. Coveralls supports parallel builds — each job uploading its own
-report and the service merging them — which is the natural way to close that gap. It needs
-`enableAndroidTestCoverage`, which instruments the app APK, so it should be done deliberately
-rather than as a drive-by: the emulator job is the fragile one, and it currently passes.
+The first attempt covered the JVM suite only and reported about 5% of lines. That was honest but
+badly misleading if read as "this app is 5% tested" — the JVM suite covers the pure-logic core,
+while all the Activity, lifecycle and storage coverage lives in the instrumented suite. Measured
+separately, the split is stark: **JVM 371/7010 lines (5.3%), instrumented 1875/7010 (26.7%).**
+Reporting the first number alone understated the project by roughly a factor of five.
 
-The upload is `continue-on-error` and `fail-on-error: false` on purpose. Coverage is informational;
-a Coveralls outage must not turn a green build red when the release is gated on tests passing.
+Both halves are now uploaded under Coveralls flags (`jvm` and `instrumented`) with `parallel: true`,
+and a third job posts `parallel-finished` so the service publishes the union. Three things about
+this are worth keeping in mind before anyone changes it:
+
+- **Nothing is combined in Gradle.** Each job reports only its own suite; the merge is server-side.
+  There is deliberately no combined Gradle task, so do not go looking for one.
+- **Both reports must measure the same class set**, or the merged figure blends two different
+  measurements and nobody can tell which half moved. That is why `applyCoverageScope` in
+  `app/build.gradle` is shared rather than copied, and why AGP's own
+  `createAlphaDebugAndroidTestCoverageReport` is *not* used: it is an AGP-internal
+  `JacocoReportTask`, not a Gradle `JacocoReport`, so its excludes and source roots cannot be
+  configured to match. Identical denominators (7010 lines, 19 packages) in both reports are the
+  check that this still holds.
+- **`carryforward: jvm,instrumented` on the finish job is load-bearing.** If the emulator job fails,
+  only the `jvm` flag arrives, and without `carryforward` Coveralls would publish that alone — the
+  figure would drop from the merged value to ~5% and read as a catastrophic coverage regression
+  caused by whichever commit happened to be pushed.
+
+`base-path: studio-android/LightNovelLibrary/app/src/main/java` is also required rather than
+cosmetic. JaCoCo names files by package, so the XML says `org/mewx/wenku8/global/GlobalConfig.java`;
+without the base path Coveralls cannot match a single file against the git tree.
+
+`enableAndroidTestCoverage` instruments the app's classes, which was the risk in doing this: the
+emulator job is the fragile one. It was gated on a local run before being pushed — all 105
+instrumented tests pass with instrumentation active (18.2s), and the APK grows from ~20 MB to
+24.9 MB with `pm install` taking 7.3s. Neither is close to the margin that broke this job before.
+The flag is deliberately not hidden behind a CI-only property: that would mean CI building an
+artifact nobody builds locally, which is exactly how the api-stub failures stayed invisible.
+
+The uploads are `continue-on-error` and `fail-on-error: false` on purpose. Coverage is
+informational; a Coveralls outage must not turn a green build red when the release is gated on
+tests passing.
 
 **The one test in `api/` does not run anywhere, and that is deliberate.** `api/src/test/.../
 Wenku8APITest.java` fails when invoked on a machine that has the private submodule:

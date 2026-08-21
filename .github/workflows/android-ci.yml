@@ -56,6 +56,16 @@ jobs:
     # app/build.gradle for years. Paths here are repo-relative on purpose: the `defaults.run`
     # working-directory above applies only to `run:` steps, never to `uses:` ones.
     #
+    # This is half of the coverage picture. The instrumented job below uploads the other half under
+    # its own flag, and the coverage-finish job tells Coveralls to merge them -- see the comments
+    # there. Coverage is NOT combined anywhere in Gradle: each job reports only its own suite and
+    # the union is computed server-side.
+    #
+    # base-path is required, not cosmetic. JaCoCo names files by package, so the XML says
+    # `org/mewx/wenku8/global/GlobalConfig.java`, but in this repo that file lives under
+    # studio-android/LightNovelLibrary/app/src/main/java/. Without this, Coveralls cannot match a
+    # single source file against the git tree and silently reports nothing useful.
+    #
     # fail-on-error is false deliberately. Coverage reporting is informational, and a Coveralls
     # outage or an unlinked repository must not turn a green build red -- the release is gated on
     # tests passing, not on a third party being reachable.
@@ -63,12 +73,15 @@ jobs:
     # anything committed here is public. Add it under Settings > Secrets and variables > Actions
     # as COVERALLS_REPO_TOKEN. On a public repo the action can often authenticate with the built-in
     # github-token alone, but the repo token is what makes it work regardless of that.
-    - name: Upload coverage to Coveralls
+    - name: Upload JVM coverage to Coveralls
       uses: coverallsapp/github-action@v2
       continue-on-error: true
       with:
         file: studio-android/LightNovelLibrary/app/build/reports/jacoco/jacocoAlphaDebugUnitTestReport/jacocoAlphaDebugUnitTestReport.xml
         format: jacoco
+        base-path: studio-android/LightNovelLibrary/app/src/main/java
+        flag-name: jvm
+        parallel: true
         github-token: ${{ secrets.GITHUB_TOKEN }}
         repo-token: ${{ secrets.COVERALLS_REPO_TOKEN }}
         fail-on-error: false
@@ -143,7 +156,7 @@ jobs:
           echo "--- device state before tests ---"
           adb shell dumpsys power | grep -E "mWakefulness=" || true
           adb shell dumpsys window | grep -iE "isKeyguardShowing" || true
-          ./gradlew connectedAlphaDebugAndroidTest
+          ./gradlew connectedAlphaDebugAndroidTest jacocoAlphaDebugAndroidTestReport
 
     - name: Upload instrumented test report
       if: always()
@@ -152,3 +165,52 @@ jobs:
         name: instrumented-test-results
         path: studio-android/LightNovelLibrary/app/build/reports/androidTests/
         if-no-files-found: ignore
+
+    # The other half of the coverage picture. This suite is the one that exercises the Activities,
+    # the lifecycle guards and the save-file code, so it carries several times the line coverage of
+    # the JVM suite -- measured locally at 26.7% against 5.3%. Reporting only the JVM half, as this
+    # workflow did initially, understates the project by roughly a factor of five.
+    #
+    # Both reports are generated from the same class set and the same source directory (see
+    # applyCoverageScope in app/build.gradle), which is what makes them safe to merge: the two
+    # differ only in which execution data they read.
+    - name: Upload instrumented coverage to Coveralls
+      uses: coverallsapp/github-action@v2
+      continue-on-error: true
+      with:
+        file: studio-android/LightNovelLibrary/app/build/reports/jacoco/jacocoAlphaDebugAndroidTestReport/jacocoAlphaDebugAndroidTestReport.xml
+        format: jacoco
+        base-path: studio-android/LightNovelLibrary/app/src/main/java
+        flag-name: instrumented
+        parallel: true
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        repo-token: ${{ secrets.COVERALLS_REPO_TOKEN }}
+        fail-on-error: false
+
+  # Tells Coveralls both halves have arrived so it can publish the merged figure. Needs no checkout,
+  # no JDK and no Gradle -- it is one API call.
+  #
+  # `if: always()` because this must run even when a test job goes red. A parallel Coveralls build
+  # that is never finished stays pending forever, and the badge then shows a stale number with no
+  # indication anything is wrong.
+  #
+  # `carryforward` is the part that is easy to omit and expensive to omit. If the emulator job fails
+  # or is skipped, only the jvm flag arrives, and without this line Coveralls would publish that
+  # alone -- the figure would collapse from the merged value to ~5% and read as a catastrophic
+  # coverage regression caused by whatever commit happened to be pushed. Naming both flags here tells
+  # Coveralls to reuse the last known data for whichever one is missing.
+  coverage-finish:
+    name: Publish merged coverage
+    needs: [ build-and-test, instrumented-test ]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+    - name: Close the Coveralls parallel build
+      uses: coverallsapp/github-action@v2
+      continue-on-error: true
+      with:
+        parallel-finished: true
+        carryforward: jvm,instrumented
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        repo-token: ${{ secrets.COVERALLS_REPO_TOKEN }}
+        fail-on-error: false
