@@ -92,12 +92,12 @@ applies, and there is work waiting that only that machine can do.
 **Run what CI runs, plus the part CI cannot judge.**
 
 ```
-./gradlew assembleAlpha testAlphaDebugUnitTest      # 99 JVM tests, seconds
+./gradlew assembleAlpha testAlphaDebugUnitTest      # 114 JVM tests, seconds
 ./gradlew connectedAlphaDebugAndroidTest            # 65 tests, needs an awake, unlocked device
 ```
 
 **Both have now been run on a real device** — a Pixel 10 Pro Fold on API 37, i.e. above the
-API 33 CI emulator and above `targetSdk 36`. 99 JVM tests and 65 instrumented tests, no failures.
+API 33 CI emulator and above `targetSdk 36`. 114 JVM tests and 65 instrumented tests, no failures.
 That is the first execution of the instrumented suite on hardware rather than an emulator, and it
 says the storage tests hold on a current device as well as on API 33.
 
@@ -162,6 +162,15 @@ by hash before trusting a result:
 adb shell md5sum $(adb shell pm path org.mewx.wenku8 | sed 's/package://' | tr -d '\r')
 md5sum app/build/outputs/apk/alpha/debug/app-alpha-debug.apk
 ```
+
+*Addendum, and it matters because the documented fix does not always work:* on the Pixel 10 Pro
+Fold, `settings put global verifier_verify_adb_installs 0` **silently fails** — the write is
+accepted and the value still reads back `1`. The install then hangs exactly as described above.
+What does work on that device is `settings put global package_verifier_user_consent -1`, after
+which the same install finished in 2.1s having previously burned a ten-minute timeout. Always read
+the setting back rather than assuming the write took, and always hash-check afterwards: the failed
+install left the *previous* test APK in place, so the suite would have run and passed against code
+that predated the change.
 
 **3. Lifecycle tests need the screen awake and unlocked.** `ActivityScenario` cannot reach
 `RESUMED` on a dozing device — the system parks activities at STOPPED — so every test using
@@ -941,14 +950,15 @@ appears at first glance. The problem was never the count, it was *where* they ru
 
 | Location | Before | Now | Runs on |
 |---|---|---|---|
-| `app/src/test` | 3 files / 10 tests | **14 files / 99 tests** | JVM, seconds |
+| `app/src/test` | 3 files / 10 tests | **15 files / 114 tests** | JVM, seconds |
 | `app/src/androidTest` | 8 files / 31 tests | **10 files / 65 tests** | emulator or device, minutes |
 | `api/src/test` | 1 file | 1 file | JVM |
 
 (Step 1 moved the JVM count from 10 to 37; `CrashReporterTest` took it to 44 in Phase 0; Phase 1
 added the rest, mostly `LightCacheStreamTest` and `AsyncTaskTrackerTest`; `ChapterNavigatorTest`
 took it from 78 to 90 when the reader's chapter navigation gained a seam, and
-`ChapterContentLoaderTest` to 99 when the cache-or-network decision gained one.)
+`ChapterContentLoaderTest` to 99 when the cache-or-network decision gained one, and
+`AccountInfoLoaderTest` to 114 when the account screen's load decision did.)
 
 **Activity-level coverage was impossible on CI until recently, and not for a reason anyone would
 guess.** `BaseMaterialActivity.onResume` samples `LightUserSession.getLogStatus()`, and
@@ -984,9 +994,26 @@ calls `finish()` on every failure, so on a stub build it is closing from the mom
 already finished never reaches, so they would not fail — they would hang for the full 45-second
 timeout and report something that reads like a startup defect. Launching is the only move that
 stays meaningful in both outcomes, and whether the screen *stays* open depends on a session and a
-server, which differ between CI and a developer's device. Hence one test. Getting more requires the
-stubbable `LightNetwork` already listed below; until then, that single test still covers the thing
-that has actually broken before, which is startup.
+server, which differ between CI and a developer's device. Hence one test on the device.
+
+**What that screen's logic needed was not a device test at all.** The interesting part of
+`UserInfoActivity` was never its lifecycle — it was the decision tree inside
+`AsyncGetUserInfo.doInBackground`: an optional daily sign-in, a fetch, a re-login-and-retry when
+the server reports a lapsed session, and four distinct failures the screen maps differently. None
+of it could be provoked on demand, because producing "the server says your session lapsed, then
+accepts your stored credentials, then answers properly" requires a server that will do that on
+cue. That decision now lives in `AccountInfoLoader` with its I/O injected, exactly as
+`ChapterContentLoader` did for the reader, and is covered by 15 JVM tests that run in
+milliseconds. The Activity keeps only what genuinely needs Android: decoding the avatar and
+writing it to the disk cache.
+
+One design point worth keeping, because it is the reason this seam works on CI at all:
+`Wenku8Error.getSystemDefinedErrorCode` — turning a response integer into an `ErrorCode` — is
+**injected rather than called**. It throws on `api-stub`, and it should: that mapping is wire
+protocol belonging to the private `api/` module, and reproducing it in the public stub would
+publish the thing the stub exists to keep out. Taking it as a dependency lets the decision be
+tested under either configuration without either module knowing tests exist. Any future seam over
+`api/` should do the same.
 
 **No test signs in, and no test signs out.** A successful login has to reach the real wenku8
 server, and an automated suite firing credentials at someone else's production service is not
@@ -1001,7 +1028,7 @@ never reported at all. Four changes to `.github/workflows/android-ci.yml`:
 
 1. **Split into two jobs.** JVM tests no longer depend on an emulator booting. This is the whole
    payoff of having moved those tests off the device: an emulator that will not start now costs
-   the 65 instrumented tests instead of all 164. The same split pays off again on a local device,
+   the 65 instrumented tests instead of all 179. The same split pays off again on a local device,
    where the emulator's flakiness is replaced by the install stall documented above.
 2. **Enable KVM.** The failure was `ShellCommandUnresponsiveException` during `installCommit`,
    with the emulator console also failing to start — the signature of an emulator running
