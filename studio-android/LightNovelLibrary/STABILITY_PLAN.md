@@ -115,40 +115,53 @@ one, so a stray `adb` from the shell silently downgrades the daemon underneath a
 `/usr/bin` on `PATH`.** This was not the cause of the install failure below, but it is a real
 hazard and it muddied the diagnosis for several runs.
 
-**2. `connectedAndroidTest` install stalls under WSL2, intermittently.** The symptom is
-`com.android.ddmlib.InstallException: Failed to install-write all apks`, reported as
-`Failed to install split APK(s)`. It is worth being precise about what this is *not*, because
-two plausible readings are both wrong:
+**2. Installs stall because of Play Protect, not WSL2.** The symptom is
+`com.android.ddmlib.InstallException: Failed to install-write all apks` from Gradle, or a plain
+`adb install` that simply never returns. **This was misdiagnosed for several sessions** and the
+earlier explanation in this document was wrong; what follows replaces it.
 
-- Not a signature clash with an installed release build. It reproduces with nothing at all
-  installed, verified against `pm list packages` for every user on the device.
-- Not a slow transfer. Every failure lands at 4m18s–4m25s, which is ddmlib's four-minute install
-  timeout; every success lands at 24–29s. The transfer either completes in seconds or hangs
-  outright. Installing the identical APK from the identical fresh state with
-  `adb install-multiple` takes **9 seconds** and has never failed.
+The cause is Google Play Protect's ADB install verification, controlled by the
+`verifier_verify_adb_installs` global setting, which is `1` by default. It intercepts the install
+on-device and can hang for many minutes before the APK is committed.
 
-So the device, the cable, the APK and the package manager are all fine — only AGP's ddmlib
-install path stalls, and only sometimes. Across eight runs it succeeded twice. The suspect is
-WSL2's `usbipd` USB passthrough, on the grounds that a bulk transfer stalling while an
-identical one through a different code path succeeds is characteristic of it; that is inference
-from the timing signature, not a proven root cause.
+The measurement that settles it — splitting `adb install` into its two halves, which is also the
+diagnostic worth reaching for first:
 
-*A dead end, recorded so it is not re-run:* the two successes both had an `adb logcat` streaming
-alongside, which suggested a keepalive against an idling USB link. A third run with logcat
-running failed, which kills the theory. The tally is 2 pass / 1 fail with logcat against 5 fail
-without — flaky, not causal. Do not build a workaround on it.
+| Step | Time |
+| --- | --- |
+| `adb push` of the same 20 MB APK | **0.5 s** (59 MB/s) |
+| `adb shell pm install` with the verifier on | hung; killed at 5 min and at 7 min |
+| `adb shell pm install` with the verifier off | **11.6 s** |
 
-**Until this is understood, retry the Gradle task; it succeeds within a few attempts.** The
-faster path is to bypass AGP's install step entirely, since the manual install is reliable:
+If push is fast and install hangs, it is verification. It is never the cable.
 
 ```
-adb install-multiple -r -t app/build/outputs/apk/alpha/debug/app-alpha-debug.apk
-adb install-multiple -r -t app/build/outputs/apk/androidTest/alpha/debug/app-alpha-debug-androidTest.apk
-adb shell am instrument -w org.mewx.wenku8.test/androidx.test.runner.AndroidJUnitRunner
+adb shell settings get global verifier_verify_adb_installs   # save it, normally 1
+adb shell settings put global verifier_verify_adb_installs 0
+adb push <apk> /data/local/tmp/x.apk && adb shell pm install -r -t /data/local/tmp/x.apk
+adb shell settings put global verifier_verify_adb_installs 1  # restore when finished
 ```
 
 Note that `connectedAndroidTest` uninstalls both packages when it finishes, so a manual
-pre-install does not survive into a subsequent Gradle run — it has to be the runner above.
+pre-install does not survive into a subsequent Gradle run — use
+`adb shell am instrument -w org.mewx.wenku8.test/androidx.test.runner.AndroidJUnitRunner`.
+
+*Two dead ends, recorded so they are not re-run.* Neither is worth revisiting:
+
+- **WSL2 `usbipd` passthrough.** Inferred from the timing signature alone — every failure landing
+  near ddmlib's four-minute timeout while successes took 24–29 s. Plausible and wrong; a 0.5 s
+  push through the same USB link disproves it.
+- **`adb logcat` as a keepalive.** Two early successes happened to have logcat streaming
+  alongside. A third run with logcat still failed. Flaky, not causal.
+
+**A stalled install leaves the previous APK in place**, so the next test run silently exercises
+stale code and "passes". This has caused a wrong conclusion at least four times. Always confirm
+by hash before trusting a result:
+
+```
+adb shell md5sum $(adb shell pm path org.mewx.wenku8 | sed 's/package://' | tr -d '\r')
+md5sum app/build/outputs/apk/alpha/debug/app-alpha-debug.apk
+```
 
 **3. Lifecycle tests need the screen awake and unlocked.** `ActivityScenario` cannot reach
 `RESUMED` on a dozing device — the system parks activities at STOPPED — so every test using
@@ -167,7 +180,50 @@ by hand. `ReaderRecreationTest` asserts both conditions in `@Before`, so this no
 with an actionable message instead of 45s of ambiguity — worth copying into any future lifecycle
 test.
 
-**4. Do not run `adb tcpip`.** Switching `adbd` to TCP restarts it and drops the USB transport,
+**4. CI builds against `api-stub`; your machine almost certainly does not.** `settings.gradle`
+points `:api` at the private submodule when `api/build.gradle` exists and at the in-repo
+`api-stub/` otherwise. CI never checks out the submodule. So **CI always builds against the stub
+and any machine with the submodule never does** — a divergence that no local run can see.
+
+Most stub methods `throw new UnsupportedOperationException("stub")`, which makes this sharp. The
+symptom in a CI log is not a test failure at all:
+
+```
+Test run failed to complete. Instrumentation run failed due to Process crashed.
+```
+
+No assertion, no test name — because no test ever ran. Two throws did this, and the second was
+far worse than the first:
+
+- `Wenku8API.getNovelContent()`, reached from `Wenku8ReaderActivityV1.onCreate` **eagerly**,
+  before the reader decides whether it needs the network at all. A chapter opened entirely from
+  disk still went through the API and took the process down.
+- `LightUserSession.getLogStatus()`, sampled by `BaseMaterialActivity.onResume` — the base class
+  of every Activity in the app. While it threw, **no Activity in this project could reach RESUMED
+  on a stub build**, so no instrumented test that launches a screen could ever pass on CI.
+
+Reproduce CI's configuration locally instead of inferring it from a red build:
+
+```
+./gradlew -DforceApiStub assembleAlphaDebug testAlphaDebugUnitTest   # or WENKU8_FORCE_API_STUB=1
+```
+
+Added for exactly this reason. **Run it before pushing anything that touches an Activity.**
+
+The rule for `api-stub`: where a stubbed method has a truthful failure value, return it — the
+`LightNetwork` request methods are already `@Nullable` and now return `null`, which is genuinely
+what "no server" means, so a stub build exercises the app's offline path rather than dying inside
+an `AsyncTask`. Where there is no honest inert value — logging in, logging out, the user-file
+crypto — keep throwing, so a path nobody has considered stays loud instead of quietly succeeding
+against an invented answer. **Do not put fixture data in the stub**: test data belongs in each
+test's own fixture, and data in the stub becomes global state every future test silently inherits.
+
+*Recorded so it is not re-run:* three consecutive CI fixes were pushed on inference from job step
+*durations*, because the logs were unreadable from the dev machine (403 on logs, 401 on
+artifacts, no `gh`, no token). All three were wrong, and each cost a full CI cycle. The stack
+trace was in the log the whole time. Ask for the log rather than theorising from timing.
+
+**5. Do not run `adb tcpip`.** Switching `adbd` to TCP restarts it and drops the USB transport,
 and under WSL2 the device does not come back on its own: it needs re-attaching with
 `usbipd attach` from Windows. On Android 11+ this is a bad trade anyway, since wireless
 debugging uses a random port and a pairing code that only the device screen shows, so

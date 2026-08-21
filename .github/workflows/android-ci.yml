@@ -93,17 +93,24 @@ jobs:
         working-directory: ./studio-android/LightNovelLibrary
         emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot -camera-back none
         disable-animations: true
-        # The emulator boots to a lock screen, and a locked or dozing device parks activities at
-        # STOPPED so ActivityScenario can never reach RESUMED. Every lifecycle test then fails
-        # with "Activity never becomes requested state [RESUMED]" after a 45-second timeout,
-        # which reads like the Activity failing to start rather than like an unprepared device.
-        # `locksettings set-disabled true` works here because a fresh emulator has no secure
-        # lock; on a real device with a PIN it would not, which is why ReaderRecreationTest
-        # asserts both conditions itself rather than assuming anyone ran this.
-        # Waking the screen once is not enough: the Gradle line below spends minutes assembling
-        # before it installs anything, and the emulator dozes off again in the meantime. So the
-        # screen is pinned on for the life of the job rather than nudged awake, and the state is
-        # printed immediately before the tests so a future failure is diagnosable from the log.
+        # Screen preparation. The emulator boots to a lock screen, and a locked or dozing device
+        # parks activities at STOPPED so ActivityScenario can never reach RESUMED -- every
+        # lifecycle test then fails with "Activity never becomes requested state [RESUMED]" after
+        # a 45-second timeout, which reads like the Activity failing to start rather than like an
+        # unprepared device. `locksettings set-disabled true` works here because a fresh emulator
+        # has no secure lock; on a real device with a PIN it would not, which is why
+        # ReaderRecreationTest asserts both conditions itself rather than assuming anyone ran
+        # this. Waking once is not enough either: the Gradle line below spends minutes assembling
+        # before it installs anything, so the screen is pinned on for the life of the job.
+        #
+        # Worth knowing what this is NOT for. These lines were added while chasing a red build
+        # that turned out to be `UnsupportedOperationException: stub` -- CI builds against
+        # api-stub, and two methods on the Activity startup path threw. Screen state was never
+        # the cause. They stay because a fresh emulator genuinely does boot locked, but if this
+        # job goes red again, read the log before assuming it is the device: reproduce what CI
+        # builds with `./gradlew -DforceApiStub ...` locally. See "Device setup traps" in
+        # STABILITY_PLAN.md. The echo below exists so the next failure is diagnosable from the
+        # log alone rather than inferred from step durations.
         script: |
           adb shell svc power stayon true || true
           adb shell settings put system screen_off_timeout 2147483647 || true
