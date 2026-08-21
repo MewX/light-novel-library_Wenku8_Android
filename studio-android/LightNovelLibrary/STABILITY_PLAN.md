@@ -93,11 +93,11 @@ applies, and there is work waiting that only that machine can do.
 
 ```
 ./gradlew assembleAlpha testAlphaDebugUnitTest      # 99 JVM tests, seconds
-./gradlew connectedAlphaDebugAndroidTest            # 58 tests, needs an awake, unlocked device
+./gradlew connectedAlphaDebugAndroidTest            # 65 tests, needs an awake, unlocked device
 ```
 
 **Both have now been run on a real device** — a Pixel 10 Pro Fold on API 37, i.e. above the
-API 33 CI emulator and above `targetSdk 36`. 99 JVM tests and 58 instrumented tests, no failures.
+API 33 CI emulator and above `targetSdk 36`. 99 JVM tests and 65 instrumented tests, no failures.
 That is the first execution of the instrumented suite on hardware rather than an emulator, and it
 says the storage tests hold on a current device as well as on API 33.
 
@@ -228,6 +228,31 @@ and under WSL2 the device does not come back on its own: it needs re-attaching w
 `usbipd attach` from Windows. On Android 11+ this is a bad trade anyway, since wireless
 debugging uses a random port and a pairing code that only the device screen shows, so
 `adb connect <ip>:5555` will not reach it. Recovering costs a replug.
+
+**6. An instrumented crash is blamed on whichever test was running when it landed, not the one
+that caused it.** Background work outlives the test that started it, and a `Process crashed`
+report names the current test. `UserLoginActivityLifecycleTest` produced exactly this:
+`AsyncLoginTask.doInBackground` sleeps 500ms before it calls anything, so a tap in one test
+crashed the run three tests later, and the report accused a test that taps nothing. The stack
+trace is the reliable part — read it and find the test that reaches that code, rather than the
+test named at the top. Per-test status codes make the sequence visible:
+
+```bash
+adb shell am instrument -w -r -e class <FQCN> org.mewx.wenku8.test/androidx.test.runner.AndroidJUnitRunner \
+  | grep -E "INSTRUMENTATION_STATUS: test=|INSTRUMENTATION_STATUS_CODE:"
+```
+
+`0` is a pass, `-2` a failure; the culprit is usually the test that passed immediately before the
+one that died. Note that JUnit 4 does not run methods in source order, so "before" means what the
+log says, not what the file says.
+
+**7. `setText` in a test is filtered like typing is.** `layout_user_login.xml` puts
+`android:maxLength="30"` on both fields, so a test setting 31 characters silently gets 30 —
+which is *valid* input, so it sailed past the Activity's own `length() > 30` guard and submitted
+a real login attempt. On a stub build that surfaced as trap 6 above; on a real build it would
+have gone to the wenku8 server. Two lessons: input-length guards behind a `maxLength` cannot be
+reached from the view layer at all (test the filter instead, which is the thing actually holding
+the line), and a test that fills a form is one bug away from submitting it.
 
 #### A packaging hazard found while diagnosing the above
 
@@ -917,7 +942,7 @@ appears at first glance. The problem was never the count, it was *where* they ru
 | Location | Before | Now | Runs on |
 |---|---|---|---|
 | `app/src/test` | 3 files / 10 tests | **14 files / 99 tests** | JVM, seconds |
-| `app/src/androidTest` | 8 files / 31 tests | **8 files / 58 tests** | emulator or device, minutes |
+| `app/src/androidTest` | 8 files / 31 tests | **10 files / 65 tests** | emulator or device, minutes |
 | `api/src/test` | 1 file | 1 file | JVM |
 
 (Step 1 moved the JVM count from 10 to 37; `CrashReporterTest` took it to 44 in Phase 0; Phase 1
@@ -938,6 +963,8 @@ throwing, the same tests became writable for the screens that matter most:
 | `ReaderRecreationTest` (6) | the reader across rebuilds, and the three ways its volume can be missing |
 | `MainActivityLifecycleTest` (4) | the launcher: opening, rebuilding twice, backgrounding |
 | `NovelInfoActivityLifecycleTest` (4) | the detail screen with nothing to show and no server |
+| `UserLoginActivityLifecycleTest` (6) | the login form across rebuilds, and its two input guards |
+| `UserInfoActivityLifecycleTest` (1) | the account screen starting up |
 
 The launcher and detail tests are worth their runtime for a specific reason: those two screens do
 the most work in `onCreate` and host the Fragments where, per the diagnosis above, most of the
@@ -949,6 +976,24 @@ Note what these deliberately do **not** assert: what a failed screen *displays*.
 this app is inconsistent and partly untranslated, and freezing today's appearance into a test
 would make fixing it harder. The contract they hold is structural — the Activity survives.
 
+**The two account screens are uneven on purpose, and the imbalance marks the next seam to build.**
+`UserLoginActivity` does nothing networked in `onCreate`, so it behaves the same on a stub build
+and a real one and gets the full set. `UserInfoActivity` fires `AsyncGetUserInfo` immediately and
+calls `finish()` on every failure, so on a stub build it is closing from the moment it opens:
+`recreate()` and `moveToState(RESUMED)` both block until RESUMED, which an Activity that has
+already finished never reaches, so they would not fail — they would hang for the full 45-second
+timeout and report something that reads like a startup defect. Launching is the only move that
+stays meaningful in both outcomes, and whether the screen *stays* open depends on a session and a
+server, which differ between CI and a developer's device. Hence one test. Getting more requires the
+stubbable `LightNetwork` already listed below; until then, that single test still covers the thing
+that has actually broken before, which is startup.
+
+**No test signs in, and no test signs out.** A successful login has to reach the real wenku8
+server, and an automated suite firing credentials at someone else's production service is not
+worth the coverage. Logout is worse than useless to test: `AsyncLogout` deletes the stored account
+and avatar files, so a test that reached it would destroy the credentials of whoever ran the suite
+— the same landmine `AsyncInitUserInfo`'s failure callback carries, documented in the stub.
+
 **The emulator flakiness was not theoretical, and CI has been restructured because of it.** The
 run for commit `2525b3b` failed in the emulator step, and because that one step ran
 `assembleAlpha testAlphaDebugUnitTest connectedAlphaDebugAndroidTest` together, the 44 JVM tests
@@ -956,7 +1001,7 @@ never reported at all. Four changes to `.github/workflows/android-ci.yml`:
 
 1. **Split into two jobs.** JVM tests no longer depend on an emulator booting. This is the whole
    payoff of having moved those tests off the device: an emulator that will not start now costs
-   the 58 instrumented tests instead of all 157. The same split pays off again on a local device,
+   the 65 instrumented tests instead of all 164. The same split pays off again on a local device,
    where the emulator's flakiness is replaced by the install stall documented above.
 2. **Enable KVM.** The failure was `ShellCommandUnresponsiveException` during `installCommit`,
    with the emulator console also failing to start — the signature of an emulator running
