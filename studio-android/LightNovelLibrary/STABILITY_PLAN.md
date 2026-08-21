@@ -46,11 +46,11 @@ applies, and there is work waiting that only that machine can do.
 
 ```
 ./gradlew assembleAlpha testAlphaDebugUnitTest      # 78 JVM tests, seconds
-./gradlew connectedAlphaDebugAndroidTest            # 32 tests, needs a device or emulator
+./gradlew connectedAlphaDebugAndroidTest            # 42 tests, needs a device or emulator
 ```
 
 **Both have now been run on a real device** — a Pixel 10 Pro Fold on API 37, i.e. above the
-API 33 CI emulator and above `targetSdk 36`. 78 JVM tests and 32 instrumented tests, no failures.
+API 33 CI emulator and above `targetSdk 36`. 78 JVM tests and 42 instrumented tests, no failures.
 That is the first execution of the instrumented suite on hardware rather than an emulator, and it
 says the storage tests hold on a current device as well as on API 33.
 
@@ -417,6 +417,43 @@ Four things turned out differently from the plan as written, and are worth recor
    goes by without that breadcrumb appearing** — the same measure-then-act shape Phase 0 used
    for `loadStream`, applied to a tolerance nobody can currently justify or refute.
 
+9. **`loadLocalBookShelf` throws on a corrupt bookshelf file — NOT YET FIXED.** Found by writing
+   `LocalBookshelfTest`, and the same shape as items 7 and 8 one layer down: a reader that
+   assumes its input is well-formed because it usually is.
+
+   The local bookshelf is one line of `aid||aid||aid`. `GlobalConfig.loadLocalBookShelf` splits it
+   and calls `Integer.valueOf` on every token with no `try`/`catch`, so a single non-numeric token
+   throws `NumberFormatException` out of the method. Empty tokens *are* skipped, so a trailing or
+   doubled separator is survivable — it is specifically a corrupt token that is fatal.
+
+   What makes it worth fixing rather than noting: nothing calls it defensively.
+   `getLocalBookshelfList` and `testInLocalBookshelf` both invoke it lazily on first use, with no
+   catch anywhere up the stack, and the bookshelf tab is the app's home screen. So a bookshelf
+   file damaged by a partial write — root cause 4's territory, and this file is rewritten on
+   every add and remove — takes out the screen that reads it, on launch, permanently, with no way
+   for the user to recover except clearing app data.
+
+   The fix matches item 7: skip the token that does not parse rather than rejecting the file, and
+   record a non-fatal so the frequency is visible. Rejecting the whole file would silently empty
+   a user's bookshelf, which is worse than dropping one entry from it.
+
+   `LocalBookshelfTest.testNonNumericEntryCurrentlyThrows` pins the present behaviour as a
+   characterization test, per the testing strategy below. **It has to be inverted when the fix
+   lands** — it asserts the bug.
+
+   Two smaller things found alongside it, neither yet addressed:
+
+   - `moveBookToTheTopOfBookshelf` dereferences the `bookshelf` static with no null check, unlike
+     `addToLocalBookshelf`, `removeFromLocalBookshelf`, `getLocalBookshelfList` and
+     `testInLocalBookshelf`, which all lazily load first. It is only reachable after something
+     else has loaded the shelf, so it is latent rather than live — but it is root cause 2 in
+     miniature, and one call from a new screen makes it real.
+   - `getDefaultStoragePath()` returns the *external* root (`/storage/emulated/0/wenku8/`) on a
+     current device, which is unwritable on API 29+, so every save silently falls through to the
+     internal backup root. Everything works, but the names are backwards from what actually
+     happens, and a test that writes to "the default path" writes somewhere the app never reads.
+     That is not a bug so much as a trap, and it cost this test a full debug cycle.
+
 Expected outcome: this should remove the majority of crash *volume* without touching
 architecture. Phase 0's data will confirm — and because Phase 0 shipped first, the before/after
 comparison is actually available this time.
@@ -554,7 +591,7 @@ appears at first glance. The problem was never the count, it was *where* they ru
 | Location | Before | Now | Runs on |
 |---|---|---|---|
 | `app/src/test` | 3 files / 10 tests | **12 files / 78 tests** | JVM, seconds |
-| `app/src/androidTest` | 8 files / 31 tests | **4 files / 32 tests** | emulator or device, minutes |
+| `app/src/androidTest` | 8 files / 31 tests | **5 files / 42 tests** | emulator or device, minutes |
 | `api/src/test` | 1 file | 1 file | JVM |
 
 (Step 1 moved the JVM count from 10 to 37; `CrashReporterTest` took it to 44 in Phase 0; Phase 1
@@ -567,7 +604,7 @@ never reported at all. Four changes to `.github/workflows/android-ci.yml`:
 
 1. **Split into two jobs.** JVM tests no longer depend on an emulator booting. This is the whole
    payoff of having moved those tests off the device: an emulator that will not start now costs
-   the 32 instrumented tests instead of all 110. The same split pays off again on a local device,
+   the 42 instrumented tests instead of all 120. The same split pays off again on a local device,
    where the emulator's flakiness is replaced by the install stall documented above.
 2. **Enable KVM.** The failure was `ShellCommandUnresponsiveException` during `installCommit`,
    with the emulator console also failing to start — the signature of an emulator running
