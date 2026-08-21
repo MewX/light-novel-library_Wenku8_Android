@@ -93,11 +93,11 @@ applies, and there is work waiting that only that machine can do.
 
 ```
 ./gradlew assembleAlpha testAlphaDebugUnitTest      # 99 JVM tests, seconds
-./gradlew connectedAlphaDebugAndroidTest            # 50 tests, needs an awake, unlocked device
+./gradlew connectedAlphaDebugAndroidTest            # 58 tests, needs an awake, unlocked device
 ```
 
 **Both have now been run on a real device** — a Pixel 10 Pro Fold on API 37, i.e. above the
-API 33 CI emulator and above `targetSdk 36`. 99 JVM tests and 50 instrumented tests, no failures.
+API 33 CI emulator and above `targetSdk 36`. 99 JVM tests and 58 instrumented tests, no failures.
 That is the first execution of the instrumented suite on hardware rather than an emulator, and it
 says the storage tests hold on a current device as well as on API 33.
 
@@ -917,13 +917,37 @@ appears at first glance. The problem was never the count, it was *where* they ru
 | Location | Before | Now | Runs on |
 |---|---|---|---|
 | `app/src/test` | 3 files / 10 tests | **14 files / 99 tests** | JVM, seconds |
-| `app/src/androidTest` | 8 files / 31 tests | **6 files / 50 tests** | emulator or device, minutes |
+| `app/src/androidTest` | 8 files / 31 tests | **8 files / 58 tests** | emulator or device, minutes |
 | `api/src/test` | 1 file | 1 file | JVM |
 
 (Step 1 moved the JVM count from 10 to 37; `CrashReporterTest` took it to 44 in Phase 0; Phase 1
 added the rest, mostly `LightCacheStreamTest` and `AsyncTaskTrackerTest`; `ChapterNavigatorTest`
 took it from 78 to 90 when the reader's chapter navigation gained a seam, and
 `ChapterContentLoaderTest` to 99 when the cache-or-network decision gained one.)
+
+**Activity-level coverage was impossible on CI until recently, and not for a reason anyone would
+guess.** `BaseMaterialActivity.onResume` samples `LightUserSession.getLogStatus()`, and
+`MainActivity.onCreate` constructs `LightUserSession.AsyncInitUserInfo`. Both threw on a build
+against `api-stub` — which is the only thing CI builds — so **no Activity in this project could
+reach RESUMED there**, and any test that launched a screen crashed the instrumentation run rather
+than failing. `ReaderRecreationTest` was the first to hit it. Once the stub answered instead of
+throwing, the same tests became writable for the screens that matter most:
+
+| Class | Covers |
+|---|---|
+| `ReaderRecreationTest` (6) | the reader across rebuilds, and the three ways its volume can be missing |
+| `MainActivityLifecycleTest` (4) | the launcher: opening, rebuilding twice, backgrounding |
+| `NovelInfoActivityLifecycleTest` (4) | the detail screen with nothing to show and no server |
+
+The launcher and detail tests are worth their runtime for a specific reason: those two screens do
+the most work in `onCreate` and host the Fragments where, per the diagnosis above, most of the
+lifecycle crashes actually live. The shared precondition check lives in `InteractiveDevice` rather
+than being copied into each class — a dozing device makes all of them fail identically and
+misleadingly, so it is worth having exactly one explanation of that.
+
+Note what these deliberately do **not** assert: what a failed screen *displays*. Error text in
+this app is inconsistent and partly untranslated, and freezing today's appearance into a test
+would make fixing it harder. The contract they hold is structural — the Activity survives.
 
 **The emulator flakiness was not theoretical, and CI has been restructured because of it.** The
 run for commit `2525b3b` failed in the emulator step, and because that one step ran
@@ -932,7 +956,7 @@ never reported at all. Four changes to `.github/workflows/android-ci.yml`:
 
 1. **Split into two jobs.** JVM tests no longer depend on an emulator booting. This is the whole
    payoff of having moved those tests off the device: an emulator that will not start now costs
-   the 50 instrumented tests instead of all 149. The same split pays off again on a local device,
+   the 58 instrumented tests instead of all 157. The same split pays off again on a local device,
    where the emulator's flakiness is replaced by the install stall documented above.
 2. **Enable KVM.** The failure was `ShellCommandUnresponsiveException` during `installCommit`,
    with the emulator console also failing to start — the signature of an emulator running

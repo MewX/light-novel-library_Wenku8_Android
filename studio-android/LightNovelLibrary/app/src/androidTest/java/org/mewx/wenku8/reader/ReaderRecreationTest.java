@@ -6,10 +6,8 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
-import android.app.KeyguardManager;
 import android.content.Context;
 import android.content.Intent;
-import android.os.PowerManager;
 
 import androidx.lifecycle.Lifecycle;
 import androidx.test.core.app.ActivityScenario;
@@ -19,6 +17,7 @@ import androidx.test.filters.LargeTest;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
+import org.mewx.wenku8.InteractiveDevice;
 import org.mewx.wenku8.global.GlobalConfig;
 import org.mewx.wenku8.global.api.VolumeList;
 import org.mewx.wenku8.reader.activity.Wenku8ReaderActivityV1;
@@ -79,26 +78,13 @@ public class ReaderRecreationTest {
 
     /**
      * These tests need an awake, unlocked device, and say so rather than letting it look like an
-     * app defect.
-     *
-     * <p>Without this, a locked screen surfaces as {@code Activity never becomes requested state
-     * "[RESUMED]"} after a 45-second timeout — which reads exactly like the reader failing to
-     * start, and cost real debugging time before it was understood. A dozing device parks
-     * activities at STOPPED, so RESUMED is unreachable no matter what the app does.
+     * app defect. See {@link InteractiveDevice} for why that distinction is worth the check.
      */
     // One @Before rather than two: JUnit 4 does not order them within a class, and the device
     // check has to be the thing that speaks first when it is the thing that is wrong.
     @Before
     public void requireAnInteractiveDeviceAndPlantFixture() {
-        final Context context = ApplicationProvider.getApplicationContext();
-        final PowerManager power = context.getSystemService(PowerManager.class);
-        final KeyguardManager keyguard = context.getSystemService(KeyguardManager.class);
-
-        assertTrue("the device screen is off -- these tests need it awake "
-                + "(adb shell input keyevent KEYCODE_WAKEUP)", power.isInteractive());
-        assertFalse("the device is locked -- these tests need it unlocked; a secure lock cannot "
-                + "be dismissed with `adb shell wm dismiss-keyguard`, so unlock it by hand",
-                keyguard.isKeyguardLocked());
+        InteractiveDevice.require();
 
         // A previous run that died mid-test would otherwise decide these cases for the wrong
         // reason -- a leftover index makes a "missing index" case pass spuriously.

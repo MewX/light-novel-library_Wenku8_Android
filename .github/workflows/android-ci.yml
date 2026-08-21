@@ -18,7 +18,7 @@ defaults:
 
 jobs:
   # Split out from the emulator job deliberately. These two run independently so that an
-  # emulator that will not boot costs the 50 instrumented tests rather than all 149: previously
+  # emulator that will not boot costs the 58 instrumented tests rather than all 157: previously
   # a single step ran assembleAlpha, the JVM tests and the instrumented tests together, so an
   # emulator failure meant the JVM tests never reported at all.
   build-and-test:
