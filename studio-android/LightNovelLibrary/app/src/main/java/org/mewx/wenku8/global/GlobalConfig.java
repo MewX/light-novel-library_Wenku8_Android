@@ -622,11 +622,36 @@ public class GlobalConfig {
 
         // split string h
         String[] p = h.split("\\|\\|"); // regular expression
+        OutLoop:
         for (String temp : p) {
             Log.v("MewX", temp);
             String[] parts = temp.split(",,");
             if (parts.length != 3)
                 continue;
+
+            // A record with an unparseable field is dropped rather than thrown on. This is item 9
+            // in a second location, and this loader is the one that still had it: loadReadSavesV1
+            // below does the identical job and validates every field before parsing, while this
+            // one validated only the field count and then parsed regardless.
+            //
+            // It was reachable and it was fatal. getReadSavesRecord is called from
+            // VerticalReaderActivity's scroll-restore runnable and from an unguarded
+            // onPostExecute, and addReadSavesRecord from onPause -- none of which catch. So a
+            // record damaged by a partial write crashed that reader when opening a chapter and
+            // again when leaving one, every time, and nothing in the app lets a user delete the
+            // file to escape it.
+            //
+            // Dropping the record rather than rejecting the file is the same trade item 9 settled
+            // for the bookshelf: one chapter loses its position instead of every chapter losing
+            // it. Reported so the real frequency is visible, since this used to fail as a crash
+            // and would otherwise now fail silently.
+            for (String str : parts) {
+                if (!LightTool.isInteger(str)) {
+                    CrashReporter.recordException("GlobalConfig.loadReadSaves",
+                            new NumberFormatException("dropped unparseable record: " + temp));
+                    continue OutLoop;
+                }
+            }
 
             ReadSaves rs = new ReadSaves();
             rs.cid = Integer.valueOf(parts[0]);
