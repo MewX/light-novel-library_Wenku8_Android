@@ -185,18 +185,39 @@ done. It is not the list above.
 Being precise about this matters, because **almost none of it is genuinely un-automatable.** It is
 un-automated, which is a different claim. What is actually missing is listed after each case.
 
-| # | Steps | Expected | Why not automated |
+| # | Steps | Result | Why not automated |
 |---|---|---|---|
-| 1 | Find a novel with hundreds of chapters that is **not** in your bookshelf — search or browse to it, do **not** favourite it. Open chapter 1. | Opens and renders. | Needs a launched Activity driven through the UI. No Espresso dependency, and no seam to serve fixture data instead of the live server. |
-| 2 | From that novel, page forward to the next chapter, then back. Then do it **across a volume boundary** (last chapter of vol. 1 → first of vol. 2). | Both directions work; the volume title updates at the boundary. | Same as 1. The boundary is the interesting part because it re-reads the cached index. |
-| 3 | Reopen a novel you have read before and accept the "jump to last read" prompt. | Lands on the right chapter and scroll position. | Same as 1, plus it depends on persisted state from an earlier run. |
-| 4 | Switch to the vertical reader in the engine picker and repeat 1–2. | Same behaviour. | Same as 1; this is a second Activity with its own copy of the load path. |
-| 5 | Turn the network off and open a novel that **is** in your bookshelf and downloaded. | Reads from cache, no error. | Needs airplane mode toggled around a UI flow. |
-| 6 | Developer Options → **Don't keep activities** on, then read for a few minutes: rotate, background and restore, open a chapter. | No crash; position preserved. | **This one is the closest to automatable today** — `androidx.test:core` is already on the classpath via `androidx.test.ext:junit`, so `ActivityScenario.recreate()` covers the recreation half without any new dependency. Full process death still needs more. |
-| 7 | Verify item 10: interrupt a chapter download (kill the app or drop the network mid-download), then open that chapter. | It refetches and reads, rather than reporting `SERVER_RETURN_NOTHING` and closing. | Needs fault injection into the write path plus a UI flow. Nothing today can force a partial write. |
+| 1 | A novel with hundreds of chapters **not** in the bookshelf — browse to it without favouriting, open a chapter. | **Pass.** Loads normally. | Needs a launched Activity driven through the UI. No Espresso dependency, and no seam to serve fixture data instead of the live server. |
+| 2 | Page forward and back between chapters within a volume. | **Pass**, and the volume-boundary half of this case was **wrong to ask for** — see below. | Same as 1. |
+| 3 | Reopen a previously read novel and accept "jump to last read". | **Pass.** | Same as 1, plus it depends on persisted state from an earlier run. |
+| 4 | Vertical reader. | **Not applicable** — see below. | — |
+| 5 | Network off, open a downloaded bookshelf novel. | **Pass.** Reads from cache. Uncached chapters report `NETWORK_ERROR`, which is correct. | Needs airplane mode toggled around a UI flow. |
+| 6 | Developer Options → **Don't keep activities** on, then read, leave to another screen, and return. | **Pass**, on the reading that the option was enabled — "no difference" is exactly the pass condition, since the Activity is destroyed and rebuilt invisibly. | **Closest to automatable today** — `androidx.test:core` is already on the classpath via `androidx.test.ext:junit`, so `ActivityScenario.recreate()` covers the recreation half with no new dependency. Full process death needs more. |
+| 7 | Interrupt a chapter download, then open that chapter. | **Pass.** Refetches and reads instead of reporting `SERVER_RETURN_NOTHING` and closing. Verifies item 10. | Needs fault injection into the write path plus a UI flow. Nothing today can force a partial write. |
 
-A long series matters for 1 and 2 specifically: the crash Phase 2.1 removed was size-dependent, so
-a novel with hundreds of chapters is the one that used to fail.
+**Phase 2.1 is therefore verified on a device.** Its caveat — "compiled and unit-tested but never
+run" — is discharged. Case 1 was the specific risk it carried, a novel that reaches a reader
+without any bookshelf path having written its index, and it loads.
+
+**Two of these cases were based on features that do not exist**, which is worth recording because
+both assumptions came from reading the code rather than using it:
+
+- **Cross-volume navigation is not implemented, by design.** `gotoNextPage` (`:888`) and
+  `gotoPreviousPage` (`:926`) iterate `volumeList.chapterList` — the *current* volume only — and
+  toast `已是最后一章` / `已是第一章` at the ends. That is correct behaviour, not a bug, and it is
+  consistent with Phase 2.1 giving the reader a single `vid`. Asking for a boundary crossing was
+  asking for a feature.
+- **The vertical reader has no chapter navigation at all.** It holds no chapter list and has no
+  next/previous path; it renders one `cid`. That is why Phase 2.1 could delete its volume extra
+  outright rather than migrating it.
+
+A long series still matters for case 1: the crash Phase 2.1 removed was size-dependent, so a novel
+with hundreds of chapters is the one that used to fail.
+
+**One thing case 5 exposes.** An uncached chapter offline surfaces as the bare string
+`NETWORK_ERROR`, because `onPostExecute` toasts `result.toString()` and the codes have no
+localized strings. The behaviour is right and the message is not — same defect that showed
+`SERVER_RETURN_NOTHING` to a user, and it is now the most visible thing left in the reader.
 
 **What would replace this list.** Three things, in order of what they unblock: a seam in the
 readers' load-a-chapter decision (covers 1, 2, 4, 7 on the JVM); `ActivityScenario` tests for
@@ -654,7 +675,7 @@ comparison is actually available this time.
 Only worth doing once Phase 1 has landed and the crash rate has visibly dropped, so the
 effect of each change is measurable.
 
-1. **Pass IDs, not objects, through Intents — implemented, unverified on a device.** The
+1. **Pass IDs, not objects, through Intents — implemented and device-verified.** The
    `VolumeList` extra is gone: the readers take `aid` + `vid` and rebuild the volume from the
    cached novel index. Kills `TransactionTooLargeException` permanently and makes the reader
    survive process death for free, since ints in an Intent always restore.
@@ -705,9 +726,15 @@ effect of each change is measurable.
    null is the documented ordinary outcome so the reader can show a message, and a throw would
    be a crash on the path that opens a chapter.
 
-   **The reader flow above the cache still has no automated coverage at all**, so Phase 2.1 as a
-   whole remains compiled and tested but never run. See "Picking this up on a machine with an
-   SDK" for the manual pass it needs; the storage layer under it no longer needs one.
+   **The reader flow above the cache still has no automated coverage at all.** It has now been
+   walked manually instead — see the case table under "Picking this up on a machine with an SDK",
+   all seven of which pass. Case 1 is the one that mattered here: a long novel opened without ever
+   being favourited, which is exactly the path this item put at risk, since no bookshelf writer
+   would have cached its index. It loads.
+
+   So Phase 2.1 is verified, but by a method that does not repeat itself. Every future change to
+   this path costs another manual pass until the reader has a seam — which is why that seam is the
+   first item under the standing coverage priority at the top of this document.
 2. **Retire `AsyncTask`.** Do not rewrite all 24 at once. Introduce one small helper
    (`ExecutorService` + main-thread `Handler`, or `androidx.lifecycle` if you are open to
    adding it) and migrate screen by screen, starting with whichever Phase 0 shows is
@@ -918,7 +945,7 @@ derived from something that might not be ready yet is a trap wherever it appears
 | Ship | Contents | Risk |
 |---|---|---|
 | — | **Coverage work: the reader seam, then `ActivityScenario` recreation tests** | low, additive |
-| v1.30.0 | Phase 0 instrumentation + Phase 1 items 1–10 + Phase 2.1 | low, all CI- and device-tested |
+| v1.30.0 | Phase 0 instrumentation + Phase 1 items 1–10 + Phase 2.1 | low, CI-green, device-tested, manual pass complete |
 | v1.31 | Phase 1 item 12 (prefer cached content), then highest-crash screen from 2.2 | medium |
 | v1.32+ | Remainder of Phase 2, Phase 3, storage migration step 0 | medium |
 
