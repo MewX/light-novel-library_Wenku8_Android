@@ -46,11 +46,11 @@ applies, and there is work waiting that only that machine can do.
 
 ```
 ./gradlew assembleAlpha testAlphaDebugUnitTest      # 78 JVM tests, seconds
-./gradlew connectedAlphaDebugAndroidTest            # 25 tests, needs a device or emulator
+./gradlew connectedAlphaDebugAndroidTest            # 32 tests, needs a device or emulator
 ```
 
 **Both have now been run on a real device** — a Pixel 10 Pro Fold on API 37, i.e. above the
-API 33 CI emulator and above `targetSdk 36`. 78 JVM tests and 25 instrumented tests, no failures.
+API 33 CI emulator and above `targetSdk 36`. 78 JVM tests and 32 instrumented tests, no failures.
 That is the first execution of the instrumented suite on hardware rather than an emulator, and it
 says the storage tests hold on a current device as well as on API 33.
 
@@ -467,13 +467,19 @@ effect of each change is measurable.
    a cache miss puts a network round trip in front of the reader's startup, and an in-memory
    handoff would be root cause 2 all over again.
 
-   **What is tested, and what is not.** `findVolumeByVid` is pure and has JVM tests. Nothing
-   else here does: neither the cache the readers now depend on nor the reader flow itself has
-   automated coverage, so Phase 2.1 is compiled and unit-tested but has never been run. See
-   "Picking this up on a machine with an SDK" for the manual pass it needs.
+   **What is tested, and what is not.** `findVolumeByVid` is pure and has JVM tests, and the
+   cache either side of it now has device coverage — `VolumeIndexCacheTest`, 7 tests, written
+   once the two storage bugs that were blocking it were fixed. It covers the round trip through
+   a real filesystem, which is the part the JVM cannot check: that a written index reparses with
+   its CJK volume and chapter names intact, that re-caching replaces the previous index rather
+   than leaving a longer one behind it, and that every way the file can be absent, empty,
+   truncated or unparseable yields null rather than an exception. That last group is the point —
+   null is the documented ordinary outcome so the reader can show a message, and a throw would
+   be a crash on the path that opens a chapter.
 
-   Device coverage for `cacheVolumeIndex` and `loadCachedVolume` is a follow-up, and has to be:
-   writing it turned up two storage bugs that have to be fixed before any such test can pass.
+   **The reader flow above the cache still has no automated coverage at all**, so Phase 2.1 as a
+   whole remains compiled and tested but never run. See "Picking this up on a machine with an
+   SDK" for the manual pass it needs; the storage layer under it no longer needs one.
 2. **Retire `AsyncTask`.** Do not rewrite all 24 at once. Introduce one small helper
    (`ExecutorService` + main-thread `Handler`, or `androidx.lifecycle` if you are open to
    adding it) and migrate screen by screen, starting with whichever Phase 0 shows is
@@ -548,7 +554,7 @@ appears at first glance. The problem was never the count, it was *where* they ru
 | Location | Before | Now | Runs on |
 |---|---|---|---|
 | `app/src/test` | 3 files / 10 tests | **12 files / 78 tests** | JVM, seconds |
-| `app/src/androidTest` | 8 files / 31 tests | **3 files / 25 tests** | emulator or device, minutes |
+| `app/src/androidTest` | 8 files / 31 tests | **4 files / 32 tests** | emulator or device, minutes |
 | `api/src/test` | 1 file | 1 file | JVM |
 
 (Step 1 moved the JVM count from 10 to 37; `CrashReporterTest` took it to 44 in Phase 0; Phase 1
@@ -561,7 +567,7 @@ never reported at all. Four changes to `.github/workflows/android-ci.yml`:
 
 1. **Split into two jobs.** JVM tests no longer depend on an emulator booting. This is the whole
    payoff of having moved those tests off the device: an emulator that will not start now costs
-   the 25 instrumented tests instead of all 103. The same split pays off again on a local device,
+   the 32 instrumented tests instead of all 110. The same split pays off again on a local device,
    where the emulator's flakiness is replaced by the install stall documented above.
 2. **Enable KVM.** The failure was `ShellCommandUnresponsiveException` during `installCommit`,
    with the emulator console also failing to start — the signature of an emulator running
