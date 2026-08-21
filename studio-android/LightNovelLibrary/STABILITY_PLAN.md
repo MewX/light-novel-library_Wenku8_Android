@@ -11,6 +11,39 @@ crash that does not need crash counts to rank. **The rest of Phase 2 does need t
 which screen to migrate first, and that is exactly the question the data answers. Phases 3–4 are
 proposed, not done.
 
+**Standing priority: fill the test gap before writing more logical patches.** Where a remaining
+item could be addressed either by changing behaviour or by covering it, cover it. The evidence for
+this is in this document's own history: item 9 was found by writing a test, item 10 by using the
+app, and neither was found by any amount of reading the code — while several rounds of careful
+reading produced a ranking that is still, by its own admission, inference. The codebase's deficit
+was never the number of fixes; it is that almost nothing above the storage layer can be verified
+at all.
+
+Two clarifications, because this rule is easy to over-apply:
+
+- **It is not a freeze.** A live crash with a known cause still gets fixed — item 9 was a crash on
+  the home screen and waiting for perfect coverage would have been absurd. The rule bites on
+  *discretionary* changes: improvements, hardening, and anything whose value is "this looks
+  fragile".
+- **Refactoring to create a seam is test work, not a patch.** The two biggest gaps below cannot be
+  covered without one, so extracting a testable unit counts as filling the gap even though it
+  edits production code. What it must not do is change behaviour on the way past.
+
+The gaps worth attacking, in order:
+
+1. **The reader flow.** Nothing above storage is covered, which is why Phase 1 item 10's fix
+   shipped unverified. Both readers' chapter-loading bodies are `doInBackground` inside Activity
+   inner classes calling static helpers — extracting that decision into something injectable is
+   the highest-value seam in the codebase.
+2. **Lifecycle guards.** Phase 1 item 2 added guards to ~20 `onPostExecute` bodies against root
+   cause 1, the largest single crash source, and not one of them is exercised by a test.
+3. **`GlobalConfig`'s remaining save/load surface.** ~30 methods; the bookshelf and volume index
+   now have device coverage, the rest do not.
+
+Note this sits alongside the storage decision, which points the same way: `STORAGE_MIGRATION_PLAN.md`
+declines incremental fixes to persistence in favour of replacing it properly. Both rules trade
+short-term patching for work that compounds.
+
 **The Phase 1 caveat is discharged.** Those commits were written with no Android SDK and no
 emulator, so this section used to warn that `./gradlew assembleAlpha testAlphaDebugUnitTest` had
 never been run against them and that CI would be the first real check. It has now run: CI is
@@ -46,11 +79,11 @@ applies, and there is work waiting that only that machine can do.
 
 ```
 ./gradlew assembleAlpha testAlphaDebugUnitTest      # 78 JVM tests, seconds
-./gradlew connectedAlphaDebugAndroidTest            # 48 tests, needs a device or emulator
+./gradlew connectedAlphaDebugAndroidTest            # 44 tests, needs a device or emulator
 ```
 
 **Both have now been run on a real device** — a Pixel 10 Pro Fold on API 37, i.e. above the
-API 33 CI emulator and above `targetSdk 36`. 78 JVM tests and 48 instrumented tests, no failures.
+API 33 CI emulator and above `targetSdk 36`. 78 JVM tests and 44 instrumented tests, no failures.
 That is the first execution of the instrumented suite on hardware rather than an emulator, and it
 says the storage tests hold on a current device as well as on API 33.
 
@@ -514,36 +547,40 @@ Four things turned out differently from the plan as written, and are worth recor
     And `onPostExecute` still toasts `result.toString()`, i.e. the raw enum name, which is how
     `SERVER_RETURN_NOTHING` reached a user as those words; the codes have no localized strings.
 
-11. **`LightCache.saveFile` destroyed the old file before writing the new one — fixed.** Item 10
-    fixed the reader's response to a corrupt cached chapter. This fixes the thing that *created*
-    one.
+11. **`LightCache.saveFile` destroys the old file before writing the new one — KNOWN, DELIBERATELY
+    NOT FIXED.** Item 10 fixed the reader's response to a corrupt cached chapter. This is the
+    thing that *creates* one, and it is being left alone on purpose.
 
-    The write opened a `FileOutputStream` directly on the destination, which truncates it on open.
+    The write opens a `FileOutputStream` directly on the destination, which truncates it on open.
     From that instant until the last byte lands there is no good copy of the file anywhere: an
-    interrupted write — killed process, full disk, `IOException` partway through — left an empty
+    interrupted write — killed process, full disk, `IOException` partway through — leaves an empty
     or half-written file where working content had been. That is root cause 4's other half. Root
     cause 4 as originally written was about *reading* fewer bytes than expected; this is the
     writer manufacturing the same corruption directly, and it is the mechanism behind item 10's
-    permanently unreadable chapter.
+    permanently unreadable chapter. Two smaller defects sit in the same eight lines: no `sync()`,
+    so bytes can be in the page cache when the app reports success; and closes on the success path
+    rather than in a `finally`, so a throwing `write()` leaks the descriptor.
 
-    Two smaller defects in the same eight lines: there was no `sync()`, so bytes could still be in
-    the page cache when the app believed the save had succeeded; and because the streams were
-    closed on the success path only rather than in a `finally`, a throwing `write()` leaked the
-    file descriptor.
+    **A temp-file-and-rename fix was written, tested on a device, and then reverted.** It worked,
+    but it is the wrong shape of change for this subsystem, and the reasoning generalises:
 
-    Now written to a sibling `.tmp` and renamed into place, with a `flush()` and `getFD().sync()`
-    before the rename, in try-with-resources. `rename` is atomic within a filesystem and a sibling
-    is always on the same one, so a reader sees the whole old content or the whole new content and
-    never a partial. **This is the cheap half of what a transactional store would provide**, and
-    it was worth taking on its own terms — see "Should we move to platform storage?" below.
+    - It is a partial fix to a component scheduled for replacement, so the work is thrown away
+      twice — once when the store changes, and once more by anyone who has to reason about why
+      `LightCache` had two write strategies in its history.
+    - It carried its own new risk. An orphaned `.tmp` after a process death would be picked up by
+      `LightCache.listAllFilesInDirectory`, which feeds the background selector — a new defect
+      introduced into a system about to be rewritten.
+    - Its tests could not prove the benefit. All four passed against the *old* implementation too,
+      because that one never created a temp file, so they were regression protection for the new
+      mechanism rather than evidence it was better.
 
-    `LightCacheTest` gained four tests, and their limits should be understood: the property that
-    matters cannot be provoked without injecting a failure mid-write, so they pin the mechanism's
-    observable invariants — a shorter overwrite replaces the content wholesale, and no `.tmp`
-    survives either a success or a failure — rather than proving the atomicity itself. That rests
-    on `rename` semantics, not on the suite. Note also that all four would pass against the *old*
-    implementation, since it never created a temp file; they are regression protection for the new
-    mechanism, not evidence it is better than the old one.
+    **The standing decision: today's storage logic is not to be touched incrementally.** Either it
+    is replaced with a real structure, or it is left exactly as it is. Patching it in place buys
+    small correctness gains at the cost of churn in the one part of the codebase where churn is
+    most expensive, and where the plan's own thesis — fix generators, not symptoms — argues hardest
+    against it. The defect above is therefore a *known accepted risk* until the migration lands,
+    not an oversight. See "Should we move to platform storage?" below, and the separate storage
+    migration plan for what replacing it involves.
 
 Expected outcome: this should remove the majority of crash *volume* without touching
 architecture. Phase 0's data will confirm — and because Phase 0 shipped first, the before/after
@@ -682,7 +719,7 @@ appears at first glance. The problem was never the count, it was *where* they ru
 | Location | Before | Now | Runs on |
 |---|---|---|---|
 | `app/src/test` | 3 files / 10 tests | **12 files / 78 tests** | JVM, seconds |
-| `app/src/androidTest` | 8 files / 31 tests | **5 files / 48 tests** | emulator or device, minutes |
+| `app/src/androidTest` | 8 files / 31 tests | **5 files / 44 tests** | emulator or device, minutes |
 | `api/src/test` | 1 file | 1 file | JVM |
 
 (Step 1 moved the JVM count from 10 to 37; `CrashReporterTest` took it to 44 in Phase 0; Phase 1
@@ -695,7 +732,7 @@ never reported at all. Four changes to `.github/workflows/android-ci.yml`:
 
 1. **Split into two jobs.** JVM tests no longer depend on an emulator booting. This is the whole
    payoff of having moved those tests off the device: an emulator that will not start now costs
-   the 48 instrumented tests instead of all 126. The same split pays off again on a local device,
+   the 44 instrumented tests instead of all 122. The same split pays off again on a local device,
    where the emulator's flakiness is replaced by the install stall documented above.
 2. **Enable KVM.** The failure was `ShellCommandUnresponsiveException` during `installCommit`,
    with the emulator console also failing to start — the signature of an emulator running
@@ -927,9 +964,9 @@ change.
 0. **Funnel all storage access through `GlobalConfig`.** The 13 files above, one at a time. No
    behaviour change, no format change, no migration. This is the prerequisite everything else
    depends on, and the step most likely to be skipped.
-1. **Atomic writes — done**, as Phase 1 item 11. Worth noting the ordering lesson: this delivered
-   a real part of the transactional benefit *before* any database existed, and would have been
-   worth doing even if the answer to this whole section were "no".
+1. **Atomic writes for chapter files.** Deliberately *not* done as a standalone patch — see Phase
+   1 item 11 for why that was tried and reverted. It arrives as part of step 5, where the row
+   recording a file's completeness and the atomic write that justifies it land together.
 2. **Settings to DataStore.** Smallest surface, no relational structure, easiest migration to
    verify, and a genuine test of the migration machinery on data whose loss is an annoyance rather
    than a disaster.

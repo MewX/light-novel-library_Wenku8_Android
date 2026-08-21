@@ -19,6 +19,7 @@ import org.mewx.wenku8.global.GlobalConfig;
 import org.mewx.wenku8.util.CrashReporter;
 
 import java.io.ByteArrayOutputStream;
+import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
@@ -130,43 +131,24 @@ public class LightCache {
                 return false; // is not a file
             }
 
-            // Written to a sibling temp file and renamed into place, rather than straight into
-            // the destination. Opening the destination truncates it before the first byte
-            // arrives, so an interrupted write -- a killed process, a full disk, an IOException
-            // partway through -- destroyed the good file that was already there and left an
-            // empty or half-written one behind. Nothing downstream could tell that apart from a
-            // genuinely empty response, which is what made a partly downloaded chapter
-            // permanently unreadable and reported it as a server error (Phase 1 item 10).
-            //
-            // rename is atomic within a filesystem, and a sibling temp file is always on the
-            // same one, so a reader sees either the whole old content or the whole new content
-            // and never a partial. This is the cheap half of what a transactional store would
-            // give, and it is worth having whether or not the rest ever moves to one.
-            final File temp = new File(filepath + ".tmp");
-            try (FileOutputStream out = new FileOutputStream(temp)) {
-                out.write(bs);
-                out.flush();
-                // Forces the bytes out before the rename. Without it the rename can reach disk
-                // ahead of the data after a power loss, which is the same corrupt file by a
-                // slower route.
-                out.getFD().sync();
+            try {
+                // create file
+                if (!file.createNewFile())
+                    Log.d(TAG, "File existed or failed to create file: " + filepath);
+
+                FileOutputStream out = new FileOutputStream(file); // truncate
+                DataOutputStream dos = new DataOutputStream(out);
+
+                // write all
+                dos.write(bs);
+
+                dos.close();
+                out.close();
+                Log.d(TAG, "Write successfully");
             } catch (IOException e) {
                 CrashReporter.recordException("LightCache.saveFile", e);
-                //noinspection ResultOfMethodCallIgnored
-                temp.delete();
                 return false;
             }
-
-            // rename(2) replaces an existing destination, so the old file does not need
-            // removing first -- doing so would reopen the very window this closes.
-            if (!temp.renameTo(file)) {
-                CrashReporter.recordException("LightCache.saveFile",
-                        new IOException("Could not move " + temp.getPath() + " into place"));
-                //noinspection ResultOfMethodCallIgnored
-                temp.delete();
-                return false;
-            }
-            Log.d(TAG, "Write successfully");
         }
         return true; // say it successful
     }
