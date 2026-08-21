@@ -34,6 +34,7 @@ import org.mewx.wenku8.global.api.OldNovelContentParser;
 import org.mewx.wenku8.api.Wenku8API;
 import org.mewx.wenku8.network.LightNetwork;
 
+import java.io.FileNotFoundException;
 import java.io.UnsupportedEncodingException;
 import java.util.List;
 
@@ -199,16 +200,35 @@ public class VerticalReaderActivity extends AppCompatActivity {
         protected Integer doInBackground(ContentValues... params) {
 
             try {
-                String xml;
-                if (from.equals(FromLocal))
-                    xml = GlobalConfig.loadFullFileFromSaveFolder("novel", cid + ".xml");
-                else {
-                    byte[] tempXml = LightNetwork.LightHttpPostConnection(
-                            Wenku8API.BASE_URL, params[0]);
-                    if (tempXml == null)
-                        return -100;
-                    xml = new String(tempXml, "UTF-8");
+                // Same fix as Wenku8ReaderActivityV1: a chapter whose download was interrupted
+                // leaves an empty or truncated file, and treating the cache as the only source
+                // turned that into a permanent dead end -- the reader failed identically on
+                // every later attempt and never tried the network. The cache is now preferred
+                // but not required.
+                if (from.equals(FromLocal)) {
+                    String cached = GlobalConfig.loadFullFileFromSaveFolder("novel", cid + ".xml");
+                    if (!cached.isEmpty()) {
+                        nc = OldNovelContentParser.parseNovelContent(cached, size -> {
+                            if (pDialog != null) {
+                                pDialog.setMaxProgress(size);
+                            }
+                        });
+                        if (!nc.isEmpty()) {
+                            return 0;
+                        }
+                    }
+
+                    CrashReporter.recordException("VerticalReaderActivity.cachedChapterUnusable",
+                            new FileNotFoundException("Cached chapter " + cid + " was "
+                                    + (cached.isEmpty() ? "missing or empty" : "unparseable")
+                                    + "; refetching from the network"));
                 }
+
+                byte[] tempXml = LightNetwork.LightHttpPostConnection(
+                        Wenku8API.BASE_URL, params[0]);
+                if (tempXml == null)
+                    return -100;
+                String xml = new String(tempXml, "UTF-8");
 
                 nc = OldNovelContentParser.parseNovelContent(xml, size -> {
                     if (pDialog != null) {

@@ -139,9 +139,13 @@ unit-tested but has never been *run*. On a device:
 A long series matters for 1 and 2: the crash Phase 2.1 removes was size-dependent, so a novel
 with hundreds of chapters is the one that used to fail.
 
-**Status: informally exercised, not formally passed.** The maintainer has used the build on a
-device and reports it behaving normally, which is real evidence and rules out an obviously broken
-reader. It is not the list above. The scenarios that matter most are the ones ordinary use is
+**Status: informally exercised, not formally passed — and it already paid for itself.** The
+maintainer has used the build on a device and reports it behaving normally, which rules out an
+obviously broken reader. It also turned up Phase 1 item 10: a broken download made the next
+chapter permanently unreachable and reported a server error for a server that was never
+contacted. That bug was years old, sat in both readers, and no amount of test-writing had found
+it — which is the argument for doing the rest of this list rather than a reason to consider it
+done. It is not the list above. The scenarios that matter most are the ones ordinary use is
 least likely to hit by accident — a long series that was never added to the bookshelf (1),
 a volume boundary (2), and *Don't keep activities* (6) — and the first of those is precisely the
 case Phase 2.1 identified as the one that could break it. Treat the list as outstanding until
@@ -468,6 +472,47 @@ Four things turned out differently from the plan as written, and are worth recor
    a full debug cycle — nine of its ten tests failed with `ENOENT` — and the fix was to mirror the
    app's own fallback rather than trust the name. Any future test that arranges save-folder state
    has to do the same.
+
+10. **A broken download made the next chapter unreachable, permanently — fixed.** Reported from
+    manual use, which is worth recording on its own: this is root cause 4's most user-visible
+    consequence, it had been in both readers for years, and no amount of test-writing had found
+    it. The manual pass earns its place in this document.
+
+    Both readers built the network request unconditionally but then ignored it when the novel came
+    from the bookshelf: `if (from.equals(FromLocal)) xml = loadFullFileFromSaveFolder(...)`, with
+    an `// or exist` comment marking the gap the original author already knew about. A chapter
+    whose download was interrupted — or truncated by the short read in root cause 4 — leaves an
+    empty or unparseable file, and the consequences were bad in three separate ways:
+
+    - **The error blamed the wrong party.** An empty cached file produced
+      `SERVER_RETURN_NOTHING`, for a server the app had not contacted. Anyone triaging that
+      report, in Crashlytics or from a user, would have gone looking at the API.
+    - **The reader closed itself.** `onPostExecute` toasts and calls `finish()`, so the failure
+      presented as the app ejecting the user out of the book.
+    - **It never recovered.** Nothing deleted or refetched the bad file, so every subsequent
+      attempt at that chapter failed identically. A single interrupted download made one chapter
+      of a bookshelf novel permanently unreachable, and reading forward through the novel hit it
+      every time.
+
+    The cache is now preferred but not required: an unusable cached chapter falls through to the
+    network fetch that was already prepared, and `SERVER_RETURN_NOTHING` is reachable only when
+    the server really did return nothing. A non-fatal is recorded when the fallback fires, because
+    the refetch would otherwise hide how often downloads produce unusable files — the same
+    measure-while-fixing shape as item 9.
+
+    **Not covered by any test, and honestly not coverable as written.** Both bodies are
+    `doInBackground` inside an Activity inner class, calling static storage and network helpers,
+    so there is no seam to inject through. The instrumented suite passing after this change is a
+    regression check, not evidence the fix works; that needs the manual scenario that found it —
+    break a download, then page into that chapter. Extracting the load-a-chapter decision into
+    something injectable is the natural Phase 2.2 byproduct, per the testing strategy's rule that
+    seams should fall out of refactors rather than precede them.
+
+    Two things deliberately left alone. A successful refetch is **not** written back to the cache,
+    so a broken chapter refetches on every visit rather than repairing itself — correct but
+    wasteful, and adding a write here means adding a write failure path to the reader's startup.
+    And `onPostExecute` still toasts `result.toString()`, i.e. the raw enum name, which is how
+    `SERVER_RETURN_NOTHING` reached a user as those words; the codes have no localized strings.
 
 Expected outcome: this should remove the majority of crash *volume* without touching
 architecture. Phase 0's data will confirm — and because Phase 0 shipped first, the before/after
