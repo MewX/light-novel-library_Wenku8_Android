@@ -100,10 +100,19 @@ jobs:
         # `locksettings set-disabled true` works here because a fresh emulator has no secure
         # lock; on a real device with a PIN it would not, which is why ReaderRecreationTest
         # asserts both conditions itself rather than assuming anyone ran this.
+        # Waking the screen once is not enough: the Gradle line below spends minutes assembling
+        # before it installs anything, and the emulator dozes off again in the meantime. So the
+        # screen is pinned on for the life of the job rather than nudged awake, and the state is
+        # printed immediately before the tests so a future failure is diagnosable from the log.
         script: |
-          adb shell input keyevent KEYCODE_WAKEUP || true
+          adb shell svc power stayon true || true
+          adb shell settings put system screen_off_timeout 2147483647 || true
           adb shell locksettings set-disabled true || true
+          adb shell input keyevent KEYCODE_WAKEUP || true
           adb shell wm dismiss-keyguard || true
+          echo "--- device state before tests ---"
+          adb shell dumpsys power | grep -E "mWakefulness=" || true
+          adb shell dumpsys window | grep -iE "isKeyguardShowing" || true
           ./gradlew connectedAlphaDebugAndroidTest
 
     - name: Upload instrumented test report
