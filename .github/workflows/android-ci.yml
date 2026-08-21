@@ -18,7 +18,7 @@ defaults:
 
 jobs:
   # Split out from the emulator job deliberately. These two run independently so that an
-  # emulator that will not boot costs the 23 instrumented tests rather than all 101: previously
+  # emulator that will not boot costs the 50 instrumented tests rather than all 149: previously
   # a single step ran assembleAlpha, the JVM tests and the instrumented tests together, so an
   # emulator failure meant the JVM tests never reported at all.
   build-and-test:
@@ -93,7 +93,18 @@ jobs:
         working-directory: ./studio-android/LightNovelLibrary
         emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot -camera-back none
         disable-animations: true
-        script: ./gradlew connectedAlphaDebugAndroidTest
+        # The emulator boots to a lock screen, and a locked or dozing device parks activities at
+        # STOPPED so ActivityScenario can never reach RESUMED. Every lifecycle test then fails
+        # with "Activity never becomes requested state [RESUMED]" after a 45-second timeout,
+        # which reads like the Activity failing to start rather than like an unprepared device.
+        # `locksettings set-disabled true` works here because a fresh emulator has no secure
+        # lock; on a real device with a PIN it would not, which is why ReaderRecreationTest
+        # asserts both conditions itself rather than assuming anyone ran this.
+        script: |
+          adb shell input keyevent KEYCODE_WAKEUP || true
+          adb shell locksettings set-disabled true || true
+          adb shell wm dismiss-keyguard || true
+          ./gradlew connectedAlphaDebugAndroidTest
 
     - name: Upload instrumented test report
       if: always()
