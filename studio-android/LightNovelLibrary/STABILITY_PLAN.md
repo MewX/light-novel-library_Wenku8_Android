@@ -973,6 +973,36 @@ effect of each change is measurable.
    adding it) and migrate screen by screen, starting with whichever Phase 0 shows is
    crashiest — likely `NovelInfoActivity` (4 tasks) or `FavFragment` (2 tasks + a 3-thread pool).
    Each migration is independently shippable.
+
+   **Considered on 2026-08-22 and deliberately deferred: writing the tests first, then migrating
+   behind them.** The proposal was to characterise each screen's async behaviour, swap the
+   mechanism, and require the tests to stay green throughout. That is the right shape for this
+   refactor and remains the intended route — it was judged too risky to *start* with a release
+   pending, and coverage work was chosen over it. The analysis is recorded here so the next
+   attempt begins from this point rather than re-deriving it:
+
+   - **The tests must be mechanism-agnostic or they are worthless as a safety net.** Anything
+     reaching for `ShadowAsyncTask`, calling `execute()` directly, or flushing AsyncTask's
+     particular scheduler breaks the moment a screen migrates — which would mean editing tests
+     and production code in the same commit, precisely the situation the tests exist to prevent.
+     They must drive public entry points only (`onCreate`, `onResume`, a click, `onDestroy`),
+     assert observable outcomes (did not crash, list populated, file written, dialog dismissed),
+     and advance time through one shared helper, so a mechanism change lands in a single place.
+     The proof that this was done right is that the migration commit needs *no* test edits; if it
+     does, the remaining migrations are unprotected.
+   - **`AsyncTaskTracker`'s generic bound is the coupling point,** and it had not been examined.
+     `track(T extends AsyncTask<?, ?, ?>)` forces every migration site to change its tracker call,
+     and it blocks the screen-by-screen approach this item asks for, because a half-migrated app
+     needs both mechanisms tracked at once. Generalising it to a small `Cancellable` interface is
+     small, safe and independently shippable, and should land before any screen moves.
+   - **It depends on Robolectric being able to drive Activities and Fragments in this project,
+     which is unproven.** `unitTests.includeAndroidResources` is not set, and these screens touch
+     Firebase, ads and `api/` during startup. That has to be spiked before the approach can be
+     costed at all.
+
+   One number in this item is worth correcting while it is open: counting `onPostExecute` with
+   grep double-counts, because each override also calls `super.onPostExecute(...)`. A raw count
+   of 10 in `NovelInfoActivity` is 5 tasks, which agrees with the figure in Phase 1 item 5.
 3. **De-static `WenkuReaderPageView`.** Move `mLoader`/`mSetting`/paint state to instance
    fields owned by the reader Activity. This is the fix for the recurring reader NPEs that
    `b43e8c7` and `522c385` patched individually.
@@ -1191,9 +1221,40 @@ prior session rather than measured, and the figures here replace it.)
 The flag is deliberately not hidden behind a CI-only property: that would mean CI building an
 artifact nobody builds locally, which is exactly how the api-stub failures stayed invisible.
 
-The uploads are `continue-on-error` and `fail-on-error: false` on purpose. Coverage is
-informational; a Coveralls outage must not turn a green build red when the release is gated on
-tests passing.
+The uploads carry `fail-on-error: false` on purpose. Coverage is informational; a Coveralls outage
+must not turn a green build red when the release is gated on tests passing. They deliberately do
+*not* carry `continue-on-error` as well — together the two hid a genuinely broken upload behind a
+green tick for two builds.
+
+**Coverage audit, 2026-08-22.** Merged figure 34.5%, and the shape of what is left is more useful
+than the number. The parser and API layer is effectively finished — `Wenku8Parser` 228/229,
+`OldNovelContentParser` 65/66, `NovelItemInfoUpdate` 63/63, `ReviewList` 49/49, `UserInfo` 39/39,
+`ChapterNavigator` 28/28, `CrashReporter` 41/41, `AccountInfoLoader` 40/40. **Not one of the twenty
+largest uncovered classes is pure logic**, so there are no cheap JVM wins left; everything
+remaining is Activity, Fragment or custom-view code.
+
+Ranked by uncovered lines: `NovelInfoActivity` 644/817, `PagerSlidingTabStrip` 373 (vendored),
+`Wenku8ReaderActivityV1` 314/493, `FavFragment` 275/280, `PageSlider` 217, `NovelItemListFragment`
+206, `VerticalReaderActivity` 185, `NovelReviewReplyListActivity` 172, `OverlappedSlider` 169,
+`ConfigFragment` 166/168, `MainActivity` 152/211, `GlobalConfig` 140/446.
+
+Two entries deserve naming. `FavFragment` is 275 uncovered of 280 and it is the bookshelf — the
+first screen most users see. `VerticalReaderActivity` is 0/185, and it is the screen whose crash
+Phase 1 item 13 fixed; the loader beneath it is now tested, the screen itself is not.
+
+About **1000 lines will realistically never be covered** — the vendored `PagerSlidingTabStrip`
+(373), the reader sliders `PageSlider`/`OverlappedSlider`/`SlidingLayout` (~540 lines of custom
+animation), and three trivial adapters (~86). That is roughly 14 points of permanent ceiling, worth
+knowing before anyone sets a coverage target. Excluding the vendored file alone is worth about
++1.9 points and is a one-line change to the exclusion list.
+
+**A caution about how this ranking was produced, because the first attempt was wrong.** Ranking
+crash risk by grepping for `isFinishing()`/`isDestroyed()`/`isAdded()` reported `ConfigFragment` and
+the three review Activities as having no lifecycle guards at all. They are in fact guarded, via
+`WeakReference` + a null check — an idiom that grep missed. Re-running with both patterns leaves
+only three classes genuinely unguarded: `WenkuReaderPageView` (3 callbacks, 109/215 covered),
+`NovelItemAdapterUpdate` (2, 52/109) and `UpdateNotificationMessage` (2). Check both idioms before
+trusting any such ranking.
 
 **The one test in `api/` does not run anywhere, and that is deliberate.** `api/src/test/.../
 Wenku8APITest.java` fails when invoked on a machine that has the private submodule:
