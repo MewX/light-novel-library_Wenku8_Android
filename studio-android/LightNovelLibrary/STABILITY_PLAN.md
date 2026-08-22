@@ -174,6 +174,44 @@ Note that `connectedAndroidTest` uninstalls both packages when it finishes, so a
 pre-install does not survive into a subsequent Gradle run — use
 `adb shell am instrument -w org.mewx.wenku8.test/androidx.test.runner.AndroidJUnitRunner`.
 
+**3. That uninstall destroys the save data, and on 2026-08-22 it did.** The line above was already
+in this document, describing the uninstall as an inconvenience. It is not. On any device past the
+API 33 migration the save folder is `SaveFileMigration.getInternalSavePath()` —
+`/data/data/org.mewx.wenku8/files/` — and `/sdcard/wenku8/` no longer exists. Uninstalling the
+package deletes the bookshelf, `read_saves_v1.wk8`, `settings.wk8`, the search history, the saved
+login and every downloaded chapter.
+
+A `connectedAlphaDebugAndroidTest` run against the development phone hit the install failure in
+trap 2, and AGP responded by uninstalling to recover:
+
+```
+11:48:07  Force stopping org.mewx.wenku8 ... deletePackageX
+11:48:08  broadcast=ACTION_PACKAGE_FULLY_REMOVED pkg=org.mewx.wenku8
+```
+
+Recovery was attempted and mostly failed. Worth recording precisely, because it defines what this
+mistake costs next time:
+
+- **The bookshelf survives.** `FavFragment.AsyncLoadAllFromCloud` pushes local-only aids up with
+  `getAddToBookshelfParams`, so a logged-in device has already mirrored its shelf to the account.
+  Logging back in restores it.
+- **Reading positions do not.** `read_saves_v1.wk8` has no cloud counterpart anywhere in the app.
+  This is the one file a user cannot reconstruct, and it was lost.
+- **Android Auto Backup did not save it.** `android:allowBackup="true"` is set with no exclusion
+  rules and Backup Manager was enabled, but a forced `bmgr restore <token> org.mewx.wenku8`
+  against the device's own set returned `restoreFinished: 0` with nothing written — most likely
+  the app exceeds the 25 MB Auto Backup quota once chapters are cached, which makes the backup
+  silently no-op. **Do not count on Auto Backup for this app.**
+
+So: never run `connectedAndroidTest` against a device holding real data. Use an emulator, or the
+`am instrument` route above after a `pm install -r`, which updates in place and never uninstalls.
+That reading positions have no cloud copy and no working backup is a product gap this incident
+exposed rather than a testing one: the only copy of a user's reading history lives in one file in
+app-private storage, which any uninstall removes. Nothing in this plan currently addresses it.
+Candidates, none scheduled: sync positions to the account alongside the bookshelf, add an
+export/import action, or set `android:fullBackupContent` rules that keep the small `.wk8` files
+inside the Auto Backup quota by excluding the cached chapters.
+
 *Two dead ends, recorded so they are not re-run.* Neither is worth revisiting:
 
 - **WSL2 `usbipd` passthrough.** Inferred from the timing signature alone — every failure landing
@@ -1072,7 +1110,7 @@ appears at first glance. The problem was never the count, it was *where* they ru
 | Location | Before | Now | Runs on |
 |---|---|---|---|
 | `app/src/test` | 3 files / 10 tests | **15 files / 114 tests** | JVM, seconds |
-| `app/src/androidTest` | 8 files / 31 tests | **19 files / 137 tests** | emulator or device, minutes |
+| `app/src/androidTest` | 8 files / 31 tests | **20 files / 144 tests** | emulator or device, minutes |
 | `api/src/test` | 1 file | 1 file | JVM |
 
 (Step 1 moved the JVM count from 10 to 37; `CrashReporterTest` took it to 44 in Phase 0; Phase 1
@@ -1171,7 +1209,7 @@ never reported at all. Four changes to `.github/workflows/android-ci.yml`:
 Note the API 21 → 33 move means the minSdk floor is no longer verified by CI. That is an accepted
 trade for two test classes; if Phase 4 raises `minSdkVersion` anyway the question goes away.
 
-**Coverage reporting is wired again, and it now measures all 251 tests rather than half of them.**
+**Coverage reporting is wired again, and it now measures all 258 tests rather than half of them.**
 The README's Travis badge pointed at a service that no longer runs the build, and the Coveralls
 badge was fed by a `kt3k` Gradle plugin hooked to `connectedAlphaDebugAndroidTest` that has been
 commented out in `app/build.gradle` for years — neither could be revived as-is under AGP 9. The
