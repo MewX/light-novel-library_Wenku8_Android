@@ -14,6 +14,7 @@ import androidx.test.filters.LargeTest;
 import org.junit.Before;
 import org.junit.Test;
 import org.mewx.wenku8.InteractiveDevice;
+import org.mewx.wenku8.RealApi;
 
 /**
  * The three review screens, none of which had ever been executed by a test.
@@ -45,6 +46,7 @@ public class NovelReviewScreensTest {
     @Before
     public void requireAnInteractiveDevice() {
         InteractiveDevice.require();
+        RealApi.require();
     }
 
     private static Intent intentFor(Class<?> screen) {

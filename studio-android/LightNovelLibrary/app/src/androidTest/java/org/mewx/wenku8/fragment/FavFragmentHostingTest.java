@@ -16,6 +16,7 @@ import androidx.test.platform.app.InstrumentationRegistry;
 import org.junit.Before;
 import org.junit.Test;
 import org.mewx.wenku8.InteractiveDevice;
+import org.mewx.wenku8.RealApi;
 import org.mewx.wenku8.activity.MainActivity;
 
 /**
@@ -53,6 +54,7 @@ public class FavFragmentHostingTest {
     @Before
     public void requireAnInteractiveDevice() {
         InteractiveDevice.require();
+        RealApi.require();
 
         // The bookshelf reads cached novel metadata from the save folder, so it needs the same
         // grants MainActivityLifecycleTest asks for on the API levels that still gate them.

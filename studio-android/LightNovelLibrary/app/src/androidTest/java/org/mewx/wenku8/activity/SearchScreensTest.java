@@ -14,6 +14,7 @@ import androidx.test.filters.LargeTest;
 import org.junit.Before;
 import org.junit.Test;
 import org.mewx.wenku8.InteractiveDevice;
+import org.mewx.wenku8.RealApi;
 
 /**
  * The search entry screen and the results it opens.
@@ -42,6 +43,7 @@ public class SearchScreensTest {
     @Before
     public void requireAnInteractiveDevice() {
         InteractiveDevice.require();
+        RealApi.require();
     }
 
     private static void assertStaysOpen(ActivityScenario<?> scenario, String what) {
