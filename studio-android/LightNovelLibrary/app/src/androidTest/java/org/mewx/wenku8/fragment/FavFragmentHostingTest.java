@@ -27,11 +27,21 @@ import org.mewx.wenku8.activity.MainActivity;
  * in {@link MainActivity}, which is the only place it is ever hosted. {@code changeFragment} is
  * public and is the seam the app itself uses.
  *
- * <p><b>The device's bookshelf is deliberately not modified.</b> These tests read whatever the
- * owner already has, which exercises the populated path for free, and a run that is interrupted
- * therefore cannot leave the library in a state the owner has to repair. That is a firmer
- * guarantee than capture-and-restore for data this valuable, and it costs only the empty-bookshelf
- * case — which {@code LocalBookshelfTest} already owns at the storage level.
+ * <p><b>These tests do change the device's bookshelf, and an earlier version of this comment
+ * wrongly promised they did not.</b> Hosting the Fragment runs its {@code onResume}, whose first
+ * pass always takes the cloud branch, so a run on a logged-in device performs a real bookshelf
+ * sync. There is no way to host it and avoid that: the branch is chosen by a counter the Fragment
+ * owns. Observed on the development device, 50 entries became 64.
+ *
+ * <p>What makes that acceptable rather than merely unavoidable is that the sync is <i>additive</i>.
+ * {@code AsyncLoadAllFromCloud} unions the local and cloud lists rather than replacing one with the
+ * other, so it cannot drop a novel that exists only on the device, and the result was verified to
+ * contain no duplicates and no sentinel ids. It is also exactly what the app does whenever a
+ * logged-in user opens the bookshelf — this runs the same code the same way, not a test-only path.
+ *
+ * <p>Nothing is written on purpose, and no fixture is planted: these read whatever the owner
+ * already has, which exercises the populated path for free. The empty-bookshelf case is left to
+ * {@code LocalBookshelfTest}, which owns it at the storage level without touching the network.
  *
  * <p>Assertions are structural, matching the other lifecycle tests: the host survives, the
  * Fragment is attached, and nothing finishes itself. What the bookshelf renders depends on the

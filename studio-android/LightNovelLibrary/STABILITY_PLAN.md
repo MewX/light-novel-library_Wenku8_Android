@@ -1072,7 +1072,7 @@ appears at first glance. The problem was never the count, it was *where* they ru
 | Location | Before | Now | Runs on |
 |---|---|---|---|
 | `app/src/test` | 3 files / 10 tests | **15 files / 114 tests** | JVM, seconds |
-| `app/src/androidTest` | 8 files / 31 tests | **15 files / 116 tests** | emulator or device, minutes |
+| `app/src/androidTest` | 8 files / 31 tests | **16 files / 124 tests** | emulator or device, minutes |
 | `api/src/test` | 1 file | 1 file | JVM |
 
 (Step 1 moved the JVM count from 10 to 37; `CrashReporterTest` took it to 44 in Phase 0; Phase 1
@@ -1171,7 +1171,7 @@ never reported at all. Four changes to `.github/workflows/android-ci.yml`:
 Note the API 21 → 33 move means the minSdk floor is no longer verified by CI. That is an accepted
 trade for two test classes; if Phase 4 raises `minSdkVersion` anyway the question goes away.
 
-**Coverage reporting is wired again, and it now measures all 230 tests rather than half of them.**
+**Coverage reporting is wired again, and it now measures all 238 tests rather than half of them.**
 The README's Travis badge pointed at a service that no longer runs the build, and the Coveralls
 badge was fed by a `kt3k` Gradle plugin hooked to `connectedAlphaDebugAndroidTest` that has been
 commented out in `app/build.gradle` for years — neither could be revived as-is under AGP 9. The
@@ -1240,6 +1240,21 @@ Ranked by uncovered lines: `NovelInfoActivity` 644/817, `PagerSlidingTabStrip` 3
 
 Two entries deserved naming. `FavFragment` is 275 uncovered of 280 and it is the bookshelf — the
 first screen most users see, and it is now the largest untested thing in the app.
+
+**A guarantee that was claimed and turned out to be false, kept here because it is the kind of
+thing worth not repeating.** `FavFragmentHostingTest` originally documented that it did not modify
+the device's bookshelf. It does. Hosting the Fragment runs its `onResume`, whose first pass always
+takes the cloud branch, so a run on a logged-in device performs a real bookshelf sync — 50 entries
+became 64 on the development device. There is no way to host the Fragment and avoid it, because the
+branch is selected by a counter the Fragment owns.
+
+It was allowed to stand rather than deleted, on two grounds that were checked rather than assumed:
+`AsyncLoadAllFromCloud` unions the local and cloud lists instead of replacing one with the other,
+so it cannot drop a device-only novel, and the result was verified to hold 64 unique ids with no
+duplicates and no sentinel leakage. It is also precisely what the app does when a logged-in user
+opens the bookshelf. The lesson is narrower than "do not test Fragments": **a test that hosts a real
+screen inherits everything that screen does on startup, including its network writes**, so the
+promise to make about such a test is what its effects are, not that it has none.
 
 `VerticalReaderActivity` was the other, at 0/185, being the screen whose crash Phase 1 item 13
 fixed — the loader beneath it was tested, the screen itself was not. **Closed:**
