@@ -1072,7 +1072,7 @@ appears at first glance. The problem was never the count, it was *where* they ru
 | Location | Before | Now | Runs on |
 |---|---|---|---|
 | `app/src/test` | 3 files / 10 tests | **15 files / 114 tests** | JVM, seconds |
-| `app/src/androidTest` | 8 files / 31 tests | **13 files / 105 tests** | emulator or device, minutes |
+| `app/src/androidTest` | 8 files / 31 tests | **14 files / 111 tests** | emulator or device, minutes |
 | `api/src/test` | 1 file | 1 file | JVM |
 
 (Step 1 moved the JVM count from 10 to 37; `CrashReporterTest` took it to 44 in Phase 0; Phase 1
@@ -1171,7 +1171,7 @@ never reported at all. Four changes to `.github/workflows/android-ci.yml`:
 Note the API 21 → 33 move means the minSdk floor is no longer verified by CI. That is an accepted
 trade for two test classes; if Phase 4 raises `minSdkVersion` anyway the question goes away.
 
-**Coverage reporting is wired again, and it now measures all 219 tests rather than half of them.**
+**Coverage reporting is wired again, and it now measures all 225 tests rather than half of them.**
 The README's Travis badge pointed at a service that no longer runs the build, and the Coveralls
 badge was fed by a `kt3k` Gradle plugin hooked to `connectedAlphaDebugAndroidTest` that has been
 commented out in `app/build.gradle` for years — neither could be revived as-is under AGP 9. The
@@ -1238,9 +1238,22 @@ Ranked by uncovered lines: `NovelInfoActivity` 644/817, `PagerSlidingTabStrip` 3
 206, `VerticalReaderActivity` 185, `NovelReviewReplyListActivity` 172, `OverlappedSlider` 169,
 `ConfigFragment` 166/168, `MainActivity` 152/211, `GlobalConfig` 140/446.
 
-Two entries deserve naming. `FavFragment` is 275 uncovered of 280 and it is the bookshelf — the
-first screen most users see. `VerticalReaderActivity` is 0/185, and it is the screen whose crash
-Phase 1 item 13 fixed; the loader beneath it is now tested, the screen itself is not.
+Two entries deserved naming. `FavFragment` is 275 uncovered of 280 and it is the bookshelf — the
+first screen most users see, and it is now the largest untested thing in the app.
+
+`VerticalReaderActivity` was the other, at 0/185, being the screen whose crash Phase 1 item 13
+fixed — the loader beneath it was tested, the screen itself was not. **Closed:**
+`VerticalReaderActivityLifecycleTest`, 6 device tests, covering startup from a cached chapter,
+recreation once and twice, backgrounding (which is what runs `onPause`, where this reader writes
+the position), a chapter with nothing cached, and a corrupt reading position.
+
+That last one is worth reading before it is trusted, because it proves less than its name suggests.
+`getReadSavesRecord` parses the file only while its static is still null, and that static outlives
+any one test, so the test cannot rely on the Activity being what triggers the parse — it reloads
+explicitly first. The parse guard stays owned by `ReadSavesV0Test`, which drives the loader
+directly. What the screen-level test adds is the half the loader test cannot reach: that a damaged
+record resolves to a position of 0 rather than to something the reader then tries to scroll to,
+and that the screen opens normally with one present.
 
 About **1000 lines will realistically never be covered** — the vendored `PagerSlidingTabStrip`
 (373), the reader sliders `PageSlider`/`OverlappedSlider`/`SlidingLayout` (~540 lines of custom
