@@ -1072,7 +1072,7 @@ appears at first glance. The problem was never the count, it was *where* they ru
 | Location | Before | Now | Runs on |
 |---|---|---|---|
 | `app/src/test` | 3 files / 10 tests | **15 files / 114 tests** | JVM, seconds |
-| `app/src/androidTest` | 8 files / 31 tests | **18 files / 134 tests** | emulator or device, minutes |
+| `app/src/androidTest` | 8 files / 31 tests | **19 files / 137 tests** | emulator or device, minutes |
 | `api/src/test` | 1 file | 1 file | JVM |
 
 (Step 1 moved the JVM count from 10 to 37; `CrashReporterTest` took it to 44 in Phase 0; Phase 1
@@ -1171,7 +1171,7 @@ never reported at all. Four changes to `.github/workflows/android-ci.yml`:
 Note the API 21 → 33 move means the minSdk floor is no longer verified by CI. That is an accepted
 trade for two test classes; if Phase 4 raises `minSdkVersion` anyway the question goes away.
 
-**Coverage reporting is wired again, and it now measures all 248 tests rather than half of them.**
+**Coverage reporting is wired again, and it now measures all 251 tests rather than half of them.**
 The README's Travis badge pointed at a service that no longer runs the build, and the Coveralls
 badge was fed by a `kt3k` Gradle plugin hooked to `connectedAlphaDebugAndroidTest` that has been
 commented out in `app/build.gradle` for years — neither could be revived as-is under AGP 9. The
@@ -1240,6 +1240,29 @@ Ranked by uncovered lines: `NovelInfoActivity` 644/817, `PagerSlidingTabStrip` 3
 
 Two entries deserved naming. `FavFragment` is 275 uncovered of 280 and it is the bookshelf — the
 first screen most users see, and it is now the largest untested thing in the app.
+
+**A defence that converts a missing argument into a crash one layer down.** Found while trying to
+cover `NovelItemListFragment` and left unpatched on purpose. Its `onCreate` reads arguments
+defensively — `listType = args == null ? "" : args.getString("type", "")` — which reads like a
+Fragment that copes with having no arguments. It does not: `""` then reaches
+`Wenku8API.getNovelSortedBy` inside `AsyncGetNovelItemList.doInBackground`, which throws
+`IllegalStateException: Unknown NovelSortedBy:` from a background thread, so the app dies rather
+than showing an empty list. The guard produces a value its own consumer rejects.
+
+It is **not reachable today** — the framework retains `setArguments` across recreation, and both
+callers (`RKListFragment`, `SearchResultActivity`) pass a real value — so under the standing
+preference for coverage over logical patches it is recorded rather than fixed. Whoever does fix it
+should make the empty type resolve to a default listing rather than adding a second guard further
+down, since the existing one already reads as sufficient and is not.
+
+Two other things came out of that same attempt. `NovelItemListFragment.onCreateView:142` resolves
+its progress indicator with `getActivity().findViewById(R.id.spb)` — the *host Activity's* view
+tree, not the `rootView` it just inflated — and `R.id.spb` exists in only two layouts. That is an
+id-based coupling with no compile-time link, so a third host, or a layout that drops the indicator,
+becomes an NPE with no warning. And the Fragment cannot be covered this way at all without a valid
+`NovelSortedBy`, which comes from the private `api/` module that CI stubs; a test written around it
+would pass locally and risk failing on CI, which is the api-stub trap. `ConfigFragmentHostingTest`
+therefore covers settings only, and says so.
 
 **A guarantee that was claimed and turned out to be false, kept here because it is the kind of
 thing worth not repeating.** `FavFragmentHostingTest` originally documented that it did not modify
