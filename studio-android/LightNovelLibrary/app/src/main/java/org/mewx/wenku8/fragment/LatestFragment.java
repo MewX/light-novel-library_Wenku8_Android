@@ -30,7 +30,7 @@ import org.mewx.wenku8.async.CheckAppNewVersion;
 import org.mewx.wenku8.global.GlobalConfig;
 import org.mewx.wenku8.global.ScreenState;
 import org.mewx.wenku8.global.api.NovelItemInfoUpdate;
-import org.mewx.wenku8.global.api.custom.NovelListWithInfoParser;
+import org.mewx.wenku8.global.api.NovelListWithInfoParser;
 import org.mewx.wenku8.api.Wenku8API;
 import org.mewx.wenku8.listener.MyItemClickListener;
 import org.mewx.wenku8.listener.MyItemLongClickListener;
@@ -143,7 +143,7 @@ public class LatestFragment extends Fragment implements MyItemClickListener, MyI
 
         // fetch list
         AsyncLoadLatestList ast = tracker.track(new AsyncLoadLatestList());
-        ast.execute(Wenku8API.getMewxNovelList(Wenku8API.NovelSortedBy.lastUpdate, page,
+        ast.execute(Wenku8API.getNovelListWithInfo(Wenku8API.NovelSortedBy.lastUpdate, page,
                 GlobalConfig.getCurrentLang()));
     }
 
@@ -239,8 +239,8 @@ public class LatestFragment extends Fragment implements MyItemClickListener, MyI
                 if (tempResult == null) {
                     return null;
                 }
-                String json = new String(tempResult, "UTF-8");
-                NovelListWithInfoParser.Result result = NovelListWithInfoParser.parse(json);
+                String xml = new String(tempResult, "UTF-8");
+                NovelListWithInfoParser.Result result = NovelListWithInfoParser.parse(xml);
                 if (result == null || result.items.isEmpty()) {
                     return null;
                 }

@@ -129,7 +129,7 @@ public class Wenku8API {
     }
 
     public static ContentValues getNovelListWithInfo(NovelSortedBy n, int page, AppLanguage l) {
-        throw new UnsupportedOperationException("stub");
+        return new ContentValues();
     }
 
     public static ContentValues getLibraryList() {
