@@ -65,11 +65,9 @@ public class GlobalConfig {
     private static int maxSearchHistory = 20; // default
 
     // vars
-    private static boolean lookupInternalStorageOnly = false;
     private static boolean isInBookshelf = false;
     private static boolean isInLatest = false;
     private static boolean doLoadImage = true;
-    private static boolean externalStoragePathAvailable = true;
     private static Wenku8API.AppLanguage currentLang = Wenku8API.AppLanguage.SC;
     public static String pathPickedSave; // dir picker save path
 
@@ -189,22 +187,16 @@ public class GlobalConfig {
      * @param available true-合法可以使用; false-不能使用，只能只用第二路径
      */
     public static void setExternalStoragePathAvailable(boolean available) {
-        externalStoragePathAvailable = available;
+        StorageRoots.setExternalAvailable(available);
     }
 
     public static String getDefaultStoragePath() {
-        // The lookupInternalStorageOnly flag has the highest priority.
-        if (lookupInternalStorageOnly || !externalStoragePathAvailable) {
-            return SaveFileMigration.getInternalSavePath();
-        }
-        return SaveFileMigration.getExternalStoragePath();
+        return StorageRoots.primary();
     }
 
     // TODO: get rid of this shortcut.
     public static String getBackupStoragePath() {
-        String internalPath = SaveFileMigration.getInternalSavePath();
-        return getDefaultStoragePath().equals(internalPath) ?
-                SaveFileMigration.getExternalStoragePath() : internalPath;
+        return StorageRoots.backup();
     }
 
     public static boolean doCacheImage() {
@@ -826,7 +818,7 @@ public class GlobalConfig {
     /** All settings */
     public static void loadAllSetting() {
         // Verify which storage source to user.
-        lookupInternalStorageOnly = SaveFileMigration.migrationCompleted();
+        StorageRoots.setInternalOnly(SaveFileMigration.migrationCompleted());
 
         // Loads all settings.
         allSetting = new ContentValues();
@@ -853,7 +845,8 @@ public class GlobalConfig {
         String lang = allSetting.getAsString(SettingItems.language.toString());
         CrashReporter.setKey(CrashReporter.Keys.LANGUAGE, lang == null ? currentLang.toString() : lang);
         CrashReporter.setKey(CrashReporter.Keys.STORAGE_MODE,
-                lookupInternalStorageOnly || !externalStoragePathAvailable ? "internal" : "external");
+                StorageRoots.isInternalOnly() || !StorageRoots.isExternalAvailable()
+                        ? "internal" : "external");
         CrashReporter.log("GlobalConfig#loadAllSetting completed");
     }
 

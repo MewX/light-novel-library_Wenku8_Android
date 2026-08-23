@@ -1124,7 +1124,7 @@ appears at first glance. The problem was never the count, it was *where* they ru
 | Location | Before | Now | Runs on |
 |---|---|---|---|
 | `app/src/test` | 3 files / 10 tests | **16 files / 133 tests** | JVM, seconds |
-| `app/src/androidTest` | 8 files / 31 tests | **23 files / 174 tests** | emulator or device, minutes |
+| `app/src/androidTest` | 8 files / 31 tests | **24 files / 184 tests** | emulator or device, minutes |
 | `api/src/test` | 1 file | 1 file | JVM |
 
 (Step 1 moved the JVM count from 10 to 37; `CrashReporterTest` took it to 44 in Phase 0; Phase 1
@@ -1223,7 +1223,7 @@ never reported at all. Four changes to `.github/workflows/android-ci.yml`:
 Note the API 21 → 33 move means the minSdk floor is no longer verified by CI. That is an accepted
 trade for two test classes; if Phase 4 raises `minSdkVersion` anyway the question goes away.
 
-**Coverage reporting is wired again, and it now measures all 307 tests rather than half of them.**
+**Coverage reporting is wired again, and it now measures all 317 tests rather than half of them.**
 The README's Travis badge pointed at a service that no longer runs the build, and the Coveralls
 badge was fed by a `kt3k` Gradle plugin hooked to `connectedAlphaDebugAndroidTest` that has been
 commented out in `app/build.gradle` for years — neither could be revived as-is under AGP 9. The
@@ -1316,6 +1316,14 @@ Run per class, one file each, and let the report task merge them.
 across forced clean regenerations, but single classes do not agree between methods —
 `WenkuReaderPageView` reads 4/215 per-class and 109/215 from the single-file run. Treat the ranking
 below as directional, and re-measure a specific class before committing effort to it.
+
+*Execution data expires the moment the code changes, silently.* JaCoCo keys a `.ec` file to the
+identity of the class it was recorded against, so editing a source file invalidates every `.ec`
+already collected for it — and the report does not complain, it simply reports the class as barely
+covered. Extracting `StorageRoots` dropped `GlobalConfig` from 380/446 to 66/441 in a stale merge,
+which reads exactly like a catastrophic regression and is nothing of the sort. **Re-collect
+coverage after changing main code, and do not interleave measurement with refactoring** — every
+step invalidates the last measurement, so collect once at the end.
 
 Ranked by uncovered lines, 2026-08-23, approximate per the caveat above: `NovelInfoActivity`
 565/817, `Wenku8ReaderActivityV1` 316/493, `PageSlider` 217 (vendored-ish custom animation),
@@ -1738,7 +1746,7 @@ on `GlobalConfig`'s API means designing it blind and reopening it afterwards.
 | # | step | axis | status |
 |---|---|---|---|
 | 1 | Cover the 123 untested `GlobalConfig` lines — settings writers, credentials, image cache | test | **done** 2026-08-23 — `GlobalConfigSettingsTest` (14) + `GlobalConfigMiscTest` (10), +57 lines, 323→380 of 446. The 66 left are credentials, the network download, one dead method, and second-root fallbacks needing step 2 |
-| 2 | Extract `StorageRoots` with an injectable root | split | not started |
+| 2 | Extract `StorageRoots` with an injectable root | split | **done** 2026-08-23 — `StorageRootsTest`, 10 tests; second-root fallbacks reachable for the first time |
 | 3 | Funnel the 13 `LightCache` callers onto `GlobalConfig` (step 0 above) | funnel | not started — 13 files, 27 in `NovelInfoActivity`, re-measured 2026-08-23 |
 | 4 | `SettingsStore`, then `AccountStore`, then the already-covered stores | split | not started |
 | 5 | Evict the transient UI flags | split | not started |
