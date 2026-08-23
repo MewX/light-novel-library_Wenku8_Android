@@ -84,6 +84,17 @@ public class ConfigFragmentHostingTest {
      * Testing it properly needs a valid NovelSortedBy, which comes from the private api/ module.
      * CI builds against api-stub, so a test written that way risks passing here and failing there
      * -- the api-stub trap. That is why this is left rather than bodged.
+     *
+     * RESOLVED, and the reasoning above still holds -- it is why the fix took the shape it did.
+     * NovelItemListFragmentHostingTest covers it with a real list type, hosted as a ranking list
+     * rather than as type=search, and guarded by RealApi.require() so it skips on CI instead of
+     * dying there. RealApi did not exist when the attempt recorded above was made.
+     *
+     * One thing that attempt did not reach, and which the new test documents: the type string has
+     * to be derived via Wenku8API rather than written literally. The real module maps
+     * NovelSortedBy.allVote to "allvote", while api-stub implements the same pair as
+     * valueOf/name and so produces "allVote". A hardcoded "allvote" reaches valueOf on CI and
+     * throws IllegalArgumentException from a background thread.
      */
 
     // ---- settings --------------------------------------------------------------------------

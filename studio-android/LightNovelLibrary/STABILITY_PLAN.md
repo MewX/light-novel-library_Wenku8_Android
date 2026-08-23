@@ -1124,7 +1124,7 @@ appears at first glance. The problem was never the count, it was *where* they ru
 | Location | Before | Now | Runs on |
 |---|---|---|---|
 | `app/src/test` | 3 files / 10 tests | **16 files / 133 tests** | JVM, seconds |
-| `app/src/androidTest` | 8 files / 31 tests | **20 files / 144 tests** | emulator or device, minutes |
+| `app/src/androidTest` | 8 files / 31 tests | **21 files / 150 tests** | emulator or device, minutes |
 | `api/src/test` | 1 file | 1 file | JVM |
 
 (Step 1 moved the JVM count from 10 to 37; `CrashReporterTest` took it to 44 in Phase 0; Phase 1
@@ -1223,7 +1223,7 @@ never reported at all. Four changes to `.github/workflows/android-ci.yml`:
 Note the API 21 → 33 move means the minSdk floor is no longer verified by CI. That is an accepted
 trade for two test classes; if Phase 4 raises `minSdkVersion` anyway the question goes away.
 
-**Coverage reporting is wired again, and it now measures all 277 tests rather than half of them.**
+**Coverage reporting is wired again, and it now measures all 283 tests rather than half of them.**
 The README's Travis badge pointed at a service that no longer runs the build, and the Coveralls
 badge was fed by a `kt3k` Gradle plugin hooked to `connectedAlphaDebugAndroidTest` that has been
 commented out in `app/build.gradle` for years — neither could be revived as-is under AGP 9. The
@@ -1364,6 +1364,24 @@ becomes an NPE with no warning. And the Fragment cannot be covered this way at a
 `NovelSortedBy`, which comes from the private `api/` module that CI stubs; a test written around it
 would pass locally and risk failing on CI, which is the api-stub trap. `ConfigFragmentHostingTest`
 therefore covers settings only, and says so.
+
+**Now covered, by `NovelItemListFragmentHostingTest` — 6 device tests.** The reasoning above was
+right and is why the test took the shape it did: it passes a real list type instead of `""`, and
+hosts a ranking list instead of `type=search`, so it constructs neither of the states that made the
+first attempt crash. The api-stub objection is answered by `RealApi.require()`, which skips on CI
+rather than dying there; it did not exist when that attempt was made. The listing genuinely loads —
+the case that reaches `refreshPartialIdList` asserts a populated adapter and was confirmed not to
+have been skipped by its `assumeTrue`.
+
+**A third spelling trap the first attempt did not reach, and the sharpest of the three.** The two
+API implementations disagree on how a list type is spelled. The real module maps
+`NovelSortedBy.allVote` to `"allvote"` and back; `api-stub` implements the same pair as
+`valueOf`/`name`, giving `"allVote"`. Each round-trips against itself, so `RKListFragment` works
+under both — but a test with a literal `"allvote"` reaches `valueOf("allvote")` on CI and throws
+`IllegalArgumentException` from a background thread, which takes the process rather than failing an
+assertion. Derive the string through `Wenku8API` as the pager does; never write it out. This is the
+same class of hazard as the api-stub trap but survives it: `RealApi.require()` would not have caught
+this one, because the stub's `getNovelSortedBy` does not throw `UnsupportedOperationException`.
 
 **A guarantee that was claimed and turned out to be false, kept here because it is the kind of
 thing worth not repeating.** `FavFragmentHostingTest` originally documented that it did not modify
