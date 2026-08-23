@@ -1124,7 +1124,7 @@ appears at first glance. The problem was never the count, it was *where* they ru
 | Location | Before | Now | Runs on |
 |---|---|---|---|
 | `app/src/test` | 3 files / 10 tests | **16 files / 133 tests** | JVM, seconds |
-| `app/src/androidTest` | 8 files / 31 tests | **21 files / 150 tests** | emulator or device, minutes |
+| `app/src/androidTest` | 8 files / 31 tests | **22 files / 164 tests** | emulator or device, minutes |
 | `api/src/test` | 1 file | 1 file | JVM |
 
 (Step 1 moved the JVM count from 10 to 37; `CrashReporterTest` took it to 44 in Phase 0; Phase 1
@@ -1223,7 +1223,7 @@ never reported at all. Four changes to `.github/workflows/android-ci.yml`:
 Note the API 21 → 33 move means the minSdk floor is no longer verified by CI. That is an accepted
 trade for two test classes; if Phase 4 raises `minSdkVersion` anyway the question goes away.
 
-**Coverage reporting is wired again, and it now measures all 283 tests rather than half of them.**
+**Coverage reporting is wired again, and it now measures all 297 tests rather than half of them.**
 The README's Travis badge pointed at a service that no longer runs the build, and the Coveralls
 badge was fed by a `kt3k` Gradle plugin hooked to `connectedAlphaDebugAndroidTest` that has been
 commented out in `app/build.gradle` for years — neither could be revived as-is under AGP 9. The
@@ -1737,7 +1737,7 @@ on `GlobalConfig`'s API means designing it blind and reopening it afterwards.
 
 | # | step | axis | status |
 |---|---|---|---|
-| 1 | Cover the 123 untested `GlobalConfig` lines — settings writers, credentials, image cache | test | **in progress** 2026-08-23 |
+| 1 | Cover the 123 untested `GlobalConfig` lines — settings writers, credentials, image cache | test | **partly done** 2026-08-23 — `GlobalConfigSettingsTest`, 14 tests, +27 lines (323→350 of 446). 96 remain; see below |
 | 2 | Extract `StorageRoots` with an injectable root | split | not started |
 | 3 | Funnel the 13 `LightCache` callers onto `GlobalConfig` (step 0 above) | funnel | not started — 13 files, 27 in `NovelInfoActivity`, re-measured 2026-08-23 |
 | 4 | `SettingsStore`, then `AccountStore`, then the already-covered stores | split | not started |
@@ -1747,6 +1747,26 @@ on `GlobalConfig`'s API means designing it blind and reopening it afterwards.
 Step 2 deliberately precedes step 3 despite the ordering argument, as a narrow exception: it is
 ~40 lines, changes no public API, and makes every later test both safer and cheaper to write, so
 it de-risks the funnelling rather than competing with it.
+
+**What step 1 could not reach, which turns out to be the argument for step 2.** Of the 96 lines
+still uncovered after `GlobalConfigSettingsTest`, only about a third are ordinary untested code —
+`setCurrentLang`, `getOpensourceLicense`, `generateImageFileNameByURL`,
+`moveBookToTheTopOfBookshelf` and `onSearchClicked`, roughly 40 lines that are cheap to cover and
+simply have not been. The rest split into two groups that a test cannot honestly reach today:
+
+- **Deliberately out of scope, ~35 lines.** `saveUserInfoSet` and the success path of
+  `loadUserInfoSet` write and decode a real credential file through `LightUserSession`;
+  `saveNovelContentImage` downloads over the network. Writing credentials on a real device is not
+  something a test should do, and the download path belongs behind a `RealApi` guard where it
+  would not count on CI anyway.
+- **Unreachable without a storage seam.** Every second-root fallback — `getExistingNovelContentImagePath:937`,
+  the write-failure branches in `writeFullSaveFileContent`, the alternate paths in
+  `generateImageFileNameByURL` — only runs when the first root fails. There is no way to make the
+  first root fail from a test, because the root is resolved internally with nothing to inject.
+
+That second group is precisely what step 2 exists to fix, and it is worth noting that the ceiling
+was found by measuring rather than assumed: step 1 was expected to close most of the 123 and closed
+27, because the code is less testable than it looks from a line count.
 
 **Step 3 is not on the coverage critical path.** It is the prerequisite for the backend migration,
 which is unscheduled. If the release gate is what matters, steps 1, 2 and 4 buy more.
