@@ -19,8 +19,8 @@ android {
             debuggable true
             minifyEnabled false
             // Coverage for the two suites. These are separate switches covering separate things:
-            // the first instruments `test<Variant>UnitTest` (the 114 JVM tests), the second
-            // instruments the app's own classes so the 105 instrumented tests report coverage from
+            // the first instruments `test<Variant>UnitTest` (the JVM tests), the second
+            // instruments the app's own classes so the instrumented tests report coverage from
             // the device. Both are needed -- the instrumented suite is where the Activity,
             // lifecycle and storage coverage lives, so a JVM-only figure understates the real one
             // by a wide margin. The `testCoverageEnabled` spelling these replaced was removed in
@@ -198,7 +198,7 @@ def applyCoverageScope = { JacocoReport task ->
 }
 
 /**
- * Coverage for the 114 JVM unit tests, in the XML form Coveralls reads.
+ * Coverage for the JVM unit tests, in the XML form Coveralls reads.
  *
  * This replaces a commented-out block that used the kt3k coveralls Gradle plugin and hung itself
  * off `connectedAlphaDebugAndroidTest`, driven by Travis. None of that could be revived as-is: the
@@ -216,7 +216,7 @@ tasks.register('jacocoAlphaDebugUnitTestReport', JacocoReport) {
 }
 
 /**
- * Coverage for the 105 instrumented tests, from execution data gathered on the device.
+ * Coverage for the instrumented tests, from execution data gathered on the device.
  *
  * AGP already registers `createAlphaDebugAndroidTestCoverageReport` for this, and it is deliberately
  * not used. That task is `com.android.build.gradle.internal.coverage.JacocoReportTask` -- an

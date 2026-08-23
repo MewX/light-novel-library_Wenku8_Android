@@ -1290,16 +1290,18 @@ Ranked by uncovered lines: `NovelInfoActivity` 644/817, `PagerSlidingTabStrip` 3
 206, `VerticalReaderActivity` 185, `NovelReviewReplyListActivity` 172, `OverlappedSlider` 169,
 `ConfigFragment` 166/168, `MainActivity` 152/211, `GlobalConfig` 140/446.
 
-**Re-measured 2026-08-23 on the physical device, all 150 instrumented tests plus the 133 JVM ones.
+**Re-measured 2026-08-23 on the physical device, at 150 instrumented tests plus 133 JVM — superseded by the figures below, kept for the traps it documents.
 Two figures, and the gap between them is the point:**
 
 | | lines | what it is |
 |---|---|---|
-| **local merged** | **3583/7065 — 50.7%** | every test, including the 25 `RealApi`-guarded ones |
-| **CI merged** | **2807/7065 — 39.7%** | what Coveralls can publish; the guarded tests skip against api-stub |
+| **local merged** | **3601/7058 — 51.0%** | every test, including the 25 `RealApi`-guarded ones |
+| **CI merged** | **2839/7058 — 40.2%** | what Coveralls can publish; the guarded tests skip against api-stub |
 
-Re-measured 2026-08-23 after the `GlobalConfig` split, against all 184 instrumented and 133 JVM
-tests. Both figures were 48.2% and 37.2% earlier the same day, before steps 1, 2, 4 and 5.
+Re-measured 2026-08-23 after the `GlobalConfig` split and the migration tests, against all 195
+instrumented and 133 JVM tests. Both figures were 48.2% and 37.2% earlier the same day, before
+steps 1, 2, 4 and 5. Both halves were regenerated together and checked to agree on a file's line
+count before merging — see the third trap below for what happens when they do not.
 
 The 11-point gap is roughly 780 lines of review, search, bookshelf and ranking screens that are
 genuinely tested but only on a machine holding the private `api/` module. The published badge is a
@@ -1787,7 +1789,7 @@ can start whenever there is appetite, is low-risk, and needs no decision about d
 
 The section above asks what should sit *behind* the storage door. This one asks what the door
 itself should be, which is a separate problem that had not been written down: `GlobalConfig` is
-**996 lines, 79 public static methods, ~10 mutable static fields, 24 caller files**, holding
+**Was 996 lines, 79 public static methods, ~10 mutable static fields, 24 caller files** (901 / 72 / 7 / 26 as of 2026-08-23, after steps 2, 4 and 5), holding
 twelve unrelated responsibilities — storage paths, file I/O, settings, search history, reading
 positions, bookshelf, volume cache, images, credentials, the cached notice, transient UI flags,
 and assorted helpers.
@@ -1832,9 +1834,10 @@ it de-risks the funnelling rather than competing with it.
 
 **What step 1 could not reach, which turns out to be the argument for step 2.** Of the 96 lines
 still uncovered after `GlobalConfigSettingsTest`, only about a third are ordinary untested code —
-`setCurrentLang`, `getOpensourceLicense`, `generateImageFileNameByURL`,
-`moveBookToTheTopOfBookshelf` and `onSearchClicked`, roughly 40 lines that are cheap to cover and
-simply have not been. The rest split into two groups that a test cannot honestly reach today:
+`setCurrentLang`, `getOpensourceLicense`, `generateImageFileNameByURL` and
+`moveBookToTheTopOfBookshelf`, roughly 40 lines that were cheap to cover and simply had not been —
+all closed by `GlobalConfigMiscTest`. A fifth, `onSearchClicked`, was deleted instead: deprecated,
+callerless, and carrying the null-guard defect its siblings had fixed. The rest split into two groups that a test cannot honestly reach today:
 
 - **Deliberately out of scope, ~35 lines.** `saveUserInfoSet` and the success path of
   `loadUserInfoSet` write and decode a real credential file through `LightUserSession`;
