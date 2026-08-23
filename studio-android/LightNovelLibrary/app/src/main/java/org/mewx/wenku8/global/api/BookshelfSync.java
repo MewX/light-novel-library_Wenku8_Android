@@ -36,21 +36,26 @@ public final class BookshelfSync {
     /**
      * Matches the {@code aid} attributes in a bookshelf listing.
      *
-     * <p><b>The greedy {@code (.*)} is the original expression and is kept deliberately, but it is
-     * narrower than it looks.</b> Because {@code .} does not match a line terminator, it captures
-     * to the last quote <i>on the same line</i> — so it reads an id correctly only when {@code aid}
-     * is the last quoted attribute on its line. Two records sharing a line, or a single record with
-     * any attribute after {@code aid}, both yield a capture that will not parse, and the ids are
-     * skipped. {@code BookshelfSyncTest} pins all three cases.
+     * <p><b>This was {@code aid="(.*)"} until it was measured against the live server.</b> The
+     * greedy form captures to the last quote on the line, so it reads an id correctly only when
+     * {@code aid} is the last quoted attribute there. That happens to hold for the endpoint the
+     * bookshelf actually calls — {@code action=bookcase&do=list} returns {@code <book aid="3988" />}
+     * one per line, and a real 66-entry shelf parsed 66 of 66 under either form, so the greedy
+     * version was never broken in production.
      *
-     * <p>What saves this from being a data-loss bug is the shape of the failure: skipped ids make
-     * the cloud list come back short or empty, and {@link #plan} reads a missing id as "the cloud
-     * does not have it" and pushes the local copy up. The cost is wasted uploads, not a lost novel.
-     * Tightening this to {@code ([^"]*)} would be a one-character fix, and is left undone on
-     * purpose under the standing preference for coverage over logical patches — it is recorded in
-     * {@code STABILITY_PLAN.md} for whoever picks it up.
+     * <p>It fails completely on the sibling endpoint. {@code action=bookcase} returns
+     * {@code <book aid="3988" date="2026-08-23">}, where the capture swallows the date and
+     * <i>none</i> of the 66 entries parse. Nothing calls that endpoint today —
+     * {@code Wenku8API.getBookshelfListParams} has no caller — but reaching for it looks like a
+     * plain optimisation, since it carries names and dates and would save one request per novel.
+     * The failure would be silent: an empty listing, read by {@link #plan} as "the cloud has
+     * nothing", followed by a pointless re-upload of the entire shelf.
+     *
+     * <p>So the bound is deliberate rather than incidental. It is verified to produce identical
+     * results on the endpoint in use, and it keeps producing correct ones on an endpoint someone
+     * may switch to. {@code BookshelfSyncTest} covers both shapes.
      */
-    private static final Pattern AID_ATTRIBUTE = Pattern.compile("aid=\"(.*)\"");
+    private static final Pattern AID_ATTRIBUTE = Pattern.compile("aid=\"([^\"]*)\"");
 
     /**
      * The ids in a cloud bookshelf listing, in the order they appear.

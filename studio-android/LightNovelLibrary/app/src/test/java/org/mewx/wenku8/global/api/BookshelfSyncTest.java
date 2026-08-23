@@ -68,25 +68,59 @@ public class BookshelfSyncTest {
     }
 
     /**
-     * <b>Current behaviour, not endorsed behaviour.</b> The greedy pattern captures to the last
-     * quote on the line, so two records sharing a line produce one unparseable capture and both
-     * ids are lost. Pinned so that tightening the pattern later shows up here as a deliberate
-     * change rather than as a surprise.
+     * Two records sharing a line. The greedy {@code (.*)} this replaced captured across both and
+     * lost the pair; the bounded form reads them independently.
      */
     @Test
-    public void twoRecordsOnOneLineAreBothLostToTheGreedyPattern() {
-        assertTrue("the greedy capture spans both records, so neither id parses",
-                BookshelfSync.parseCloudAidList("<item aid=\"11\"/><item aid=\"22\"/>").isEmpty());
+    public void twoRecordsOnOneLineAreBothRead() {
+        assertEquals(aids(11, 22),
+                BookshelfSync.parseCloudAidList("<item aid=\"11\"/><item aid=\"22\"/>"));
     }
 
     /**
-     * The same flaw in its more likely form: {@code aid} is not the last quoted attribute on the
-     * line. A server that adds any attribute after it silently empties the shelf listing.
+     * An attribute after the id, which is the shape that matters in practice: it is exactly what
+     * {@code action=bookcase} returns, and under the greedy pattern none of a 66-entry shelf
+     * parsed. See the note on {@code AID_ATTRIBUTE}.
      */
     @Test
-    public void anAttributeAfterTheIdAlsoDefeatsTheGreedyPattern() {
-        assertTrue("a trailing attribute is swallowed into the capture",
-                BookshelfSync.parseCloudAidList("<item aid=\"33\" name=\"x\"/>").isEmpty());
+    public void anAttributeAfterTheIdDoesNotSwallowIt() {
+        assertEquals(aids(33),
+                BookshelfSync.parseCloudAidList("<item aid=\"33\" name=\"x\"/>"));
+    }
+
+    /**
+     * The live endpoint's real shape, copied from a genuine {@code action=bookcase&do=list}
+     * response. This is the format the bookshelf depends on today.
+     */
+    @Test
+    public void theShapeTheBookshelfEndpointActuallyReturnsIsRead() {
+        String listing = "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n"
+                + "<metadata>\n"
+                + "<book aid=\"3988\" />\n"
+                + "<book aid=\"1508\" />\n"
+                + "<book aid=\"1861\" />\n"
+                + "</metadata>";
+
+        assertEquals(aids(3988, 1508, 1861), BookshelfSync.parseCloudAidList(listing));
+    }
+
+    /**
+     * The sibling endpoint's shape, from a genuine {@code action=bookcase} response. Nothing calls
+     * it today, and this test is the reason switching to it would not silently empty the shelf.
+     */
+    @Test
+    public void theFullerListingShapeIsAlsoRead() {
+        String listing = "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n"
+                + "<metadata>\n"
+                + "<book aid=\"3988\" date=\"2026-08-23\">\n"
+                + "<name><![CDATA[a novel]]></name>\n"
+                + "</book>\n"
+                + "<book aid=\"1508\" date=\"2026-08-21\">\n"
+                + "</book>\n"
+                + "</metadata>";
+
+        assertEquals("the date attribute must not be swallowed into the capture",
+                aids(3988, 1508), BookshelfSync.parseCloudAidList(listing));
     }
 
     // ---- plan --------------------------------------------------------------------------------
