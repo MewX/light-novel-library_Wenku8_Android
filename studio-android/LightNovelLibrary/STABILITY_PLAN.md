@@ -1295,8 +1295,11 @@ Two figures, and the gap between them is the point:**
 
 | | lines | what it is |
 |---|---|---|
-| **local merged** | **3391/7029 — 48.2%** | every test, including the 25 `RealApi`-guarded ones |
-| **CI merged** | **2614/7029 — 37.2%** | what Coveralls can publish; the guarded tests skip against api-stub |
+| **local merged** | **3583/7065 — 50.7%** | every test, including the 25 `RealApi`-guarded ones |
+| **CI merged** | **2807/7065 — 39.7%** | what Coveralls can publish; the guarded tests skip against api-stub |
+
+Re-measured 2026-08-23 after the `GlobalConfig` split, against all 184 instrumented and 133 JVM
+tests. Both figures were 48.2% and 37.2% earlier the same day, before steps 1, 2, 4 and 5.
 
 The 11-point gap is roughly 780 lines of review, search, bookshelf and ranking screens that are
 genuinely tested but only on a machine holding the private `api/` module. The published badge is a
@@ -1316,6 +1319,18 @@ Run per class, one file each, and let the report task merge them.
 across forced clean regenerations, but single classes do not agree between methods —
 `WenkuReaderPageView` reads 4/215 per-class and 109/215 from the single-file run. Treat the ranking
 below as directional, and re-measure a specific class before committing effort to it.
+
+*The two halves must be generated from the same source, or the union is nonsense.* The merged
+figure unions per-line entries from the JVM and instrumented reports keyed by file name, so if one
+half was produced against an older version of a file, the union is a superset of two different line
+numberings and the denominator inflates. After the split this reported `GlobalConfig` as 332/**621**
+while the instrumented report alone said 332/**386** — a file cannot have two line counts, and that
+mismatch is the tell. It dragged the merged figure to 47.7% when the true value was 50.7%, i.e. it
+looked like the refactor had cost coverage while covered lines had in fact gone up. Cause: the JVM
+half was stale, because `jacocoAlphaDebugUnitTestReport --rerun-tasks` did not re-run
+`testAlphaDebugUnitTest`. **Delete `outputs/unit_test_code_coverage` and run the test task
+explicitly before regenerating**, and sanity-check that both reports agree on a file's line count
+before trusting a merge.
 
 *Execution data expires the moment the code changes, silently.* JaCoCo keys a `.ec` file to the
 identity of the class it was recorded against, so editing a source file invalidates every `.ec`
