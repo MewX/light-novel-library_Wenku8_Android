@@ -29,6 +29,7 @@ import org.mewx.wenku8.R;
 import org.mewx.wenku8.activity.NovelInfoActivity;
 import org.mewx.wenku8.adapter.NovelItemAdapterUpdate;
 import org.mewx.wenku8.global.GlobalConfig;
+import org.mewx.wenku8.global.api.BookshelfSync;
 import org.mewx.wenku8.global.api.NovelItemInfoUpdate;
 import org.mewx.wenku8.global.api.NovelItemMeta;
 import org.mewx.wenku8.global.api.VolumeList;
@@ -48,14 +49,11 @@ import org.mewx.wenku8.util.CrashReporter;
 import java.io.File;
 import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 
 public class FavFragment extends Fragment implements MyItemClickListener, MyItemLongClickListener, MyOptionClickListener {
@@ -305,41 +303,20 @@ public class FavFragment extends Fragment implements MyItemClickListener, MyItem
             // purify returned data
             List<Integer> listResultList = new ArrayList<>(); // result list
             try {
-                Log.d("MewX", new String(b, "UTF-8"));
-
-                Pattern p = Pattern.compile("aid=\"(.*)\""); // match content between "aid=\"" and "\""
-                Matcher m = p.matcher(new String(b, "UTF-8"));
-                while (m.find()) {
-                    try {
-                        listResultList.add(Integer.valueOf(m.group(1)));
-                    } catch (NumberFormatException e) {
-                        Log.e(FavFragment.class.getSimpleName(), "Found and skipped broken aid.");
-                    }
-                }
+                String listing = new String(b, "UTF-8");
+                Log.d("MewX", listing);
+                listResultList = BookshelfSync.parseCloudAidList(listing);
             } catch (UnsupportedEncodingException e) {
                 CrashReporter.recordException("FavFragment.AsyncLoadAllFromCloud", e);
             }
 
-            // calc difference
-            List<Integer> listAll = new ArrayList<>();
-            listAll.addAll(GlobalConfig.getLocalBookshelfList()); // make a copy
-            listAll.addAll(listResultList);
-
-            List<Integer> localOnly = new ArrayList<>(listAll);
-            localOnly.removeAll(listResultList); // local only
-
-            List<Integer> listDiff = new ArrayList<>(listAll);
-            if(!forceLoad) {
-                // cloud only
-                listDiff.removeAll(GlobalConfig.getLocalBookshelfList());
-            }
-            else {
-                // local and cloud together
-                HashSet<Integer> hs = new HashSet<>(listDiff);
-                listDiff.clear();
-                listDiff.addAll(hs);
-            }
-            if(listDiff.isEmpty() && localOnly.isEmpty()) {
+            // calc difference -- see BookshelfSync for why this is not done inline any more, and
+            // for the guarantee that a novel held only on the device is pushed up rather than lost.
+            BookshelfSync.Plan plan =
+                    BookshelfSync.plan(GlobalConfig.getLocalBookshelfList(), listResultList, forceLoad);
+            List<Integer> localOnly = plan.localOnly;
+            List<Integer> listDiff = plan.toDownload;
+            if(plan.isUpToDate()) {
                 // equal, so exit
                 return Wenku8Error.ErrorCode.SYSTEM_1_SUCCEEDED;
             }

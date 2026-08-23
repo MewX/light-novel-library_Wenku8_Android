@@ -1109,7 +1109,7 @@ appears at first glance. The problem was never the count, it was *where* they ru
 
 | Location | Before | Now | Runs on |
 |---|---|---|---|
-| `app/src/test` | 3 files / 10 tests | **15 files / 114 tests** | JVM, seconds |
+| `app/src/test` | 3 files / 10 tests | **16 files / 131 tests** | JVM, seconds |
 | `app/src/androidTest` | 8 files / 31 tests | **20 files / 144 tests** | emulator or device, minutes |
 | `api/src/test` | 1 file | 1 file | JVM |
 
@@ -1209,7 +1209,7 @@ never reported at all. Four changes to `.github/workflows/android-ci.yml`:
 Note the API 21 → 33 move means the minSdk floor is no longer verified by CI. That is an accepted
 trade for two test classes; if Phase 4 raises `minSdkVersion` anyway the question goes away.
 
-**Coverage reporting is wired again, and it now measures all 258 tests rather than half of them.**
+**Coverage reporting is wired again, and it now measures all 275 tests rather than half of them.**
 The README's Travis badge pointed at a service that no longer runs the build, and the Coveralls
 badge was fed by a `kt3k` Gradle plugin hooked to `connectedAlphaDebugAndroidTest` that has been
 commented out in `app/build.gradle` for years — neither could be revived as-is under AGP 9. The
@@ -1276,8 +1276,46 @@ Ranked by uncovered lines: `NovelInfoActivity` 644/817, `PagerSlidingTabStrip` 3
 206, `VerticalReaderActivity` 185, `NovelReviewReplyListActivity` 172, `OverlappedSlider` 169,
 `ConfigFragment` 166/168, `MainActivity` 152/211, `GlobalConfig` 140/446.
 
+**That ranking is a snapshot and goes stale silently — check its date before trusting an entry.**
+Several rows have since been closed and the numbers do not update themselves: `VerticalReaderActivity`
+still reads 185 here and `ViewImageDetailActivity` 117, but both have had unguarded device tests
+since this was written. Regenerating it needs a device or emulator, and the JaCoCo XML left in
+`app/build/reports/` after a run is whatever that run covered — a partial run leaves a partial
+report that looks exactly like a complete one. Note also that a merged figure cannot be obtained by
+adding the two `<counter>` totals: a line covered by both suites would be counted twice, so a true
+union has to be computed from the per-line `<line nr= mi= ci=/>` entries, which is what Coveralls
+does server-side.
+
 Two entries deserved naming. `FavFragment` is 275 uncovered of 280 and it is the bookshelf — the
 first screen most users see, and it is now the largest untested thing in the app.
+
+**Partly closed by extraction rather than by hosting the screen**, because hosting it performs a
+real sync against the user's real account (see the false-guarantee note below). `BookshelfSync` now
+holds the two pure pieces that were inline in `AsyncLoadAllFromCloud.doInBackground` — reading the
+aid list out of the cloud response, and computing what to download against what to push up — and
+`BookshelfSyncTest` covers them with 17 JVM tests. This is the same move that produced
+`ChapterNavigator` and `ChapterContentLoader`, for the same reason: the logic was reachable only by
+running the screen, and running the screen is the thing that carries the risk.
+
+The case worth having is `aNovelOnlyOnTheDeviceIsPushedUpRatherThanDropped`. This document already
+asserted that a device-only novel survives a sync; that claim rested on reading the code and
+watching one sync by hand, and now has a test. Behaviour is unchanged, with one incidental
+improvement: the original read `GlobalConfig.getLocalBookshelfList()` twice, once to build the
+combined list and again to subtract it, so a shelf that changed between the two calls could produce
+a plan matching neither state. It is one snapshot now.
+
+**A parse that only works when `aid` is the last quoted attribute on its line.** The expression is
+`aid="(.*)"`, and the capture is greedy. `.` does not match a newline, so one record per line is
+read correctly and that is what the server sends today — but two records sharing a line, or any
+attribute appearing after `aid`, make the capture span past the closing quote, fail to parse, and
+drop the ids silently. `aid="33" name="x"` yields nothing. All three cases are pinned in
+`BookshelfSyncTest` as current behaviour rather than endorsed behaviour.
+
+It is not a data-loss bug, which is why it is recorded rather than fixed under the standing
+preference for coverage over logical patches: skipped ids make the cloud list read as short or
+empty, `plan` treats a missing id as "the cloud does not have it", and the local copy is pushed up.
+The cost is wasted uploads. The fix is `([^"]*)` in place of `(.*)`, one character of real change,
+and the tests above will show it as a deliberate change when someone makes it.
 
 **A defence that converts a missing argument into a crash one layer down.** Found while trying to
 cover `NovelItemListFragment` and left unpatched on purpose. Its `onCreate` reads arguments
