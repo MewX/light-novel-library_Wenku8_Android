@@ -1290,7 +1290,41 @@ Ranked by uncovered lines: `NovelInfoActivity` 644/817, `PagerSlidingTabStrip` 3
 206, `VerticalReaderActivity` 185, `NovelReviewReplyListActivity` 172, `OverlappedSlider` 169,
 `ConfigFragment` 166/168, `MainActivity` 152/211, `GlobalConfig` 140/446.
 
-**That ranking is a snapshot and goes stale silently — check its date before trusting an entry.**
+**Re-measured 2026-08-23 on the physical device, all 150 instrumented tests plus the 133 JVM ones.
+Two figures, and the gap between them is the point:**
+
+| | lines | what it is |
+|---|---|---|
+| **local merged** | **3391/7029 — 48.2%** | every test, including the 25 `RealApi`-guarded ones |
+| **CI merged** | **2614/7029 — 37.2%** | what Coveralls can publish; the guarded tests skip against api-stub |
+
+The 11-point gap is roughly 780 lines of review, search, bookshelf and ranking screens that are
+genuinely tested but only on a machine holding the private `api/` module. The published badge is a
+floor, by decision — see `RealApi`. Do not quote the local figure as the project's coverage.
+
+**Two measurement traps, both of which produced a confident wrong number before being caught.**
+
+*One `.ec` for a whole run silently loses most of it.* Running the suite with a single
+`-e coverageFile` produced a clean-looking 40.7% in which `NovelInfoActivity` showed **1 covered
+line of 817** — while eleven passing tests assert on that screen's views — and `UserLoginActivity`
+showed 0 of 68 against six passing tests. JaCoCo dumps its in-memory data once when instrumentation
+ends, so everything accumulated before an app-process restart is gone, and several tests restart the
+process by design (`recreate()`, backgrounding). This is why AGP writes one `.ec` per test class.
+Run per class, one file each, and let the report task merge them.
+
+*Per-class rows are still not individually reliable.* The merged totals above reproduce exactly
+across forced clean regenerations, but single classes do not agree between methods —
+`WenkuReaderPageView` reads 4/215 per-class and 109/215 from the single-file run. Treat the ranking
+below as directional, and re-measure a specific class before committing effort to it.
+
+Ranked by uncovered lines, 2026-08-23, approximate per the caveat above: `NovelInfoActivity`
+565/817, `Wenku8ReaderActivityV1` 316/493, `PageSlider` 217 (vendored-ish custom animation),
+`WenkuReaderPageView` 211/215, `FavFragment` 195/267, `OverlappedSlider` 169/192,
+`PagerSlidingTabStrip` 153/373 (vendored), `MainActivity` 150/211, `ConfigFragment` 136/168,
+`GlobalConfig` 123/446, `NavigationDrawerFragment` 120/208, `UserInfoActivity` 96/129.
+
+**The older ranking below is kept for its notes, not its numbers, and goes stale silently — check
+its date before trusting an entry.**
 Several rows have since been closed and the numbers do not update themselves: `VerticalReaderActivity`
 still reads 185 here and `ViewImageDetailActivity` 117, but both have had unguarded device tests
 since this was written. Regenerating it needs a device or emulator, and the JaCoCo XML left in
