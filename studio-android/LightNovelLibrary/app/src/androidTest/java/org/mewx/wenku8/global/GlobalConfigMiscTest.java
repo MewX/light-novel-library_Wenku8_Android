@@ -24,12 +24,12 @@ import java.util.List;
  * after this is either deliberately out of scope (credentials, network downloads) or unreachable
  * until step 2 supplies a storage seam, so this is where step 1 stops.
  *
- * <p><b>{@code onSearchClicked} is deliberately not tested.</b> It is {@code @Deprecated}, it has
- * no callers anywhere in the app, and it carries the same defect that was already fixed in
+ * <p><b>{@code onSearchClicked} was deleted rather than tested.</b> It was {@code @Deprecated},
+ * had no callers anywhere, and carried the same defect already fixed in
  * {@code moveBookToTheTopOfBookshelf}: every sibling guards the lazily-loaded static with
- * {@code if (searchHistory == null) readSearchHistory()} — lines 536, 543 and 567 — and this one
- * reaches straight for {@code searchHistory.size()}. Writing a test for dead code would raise the
- * coverage number and protect nothing; it is recorded in the plan for deletion instead.
+ * {@code if (searchHistory == null) readSearchHistory()} and that one reached straight for
+ * {@code searchHistory.size()}. Writing a test for dead code would have raised the coverage number
+ * and protected nothing.
  *
  * <p><b>This rewrites the real bookshelf and settings files.</b> Both are captured before each test
  * and put back afterwards through {@link SaveFileFixture}, with the matching {@code GlobalConfig}

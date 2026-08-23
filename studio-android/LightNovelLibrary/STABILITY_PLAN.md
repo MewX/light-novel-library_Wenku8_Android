@@ -1670,6 +1670,50 @@ Constraints any implementation should be held to:
    bookshelf token, a partially downloaded chapter. Those all exist on real devices *today*, so
    the migration meets them on day one. The device tests written this session are the fixtures.
 
+### The migration that already exists, audited 2026-08-23
+
+Asked whether anything in storage needs an old-data migration flow, three answers came out of
+looking rather than remembering.
+
+**Nothing in the `GlobalConfig` split needs one.** `StorageRoots`, `SettingsStore`, `AccountStore`
+and `ScreenState` preserved every on-disk format and every path decision exactly; the `||||` and
+`::::` separators are the same values, now named, and root resolution still delegates to the same
+`SaveFileMigration` methods. A split that changed a format would need one, and this did not.
+
+**The V0/V1 reading positions are not a versioning case, despite the names.** `read_saves.wk8` is
+keyed by `cid` and holds a scroll offset and height, written and read by `VerticalReaderActivity`.
+`read_saves_v1.wk8` is keyed by `aid` and holds vid/cid/line/word, written and read by
+`Wenku8ReaderActivityV1` and by the "continue reading" entry on `NovelInfoActivity`. **Both are
+live, and neither converts into the other** — a scroll offset in pixels and a line-and-word index
+are not the same information. There is nothing to migrate. Both fields carry a `// deprecated`
+comment, which is simply wrong and misleads anyone reading the class.
+
+**One real migration exists, external to internal, and it has one genuine gap.** Held against the
+four constraints this document sets out above:
+
+| constraint | verdict |
+|---|---|
+| Never delete the old files in the same release | **Pass.** It copies; the external originals are never removed, and `StorageRoots.backup()` still resolves to external, so a straggler is still readable. |
+| Idempotent and resumable | **Fails on partial failure.** `MainActivity` calls `markMigrationCompleted()` unconditionally after the copy loop, including when `failedFiles > 0`. `revertMigrationStatus()` exists but **has no caller**, so there is no path back. A migration that failed on some files is recorded as done and never retried. |
+| Report on it | **Pass.** Firebase `save_migration_files_total` and `save_migration_files_failed`, plus a dialog showing both counts. |
+| Test against real corrupt inputs | **Fails.** `SaveFileMigrationTest` is two tests, both asserting the *shape of the string* `getInternalSavePath()` returns. Nothing exercises `generateMigrationPlan`, `migrateFile`, or the failure path. |
+
+The second row is not immediate data loss, and the reason is worth being precise about: because the
+migration copies rather than moves, and because the backup root still points at external storage, a
+file that failed to copy is still found by the reader. **That safety net depends on external storage
+remaining readable — which is exactly what is in doubt on API 33+, and the whole reason the
+migration exists.** So the failure is latent rather than harmless.
+
+Also noted while reading it: the copy loop sleeps two seconds and rethrows `InterruptedException`
+as a `RuntimeException`, which would take the app down if that executor is ever interrupted.
+
+**No format carries a version marker except settings, and nothing reads that one.** The bookshelf
+(`aid||aid||aid`), search history, volume index cache, cached notice and `cert.wk8` have no version
+field, so a future format change has nothing to migrate *from* — it would have to infer the old
+shape by parsing. `SettingItems.version` is written as `"1"` and only ever compared against empty.
+That is fine today and becomes the first thing to fix when the DataStore step below starts, since a
+settings migration is the one this document proposes doing first.
+
 ### The actual blocker, measured
 
 An earlier draft of this section said the migration should wait for Phase 0's crash data. **That

@@ -551,17 +551,9 @@ public class GlobalConfig {
         writeSearchHistory(); // save history file
     }
 
-    @Deprecated
-    public static void onSearchClicked(int index) {
-        if (index >= searchHistory.size())
-            return;
-
-        String temp = searchHistory.get(index);
-        searchHistory.remove(index);
-        searchHistory.add(0, temp);
-
-        writeSearchHistory(); // save history file
-    }
+    // onSearchClicked was removed here: @Deprecated, no callers anywhere, and it reached straight
+    // for searchHistory.size() where every sibling guards the lazily-loaded static with a null
+    // check first -- the same defect that was fixed in moveBookToTheTopOfBookshelf.
 
     public static void clearSearchHistory() {
         searchHistory = new ArrayList<>();
