@@ -205,6 +205,20 @@ mistake costs next time:
 
 So: never run `connectedAndroidTest` against a device holding real data. Use an emulator, or the
 `am instrument` route above after a `pm install -r`, which updates in place and never uninstalls.
+
+**That route is no longer theoretical — it was run end to end on 2026-08-23 and is now the way to
+work on this project without an emulator.** `assembleAlphaDebug assembleAlphaDebugAndroidTest` to
+build without installing, `adb push` both APKs to `/data/local/tmp`, md5-compare them on the device,
+`pm install -r -t` each, then `am instrument -w -e class <FQCN>`. `NovelInfoCachedNovelTest` ran its
+7 tests in **7.9 seconds**, against roughly ten minutes to learn the same thing from CI, and the app
+data directory was intact afterwards. Delete the staged APKs when finished.
+
+Two things make this safe rather than merely fast, and both are easy to skip. **Hash-check the
+install**: a stalled install leaves the previous APK in place, so the tests exercise old code and
+pass, which has caught people here more than once. **Name the class explicitly** — do not run the
+suite unfiltered against a device holding real data, because `FavFragmentHostingTest` performs a
+genuine bookshelf sync against the logged-in account. It is `RealApi`-guarded, so it skips on CI,
+but locally the real `api/` submodule is present and it runs.
 That reading positions have no cloud copy and no working backup is a product gap this incident
 exposed rather than a testing one: the only copy of a user's reading history lives in one file in
 app-private storage, which any uninstall removes. Nothing in this plan currently addresses it.
