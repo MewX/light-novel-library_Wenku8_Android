@@ -1124,7 +1124,7 @@ appears at first glance. The problem was never the count, it was *where* they ru
 | Location | Before | Now | Runs on |
 |---|---|---|---|
 | `app/src/test` | 3 files / 10 tests | **16 files / 133 tests** | JVM, seconds |
-| `app/src/androidTest` | 8 files / 31 tests | **22 files / 164 tests** | emulator or device, minutes |
+| `app/src/androidTest` | 8 files / 31 tests | **23 files / 174 tests** | emulator or device, minutes |
 | `api/src/test` | 1 file | 1 file | JVM |
 
 (Step 1 moved the JVM count from 10 to 37; `CrashReporterTest` took it to 44 in Phase 0; Phase 1
@@ -1223,7 +1223,7 @@ never reported at all. Four changes to `.github/workflows/android-ci.yml`:
 Note the API 21 → 33 move means the minSdk floor is no longer verified by CI. That is an accepted
 trade for two test classes; if Phase 4 raises `minSdkVersion` anyway the question goes away.
 
-**Coverage reporting is wired again, and it now measures all 297 tests rather than half of them.**
+**Coverage reporting is wired again, and it now measures all 307 tests rather than half of them.**
 The README's Travis badge pointed at a service that no longer runs the build, and the Coveralls
 badge was fed by a `kt3k` Gradle plugin hooked to `connectedAlphaDebugAndroidTest` that has been
 commented out in `app/build.gradle` for years — neither could be revived as-is under AGP 9. The
@@ -1737,7 +1737,7 @@ on `GlobalConfig`'s API means designing it blind and reopening it afterwards.
 
 | # | step | axis | status |
 |---|---|---|---|
-| 1 | Cover the 123 untested `GlobalConfig` lines — settings writers, credentials, image cache | test | **partly done** 2026-08-23 — `GlobalConfigSettingsTest`, 14 tests, +27 lines (323→350 of 446). 96 remain; see below |
+| 1 | Cover the 123 untested `GlobalConfig` lines — settings writers, credentials, image cache | test | **done** 2026-08-23 — `GlobalConfigSettingsTest` (14) + `GlobalConfigMiscTest` (10), +57 lines, 323→380 of 446. The 66 left are credentials, the network download, one dead method, and second-root fallbacks needing step 2 |
 | 2 | Extract `StorageRoots` with an injectable root | split | not started |
 | 3 | Funnel the 13 `LightCache` callers onto `GlobalConfig` (step 0 above) | funnel | not started — 13 files, 27 in `NovelInfoActivity`, re-measured 2026-08-23 |
 | 4 | `SettingsStore`, then `AccountStore`, then the already-covered stores | split | not started |
