@@ -1700,3 +1700,58 @@ steps 2–5 never happen.
 
 **Still not scheduled, but no longer blocked on evidence.** What it is blocked on is step 0, which
 can start whenever there is appetite, is low-risk, and needs no decision about databases at all.
+
+## Making `GlobalConfig` maintainable — accepted 2026-08-23, in progress
+
+The section above asks what should sit *behind* the storage door. This one asks what the door
+itself should be, which is a separate problem that had not been written down: `GlobalConfig` is
+**996 lines, 79 public static methods, ~10 mutable static fields, 24 caller files**, holding
+twelve unrelated responsibilities — storage paths, file I/O, settings, search history, reading
+positions, bookshelf, volume cache, images, credentials, the cached notice, transient UI flags,
+and assorted helpers.
+
+Three costs, none of them aesthetic:
+
+1. **Static mutable state with no lifecycle.** `loadAllSetting()` assigns `lookupInternalStorageOnly`
+   (line 829), which decides the storage root at line 197 — process-wide. One test calling it
+   changes how every later test in the same process resolves paths.
+2. **No storage-root seam.** Every storage test writes to the real save folder.
+   `VerticalReaderActivityLifecycleTest` has to read the device owner's actual `read_saves.wk8`,
+   hold it in a field and put it back in `@After`, because there is nowhere else to point the
+   code. That is a standing tax on every storage test and a standing risk to real data.
+3. **Unrelated things sharing a namespace.** `isInBookshelf`, a transient screen flag, sits beside
+   `cert.wk8` credential handling.
+
+**Approach: incremental extraction behind a delegating facade**, rejecting both a big-bang
+Repository/DI/Room rewrite and doing nothing. Each step moves one responsibility into a focused
+class and leaves `GlobalConfig` delegating, so **none of the 24 callers change**. The property
+that matters is that it degrades well: stopping after two extractions leaves the codebase better,
+not carrying two half-architectures. This is the same move already proven three times here —
+`ChapterNavigator`, `ChapterContentLoader`, `BookshelfSync`.
+
+**Two axes, and the order between them was initially proposed wrong.** Funnelling (step 0 above)
+concerns the *external* surface; extraction concerns *internal* structure. They compose, but
+funnelling comes first for a reason the section above does not state outright: **it reveals the
+API the extracted classes actually need.** Designing `SettingsStore` before the thirteen files are
+on `GlobalConfig`'s API means designing it blind and reopening it afterwards.
+
+| # | step | axis | status |
+|---|---|---|---|
+| 1 | Cover the 123 untested `GlobalConfig` lines — settings writers, credentials, image cache | test | **in progress** 2026-08-23 |
+| 2 | Extract `StorageRoots` with an injectable root | split | not started |
+| 3 | Funnel the 13 `LightCache` callers onto `GlobalConfig` (step 0 above) | funnel | not started — 13 files, 27 in `NovelInfoActivity`, re-measured 2026-08-23 |
+| 4 | `SettingsStore`, then `AccountStore`, then the already-covered stores | split | not started |
+| 5 | Evict the transient UI flags | split | not started |
+| — | Backend swap, steps 1–5 of the section above | backend | not started, unscheduled |
+
+Step 2 deliberately precedes step 3 despite the ordering argument, as a narrow exception: it is
+~40 lines, changes no public API, and makes every later test both safer and cheaper to write, so
+it de-risks the funnelling rather than competing with it.
+
+**Step 3 is not on the coverage critical path.** It is the prerequisite for the backend migration,
+which is unscheduled. If the release gate is what matters, steps 1, 2 and 4 buy more.
+
+**Keep this table current.** It exists because prose spread across many commits cannot tell a later
+reader what is already done, and this document has twice sent someone down a path that was closed
+months earlier — the coverage ranking above, and the `NovelItemListFragment` note that claimed a
+Fragment could not be tested after it had been.
