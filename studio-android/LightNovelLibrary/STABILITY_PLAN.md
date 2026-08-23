@@ -1124,7 +1124,7 @@ appears at first glance. The problem was never the count, it was *where* they ru
 | Location | Before | Now | Runs on |
 |---|---|---|---|
 | `app/src/test` | 3 files / 10 tests | **16 files / 133 tests** | JVM, seconds |
-| `app/src/androidTest` | 8 files / 31 tests | **24 files / 184 tests** | emulator or device, minutes |
+| `app/src/androidTest` | 8 files / 31 tests | **25 files / 195 tests** | emulator or device, minutes |
 | `api/src/test` | 1 file | 1 file | JVM |
 
 (Step 1 moved the JVM count from 10 to 37; `CrashReporterTest` took it to 44 in Phase 0; Phase 1
@@ -1223,7 +1223,7 @@ never reported at all. Four changes to `.github/workflows/android-ci.yml`:
 Note the API 21 → 33 move means the minSdk floor is no longer verified by CI. That is an accepted
 trade for two test classes; if Phase 4 raises `minSdkVersion` anyway the question goes away.
 
-**Coverage reporting is wired again, and it now measures all 317 tests rather than half of them.**
+**Coverage reporting is wired again, and it now measures all 328 tests rather than half of them.**
 The README's Travis badge pointed at a service that no longer runs the build, and the Coveralls
 badge was fed by a `kt3k` Gradle plugin hooked to `connectedAlphaDebugAndroidTest` that has been
 commented out in `app/build.gradle` for years — neither could be revived as-is under AGP 9. The
@@ -1711,7 +1711,7 @@ four constraints this document sets out above:
 | Never delete the old files in the same release | **Pass.** It copies; the external originals are never removed, and `StorageRoots.backup()` still resolves to external, so a straggler is still readable. |
 | Idempotent and resumable | **Fails on partial failure.** `MainActivity` calls `markMigrationCompleted()` unconditionally after the copy loop, including when `failedFiles > 0`. `revertMigrationStatus()` exists but **has no caller**, so there is no path back. A migration that failed on some files is recorded as done and never retried. |
 | Report on it | **Pass.** Firebase `save_migration_files_total` and `save_migration_files_failed`, plus a dialog showing both counts. |
-| Test against real corrupt inputs | **Fails.** `SaveFileMigrationTest` is two tests, both asserting the *shape of the string* `getInternalSavePath()` returns. Nothing exercises `generateMigrationPlan`, `migrateFile`, or the failure path. |
+| Test against real corrupt inputs | **Partly closed 2026-08-23.** `SaveFileMigrationFlowTest` adds 11 tests over the completion flag and the per-file copy — content fidelity, relative-path preservation, folder creation, an empty file, and a missing source. `generateMigrationPlan`'s override branch stays uncovered: it resolves through `DocumentFile.fromTreeUri`, which needs a real SAF tree Uri a test cannot mint. |
 
 The second row is not immediate data loss, and the reason is worth being precise about: because the
 migration copies rather than moves, and because the backup root still points at external storage, a
@@ -1821,7 +1821,7 @@ on `GlobalConfig`'s API means designing it blind and reopening it afterwards.
 |---|---|---|---|
 | 1 | Cover the 123 untested `GlobalConfig` lines — settings writers, credentials, image cache | test | **done** 2026-08-23 — `GlobalConfigSettingsTest` (14) + `GlobalConfigMiscTest` (10), +57 lines, 323→380 of 446. The 66 left are credentials, the network download, one dead method, and second-root fallbacks needing step 2 |
 | 2 | Extract `StorageRoots` with an injectable root | split | **done** 2026-08-23 — `StorageRootsTest`, 10 tests; second-root fallbacks reachable for the first time |
-| 3 | Funnel the 13 `LightCache` callers onto `GlobalConfig` (step 0 above) | funnel | **deferred, needs a decision** — 112 call sites in 13 files, 27 in `NovelInfoActivity`, re-measured 2026-08-23. See below |
+| 3 | Funnel the 13 `LightCache` callers onto `GlobalConfig` (step 0 above) | funnel | **deferred by decision 2026-08-23** until the backend migration is actually scheduled — it is that work's prerequisite and buys nothing before it. 112 call sites in 13 files, 27 in `NovelInfoActivity`. See below |
 | 4 | `SettingsStore`, then `AccountStore`, then the already-covered stores | split | **partly done** 2026-08-23 — `SettingsStore` and `AccountStore` extracted, `GlobalConfig` delegating. The four already-covered stores (search history, bookshelf, reading positions, volume index) are still in place |
 | 5 | Evict the transient UI flags | split | **done** 2026-08-23 — `ScreenState`, 8 call sites moved, methods and fields removed rather than delegated |
 | — | Backend swap, steps 1–5 of the section above | backend | not started, unscheduled |

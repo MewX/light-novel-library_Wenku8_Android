@@ -70,19 +70,30 @@ public class GlobalConfig {
 
     // static variables
     private static ArrayList<String> searchHistory = null;
-    private static ArrayList<ReadSaves> readSaves = null; // deprecated
+    private static ArrayList<ReadSaves> readSaves = null; // vertical reader, keyed by cid
     private static ArrayList<Integer> bookshelf = null;
-    private static ArrayList<ReadSavesV1> readSavesV1 = null; // deprecated
+    private static ArrayList<ReadSavesV1> readSavesV1 = null; // paged reader, keyed by aid
 
 
-    /** Structures */
-    public static class ReadSaves { // deprecated
+    /**
+     * Structures.
+     *
+     * <p><b>Neither of these is deprecated, despite what both used to say here.</b> They are not
+     * two versions of one thing — they are the two readers' position formats, and both are live.
+     * {@link ReadSaves} is written and read by {@code VerticalReaderActivity}; {@link ReadSavesV1}
+     * by {@code Wenku8ReaderActivityV1} and by the "continue reading" entry on
+     * {@code NovelInfoActivity}. A pixel scroll offset and a line-and-word index do not convert
+     * into one another, so there is nothing to migrate and neither replaces the other.
+     */
+    /** Vertical reader position: a scroll offset in pixels, keyed by {@code cid}. */
+    public static class ReadSaves {
         public int cid;
         public int pos; // last time scroll Y pos
         public int height; // last time scroll Y height
     }
 
-    public static class ReadSavesV1 { // deprecated
+    /** Paged reader position: a line and word index within a chapter, keyed by {@code aid}. */
+    public static class ReadSavesV1 {
         public int aid;
         public int vid;
         public int cid;
