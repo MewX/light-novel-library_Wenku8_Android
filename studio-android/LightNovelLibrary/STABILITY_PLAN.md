@@ -1440,6 +1440,21 @@ assertion. Derive the string through `Wenku8API` as the pager does; never write 
 same class of hazard as the api-stub trap but survives it: `RealApi.require()` would not have caught
 this one, because the stub's `getNovelSortedBy` does not throw `UnsupportedOperationException`.
 
+**A test can leak through a file it never plants, and cleaning up what it wrote is not enough.**
+Found 2026-08-23 by listing the save folder after a full run rather than trusting the teardowns.
+`ReaderRecreationTest` planted a volume index and chapter text and deleted both afterwards — but
+opening the paged reader makes `Wenku8ReaderActivityV1.onPause` write a reading position, so every
+run left a sentinel entry for aid 999000002 in the device owner's real `read_saves_v1.wk8`, and
+nothing ever removed it. The teardown was complete with respect to what the test *wrote* and blind
+to what the test *caused*. Fixed by capturing and restoring that file the way
+`VerticalReaderActivityLifecycleTest` already did for the V0 one, verified by deleting the file,
+running the class, and confirming it stays absent.
+
+The generalisation is worth carrying: **ask what the screen under test writes on its way out, not
+only what the fixture puts in.** The same sweep found `intro/4340-volume.xml` cached by a test doing
+a real fetch — harmless, since a cache entry is regenerable, unlike a reading position, and already
+covered by the "a hosted screen inherits everything it does on startup" note below.
+
 **A guarantee that was claimed and turned out to be false, kept here because it is the kind of
 thing worth not repeating.** `FavFragmentHostingTest` originally documented that it did not modify
 the device's bookshelf. It does. Hosting the Fragment runs its `onResume`, whose first pass always

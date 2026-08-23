@@ -23,6 +23,9 @@ import org.mewx.wenku8.global.api.VolumeList;
 import org.mewx.wenku8.reader.activity.Wenku8ReaderActivityV1;
 
 import java.io.File;
+import java.nio.file.Files;
+import java.nio.charset.StandardCharsets;
+import java.io.IOException;
 
 /**
  * What happens to the reader when the system destroys and rebuilds it — manual case 6, and the
@@ -77,14 +80,27 @@ public class ReaderRecreationTest {
             + "    这是第三段，稍微长一点，好让分页有东西可做。  ";
 
     /**
+     * The device owner's real reading positions, put back in {@link #removeFixture()}.
+     *
+     * <p>Not optional, and it was missing until 2026-08-23. These tests open the paged reader, and
+     * {@code Wenku8ReaderActivityV1.onPause} writes a position on the way out — so a run left a
+     * sentinel entry for aid 999000002 in the owner's real {@code read_saves_v1.wk8} permanently.
+     * Deleting the planted volume index and chapter files was never enough, because the file this
+     * test causes to be written is not one of the files it plants.
+     */
+    private String realReadSavesV1;
+
+    /**
      * These tests need an awake, unlocked device, and say so rather than letting it look like an
      * app defect. See {@link InteractiveDevice} for why that distinction is worth the check.
      */
     // One @Before rather than two: JUnit 4 does not order them within a class, and the device
     // check has to be the thing that speaks first when it is the thing that is wrong.
     @Before
-    public void requireAnInteractiveDeviceAndPlantFixture() {
+    public void requireAnInteractiveDeviceAndPlantFixture() throws IOException {
         InteractiveDevice.require();
+
+        realReadSavesV1 = readSaveFile();
 
         // A previous run that died mid-test would otherwise decide these cases for the wrong
         // reason -- a leftover index makes a "missing index" case pass spuriously.
@@ -100,8 +116,64 @@ public class ReaderRecreationTest {
     }
 
     @After
-    public void removeFixture() {
+    public void removeFixture() throws IOException {
         deleteFixture();
+
+        // Put the owner's reading positions back. The reader wrote one on its way out.
+        deleteSaveFile();
+        if (realReadSavesV1 != null) {
+            writeSaveFile(realReadSavesV1);
+        }
+
+        // The parsed positions live in a static that outlives one test, so reload from the
+        // restored file rather than leaving this test's entry in the process.
+        GlobalConfig.loadReadSavesV1();
+    }
+
+    // ---- reading-position fixture ------------------------------------------------------------
+    //
+    // Own copies rather than the SaveFileFixture the storage tests share, which is package-private
+    // to org.mewx.wenku8.global. Both roots are probed in the app's own order, as elsewhere.
+
+    private static final String READ_SAVES_V1_FILE = "read_saves_v1.wk8";
+
+    private static File[] saveFileCandidates() {
+        return new File[]{
+                new File(GlobalConfig.getFirstFullSaveFilePath() + READ_SAVES_V1_FILE),
+                new File(GlobalConfig.getSecondFullSaveFilePath() + READ_SAVES_V1_FILE),
+        };
+    }
+
+    private static String readSaveFile() throws IOException {
+        for (File candidate : saveFileCandidates()) {
+            if (candidate.isFile()) {
+                return new String(Files.readAllBytes(candidate.toPath()), StandardCharsets.UTF_8);
+            }
+        }
+        return null;
+    }
+
+    private static void writeSaveFile(String content) throws IOException {
+        for (File candidate : saveFileCandidates()) {
+            final File parent = candidate.getParentFile();
+            if (parent != null && !parent.isDirectory() && !parent.mkdirs()) {
+                continue;
+            }
+            try {
+                Files.write(candidate.toPath(), content.getBytes(StandardCharsets.UTF_8));
+                return;
+            } catch (IOException ignored) {
+                // Try the other root; only both failing is worth reporting.
+            }
+        }
+        throw new IOException("neither save root accepted " + READ_SAVES_V1_FILE);
+    }
+
+    private static void deleteSaveFile() {
+        for (File candidate : saveFileCandidates()) {
+            //noinspection ResultOfMethodCallIgnored
+            candidate.delete();
+        }
     }
 
     private void deleteFixture() {
