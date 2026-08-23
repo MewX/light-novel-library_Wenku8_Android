@@ -29,6 +29,7 @@ import org.mewx.wenku8.R;
 import org.mewx.wenku8.activity.NovelInfoActivity;
 import org.mewx.wenku8.adapter.NovelItemAdapterUpdate;
 import org.mewx.wenku8.global.GlobalConfig;
+import org.mewx.wenku8.global.ScreenState;
 import org.mewx.wenku8.global.api.BookshelfSync;
 import org.mewx.wenku8.global.api.NovelItemInfoUpdate;
 import org.mewx.wenku8.global.api.NovelItemMeta;
@@ -550,13 +551,13 @@ public class FavFragment extends Fragment implements MyItemClickListener, MyItem
     @Override
     public void onPause() {
         super.onPause();
-        GlobalConfig.LeaveBookshelf();
+        ScreenState.leaveBookshelf();
     }
 
     @Override
     public void onResume() {
         super.onResume();
-        GlobalConfig.EnterBookshelf();
+        ScreenState.enterBookshelf();
 
         // refresh list
         refreshList(timecount ++);

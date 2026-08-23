@@ -28,6 +28,7 @@ import org.mewx.wenku8.activity.NovelInfoActivity;
 import org.mewx.wenku8.adapter.NovelItemAdapterUpdate;
 import org.mewx.wenku8.async.CheckAppNewVersion;
 import org.mewx.wenku8.global.GlobalConfig;
+import org.mewx.wenku8.global.ScreenState;
 import org.mewx.wenku8.global.api.NovelItemInfoUpdate;
 import org.mewx.wenku8.global.api.custom.NovelListWithInfoParser;
 import org.mewx.wenku8.api.Wenku8API;
@@ -314,13 +315,13 @@ public class LatestFragment extends Fragment implements MyItemClickListener, MyI
     @Override
     public void onPause() {
         super.onPause();
-        GlobalConfig.LeaveLatest();
+        ScreenState.leaveLatest();
     }
 
     @Override
     public void onResume() {
         super.onResume();
-        GlobalConfig.EnterLatest();
+        ScreenState.enterLatest();
     }
 
     private void showRetryButton() {

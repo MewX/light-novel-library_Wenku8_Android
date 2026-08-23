@@ -58,15 +58,12 @@ public class GlobalConfig {
     private static final String saveReadSavesFileName = "read_saves.wk8";
     private static final String saveReadSavesV1FileName = "read_saves_v1.wk8";
     private static final String saveLocalBookshelfFileName = "bookshelf_local.wk8";
-    private static final String saveSetting = "settings.wk8";
     private static final String saveUserAccountFileName = "cert.wk8"; // certification file
     private static final String saveUserAvatarFileName = "avatar.jpg";
     private static final String saveNoticeString = "notice.wk8"; // the notice cache from online
     private static int maxSearchHistory = 20; // default
 
     // vars
-    private static boolean isInBookshelf = false;
-    private static boolean isInLatest = false;
     private static boolean doLoadImage = true;
     private static Wenku8API.AppLanguage currentLang = Wenku8API.AppLanguage.SC;
     public static String pathPickedSave; // dir picker save path
@@ -76,7 +73,6 @@ public class GlobalConfig {
     private static ArrayList<ReadSaves> readSaves = null; // deprecated
     private static ArrayList<Integer> bookshelf = null;
     private static ArrayList<ReadSavesV1> readSavesV1 = null; // deprecated
-    private static ContentValues allSetting = null;
 
 
     /** Structures */
@@ -272,7 +268,7 @@ public class GlobalConfig {
     }
 
     @NonNull
-    private static String loadFullSaveFileContent(@NonNull String FileName) {
+    static String loadFullSaveFileContent(@NonNull String FileName) {
         // get full file in file save path
         String h = "";
         if (LightCache.testFileExist(getDefaultStoragePath() + saveFolderName + File.separator + FileName)) {
@@ -297,7 +293,7 @@ public class GlobalConfig {
         return h;
     }
 
-    private static boolean writeFullSaveFileContent(String FileName, @NonNull String s) {
+    static boolean writeFullSaveFileContent(String FileName, @NonNull String s) {
         // process path and filename
         String path = "", fileName = FileName;
         if (FileName.contains(File.separator)) {
@@ -464,28 +460,8 @@ public class GlobalConfig {
         writeLocalBookShelf();
     }
 
-    public static boolean testInBookshelf() {
-        return isInBookshelf;
-    }
-
-    public static void EnterBookshelf() {
-        isInBookshelf = true;
-    }
-
-    public static void LeaveBookshelf() {
-        isInBookshelf = false;
-    }
-    public static boolean testInLatest() {
-        return isInLatest;
-    }
-
-    public static void EnterLatest() {
-        isInLatest = true;
-    }
-
-    public static void LeaveLatest() {
-        isInLatest = false;
-    }
+    // Which list screen is on show moved to ScreenState -- it described what was on screen rather
+    // than anything configured, and sat here only because this class was where globals collected.
 
 
     /** search history */
@@ -815,65 +791,22 @@ public class GlobalConfig {
         return null;
     }
 
-    /** All settings */
+    /** All settings. The work lives in {@link SettingsStore}; these stay so callers need not move. */
     public static void loadAllSetting() {
-        // Verify which storage source to user.
-        StorageRoots.setInternalOnly(SaveFileMigration.migrationCompleted());
-
-        // Loads all settings.
-        allSetting = new ContentValues();
-        String h = loadFullSaveFileContent(saveSetting);
-
-        String[] sets = h.split("\\|\\|\\|\\|");
-        for(String set : sets) {
-            String[] temp = set.split("::::");
-            if(temp.length != 2 || temp[0] == null || temp[0].isEmpty() || temp[1] == null || temp[1].isEmpty()) continue;
-
-            allSetting.put(temp[0], temp[1]);
-        }
-
-        // Updates settings version.
-        String version = getFromAllSetting(SettingItems.version);
-        if(version == null || version.isEmpty()) {
-            setToAllSetting(SettingItems.version, "1");
-        }
-        // Else, reserved for future settings migration.
-
-        // Crash report context. Both of these change which files get read and which parser path
-        // runs, so a report without them is hard to reproduce. Read straight out of allSetting
-        // rather than via getCurrentLang(), which writes the settings file back on first run.
-        String lang = allSetting.getAsString(SettingItems.language.toString());
-        CrashReporter.setKey(CrashReporter.Keys.LANGUAGE, lang == null ? currentLang.toString() : lang);
-        CrashReporter.setKey(CrashReporter.Keys.STORAGE_MODE,
-                StorageRoots.isInternalOnly() || !StorageRoots.isExternalAvailable()
-                        ? "internal" : "external");
-        CrashReporter.log("GlobalConfig#loadAllSetting completed");
+        SettingsStore.load(currentLang.toString());
     }
 
     public static void saveAllSetting() {
-        if(allSetting == null) loadAllSetting();
-
-        StringBuilder result = new StringBuilder();
-        for( String key : allSetting.keySet() ) {
-            if(!result.toString().isEmpty()) result.append("||||");
-            result.append(key).append("::::").append(allSetting.getAsString(key));
-        }
-        writeFullSaveFileContent(saveSetting, result.toString());
+        SettingsStore.save();
     }
 
     @Nullable
     public static String getFromAllSetting(SettingItems name) {
-        if(allSetting == null) loadAllSetting();
-        return allSetting.getAsString(name.toString());
+        return SettingsStore.get(name);
     }
 
     public static void setToAllSetting(SettingItems name, String value) {
-        if(allSetting == null) loadAllSetting();
-        if(name != null && value != null) {
-            allSetting.remove(name.toString());
-            allSetting.put(name.toString(), value);
-            saveAllSetting();
-        }
+        SettingsStore.set(name, value);
     }
 
 
@@ -954,36 +887,12 @@ public class GlobalConfig {
         writeFullSaveFileContent(saveNoticeString, noticeStr);
     }
 
+    /** The stored account. The work lives in {@link AccountStore}; these stay for callers. */
     public static boolean loadUserInfoSet() {
-        byte[] bytes;
-        if(LightCache.testFileExist(getFirstFullUserAccountSaveFilePath())) {
-            bytes = LightCache.loadFile(getFirstFullUserAccountSaveFilePath());
-        }
-        else if(LightCache.testFileExist(getSecondFullUserAccountSaveFilePath())) {
-            bytes = LightCache.loadFile(getSecondFullUserAccountSaveFilePath());
-        }
-        else {
-            return false; // file read failed
-        }
-
-        try {
-            Log.d("MewX", new String(bytes, "UTF-8"));
-            // TODO: decouple
-            LightUserSession.decAndSetUserFile(new String(bytes, "UTF-8"));
-        } catch (Exception e) {
-            CrashReporter.recordException("GlobalConfig.loadUserInfoSet", e);
-            return false; // exception
-        }
-
-        return true;
+        return AccountStore.load();
     }
 
     public static boolean saveUserInfoSet() {
-        LightCache.saveFile(getFirstFullUserAccountSaveFilePath(), LightUserSession.encUserFile().getBytes(), true);
-        if (!LightCache.testFileExist(getFirstFullUserAccountSaveFilePath())) {
-            LightCache.saveFile(getSecondFullUserAccountSaveFilePath(), LightUserSession.encUserFile().getBytes(), true);
-            return LightCache.testFileExist(getSecondFullUserAccountSaveFilePath());
-        }
-        return true;
+        return AccountStore.save();
     }
 }

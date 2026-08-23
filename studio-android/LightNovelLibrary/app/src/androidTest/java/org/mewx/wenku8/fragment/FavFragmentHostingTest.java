@@ -110,8 +110,8 @@ public class FavFragmentHostingTest {
      * <p>{@code onResume} calls {@code refreshList(timecount++)}: the first pass takes the cloud
      * branch, every later one takes {@code loadAllLocal}. So this is the only way to reach the
      * local-load branch, and it is also the branch that runs when a user returns to the app.
-     * {@code onPause} runs too, which is what balances {@code EnterBookshelf}/{@code
-     * LeaveBookshelf}.
+     * {@code onPause} runs too, which is what balances {@code ScreenState.enterBookshelf} against
+     * {@code ScreenState.leaveBookshelf}.
      */
     @Test
     public void theBookshelfTakesItsLocalPathOnASecondResume() {

@@ -1747,9 +1747,9 @@ on `GlobalConfig`'s API means designing it blind and reopening it afterwards.
 |---|---|---|---|
 | 1 | Cover the 123 untested `GlobalConfig` lines — settings writers, credentials, image cache | test | **done** 2026-08-23 — `GlobalConfigSettingsTest` (14) + `GlobalConfigMiscTest` (10), +57 lines, 323→380 of 446. The 66 left are credentials, the network download, one dead method, and second-root fallbacks needing step 2 |
 | 2 | Extract `StorageRoots` with an injectable root | split | **done** 2026-08-23 — `StorageRootsTest`, 10 tests; second-root fallbacks reachable for the first time |
-| 3 | Funnel the 13 `LightCache` callers onto `GlobalConfig` (step 0 above) | funnel | not started — 13 files, 27 in `NovelInfoActivity`, re-measured 2026-08-23 |
-| 4 | `SettingsStore`, then `AccountStore`, then the already-covered stores | split | not started |
-| 5 | Evict the transient UI flags | split | not started |
+| 3 | Funnel the 13 `LightCache` callers onto `GlobalConfig` (step 0 above) | funnel | **deferred, needs a decision** — 112 call sites in 13 files, 27 in `NovelInfoActivity`, re-measured 2026-08-23. See below |
+| 4 | `SettingsStore`, then `AccountStore`, then the already-covered stores | split | **partly done** 2026-08-23 — `SettingsStore` and `AccountStore` extracted, `GlobalConfig` delegating. The four already-covered stores (search history, bookshelf, reading positions, volume index) are still in place |
+| 5 | Evict the transient UI flags | split | **done** 2026-08-23 — `ScreenState`, 8 call sites moved, methods and fields removed rather than delegated |
 | — | Backend swap, steps 1–5 of the section above | backend | not started, unscheduled |
 
 Step 2 deliberately precedes step 3 despite the ordering argument, as a narrow exception: it is
@@ -1778,6 +1778,21 @@ was found by measuring rather than assumed: step 1 was expected to close most of
 
 **Step 3 is not on the coverage critical path.** It is the prerequisite for the backend migration,
 which is unscheduled. If the release gate is what matters, steps 1, 2 and 4 buy more.
+
+**Why step 3 stopped for a decision rather than being done with the rest.** Two things came out of
+measuring it. First, the ordering argument above turns out not to bind: none of the thirteen files
+touches settings or credentials through `LightCache` — they operate on the save folder and the
+image and custom directories — so the funnel and the step 4 split are independent, and step 4 did
+not need to wait. Second, the size is 112 call sites, not 13 files' worth of tidying, and they are
+concentrated where the safety net is thinnest: 27 in `NovelInfoActivity`, which is 565 of 817 lines
+uncovered. The plan above calls the funnel "verifiable by the tests that already exist", and for
+most of those files that holds; for `NovelInfoActivity` it does not.
+
+That combination — a large mechanical diff, in the least covered file, changing which directory
+user data is written to — is the shape this document repeatedly warns against. It also needs a new
+`GlobalConfig` file-operation API designed up front, since `testFileExist`, `deleteFile`,
+`saveFile`, `copyFile` and `loadFile` are called with paths assembled at each site. Worth doing,
+worth doing deliberately, and worth a human reading the diff.
 
 **Keep this table current.** It exists because prose spread across many commits cannot tell a later
 reader what is already done, and this document has twice sent someone down a path that was closed

@@ -16,6 +16,7 @@ import com.nostra13.universalimageloader.core.ImageLoader;
 
 import org.mewx.wenku8.R;
 import org.mewx.wenku8.global.GlobalConfig;
+import org.mewx.wenku8.global.ScreenState;
 import org.mewx.wenku8.global.api.NovelItemInfoUpdate;
 import org.mewx.wenku8.api.Wenku8API;
 import org.mewx.wenku8.api.Wenku8Error;
@@ -75,7 +76,7 @@ public class NovelItemAdapterUpdate extends RecyclerView.Adapter<NovelItemAdapte
         // Check cache first
         NovelItemInfoUpdate cached = NovelItemInfoUpdate.getFromCache(mDataset.get(i).aid);
         if (cached != null) {
-            if (GlobalConfig.testInBookshelf() && NovelItemInfoUpdate.LOADING_STRING.equals(cached.latest_chapter) && !NovelItemInfoUpdate.LOADING_STRING.equals(mDataset.get(i).latest_chapter)) {
+            if (ScreenState.isInBookshelf() && NovelItemInfoUpdate.LOADING_STRING.equals(cached.latest_chapter) && !NovelItemInfoUpdate.LOADING_STRING.equals(mDataset.get(i).latest_chapter)) {
                 cached.latest_chapter = mDataset.get(i).latest_chapter;
             }
             mDataset.set(i, cached);
@@ -112,7 +113,7 @@ public class NovelItemAdapterUpdate extends RecyclerView.Adapter<NovelItemAdapte
         viewHolder.tvNovelAuthor.setText(info.author);
         viewHolder.tvNovelStatus.setText(info.status);
         viewHolder.tvNovelUpdate.setText(info.update);
-        if(!GlobalConfig.testInBookshelf())
+        if(!ScreenState.isInBookshelf())
             // show short intro
             viewHolder.tvNovelIntro.setText(info.intro_short);
         else if (info.latest_chapter.isEmpty()) {
@@ -193,7 +194,7 @@ public class NovelItemAdapterUpdate extends RecyclerView.Adapter<NovelItemAdapte
             tvLatestChapterNameText = itemView.findViewById(R.id.novel_item_text_shortinfo);
 
             // test current fragment
-            if(!GlobalConfig.testInBookshelf())
+            if(!ScreenState.isInBookshelf())
                 ibNovelOption.setVisibility(View.INVISIBLE);
         }
 
