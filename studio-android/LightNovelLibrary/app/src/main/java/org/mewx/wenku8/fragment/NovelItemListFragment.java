@@ -32,8 +32,8 @@ import org.mewx.wenku8.activity.NovelInfoActivity;
 import org.mewx.wenku8.adapter.NovelItemAdapterUpdate;
 import org.mewx.wenku8.global.GlobalConfig;
 import org.mewx.wenku8.global.api.NovelItemInfoUpdate;
+import org.mewx.wenku8.global.api.NovelListWithInfoParser;
 import org.mewx.wenku8.api.Wenku8API;
-import org.mewx.wenku8.global.api.Wenku8Parser;
 import org.mewx.wenku8.listener.MyItemClickListener;
 import org.mewx.wenku8.listener.MyItemLongClickListener;
 import org.mewx.wenku8.network.LightNetwork;
@@ -205,21 +205,23 @@ public class NovelItemListFragment extends Fragment implements MyItemClickListen
     }
 
 
-    private void refreshPartialIdList(List<Integer> newNovelItemAids) {
+    /**
+     * Appends a page that already carries its novel details, so no row has to fetch its own.
+     * The search path still arrives as bare ids and goes through {@link #refreshEntireIdList()}.
+     */
+    private void refreshPartialInfoList(List<NovelItemInfoUpdate> newNovelItems) {
         // Some sanity checks.
-        if (newNovelItemAids == null || newNovelItemAids.isEmpty()) {
+        if (newNovelItems == null || newNovelItems.isEmpty()) {
             return;
         }
-
-        // add to total list
-        listNovelItemAid.addAll(newNovelItemAids);
 
         // Just append new updates.
         int startIndex = listNovelItemInfo.size();
 
-        // set empty
-        for(Integer aid : newNovelItemAids) {
-            listNovelItemInfo.add(new NovelItemInfoUpdate(aid));
+        // The aid list backs onItemClick, so it has to grow alongside the info list.
+        for(NovelItemInfoUpdate info : newNovelItems) {
+            listNovelItemAid.add(info.aid);
+            listNovelItemInfo.add(info);
         }
 
         if(mAdapter == null) {
@@ -233,7 +235,7 @@ public class NovelItemListFragment extends Fragment implements MyItemClickListen
             mRecyclerView.setAdapter(mAdapter);
         }
         else {
-            mAdapter.notifyItemRangeInserted(startIndex, newNovelItemAids.size());
+            mAdapter.notifyItemRangeInserted(startIndex, newNovelItems.size());
         }
     }
 
@@ -292,7 +294,7 @@ public class NovelItemListFragment extends Fragment implements MyItemClickListen
     private class AsyncGetNovelItemList extends AsyncTask<Integer, Integer, Integer> {
         private boolean usingWenku8Relay = false;
 
-        private List<Integer> tempNovelList = new ArrayList<>();
+        private List<NovelItemInfoUpdate> tempNovelItems = new ArrayList<>();
 
         private boolean raceCondition;
 
@@ -312,27 +314,30 @@ public class NovelItemListFragment extends Fragment implements MyItemClickListen
             currentPage = params[0];
 
             // params[0] is current page number
-            ContentValues cv = Wenku8API.getNovelList(Wenku8API.getNovelSortedBy(listType), currentPage);
+            ContentValues cv = Wenku8API.getNovelListWithInfo(Wenku8API.getNovelSortedBy(listType),
+                    currentPage, GlobalConfig.getCurrentLang());
             byte[] temp = LightNetwork.LightHttpPostConnection( Wenku8API.BASE_URL, cv);
             if (temp == null) {
                 return -1;
             }
             try {
                 Log.d("MewX", "doInBackground: loading page " + currentPage);
-                tempNovelList = Wenku8Parser.parseNovelItemList(new String(temp, "UTF-8"));
+                NovelListWithInfoParser.Result result =
+                        NovelListWithInfoParser.parse(new String(temp, "UTF-8"));
+                if (result == null) {
+                    return -1;
+                }
+                totalPage = result.pageNum;
+                tempNovelItems = result.items;
             }
             catch (UnsupportedEncodingException e) {
                 CrashReporter.recordException("NovelItemListFragment.AsyncGetNovelItemList", e);
             }
 
             // judge result
-            if (tempNovelList.isEmpty()) {
-                Log.d("MewX", "in AsyncGetNovelItemList: doInBackground: tempNovelList == null || tempNovelList.size() == 0");
-                return 0;
+            if (tempNovelItems.isEmpty()) {
+                Log.d("MewX", "in AsyncGetNovelItemList: doInBackground: tempNovelItems is empty");
             }
-
-            totalPage = tempNovelList.get(0);
-            tempNovelList.remove(0);
             return 0;
         }
 
@@ -350,12 +355,12 @@ public class NovelItemListFragment extends Fragment implements MyItemClickListen
                 // network error
                 return;
             }
-            if (tempNovelList.isEmpty()) {
-                Log.d("MewX", "in AsyncGetNovelItemList: onPostExecute: tempNovelList == null || tempNovelList.size() == 0");
+            if (tempNovelItems.isEmpty()) {
+                Log.d("MewX", "in AsyncGetNovelItemList: onPostExecute: tempNovelItems is empty");
                 return;
             }
 
-            refreshPartialIdList(tempNovelList);
+            refreshPartialInfoList(tempNovelItems);
 
             // TODO: remove this warning view because all traffic will come from the relay.
             View relayWarningView = getActivity().findViewById(R.id.relay_warning);

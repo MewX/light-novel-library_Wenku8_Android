@@ -133,7 +133,7 @@ public class NovelItemListFragmentHostingTest {
     /**
      * The page actually loads and populates the list.
      *
-     * <p>This is the case that reaches {@code refreshPartialIdList} and the adapter, so it is the
+     * <p>This is the case that reaches {@code refreshPartialInfoList} and the adapter, so it is the
      * one carrying most of the coverage. It needs the network, and says so rather than passing
      * vacuously when there is none.
      */

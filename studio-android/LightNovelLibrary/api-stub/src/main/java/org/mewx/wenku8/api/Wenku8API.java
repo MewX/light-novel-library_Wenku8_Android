@@ -117,9 +117,6 @@ public class Wenku8API {
         throw new UnsupportedOperationException("stub");
     }
 
-    // Reached from NovelItemListFragment and LatestFragment as they start loading, i.e. from the
-    // fragments MainActivity shows on launch. Empty parameters for a request that will return null
-    // anyway; the list then renders its empty/failed state, which is the point.
     public static ContentValues getNovelList(NovelSortedBy n, int page) {
         return new ContentValues();
     }
@@ -128,6 +125,9 @@ public class Wenku8API {
         return new ContentValues();
     }
 
+    // Reached from NovelItemListFragment and LatestFragment as they start loading, i.e. from the
+    // fragments MainActivity shows on launch. Empty parameters for a request that will return null
+    // anyway; the list then renders its empty/failed state, which is the point.
     public static ContentValues getNovelListWithInfo(NovelSortedBy n, int page, AppLanguage l) {
         return new ContentValues();
     }
