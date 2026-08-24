@@ -280,10 +280,18 @@ public class Wenku8ReaderActivityV1 extends BaseMaterialActivity {
     public boolean dispatchKeyEvent(@NonNull KeyEvent event) {
         switch(event.getKeyCode()) {
             case KeyEvent.KEYCODE_VOLUME_DOWN:
-                gotoNextPage();
-                return true;
             case KeyEvent.KEYCODE_VOLUME_UP:
-                gotoPreviousPage();
+                // One press, one page. dispatchKeyEvent sees both halves of a press, so ACTION_UP
+                // is consumed -- keeping the system volume panel away -- but must not flip again.
+                // Repeats are dropped too: in eink mode OverlappedSlider turns the page without
+                // the Scroller, so its !isFinished() guard never fires and a held key would race
+                // through pages unthrottled.
+                if (event.getAction() == KeyEvent.ACTION_DOWN && event.getRepeatCount() == 0) {
+                    if (event.getKeyCode() == KeyEvent.KEYCODE_VOLUME_DOWN)
+                        gotoNextPage();
+                    else
+                        gotoPreviousPage();
+                }
                 return true;
         }
         return super.dispatchKeyEvent(event);
