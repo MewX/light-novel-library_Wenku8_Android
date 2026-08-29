@@ -203,7 +203,11 @@ public class FavFragment extends Fragment implements MyItemClickListener, MyItem
 
     private void loadAllLocal() {
         int retValue = 0;
-        boolean datasetChanged = false;
+
+        // Recorded beside each change to the list rather than worked out afterwards, so the two
+        // cannot disagree -- and RecyclerView throws "Inconsistency detected" when they do.
+        // Replayed once the adapter is known to exist, since the first call creates it below.
+        final List<Runnable> changes = new ArrayList<>();
 
         // init
         listNovelItemAid.clear();
@@ -223,7 +227,9 @@ public class FavFragment extends Fragment implements MyItemClickListener, MyItem
                     // Found, not in the same place remove and re-insert.
                     listNovelItemInfo.remove(i);
                     listNovelItemInfo.add(j, info);
-                    datasetChanged = true;
+                    final int movedFrom = i;
+                    final int movedTo = j;
+                    changes.add(() -> notifyMoved(movedFrom, movedTo));
                     continue aids;
                 }
             }
@@ -244,12 +250,16 @@ public class FavFragment extends Fragment implements MyItemClickListener, MyItem
             else {
                 info = NovelItemInfoUpdate.convertFromMeta(meta);
             }
-            datasetChanged = true;
             listNovelItemInfo.add(j, info);
+            final int insertedAt = j;
+            changes.add(() -> notifyInserted(insertedAt));
         }
         // Trim everything after aid.size().
         if (listNovelItemInfo.size() > listNovelItemAid.size()) {
-            listNovelItemInfo.subList(listNovelItemAid.size(), listNovelItemInfo.size()).clear();
+            final int trimFrom = listNovelItemAid.size();
+            final int trimCount = listNovelItemInfo.size() - trimFrom;
+            listNovelItemInfo.subList(trimFrom, listNovelItemInfo.size()).clear();
+            changes.add(() -> notifyRemovedRange(trimFrom, trimCount));
         }
 
         // result
@@ -265,11 +275,40 @@ public class FavFragment extends Fragment implements MyItemClickListener, MyItem
             adapter.setOnDeleteClickListener(FavFragment.this);
             adapter.setOnItemLongClickListener(FavFragment.this);
             mRecyclerView.setAdapter(adapter);
+            // Setting an adapter binds the visible rows anyway; replaying changes on top of that
+            // would describe edits to a list nothing had drawn yet.
+            changes.clear();
         }
-        if (datasetChanged) {
-            mRecyclerView.getAdapter().notifyDataSetChanged();
+
+        // This was one notifyDataSetChanged, which rebinds every row -- and each bind runs two
+        // testFileExist calls on the main thread looking for a local cover, so returning to a
+        // shelf of seventy novels cost about a hundred and forty filesystem stats to move one row.
+        // Told what actually changed, RecyclerView repositions the affected views and rebinds
+        // none of them.
+        for (Runnable change : changes) {
+            change.run();
         }
         mSwipeRefreshLayout.setRefreshing(false);
+    }
+
+    @Nullable
+    private RecyclerView.Adapter<?> listAdapter() {
+        return mRecyclerView == null ? null : mRecyclerView.getAdapter();
+    }
+
+    private void notifyMoved(int from, int to) {
+        final RecyclerView.Adapter<?> adapter = listAdapter();
+        if (adapter != null) adapter.notifyItemMoved(from, to);
+    }
+
+    private void notifyInserted(int position) {
+        final RecyclerView.Adapter<?> adapter = listAdapter();
+        if (adapter != null) adapter.notifyItemInserted(position);
+    }
+
+    private void notifyRemovedRange(int start, int count) {
+        final RecyclerView.Adapter<?> adapter = listAdapter();
+        if (adapter != null) adapter.notifyItemRangeRemoved(start, count);
     }
 
     /**
