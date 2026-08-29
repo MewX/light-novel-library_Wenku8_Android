@@ -19,7 +19,6 @@ import org.mewx.wenku8.global.GlobalConfig;
 import org.mewx.wenku8.util.CrashReporter;
 
 import java.io.ByteArrayOutputStream;
-import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
@@ -117,6 +116,34 @@ public class LightCache {
         return saveFile(fullPath, bs, forceUpdate);
     }
 
+    /**
+     * Suffix of the file a write goes to before it is renamed over the real one.
+     *
+     * <p>Fixed rather than unique on purpose: a process killed mid-write leaves one of these
+     * behind, and the next write to the same path overwrites it, so they cannot accumulate. It
+     * does not collide with any name the app looks up, all of which end in {@code .xml}.
+     */
+    private static final String STAGING_SUFFIX = ".tmp";
+
+    /**
+     * Writes {@code bs} to {@code filepath}, replacing what is there in one step.
+     *
+     * <p>This used to open the real file and truncate it, so a process killed partway through --
+     * or a device out of space -- left a file that existed, was readable, and held half a
+     * document. That is not hypothetical here: {@code GlobalConfig.loadLocalBookShelf} carries a
+     * comment about a partially written bookshelf taking out the app on launch, and
+     * {@code FavFragment} treats an unparseable novel intro as a truncated cache file. Both were
+     * this method.
+     *
+     * <p>So the content goes to a sibling file first, is flushed to disk, and is then renamed
+     * over the target. Rename within a directory is atomic, which means a reader sees either the
+     * previous file or the new one, never a partial one. The fsync is what makes that true after
+     * power loss rather than only after a process death, and costs a few milliseconds against
+     * network requests that cost hundreds.
+     *
+     * <p>Callers keep the old contract: nothing is written when the file already exists and
+     * {@code forceUpdate} is false, and that still counts as success.
+     */
     public static boolean saveFile(String filepath, byte[] bs, boolean forceUpdate) {
         // create parent folder first when applicable
         File file = new File(filepath);
@@ -131,24 +158,35 @@ public class LightCache {
                 return false; // is not a file
             }
 
+            final File staging = new File(filepath + STAGING_SUFFIX);
             try {
-                // create file
-                if (!file.createNewFile())
-                    Log.d(TAG, "File existed or failed to create file: " + filepath);
-
-                FileOutputStream out = new FileOutputStream(file); // truncate
-                DataOutputStream dos = new DataOutputStream(out);
-
-                // write all
-                dos.write(bs);
-
-                dos.close();
-                out.close();
-                Log.d(TAG, "Write successfully");
+                FileOutputStream out = new FileOutputStream(staging); // truncate the staging file
+                try {
+                    out.write(bs);
+                    out.flush();
+                    out.getFD().sync();
+                } finally {
+                    out.close();
+                }
             } catch (IOException e) {
                 CrashReporter.recordException("LightCache.saveFile", e);
+                deleteFile(staging.getPath());
                 return false;
             }
+
+            if (!staging.renameTo(file)) {
+                // Renaming onto an existing file replaces it on the filesystems Android uses, so
+                // this is not the ordinary path. Falling back to remove-then-rename reopens the
+                // window this method exists to close, but losing the write outright is worse, and
+                // the staging file is still removed either way.
+                Log.d(TAG, "Rename failed, falling back to replace: " + filepath);
+                if (!file.delete() || !staging.renameTo(file)) {
+                    Log.d(TAG, "Failed to write: " + filepath);
+                    deleteFile(staging.getPath());
+                    return false;
+                }
+            }
+            Log.d(TAG, "Write successfully");
         }
         return true; // say it successful
     }
