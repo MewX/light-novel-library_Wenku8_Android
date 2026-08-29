@@ -112,7 +112,11 @@ public class FavFragment extends Fragment implements MyItemClickListener, MyItem
         mRecyclerView.setLayoutManager(mLayoutManager);
 
         mSwipeRefreshLayout.setColorSchemeColors(getResources().getColor(R.color.myAccentColor));
-        mSwipeRefreshLayout.setOnRefreshListener(() -> new AsyncLoadAllFromCloud().execute(1));
+        // Pulling down runs the cheap check, not a forced reload. It used to pass the force flag,
+        // which re-downloaded every novel on the shelf in full -- three requests each -- so the
+        // gesture people reach for most often was wired to the most expensive thing the app does.
+        // Re-downloading everything is still available, deliberately, from the overflow menu.
+        mSwipeRefreshLayout.setOnRefreshListener(this::checkUpdates);
 
         return rootView;
     }
@@ -266,6 +270,46 @@ public class FavFragment extends Fragment implements MyItemClickListener, MyItem
             mRecyclerView.getAdapter().notifyDataSetChanged();
         }
         mSwipeRefreshLayout.setRefreshing(false);
+    }
+
+    /**
+     * Brings the shelf up to date as cheaply as it can, which is what pulling the list down does.
+     *
+     * <p>One listing request tells us the account's novels along with each one's last update and
+     * latest chapter; only the novels that disagree with what the device holds, or whose cached
+     * files cannot be read, are fetched. A shelf where nothing has changed costs a single request,
+     * so this normally finishes in about one round trip and looks like it did nothing -- which is
+     * the point.
+     */
+    public void checkUpdates() {
+        if (mSwipeRefreshLayout != null) {
+            mSwipeRefreshLayout.setRefreshing(true);
+        }
+        new AsyncLoadAllFromCloud().execute();
+    }
+
+    /**
+     * Re-downloads every novel on the shelf, whether or not anything changed.
+     *
+     * <p>Kept because {@link #checkUpdates()} trusts what the account reports, and repairing local
+     * files it has no reason to suspect is exactly what this is for. It is minutes of network on a
+     * large shelf, so it asks first rather than starting on a stray tap.
+     */
+    public void forceUpdates() {
+        if (getActivity() == null) {
+            return;
+        }
+        new MaterialAlertDialogBuilder(getActivity())
+                .setTitle(R.string.bookshelf_action_force_updates)
+                .setMessage(R.string.bookshelf_force_updates_confirm)
+                .setNegativeButton(android.R.string.cancel, null)
+                .setPositiveButton(R.string.dialog_positive_ok, (dialog, which) -> {
+                    if (mSwipeRefreshLayout != null) {
+                        mSwipeRefreshLayout.setRefreshing(true);
+                    }
+                    new AsyncLoadAllFromCloud().execute(1);
+                })
+                .show();
     }
 
     private class AsyncLoadAllFromCloud extends AsyncTask<Integer, Integer, Wenku8Error.ErrorCode> {

@@ -30,6 +30,7 @@ import org.mewx.wenku8.MyApp;
 import org.mewx.wenku8.R;
 import org.mewx.wenku8.async.CheckAppNewVersion;
 import org.mewx.wenku8.async.UpdateNotificationMessage;
+import org.mewx.wenku8.fragment.FavFragment;
 import org.mewx.wenku8.fragment.NavigationDrawerFragment;
 import org.mewx.wenku8.global.GlobalConfig;
 import org.mewx.wenku8.api.Wenku8API;
@@ -280,6 +281,12 @@ public class MainActivity extends BaseMaterialActivity {
                 // start search activity
                 startActivity(new Intent(MainActivity.this, SearchActivity.class));
                 overridePendingTransition(R.anim.fade_in, R.anim.hold); // fade in animation
+            } else if (item.getItemId() == R.id.action_check_updates) {
+                FavFragment fav = currentBookshelf();
+                if (fav != null) fav.checkUpdates();
+            } else if (item.getItemId() == R.id.action_force_updates) {
+                FavFragment fav = currentBookshelf();
+                if (fav != null) fav.forceUpdates();
             }
             return true;
         });
@@ -328,6 +335,7 @@ public class MainActivity extends BaseMaterialActivity {
                 case FAV:
                     if (getSupportActionBar() != null)
                         getSupportActionBar().setTitle(getResources().getString(R.string.main_menu_fav));
+                    getMenuInflater().inflate(R.menu.menu_fav, menu);
                     break;
                 case CONFIG:
                     if (getSupportActionBar() != null)
@@ -340,6 +348,21 @@ public class MainActivity extends BaseMaterialActivity {
         }
 
         return true;
+    }
+
+    /**
+     * The bookshelf, when it is the fragment on screen.
+     *
+     * <p>Looked up by the tag {@link #changeFragment} attaches it under, rather than held in a
+     * field: the Fragment is replaced on every navigation, so a field would go stale and keep the
+     * old one alive.
+     *
+     * @return the bookshelf, or null if something else is showing
+     */
+    @Nullable
+    private FavFragment currentBookshelf() {
+        Fragment current = getSupportFragmentManager().findFragmentByTag("fragment");
+        return current instanceof FavFragment ? (FavFragment) current : null;
     }
 
     /**

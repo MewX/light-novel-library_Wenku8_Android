@@ -1,0 +1,20 @@
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <!--
+      Check Updates is the cheap path: one listing request, then only the novels that actually
+      changed. It sits in the bar because it is the one people want.
+
+      Force Updates re-downloads the whole shelf and can take minutes, so it stays in the overflow
+      and asks first. It used to be what pulling the list down did.
+    -->
+    <item
+        android:id="@+id/action_check_updates"
+        android:title="@string/bookshelf_action_check_updates"
+        android:icon="@drawable/ic_update"
+        app:showAsAction="withText|ifRoom" />
+    <item
+        android:id="@+id/action_force_updates"
+        android:title="@string/bookshelf_action_force_updates"
+        app:showAsAction="never" />
+</menu>
