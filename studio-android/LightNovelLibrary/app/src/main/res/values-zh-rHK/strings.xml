@@ -161,6 +161,8 @@
     <string name="bookshelf_inlocal">已緩存</string>
     <string name="bookshelf_sync_partial">已同步 %1$d/%2$d 本小說，其餘將在下次同步時重試。</string>
     <string name="bookshelf_action_check_updates">檢查更新</string>
+    <string name="bookshelf_search_hint">搜尋本地書架</string>
+    <string name="bookshelf_search_empty">書架上沒有找到符合的小說</string>
     <string name="bookshelf_action_force_updates">強制重新下載全部</string>
     <string name="bookshelf_force_updates_confirm">將重新下載書架上的每一本小說，可能需要幾分鐘並消耗較多流量。通常「檢查更新」就夠了。確定要繼續嗎？</string>
     <string name="userinfo_username">用戶名</string>

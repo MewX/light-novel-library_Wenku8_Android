@@ -281,6 +281,9 @@ public class MainActivity extends BaseMaterialActivity {
                 // start search activity
                 startActivity(new Intent(MainActivity.this, SearchActivity.class));
                 overridePendingTransition(R.anim.fade_in, R.anim.hold); // fade in animation
+            } else if (item.getItemId() == R.id.action_bookshelf_search) {
+                startActivity(new Intent(MainActivity.this, BookshelfSearchActivity.class));
+                overridePendingTransition(R.anim.fade_in, R.anim.hold); // as the site-wide search
             } else if (item.getItemId() == R.id.action_check_updates) {
                 FavFragment fav = currentBookshelf();
                 if (fav != null) fav.checkUpdates();

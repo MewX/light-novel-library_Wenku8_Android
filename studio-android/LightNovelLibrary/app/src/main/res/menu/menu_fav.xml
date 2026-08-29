@@ -13,6 +13,11 @@
       settings screen draws it on a light background.
     -->
     <item
+        android:id="@+id/action_bookshelf_search"
+        android:title="@string/bookshelf_search_hint"
+        android:icon="@drawable/ic_search"
+        app:showAsAction="withText|ifRoom" />
+    <item
         android:id="@+id/action_check_updates"
         android:title="@string/bookshelf_action_check_updates"
         android:icon="@drawable/ic_update_white"

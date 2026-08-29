@@ -55,6 +55,16 @@ public class NovelItemAdapterUpdate extends RecyclerView.Adapter<NovelItemAdapte
      */
     private final Set<Integer> attemptedAids = Collections.synchronizedSet(new HashSet<>());
 
+    /**
+     * Whether rows offer the per-row menu that deletes a novel or clears its cache.
+     *
+     * <p>Screens that only navigate turn this off. It is separate from {@link ScreenState} on
+     * purpose: that flag answers "does this screen show a latest chapter instead of a synopsis",
+     * which the bookshelf search screen needs to answer yes while still not offering to delete
+     * anything.
+     */
+    private boolean optionButtonVisible = true;
+
     // empty list, then use append method to add list elements
     public NovelItemAdapterUpdate() {
         mDataset = new ArrayList<>();
@@ -104,6 +114,12 @@ public class NovelItemAdapterUpdate extends RecyclerView.Adapter<NovelItemAdapte
                 NovelItemInfoUpdate.putToCache(row);
             }
         }
+
+        // Applied on every bind rather than once in the ViewHolder, which is where it used to
+        // live: holders are recycled, so one created while a different screen was showing kept
+        // whatever visibility it was born with.
+        viewHolder.ibNovelOption.setVisibility(
+                optionButtonVisible && ScreenState.isInBookshelf() ? View.VISIBLE : View.INVISIBLE);
 
         // ALWAYS refresh all fields even if it's "Loading..." to avoid ghosting from recycled views.
         refreshAllFields(viewHolder, row);
@@ -197,6 +213,11 @@ public class NovelItemAdapterUpdate extends RecyclerView.Adapter<NovelItemAdapte
     }
 
 
+    /** @see #optionButtonVisible */
+    public void setOptionButtonVisible(boolean visible) {
+        optionButtonVisible = visible;
+    }
+
     public void setOnItemClickListener(MyItemClickListener listener){
         this.mItemClickListener = listener;
     }
@@ -250,9 +271,6 @@ public class NovelItemAdapterUpdate extends RecyclerView.Adapter<NovelItemAdapte
             tvNovelIntro = itemView.findViewById(R.id.novel_intro);
             tvLatestChapterNameText = itemView.findViewById(R.id.novel_item_text_shortinfo);
 
-            // test current fragment
-            if(!ScreenState.isInBookshelf())
-                ibNovelOption.setVisibility(View.INVISIBLE);
         }
 
         @Override
@@ -264,7 +282,10 @@ public class NovelItemAdapterUpdate extends RecyclerView.Adapter<NovelItemAdapte
                     }
                     break;
                 case R.id.novel_option:
-                    if(mClickListener != null){
+                    // Guards its own listener. This tested mClickListener while calling
+                    // mMyOptionClickListener, so a list that wanted rows tappable but offered no
+                    // per-row menu crashed the moment the button was touched.
+                    if(mMyOptionClickListener != null){
                         mMyOptionClickListener.onOptionButtonClick(v, getAdapterPosition());
                     }
                     break;
