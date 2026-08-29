@@ -336,6 +336,20 @@ public class FavFragment extends Fragment implements MyItemClickListener, MyItem
                     BookshelfSync.plan(GlobalConfig.getLocalBookshelfList(), listResultList, forceLoad);
             List<Integer> localOnly = plan.localOnly;
             List<Integer> listDiff = plan.toDownload;
+
+            // Refresh the novels the account says have changed since they were downloaded, plus
+            // any whose cached metadata cannot be read at all. Without this the bookshelf shows
+            // whatever it was given when a novel was first fetched and has no way back: the only
+            // refresh available was a forced reload of every novel in full.
+            //
+            // listDiff is plan.toDownload itself, so isUpToDate() below still speaks for the
+            // whole sync. A forced reload re-fetches everything anyway and has nothing to single
+            // out.
+            if (!forceLoad && shelf != null) {
+                listDiff.addAll(BookshelfSync.staleNovels(
+                        shelf, GlobalConfig.getLocalBookshelfList(), this::snapshotOf));
+            }
+
             if(plan.isUpToDate()) {
                 // equal, so exit
                 return Wenku8Error.ErrorCode.SYSTEM_1_SUCCEEDED;
@@ -427,6 +441,27 @@ public class FavFragment extends Fragment implements MyItemClickListener, MyItem
             }
 
             return Wenku8Error.ErrorCode.SYSTEM_1_SUCCEEDED;
+        }
+
+        /**
+         * What the device currently records for a novel, or null when it has nothing readable.
+         *
+         * <p>Reads the same cached file the bookshelf renders from, so "cannot be read" here means
+         * exactly what it means there -- a row that would show an id where its title belongs. Both
+         * fields come out of metadata the device already stores, so telling stale from current
+         * needs no bookkeeping of its own.
+         */
+        @Nullable
+        private BookshelfSync.Snapshot snapshotOf(int aid) {
+            final String xml = GlobalConfig.loadFullFileFromSaveFolder(
+                    NovelDownloader.SUB_FOLDER, NovelDownloader.introFileName(aid));
+            if (xml.isEmpty()) {
+                return null;
+            }
+            final NovelItemMeta meta = Wenku8Parser.parseNovelFullMeta(xml);
+            return meta == null
+                    ? null
+                    : new BookshelfSync.Snapshot(meta.lastUpdate, meta.latestSectionCid);
         }
 
         /**

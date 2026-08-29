@@ -2,6 +2,9 @@ package org.mewx.wenku8.global.api;
 
 import android.util.Log;
 
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -106,6 +109,75 @@ public final class BookshelfSync {
         public boolean isUpToDate() {
             return toDownload.isEmpty() && localOnly.isEmpty();
         }
+    }
+
+    /** What the device has recorded for a novel, read back out of its cached metadata. */
+    public static final class Snapshot {
+        /** The metadata's {@code LastUpdate}; the listing calls the same value {@code date}. */
+        public final String lastUpdate;
+        /** The metadata's {@code LatestSection} cid. */
+        public final int latestChapterCid;
+
+        public Snapshot(String lastUpdate, int latestChapterCid) {
+            this.lastUpdate = lastUpdate == null ? "" : lastUpdate;
+            this.latestChapterCid = latestChapterCid;
+        }
+    }
+
+    /** Reads back what the device recorded for a novel, or null when it has nothing usable. */
+    public interface LocalSnapshot {
+        @Nullable
+        Snapshot of(int aid);
+    }
+
+    /**
+     * Which novels already on the shelf no longer match what the account says about them.
+     *
+     * <p>This is what makes a refresh cheap. The bookshelf shows metadata captured whenever a
+     * novel was downloaded, and nothing ever refreshed it, so the only way to correct a stale
+     * "last updated" or latest chapter was to re-download every novel in full. The listing now
+     * carries both fields for the whole shelf in one request, and the device already stores both
+     * in each novel's cached metadata -- {@code LastUpdate} and {@code LatestSection} cid -- so
+     * the comparison needs no new state on either side.
+     *
+     * <p>A novel with no readable snapshot counts as stale. That is deliberate and does double
+     * duty: it catches a cached file that is missing, truncated or not parseable, which is
+     * exactly the damage that shows up as a bookshelf row with an id where its title should be.
+     *
+     * <p>Only novels the device already holds are considered. Ones the account has and the device
+     * does not are not stale, they are missing, and {@link #plan} already schedules those.
+     *
+     * @return the ids to refresh, in the order the account listed them
+     */
+    public static List<Integer> staleNovels(@Nullable List<BookshelfListParser.Entry> cloud,
+                                            @Nullable List<Integer> local,
+                                            @NonNull LocalSnapshot snapshot) {
+        final List<Integer> stale = new ArrayList<>();
+        if (cloud == null || local == null) {
+            return stale;
+        }
+
+        final Set<Integer> onDevice = new HashSet<>(local);
+        for (BookshelfListParser.Entry entry : cloud) {
+            if (!onDevice.contains(entry.aid)) {
+                continue; // missing rather than stale; plan() covers it
+            }
+
+            final Snapshot held = snapshot.of(entry.aid);
+            if (held == null) {
+                stale.add(entry.aid);
+                continue;
+            }
+
+            // The cid is the more precise of the two -- a novel updated twice in one day moves it
+            // while the date stands still -- but both are compared, because a cached file written
+            // before either field was recorded reads as absent rather than as different.
+            if (held.latestChapterCid != entry.latestChapterCid
+                    || !held.lastUpdate.equals(entry.date)) {
+                stale.add(entry.aid);
+            }
+        }
+        return stale;
     }
 
     /**

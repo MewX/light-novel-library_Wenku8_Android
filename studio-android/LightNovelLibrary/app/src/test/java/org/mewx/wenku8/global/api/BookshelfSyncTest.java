@@ -234,4 +234,109 @@ public class BookshelfSyncTest {
 
         assertTrue("both copies should have been subtracted", plan.localOnly.isEmpty());
     }
+
+    // ---- staleNovels -------------------------------------------------------------------------
+
+    /** Builds a cloud listing entry without going through the parser. */
+    private static BookshelfListParser.Entry entry(int aid, String date, int cid) {
+        BookshelfListParser.Entry e = new BookshelfListParser.Entry();
+        e.aid = aid;
+        e.date = date;
+        e.latestChapterCid = cid;
+        return e;
+    }
+
+    /** A device whose recorded state is whatever this map says, and nothing otherwise. */
+    private static BookshelfSync.LocalSnapshot deviceHolding(
+            final java.util.Map<Integer, BookshelfSync.Snapshot> held) {
+        return aid -> held.get(aid);
+    }
+
+    private static java.util.Map<Integer, BookshelfSync.Snapshot> snapshots() {
+        return new java.util.HashMap<>();
+    }
+
+    @Test
+    public void aNovelMatchingTheAccountIsNotStale() {
+        java.util.Map<Integer, BookshelfSync.Snapshot> held = snapshots();
+        held.put(7, new BookshelfSync.Snapshot("2026-08-27", 178219));
+
+        assertEquals(aids(),
+                BookshelfSync.staleNovels(
+                        Collections.singletonList(entry(7, "2026-08-27", 178219)),
+                        aids(7), deviceHolding(held)));
+    }
+
+    @Test
+    public void aNewerChapterMakesANovelStale() {
+        java.util.Map<Integer, BookshelfSync.Snapshot> held = snapshots();
+        held.put(7, new BookshelfSync.Snapshot("2026-08-27", 178219));
+
+        assertEquals(aids(7),
+                BookshelfSync.staleNovels(
+                        Collections.singletonList(entry(7, "2026-08-27", 178300)),
+                        aids(7), deviceHolding(held)));
+    }
+
+    /**
+     * The cid is the more precise signal -- a novel updated twice in a day moves it while the date
+     * stands still -- but a changed date alone still counts, since a cached file written before
+     * either field was recorded reads as absent rather than as different.
+     */
+    @Test
+    public void aChangedDateAloneMakesANovelStale() {
+        java.util.Map<Integer, BookshelfSync.Snapshot> held = snapshots();
+        held.put(7, new BookshelfSync.Snapshot("2026-08-20", 178219));
+
+        assertEquals(aids(7),
+                BookshelfSync.staleNovels(
+                        Collections.singletonList(entry(7, "2026-08-27", 178219)),
+                        aids(7), deviceHolding(held)));
+    }
+
+    /**
+     * The damage check. A novel on the shelf whose cached metadata cannot be read is exactly the
+     * row that renders with an id where its title should be, and it must be repaired rather than
+     * left alone.
+     */
+    @Test
+    public void aNovelWithNoReadableSnapshotIsStale() {
+        assertEquals(aids(7),
+                BookshelfSync.staleNovels(
+                        Collections.singletonList(entry(7, "2026-08-27", 178219)),
+                        aids(7), deviceHolding(snapshots())));
+    }
+
+    /** A novel the device does not hold is missing, not stale; plan() already schedules it. */
+    @Test
+    public void aNovelTheDeviceDoesNotHoldIsNotReportedAsStale() {
+        assertEquals(aids(),
+                BookshelfSync.staleNovels(
+                        Collections.singletonList(entry(7, "2026-08-27", 178219)),
+                        aids(), deviceHolding(snapshots())));
+    }
+
+    @Test
+    public void staleNovelsKeepTheOrderTheAccountListedThem() {
+        java.util.Map<Integer, BookshelfSync.Snapshot> held = snapshots();
+        held.put(1, new BookshelfSync.Snapshot("2020-01-01", 10));
+        held.put(2, new BookshelfSync.Snapshot("2020-01-01", 20));
+        held.put(3, new BookshelfSync.Snapshot("2020-01-01", 30));
+
+        assertEquals(aids(3, 1),
+                BookshelfSync.staleNovels(
+                        java.util.Arrays.asList(
+                                entry(3, "2026-01-01", 31),
+                                entry(2, "2020-01-01", 20),
+                                entry(1, "2020-01-02", 10)),
+                        aids(1, 2, 3), deviceHolding(held)));
+    }
+
+    @Test
+    public void nullInputsYieldNothingToRefresh() {
+        assertTrue(BookshelfSync.staleNovels(null, aids(7), deviceHolding(snapshots())).isEmpty());
+        assertTrue(BookshelfSync.staleNovels(
+                Collections.singletonList(entry(7, "d", 1)), null,
+                deviceHolding(snapshots())).isEmpty());
+    }
 }
