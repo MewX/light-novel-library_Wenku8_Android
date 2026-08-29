@@ -1364,22 +1364,34 @@ public class NovelInfoActivity extends BaseMaterialActivity {
             refreshInfoFromCloud();
     }
 
+    /**
+     * Fills the screen from the three documents cached on the device.
+     *
+     * <p>Started on {@link AsyncTask#THREAD_POOL_EXECUTOR}, not through {@code execute()}, which
+     * would use the serial one. That queue is a single one for the whole process, and
+     * {@code MainActivity.onResume} puts two network downloads on it -- the version check and the
+     * notification message. On a slow connection they hold it for their timeouts, and this task,
+     * which only has to read three local files, waited behind them with the progress bar up. The
+     * novel then appeared the moment the network gave up, which looks exactly like the local read
+     * being the slow part.
+     */
     private void refreshInfoFromLocal() {
         if (isLoading) return;
         isLoading = true;
         llError.setVisibility(View.GONE);
         spb.setVisibility(View.VISIBLE);
         FetchInfoAsyncTask fetchInfoAsyncTask = tracker.track(new FetchInfoAsyncTask());
-        fetchInfoAsyncTask.execute(1); // load from local
+        fetchInfoAsyncTask.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR, 1); // 1 = from local
     }
 
+    /** As {@link #refreshInfoFromLocal()}, and queued behind the same unrelated work without this. */
     private void refreshInfoFromCloud() {
         if (isLoading) return;
         isLoading = true;
         llError.setVisibility(View.GONE);
         spb.setVisibility(View.VISIBLE);
         FetchInfoAsyncTask fetchInfoAsyncTask = tracker.track(new FetchInfoAsyncTask());
-        fetchInfoAsyncTask.execute();
+        fetchInfoAsyncTask.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR);
     }
 
     private void fetchAndShowNovelCover() {
