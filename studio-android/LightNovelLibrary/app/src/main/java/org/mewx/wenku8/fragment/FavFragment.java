@@ -1,6 +1,5 @@
 package org.mewx.wenku8.fragment;
 
-import android.content.ContentValues;
 import android.content.Intent;
 import android.os.AsyncTask;
 import android.os.Build;
@@ -32,6 +31,7 @@ import org.mewx.wenku8.global.GlobalConfig;
 import org.mewx.wenku8.global.ScreenState;
 import org.mewx.wenku8.global.api.BookshelfSync;
 import org.mewx.wenku8.global.api.NovelItemInfoUpdate;
+import org.mewx.wenku8.global.api.NovelDownloader;
 import org.mewx.wenku8.global.api.NovelItemMeta;
 import org.mewx.wenku8.global.api.VolumeList;
 import org.mewx.wenku8.api.Wenku8API;
@@ -51,10 +51,8 @@ import java.io.File;
 import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
 
 
 public class FavFragment extends Fragment implements MyItemClickListener, MyItemLongClickListener, MyOptionClickListener {
@@ -263,6 +261,10 @@ public class FavFragment extends Fragment implements MyItemClickListener, MyItem
         private boolean isLoading; // check in "doInBackground" to make sure to continue or not
         private boolean forceLoad = false;
 
+        /** Novels committed and novels left for a later run; reported once the sync ends. */
+        private int succeeded = 0;
+        private int failed = 0;
+
         @Override
         protected void onPreExecute() {
             super.onPreExecute();
@@ -322,98 +324,75 @@ public class FavFragment extends Fragment implements MyItemClickListener, MyItem
                 return Wenku8Error.ErrorCode.SYSTEM_1_SUCCEEDED;
             }
 
-            // load all cloud only book
-            int count = 0;
-            md.setMaxProgress(listDiff.size());
-            for(Integer aid : listDiff) {
-                if(!isLoading) return Wenku8Error.ErrorCode.USER_CANCELLED_TASK;
-
-                // download general file using parallel requests
-                String volumeXml, introXml, fullIntroXml;
-                List<VolumeList> vl;
-                NovelItemMeta ni;
-                try {
-                    // Create executor for parallel requests.
-                    ExecutorService executor = Executors.newFixedThreadPool(3);
-                    
-                    // Task 1: Fetch volumes.
-                    Callable<byte[]> volumeTask = () -> {
-                        if(!isLoading) return null;
-                        ContentValues cv = Wenku8API.getNovelIndex(aid, GlobalConfig.getCurrentLang());
-                        return LightNetwork.LightHttpPostConnection(Wenku8API.BASE_URL, cv);
-                    };
-                    
-                    // Task 2: Fetch intro.
-                    Callable<byte[]> introTask = () -> {
-                        if(!isLoading) return null;
+            // Download everything the device is missing. One pool serves the whole sync and is
+            // shut down in a finally -- the per-novel pools this replaces were only shut down on
+            // the paths that returned normally, and their threads are not daemons.
+            //
+            // A novel that fails no longer ends the sync. It is left off the bookshelf, which is
+            // both what the user sees as "not synced yet" and what makes the next run fetch it
+            // again. See issue #114: one flaky response used to cost every novel after it.
+            final Wenku8API.AppLanguage lang = GlobalConfig.getCurrentLang();
+            final NovelDownloader.Fetcher fetcher = (document, id) -> {
+                switch (document) {
+                    case VOLUME_INDEX:
                         return LightNetwork.LightHttpPostConnection(Wenku8API.BASE_URL,
-                                Wenku8API.getNovelFullMeta(aid, GlobalConfig.getCurrentLang()));
-                    };
-                    
-                    // Task 3: Fetch full intro (needs to be done after parsing meta, so we'll do it separately)
-                    // Submit first 2 tasks.
-                    Future<byte[]> volumeFuture = executor.submit(volumeTask);
-                    Future<byte[]> introFuture = executor.submit(introTask);
-                    // Wait for results.
-                    byte[] tempVolumeXml = volumeFuture.get();
-                    byte[] tempIntroXml = introFuture.get();
-                    if(!isLoading) {
-                        executor.shutdown();
-                        return Wenku8Error.ErrorCode.USER_CANCELLED_TASK;
-                    }
-                    if(tempVolumeXml == null || tempIntroXml == null) {
-                        executor.shutdown();
-                        return Wenku8Error.ErrorCode.NETWORK_ERROR;
-                    }
-                    
-                    // Parse into structures.
-                    volumeXml = new String(tempVolumeXml, "UTF-8");
-                    introXml = new String(tempIntroXml, "UTF-8");
-                    vl = Wenku8Parser.getVolumeList(volumeXml);
-                    ni = Wenku8Parser.parseNovelFullMeta(introXml);
-                    if (vl.isEmpty() || ni == null) {
-                        executor.shutdown();
-                        return Wenku8Error.ErrorCode.XML_PARSE_FAILED;
-                    }
-
-                    // Now fetch full intro (depends on ni.aid from parsing).
-                    if(!isLoading) {
-                        executor.shutdown();
-                        return Wenku8Error.ErrorCode.USER_CANCELLED_TASK;
-                    }
-                    
-                    final int finalAid = ni.aid;
-                    Callable<byte[]> fullIntroTask = () -> {
-                        if(!isLoading) return null;
-                        ContentValues cv = Wenku8API.getNovelFullIntro(finalAid, GlobalConfig.getCurrentLang());
-                        return LightNetwork.LightHttpPostConnection(Wenku8API.BASE_URL, cv);
-                    };
-                    Future<byte[]> fullIntroFuture = executor.submit(fullIntroTask);
-                    byte[] tempFullIntro = fullIntroFuture.get();
-                    executor.shutdown();
-
-                    if (tempFullIntro == null) return Wenku8Error.ErrorCode.NETWORK_ERROR;
-                    ni.fullIntro = new String(tempFullIntro, "UTF-8");
-
-                    // Write into saved file, save from volum -> meta -> add2bookshelf.
-                    GlobalConfig.writeFullFileIntoSaveFolder("intro", aid + "-volume.xml", volumeXml);
-                    GlobalConfig.writeFullFileIntoSaveFolder("intro", aid + "-introfull.xml", ni.fullIntro);
-                    GlobalConfig.writeFullFileIntoSaveFolder("intro", aid + "-intro.xml", introXml);
-
-                } catch (Exception e) {
-                    CrashReporter.recordException("FavFragment.AsyncLoadAllFromCloud.cloudToLocal", e);
+                                Wenku8API.getNovelIndex(id, lang));
+                    case META:
+                        return LightNetwork.LightHttpPostConnection(Wenku8API.BASE_URL,
+                                Wenku8API.getNovelFullMeta(id, lang));
+                    case FULL_INTRO:
+                        return LightNetwork.LightHttpPostConnection(Wenku8API.BASE_URL,
+                                Wenku8API.getNovelFullIntro(id, lang));
+                    default:
+                        return null;
+                }
+            };
+            final NovelDownloader.Store store = new NovelDownloader.Store() {
+                @Override
+                public boolean write(@NonNull String subFolder, @NonNull String fileName,
+                                     @NonNull String content) {
+                    return GlobalConfig.writeFullFileIntoSaveFolder(subFolder, fileName, content);
                 }
 
-                // last, add to local
-                GlobalConfig.addToLocalBookshelf(aid);
-                publishProgress(++ count);
+                @Override
+                public void commit(int aid) {
+                    GlobalConfig.addToLocalBookshelf(aid);
+                }
+            };
+            final NovelDownloader.Cancellation cancellation = () -> !isLoading;
+
+            int count = 0;
+            md.setMaxProgress(listDiff.size());
+            final ExecutorService executor = Executors.newFixedThreadPool(3);
+            try {
+                for (Integer aid : listDiff) {
+                    if (!isLoading) return Wenku8Error.ErrorCode.USER_CANCELLED_TASK;
+
+                    NovelDownloader.Outcome outcome = NovelDownloader.syncOne(
+                            aid, executor, fetcher, store, cancellation);
+                    if (outcome == NovelDownloader.Outcome.CANCELLED) {
+                        return Wenku8Error.ErrorCode.USER_CANCELLED_TASK;
+                    }
+                    if (outcome == NovelDownloader.Outcome.COMMITTED) {
+                        succeeded++;
+                    } else {
+                        failed++;
+                    }
+                    publishProgress(++count);
+                }
+            } finally {
+                executor.shutdown();
             }
 
             // sync local bookshelf, and set ribbon, sync one, delete one
             List<Integer> copy = new ArrayList<>(localOnly); // make a copy
             for(Integer aid : copy) {
                 b = LightNetwork.LightHttpPostConnection(Wenku8API.BASE_URL, Wenku8API.getAddToBookshelfParams(aid));
-                if(b == null) return Wenku8Error.ErrorCode.NETWORK_ERROR;
+                if(b == null) {
+                    // Same rule as the download loop: leave this one in localOnly so it is pushed
+                    // again next time, rather than abandoning every novel queued behind it.
+                    continue;
+                }
 
                 try {
                     if(LightTool.isInteger(new String(b, "UTF-8"))) {
@@ -463,6 +442,13 @@ public class FavFragment extends Fragment implements MyItemClickListener, MyItem
             }
             else {
                 loadAllLocal();
+                if (failed > 0) {
+                    // The sync itself succeeded; some novels are simply not on the shelf yet and
+                    // will be fetched next time. Saying so beats silently coming up short.
+                    Toast.makeText(MyApp.getContext(),
+                            getString(R.string.bookshelf_sync_partial, succeeded, succeeded + failed),
+                            Toast.LENGTH_LONG).show();
+                }
             }
         }
     }

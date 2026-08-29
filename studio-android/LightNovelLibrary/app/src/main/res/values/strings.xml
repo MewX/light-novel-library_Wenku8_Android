@@ -184,6 +184,7 @@
     <string name="bookshelf_added">成功添加到收藏！</string>
     <string name="bookshelf_intro_load_failed">小说信息损坏，需要手动同步小说信息。右下角+号 -> 下载 -> 检查更新。</string>
     <string name="bookshelf_inlocal">已缓存</string>
+    <string name="bookshelf_sync_partial">已同步 %1$d/%2$d 本小说，其余将在下次同步时重试。</string>
     <string name="userinfo_username">用户名</string>
     <string name="userinfo_nickyname">昵称</string>
     <string name="userinfo_score">可用积分</string>
