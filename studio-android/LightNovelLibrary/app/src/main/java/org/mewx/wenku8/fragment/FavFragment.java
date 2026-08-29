@@ -53,11 +53,21 @@ import java.io.File;
 import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 
 public class FavFragment extends Fragment implements MyItemClickListener, MyItemLongClickListener, MyOptionClickListener {
+
+    /**
+     * How many novels a sync fetches at once.
+     *
+     * <p>Deliberately small. The point is to stop a shelf of seventy taking seventy times one
+     * novel's round trips, not to open as many connections as the device will allow.
+     */
+    private static final int NOVELS_IN_PARALLEL = 3;
 
     // local vars
     private SwipeRefreshLayout mSwipeRefreshLayout;
@@ -385,22 +395,59 @@ public class FavFragment extends Fragment implements MyItemClickListener, MyItem
                     return GlobalConfig.writeFullFileIntoSaveFolder(subFolder, fileName, content);
                 }
 
+                /**
+                 * Synchronized because novels now finish on several threads at once, and this
+                 * mutates one shared list and rewrites the whole bookshelf file from it. Two
+                 * unsynchronized commits can interleave into a file missing a novel that was
+                 * successfully downloaded -- and there is a comment in
+                 * GlobalConfig.loadLocalBookShelf about what a damaged bookshelf file does on
+                 * launch. Writes need no such guard: every novel writes only its own files.
+                 */
                 @Override
-                public void commit(int aid) {
+                public synchronized void commit(int aid) {
                     GlobalConfig.addToLocalBookshelf(aid);
                 }
             };
             final NovelDownloader.Cancellation cancellation = () -> !isLoading;
 
-            int count = 0;
             md.setMaxProgress(listDiff.size());
-            final ExecutorService executor = Executors.newFixedThreadPool(3);
+
+            // Two pools, not one. A novel's own task blocks waiting on the document requests it
+            // submitted, so running both on the same pool lets every thread sit waiting for work
+            // that cannot be scheduled -- a deadlock, not merely slow. Sizing the document pool at
+            // twice the novel pool matches what a novel actually asks for at once: the index and
+            // the metadata together, then the intro on its own. So at most six requests are ever
+            // in flight, and the number of requests a sync makes is unchanged either way.
+            final ExecutorService novelExecutor = Executors.newFixedThreadPool(NOVELS_IN_PARALLEL);
+            final ExecutorService documentExecutor =
+                    Executors.newFixedThreadPool(NOVELS_IN_PARALLEL * 2);
             try {
+                final List<Future<NovelDownloader.Outcome>> pending =
+                        new ArrayList<>(listDiff.size());
                 for (Integer aid : listDiff) {
+                    pending.add(novelExecutor.submit(() -> NovelDownloader.syncOne(
+                            aid, documentExecutor, fetcher, store, cancellation)));
+                }
+
+                // Collected in submission order, so progress still climbs steadily and the
+                // counters stay on this thread rather than needing to be atomic. Cancelling does
+                // not have to drain the queue: syncOne checks before doing anything, so whatever
+                // is still queued returns immediately.
+                int count = 0;
+                for (Future<NovelDownloader.Outcome> future : pending) {
                     if (!isLoading) return Wenku8Error.ErrorCode.USER_CANCELLED_TASK;
 
-                    NovelDownloader.Outcome outcome = NovelDownloader.syncOne(
-                            aid, executor, fetcher, store, cancellation);
+                    NovelDownloader.Outcome outcome;
+                    try {
+                        outcome = future.get();
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                        return Wenku8Error.ErrorCode.USER_CANCELLED_TASK;
+                    } catch (ExecutionException e) {
+                        CrashReporter.recordException("FavFragment.AsyncLoadAllFromCloud", e);
+                        outcome = NovelDownloader.Outcome.FAILED;
+                    }
+
                     if (outcome == NovelDownloader.Outcome.CANCELLED) {
                         return Wenku8Error.ErrorCode.USER_CANCELLED_TASK;
                     }
@@ -412,7 +459,8 @@ public class FavFragment extends Fragment implements MyItemClickListener, MyItem
                     publishProgress(++count);
                 }
             } finally {
-                executor.shutdown();
+                novelExecutor.shutdown();
+                documentExecutor.shutdown();
             }
 
             // sync local bookshelf, and set ribbon, sync one, delete one
