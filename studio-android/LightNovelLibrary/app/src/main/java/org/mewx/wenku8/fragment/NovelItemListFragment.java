@@ -190,17 +190,32 @@ public class NovelItemListFragment extends Fragment implements MyItemClickListen
     }
 
     private class OnHidingScrollListener extends RecyclerView.OnScrollListener {
-        int toolbarMarginOffset = 0;
+        private int accumulatedDy = 0;
 
         @Override
         public void onScrolled(@NonNull RecyclerView recyclerView, int dx, int dy) {
             super.onScrolled(recyclerView, dx, dy);
+            if (actionBar == null) {
+                return;
+            }
 
-            toolbarMarginOffset += dy;
-            if (toolbarMarginOffset > actionBar.getHeight())
+            // Accumulate within one direction only, resetting when the direction changes.
+            //
+            // This used to be a single running total that called show() when it came back to
+            // exactly zero, so the bar stayed hidden until the list was scrolled the whole way
+            // back to the top -- and stayed hidden for good whenever the total never landed on
+            // zero, which appending a page makes easy.
+            if ((dy > 0) != (accumulatedDy > 0)) {
+                accumulatedDy = 0;
+            }
+            accumulatedDy += dy;
+
+            final int threshold = actionBar.getHeight();
+            if (accumulatedDy > threshold) {
                 actionBar.hide();
-            if (toolbarMarginOffset == 0)
+            } else if (accumulatedDy < -threshold) {
                 actionBar.show();
+            }
         }
     }
 
