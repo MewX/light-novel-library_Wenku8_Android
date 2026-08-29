@@ -25,7 +25,6 @@ import org.mewx.wenku8.listener.MyItemLongClickListener;
 import org.mewx.wenku8.listener.MyOptionClickListener;
 import org.mewx.wenku8.util.LightCache;
 import org.mewx.wenku8.network.LightNetwork;
-import org.mewx.wenku8.global.api.NovelItemInfoUpdate;
 import org.mewx.wenku8.util.CrashReporter;
 
 import java.io.File;
@@ -48,6 +47,13 @@ public class NovelItemAdapterUpdate extends RecyclerView.Adapter<NovelItemAdapte
     private MyItemLongClickListener mItemLongClickListener;
     private List<NovelItemInfoUpdate> mDataset;
     private Set<Integer> loadingAids = Collections.synchronizedSet(new HashSet<>());
+
+    /**
+     * Novels the server has already answered for, so a row the response could not complete is not
+     * re-requested on every bind. Scoped to this adapter rather than made static: it is a guard
+     * against a bind loop, not a cache, and {@link NovelItemInfoUpdate} already owns the caching.
+     */
+    private final Set<Integer> attemptedAids = Collections.synchronizedSet(new HashSet<>());
 
     // empty list, then use append method to add list elements
     public NovelItemAdapterUpdate() {
@@ -73,21 +79,37 @@ public class NovelItemAdapterUpdate extends RecyclerView.Adapter<NovelItemAdapte
 
     @Override
     public void onBindViewHolder(@NonNull final ViewHolder viewHolder, int i) {
-        // Check cache first
-        NovelItemInfoUpdate cached = NovelItemInfoUpdate.getFromCache(mDataset.get(i).aid);
-        if (cached != null) {
-            if (ScreenState.isInBookshelf() && NovelItemInfoUpdate.LOADING_STRING.equals(cached.latest_chapter) && !NovelItemInfoUpdate.LOADING_STRING.equals(mDataset.get(i).latest_chapter)) {
-                cached.latest_chapter = mDataset.get(i).latest_chapter;
-            }
-            mDataset.set(i, cached);
-            refreshAllFields(viewHolder, cached);
-        } else {
-            // ALWAYS refresh all fields even if it's "Loading..." to avoid ghosting from recycled views.
-            refreshAllFields(viewHolder, mDataset.get(i));
+        NovelItemInfoUpdate row = mDataset.get(i);
 
-            // Check if we need to load current item.
-            checkAndLoad(mDataset.get(i).aid, i);
+        // Reconcile with the shared cache rather than deferring to it. The cache is written by
+        // every list in the app, so it can hold a sparser record for this novel than the page this
+        // list just parsed -- taking it unconditionally is what stranded rows on "Loading...".
+        final NovelItemInfoUpdate cached = NovelItemInfoUpdate.getFromCache(row.aid);
+        if (cached != null && cached != row) {
+            if (cached.populatedFieldCount() > row.populatedFieldCount()) {
+                // The bookshelf is the only screen that knows a novel's latest chapter, and no list
+                // endpoint returns it, so carry it across rather than lose it to the fuller record.
+                // The local volume index is the sole authority here, so it overwrites unconditionally:
+                // guarding on the cached value being absent would pin the first chapter name this
+                // novel was ever bound with, and a later sync could never move it.
+                if (ScreenState.isInBookshelf()
+                        && !NovelItemInfoUpdate.isMissing(row.latest_chapter)) {
+                    cached.latest_chapter = row.latest_chapter;
+                }
+                row = cached;
+                mDataset.set(i, cached);
+            } else if (row.populatedFieldCount() > cached.populatedFieldCount()) {
+                // This page holds the better record; publish it so other lists stop showing the
+                // sparse one. putToCache only replaces when strictly more complete.
+                NovelItemInfoUpdate.putToCache(row);
+            }
         }
+
+        // ALWAYS refresh all fields even if it's "Loading..." to avoid ghosting from recycled views.
+        refreshAllFields(viewHolder, row);
+
+        // Check if we need to load current item.
+        checkAndLoad(row.aid, i);
 
         // Prefetch next 10 items.
         for (int k = 1; k <= 10; k++) {
@@ -97,10 +119,45 @@ public class NovelItemAdapterUpdate extends RecyclerView.Adapter<NovelItemAdapte
         }
     }
 
-    private void checkAndLoad(int aid, int position) {
-        if (mDataset.get(position).isInitialized() && !loadingAids.contains(aid) && NovelItemInfoUpdate.getFromCache(aid) == null) {
-            new AsyncLoadNovelIntro(aid).executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR);
+    /**
+     * Whether a row still shows "Loading..." in a field this screen actually renders.
+     *
+     * <p>The bookshelf shows {@code latest_chapter} in place of the preview, and it fills that from
+     * the saved volume index, so a missing preview there is not something to go to the network for.
+     */
+    private static boolean needsRepair(NovelItemInfoUpdate info) {
+        if (info.isPlaceholder()) {
+            return true;
         }
+        if (NovelItemInfoUpdate.isMissing(info.author)
+                || NovelItemInfoUpdate.isMissing(info.status)
+                || NovelItemInfoUpdate.isMissing(info.update)) {
+            return true;
+        }
+        return !ScreenState.isInBookshelf() && NovelItemInfoUpdate.isMissing(info.intro_short);
+    }
+
+    /**
+     * Fetches a novel's details when the row is missing some.
+     *
+     * <p>This used to fire only for a row that was still a bare placeholder, and only when the
+     * cache held nothing at all. Both halves stopped working when the ranking lists moved to
+     * {@code novellist} in c347711: rows now arrive with a real title, so they are never
+     * placeholders, and the parser caches every one of them, so the cache is never empty. A row
+     * that arrived with a field missing therefore had nothing left that would ever repair it.
+     *
+     * <p>The gate is now the symptom itself -- a field the user would see as "Loading...".
+     * {@link #attemptedAids} keeps a novel the server simply has no data for from being re-fetched
+     * on every bind; a network failure is not recorded there, so it can still be retried.
+     */
+    private void checkAndLoad(int aid, int position) {
+        if (!needsRepair(mDataset.get(position))) {
+            return;
+        }
+        if (loadingAids.contains(aid) || attemptedAids.contains(aid)) {
+            return;
+        }
+        new AsyncLoadNovelIntro(aid).executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR);
     }
 
     private void refreshAllFields(final ViewHolder viewHolder, NovelItemInfoUpdate info) {
@@ -262,6 +319,11 @@ public class NovelItemAdapterUpdate extends RecyclerView.Adapter<NovelItemAdapte
             loadingAids.remove(aid); // Mark as finished
 
             if(errorCode == Wenku8Error.ErrorCode.SYSTEM_1_SUCCEEDED) {
+                // The server answered. Whatever it returned is all there is, so do not ask again
+                // even if the row is still incomplete. A failure is deliberately not recorded
+                // here, so a transient network error can still be retried on a later bind.
+                attemptedAids.add(aid);
+
                 // The index might have been changed. We need to find the correct index again.
                 int currentIndex = -1;
                 for (int j = 0; j < mDataset.size(); j ++) {
@@ -275,9 +337,16 @@ public class NovelItemAdapterUpdate extends RecyclerView.Adapter<NovelItemAdapte
                 if (currentIndex >= 0) {
                     NovelItemInfoUpdate info = NovelItemInfoUpdate.parse(novelIntro);
                     if (info != null) {
-                       NovelItemInfoUpdate.putToCache(info); // Cache the result!
-                       mDataset.set(currentIndex, info);
-                       notifyItemChanged(currentIndex);
+                        NovelItemInfoUpdate.putToCache(info); // Cache the result!
+
+                        // Take whichever record ends up the fuller one. This endpoint returns a
+                        // single novel completely, so it is normally the winner -- but it does not
+                        // carry Tags, and the row it is replacing came from a list endpoint that
+                        // does, so it is not unconditionally better.
+                        if (info.populatedFieldCount() >= mDataset.get(currentIndex).populatedFieldCount()) {
+                            mDataset.set(currentIndex, info);
+                            notifyItemChanged(currentIndex);
+                        }
                     }
                 }
             }

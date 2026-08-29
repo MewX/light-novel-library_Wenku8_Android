@@ -68,4 +68,79 @@ public class NovelItemInfoUpdateTest {
         NovelItemInfoUpdate info = NovelItemInfoUpdate.parse("1234");
         assertNull(info);
     }
+
+    /** A record carrying every field a list row renders. Distinct aids: the cache is static. */
+    private static NovelItemInfoUpdate complete(int aid) {
+        NovelItemInfoUpdate info = new NovelItemInfoUpdate(aid);
+        info.title = "\u5b8c\u6574";
+        info.author = "\u4f5c\u8005";
+        info.status = "\u8fde\u8f7d\u4e2d";
+        info.update = "2026-08-23";
+        info.intro_short = "\u7b80\u4ecb";
+        return info;
+    }
+
+    /** What a novellist page yields when the response omits a field element entirely. */
+    private static NovelItemInfoUpdate sparse(int aid) {
+        NovelItemInfoUpdate info = new NovelItemInfoUpdate(aid);
+        info.title = "\u53ea\u6709\u6807\u9898";
+        return info;
+    }
+
+    @Test
+    public void isPlaceholderUntilATitleArrives() {
+        NovelItemInfoUpdate info = new NovelItemInfoUpdate(4346);
+        assertTrue(info.isPlaceholder());
+
+        info.title = "\u770b\u4e0d\u89c1\u7684\u89c4\u5219";
+        assertFalse(info.isPlaceholder());
+    }
+
+    @Test
+    public void populatedFieldCountIgnoresLatestChapter() {
+        // latest_chapter is never returned by a list endpoint, so counting it would mark every
+        // ranking row incomplete forever.
+        NovelItemInfoUpdate info = complete(1);
+        assertEquals(5, info.populatedFieldCount());
+
+        info.latest_chapter = NovelItemInfoUpdate.LOADING_STRING;
+        assertEquals(5, info.populatedFieldCount());
+
+        assertEquals(1, sparse(2).populatedFieldCount());
+        assertEquals(0, new NovelItemInfoUpdate(3).populatedFieldCount());
+    }
+
+    @Test
+    public void putToCachePrefersTheFullerRecord() {
+        // The regression this guards: a sparse page cached first used to own the entry forever,
+        // so every other list rendered its "Loading..." fields.
+        NovelItemInfoUpdate first = sparse(900001);
+        NovelItemInfoUpdate better = complete(900001);
+
+        NovelItemInfoUpdate.putToCache(first);
+        assertSame(first, NovelItemInfoUpdate.getFromCache(900001));
+
+        NovelItemInfoUpdate.putToCache(better);
+        assertSame(better, NovelItemInfoUpdate.getFromCache(900001));
+    }
+
+    @Test
+    public void putToCacheKeepsTheFullerRecord() {
+        NovelItemInfoUpdate better = complete(900002);
+        NovelItemInfoUpdate worse = sparse(900002);
+
+        NovelItemInfoUpdate.putToCache(better);
+        NovelItemInfoUpdate.putToCache(worse);
+
+        assertSame(better, NovelItemInfoUpdate.getFromCache(900002));
+    }
+
+    @Test
+    public void isMissingMatchesTheLoadingSentinelOnly() {
+        assertTrue(NovelItemInfoUpdate.isMissing(null));
+        assertTrue(NovelItemInfoUpdate.isMissing(NovelItemInfoUpdate.LOADING_STRING));
+        // An empty value is an answer -- the novel simply has no synopsis -- not a missing field.
+        assertFalse(NovelItemInfoUpdate.isMissing(""));
+        assertFalse(NovelItemInfoUpdate.isMissing("\u4f5c\u8005"));
+    }
 }
