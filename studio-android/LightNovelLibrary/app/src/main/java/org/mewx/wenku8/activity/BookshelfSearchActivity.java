@@ -201,6 +201,18 @@ public class BookshelfSearchActivity extends BaseMaterialActivity
     }
 
     /**
+     * Fades out on the way back, mirroring the fade this screen is entered with.
+     *
+     * <p>On {@code finish} rather than {@code onBackPressed}, so the system back gesture, the up
+     * arrow and any programmatic close all animate the same way through one path.
+     */
+    @Override
+    public void finish() {
+        super.finish();
+        overridePendingTransition(0, R.anim.fade_out);
+    }
+
+    /**
      * initMaterialStyle turns the up indicator on, but nothing in the base class acts on it --
      * every screen wires its own, and without this the back arrow is inert.
      */
