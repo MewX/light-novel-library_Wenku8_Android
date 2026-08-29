@@ -1,9 +1,10 @@
 package org.mewx.wenku8.global.api;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import android.util.Log;
 
-import org.mewx.wenku8.util.LightTool;
+import org.mewx.wenku8.util.CrashReporter;
 import org.xmlpull.v1.XmlPullParser;
 import org.xmlpull.v1.XmlPullParserFactory;
 
@@ -18,56 +19,6 @@ import java.util.List;
  * Wenku8 parsers.
  */
 public class Wenku8Parser {
-
-    @NonNull
-    public static List<Integer> parseNovelItemList(@NonNull String str) {
-        List<Integer> list = new ArrayList<>();
-
-        // <?xml version="1.0" encoding="utf-8"?>
-        // <result>
-        // <page num='166'/>
-        // <item aid='1143'/>
-        // <item aid='1034'/>
-        // <item aid='1213'/>
-        // <item aid='1'/>
-        // <item aid='1011'/>
-        // <item aid='1192'/>
-        // <item aid='433'/>
-        // <item aid='47'/>
-        // <item aid='7'/>
-        // <item aid='374'/>
-        // </result>
-
-        // The returning list of this xml is: (total page, aids)
-        // { 166, 1143, 1034, 1213, 1, 1011, 1192, 433, 47, 7, 374 }
-
-        final char SEPARATOR = '\''; // seperator
-
-        // get total page
-        int beg, temp;
-        beg = str.indexOf(SEPARATOR);
-        temp = str.indexOf(SEPARATOR, beg + 1);
-        if (beg == -1 || temp == -1) return list; // empty, this is an exception
-        if(LightTool.isInteger(str.substring(beg + 1, temp)))
-            list.add(Integer.parseInt(str.substring(beg + 1, temp)));
-        beg = temp + 1; // prepare for loop
-
-        // init array
-        while (true) {
-            beg = str.indexOf(SEPARATOR, beg);
-            temp = str.indexOf(SEPARATOR, beg + 1);
-            if (beg == -1 || temp == -1) break;
-
-            if(LightTool.isInteger(str.substring(beg + 1, temp)))
-                list.add(Integer.parseInt(str.substring(beg + 1, temp)));
-            Log.v("MewX", "Add novel aid: " + list.get(list.size() - 1));
-
-            beg = temp + 1; // prepare for next round
-        }
-
-        return list;
-    }
-
 
     static public NovelItemMeta parseNovelFullMeta(String xml) {
         // get full XML metadata of a novel, here is an example:
@@ -92,6 +43,10 @@ public class Wenku8Parser {
             XmlPullParserFactory factory = XmlPullParserFactory.newInstance();
             XmlPullParser xmlPullParser = factory.newPullParser();
             NovelItemMeta nfi = new NovelItemMeta();
+            // Tracked explicitly rather than by inspecting nfi afterwards: NovelItemMeta's
+            // constructor pre-fills every field (title defaults to "1", author to UNKNOWN),
+            // so a never-populated object is indistinguishable from a populated one by value.
+            boolean foundTitle = false;
             xmlPullParser.setInput(new StringReader(xml));
             int eventType = xmlPullParser.getEventType();
 
@@ -108,6 +63,7 @@ public class Wenku8Parser {
                             if ("Title".equals(xmlPullParser.getAttributeValue(0))) {
                                 nfi.aid = Integer.valueOf(xmlPullParser.getAttributeValue(1));
                                 nfi.title = xmlPullParser.nextText();
+                                foundTitle = true;
                             } else if ("Author".equals(xmlPullParser
                                     .getAttributeValue(0))) {
                                 nfi.author = xmlPullParser.getAttributeValue(1);
@@ -145,9 +101,19 @@ public class Wenku8Parser {
                 }
                 eventType = xmlPullParser.next();
             }
+
+            // See UserInfo.parseUserInfo: well-formed XML that is not a novel-metadata
+            // response used to come back as a default-constructed NovelItemMeta rather than
+            // as null, which reaches the UI as a novel titled "1" by an unknown author. aid is
+            // read in the same branch as the title, so this one flag covers both.
+            if (!foundTitle) {
+                CrashReporter.log("parseNovelFullMeta: well-formed XML with no Title data, "
+                        + "length=" + (xml == null ? -1 : xml.length()));
+                return null;
+            }
             return nfi;
         } catch (Exception e) {
-            e.printStackTrace();
+            CrashReporter.recordException("Wenku8Parser.parseNovelFullMeta", e);
             return null;
         }
     }
@@ -223,9 +189,26 @@ public class Wenku8Parser {
                     break;
             }
         } catch (Exception e) {
-            e.printStackTrace();
+            CrashReporter.recordException("Wenku8Parser.getVolumeList", e);
         }
         return l;
+    }
+
+    /**
+     * Returns the volume carrying {@code vid}, or null when the list holds no such volume.
+     *
+     * <p>Null entries in the list are skipped rather than dereferenced: {@link #getVolumeList}
+     * appends on the closing tag, so a stray closing tag with no opening one puts a null in
+     * there.
+     */
+    @Nullable
+    public static VolumeList findVolumeByVid(@NonNull List<VolumeList> volumes, int vid) {
+        for (VolumeList volume : volumes) {
+            if (volume != null && volume.vid == vid) {
+                return volume;
+            }
+        }
+        return null;
     }
 
     /**
@@ -297,7 +280,7 @@ public class Wenku8Parser {
                 eventType = xmlPullParser.next();
             }
         } catch (Exception e) {
-            e.printStackTrace();
+            CrashReporter.recordException("Wenku8Parser.parseReviewList", e);
         }
     }
 
@@ -356,7 +339,7 @@ public class Wenku8Parser {
                 eventType = xmlPullParser.next();
             }
         } catch (Exception e) {
-            e.printStackTrace();
+            CrashReporter.recordException("Wenku8Parser.parseReviewReplyList", e);
         }
     }
 

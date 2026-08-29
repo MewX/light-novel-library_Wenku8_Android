@@ -13,8 +13,16 @@ public class Wenku8API {
     public static final String REGISTER_URL = UNKNOWN;
     public static final String BASE_URL = UNKNOWN;
 
+    // The methods below build request parameters or URLs -- they do not talk to anything
+    // themselves, and LightNetwork refuses every request on a stub build anyway. Returning an
+    // inert value instead of throwing lets a screen reach its normal offline state, which is what
+    // an instrumented test on CI should be looking at. Anything that would have to invent a
+    // *result* still throws; see LightUserSession.
+    //
+    // NovelInfoActivity hands this straight to ImageLoader in onCreateView, so a throw made the
+    // whole screen unstartable. An empty URI loads no image, which is the truth here.
     public static String getCoverURL(int aid) {
-        throw new UnsupportedOperationException("stub");
+        return "";
     }
 
     public static String getAvatarURL(int uid) {
@@ -47,12 +55,18 @@ public class Wenku8API {
         allVisit, allVote, monthVisit, monthVote, weekVisit, weekVote, dayVisit, dayVote, postDate, lastUpdate, goodNum, size, fullFlag
     }
 
+    /**
+     * The enum constants are spelled exactly as the server's sort keys, so converting between the
+     * two is a rename rather than a lookup and the stub can do it honestly. An unrecognised key
+     * still throws out of {@code valueOf}, which is the loud behaviour a genuinely wrong sort
+     * order deserves.
+     */
     public static NovelSortedBy getNovelSortedBy(String n) {
-        throw new UnsupportedOperationException("stub");
+        return NovelSortedBy.valueOf(n);
     }
 
     public static String getNovelSortedBy(NovelSortedBy n) {
-        throw new UnsupportedOperationException("stub");
+        return n.name();
     }
 
 
@@ -80,8 +94,19 @@ public class Wenku8API {
         throw new UnsupportedOperationException("stub");
     }
 
+    /**
+     * Returns empty parameters rather than throwing, because the reader calls this from
+     * {@code onCreate} before it knows whether it needs the network at all — so a chapter being
+     * read straight off disk still passes through here, and a throw takes the Activity down with
+     * it. That is not hypothetical: it crashed the whole instrumentation run on CI while every
+     * developer machine, which builds against the real submodule, stayed green.
+     *
+     * <p>Empty is the honest value. These are POST parameters for a server this stub cannot
+     * reach, and {@link org.mewx.wenku8.network.LightNetwork} refuses every request anyway, so
+     * nothing downstream reads them.
+     */
     public static ContentValues getNovelContent(int aid, int cid, AppLanguage l) {
-        throw new UnsupportedOperationException("stub");
+        return new ContentValues();
     }
 
     public static ContentValues searchNovelByNovelName(String novelName, AppLanguage l) {
@@ -93,15 +118,18 @@ public class Wenku8API {
     }
 
     public static ContentValues getNovelList(NovelSortedBy n, int page) {
-        throw new UnsupportedOperationException("stub");
+        return new ContentValues();
     }
 
     public static ContentValues getMewxNovelList(NovelSortedBy n, int page, AppLanguage l) {
-        throw new UnsupportedOperationException("stub");
+        return new ContentValues();
     }
 
+    // Reached from NovelItemListFragment and LatestFragment as they start loading, i.e. from the
+    // fragments MainActivity shows on launch. Empty parameters for a request that will return null
+    // anyway; the list then renders its empty/failed state, which is the point.
     public static ContentValues getNovelListWithInfo(NovelSortedBy n, int page, AppLanguage l) {
-        throw new UnsupportedOperationException("stub");
+        return new ContentValues();
     }
 
     public static ContentValues getLibraryList() {
@@ -132,8 +160,17 @@ public class Wenku8API {
         throw new UnsupportedOperationException("stub");
     }
 
+    /**
+     * Inert rather than throwing, and for a different reason than the builders above -- here the
+     * throw was not even loud. {@code UserInfoActivity.AsyncGetUserInfo} wraps its whole body in
+     * {@code catch (Exception e)} and funnels it to {@code CrashReporter.recordException}, so on a
+     * stub build this method filed a non-fatal crash report on every launch of the account screen
+     * and then carried on to the same NETWORK_ERROR it reaches anyway. Throwing only pays for
+     * itself where it surfaces an unconsidered path; swallowed and reported as a real defect, it
+     * buries the reports that are.
+     */
     public static ContentValues getUserInfoParams() {
-        throw new UnsupportedOperationException("stub");
+        return new ContentValues();
     }
 
     public static ContentValues getUserSignParams() {

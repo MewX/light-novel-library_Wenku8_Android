@@ -26,6 +26,7 @@ import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 
 import com.google.android.material.snackbar.Snackbar;
 import org.mewx.wenku8.util.GoogleServicesHelper;
+import org.mewx.wenku8.util.LightTool;
 
 import org.mewx.wenku8.R;
 import org.mewx.wenku8.adapter.ReviewReplyItemAdapter;
@@ -281,12 +282,18 @@ public class NovelReviewReplyListActivity extends BaseMaterialActivity implement
             // refresh everything when required
             if (!runOrNot) return;
 
+            // See NovelReviewListActivity: a non-null WeakReference can still be a destroyed
+            // Activity, so treat that as gone.
             NovelReviewReplyListActivity tempActivity = novelReviewListActivityWeakReference.get();
+            if (!LightTool.isAlive(tempActivity)) tempActivity = null;
+
             if (metNetworkIssue) {
                 // met net work issue, show retry button
                 if (tempActivity != null) tempActivity.showRetryButton();
-            } else {
+            } else if (tempActivity != null) {
                 // all good, update list
+                // The null check was missing on this branch while the one above had it, so a
+                // collected Activity NPE'd here rather than being skipped.
                 if (tempActivity.getAdapter() == null) {
                     ReviewReplyItemAdapter reviewReplyItemAdapter = new ReviewReplyItemAdapter(reviewReplyList);
                     tempActivity.setAdapter(reviewReplyItemAdapter);
@@ -351,6 +358,8 @@ public class NovelReviewReplyListActivity extends BaseMaterialActivity implement
             if (runOrNot) {
                 EditText editText = editTextWeakReference.get();
                 NovelReviewReplyListActivity activity = activityWeakReference.get();
+                if (!LightTool.isAlive(activity)) activity = null;
+
                 switch (i) {
                     case 1:
                         // successful -> clear and enable edit text

@@ -159,6 +159,12 @@
     <string name="bookshelf_added">成功添加到收藏！</string>
     <string name="bookshelf_intro_load_failed">小說信息損壞，需要手動同步小說信息。右下角+號 -> 下載 -> 檢查更新。</string>
     <string name="bookshelf_inlocal">已緩存</string>
+    <string name="bookshelf_sync_partial">已同步 %1$d/%2$d 本小說，其餘將在下次同步時重試。</string>
+    <string name="bookshelf_action_check_updates">檢查更新</string>
+    <string name="bookshelf_search_hint">搜尋本地書架</string>
+    <string name="bookshelf_search_empty">書架上沒有找到符合的小說</string>
+    <string name="bookshelf_action_force_updates">強制重新下載全部</string>
+    <string name="bookshelf_force_updates_confirm">將重新下載書架上的每一本小說，可能需要幾分鐘並消耗較多流量。通常「檢查更新」就夠了。確定要繼續嗎？</string>
     <string name="userinfo_username">用戶名</string>
     <string name="userinfo_nickyname">昵稱</string>
     <string name="userinfo_score">可用積分</string>
@@ -181,6 +187,7 @@
     <string name="dialog_option_choose_simpified_chinese">簡體中文</string>
     <string name="dialog_option_choose_traditional_chinese">繁體中文</string>
     <string name="reader_please_wait">請稍候……</string>
+    <string name="reader_load_failed">章節信息讀取失敗，請返回重試。</string>
     <string name="reader_engine_v1_parsing">V1引擎正在獲取並解析文本內容</string>
     <string name="reader_already_first_chapter">已是第壹章</string>
     <string name="reader_already_last_chapter">已是最後壹章</string>

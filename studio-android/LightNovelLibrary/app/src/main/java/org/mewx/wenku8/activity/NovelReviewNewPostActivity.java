@@ -13,6 +13,7 @@ import android.widget.Toast;
 
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import org.mewx.wenku8.util.GoogleServicesHelper;
+import org.mewx.wenku8.util.LightTool;
 
 import org.mewx.wenku8.R;
 import org.mewx.wenku8.api.Wenku8API;
@@ -162,7 +163,14 @@ public class NovelReviewNewPostActivity extends BaseMaterialActivity {
             if (!ran) return;
 
             NovelReviewNewPostActivity activity = activityWeakReference.get();
+            if (!LightTool.isAlive(activity)) activity = null;
+
             if (errorCode == null || errorCode != 1) {
+                // The flag has to clear on the failure path too. It used to be reset only on
+                // success, so a failed post left the screen permanently refusing to submit
+                // again -- the same stuck-flag shape as the "Loading..." bug in 723e93d.
+                isSubmitting.set(false);
+
                 // net network or other issue
                 if (activity != null) {
                     Toast.makeText(activity, activity.getResources().getString(R.string.system_network_error), Toast.LENGTH_SHORT).show();

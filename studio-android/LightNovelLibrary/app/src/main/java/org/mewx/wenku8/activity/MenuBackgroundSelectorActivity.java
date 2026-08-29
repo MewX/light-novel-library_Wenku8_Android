@@ -20,6 +20,7 @@ import org.mewx.wenku8.util.GoogleServicesHelper;
 import org.mewx.wenku8.R;
 import org.mewx.wenku8.global.GlobalConfig;
 import org.mewx.wenku8.util.LightCache;
+import org.mewx.wenku8.util.CrashReporter;
 
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -102,7 +103,7 @@ public class MenuBackgroundSelectorActivity extends BaseMaterialActivity {
                 LightCache.copyFile(getApplicationContext().getContentResolver().openInputStream(mediaUri), copiedFilePath, true);
                 runSaveCustomMenuBackground(copiedFilePath.replaceAll("file://", ""));
             } catch (FileNotFoundException e) {
-                e.printStackTrace();
+                CrashReporter.recordException("MenuBackgroundSelectorActivity.onActivityResult", e);
                 Toast.makeText(this, "Exception: " + e, Toast.LENGTH_SHORT).show();
                 // Failed to copy. Just ignore it.
             }
@@ -121,7 +122,7 @@ public class MenuBackgroundSelectorActivity extends BaseMaterialActivity {
                 Bitmap bitmap = BitmapFactory.decodeFile(path, options);
                 if(bitmap == null) throw new Exception("PictureDecodeFailedException");
             } catch(Exception e) {
-                e.printStackTrace();
+                CrashReporter.recordException("MenuBackgroundSelectorActivity.runSaveCustomMenuBackground", e);
                 Toast.makeText(this, "Exception: " + e, Toast.LENGTH_SHORT).show();
                 return;
             }

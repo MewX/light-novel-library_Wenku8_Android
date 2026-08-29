@@ -1,8 +1,7 @@
 apply plugin: 'com.android.application'
 apply plugin: 'com.google.gms.google-services'
 apply plugin: 'com.google.firebase.crashlytics'
-//apply plugin: "jacoco"
-//apply plugin: 'com.github.kt3k.coveralls'
+apply plugin: 'jacoco'
 
 android {
     compileSdkVersion rootProject.targetSdkVersion
@@ -11,15 +10,28 @@ android {
         applicationId "org.mewx.wenku8"
         minSdkVersion rootProject.minSdkVersion
         targetSdkVersion rootProject.targetSdkVersion
-        versionCode 72
-        versionName "1.29"
+        versionCode 73
+        versionName "1.30"
         testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner'
     }
     buildTypes {
         debug {
             debuggable true
             minifyEnabled false
-            // testCoverageEnabled true
+            // Coverage for the two suites. These are separate switches covering separate things:
+            // the first instruments `test<Variant>UnitTest` (the JVM tests), the second
+            // instruments the app's own classes so the instrumented tests report coverage from
+            // the device. Both are needed -- the instrumented suite is where the Activity,
+            // lifecycle and storage coverage lives, so a JVM-only figure understates the real one
+            // by a wide margin. The `testCoverageEnabled` spelling these replaced was removed in
+            // AGP 8. See the two report tasks at the bottom of this file.
+            //
+            // Deliberately not gated behind a CI-only property. Doing that would mean CI builds an
+            // artifact nobody builds locally, which is exactly how the api-stub failures stayed
+            // invisible until they turned a build red. The cost is that every debug build carries
+            // instrumentation; that is the price of the two staying identical.
+            enableUnitTestCoverage true
+            enableAndroidTestCoverage true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
             firebaseCrashlytics {
                 mappingFileUploadEnabled false
@@ -92,6 +104,22 @@ android {
     }
     testOptions {
         unitTests.returnDefaultValues = true
+
+        // Without this, every class a Robolectric test touches reports zero coverage while the
+        // tests themselves pass. Robolectric loads classes through its own sandbox classloader,
+        // and those classes arrive with no source location attached; JaCoCo drops such classes by
+        // default, so the execution data never mentions them. `Wenku8Parser` showed the symptom
+        // exactly -- 24 passing tests across all six of its public methods, 0/229 lines reported,
+        // while `ChapterNavigator` (plain JUnit, no Robolectric) reported 28/28.
+        //
+        // The jdk.internal exclusion goes with it: those classes cannot be instrumented on a
+        // modern JDK and produce a warning per class without it.
+        unitTests.all {
+            jacoco {
+                includeNoLocationClasses = true
+                excludes = ['jdk.internal.*']
+            }
+        }
     }
 }
 
@@ -124,19 +152,97 @@ dependencies {
     testImplementation 'junit:junit:4.13.2'
     testImplementation 'org.json:json:20231013'
     testImplementation 'org.mockito:mockito-core:5.4.0'
+    // Robolectric runs JVM tests against real Android framework code. Needed by the XML
+    // parser tests: the android.jar stub returns default values (see
+    // testOptions.unitTests.returnDefaultValues), so XmlPullParserFactory.newInstance()
+    // fails silently and every parser returns null. A standalone kxml2 makes them run but
+    // is NOT behaviour-faithful -- it does not throw on malformed input the way Android's
+    // parser does, which silently inverts the malformed-input test cases.
+    testImplementation 'org.robolectric:robolectric:4.13'
 }
 
-//jacocoTestReport {
-//    reports {
-//        xml.enabled = true // coveralls plugin depends on xml format report
-//        html.enabled = true
-//    }
-//}
-//
-//coveralls {
-//    jacocoReportPath = "${buildDir}/reports/coverage/alpha/debug/report.xml"
-//}
-//
-//tasks.coveralls {
-//    dependsOn 'connectedAlphaDebugAndroidTest'
-//}
+jacoco {
+    toolVersion = "0.8.12"
+}
+
+// Generated code nobody writes or tests: resource ids, the BuildConfig, manifest-derived classes,
+// and the synthetic classes desugaring and data binding leave behind. Counting them would move the
+// percentage without saying anything about the code.
+def generatedCode = [
+        '**/R.class', '**/R$*.class', '**/BuildConfig.*', '**/Manifest*.*',
+        '**/*_Impl*.*', '**/*$$*', '**/*$Lambda$*.*', '**/*$inlined$*.*',
+]
+
+/**
+ * The measured scope, shared by both report tasks below.
+ *
+ * Shared on purpose rather than copied. Coveralls merges the two reports into one figure, so if the
+ * two tasks disagreed about which classes exist or where the sources are, the merged number would
+ * be a blend of two different measurements and nobody could tell which half moved.
+ *
+ * Note this points at the *compiled* classes under intermediates/javac, not at the instrumented
+ * copies AGP produces for `enableAndroidTestCoverage`. JaCoCo reports against original bytecode --
+ * handing it instrumented classes makes it fail to match the execution data.
+ */
+def applyCoverageScope = { JacocoReport task ->
+    task.reports {
+        xml.required = true   // the only format Coveralls consumes
+        html.required = true  // for reading locally
+    }
+    task.classDirectories.setFrom(files([
+            fileTree(dir: layout.buildDirectory.dir(
+                    'intermediates/javac/alphaDebug/compileAlphaDebugJavaWithJavac/classes').get(),
+                    excludes: generatedCode),
+    ]))
+    task.sourceDirectories.setFrom(files(['src/main/java']))
+}
+
+/**
+ * Coverage for the JVM unit tests, in the XML form Coveralls reads.
+ *
+ * This replaces a commented-out block that used the kt3k coveralls Gradle plugin and hung itself
+ * off `connectedAlphaDebugAndroidTest`, driven by Travis. None of that could be revived as-is: the
+ * plugin is unmaintained, `jacocoTestReport` is not a task the Android plugin creates, and Travis
+ * is gone. Uploading is now the CI workflow's job, so this task only has to produce the report.
+ */
+tasks.register('jacocoAlphaDebugUnitTestReport', JacocoReport) {
+    dependsOn 'testAlphaDebugUnitTest'
+    group = 'verification'
+    description = 'Generates JaCoCo XML/HTML coverage for the alphaDebug JVM unit tests.'
+    applyCoverageScope(it)
+
+    executionData.setFrom(fileTree(dir: layout.buildDirectory.get().asFile,
+            includes: ['outputs/unit_test_code_coverage/**/*.exec']))
+}
+
+/**
+ * Coverage for the instrumented tests, from execution data gathered on the device.
+ *
+ * AGP already registers `createAlphaDebugAndroidTestCoverageReport` for this, and it is deliberately
+ * not used. That task is `com.android.build.gradle.internal.coverage.JacocoReportTask` -- an
+ * AGP-internal type, not a Gradle `JacocoReport` -- so its excludes, source directories and XML
+ * layout cannot be configured. Using it would mean the two halves of the merged Coveralls figure
+ * were produced by different machinery under different exclusion rules. This task exists so the two
+ * differ in exactly one respect: which execution data they read.
+ *
+ * The .ec files are written on the device and pulled back by `connectedAlphaDebugAndroidTest`, so
+ * that task has to have run for this one to have anything to read. It is not wired as a
+ * `dependsOn`: on CI the connected run happens inside the emulator action's script block, and a
+ * dependency here would try to start a second one.
+ *
+ * `mustRunAfter` is what keeps the order right, and it is not optional. Listing two tasks on the
+ * command line does NOT guarantee Gradle runs them in that order when neither depends on the other
+ * -- it is free to reorder them. Relying on the command line alone is what produced a silent
+ * failure the first time this shipped: with no .ec files present yet, a Gradle `JacocoReport` is
+ * SKIPPED rather than failed, so no XML is written, the upload step then has nothing to send, and
+ * the whole thing reports green while publishing JVM-only coverage.
+ */
+tasks.register('jacocoAlphaDebugAndroidTestReport', JacocoReport) {
+    group = 'verification'
+    description = 'Generates JaCoCo XML/HTML coverage for the alphaDebug instrumented tests.'
+    mustRunAfter 'connectedAlphaDebugAndroidTest'
+    applyCoverageScope(it)
+
+    executionData.setFrom(fileTree(dir: layout.buildDirectory.get().asFile,
+            includes: ['outputs/code_coverage/**/*.ec']))
+}

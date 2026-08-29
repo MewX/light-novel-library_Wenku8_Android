@@ -42,6 +42,8 @@ import org.mewx.wenku8.global.api.OldNovelContentParser;
 import org.mewx.wenku8.global.api.VolumeList;
 import org.mewx.wenku8.api.Wenku8API;
 import org.mewx.wenku8.api.Wenku8Error;
+import org.mewx.wenku8.reader.ChapterContentLoader;
+import org.mewx.wenku8.reader.ChapterNavigator;
 import org.mewx.wenku8.reader.loader.WenkuReaderLoader;
 import org.mewx.wenku8.reader.loader.WenkuReaderLoaderXML;
 import org.mewx.wenku8.reader.setting.WenkuReaderSettingV1;
@@ -52,6 +54,8 @@ import org.mewx.wenku8.reader.view.WenkuReaderPageView;
 import org.mewx.wenku8.util.LightCache;
 import org.mewx.wenku8.network.LightNetwork;
 import org.mewx.wenku8.util.LightTool;
+import org.mewx.wenku8.util.AsyncTaskTracker;
+import org.mewx.wenku8.util.CrashReporter;
 
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -73,7 +77,7 @@ public class Wenku8ReaderActivityV1 extends BaseMaterialActivity {
     // vars
     private FirebaseAnalytics mFirebaseAnalytics;
     private String from = "";
-    private int aid, cid;
+    private int aid, cid, vid;
     private String forcejump;
     private VolumeList volumeList= null;
     private List<OldNovelContentParser.NovelContent> nc = new ArrayList<>();
@@ -86,6 +90,7 @@ public class Wenku8ReaderActivityV1 extends BaseMaterialActivity {
     private SlidingPageAdapter mSlidingPageAdapter;
     private WenkuReaderLoader loader;
     private WenkuReaderSettingV1 setting;
+    private final AsyncTaskTracker tracker = new AsyncTaskTracker();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -97,7 +102,13 @@ public class Wenku8ReaderActivityV1 extends BaseMaterialActivity {
 
         // fetch values
         aid = getIntent().getIntExtra("aid", 1);
-        volumeList = (VolumeList) getIntent().getSerializableExtra("volume");
+        // Rebuilt from the cached novel index rather than arriving as a Serializable extra. A
+        // VolumeList carries every ChapterInfo in the volume, so a long series could overflow
+        // the ~1MB Binder transaction buffer on the way in; ints cannot. It also means the
+        // volume survives process death, because the system restores these extras and the
+        // reader can load the rest again from disk.
+        vid = getIntent().getIntExtra("vid", -1);
+        volumeList = GlobalConfig.loadCachedVolume(aid, vid);
         cid = getIntent().getIntExtra("cid", 1);
         from = getIntent().getStringExtra("from");
         forcejump = getIntent().getStringExtra("forcejump");
@@ -112,6 +123,28 @@ public class Wenku8ReaderActivityV1 extends BaseMaterialActivity {
         readerParams.putString("from", from);
         readerParams.putString("jump_to_saved_page", forcejump);
         GoogleServicesHelper.logEvent(mFirebaseAnalytics, "reader_v1", readerParams);
+
+        // Crash report context. Which novel and chapter matters because the crashes we are
+        // chasing are content-dependent: long series produce big Intent payloads and big
+        // chapter XML.
+        CrashReporter.setKey(CrashReporter.Keys.READER_MODE, "v1");
+        CrashReporter.setKey(CrashReporter.Keys.NOVEL_AID, aid);
+        CrashReporter.setKey(CrashReporter.Keys.CHAPTER_CID, cid);
+        if (volumeList == null) {
+            // Now means the cached index is missing, unparseable, or holds no such vid, rather
+            // than an Intent extra that failed to deserialise. Reachable in ordinary use: the
+            // index is deleted when a novel leaves the bookshelf, so a reader the system
+            // restores long afterwards can find nothing left to read.
+            CrashReporter.log("Reader found no cached volume (aid=" + aid + ", vid=" + vid
+                    + ", cid=" + cid + ", from=" + from + ")");
+            Toast.makeText(this, R.string.reader_load_failed, Toast.LENGTH_SHORT).show();
+            finish();
+            return;
+        } else {
+            CrashReporter.log("Reader volume has "
+                    + (volumeList.chapterList == null ? "null" : volumeList.chapterList.size())
+                    + " chapters");
+        }
 
 
         setStatusBarAlpha(0.0f);
@@ -130,7 +163,7 @@ public class Wenku8ReaderActivityV1 extends BaseMaterialActivity {
 
         // async tasks
         ContentValues cv = Wenku8API.getNovelContent(aid, cid, GlobalConfig.getCurrentLang());
-        AsyncNovelContentTask ast = new AsyncNovelContentTask();
+        AsyncNovelContentTask ast = tracker.track(new AsyncNovelContentTask());
         ast.execute(cv);
     }
 
@@ -221,6 +254,15 @@ public class Wenku8ReaderActivityV1 extends BaseMaterialActivity {
     }
 
     @Override
+    protected void onDestroy() {
+        // The chapter fetch is as slow as the network is, so leaving the reader mid-fetch used
+        // to deliver onPostExecute into a dead Activity. See AsyncTaskTracker: the background
+        // work still finishes, only the UI callback is dropped.
+        tracker.cancelAll();
+        super.onDestroy();
+    }
+
+    @Override
     protected void onPause() {
         super.onPause();
 
@@ -238,10 +280,18 @@ public class Wenku8ReaderActivityV1 extends BaseMaterialActivity {
     public boolean dispatchKeyEvent(@NonNull KeyEvent event) {
         switch(event.getKeyCode()) {
             case KeyEvent.KEYCODE_VOLUME_DOWN:
-                gotoNextPage();
-                return true;
             case KeyEvent.KEYCODE_VOLUME_UP:
-                gotoPreviousPage();
+                // One press, one page. dispatchKeyEvent sees both halves of a press, so ACTION_UP
+                // is consumed -- keeping the system volume panel away -- but must not flip again.
+                // Repeats are dropped too: in eink mode OverlappedSlider turns the page without
+                // the Scroller, so its !isFinished() guard never fires and a held key would race
+                // through pages unthrottled.
+                if (event.getAction() == KeyEvent.ACTION_DOWN && event.getRepeatCount() == 0) {
+                    if (event.getKeyCode() == KeyEvent.KEYCODE_VOLUME_DOWN)
+                        gotoNextPage();
+                    else
+                        gotoPreviousPage();
+                }
                 return true;
         }
         return super.dispatchKeyEvent(event);
@@ -410,25 +460,46 @@ public class Wenku8ReaderActivityV1 extends BaseMaterialActivity {
 
         @Override
         protected Wenku8Error.ErrorCode doInBackground(ContentValues... params) {
-            try {
-                String xml;
-                if (from.equals(FromLocal)) // or exist
-                    xml = GlobalConfig.loadFullFileFromSaveFolder("novel", cid + ".xml");
-                else {
-                    byte[] tempXml = LightNetwork.LightHttpPostConnection(Wenku8API.BASE_URL, params[0]);
-                    if (tempXml == null) return Wenku8Error.ErrorCode.NETWORK_ERROR;
-                    xml = new String(tempXml, "UTF-8");
-                }
+            // The cache-or-network decision lives in ChapterContentLoader, where it is covered by
+            // JVM tests. What stays here is the mapping onto this reader's error codes, which
+            // differs from the vertical reader's.
+            ChapterContentLoader.Result result = ChapterContentLoader.load(
+                    from.equals(FromLocal),
+                    () -> GlobalConfig.loadFullFileFromSaveFolder("novel", cid + ".xml"),
+                    () -> LightNetwork.LightHttpPostConnection(Wenku8API.BASE_URL, params[0]),
+                    unused -> {},
+                    this::reportUnusableCache);
 
-                nc = OldNovelContentParser.parseNovelContent(xml, unused -> {});
-                if (nc.isEmpty())
-                    return xml.isEmpty() ? Wenku8Error.ErrorCode.SERVER_RETURN_NOTHING : Wenku8Error.ErrorCode.XML_PARSE_FAILED;
+            nc = result.content;
 
-                return Wenku8Error.ErrorCode.SYSTEM_1_SUCCEEDED;
-            } catch (UnsupportedEncodingException e) {
-                e.printStackTrace();
-                return Wenku8Error.ErrorCode.STRING_CONVERSION_ERROR;
+            switch (result.outcome) {
+                case LOADED_FROM_CACHE:
+                case LOADED_FROM_NETWORK:
+                    return Wenku8Error.ErrorCode.SYSTEM_1_SUCCEEDED;
+                case NETWORK_UNAVAILABLE:
+                    return Wenku8Error.ErrorCode.NETWORK_ERROR;
+                case EMPTY_RESPONSE:
+                    return Wenku8Error.ErrorCode.SERVER_RETURN_NOTHING;
+                case ENCODING_UNSUPPORTED:
+                    CrashReporter.recordException("Wenku8ReaderActivityV1.AsyncNovelContentTask",
+                            new UnsupportedEncodingException("UTF-8"));
+                    return Wenku8Error.ErrorCode.STRING_CONVERSION_ERROR;
+                case PARSE_FAILED:
+                default:
+                    return Wenku8Error.ErrorCode.XML_PARSE_FAILED;
             }
+        }
+
+        /**
+         * Reported rather than silently retried: this is the only signal that a download produced
+         * an unusable file, and the refetch would otherwise hide how often that happens.
+         */
+        private void reportUnusableCache(ChapterContentLoader.CacheProblem problem) {
+            CrashReporter.recordException("Wenku8ReaderActivityV1.cachedChapterUnusable",
+                    new FileNotFoundException("Cached chapter " + cid + " was "
+                            + (problem == ChapterContentLoader.CacheProblem.MISSING_OR_EMPTY
+                                    ? "missing or empty" : "unparseable")
+                            + "; refetching from the network"));
         }
 
         @Override
@@ -683,69 +754,9 @@ public class Wenku8ReaderActivityV1 extends BaseMaterialActivity {
                                     return true;
                                 });
 
-                                findViewById(R.id.text_previous).setOnClickListener(v -> {
-                                    // goto previous chapter
-                                    for (int i = 0; i < volumeList.chapterList.size(); i++) {
-                                        if (cid == volumeList.chapterList.get(i).cid) {
-                                            // found self
-                                            if (i == 0) {
-                                                // no more previous
-                                                Toast.makeText(Wenku8ReaderActivityV1.this, getResources().getString(R.string.reader_already_first_chapter), Toast.LENGTH_SHORT).show();
-                                            } else {
-                                                // jump to previous
-                                                final int i_bak = i;
-                                                new MaterialAlertDialogBuilder(Wenku8ReaderActivityV1.this)
-                                                        .setTitle(R.string.dialog_sure_to_jump_chapter)
-                                                        .setMessage(volumeList.chapterList.get(i_bak - 1).chapterName)
-                                                        .setPositiveButton(R.string.dialog_positive_yes, (dialog, which) -> {
-                                                            Intent intent = new Intent(Wenku8ReaderActivityV1.this, Wenku8ReaderActivityV1.class);
-                                                            intent.putExtra("aid", aid);
-                                                            intent.putExtra("volume", volumeList);
-                                                            intent.putExtra("cid", volumeList.chapterList.get(i_bak - 1).cid);
-                                                            intent.putExtra("from", from); // from cloud
-                                                            startActivity(intent);
-                                                            overridePendingTransition(R.anim.fade_in, R.anim.hold); // fade in animation
-                                                            Wenku8ReaderActivityV1.this.finish();
-                                                        })
-                                                        .setNegativeButton(R.string.dialog_negative_no, null)
-                                                        .show();
-                                            }
-                                            break;
-                                        }
-                                    }
-                                });
+                                findViewById(R.id.text_previous).setOnClickListener(v -> jumpToPreviousChapter());
 
-                                findViewById(R.id.text_next).setOnClickListener(v -> {
-                                    // goto next chapter
-                                    for (int i = 0; i < volumeList.chapterList.size(); i++) {
-                                        if (cid == volumeList.chapterList.get(i).cid) {
-                                            // found self
-                                            if (i + 1 >= volumeList.chapterList.size()) {
-                                                // no more previous
-                                                Toast.makeText(Wenku8ReaderActivityV1.this, getResources().getString(R.string.reader_already_last_chapter), Toast.LENGTH_SHORT).show();
-                                            } else {
-                                                // jump to previous
-                                                final int i_bak = i;
-                                                new MaterialAlertDialogBuilder(Wenku8ReaderActivityV1.this)
-                                                        .setTitle(R.string.dialog_sure_to_jump_chapter)
-                                                        .setMessage(volumeList.chapterList.get(i_bak + 1).chapterName)
-                                                        .setPositiveButton(R.string.dialog_positive_yes, (dialog, which) -> {
-                                                            Intent intent = new Intent(Wenku8ReaderActivityV1.this, Wenku8ReaderActivityV1.class);
-                                                            intent.putExtra("aid", aid);
-                                                            intent.putExtra("volume", volumeList);
-                                                            intent.putExtra("cid", volumeList.chapterList.get(i_bak + 1).cid);
-                                                            intent.putExtra("from", from); // from cloud
-                                                            startActivity(intent);
-                                                            overridePendingTransition(R.anim.fade_in, R.anim.hold); // fade in animation
-                                                            Wenku8ReaderActivityV1.this.finish();
-                                                        })
-                                                        .setNegativeButton(R.string.dialog_negative_no, null)
-                                                        .show();
-                                            }
-                                            break;
-                                        }
-                                    }
-                                });
+                                findViewById(R.id.text_next).setOnClickListener(v -> jumpToNextChapter());
                             }
                         }
                         else {
@@ -824,35 +835,7 @@ public class Wenku8ReaderActivityV1 extends BaseMaterialActivity {
 
     private void gotoNextPage() {
         if(mSlidingPageAdapter != null && !mSlidingPageAdapter.hasNext()) {
-            // goto next chapter
-            for (int i = 0; i < volumeList.chapterList.size(); i++) {
-                if (cid == volumeList.chapterList.get(i).cid) {
-                    // found self
-                    if (i + 1 >= volumeList.chapterList.size()) {
-                        // no more previous
-                        Toast.makeText(Wenku8ReaderActivityV1.this, getResources().getString(R.string.reader_already_last_chapter), Toast.LENGTH_SHORT).show();
-                    } else {
-                        // jump to previous
-                        final int i_bak = i;
-                        new MaterialAlertDialogBuilder(Wenku8ReaderActivityV1.this)
-                                .setTitle(R.string.dialog_sure_to_jump_chapter)
-                                .setMessage(volumeList.chapterList.get(i_bak + 1).chapterName)
-                                .setPositiveButton(R.string.dialog_positive_yes, (dialog, which) -> {
-                                    Intent intent = new Intent(Wenku8ReaderActivityV1.this, Wenku8ReaderActivityV1.class);
-                                    intent.putExtra("aid", aid);
-                                    intent.putExtra("volume", volumeList);
-                                    intent.putExtra("cid", volumeList.chapterList.get(i_bak + 1).cid);
-                                    intent.putExtra("from", from); // from cloud
-                                    startActivity(intent);
-                                    overridePendingTransition(R.anim.fade_in, R.anim.hold); // fade in animation
-                                    Wenku8ReaderActivityV1.this.finish();
-                                })
-                                .setNegativeButton(R.string.dialog_negative_no, null)
-                                .show();
-                    }
-                    break;
-                }
-            }
+            jumpToNextChapter();
         }
         else {
             if(sl != null)
@@ -862,40 +845,59 @@ public class Wenku8ReaderActivityV1 extends BaseMaterialActivity {
 
     private void gotoPreviousPage() {
         if(mSlidingPageAdapter != null && !mSlidingPageAdapter.hasPrevious()) {
-            // goto previous chapter
-            for (int i = 0; i < volumeList.chapterList.size(); i++) {
-                if (cid == volumeList.chapterList.get(i).cid) {
-                    // found self
-                    if (i == 0) {
-                        // no more previous
-                        Toast.makeText(Wenku8ReaderActivityV1.this, getResources().getString(R.string.reader_already_first_chapter), Toast.LENGTH_SHORT).show();
-                    } else {
-                        // jump to previous
-                        final int i_bak = i;
-                        new MaterialAlertDialogBuilder(Wenku8ReaderActivityV1.this)
-                                .setTitle(R.string.dialog_sure_to_jump_chapter)
-                                .setMessage(volumeList.chapterList.get(i_bak - 1).chapterName)
-                                .setPositiveButton(R.string.dialog_positive_yes, (dialog, which) -> {
-                                    Intent intent = new Intent(Wenku8ReaderActivityV1.this, Wenku8ReaderActivityV1.class);
-                                    intent.putExtra("aid", aid);
-                                    intent.putExtra("volume", volumeList);
-                                    intent.putExtra("cid", volumeList.chapterList.get(i_bak - 1).cid);
-                                    intent.putExtra("from", from); // from cloud
-                                    startActivity(intent);
-                                    overridePendingTransition(R.anim.fade_in, R.anim.hold); // fade in animation
-                                    Wenku8ReaderActivityV1.this.finish();
-                                })
-                                .setNegativeButton(R.string.dialog_negative_no, null)
-                                .show();
-                    }
-                    break;
-                }
-            }
+            jumpToPreviousChapter();
         }
         else {
             if(sl != null)
                 sl.slidePrevious();
         }
+    }
+
+    private void jumpToNextChapter() {
+        jumpToChapter(ChapterNavigator.next(chapterList(), cid), R.string.reader_already_last_chapter);
+    }
+
+    private void jumpToPreviousChapter() {
+        jumpToChapter(ChapterNavigator.previous(chapterList(), cid), R.string.reader_already_first_chapter);
+    }
+
+    private List<ChapterInfo> chapterList() {
+        return volumeList == null ? null : volumeList.chapterList;
+    }
+
+    /**
+     * Confirms, then reopens this activity on the neighbouring chapter. Reached both from the
+     * previous/next buttons and from paging off either end of the chapter, which is why the four
+     * copies of this became one.
+     *
+     * @param atBoundaryMessage what to say when the volume has no chapter in that direction
+     */
+    private void jumpToChapter(ChapterNavigator.Target target, int atBoundaryMessage) {
+        if (!target.canMove()) {
+            if (target.outcome == ChapterNavigator.Outcome.AT_BOUNDARY) {
+                Toast.makeText(this, getResources().getString(atBoundaryMessage), Toast.LENGTH_SHORT).show();
+            }
+            // UNKNOWN_CHAPTER stays silent, as the original loops did by never matching: the
+            // reader disagreeing with the cached index is not something to explain to a reader.
+            return;
+        }
+
+        final ChapterInfo destination = target.chapter;
+        new MaterialAlertDialogBuilder(this)
+                .setTitle(R.string.dialog_sure_to_jump_chapter)
+                .setMessage(destination.chapterName)
+                .setPositiveButton(R.string.dialog_positive_yes, (dialog, which) -> {
+                    Intent intent = new Intent(Wenku8ReaderActivityV1.this, Wenku8ReaderActivityV1.class);
+                    intent.putExtra("aid", aid);
+                    intent.putExtra("vid", volumeList.vid);
+                    intent.putExtra("cid", destination.cid);
+                    intent.putExtra("from", from); // from cloud
+                    startActivity(intent);
+                    overridePendingTransition(R.anim.fade_in, R.anim.hold); // fade in animation
+                    Wenku8ReaderActivityV1.this.finish();
+                })
+                .setNegativeButton(R.string.dialog_negative_no, null)
+                .show();
     }
 
     @Override
@@ -909,7 +911,7 @@ public class Wenku8ReaderActivityV1 extends BaseMaterialActivity {
                 LightCache.copyFile(getApplicationContext().getContentResolver().openInputStream(fontUri), copiedFilePath, true);
                 runSaveCustomFontPath(copiedFilePath.replaceAll("file://", ""));
             } catch (FileNotFoundException e) {
-                e.printStackTrace();
+                CrashReporter.recordException("Wenku8ReaderActivityV1.onActivityResult", e);
                 Toast.makeText(this, "Exception: " + e, Toast.LENGTH_SHORT).show();
                 // Failed to copy. Just ignore it.
             }
@@ -920,7 +922,7 @@ public class Wenku8ReaderActivityV1 extends BaseMaterialActivity {
                 LightCache.copyFile(getApplicationContext().getContentResolver().openInputStream(mediaUri), copiedFilePath, true);
                 runSaveCustomBackgroundPath(copiedFilePath.replaceAll("file://", ""));
             } catch (FileNotFoundException e) {
-                e.printStackTrace();
+                CrashReporter.recordException("Wenku8ReaderActivityV1.onActivityResult", e);
                 Toast.makeText(this, "Exception: " + e, Toast.LENGTH_SHORT).show();
                 // Failed to copy. Just ignore it.
             }
@@ -944,7 +946,7 @@ public class Wenku8ReaderActivityV1 extends BaseMaterialActivity {
                 Bitmap bitmap = BitmapFactory.decodeFile(path, options);
                 if (bitmap == null) throw new Exception("PictureDecodeFailedException");
             } catch (Exception e) {
-                e.printStackTrace();
+                CrashReporter.recordException("Wenku8ReaderActivityV1.runSaveCustomBackgroundPath", e);
                 Toast.makeText(this, "Exception: " + e + "\n可能的原因有：图片不在内置SD卡；图片格式不正确；图片像素尺寸太大，请使用小一点的图，谢谢，此功能为试验性功能；", Toast.LENGTH_LONG).show();
                 return;
             }

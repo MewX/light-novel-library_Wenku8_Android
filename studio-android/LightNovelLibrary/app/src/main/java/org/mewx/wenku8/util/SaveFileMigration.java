@@ -1,6 +1,7 @@
 package org.mewx.wenku8.util;
 
 import android.annotation.TargetApi;
+import android.content.Context;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Environment;
@@ -28,11 +29,27 @@ public class SaveFileMigration {
     private static Uri overrideExternalPathUrl = null;
 
     public static void markMigrationCompleted() {
-        LightCache.saveFile(getInternalSavePath(), SIGNAL_FILE_NAME, "".getBytes(), false);
+        String path = getInternalSavePath();
+        if (path.isEmpty()) {
+            // See getInternalSavePath: empty means the files dir was not resolvable yet. These
+            // two are the only callers that hand the path straight to LightCache as a directory
+            // rather than concatenating onto it, and those helpers index path.charAt(length - 1)
+            // without checking, so an empty one throws StringIndexOutOfBoundsException. Skipping
+            // is the honest outcome: there is nowhere to write the signal file yet, and the next
+            // call resolves the path again.
+            Log.d(TAG, "markMigrationCompleted: no internal save path yet, skipping");
+            return;
+        }
+        LightCache.saveFile(path, SIGNAL_FILE_NAME, "".getBytes(), false);
     }
 
     public static void revertMigrationStatus() {
-        LightCache.deleteFile(getInternalSavePath(), SIGNAL_FILE_NAME);
+        String path = getInternalSavePath();
+        if (path.isEmpty()) {
+            Log.d(TAG, "revertMigrationStatus: no internal save path yet, skipping");
+            return;
+        }
+        LightCache.deleteFile(path, SIGNAL_FILE_NAME);
     }
 
     /**
@@ -78,7 +95,18 @@ public class SaveFileMigration {
 
     public static String getInternalSavePath() {
         if (savedInternalPath == null) {
-            savedInternalPath = MyApp.getContext().getFilesDir() + File.separator;
+            // Only cache a path that came from a real files dir. This used to be
+            // MyApp.getContext().getFilesDir() + File.separator, which turns into the literal
+            // string "null/" when either is null -- and then caches it for the life of the
+            // process, so every save afterwards goes to a relative "null/..." path that cannot
+            // be created. A transient null this early is enough to break storage permanently.
+            Context context = MyApp.getContext();
+            File filesDir = context == null ? null : context.getFilesDir();
+            if (filesDir == null) {
+                Log.d(TAG, "getInternalSavePath: no files dir yet, not caching");
+                return "";
+            }
+            savedInternalPath = filesDir + File.separator;
         }
         return savedInternalPath;
     }

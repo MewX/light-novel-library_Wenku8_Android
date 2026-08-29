@@ -30,6 +30,7 @@ import org.mewx.wenku8.api.Wenku8Error;
 import org.mewx.wenku8.reader.loader.WenkuReaderLoader;
 import org.mewx.wenku8.reader.setting.WenkuReaderSettingV1;
 import org.mewx.wenku8.util.LightTool;
+import org.mewx.wenku8.util.CrashReporter;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -152,7 +153,7 @@ public class WenkuReaderPageView extends View {
                         options.inSampleSize = 2;
                         bmBackgroundYellow = BitmapFactory.decodeFile(mSetting.getPageBackgroundCustomPath(), options);
                     } catch(Exception e) {
-                        e.printStackTrace();
+                        CrashReporter.recordException("WenkuReaderPageView.setViewComponents", e);
                         return;
                     }
                 }

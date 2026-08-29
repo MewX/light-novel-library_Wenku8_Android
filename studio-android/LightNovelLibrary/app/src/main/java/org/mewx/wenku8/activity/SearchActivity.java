@@ -146,11 +146,15 @@ public class SearchActivity extends BaseMaterialActivity implements MyItemClickL
         return super.onOptionsItemSelected(menuItem);
     }
 
+    /**
+     * Fades out on the way back, mirroring the fade this screen is entered with.
+     *
+     * <p>On {@code finish} rather than {@code onBackPressed}, so the system back gesture, the up
+     * arrow and any programmatic close all animate the same way through one path.
+     */
     @Override
-    public void onBackPressed() {
-        super.onBackPressed();
-
-        // leave animation: fade out
+    public void finish() {
+        super.finish();
         overridePendingTransition(0, R.anim.fade_out);
     }
 

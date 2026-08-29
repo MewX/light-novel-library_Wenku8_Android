@@ -1,5 +1,6 @@
 package org.mewx.wenku8.util;
 
+import android.app.Activity;
 import android.content.Context;
 import android.graphics.Point;
 import android.graphics.Rect;
@@ -17,6 +18,22 @@ import java.lang.reflect.InvocationTargetException;
  */
 public class LightTool {
     private static Rect displayCutout = new Rect(0, 0, 0, 0);
+
+    /**
+     * Whether an Activity is still able to accept view work.
+     *
+     * <p>Written for the AsyncTask callbacks that hold a {@code WeakReference<Activity>}. A
+     * non-null reference is not on its own enough: the reference stays reachable for as long
+     * as anything else holds the Activity, so it can hand back an Activity that is already
+     * finishing or destroyed, and touching its views from there is the crash the reference was
+     * supposed to prevent.
+     *
+     * @param activity the Activity to test, may be null
+     * @return true only if the Activity exists and is neither finishing nor destroyed
+     */
+    public static boolean isAlive(Activity activity) {
+        return activity != null && !activity.isFinishing() && !activity.isDestroyed();
+    }
 
     /* Number related useful functions */
     public static boolean isInteger(@NonNull String value) {

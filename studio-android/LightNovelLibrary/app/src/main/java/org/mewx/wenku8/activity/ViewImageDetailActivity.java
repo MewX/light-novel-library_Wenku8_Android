@@ -29,6 +29,7 @@ import org.mewx.wenku8.util.GoogleServicesHelper;
 import org.mewx.wenku8.R;
 import org.mewx.wenku8.global.GlobalConfig;
 import org.mewx.wenku8.util.LightCache;
+import org.mewx.wenku8.util.CrashReporter;
 
 import java.io.File;
 import java.io.IOException;
@@ -57,6 +58,14 @@ public class ViewImageDetailActivity extends BaseMaterialActivity {
 
         // fetch value
         path = getIntent().getStringExtra("path");
+        if (path == null) {
+            // Same shape as the reader's missing "volume" extra: every use of path below
+            // dereferences it, so there is nothing to show without one.
+            CrashReporter.log("ViewImageDetailActivity started without a 'path' extra");
+            Toast.makeText(this, R.string.error_unknown, Toast.LENGTH_SHORT).show();
+            finish();
+            return;
+        }
         fileName = path.contains("/") ? path.split("/")[path.split("/").length - 1] : "default.jpg";
         Log.d(TAG, "onCreate: path = " + path);
         Log.d(TAG, "onCreate: fileName = " + fileName);
@@ -222,7 +231,7 @@ public class ViewImageDetailActivity extends BaseMaterialActivity {
                 outputStream.write(data);
                 return true;
             } catch (IOException e) {
-                e.printStackTrace();
+                CrashReporter.recordException("ViewImageDetailActivity.saveImageToGallery", e);
                 return false;
             }
         } else {

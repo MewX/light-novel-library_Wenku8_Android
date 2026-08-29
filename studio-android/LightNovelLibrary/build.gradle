@@ -6,7 +6,7 @@ buildscript {
         google()
     }
     dependencies {
-        classpath 'com.android.tools.build:gradle:9.0.1'
+        classpath 'com.android.tools.build:gradle:9.3.1'
         classpath 'com.google.gms:google-services:4.4.4'
         classpath 'com.google.firebase:firebase-crashlytics-gradle:3.0.6'
         // classpath "gradle.plugin.org.kt3k.gradle.plugin:coveralls-gradle-plugin:2.12.2"
@@ -24,7 +24,7 @@ allprojects {
 }
 
 ext {
-    targetSdkVersion = 36
-    buildToolsVersion = "36.1.0"
+    targetSdkVersion = 37
+    buildToolsVersion = "37.0.0"
     minSdkVersion = 21  // Minimum requirement for Play Store.
 }

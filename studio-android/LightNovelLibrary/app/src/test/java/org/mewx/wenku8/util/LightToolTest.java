@@ -1,12 +1,9 @@
 package org.mewx.wenku8.util;
 
-import androidx.test.filters.SmallTest;
-
 import org.junit.Test;
 
 import static org.junit.Assert.*;
 
-@SmallTest
 public class LightToolTest {
 
     @Test

@@ -19,7 +19,10 @@ import com.nostra13.universalimageloader.core.display.FadeInBitmapDisplayer;
 import org.mewx.wenku8.MyApp;
 import org.mewx.wenku8.R;
 import org.mewx.wenku8.api.Wenku8API;
+import org.mewx.wenku8.global.api.VolumeList;
+import org.mewx.wenku8.global.api.Wenku8Parser;
 import org.mewx.wenku8.network.LightUserSession;
+import org.mewx.wenku8.util.CrashReporter;
 import org.mewx.wenku8.util.LightCache;
 import org.mewx.wenku8.network.LightNetwork;
 import org.mewx.wenku8.util.LightTool;
@@ -55,37 +58,42 @@ public class GlobalConfig {
     private static final String saveReadSavesFileName = "read_saves.wk8";
     private static final String saveReadSavesV1FileName = "read_saves_v1.wk8";
     private static final String saveLocalBookshelfFileName = "bookshelf_local.wk8";
-    private static final String saveSetting = "settings.wk8";
     private static final String saveUserAccountFileName = "cert.wk8"; // certification file
     private static final String saveUserAvatarFileName = "avatar.jpg";
     private static final String saveNoticeString = "notice.wk8"; // the notice cache from online
     private static int maxSearchHistory = 20; // default
 
     // vars
-    private static boolean lookupInternalStorageOnly = false;
-    private static boolean isInBookshelf = false;
-    private static boolean isInLatest = false;
     private static boolean doLoadImage = true;
-    private static boolean externalStoragePathAvailable = true;
     private static Wenku8API.AppLanguage currentLang = Wenku8API.AppLanguage.SC;
     public static String pathPickedSave; // dir picker save path
 
     // static variables
     private static ArrayList<String> searchHistory = null;
-    private static ArrayList<ReadSaves> readSaves = null; // deprecated
+    private static ArrayList<ReadSaves> readSaves = null; // vertical reader, keyed by cid
     private static ArrayList<Integer> bookshelf = null;
-    private static ArrayList<ReadSavesV1> readSavesV1 = null; // deprecated
-    private static ContentValues allSetting = null;
+    private static ArrayList<ReadSavesV1> readSavesV1 = null; // paged reader, keyed by aid
 
 
-    /** Structures */
-    public static class ReadSaves { // deprecated
+    /**
+     * Structures.
+     *
+     * <p><b>Neither of these is deprecated, despite what both used to say here.</b> They are not
+     * two versions of one thing — they are the two readers' position formats, and both are live.
+     * {@link ReadSaves} is written and read by {@code VerticalReaderActivity}; {@link ReadSavesV1}
+     * by {@code Wenku8ReaderActivityV1} and by the "continue reading" entry on
+     * {@code NovelInfoActivity}. A pixel scroll offset and a line-and-word index do not convert
+     * into one another, so there is nothing to migrate and neither replaces the other.
+     */
+    /** Vertical reader position: a scroll offset in pixels, keyed by {@code cid}. */
+    public static class ReadSaves {
         public int cid;
         public int pos; // last time scroll Y pos
         public int height; // last time scroll Y height
     }
 
-    public static class ReadSavesV1 { // deprecated
+    /** Paged reader position: a line and word index within a chapter, keyed by {@code aid}. */
+    public static class ReadSavesV1 {
         public int aid;
         public int vid;
         public int cid;
@@ -113,6 +121,7 @@ public class GlobalConfig {
         // FIXME
         Wenku8API.CurrentLang = currentLang;
         setToAllSetting(SettingItems.language, currentLang.toString());
+        CrashReporter.setKey(CrashReporter.Keys.LANGUAGE, currentLang.toString());
     }
 
     public static Wenku8API.AppLanguage getCurrentLang() {
@@ -167,12 +176,12 @@ public class GlobalConfig {
                 sb.append(line).append("\n");
             }
         } catch (IOException e) {
-            e.printStackTrace();
+            CrashReporter.recordException("GlobalConfig.getOpensourceLicense", e);
         } finally {
             try {
                 is.close();
             } catch (IOException e) {
-                e.printStackTrace();
+                CrashReporter.recordException("GlobalConfig.getOpensourceLicense", e);
             }
         }
         return sb.toString();
@@ -185,22 +194,16 @@ public class GlobalConfig {
      * @param available true-合法可以使用; false-不能使用，只能只用第二路径
      */
     public static void setExternalStoragePathAvailable(boolean available) {
-        externalStoragePathAvailable = available;
+        StorageRoots.setExternalAvailable(available);
     }
 
     public static String getDefaultStoragePath() {
-        // The lookupInternalStorageOnly flag has the highest priority.
-        if (lookupInternalStorageOnly || !externalStoragePathAvailable) {
-            return SaveFileMigration.getInternalSavePath();
-        }
-        return SaveFileMigration.getExternalStoragePath();
+        return StorageRoots.primary();
     }
 
     // TODO: get rid of this shortcut.
     public static String getBackupStoragePath() {
-        String internalPath = SaveFileMigration.getInternalSavePath();
-        return getDefaultStoragePath().equals(internalPath) ?
-                SaveFileMigration.getExternalStoragePath() : internalPath;
+        return StorageRoots.backup();
     }
 
     public static boolean doCacheImage() {
@@ -276,7 +279,7 @@ public class GlobalConfig {
     }
 
     @NonNull
-    private static String loadFullSaveFileContent(@NonNull String FileName) {
+    static String loadFullSaveFileContent(@NonNull String FileName) {
         // get full file in file save path
         String h = "";
         if (LightCache.testFileExist(getDefaultStoragePath() + saveFolderName + File.separator + FileName)) {
@@ -285,7 +288,7 @@ public class GlobalConfig {
                 if(b == null) return "";
                 h = new String(b, "UTF-8");
             } catch (UnsupportedEncodingException e) {
-                e.printStackTrace();
+                CrashReporter.recordException("GlobalConfig.loadFullSaveFileContent", e);
             }
 
         } else if (LightCache.testFileExist(getBackupStoragePath() + saveFolderName + File.separator + FileName)) {
@@ -294,14 +297,14 @@ public class GlobalConfig {
                 if(b == null) return "";
                 h = new String(b, "UTF-8");
             } catch (UnsupportedEncodingException e) {
-                e.printStackTrace();
+                CrashReporter.recordException("GlobalConfig.loadFullSaveFileContent", e);
             }
 
         }
         return h;
     }
 
-    private static boolean writeFullSaveFileContent(String FileName, @NonNull String s) {
+    static boolean writeFullSaveFileContent(String FileName, @NonNull String s) {
         // process path and filename
         String path = "", fileName = FileName;
         if (FileName.contains(File.separator)) {
@@ -329,6 +332,43 @@ public class GlobalConfig {
                 + fileName, s);
     }
 
+    /** Name of the cached chapter index for a novel, relative to the "intro" save subfolder. */
+    @NonNull
+    public static String getVolumeIndexFileName(int aid) {
+        return aid + "-volume.xml";
+    }
+
+    /**
+     * Caches the chapter index of a novel so a reader started later can rebuild it from
+     * {@code aid} and {@code vid} alone.
+     *
+     * <p>The readers take the volume as ids rather than as a serialized object, which is what
+     * keeps a long series from overflowing the Binder transaction buffer and what lets a reader
+     * restore itself after process death. Both depend on this file being present, so it is
+     * written whenever a novel index arrives from the network, not only when the novel is
+     * added to the bookshelf or downloaded.
+     */
+    public static boolean cacheVolumeIndex(int aid, @NonNull String volumeXml) {
+        return writeFullFileIntoSaveFolder("intro", getVolumeIndexFileName(aid), volumeXml);
+    }
+
+    /**
+     * Loads one volume of a novel out of the index cached by {@link #cacheVolumeIndex}, or null
+     * when the index is missing, unparseable, or holds no volume with that {@code vid}.
+     *
+     * <p>Null is an ordinary outcome here rather than an error: the cache is deleted when a
+     * novel leaves the bookshelf, so a reader restored by the system long after the fact can
+     * legitimately find nothing to read.
+     */
+    @Nullable
+    public static VolumeList loadCachedVolume(int aid, int vid) {
+        String xml = loadFullFileFromSaveFolder("intro", getVolumeIndexFileName(aid));
+        if (xml.isEmpty()) {
+            return null;
+        }
+        return Wenku8Parser.findVolumeByVid(Wenku8Parser.getVolumeList(xml), vid);
+    }
+
     /** Book shelf */
     public static void loadLocalBookShelf() {
         // Format:
@@ -341,7 +381,23 @@ public class GlobalConfig {
         for (String t : p) {
             if (t.isEmpty())
                 continue;
-            bookshelf.add(Integer.valueOf(t));
+
+            // A token that does not parse is dropped rather than thrown on. This method is
+            // reached lazily from getLocalBookshelfList and testInLocalBookshelf, with no catch
+            // anywhere above it, and the bookshelf tab is the first screen -- so throwing here
+            // meant a file damaged by a partial write took out the app on launch, with nothing
+            // the user could do but clear app data. This file is rewritten on every add and
+            // remove, so that is a reachable state rather than a hypothetical one.
+            //
+            // Dropping the entry rather than rejecting the file is deliberate: rejecting it
+            // would silently empty the bookshelf, which is a worse outcome than losing the one
+            // novel whose id was corrupted. Reported so the real frequency is visible, since
+            // until now this failed as a crash and afterwards it would fail silently.
+            try {
+                bookshelf.add(Integer.valueOf(t));
+            } catch (NumberFormatException e) {
+                CrashReporter.recordException("GlobalConfig.loadLocalBookShelf", e);
+            }
         }
     }
 
@@ -397,6 +453,13 @@ public class GlobalConfig {
     }
 
     public static void moveBookToTheTopOfBookshelf(int aid) {
+        // Every sibling loads lazily before touching the static; this one did not, so it was an
+        // NPE waiting for a caller that reached it first. Latent rather than live, but the
+        // cheapest possible fix for root cause 2 in miniature.
+        if (bookshelf == null) {
+            loadLocalBookShelf();
+        }
+
         int i = bookshelf.indexOf(aid);
         if (i == -1) {
             return;
@@ -408,28 +471,8 @@ public class GlobalConfig {
         writeLocalBookShelf();
     }
 
-    public static boolean testInBookshelf() {
-        return isInBookshelf;
-    }
-
-    public static void EnterBookshelf() {
-        isInBookshelf = true;
-    }
-
-    public static void LeaveBookshelf() {
-        isInBookshelf = false;
-    }
-    public static boolean testInLatest() {
-        return isInLatest;
-    }
-
-    public static void EnterLatest() {
-        isInLatest = true;
-    }
-
-    public static void LeaveLatest() {
-        isInLatest = false;
-    }
+    // Which list screen is on show moved to ScreenState -- it described what was on screen rather
+    // than anything configured, and sat here only because this class was where globals collected.
 
 
     /** search history */
@@ -519,17 +562,9 @@ public class GlobalConfig {
         writeSearchHistory(); // save history file
     }
 
-    @Deprecated
-    public static void onSearchClicked(int index) {
-        if (index >= searchHistory.size())
-            return;
-
-        String temp = searchHistory.get(index);
-        searchHistory.remove(index);
-        searchHistory.add(0, temp);
-
-        writeSearchHistory(); // save history file
-    }
+    // onSearchClicked was removed here: @Deprecated, no callers anywhere, and it reached straight
+    // for searchHistory.size() where every sibling guards the lazily-loaded static with a null
+    // check first -- the same defect that was fixed in moveBookToTheTopOfBookshelf.
 
     public static void clearSearchHistory() {
         searchHistory = new ArrayList<>();
@@ -558,11 +593,36 @@ public class GlobalConfig {
 
         // split string h
         String[] p = h.split("\\|\\|"); // regular expression
+        OutLoop:
         for (String temp : p) {
             Log.v("MewX", temp);
             String[] parts = temp.split(",,");
             if (parts.length != 3)
                 continue;
+
+            // A record with an unparseable field is dropped rather than thrown on. This is item 9
+            // in a second location, and this loader is the one that still had it: loadReadSavesV1
+            // below does the identical job and validates every field before parsing, while this
+            // one validated only the field count and then parsed regardless.
+            //
+            // It was reachable and it was fatal. getReadSavesRecord is called from
+            // VerticalReaderActivity's scroll-restore runnable and from an unguarded
+            // onPostExecute, and addReadSavesRecord from onPause -- none of which catch. So a
+            // record damaged by a partial write crashed that reader when opening a chapter and
+            // again when leaving one, every time, and nothing in the app lets a user delete the
+            // file to escape it.
+            //
+            // Dropping the record rather than rejecting the file is the same trade item 9 settled
+            // for the bookshelf: one chapter loses its position instead of every chapter losing
+            // it. Reported so the real frequency is visible, since this used to fail as a crash
+            // and would otherwise now fail silently.
+            for (String str : parts) {
+                if (!LightTool.isInteger(str)) {
+                    CrashReporter.recordException("GlobalConfig.loadReadSaves",
+                            new NumberFormatException("dropped unparseable record: " + temp));
+                    continue OutLoop;
+                }
+            }
 
             ReadSaves rs = new ReadSaves();
             rs.cid = Integer.valueOf(parts[0]);
@@ -734,55 +794,22 @@ public class GlobalConfig {
         return null;
     }
 
-    /** All settings */
+    /** All settings. The work lives in {@link SettingsStore}; these stay so callers need not move. */
     public static void loadAllSetting() {
-        // Verify which storage source to user.
-        lookupInternalStorageOnly = SaveFileMigration.migrationCompleted();
-
-        // Loads all settings.
-        allSetting = new ContentValues();
-        String h = loadFullSaveFileContent(saveSetting);
-
-        String[] sets = h.split("\\|\\|\\|\\|");
-        for(String set : sets) {
-            String[] temp = set.split("::::");
-            if(temp.length != 2 || temp[0] == null || temp[0].isEmpty() || temp[1] == null || temp[1].isEmpty()) continue;
-
-            allSetting.put(temp[0], temp[1]);
-        }
-
-        // Updates settings version.
-        String version = getFromAllSetting(SettingItems.version);
-        if(version == null || version.isEmpty()) {
-            setToAllSetting(SettingItems.version, "1");
-        }
-        // Else, reserved for future settings migration.
+        SettingsStore.load(currentLang.toString());
     }
 
     public static void saveAllSetting() {
-        if(allSetting == null) loadAllSetting();
-
-        StringBuilder result = new StringBuilder();
-        for( String key : allSetting.keySet() ) {
-            if(!result.toString().isEmpty()) result.append("||||");
-            result.append(key).append("::::").append(allSetting.getAsString(key));
-        }
-        writeFullSaveFileContent(saveSetting, result.toString());
+        SettingsStore.save();
     }
 
     @Nullable
     public static String getFromAllSetting(SettingItems name) {
-        if(allSetting == null) loadAllSetting();
-        return allSetting.getAsString(name.toString());
+        return SettingsStore.get(name);
     }
 
     public static void setToAllSetting(SettingItems name, String value) {
-        if(allSetting == null) loadAllSetting();
-        if(name != null && value != null) {
-            allSetting.remove(name.toString());
-            allSetting.put(name.toString(), value);
-            saveAllSetting();
-        }
+        SettingsStore.set(name, value);
     }
 
 
@@ -863,36 +890,12 @@ public class GlobalConfig {
         writeFullSaveFileContent(saveNoticeString, noticeStr);
     }
 
+    /** The stored account. The work lives in {@link AccountStore}; these stay for callers. */
     public static boolean loadUserInfoSet() {
-        byte[] bytes;
-        if(LightCache.testFileExist(getFirstFullUserAccountSaveFilePath())) {
-            bytes = LightCache.loadFile(getFirstFullUserAccountSaveFilePath());
-        }
-        else if(LightCache.testFileExist(getSecondFullUserAccountSaveFilePath())) {
-            bytes = LightCache.loadFile(getSecondFullUserAccountSaveFilePath());
-        }
-        else {
-            return false; // file read failed
-        }
-
-        try {
-            Log.d("MewX", new String(bytes, "UTF-8"));
-            // TODO: decouple
-            LightUserSession.decAndSetUserFile(new String(bytes, "UTF-8"));
-        } catch (Exception e) {
-            e.printStackTrace();
-            return false; // exception
-        }
-
-        return true;
+        return AccountStore.load();
     }
 
     public static boolean saveUserInfoSet() {
-        LightCache.saveFile(getFirstFullUserAccountSaveFilePath(), LightUserSession.encUserFile().getBytes(), true);
-        if (!LightCache.testFileExist(getFirstFullUserAccountSaveFilePath())) {
-            LightCache.saveFile(getSecondFullUserAccountSaveFilePath(), LightUserSession.encUserFile().getBytes(), true);
-            return LightCache.testFileExist(getSecondFullUserAccountSaveFilePath());
-        }
-        return true;
+        return AccountStore.save();
     }
 }

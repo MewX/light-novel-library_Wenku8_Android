@@ -9,6 +9,7 @@ import org.xmlpull.v1.XmlPullParser;
 import org.xmlpull.v1.XmlPullParserFactory;
 
 import java.io.StringReader;
+import org.mewx.wenku8.util.CrashReporter;
 
 /**
  * Created by MewX on 2015/1/20.
@@ -97,7 +98,7 @@ public class NovelItemInfoUpdate {
             }
             return niiu;
         } catch (Exception e) {
-            e.printStackTrace();
+            CrashReporter.recordException("NovelItemInfoUpdate.parse", e);
             return null;
         }
     }
@@ -107,8 +108,50 @@ public class NovelItemInfoUpdate {
         this.title = Integer.toString(aid);
     }
 
-    public boolean isInitialized() {
-        return title.equals(Integer.toString(aid));
+    /**
+     * True while this carries no real data yet -- the constructor above puts the aid in the title
+     * as a stand-in, so that is what "not loaded" looks like.
+     *
+     * <p>This was called {@code isInitialized()}, which read as the exact opposite of what it
+     * returns. The adapter's load gate was written against the old name and happened to be correct
+     * anyway, but the name is why the gate survived c347711 unexamined.
+     */
+    public boolean isPlaceholder() {
+        return title == null || title.equals(Integer.toString(aid));
+    }
+
+    /** A field that a list row would render as the literal text "Loading...". */
+    public static boolean isMissing(@Nullable String value) {
+        return value == null || LOADING_STRING.equals(value);
+    }
+
+    /**
+     * How many of the five fields a list row shows are actually populated.
+     *
+     * <p>Used to compare two records for the same novel, which is needed because they no longer
+     * all come from the same place, and the three sources do not agree on completeness:
+     * {@code novellist} fills a whole page at once, {@code book&do=bookinfo} fills one novel but
+     * carries no Tags, and {@link #convertFromMeta} builds a bookshelf row from the saved intro
+     * file and never sets {@link #intro_short} at all. The sparser record must never displace the
+     * fuller one.
+     *
+     * <p>A note on {@code novellist}, since an earlier version of this comment claimed otherwise:
+     * a survey of roughly 150 novels across six sorts, both languages and pages 1 to 418 found it
+     * returning all five fields every time. Its rows are treated as potentially sparse because the
+     * parser leaves the sentinel in place for anything absent, not because omissions were observed.
+     *
+     * <p>{@link #latest_chapter} is deliberately excluded. Neither list endpoint returns it -- it
+     * comes from the saved volume index, so only the bookshelf ever has it -- and counting it would
+     * mark every ranking row incomplete forever.
+     */
+    public int populatedFieldCount() {
+        int count = 0;
+        if (!isPlaceholder()) count++;
+        if (!isMissing(author)) count++;
+        if (!isMissing(status)) count++;
+        if (!isMissing(update)) count++;
+        if (!isMissing(intro_short)) count++;
+        return count;
     }
 
     @Nullable
@@ -116,8 +159,24 @@ public class NovelItemInfoUpdate {
         return mCache.get(aid);
     }
 
+    /**
+     * Caches {@code item} unless the cache already holds a more complete record for that novel.
+     *
+     * <p>This used to be first-write-wins, which stopped being safe once
+     * {@link NovelListWithInfoParser} started caching every row of every page it parses. Twelve
+     * ranking tabs, the latest list, search and the bookshelf all write here, from sources of
+     * differing completeness, so whichever screen reached a novel first owned its entry for the
+     * rest of the process -- and every other list then rendered that copy, because
+     * {@code NovelItemAdapterUpdate} preferred the cache over the page it had just parsed itself.
+     *
+     * <p>Which of those writers produced the records that showed "Loading..." in practice was never
+     * pinned down; the reproduction predates the fix and the fix removed it. So this is a
+     * correctness rule rather than a post-mortem: the cache must not lose information it already
+     * holds, whatever put it there.
+     */
     public static void putToCache(@NonNull NovelItemInfoUpdate item) {
-        if (getFromCache(item.aid) == null) {
+        final NovelItemInfoUpdate existing = getFromCache(item.aid);
+        if (existing == null || item.populatedFieldCount() > existing.populatedFieldCount()) {
             mCache.put(item.aid, item);
         }
     }

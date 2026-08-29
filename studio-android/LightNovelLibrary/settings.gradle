@@ -5,9 +5,26 @@ include ':api'
 // Check if the private submodule is populated (Author Mode).
 // We check for 'build.gradle' because an uninitialized submodule is just an empty folder.
 def privateModuleDir = file('api')
-def isPrivateAvailable = new File(privateModuleDir, 'build.gradle').exists()
+
+// Build against the stub even when the submodule is populated:
+//   ./gradlew -DforceApiStub ...      or      WENKU8_FORCE_API_STUB=1 ./gradlew ...
+//
+// CI has no access to the private submodule, so it always builds against api-stub, while anyone
+// with the submodule always builds against the real implementation. That asymmetry hides a whole
+// class of breakage: code that compiles and runs fine locally can still crash on CI the moment it
+// touches a stubbed method. It is worth being able to reproduce CI's configuration on demand
+// rather than inferring it from a red build.
+//
+// A system property and an env var rather than -P, because settings.gradle is evaluated before
+// project properties exist in every Gradle version this project has to build under.
+def forceStub = System.getProperty('forceApiStub') != null ||
+        System.getenv('WENKU8_FORCE_API_STUB') == '1'
+def isPrivateAvailable = !forceStub && new File(privateModuleDir, 'build.gradle').exists()
 if (isPrivateAvailable) {
     println "GRADLE: Private API Core detected. Using Real Implementation."
+} else if (forceStub) {
+    println "GRADLE: Public Stub forced. Using api-stub (this is what CI builds)."
+    project(':api').projectDir = new File('api-stub')
 } else {
     println "GRADLE: Private API Core missing. Falling back to Public Stub."
     // Point the module to the stub folder.

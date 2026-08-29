@@ -50,6 +50,12 @@
             android:screenOrientation="unspecified">
         </activity>
 
+        <!-- Bookshelf Search Activity -->
+        <activity android:name="org.mewx.wenku8.activity.BookshelfSearchActivity"
+            android:label="@string/bookshelf_search_hint"
+            android:screenOrientation="unspecified">
+        </activity>
+
         <!-- Search Result Activity -->
         <activity android:name="org.mewx.wenku8.activity.SearchResultActivity"
             android:label="@string/action_search"

@@ -1,17 +1,22 @@
 package org.mewx.wenku8.global.api;
 
-import androidx.test.filters.SmallTest;
-
 import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.robolectric.RobolectricTestRunner;
+import org.robolectric.annotation.Config;
 
 import java.util.Arrays;
 import java.util.Calendar;
+import java.util.Collections;
 import java.util.GregorianCalendar;
 import java.util.List;
 
 import static org.junit.Assert.*;
 
-@SmallTest
+// Robolectric is required: these parsers use XmlPullParser, which is a no-op stub under the
+// plain JVM test runtime and makes every parse silently return null.
+@RunWith(RobolectricTestRunner.class)
+@Config(manifest = Config.NONE)
 public class Wenku8ParserTest {
     private final String REVIEW_LIST_XML = "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n" +
             "<metadata>\n" +
@@ -43,33 +48,6 @@ public class Wenku8ParserTest {
             "</item>\n" +
             "\n" +
             "</metadata>";
-
-    @Test
-    public void testParseNovelItemList() {
-        final String XML = "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n" +
-                "<result>\n" +
-                "<page num='166'/>\n" +
-                "<item aid='1143'/>\n" +
-                "<item aid='1034'/>\n" +
-                "<item aid='1213'/>\n" +
-                "<item aid='1'/>\n" +
-                "<item aid='1011'/>\n" +
-                "<item aid='1192'/>\n" +
-                "<item aid='433'/>\n" +
-                "<item aid='47'/>\n" +
-                "<item aid='7'/>\n" +
-                "<item aid='374'/>\n" +
-                "</result>";
-
-        List<Integer> list = Wenku8Parser.parseNovelItemList(XML);
-        assertEquals(Arrays.asList(166, 1143, 1034, 1213, 1, 1011, 1192, 433, 47, 7, 374), list);
-    }
-
-    @Test
-    public void testParseNovelItemListInvalid() {
-        List<Integer> list = Wenku8Parser.parseNovelItemList("1234");
-        assertTrue(list.isEmpty());
-    }
 
     @Test
     public void testParseNovelFullMeta() {
@@ -109,6 +87,39 @@ public class Wenku8ParserTest {
     public void testParseNovelFullMetaInvalid() {
         NovelItemMeta meta = Wenku8Parser.parseNovelFullMeta("1234");
         assertNull(meta);
+    }
+
+    @Test
+    public void testParseNovelFullMetaRejectsAWellFormedNonResponse() {
+        // This used to return a NovelItemMeta rather than null, because null only ever came
+        // from XmlPullParser.next() throwing. NovelItemMeta's constructor pre-fills every
+        // field, so the caller got a novel titled "1" by an unknown author instead of an
+        // error -- and NovelInfoActivity's "meta == null" check never fired.
+        assertNull(Wenku8Parser.parseNovelFullMeta(
+                "<html><head><title>503 Service Unavailable</title></head>"
+                        + "<body><p>Under maintenance.</p></body></html>"));
+    }
+
+    @Test
+    public void testParseNovelFullMetaRejectsMetadataWithoutATitle() {
+        assertNull(Wenku8Parser.parseNovelFullMeta("<?xml version=\"1.0\" encoding=\"utf-8\"?>\n" +
+                "<metadata>\n" +
+                "<data name=\"Author\" value=\"小木君人\"/>\n" +
+                "<data name=\"BookStatus\" value=\"已完成\"/>\n" +
+                "</metadata>"));
+    }
+
+    @Test
+    public void testParseNovelFullMetaAcceptsATitleAlone() {
+        // Only the Title is required; the rest keep their constructor defaults.
+        NovelItemMeta meta = Wenku8Parser.parseNovelFullMeta(
+                "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n" +
+                "<metadata>\n" +
+                "<data name=\"Title\" aid=\"1306\"><![CDATA[向森之魔物献上花束]]></data>\n" +
+                "</metadata>");
+        assertNotNull(meta);
+        assertEquals(1306, meta.aid);
+        assertEquals("向森之魔物献上花束", meta.title);
     }
 
     @Test
@@ -196,6 +207,52 @@ public class Wenku8ParserTest {
     public void testGetVolumeListInvalid() {
         List<VolumeList> volumeLists = Wenku8Parser.getVolumeList("1234");
         assertTrue(volumeLists.isEmpty());
+    }
+
+    /**
+     * The lookup a reader performs on startup, now that it is given a vid rather than a volume.
+     */
+    @Test
+    public void testFindVolumeByVid() {
+        VolumeList first = new VolumeList();
+        first.vid = 41748;
+        VolumeList second = new VolumeList();
+        second.vid = 41749;
+
+        assertSame(second, Wenku8Parser.findVolumeByVid(Arrays.asList(first, second), 41749));
+    }
+
+    /**
+     * A vid that is not in the list is an ordinary outcome, not an error.
+     *
+     * <p>It is what a reader sees when the cached index is for a different novel, or when the
+     * novel's chapter list changed under it, and it is why the reader treats null as "show the
+     * failure toast and finish" rather than as something to assert against.
+     */
+    @Test
+    public void testFindVolumeByVidNotPresent() {
+        VolumeList only = new VolumeList();
+        only.vid = 41748;
+
+        assertNull(Wenku8Parser.findVolumeByVid(Collections.singletonList(only), 999));
+        assertNull(Wenku8Parser.findVolumeByVid(Collections.emptyList(), 41748));
+    }
+
+    /**
+     * Null entries are skipped rather than dereferenced.
+     *
+     * <p>{@link Wenku8Parser#getVolumeList} appends on the closing tag, so a stray closing tag
+     * with no opening one leaves a null in the list it returns. Looking a vid up in that list
+     * must not be the thing that turns a malformed index into a crash.
+     */
+    @Test
+    public void testFindVolumeByVidSkipsNullEntries() {
+        VolumeList present = new VolumeList();
+        present.vid = 41748;
+
+        assertSame(present,
+                Wenku8Parser.findVolumeByVid(Arrays.asList(null, present, null), 41748));
+        assertNull(Wenku8Parser.findVolumeByVid(Arrays.asList(null, present), 999));
     }
 
     @Test

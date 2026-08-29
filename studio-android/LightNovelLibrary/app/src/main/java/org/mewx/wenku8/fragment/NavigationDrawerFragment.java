@@ -41,6 +41,7 @@ import org.mewx.wenku8.global.GlobalConfig;
 import org.mewx.wenku8.util.LightCache;
 import org.mewx.wenku8.util.LightTool;
 import org.mewx.wenku8.network.LightUserSession;
+import org.mewx.wenku8.util.CrashReporter;
 
 public class NavigationDrawerFragment extends Fragment {
 
@@ -128,7 +129,7 @@ public class NavigationDrawerFragment extends Fragment {
 
         } catch (NullPointerException e) {
             Toast.makeText(getContext(), "NullPointerException in onViewCreated();", Toast.LENGTH_SHORT).show();
-            e.printStackTrace();
+            CrashReporter.recordException("NavigationDrawerFragment.onViewCreated", e);
         }
 
         // User Account
@@ -396,7 +397,7 @@ public class NavigationDrawerFragment extends Fragment {
                             bmMenuBackground = BitmapFactory.decodeFile(GlobalConfig.getFromAllSetting(GlobalConfig.SettingItems.menu_bg_path), options);
                             if(bmMenuBackground == null) throw new Exception("PictureLoadFailureException");
                         } catch(Exception e) {
-                            e.printStackTrace();
+                            CrashReporter.recordException("NavigationDrawerFragment.updateMenuBackground", e);
                             Toast.makeText(getActivity(), "Exception: " + e + "\n可能的原因有：图片不在内置SD卡；图片格式不正确；图片像素尺寸太大，请使用小一点的图，谢谢，此功能为试验性功能；", Toast.LENGTH_SHORT).show();
                             bgImage.setImageDrawable(getResources().getDrawable(R.drawable.bg_avatar_04));
                             return;

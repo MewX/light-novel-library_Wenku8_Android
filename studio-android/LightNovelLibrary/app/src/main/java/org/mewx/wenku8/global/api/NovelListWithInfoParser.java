@@ -1,100 +1,142 @@
 package org.mewx.wenku8.global.api;
 
-import android.util.Log;
-
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 
+import org.mewx.wenku8.util.CrashReporter;
 import org.xmlpull.v1.XmlPullParser;
+import org.xmlpull.v1.XmlPullParserException;
 import org.xmlpull.v1.XmlPullParserFactory;
 
+import java.io.IOException;
 import java.io.StringReader;
 import java.util.ArrayList;
 import java.util.List;
 
-/** Novel List With Info for improve loading speed.
+/** Parses the "novellist" API: one page of novels, each carrying enough detail to fill a list
+ * row, so the list does not need a follow-up request per novel.
  * Created by MewX on 2015/10/20.
  */
 public class NovelListWithInfoParser {
-    static public class NovelListWithInfo {
-        public int aid = 0;
-        public String name = "";
-        public int hit = 0;
-        public int push = 0;
-        public int fav = 0;
+    public static class Result {
+        public int pageNum;
+        public List<NovelItemInfoUpdate> items;
+
+        public Result() {
+            this.pageNum = 0;
+            this.items = new ArrayList<>();
+        }
     }
 
     /**
-     * get current 'page' attributes
-     * @param xml input xml
-     * @return the page in the xml file or 0 by default
+     * @param xml the raw response body
+     * @return the parsed page, or null if the response was empty or not XML at all
      */
-    static public int getNovelListWithInfoPageNum(String xml) {
+    @Nullable
+    public static Result parse(@Nullable String xml) {
+        if (xml == null || xml.isEmpty()) {
+            return null;
+        }
+
         try {
             XmlPullParserFactory factory = XmlPullParserFactory.newInstance();
-            XmlPullParser xmlPullParser = factory.newPullParser();
-            xmlPullParser.setInput(new StringReader(xml));
-            int eventType = xmlPullParser.getEventType();
+            XmlPullParser parser = factory.newPullParser();
+            parser.setInput(new StringReader(xml));
 
+            Result result = new Result();
+            NovelItemInfoUpdate current = null;
+
+            int eventType = parser.getEventType();
             while (eventType != XmlPullParser.END_DOCUMENT) {
-                switch (eventType) {
-                    case XmlPullParser.START_DOCUMENT:
-                        break;
-
-                    case XmlPullParser.START_TAG:
-                        if ("page".equals(xmlPullParser.getName())) {
-                            return Integer.valueOf(xmlPullParser.getAttributeValue(0));
-                        }
-                        break;
+                if (eventType == XmlPullParser.START_TAG) {
+                    if ("page".equals(parser.getName())) {
+                        result.pageNum = parseIntOrZero(parser.getAttributeValue(null, "num"));
+                    } else if ("item".equals(parser.getName())) {
+                        current = new NovelItemInfoUpdate(
+                                parseIntOrZero(parser.getAttributeValue(null, "aid")));
+                    } else if ("data".equals(parser.getName()) && current != null) {
+                        readData(parser, current);
+                    }
+                } else if (eventType == XmlPullParser.END_TAG
+                        && "item".equals(parser.getName()) && current != null) {
+                    // Cache the result so other components can reuse it
+                    NovelItemInfoUpdate.putToCache(current);
+                    result.items.add(current);
+                    current = null;
                 }
-                eventType = xmlPullParser.next();
+                eventType = parser.next();
             }
+            return result;
         } catch (Exception e) {
-            e.printStackTrace();
+            CrashReporter.recordException("NovelListWithInfoParser.parse", e);
+            return null;
         }
-        return 0; // default
     }
 
-    @NonNull
-    static public List<NovelListWithInfo> getNovelListWithInfo(String xml) {
-        List<NovelListWithInfo> l = new ArrayList<>();
-        try {
-            XmlPullParserFactory factory = XmlPullParserFactory.newInstance();
-            XmlPullParser xmlPullParser = factory.newPullParser();
-            NovelListWithInfo n = new NovelListWithInfo();
-            xmlPullParser.setInput(new StringReader(xml));
-            int eventType = xmlPullParser.getEventType();
-
-            while (eventType != XmlPullParser.END_DOCUMENT) {
-                switch (eventType) {
-                    case XmlPullParser.START_TAG:
-                        if ("item".equals(xmlPullParser.getName())) {
-                            n = new NovelListWithInfo();
-                            n.aid = Integer.valueOf(xmlPullParser.getAttributeValue(0));
-                        } else if ("data".equals(xmlPullParser.getName())) {
-                            if ("Title".equals(xmlPullParser.getAttributeValue(0))) {
-                                n.name = xmlPullParser.nextText();
-                            } else if ("TotalHitsCount".equals(xmlPullParser.getAttributeValue(0))) {
-                                n.hit = Integer.valueOf(xmlPullParser.getAttributeValue(1));
-                            } else if ("PushCount".equals(xmlPullParser.getAttributeValue(0))) {
-                                n.push = Integer.valueOf(xmlPullParser.getAttributeValue(1));
-                            } else if ("FavCount".equals(xmlPullParser.getAttributeValue(0))) {
-                                n.fav = Integer.valueOf(xmlPullParser.getAttributeValue(1));
-                            }
-                        }
-                        break;
-
-                    case XmlPullParser.END_TAG:
-                        if ("item".equals(xmlPullParser.getName())) {
-                            Log.d("MewX-XML", n.aid + ";" + n.name + ";" + n.hit + ";" + n.push + ";" + n.fav);
-                            l.add(n);
-                        }
-                        break;
-                }
-                eventType = xmlPullParser.next();
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
+    private static void readData(@NonNull XmlPullParser parser, @NonNull NovelItemInfoUpdate info)
+            throws XmlPullParserException, IOException {
+        String name = parser.getAttributeValue(null, "name");
+        if (name == null) {
+            return;
         }
-        return l;
+
+        switch (name) {
+            case "Title":
+                info.title = readValue(parser);
+                break;
+            case "Author":
+                info.author = readValue(parser);
+                break;
+            case "BookStatus":
+                info.status = readValue(parser);
+                break;
+            case "LastUpdate":
+                info.update = readValue(parser);
+                break;
+            case "Tags":
+                info.tags = readValue(parser);
+                break;
+            case "IntroPreview":
+                info.intro_short = normalizeIntro(readValue(parser));
+                break;
+            default:
+                // TotalHitsCount, PushCount and FavCount also arrive here; no list row shows them.
+                break;
+        }
+    }
+
+    /**
+     * The server is not consistent about how it carries a field: most arrive as a value attribute
+     * (&lt;data name="Author" value="..."/&gt;), while Title and IntroPreview currently arrive as
+     * CDATA (&lt;data name="Title"&gt;&lt;![CDATA[...]]&gt;&lt;/data&gt;) -- and IntroPreview has
+     * been served both ways. Take the attribute where there is one and fall back to the element's
+     * text, so either shape parses.
+     */
+    @NonNull
+    private static String readValue(@NonNull XmlPullParser parser)
+            throws XmlPullParserException, IOException {
+        String value = parser.getAttributeValue(null, "value");
+        return value != null ? value : parser.nextText();
+    }
+
+    /**
+     * Previews come padded with ideographic spaces and, for some novels, hard line breaks. The row
+     * showing this is a single ellipsized line, so flatten every run of whitespace down to one
+     * plain space -- U+3000 spelled out, since Java's \s covers ASCII whitespace only.
+     */
+    @NonNull
+    private static String normalizeIntro(@NonNull String intro) {
+        return intro.replaceAll("[\\s　]+", " ").trim();
+    }
+
+    private static int parseIntOrZero(@Nullable String value) {
+        if (value == null) {
+            return 0;
+        }
+        try {
+            return Integer.parseInt(value.trim());
+        } catch (NumberFormatException e) {
+            return 0;
+        }
     }
 }

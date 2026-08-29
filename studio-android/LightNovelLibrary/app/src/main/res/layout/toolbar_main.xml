@@ -1,9 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  The dark ActionBar overlay is what tints the toolbar's own icons white against the primary
+  colour: the overflow button and the navigation icon are drawn from textColorPrimary, not from
+  any drawable we supply, so a menu item set to showAsAction="never" arrives dark without it.
+  popupTheme stays light, or the overflow dropdown becomes white text on a white sheet.
+-->
 <androidx.appcompat.widget.Toolbar
     xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:id="@+id/toolbar_actionbar"
     android:layout_width="match_parent"
     android:layout_height="?android:attr/actionBarSize"
     android:fitsSystemWindows="true"
     android:elevation="@dimen/toolbar_elevation"
-    android:background="@color/myPrimaryColor" />
+    android:background="@color/myPrimaryColor"
+    android:theme="@style/ThemeOverlay.Material3.Dark.ActionBar"
+    app:popupTheme="@style/ThemeOverlay.Material3.Light" />

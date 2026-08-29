@@ -23,6 +23,7 @@ import org.mewx.wenku8.util.LightCache;
 import org.mewx.wenku8.network.LightNetwork;
 import org.mewx.wenku8.util.ProgressDialogHelper;
 import org.mewx.wenku8.network.LightUserSession;
+import org.mewx.wenku8.util.CrashReporter;
 
 import java.io.ByteArrayOutputStream;
 
@@ -95,7 +96,7 @@ public class UserLoginActivity extends BaseMaterialActivity {
             try {
                 Thread.sleep(500);
             } catch (InterruptedException e) {
-                e.printStackTrace();
+                CrashReporter.recordException("UserLoginActivity.doInBackground", e);
             }
 
             we = LightUserSession.doLoginFromGiven(params[0], params[1], GlobalConfig::saveUserInfoSet);
@@ -122,9 +123,14 @@ public class UserLoginActivity extends BaseMaterialActivity {
         protected void onPostExecute(Wenku8Error.ErrorCode i) {
             super.onPostExecute(i);
 
+            // Dismissed ahead of the guard: ProgressDialogHelper.dismiss() is already safe on
+            // a gone window, and skipping it would leak the dialog rather than crash on it.
             if (md != null) {
                 md.dismiss();
             }
+
+            if (isFinishing() || isDestroyed()) return;
+
             switch(i) {
                 case SYSTEM_1_SUCCEEDED:
                     Toast.makeText(MyApp.getContext(), getResources().getString(R.string.system_logged), Toast.LENGTH_SHORT).show();

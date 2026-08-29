@@ -10,6 +10,7 @@ import android.graphics.drawable.Drawable;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.Handler;
+import android.os.Looper;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.Menu;
@@ -55,6 +56,8 @@ import org.mewx.wenku8.reader.activity.Wenku8ReaderActivityV1;
 import org.mewx.wenku8.util.LightCache;
 import org.mewx.wenku8.network.LightNetwork;
 import org.mewx.wenku8.util.LightTool;
+import org.mewx.wenku8.util.AsyncTaskTracker;
+import org.mewx.wenku8.util.CrashReporter;
 
 import java.io.File;
 import java.io.UnsupportedEncodingException;
@@ -83,6 +86,12 @@ public class NovelInfoActivity extends BaseMaterialActivity {
     private int aid = 1;
     private String from = "", title = "";
     private boolean isLoading = true;
+
+    // Only the read-only info fetches are tracked. The tasks that change something --
+    // downloading volumes, adding to or removing from the cloud bookshelf -- are left to run:
+    // their onPostExecute is already lifecycle-guarded, and cancelling them would abandon work
+    // the user explicitly asked for.
+    private final AsyncTaskTracker tracker = new AsyncTaskTracker();
     private RelativeLayout rlMask = null; // mask layout
     private LinearLayout mLinearLayout = null;
     private DrawerLayout mDrawerLayout;
@@ -142,6 +151,10 @@ public class NovelInfoActivity extends BaseMaterialActivity {
         aid = getIntent().getIntExtra("aid", 1);
         from = getIntent().getStringExtra("from");
         title = getIntent().getStringExtra("title");
+
+        // Crash report context. This screen owns four AsyncTasks that all touch views in
+        // onPostExecute, so knowing which novel was open narrows down a report a lot.
+        CrashReporter.setKey(CrashReporter.Keys.NOVEL_AID, aid);
 
         // Analysis.
         Bundle viewItemParams = new Bundle();
@@ -209,7 +222,7 @@ public class NovelInfoActivity extends BaseMaterialActivity {
         // fetch all info
         getSupportActionBar().setTitle(R.string.action_novel_info);
         spb.setVisibility(View.INVISIBLE); // wait for runnable
-        Handler handler = new Handler();
+        Handler handler = new Handler(Looper.getMainLooper());
         handler.postDelayed(() -> {
             isLoading = false; // Reset to allow initial load
             refreshInfo();
@@ -551,7 +564,7 @@ public class NovelInfoActivity extends BaseMaterialActivity {
                     // jump to reader activity
                     Intent intent = new Intent(NovelInfoActivity.this, Wenku8ReaderActivityV1.class);
                     intent.putExtra("aid", aid);
-                    intent.putExtra("volume", volumeList_bak);
+                    intent.putExtra("vid", volumeList_bak.vid);
                     intent.putExtra("cid", cid);
 
                     // test does file exist
@@ -633,7 +646,7 @@ public class NovelInfoActivity extends BaseMaterialActivity {
                 novelFullIntro = introFuture.get();
                 novelFullVolume = volumeFuture.get();
             } catch (InterruptedException | ExecutionException e) {
-                e.printStackTrace();
+                CrashReporter.recordException("NovelInfoActivity.FetchInfoAsyncTask", e);
                 String msg = e.getMessage();
                 if (msg != null && msg.contains("local")) return -9;
                 return -1;
@@ -653,6 +666,22 @@ public class NovelInfoActivity extends BaseMaterialActivity {
             listVolume = Wenku8Parser.getVolumeList(novelFullVolume);
             if (listVolume.isEmpty()) return -1;
 
+            // The readers are started with aid + vid and rebuild the volume from this file, so
+            // it has to exist for any novel that can reach a reader -- not just the ones added
+            // to the bookshelf or downloaded, which were the only writers before. Written after
+            // the parse rather than straight off the wire so a response that does not parse
+            // cannot overwrite a good cached index with a broken one.
+            //
+            // Recorded when it fails because this is the one case the change makes worse: a
+            // device whose storage cannot be written could previously still read a novel, since
+            // the volume travelled in the Intent, and now cannot open the reader at all. Every
+            // other write in the app fails silently the same way, so without this there would
+            // be no way to tell that story apart from a reader that simply refuses to open.
+            if (!fromLocal && !GlobalConfig.cacheVolumeIndex(aid, novelFullVolume)) {
+                CrashReporter.log("Failed to cache the volume index (aid=" + aid
+                        + ", length=" + novelFullVolume.length() + "); readers cannot open");
+            }
+
             // Check local volume files exists, express in another color
             for (VolumeList vl : listVolume) {
                 for (ChapterInfo ci : vl.chapterList) {
@@ -670,9 +699,17 @@ public class NovelInfoActivity extends BaseMaterialActivity {
 
         @Override
         protected void onPostExecute(Integer integer) {
+            // The loading flag is Activity state rather than view state, so it is reset
+            // regardless -- same ordering as AsyncGetNovelItemList in NovelItemListFragment.
             isLoading = false;
-            spb.setVisibility(View.INVISIBLE);
             super.onPostExecute(integer);
+
+            // Everything below touches views. onPostExecute runs whether or not the Activity
+            // is still alive, and this task is as slow as the network is, so a rotation or a
+            // back press during the fetch used to land here on a destroyed Activity.
+            if (isFinishing() || isDestroyed()) return;
+
+            spb.setVisibility(View.INVISIBLE);
 
             if (integer == -1) {
                 // Network error or parse error
@@ -826,7 +863,7 @@ public class NovelInfoActivity extends BaseMaterialActivity {
                 // jump to reader activity
                 Intent intent = new Intent(NovelInfoActivity.this, Wenku8ReaderActivityV1.class);
                 intent.putExtra("aid", aid);
-                intent.putExtra("volume", volumeList);
+                intent.putExtra("vid", volumeList.vid);
                 intent.putExtra("cid", ci.cid);
 
                 // test does file exist
@@ -864,7 +901,7 @@ public class NovelInfoActivity extends BaseMaterialActivity {
 
                         Intent intent = new Intent(NovelInfoActivity.this, readerClass);
                         intent.putExtra("aid", aid);
-                        intent.putExtra("volume", volumeList);
+                        intent.putExtra("vid", volumeList.vid);
                         intent.putExtra("cid", ci.cid);
 
                         // test does file exist
@@ -937,7 +974,7 @@ public class NovelInfoActivity extends BaseMaterialActivity {
                 GlobalConfig.writeFullFileIntoSaveFolder("intro", taskAid + "-volume.xml", volumeXml);
 
             } catch (UnsupportedEncodingException e) {
-                e.printStackTrace();
+                CrashReporter.recordException("NovelInfoActivity.AsyncUpdateCacheTask", e);
                 return Wenku8Error.ErrorCode.SERVER_RETURN_NOTHING;
             }
             if(operationType == 0) return Wenku8Error.ErrorCode.SYSTEM_1_SUCCEEDED; // update info
@@ -1004,7 +1041,7 @@ public class NovelInfoActivity extends BaseMaterialActivity {
                         publishProgress(++current); // update progress
 
                     } catch (UnsupportedEncodingException e) {
-                        e.printStackTrace();
+                        CrashReporter.recordException("NovelInfoActivity.AsyncUpdateCacheTask.saveChapter", e);
                     }
                 }
             }
@@ -1021,6 +1058,16 @@ public class NovelInfoActivity extends BaseMaterialActivity {
 
         protected void onPostExecute(Wenku8Error.ErrorCode result)
         {
+            // Cleared regardless: a stuck flag outlives the views it guards.
+            isLoading = false;
+            // The dialog is dismissed before the guard, not after: ProgressDialogHelper
+            // .dismiss() is already safe on a gone window, and skipping it would leak the
+            // dialog instead of crashing on it.
+            if (pDialog != null) pDialog.dismiss();
+
+            // The toasts and refreshVolumeListUI() below need a live Activity.
+            if (isFinishing() || isDestroyed()) return;
+
             if (result == Wenku8Error.ErrorCode.USER_CANCELLED_TASK) {
                 // user cancelled
                 Toast.makeText(NovelInfoActivity.this, R.string.system_manually_cancelled, Toast.LENGTH_LONG).show();
@@ -1111,7 +1158,7 @@ public class NovelInfoActivity extends BaseMaterialActivity {
                     }
                 }
             } catch (UnsupportedEncodingException e) {
-                e.printStackTrace();
+                CrashReporter.recordException("NovelInfoActivity.AsyncRemoveBookFromCloud", e);
                 return Wenku8Error.ErrorCode.BYTE_TO_STRING_EXCEPTION;
             }
         }
@@ -1120,7 +1167,11 @@ public class NovelInfoActivity extends BaseMaterialActivity {
         protected void onPostExecute(Wenku8Error.ErrorCode err) {
             super.onPostExecute(err);
 
-            md.dismiss();
+            // Dismissed before the guard; see AsyncUpdateCacheTask above.
+            if (md != null) md.dismiss();
+
+            if (isFinishing() || isDestroyed()) return;
+
             if(err == Wenku8Error.ErrorCode.SYSTEM_1_SUCCEEDED) {
                 Toast.makeText(NovelInfoActivity.this, getResources().getString(R.string.bookshelf_removed), Toast.LENGTH_SHORT).show();
                 if(fabFavorite != null) {
@@ -1211,7 +1262,7 @@ public class NovelInfoActivity extends BaseMaterialActivity {
                         publishProgress(++current); // update progress
 
                     } catch (UnsupportedEncodingException e) {
-                        e.printStackTrace();
+                        CrashReporter.recordException("NovelInfoActivity.AsyncDownloadVolumes", e);
                     }
                 }
             }
@@ -1229,6 +1280,13 @@ public class NovelInfoActivity extends BaseMaterialActivity {
         @Override
         protected void onPostExecute(Wenku8Error.ErrorCode errorCode) {
             super.onPostExecute(errorCode);
+
+            // loading is this task's own field, so it dies with the task -- nothing to reset
+            // here. The dialog is dismissed before the guard; see AsyncUpdateCacheTask above.
+            if (md != null) md.dismiss();
+
+            if (isFinishing() || isDestroyed()) return;
+
             if (errorCode == Wenku8Error.ErrorCode.USER_CANCELLED_TASK) {
                 // user cancelled
                 Toast.makeText(NovelInfoActivity.this, R.string.system_manually_cancelled, Toast.LENGTH_LONG).show();
@@ -1257,6 +1315,15 @@ public class NovelInfoActivity extends BaseMaterialActivity {
             if (md != null) md.dismiss();
             refreshInfoFromLocal();
         }
+    }
+
+    @Override
+    protected void onDestroy() {
+        // Suppresses the callbacks of anything still in flight. The guards inside those
+        // callbacks make a late delivery survivable; this stops it being delivered at all,
+        // and drops the task's implicit reference back to this Activity.
+        tracker.cancelAll();
+        super.onDestroy();
     }
 
     @Override
@@ -1297,22 +1364,34 @@ public class NovelInfoActivity extends BaseMaterialActivity {
             refreshInfoFromCloud();
     }
 
+    /**
+     * Fills the screen from the three documents cached on the device.
+     *
+     * <p>Started on {@link AsyncTask#THREAD_POOL_EXECUTOR}, not through {@code execute()}, which
+     * would use the serial one. That queue is a single one for the whole process, and
+     * {@code MainActivity.onResume} puts two network downloads on it -- the version check and the
+     * notification message. On a slow connection they hold it for their timeouts, and this task,
+     * which only has to read three local files, waited behind them with the progress bar up. The
+     * novel then appeared the moment the network gave up, which looks exactly like the local read
+     * being the slow part.
+     */
     private void refreshInfoFromLocal() {
         if (isLoading) return;
         isLoading = true;
         llError.setVisibility(View.GONE);
         spb.setVisibility(View.VISIBLE);
-        FetchInfoAsyncTask fetchInfoAsyncTask = new FetchInfoAsyncTask();
-        fetchInfoAsyncTask.execute(1); // load from local
+        FetchInfoAsyncTask fetchInfoAsyncTask = tracker.track(new FetchInfoAsyncTask());
+        fetchInfoAsyncTask.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR, 1); // 1 = from local
     }
 
+    /** As {@link #refreshInfoFromLocal()}, and queued behind the same unrelated work without this. */
     private void refreshInfoFromCloud() {
         if (isLoading) return;
         isLoading = true;
         llError.setVisibility(View.GONE);
         spb.setVisibility(View.VISIBLE);
-        FetchInfoAsyncTask fetchInfoAsyncTask = new FetchInfoAsyncTask();
-        fetchInfoAsyncTask.execute();
+        FetchInfoAsyncTask fetchInfoAsyncTask = tracker.track(new FetchInfoAsyncTask());
+        fetchInfoAsyncTask.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR);
     }
 
     private void fetchAndShowNovelCover() {

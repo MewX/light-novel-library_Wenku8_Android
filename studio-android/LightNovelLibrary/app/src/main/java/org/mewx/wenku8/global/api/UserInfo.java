@@ -5,6 +5,7 @@ import androidx.annotation.Nullable;
 import android.util.Log;
 
 import org.mewx.wenku8.api.Wenku8API;
+import org.mewx.wenku8.util.CrashReporter;
 import org.xmlpull.v1.XmlPullParser;
 import org.xmlpull.v1.XmlPullParserFactory;
 
@@ -77,9 +78,21 @@ public class UserInfo {
                 }
                 eventType = xmlPullParser.next();
             }
+
+            // Until now the only way this returned null was XmlPullParser.next() throwing on
+            // malformed input. Well-formed XML that simply is not a user-info response -- an
+            // HTML maintenance page, a captive-portal or proxy interstitial, a CDN error page
+            // -- walked the loop, matched no item, and came back as a blank but non-null
+            // UserInfo. Every caller's != null check passed, so it surfaced as a logged-in
+            // user with an empty name and zero score instead of as a parse error.
+            if (ui.username == null) {
+                CrashReporter.log("parseUserInfo: well-formed XML with no uname item, "
+                        + "length=" + xml.length());
+                return null;
+            }
             return ui;
         } catch (Exception e) {
-            e.printStackTrace();
+            CrashReporter.recordException("UserInfo.parseUserInfo", e);
             return null;
         }
     }

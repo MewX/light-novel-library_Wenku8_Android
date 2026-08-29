@@ -1,24 +1,36 @@
 name: Android CI
 
+# The pull_request trigger is deliberately unfiltered. It used to be limited to PRs based on
+# master, but development lands on the release branch (v1.30) first and only reaches master at
+# release time -- so a PR into v1.30 ran no checks at all and the post-merge push to v1.30 was
+# the first build of the change. That is the wrong order when the app cannot be built without
+# an Android SDK: contributors working without one (or in a sandbox that cannot reach
+# dl.google.com) have no local check either, which leaves nothing between an unbuilt commit and
+# the release branch.
 on:
   push:
     branches: [ "master", "v*" ]
   pull_request:
-    branches: [ "master" ]
 
 defaults:
   run:
     working-directory: ./studio-android/LightNovelLibrary
 
 jobs:
-  build:
-
+  # Split out from the emulator job deliberately. These two run independently so that an
+  # emulator that will not boot costs the 195 instrumented tests rather than all 328: previously
+  # a single step ran assembleAlpha, the JVM tests and the instrumented tests together, so an
+  # emulator failure meant the JVM tests never reported at all.
+  build-and-test:
+    name: Build and JVM unit tests
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v3
+    # Deliberately no `submodules:` -- api/ is private, so CI falls back to api-stub
+    # via the check in settings.gradle.
+    - uses: actions/checkout@v4
     - name: Set up JDK 21
-      uses: actions/setup-java@v3
+      uses: actions/setup-java@v4
       with:
         java-version: '21'
         distribution: 'temurin'
@@ -27,12 +39,195 @@ jobs:
     - name: Grant execute permission for gradlew
       run: chmod +x gradlew
 
-    - name: Set up Android emulator, build, test and coverage reports
+    # jacocoAlphaDebugUnitTestReport depends on testAlphaDebugUnitTest, so the tests still run and
+    # still gate the job -- a failing test stops the report from being produced at all.
+    - name: Build and run JVM unit tests
+      run: ./gradlew assembleAlpha jacocoAlphaDebugUnitTestReport
+
+    - name: Upload unit test report
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: unit-test-results
+        path: studio-android/LightNovelLibrary/app/build/reports/tests/
+        if-no-files-found: ignore
+
+    # Replaces the Travis-driven kt3k coveralls Gradle plugin, which has been commented out in
+    # app/build.gradle for years. Paths here are repo-relative on purpose: the `defaults.run`
+    # working-directory above applies only to `run:` steps, never to `uses:` ones.
+    #
+    # This is half of the coverage picture. The instrumented job below uploads the other half under
+    # its own flag, and the coverage-finish job tells Coveralls to merge them -- see the comments
+    # there. Coverage is NOT combined anywhere in Gradle: each job reports only its own suite and
+    # the union is computed server-side.
+    #
+    # base-path is required, not cosmetic. JaCoCo names files by package, so the XML says
+    # `org/mewx/wenku8/global/GlobalConfig.java`, but in this repo that file lives under
+    # studio-android/LightNovelLibrary/app/src/main/java/. Without this, Coveralls cannot match a
+    # single source file against the git tree and silently reports nothing useful.
+    #
+    # fail-on-error is false deliberately. Coverage reporting is informational, and a Coveralls
+    # outage or an unlinked repository must not turn a green build red -- the release is gated on
+    # tests passing, not on a third party being reachable.
+    # The repo token is read from repository secrets and must never be written into this file --
+    # anything committed here is public. Add it under Settings > Secrets and variables > Actions
+    # as COVERALLS_REPO_TOKEN. On a public repo the action can often authenticate with the built-in
+    # github-token alone, but the repo token is what makes it work regardless of that.
+    - name: Upload JVM coverage to Coveralls
+      uses: coverallsapp/github-action@v2
+      with:
+        file: studio-android/LightNovelLibrary/app/build/reports/jacoco/jacocoAlphaDebugUnitTestReport/jacocoAlphaDebugUnitTestReport.xml
+        format: jacoco
+        base-path: studio-android/LightNovelLibrary/app/src/main/java
+        flag-name: jvm
+        parallel: true
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        repo-token: ${{ secrets.COVERALLS_REPO_TOKEN }}
+        fail-on-error: false
+
+  instrumented-test:
+    name: Instrumented tests (emulator)
+    runs-on: ubuntu-latest
+
+    steps:
+    # Deliberately no `submodules:` -- api/ is private, so CI falls back to api-stub
+    # via the check in settings.gradle.
+    - uses: actions/checkout@v4
+    - name: Set up JDK 21
+      uses: actions/setup-java@v4
+      with:
+        java-version: '21'
+        distribution: 'temurin'
+        cache: gradle
+
+    - name: Grant execute permission for gradlew
+      run: chmod +x gradlew
+
+    # Required on ubuntu-latest, and the likely cause of the earlier failure. Without it the
+    # emulator silently falls back to software emulation, and `pm install` of a debug APK this
+    # size (Firebase + play-services-ads) runs long enough that ddmlib gives up with
+    # ShellCommandUnresponsiveException during installCommit.
+    - name: Enable KVM
+      run: |
+        echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
+          | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+        sudo udevadm control --reload-rules
+        sudo udevadm trigger --name-match=kvm
+
+    # API 33 rather than the app's minSdk of 21. Every Build.VERSION branch in the app targets
+    # Q (29) or TIRAMISU (33) -- there are none for 21-22 -- so an API 21 emulator took the
+    # uninteresting side of every conditional while being by far the slowest and flakiest image
+    # to install onto. Neither remaining instrumented test is API-21-specific.
+    - name: Run instrumented tests
       uses: reactivecircus/android-emulator-runner@v2
       with:
-        api-level: 21
+        api-level: 33
         arch: x86_64
-        profile: Nexus 6
+        target: google_apis
+        profile: pixel_5
         working-directory: ./studio-android/LightNovelLibrary
-        # script: ./gradlew assembleAlpha connectedAlphaDebugAndroidTest jacocoTestReport coveralls
-        script: ./gradlew assembleAlpha testAlphaDebugUnitTest connectedAlphaDebugAndroidTest
+        emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot -camera-back none
+        disable-animations: true
+        # Screen preparation. The emulator boots to a lock screen, and a locked or dozing device
+        # parks activities at STOPPED so ActivityScenario can never reach RESUMED -- every
+        # lifecycle test then fails with "Activity never becomes requested state [RESUMED]" after
+        # a 45-second timeout, which reads like the Activity failing to start rather than like an
+        # unprepared device. `locksettings set-disabled true` works here because a fresh emulator
+        # has no secure lock; on a real device with a PIN it would not, which is why
+        # ReaderRecreationTest asserts both conditions itself rather than assuming anyone ran
+        # this. Waking once is not enough either: the Gradle line below spends minutes assembling
+        # before it installs anything, so the screen is pinned on for the life of the job.
+        #
+        # Worth knowing what this is NOT for. These lines were added while chasing a red build
+        # that turned out to be `UnsupportedOperationException: stub` -- CI builds against
+        # api-stub, and two methods on the Activity startup path threw. Screen state was never
+        # the cause. They stay because a fresh emulator genuinely does boot locked, but if this
+        # job goes red again, read the log before assuming it is the device: reproduce what CI
+        # builds with `./gradlew -DforceApiStub ...` locally. See "Device setup traps" in
+        # STABILITY_PLAN.md. The echo below exists so the next failure is diagnosable from the
+        # log alone rather than inferred from step durations.
+        script: |
+          adb shell svc power stayon true || true
+          adb shell settings put system screen_off_timeout 2147483647 || true
+          adb shell locksettings set-disabled true || true
+          adb shell input keyevent KEYCODE_WAKEUP || true
+          adb shell wm dismiss-keyguard || true
+          echo "--- device state before tests ---"
+          adb shell dumpsys power | grep -E "mWakefulness=" || true
+          adb shell dumpsys window | grep -iE "isKeyguardShowing" || true
+          ./gradlew connectedAlphaDebugAndroidTest jacocoAlphaDebugAndroidTestReport
+
+    - name: Upload instrumented test report
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: instrumented-test-results
+        path: studio-android/LightNovelLibrary/app/build/reports/androidTests/
+        if-no-files-found: ignore
+
+    # The other half of the coverage picture. This suite is the one that exercises the Activities,
+    # the lifecycle guards and the save-file code, so it carries several times the line coverage of
+    # the JVM suite -- measured locally at 26.7% against 5.3%. Reporting only the JVM half, as this
+    # workflow did initially, understates the project by roughly a factor of five.
+    #
+    # Both reports are generated from the same class set and the same source directory (see
+    # applyCoverageScope in app/build.gradle), which is what makes them safe to merge: the two
+    # differ only in which execution data they read.
+    # Guards against the exact failure that shipped the first time. A Gradle JacocoReport with no
+    # execution data is SKIPPED, not failed, so it writes no XML at all -- and the upload step then
+    # silently sends nothing while every step still reports green. This turns that into a red build
+    # with the .ec locations printed, because a coverage report that quietly measures nothing is
+    # worse than one that fails.
+    - name: Verify instrumented coverage report exists
+      run: |
+        echo "--- .ec execution data found on disk ---"
+        find app/build/outputs -name '*.ec' -printf '%p (%s bytes)\n' 2>/dev/null || echo "NONE"
+        XML=app/build/reports/jacoco/jacocoAlphaDebugAndroidTestReport/jacocoAlphaDebugAndroidTestReport.xml
+        if [ ! -s "$XML" ]; then
+          echo "::error::No instrumented coverage XML at $XML -- the report task was skipped, which means no .ec files were found."
+          exit 1
+        fi
+        echo "--- report line counter ---"
+        grep -o '<counter type="LINE"[^/]*/>' "$XML" | tail -1
+
+    # No `continue-on-error` here. Combined with `fail-on-error: false` below it made even a hard
+    # crash (a missing input file) report as success, which is how the broken upload went unnoticed.
+    # `fail-on-error: false` alone still keeps a Coveralls outage from turning the build red.
+    - name: Upload instrumented coverage to Coveralls
+      uses: coverallsapp/github-action@v2
+      with:
+        file: studio-android/LightNovelLibrary/app/build/reports/jacoco/jacocoAlphaDebugAndroidTestReport/jacocoAlphaDebugAndroidTestReport.xml
+        format: jacoco
+        base-path: studio-android/LightNovelLibrary/app/src/main/java
+        flag-name: instrumented
+        parallel: true
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        repo-token: ${{ secrets.COVERALLS_REPO_TOKEN }}
+        fail-on-error: false
+
+  # Tells Coveralls both halves have arrived so it can publish the merged figure. Needs no checkout,
+  # no JDK and no Gradle -- it is one API call.
+  #
+  # `if: always()` because this must run even when a test job goes red. A parallel Coveralls build
+  # that is never finished stays pending forever, and the badge then shows a stale number with no
+  # indication anything is wrong.
+  #
+  # `carryforward` is the part that is easy to omit and expensive to omit. If the emulator job fails
+  # or is skipped, only the jvm flag arrives, and without this line Coveralls would publish that
+  # alone -- the figure would collapse from the merged value to ~5% and read as a catastrophic
+  # coverage regression caused by whatever commit happened to be pushed. Naming both flags here tells
+  # Coveralls to reuse the last known data for whichever one is missing.
+  coverage-finish:
+    name: Publish merged coverage
+    needs: [ build-and-test, instrumented-test ]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+    - name: Close the Coveralls parallel build
+      uses: coverallsapp/github-action@v2
+      with:
+        parallel-finished: true
+        carryforward: jvm,instrumented
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        repo-token: ${{ secrets.COVERALLS_REPO_TOKEN }}
+        fail-on-error: false

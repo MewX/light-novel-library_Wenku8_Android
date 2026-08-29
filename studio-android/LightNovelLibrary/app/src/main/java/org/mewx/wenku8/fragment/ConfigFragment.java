@@ -36,6 +36,7 @@ import org.mewx.wenku8.api.Wenku8API;
 import org.mewx.wenku8.api.Wenku8Error;
 import org.mewx.wenku8.util.LightCache;
 import org.mewx.wenku8.util.LightTool;
+import org.mewx.wenku8.util.CrashReporter;
 
 import java.io.File;
 import java.io.UnsupportedEncodingException;
@@ -277,7 +278,7 @@ public class ConfigFragment extends Fragment {
                         List<OldNovelContentParser.NovelContent> list = OldNovelContentParser.NovelContentParser_onlyImage(new String(temp, "UTF-8"));
                         for(OldNovelContentParser.NovelContent nv : list) listPicture.add(GlobalConfig.generateImageFileNameByURL(nv.content));
                     } catch (UnsupportedEncodingException e) {
-                        e.printStackTrace();
+                        CrashReporter.recordException("ConfigFragment.doInBackground", e);
                     }
                 }
             }
