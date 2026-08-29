@@ -160,7 +160,7 @@ public class NovelItemListFragment extends Fragment implements MyItemClickListen
             }
             else {
                 AsyncGetNovelItemList asyncGetNovelItemList = tracker.track(new AsyncGetNovelItemList());
-                asyncGetNovelItemList.execute(currentPage);
+                asyncGetNovelItemList.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR, currentPage);
             }
         }
         return rootView;
@@ -345,10 +345,24 @@ public class NovelItemListFragment extends Fragment implements MyItemClickListen
                     Snackbar.LENGTH_SHORT).show();
 
             // load more thread
-            tracker.track(new AsyncGetNovelItemList()).execute(currentPage + 1);
+            tracker.track(new AsyncGetNovelItemList())
+                    .executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR, currentPage + 1);
         }
     }
 
+    /**
+     * Fetches one page of the list.
+     *
+     * <p>Started on {@link AsyncTask#THREAD_POOL_EXECUTOR} rather than through {@code execute()},
+     * which would use the serial one. All twelve ranking tabs share that single queue, so a tab's
+     * fetch could sit behind several other tabs' initial loads, each with its own connect and read
+     * timeout, and land seconds after the list had reached the point of needing it. The number of
+     * requests is unchanged -- only whether tabs wait for each other.
+     *
+     * <p>Concurrency is contained: every field this touches belongs to one Fragment, and the CAS
+     * on {@code isLoading} still admits a single fetch per list. It relies on a losing task not
+     * clearing that flag, which the serial queue used to hide.
+     */
     private class AsyncGetNovelItemList extends AsyncTask<Integer, Integer, Integer> {
         private boolean usingWenku8Relay = false;
 
