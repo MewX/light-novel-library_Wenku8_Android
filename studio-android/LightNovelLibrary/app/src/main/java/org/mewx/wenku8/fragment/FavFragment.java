@@ -12,6 +12,7 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.core.app.ActivityCompat;
 import androidx.core.app.ActivityOptionsCompat;
 import androidx.core.util.Pair;
@@ -29,6 +30,7 @@ import org.mewx.wenku8.activity.NovelInfoActivity;
 import org.mewx.wenku8.adapter.NovelItemAdapterUpdate;
 import org.mewx.wenku8.global.GlobalConfig;
 import org.mewx.wenku8.global.ScreenState;
+import org.mewx.wenku8.global.api.BookshelfListParser;
 import org.mewx.wenku8.global.api.BookshelfSync;
 import org.mewx.wenku8.global.api.NovelItemInfoUpdate;
 import org.mewx.wenku8.global.api.NovelDownloader;
@@ -288,7 +290,7 @@ public class FavFragment extends Fragment implements MyItemClickListener, MyItem
 
             // ! any network problem will interrupt this procedure
             // load bookshelf list, don't save
-            byte[] b = LightNetwork.LightHttpPostConnection(Wenku8API.BASE_URL, Wenku8API.getBookshelfListAid(GlobalConfig.getCurrentLang()));
+            byte[] b = fetchShelfListing();
             if(b == null) return Wenku8Error.ErrorCode.NETWORK_ERROR;
 
             if(LightTool.isInteger(new String(b))) {
@@ -298,19 +300,34 @@ public class FavFragment extends Fragment implements MyItemClickListener, MyItem
                     if(temp != Wenku8Error.ErrorCode.SYSTEM_1_SUCCEEDED) return temp; // return an error code
 
                     // request again
-                    b = LightNetwork.LightHttpPostConnection(Wenku8API.BASE_URL, Wenku8API.getBookshelfListAid(GlobalConfig.getCurrentLang()));
+                    b = fetchShelfListing();
                     if(b == null) return Wenku8Error.ErrorCode.NETWORK_ERROR;
                 }
             }
 
-            // purify returned data
-            List<Integer> listResultList = new ArrayList<>(); // result list
+            // Read the shelf. A null parse means the body was not a usable listing, and that
+            // must never be mistaken for an account with nothing on it -- BookshelfSync.plan
+            // reads an empty cloud listing as "the cloud has nothing" and schedules the reader's
+            // entire device shelf to be uploaded. So fall back to the ids-only endpoint, which is
+            // exactly what this did before, rather than carrying on with an empty list.
+            List<BookshelfListParser.Entry> shelf = null;
             try {
                 String listing = new String(b, "UTF-8");
                 Log.d("MewX", listing);
-                listResultList = BookshelfSync.parseCloudAidList(listing);
+                shelf = BookshelfListParser.parse(listing);
             } catch (UnsupportedEncodingException e) {
                 CrashReporter.recordException("FavFragment.AsyncLoadAllFromCloud", e);
+            }
+
+            List<Integer> listResultList;
+            if (shelf != null) {
+                listResultList = new ArrayList<>(shelf.size());
+                for (BookshelfListParser.Entry entry : shelf) {
+                    listResultList.add(entry.aid);
+                }
+            } else {
+                listResultList = fetchShelfAidsFromIdsOnlyEndpoint();
+                if (listResultList == null) return Wenku8Error.ErrorCode.NETWORK_ERROR;
             }
 
             // calc difference -- see BookshelfSync for why this is not done inline any more, and
@@ -410,6 +427,45 @@ public class FavFragment extends Fragment implements MyItemClickListener, MyItem
             }
 
             return Wenku8Error.ErrorCode.SYSTEM_1_SUCCEEDED;
+        }
+
+        /**
+         * Fetches the account's shelf.
+         *
+         * <p>This is {@code action=bookcase} rather than the {@code do=list} sibling the sync used
+         * to call. It is the same single request, but each book also carries its last update and
+         * its latest chapter -- verified equal to the metadata endpoint's {@code LastUpdate} and
+         * {@code LatestSection} cid -- which is what a later change needs to tell which novels
+         * went stale without re-downloading all of them.
+         *
+         * <p>Only the ids are used today. The switch lands on its own so it can be verified by
+         * itself, before anything depends on the fields it adds.
+         */
+        @Nullable
+        private byte[] fetchShelfListing() {
+            return LightNetwork.LightHttpPostConnection(Wenku8API.BASE_URL,
+                    Wenku8API.getBookshelfListParams(GlobalConfig.getCurrentLang()));
+        }
+
+        /**
+         * The ids-only endpoint, kept for when the fuller one cannot be read.
+         *
+         * @return the ids, or null if the request itself failed -- which the caller must treat as
+         * a network error rather than as an empty shelf
+         */
+        @Nullable
+        private List<Integer> fetchShelfAidsFromIdsOnlyEndpoint() {
+            byte[] raw = LightNetwork.LightHttpPostConnection(Wenku8API.BASE_URL,
+                    Wenku8API.getBookshelfListAid(GlobalConfig.getCurrentLang()));
+            if (raw == null) {
+                return null;
+            }
+            try {
+                return BookshelfSync.parseCloudAidList(new String(raw, "UTF-8"));
+            } catch (UnsupportedEncodingException e) {
+                CrashReporter.recordException("FavFragment.fetchShelfAidsFromIdsOnlyEndpoint", e);
+                return null;
+            }
         }
 
         @Override
