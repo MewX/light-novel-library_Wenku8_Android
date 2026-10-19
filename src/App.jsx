@@ -436,10 +436,6 @@ const Hero = ({ darkMode }) => {
                         <span>最新版本:</span>
                         <a href="https://github.com/MewX/light-novel-library_Wenku8_Android/releases" target="_blank" className="font-mono bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300 px-2 py-1 rounded">v1.30 (2026-08-29)</a>
                     </div>
-                    <div className="flex items-center gap-2">
-                        <span>历史稳定版本:</span>
-                        <a href="https://github.com/MewX/light-novel-library_Wenku8_Android/releases/tag/v1.13" target="_blank" className="font-mono bg-gray-100 dark:bg-slate-800 px-2 py-1 rounded">v1.13 (2021-01-17)</a>
-                    </div>
                 </div>
             </div>
         </div>
