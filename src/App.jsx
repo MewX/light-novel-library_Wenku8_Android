@@ -372,7 +372,7 @@ const Hero = ({ darkMode }) => {
                         href="https://play.google.com/store/apps/details?id=org.mewx.wenku8"
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="flex items-center px-8 py-3 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold shadow-lg shadow-blue-500/30 transition-all hover:scale-105"
+                        className="flex items-center justify-center w-60 py-3 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold shadow-lg shadow-blue-500/30 transition-all hover:scale-105"
                     >
                         <Download className="mr-2" size={20} />
                         从 Play Store 安装
@@ -381,7 +381,7 @@ const Hero = ({ darkMode }) => {
                         href="https://buymeacoffee.com/mewx"
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="flex items-center px-8 py-3 rounded-lg bg-yellow-400 hover:bg-yellow-300 text-yellow-900 font-bold shadow-lg shadow-yellow-400/30 transition-all hover:scale-105"
+                        className="flex items-center justify-center w-60 py-3 rounded-lg bg-yellow-400 hover:bg-yellow-300 text-yellow-900 font-bold shadow-lg shadow-yellow-400/30 transition-all hover:scale-105"
                     >
                         <Coffee className="mr-2" size={20} />
                         赞助服务器
