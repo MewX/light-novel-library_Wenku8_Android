@@ -5,9 +5,21 @@
 
 ---
 
-## 1. Visual Identity: Material 3 Expressive Meets "Archival Light Novel Studio"
+## 1. Visual Identity & Official Google AndroidX Policy
 
-Wenku8 `v2.0` fuses **Google's Material 3 Expressive** design language (physics-driven springs, morphing shapes, floating toolbars, connected button groups, wavy progress indicators) with the warm, literary **"Reading Archive" (纸页与档案)** aesthetic explored in `Wenku8_Flutter`.
+> [!IMPORTANT]
+> **Zero Third-Party Material 3 / M3 Expressive UI Libraries**: Every single Material 3 and Material 3 Expressive component, motion spring, adaptive layout, and polygon morph in Wenku8 `v2.0` comes **exclusively from official Google `androidx.*` and `com.google.android.material` Maven artifacts**—zero third-party Material 3 Expressive wrapper libraries are permitted.
+
+| Official Google Maven Artifact | Official Classes & APIs Used in `v2.0` |
+| :--- | :--- |
+| `androidx.compose.material3:material3:1.4.0+` | `MaterialExpressiveTheme`, `MotionScheme.expressive()`, `HorizontalMultiBrowseCarousel`, `SplitButtonLayout`, `HorizontalFloatingToolbar`, `LinearWavyProgressIndicator`, `CircularWavyProgressIndicator`, `SingleChoiceSegmentedButtonRow`, `SearchBar`, `ModalBottomSheet`, `Slider`, `FilterChip`, `AssistChip`, `PrimaryTabRow`, `NavigationBar`, `NavigationRail`, `MaterialShapes` |
+| `androidx.compose.material3.adaptive:adaptive-layout` & `adaptive-navigation` | `ListDetailPaneScaffold`, `SupportingPaneScaffold`, `NavigableListDetailPaneScaffold` |
+| `androidx.compose.material3:material3-adaptive-navigation-suite` | `NavigationSuiteScaffold` (automatic `NavigationBar` ↔ `NavigationRail` switching) |
+| `androidx.compose.animation:animation` | `SharedTransitionLayout`, `Modifier.sharedBounds()`, `Modifier.sharedElement()`, `spring()` |
+| `androidx.graphics:graphics-shapes:1.0.1` | Official AndroidX `RoundedPolygon`, `Morph`, `CornerRounding` |
+| `androidx.palette:palette-ktx:1.0.0` & `com.google.android.material:material:1.13.0+` | Cover seed extraction & `DynamicColors` / Material Color Utilities (`SchemeTonalSpot`) |
+
+Wenku8 `v2.0` fuses **Google's official Material 3 Expressive** design language with warm Bunkobon reading ergonomics.
 
 ```mermaid
 flowchart LR
@@ -84,7 +96,7 @@ Wenku8 `v2.0` adopts the newest `@OptIn(ExperimentalMaterial3ExpressiveApi::clas
 
 ### 3.4 `FloatingActionButtonMenu`
 - Replaces the legacy manual `ObjectAnimator` speed-dial FAB in `NovelInfoActivity`.
-- Tapping the primary FAB morphs its shape and fans out hierarchical pill items (`收藏/取消收藏`, `分卷缓存管理`, `投推荐票`, `书评广场 (128)`, `分享卡片`) with staggered `30ms` spring entrances.
+- Tapping the primary FAB morphs its shape and fans out hierarchical pill items (`收藏/取消收藏`, `分卷缓存管理`, `书评讨论专区`, `分享小说`) with staggered `30ms` spring entrances.
 
 ### 3.5 `LinearWavyProgressIndicator` & `CircularWavyProgressIndicator`
 - Replaces all blocking modal `ProgressDialogHelper` dialogs!
