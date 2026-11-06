@@ -1,0 +1,981 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Wenku8 Android v2.0 — Interactive UI/UX Prototype</title>
+  <style>
+    :root {
+      --bg: #F6F5EF;
+      --surface: #ECEAE2;
+      --surface-card: #FFFFFF;
+      --surface-glass: rgba(246, 245, 239, 0.86);
+      --text-primary: #1C1D1B;
+      --text-secondary: #5E645F;
+      --primary: #4A665B;
+      --primary-container: #D4E6DD;
+      --on-primary-container: #132820;
+      --accent: #3487F4;
+      --accent-soft: rgba(52, 135, 244, 0.14);
+      --border: rgba(74, 102, 91, 0.22);
+      --spring-spatial: cubic-bezier(0.22, 1.28, 0.36, 1);
+      --spring-fast: cubic-bezier(0.2, 0.9, 0.3, 1);
+      --transition-speed: 420ms;
+    }
+
+    body[data-theme="night"] {
+      --bg: #111312;
+      --surface: #1A1E1C;
+      --surface-card: #212624;
+      --surface-glass: rgba(24, 28, 26, 0.84);
+      --text-primary: #E8ECE9;
+      --text-secondary: #98A49E;
+      --primary: #A7C2B6;
+      --primary-container: #2D4039;
+      --on-primary-container: #DAEBE3;
+      --accent: #82B4FF;
+      --accent-soft: rgba(130, 180, 255, 0.16);
+      --border: rgba(167, 194, 182, 0.2);
+    }
+
+    body[data-theme="amoled"] {
+      --bg: #000000;
+      --surface: #0B0D0C;
+      --surface-card: #121514;
+      --surface-glass: rgba(12, 15, 14, 0.9);
+      --text-primary: #F2F5F3;
+      --text-secondary: #88948E;
+      --primary: #A7C2B6;
+      --primary-container: #1F2E28;
+      --on-primary-container: #E0F0E8;
+      --accent: #82B4FF;
+      --accent-soft: rgba(130, 180, 255, 0.18);
+      --border: rgba(255, 255, 255, 0.16);
+    }
+
+    body[data-theme="eink"] {
+      --bg: #FFFFFF;
+      --surface: #F4F4F4;
+      --surface-card: #FFFFFF;
+      --surface-glass: #FFFFFF;
+      --text-primary: #000000;
+      --text-secondary: #333333;
+      --primary: #000000;
+      --primary-container: #E6E6E6;
+      --on-primary-container: #000000;
+      --accent: #000000;
+      --accent-soft: #EBEBEB;
+      --border: #000000;
+      --transition-speed: 0ms;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Noto Sans CJK SC", "Source Han Sans SC", "Droid Sans Fallback", sans-serif;
+      background: #141716;
+      color: var(--text-primary);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px;
+      background-image:
+        linear-gradient(rgba(167, 194, 182, 0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(167, 194, 182, 0.04) 1px, transparent 1px);
+      background-size: 32px 32px;
+    }
+
+    /* Top Workbench Controls */
+    .workbench-bar {
+      width: 100%;
+      max-width: 1120px;
+      background: rgba(28, 34, 32, 0.92);
+      border: 1px solid rgba(167, 194, 182, 0.25);
+      border-radius: 20px;
+      padding: 14px 22px;
+      margin-bottom: 20px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      color: #E8ECE9;
+      backdrop-filter: blur(16px);
+    }
+
+    .workbench-title {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .workbench-title small {
+      font-family: monospace;
+      font-size: 11px;
+      letter-spacing: 0.08em;
+      color: #A7C2B6;
+    }
+    .workbench-title h1 {
+      font-size: 17px;
+      font-weight: 700;
+    }
+
+    .workbench-controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .ctrl-pill {
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(167, 194, 182, 0.25);
+      color: #DCE4E0;
+      padding: 7px 13px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .ctrl-pill.active, .ctrl-pill:hover {
+      background: #82B4FF;
+      color: #0D1826;
+      border-color: #82B4FF;
+    }
+
+    /* Device Frame */
+    .device-shell {
+      width: 412px;
+      height: 868px;
+      background: var(--bg);
+      color: var(--text-primary);
+      border-radius: 46px;
+      border: 8px solid #2A302D;
+      box-shadow: 0 28px 80px rgba(0, 0, 0, 0.65);
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      transition: width var(--transition-speed) var(--spring-spatial),
+                  background-color 0.25s ease;
+    }
+
+    .device-shell.foldable {
+      width: 960px;
+    }
+
+    /* Status bar */
+    .status-bar {
+      height: 36px;
+      padding: 0 26px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 12px;
+      font-weight: 700;
+      z-index: 20;
+      flex-shrink: 0;
+    }
+
+    /* Main Content Viewport */
+    .viewport {
+      flex: 1;
+      position: relative;
+      overflow-y: auto;
+      overflow-x: hidden;
+      padding-bottom: 108px;
+    }
+
+    .screen {
+      display: none;
+      padding: 8px 18px 24px;
+      animation: screenEnter var(--transition-speed) var(--spring-spatial);
+    }
+    .screen.active {
+      display: block;
+    }
+
+    @keyframes screenEnter {
+      from {
+        opacity: 0;
+        transform: translateY(18px) scale(0.97);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+    }
+
+    /* Archival Dossier Header */
+    .dossier-code {
+      font-family: "JetBrains Mono", monospace;
+      font-size: 11px;
+      letter-spacing: 0.08em;
+      color: var(--primary);
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+
+    .top-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin: 4px 0 14px;
+    }
+    .top-row h2 {
+      font-size: 26px;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+    }
+
+    .btn-tonal {
+      background: var(--primary-container);
+      color: var(--on-primary-container);
+      border: 1px solid var(--border);
+      padding: 7px 13px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: transform var(--transition-speed) var(--spring-fast);
+    }
+    .btn-tonal:active {
+      transform: scale(0.93);
+    }
+
+    /* Continue Reading Hero Dossier Card */
+    .hero-dossier {
+      background: var(--primary-container);
+      color: var(--on-primary-container);
+      border: 1.5px solid var(--border);
+      border-radius: 22px;
+      padding: 14px;
+      display: flex;
+      gap: 14px;
+      align-items: center;
+      position: relative;
+      margin-bottom: 16px;
+      cursor: pointer;
+      transition: transform var(--transition-speed) var(--spring-spatial);
+    }
+    .hero-dossier:hover {
+      transform: translateY(-2px);
+    }
+
+    .cover-thumb {
+      width: 68px;
+      height: 94px;
+      border-radius: 12px;
+      background: linear-gradient(145deg, #6E4826, #2B1B0E);
+      flex-shrink: 0;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      padding: 6px;
+      color: #FFF;
+      font-size: 10px;
+      font-weight: 700;
+      box-shadow: 0 6px 16px rgba(0, 0, 0, 0.25);
+    }
+
+    .wavy-bar {
+      height: 8px;
+      width: 100%;
+      background: rgba(0, 0, 0, 0.12);
+      border-radius: 99px;
+      overflow: hidden;
+      margin-top: 8px;
+      position: relative;
+    }
+    .wavy-fill {
+      height: 100%;
+      width: 68%;
+      background: repeating-linear-gradient(
+        -45deg,
+        var(--accent),
+        var(--accent) 6px,
+        #5CA0FF 6px,
+        #5CA0FF 12px
+      );
+      border-radius: 99px;
+    }
+
+    /* Filter Chips */
+    .chip-row {
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      padding-bottom: 10px;
+      margin-bottom: 8px;
+    }
+    .chip {
+      padding: 6px 14px;
+      border-radius: 8px;
+      background: var(--surface);
+      color: var(--text-secondary);
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      white-space: nowrap;
+      border: 1px solid var(--border);
+      transition: all var(--transition-speed) var(--spring-fast);
+    }
+    .chip.selected {
+      border-radius: 999px;
+      background: var(--primary);
+      color: var(--bg);
+    }
+
+    /* Bookshelf 3-Column Grid */
+    .book-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+    }
+
+    .book-card {
+      cursor: pointer;
+      transition: transform var(--transition-speed) var(--spring-spatial);
+    }
+    .book-card:hover {
+      transform: translateY(-4px) scale(1.02);
+    }
+    .book-poster {
+      height: 150px;
+      border-radius: 14px;
+      padding: 8px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      color: #FFF;
+      position: relative;
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.18);
+      overflow: hidden;
+    }
+    .badge {
+      align-self: flex-end;
+      padding: 2px 8px;
+      border-radius: 99px;
+      font-size: 10px;
+      font-weight: 800;
+      background: rgba(20, 24, 22, 0.78);
+    }
+    .badge.new {
+      background: #D93B48;
+    }
+    .book-title {
+      font-size: 13px;
+      font-weight: 700;
+      margin-top: 6px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .book-meta {
+      font-size: 11px;
+      color: var(--text-secondary);
+    }
+
+    /* 3D Spine Carousel Mode */
+    .carousel-3d-stage {
+      display: none;
+      flex-direction: column;
+      gap: 14px;
+      padding: 10px 0;
+    }
+    .carousel-3d-stage.visible {
+      display: flex;
+    }
+    .spine-row {
+      height: 250px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      perspective: 900px;
+    }
+    .spine-item {
+      width: 34px;
+      height: 210px;
+      border-radius: 8px;
+      background: #2E3A46;
+      color: #FFF;
+      writing-mode: vertical-rl;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 2px;
+      cursor: pointer;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      transition: all var(--transition-speed) var(--spring-spatial);
+    }
+    .spine-item.focused {
+      width: 148px;
+      height: 236px;
+      writing-mode: horizontal-tb;
+      flex-direction: column;
+      justify-content: flex-end;
+      padding: 12px;
+      transform: rotateY(-12deg) translateZ(18px);
+      box-shadow: 12px 14px 28px rgba(0, 0, 0, 0.45);
+    }
+
+    /* Novel Detail Screen */
+    .detail-hero {
+      border-radius: 24px;
+      padding: 16px;
+      background: linear-gradient(180deg, rgba(168, 104, 48, 0.25), var(--surface));
+      border: 1px solid var(--border);
+      margin-bottom: 14px;
+    }
+    .detail-top {
+      display: flex;
+      gap: 14px;
+    }
+    .detail-cover {
+      width: 108px;
+      height: 152px;
+      border-radius: 14px;
+      background: linear-gradient(135deg, #8B5A2B, #3A220D);
+      box-shadow: 0 10px 24px rgba(0,0,0,0.3);
+      flex-shrink: 0;
+      display: flex;
+      align-items: flex-end;
+      padding: 10px;
+      color: #FFF;
+      font-weight: 800;
+      font-size: 12px;
+    }
+
+    .split-cta {
+      display: flex;
+      gap: 4px;
+      margin-top: 14px;
+    }
+    .split-main {
+      flex: 1;
+      background: var(--accent);
+      color: #FFF;
+      border: none;
+      padding: 13px 16px;
+      border-radius: 99px 10px 10px 99px;
+      font-weight: 800;
+      font-size: 14px;
+      cursor: pointer;
+    }
+    .split-drop {
+      width: 48px;
+      background: var(--accent);
+      color: #FFF;
+      border: none;
+      border-radius: 10px 99px 99px 10px;
+      font-weight: 800;
+      cursor: pointer;
+    }
+
+    /* Volume Accordion */
+    .accordion {
+      background: var(--surface-card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      margin-bottom: 10px;
+      overflow: hidden;
+    }
+    .accordion-header {
+      padding: 13px 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      cursor: pointer;
+      font-weight: 700;
+      font-size: 14px;
+    }
+    .accordion-body {
+      display: none;
+      padding: 6px 12px 12px;
+      border-top: 1px solid var(--border);
+    }
+    .accordion.open .accordion-body {
+      display: block;
+    }
+    .chapter-item {
+      padding: 9px 10px;
+      border-radius: 10px;
+      font-size: 13px;
+      display: flex;
+      justify-content: space-between;
+      cursor: pointer;
+    }
+    .chapter-item:hover, .chapter-item.current {
+      background: var(--accent-soft);
+      color: var(--accent);
+      font-weight: 700;
+    }
+
+    /* Unified Reader Overlay */
+    .reader-modal {
+      position: absolute;
+      inset: 0;
+      background: #EDE2CA;
+      color: #2E261E;
+      z-index: 60;
+      display: none;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 42px 24px 28px;
+      animation: bookOpen var(--transition-speed) var(--spring-spatial);
+    }
+    .reader-modal.open {
+      display: flex;
+    }
+    @keyframes bookOpen {
+      from {
+        transform: perspective(900px) rotateY(-65deg) scale(0.88);
+        opacity: 0;
+      }
+      to {
+        transform: perspective(900px) rotateY(0deg) scale(1);
+        opacity: 1;
+      }
+    }
+
+    .reader-text {
+      font-family: "Noto Serif CJK SC", "Songti SC", serif;
+      font-size: 19px;
+      line-height: 1.75;
+      flex: 1;
+      overflow-y: auto;
+      transition: font-size 0.12s ease, line-height 0.12s ease;
+    }
+    .reader-text.vertical-cjk {
+      writing-mode: vertical-rl;
+      text-orientation: upright;
+      overflow-x: auto;
+    }
+    .reader-text p {
+      margin-bottom: 14px;
+      text-indent: 2em;
+    }
+
+    /* Transparent Jelly Typography Sheet */
+    .jelly-sheet {
+      position: absolute;
+      left: 14px;
+      right: 14px;
+      bottom: 18px;
+      background: rgba(24, 30, 28, 0.86);
+      color: #F2F6F4;
+      border: 1.5px solid rgba(130, 180, 255, 0.45);
+      border-radius: 26px;
+      padding: 16px;
+      backdrop-filter: blur(12px);
+      transition: opacity 0.2s ease, background 0.2s ease;
+    }
+    .jelly-sheet.dragging {
+      background: rgba(24, 30, 28, 0.22);
+    }
+
+    /* M3 Expressive Floating Toolbar */
+    .floating-nav-wrap {
+      position: absolute;
+      left: 18px;
+      right: 18px;
+      bottom: 18px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      z-index: 40;
+    }
+    .floating-toolbar {
+      flex: 1;
+      height: 62px;
+      background: var(--surface-glass);
+      border: 1.5px solid var(--border);
+      border-radius: 999px;
+      display: flex;
+      align-items: center;
+      justify-content: space-around;
+      padding: 6px;
+      backdrop-filter: blur(20px);
+      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.22);
+    }
+    .nav-pill {
+      flex: 1;
+      height: 48px;
+      border-radius: 999px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      color: var(--text-secondary);
+      transition: all var(--transition-speed) var(--spring-spatial);
+    }
+    .nav-pill.active {
+      background: var(--primary);
+      color: var(--bg);
+    }
+    .nav-fab {
+      width: 58px;
+      height: 58px;
+      border-radius: 20px;
+      background: var(--accent);
+      color: #FFF;
+      border: none;
+      font-size: 18px;
+      font-weight: 800;
+      cursor: pointer;
+      box-shadow: 0 10px 24px rgba(52, 135, 244, 0.38);
+    }
+  </style>
+</head>
+<body data-theme="day">
+
+  <!-- Top Workbench Bar -->
+  <div class="workbench-bar">
+    <div class="workbench-title">
+      <small>WENKU8 ANDROID v2.0 · INTERACTIVE PROTOTYPE</small>
+      <h1>Material 3 Expressive + Reading Archive Sandbox</h1>
+    </div>
+    <div class="workbench-controls">
+      <button class="ctrl-pill active" onclick="setTheme('day', this)">☼ 纸页日间 (#F6F5EF)</button>
+      <button class="ctrl-pill" onclick="setTheme('night', this)">☾ 碳黑夜间 (#111312)</button>
+      <button class="ctrl-pill" onclick="setTheme('amoled', this)">▣ 纯黑 AMOLED</button>
+      <button class="ctrl-pill" onclick="setTheme('eink', this)">⚡ 墨水屏无动画</button>
+      <button class="ctrl-pill" onclick="toggleFoldable(this)">▤ 切换折叠屏双栏 (Foldable)</button>
+    </div>
+  </div>
+
+  <!-- Interactive Phone / Foldable Frame -->
+  <div class="device-shell" id="deviceShell">
+    <div class="status-bar">
+      <span>14:20</span>
+      <span style="font-family: monospace; font-size: 11px;">WK8-V2.0 · 5G 100%</span>
+    </div>
+
+    <div class="viewport">
+      <!-- SCREEN 1: BOOKSHELF -->
+      <section class="screen active" id="screen-bookshelf">
+        <div class="dossier-code">01 / PERSONAL ARCHIVE</div>
+        <div class="top-row">
+          <h2>书架 Bookshelf (64)</h2>
+          <button class="btn-tonal" id="viewModeBtn" onclick="toggleShelfMode()">▣ 切换 3D 书脊</button>
+        </div>
+
+        <!-- 1-Tap Continue Reading Hero Card -->
+        <div class="hero-dossier" onclick="openReader()">
+          <div class="cover-thumb">VOL.17<br/>狼与香辛料</div>
+          <div style="flex: 1;">
+            <div class="dossier-code" style="font-size: 10px;">CONTINUE READING · WK-00005</div>
+            <div style="font-size: 16px; font-weight: 800; margin: 2px 0;">狼与香辛料 (第十七卷)</div>
+            <div style="font-size: 12px; opacity: 0.85;">读至：第三话 太阳之金币 (68%) · 点击直接续读</div>
+            <div class="wavy-bar"><div class="wavy-fill"></div></div>
+          </div>
+        </div>
+
+        <div class="chip-row">
+          <div class="chip selected">全部 64</div>
+          <div class="chip">★ 在读 8</div>
+          <div class="chip">✦ 更新 3</div>
+          <div class="chip">✓ 已缓存 42</div>
+        </div>
+
+        <!-- 3D Spine Carousel Stage (Hidden until toggled) -->
+        <div class="carousel-3d-stage" id="carouselStage">
+          <div class="spine-row">
+            <div class="spine-item" onclick="focusSpine(0)" style="background:#3B4D5E;">01 · 刀剑神域进击篇</div>
+            <div class="spine-item" onclick="focusSpine(1)" style="background:#4E3B5E;">02 · 物语系列终物语</div>
+            <div class="spine-item focused" onclick="openDetail()" style="background:linear-gradient(145deg,#2A4B7C,#132440);">
+              <span class="badge new">NEW</span>
+              <div style="font-size:15px;font-weight:800;margin-top:auto;">败犬女主太多了！</div>
+              <div style="font-size:11px;opacity:0.8;">第7卷 · 45%</div>
+            </div>
+            <div class="spine-item" onclick="focusSpine(3)" style="background:#5E433B;">04 · 狼与香辛料 XVII</div>
+            <div class="spine-item" onclick="focusSpine(4)" style="background:#3B5E4C;">05 · 古典部系列冰菓</div>
+          </div>
+          <div style="text-align:center;font-size:12px;color:var(--text-secondary);">
+            ◄ 点击或滑动 3D 书脊 · 选中后点击封面展开详情 ►
+          </div>
+        </div>
+
+        <!-- Standard 3-Column Grid -->
+        <div class="book-grid" id="gridStage">
+          <div class="book-card" onclick="openDetail()">
+            <div class="book-poster" style="background:linear-gradient(145deg,#24528A,#102542);">
+              <span class="badge new">NEW</span>
+              <span style="font-size:11px;font-weight:700;">GAGAGA文库</span>
+            </div>
+            <div class="book-title">败犬女主太多了！</div>
+            <div class="book-meta">第7卷 · 45%</div>
+          </div>
+          <div class="book-card" onclick="openDetail()">
+            <div class="book-poster" style="background:linear-gradient(145deg,#7A5230,#382210);">
+              <span class="badge">已缓存</span>
+              <span style="font-size:11px;font-weight:700;">电击文库</span>
+            </div>
+            <div class="book-title">狼与香辛料</div>
+            <div class="book-meta">第17卷 · 68%</div>
+          </div>
+          <div class="book-card" onclick="openDetail()">
+            <div class="book-poster" style="background:linear-gradient(145deg,#3A6B5C,#17332A);">
+              <span class="badge">已缓存</span>
+              <span style="font-size:11px;font-weight:700;">电击文库</span>
+            </div>
+            <div class="book-title">刀剑神域 SAO</div>
+            <div class="book-meta">第27卷 · 90%</div>
+          </div>
+          <div class="book-card" onclick="openDetail()">
+            <div class="book-poster" style="background:linear-gradient(145deg,#5D4275,#271936);">
+              <span class="badge">完结</span>
+              <span style="font-size:11px;font-weight:700;">MF文库J</span>
+            </div>
+            <div class="book-title">无职转生</div>
+            <div class="book-meta">第26卷 · 已读完</div>
+          </div>
+          <div class="book-card" onclick="openDetail()">
+            <div class="book-poster" style="background:linear-gradient(145deg,#8A3B48,#3D151C);">
+              <span class="badge new">NEW</span>
+              <span style="font-size:11px;font-weight:700;">MF文库J</span>
+            </div>
+            <div class="book-title">欢迎来到实力至上</div>
+            <div class="book-meta">二年级篇 · 80%</div>
+          </div>
+          <div class="book-card" onclick="openDetail()">
+            <div class="book-poster" style="background:linear-gradient(145deg,#4C6478,#1E2B36);">
+              <span class="badge">已缓存</span>
+              <span style="font-size:11px;font-weight:700;">角川Sneaker</span>
+            </div>
+            <div class="book-title">古典部系列</div>
+            <div class="book-meta">第6卷 · 30%</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- SCREEN 2: EXPLORE & 2D RANKINGS -->
+      <section class="screen" id="screen-explore">
+        <div class="dossier-code">02 / CATALOG & RANKINGS</div>
+        <div class="top-row">
+          <h2>发现与排行榜</h2>
+        </div>
+        <div class="chip-row">
+          <div class="chip selected">★ 热门榜</div>
+          <div class="chip">✦ 动画化</div>
+          <div class="chip">↻ 今日更新</div>
+          <div class="chip">▣ 新书一览</div>
+          <div class="chip">✓ 完结精品</div>
+        </div>
+        <div class="chip-row">
+          <div class="chip selected">周榜 Weekly</div>
+          <div class="chip">月榜 Monthly</div>
+          <div class="chip">总榜 All-Time</div>
+        </div>
+        <div class="accordion open" style="padding:14px;cursor:pointer;" onclick="openDetail()">
+          <div class="dossier-code">RANK #01 · WK-02941</div>
+          <div style="font-size:17px;font-weight:800;margin:4px 0;">败犬女主太多了！ (第7卷连载中)</div>
+          <div style="font-size:12px;color:var(--text-secondary);">作者：雨森焚火 · 插画：いみぎむる · 24.8万热度</div>
+        </div>
+        <div class="accordion open" style="padding:14px;cursor:pointer;" onclick="openDetail()">
+          <div class="dossier-code">RANK #02 · WK-00005</div>
+          <div style="font-size:17px;font-weight:800;margin:4px 0;">狼与香辛料 (Spring Log 新篇)</div>
+          <div style="font-size:12px;color:var(--text-secondary);">作者：支仓冻砂 · 插画：文仓十 · 19.4万热度</div>
+        </div>
+      </section>
+
+      <!-- SCREEN 3: NOVEL DETAIL + INLINE ACCORDIONS -->
+      <section class="screen" id="screen-detail">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+          <button class="btn-tonal" onclick="switchTab('bookshelf')">← 返回书架</button>
+          <span class="dossier-code">DOSSIER / WK-00005</span>
+        </div>
+
+        <div class="detail-hero">
+          <div class="detail-top">
+            <div class="detail-cover">狼与香辛料<br/>SPICE & WOLF</div>
+            <div>
+              <span class="dossier-code">电击文库 · 已完结</span>
+              <h3 style="font-size:20px;font-weight:800;margin:4px 0;">狼与香辛料</h3>
+              <p style="font-size:12px;color:var(--text-secondary);line-height:1.5;">
+                作者：支仓冻砂<br/>插画：文仓十<br/>全 17 卷 · 200.4 万字
+              </p>
+            </div>
+          </div>
+          <div class="split-cta">
+            <button class="split-main" onclick="openReader()">▶ 继续阅读 · 第三卷 第二话 (42%)</button>
+            <button class="split-drop" onclick="alert('弹出 4 模式非阻塞 WorkManager 离线下载面板：\n1. 智能更新 (推荐)\n2. 仅下载更新分卷\n3. 全量覆盖重下\n4. 分卷自选')">↓</button>
+          </div>
+        </div>
+
+        <div class="dossier-code" style="margin:8px 0;">INLINE VOLUME ACCORDIONS (告别新开 Activity!)</div>
+
+        <div class="accordion" onclick="this.classList.toggle('open')">
+          <div class="accordion-header">
+            <span>VOL.01 · 第一卷 旅途的开端</span>
+            <span style="font-size:12px;color:var(--primary);">✓ 已缓存 8/8 章 ▾</span>
+          </div>
+          <div class="accordion-body">
+            <div class="chapter-item" onclick="openReader()"><span>第一话 商人遇上贤狼</span><span>✓</span></div>
+            <div class="chapter-item" onclick="openReader()"><span>第二话 温泉街的算计</span><span>✓</span></div>
+          </div>
+        </div>
+
+        <div class="accordion open" onclick="this.classList.toggle('open')">
+          <div class="accordion-header">
+            <span>VOL.03 · 第三卷 狼与黄铁矿</span>
+            <span style="font-size:12px;color:var(--accent);">▸ 上次读到 第2话 ▴</span>
+          </div>
+          <div class="accordion-body">
+            <div class="chapter-item" onclick="openReader()"><span>第一话 庆典中的北方城镇</span><span>已读</span></div>
+            <div class="chapter-item current" onclick="openReader()"><span>▸ 第二话 真实与冒牌货</span><span>42%</span></div>
+            <div class="chapter-item" onclick="openReader()"><span>第三话 交易所的崩盘与反击</span><span>已缓存</span></div>
+            <div class="chapter-item" onclick="openReader()"><span>▣ 本卷插图画廊 (12 张高清插图)</span><span>查看</span></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- SCREEN 4: STUDIO & PROFILE -->
+      <section class="screen" id="screen-studio">
+        <div class="dossier-code">03 / READER STUDIO</div>
+        <div class="top-row">
+          <h2>我的与主题工作室</h2>
+        </div>
+        <div class="hero-dossier" style="cursor:default;">
+          <div style="flex:1;">
+            <div class="dossier-code">UID: 12345 · 轻国骑士</div>
+            <div style="font-size:18px;font-weight:800;margin:4px 0;">MewX · 今日已签到 (+1 积分 ✦)</div>
+            <div style="font-size:12px;">今日阅读 48 分钟 · 连续打卡 12 天 · 本地缓存 42 MB</div>
+          </div>
+        </div>
+        <div class="accordion open" style="padding:14px;">
+          <div style="font-weight:800;margin-bottom:8px;">◈ 彻底解决 v1.x 痛点</div>
+          <p style="font-size:13px;color:var(--text-secondary);line-height:1.6;">
+            • 告别「假夜间模式 Toast」：全局支持纸页日间、碳黑夜间、纯黑 AMOLED 与墨水屏无动画模式。<br/>
+            • 告别阻塞弹窗下载：WorkManager 后台队列 + 波动进度条。<br/>
+            • 统一阅读引擎：合并 V1 与 Vertical，支持实时透明滑块预览。
+          </p>
+        </div>
+      </section>
+    </div>
+
+    <!-- UNIFIED READER 2.0 OVERLAY -->
+    <div class="reader-modal" id="readerModal">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+        <button class="btn-tonal" onclick="closeReader()">← 返回详情</button>
+        <span style="font-size:12px;font-weight:700;">第三卷 · 第二话 真实与冒牌货</span>
+        <button class="btn-tonal" onclick="toggleVerticalCJK()">竖排/横排</button>
+      </div>
+
+      <div class="reader-text" id="readerText">
+        <p>旅行于各地贩卖并收购物品的商人克拉福·罗伦斯，在结束了坎梅尔森的黄铁矿骚动之后，握着缰绳望向北方灰白色的天空。</p>
+        <p>「呐，汝怎么又露出一副算盘打不响的苦瓜脸呀？」</p>
+        <p>坐在身旁的贤狼赫萝晃动着琥珀色的双耳，用蓬松的大尾巴轻轻拍了拍车板。熟透的麦香混合着果酒的气息在冷冽的晨风中弥漫开来。</p>
+        <p>罗伦斯苦笑着叹了口气：「面对一位随手就能吃掉十枚银币苹果的贤狼大人，哪个行商能笑得出来呢？」</p>
+        <p>「哼，汝明明心里高兴得很！」赫萝得意地眯起眼睛，露出洁白的小虎牙。</p>
+      </div>
+
+      <!-- Live Transparent Typography Sheet -->
+      <div class="jelly-sheet" id="jellySheet">
+        <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:700;margin-bottom:8px;">
+          <span>✦ 拖动滑块体验 88% 透明实时排版预览</span>
+          <span id="fontSizeLabel" style="color:#82B4FF;">19 sp</span>
+        </div>
+        <input
+          type="range"
+          min="14"
+          max="28"
+          value="19"
+          style="width:100%;cursor:pointer;"
+          onmousedown="document.getElementById('jellySheet').classList.add('dragging')"
+          onmouseup="document.getElementById('jellySheet').classList.remove('dragging')"
+          ontouchstart="document.getElementById('jellySheet').classList.add('dragging')"
+          ontouchend="document.getElementById('jellySheet').classList.remove('dragging')"
+          oninput="updateReaderFont(this.value)"
+        />
+      </div>
+    </div>
+
+    <!-- M3 Expressive Floating Toolbar -->
+    <div class="floating-nav-wrap">
+      <div class="floating-toolbar">
+        <div class="nav-pill active" id="tab-bookshelf" onclick="switchTab('bookshelf')">▣ 书架</div>
+        <div class="nav-pill" id="tab-explore" onclick="switchTab('explore')">✦ 发现</div>
+        <div class="nav-pill" id="tab-studio" onclick="switchTab('studio')">● 我的</div>
+      </div>
+      <button class="nav-fab" title="全局统一搜索" onclick="switchTab('explore')">◎</button>
+    </div>
+  </div>
+
+  <script>
+    function setTheme(mode, btn) {
+      document.body.setAttribute('data-theme', mode);
+      document.querySelectorAll('.workbench-controls .ctrl-pill').forEach(b => {
+        if (b.textContent.includes('日间') || b.textContent.includes('夜间') || b.textContent.includes('AMOLED') || b.textContent.includes('墨水屏')) {
+          b.classList.remove('active');
+        }
+      });
+      btn.classList.add('active');
+    }
+
+    function toggleFoldable(btn) {
+      const shell = document.getElementById('deviceShell');
+      shell.classList.toggle('foldable');
+      btn.classList.toggle('active');
+    }
+
+    function switchTab(tabId) {
+      document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+      document.querySelectorAll('.nav-pill').forEach(p => p.classList.remove('active'));
+      const target = document.getElementById('screen-' + tabId);
+      if (target) target.classList.add('active');
+      const pill = document.getElementById('tab-' + tabId);
+      if (pill) pill.classList.add('active');
+    }
+
+    function toggleShelfMode() {
+      const carousel = document.getElementById('carouselStage');
+      const grid = document.getElementById('gridStage');
+      const btn = document.getElementById('viewModeBtn');
+      const is3D = carousel.classList.toggle('visible');
+      grid.style.display = is3D ? 'none' : 'grid';
+      btn.textContent = is3D ? '▣ 切换网格视图' : '▣ 切换 3D 书脊';
+    }
+
+    function focusSpine(idx) {
+      const items = document.querySelectorAll('.spine-item');
+      items.forEach((el, i) => el.classList.toggle('focused', i === idx));
+    }
+
+    function openDetail() {
+      document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+      document.getElementById('screen-detail').classList.add('active');
+    }
+
+    function openReader() {
+      document.getElementById('readerModal').classList.add('open');
+    }
+
+    function closeReader() {
+      document.getElementById('readerModal').classList.remove('open');
+    }
+
+    function toggleVerticalCJK() {
+      document.getElementById('readerText').classList.toggle('vertical-cjk');
+    }
+
+    function updateReaderFont(val) {
+      const rt = document.getElementById('readerText');
+      rt.style.fontSize = val + 'px';
+      document.getElementById('fontSizeLabel').textContent = val + ' sp (实时重排)';
+    }
+  </script>
+</body>
+</html>
