@@ -40,14 +40,66 @@ interface TocDao {
     @Query("SELECT * FROM volumes WHERE aid = :aid ORDER BY volume_order ASC")
     fun observeVolumesForNovel(aid: Int): Flow<List<VolumeEntity>>
 
-    @Query("SELECT * FROM chapters WHERE aid = :aid ORDER BY vid ASC, chapter_order ASC")
+    @Query(
+        """
+        SELECT c.*
+        FROM chapters AS c
+        LEFT JOIN volumes AS v ON c.vid = v.vid
+        WHERE c.aid = :aid
+        ORDER BY COALESCE(v.volume_order, c.vid) ASC, c.chapter_order ASC
+        """,
+    )
     fun observeChaptersForNovel(aid: Int): Flow<List<ChapterEntity>>
 
     @Query("SELECT * FROM volumes WHERE aid = :aid ORDER BY volume_order ASC")
     suspend fun getVolumesForNovel(aid: Int): List<VolumeEntity>
 
-    @Query("SELECT * FROM chapters WHERE aid = :aid ORDER BY chapter_order ASC")
+    @Query(
+        """
+        SELECT c.*
+        FROM chapters AS c
+        LEFT JOIN volumes AS v ON c.vid = v.vid
+        WHERE c.aid = :aid
+        ORDER BY COALESCE(v.volume_order, c.vid) ASC, c.chapter_order ASC
+        """,
+    )
     suspend fun getChaptersForNovel(aid: Int): List<ChapterEntity>
+
+    @Query(
+        """
+        SELECT c.aid AS aid,
+               c.vid AS vid,
+               v.volume_order AS volume_order,
+               v.volume_title AS volume_title,
+               c.cid AS cid,
+               c.chapter_order AS chapter_order,
+               c.chapter_title AS chapter_title,
+               c.is_illustration_chapter AS is_illustration_chapter
+        FROM chapters AS c
+        INNER JOIN volumes AS v ON c.vid = v.vid
+        WHERE c.aid = :aid
+        ORDER BY v.volume_order ASC, c.chapter_order ASC
+        """,
+    )
+    suspend fun getOrderedChaptersWithVolume(aid: Int): List<OrderedChapterWithVolume>
+
+    @Query(
+        """
+        SELECT c.aid AS aid,
+               c.vid AS vid,
+               v.volume_order AS volume_order,
+               v.volume_title AS volume_title,
+               c.cid AS cid,
+               c.chapter_order AS chapter_order,
+               c.chapter_title AS chapter_title,
+               c.is_illustration_chapter AS is_illustration_chapter
+        FROM chapters AS c
+        INNER JOIN volumes AS v ON c.vid = v.vid
+        WHERE c.aid = :aid
+        ORDER BY v.volume_order ASC, c.chapter_order ASC
+        """,
+    )
+    fun observeOrderedChaptersWithVolume(aid: Int): Flow<List<OrderedChapterWithVolume>>
 
     @Query("SELECT vid FROM volumes WHERE aid = :aid")
     suspend fun getVolumeIdsForNovel(aid: Int): List<Int>
@@ -109,4 +161,15 @@ data class ChapterNovelMapping(
 data class NovelTotalChapterCount(
     @ColumnInfo(name = "aid") val aid: Int,
     @ColumnInfo(name = "total_count") val totalCount: Int,
+)
+
+data class OrderedChapterWithVolume(
+    @ColumnInfo(name = "aid") val aid: Int,
+    @ColumnInfo(name = "vid") val vid: Int,
+    @ColumnInfo(name = "volume_order") val volumeOrder: Int,
+    @ColumnInfo(name = "volume_title") val volumeTitle: String,
+    @ColumnInfo(name = "cid") val cid: Int,
+    @ColumnInfo(name = "chapter_order") val chapterOrder: Int,
+    @ColumnInfo(name = "chapter_title") val chapterTitle: String,
+    @ColumnInfo(name = "is_illustration_chapter") val isIllustrationChapter: Boolean,
 )
