@@ -835,6 +835,9 @@ private fun ReaderCanvasPage(
                 val widthDp = with(density) { element.widthPx.toDp() }
                 val heightDp = with(density) { element.heightPx.toDp() }
                 Surface(
+                    onClick = {
+                        onIllustrationClicked(element.imageUrl, element.imageIndexInChapter)
+                    },
                     color = palette.backgroundColor.copy(alpha = 0.4f),
                     shape = MaterialTheme.shapes.small,
                     modifier = Modifier
@@ -847,9 +850,6 @@ private fun ReaderCanvasPage(
                         .size(width = widthDp, height = heightDp)
                         .einkHairlineBorder(MaterialTheme.shapes.small)
                         .clip(MaterialTheme.shapes.small)
-                        .clickable {
-                            onIllustrationClicked(element.imageUrl, element.imageIndexInChapter)
-                        }
                         .testTag("${ReaderTestTags.INLINE_IMAGE_PREFIX}${element.imageIndexInChapter}"),
                 ) {
                     if (element.imageUrl.isNotBlank()) {
@@ -997,6 +997,9 @@ private fun ContinuousScrollReaderDelegate(
                 is ChapterBlock.IllustrationBlock -> {
                     val ratio = (block.cachedAspectRatio ?: 0.71f).coerceIn(0.3f, 2.5f)
                     Surface(
+                        onClick = {
+                            onIllustrationClicked(block.imageUrl, block.imageIndexInChapter)
+                        },
                         color = palette.backgroundColor.copy(alpha = 0.5f),
                         shape = MaterialTheme.shapes.medium,
                         modifier = Modifier
@@ -1004,9 +1007,6 @@ private fun ContinuousScrollReaderDelegate(
                             .aspectRatio(ratio)
                             .einkHairlineBorder(MaterialTheme.shapes.medium)
                             .clip(MaterialTheme.shapes.medium)
-                            .clickable {
-                                onIllustrationClicked(block.imageUrl, block.imageIndexInChapter)
-                            }
                             .testTag("${ReaderTestTags.INLINE_IMAGE_PREFIX}${block.imageIndexInChapter}"),
                     ) {
                         if (block.imageUrl.isNotBlank()) {

@@ -50,8 +50,10 @@ import androidx.compose.material.icons.outlined.BookmarkBorder
 import androidx.compose.material.icons.outlined.Collections
 import androidx.compose.material.icons.outlined.DarkMode
 import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.GraphicEq
 import androidx.compose.material.icons.outlined.LightMode
 import androidx.compose.material.icons.outlined.NetworkCheck
+import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.TextFields
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
@@ -114,6 +116,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.mewx.wenku8.api.Wenku8API
+import org.mewx.wenku8.v2.Wenku8V2Application
 import org.mewx.wenku8.v2.data.local.db.Wenku8Database
 import org.mewx.wenku8.v2.data.local.db.dao.OrderedChapterWithVolume
 import org.mewx.wenku8.v2.data.local.db.entity.BookmarkNoteEntity
@@ -138,6 +141,7 @@ import org.mewx.wenku8.v2.reader.model.ReaderPaperPreset
 import org.mewx.wenku8.v2.ui.detail.ReaderLaunchRequest
 import org.mewx.wenku8.v2.ui.theme.LocalEinkMode
 import org.mewx.wenku8.v2.ui.theme.einkHairlineBorder
+import java.io.File
 import kotlin.math.roundToInt
 
 /** Semantic UI test tags for Robolectric & instrumented tests on `UnifiedReaderScreen` (`P5.2`). */
@@ -179,6 +183,19 @@ object ReaderTestTags {
     const val SWITCH_VOLUME_KEYS = "reader_switch_volume_keys"
     const val SWITCH_KEEP_SCREEN_ON = "reader_switch_keep_screen_on"
     const val SWITCH_EDGE_BRIGHTNESS = "reader_switch_edge_brightness"
+    const val HUD_SEARCH_BUTTON = "reader_hud_search_button"
+    const val ACTION_TTS = "reader_action_tts"
+    const val SEARCH_SHEET = "reader_search_sheet"
+    const val SEARCH_INPUT = "reader_search_input"
+    const val SEARCH_SCOPE_CURRENT_CHIP = "reader_search_scope_current"
+    const val SEARCH_SCOPE_CACHED_CHIP = "reader_search_scope_cached"
+    const val SEARCH_RESULT_PREFIX = "reader_search_result_"
+    const val TTS_CONTROLLER_BAR = "reader_tts_controller_bar"
+    const val TTS_RATE_CHIP = "reader_tts_rate_chip"
+    const val TTS_PREV_BUTTON = "reader_tts_prev_button"
+    const val TTS_PLAY_PAUSE_BUTTON = "reader_tts_play_pause_button"
+    const val TTS_NEXT_BUTTON = "reader_tts_next_button"
+    const val TTS_STOP_BUTTON = "reader_tts_stop_button"
 }
 
 enum class ReaderTypographySliderField(val label: String) {
@@ -193,6 +210,12 @@ private data class ReaderUndoJumpState(
     val pageIndexOneBased: Int,
     val anchor: ReadingAnchor,
     val createdAtElapsedMs: Long,
+)
+
+private data class ReaderActiveArtbookState(
+    val chapterTitle: String,
+    val imageUrls: List<String>,
+    val initialIndex: Int,
 )
 
 /**
@@ -237,7 +260,7 @@ fun shouldConsumeHardwareVolumeKeyEvent(
 }
 
 /**
- * Full-screen Material 3 Expressive (`M3e`) `UnifiedReaderScreen` (`P5.2`).
+ * Full-screen Material 3 Expressive (`M3e`) `UnifiedReaderScreen` (`P5.2` + `P5.3`).
  *
  * Integrates:
  * - `ChapterWindowBuffer` (3-chapter continuous virtual paging + 70% pre-fetch + zero-IO reflow)
@@ -247,6 +270,8 @@ fun shouldConsumeHardwareVolumeKeyEvent(
  * - Contextual M3e `HorizontalFloatingToolbar` HUD + chapter scrubber + `5s` `"↩ 还原至第 N 页"` pill
  * - **Opaque Active-Slider Reflow Capsule** (`92%`-opaque `surfaceContainerHighest` pill while
  *   dragging `8–36 sp` font size or spacing sliders, zero text-on-text overlap)
+ * - **In-Reader `ArtbookLightboxOverlay`** (`BitmapRegionDecoder` 4× tiling zoom + `跨页拼合` spreads)
+ * - **In-Book Search** (`当前章节` & `已缓存全书`) and **System `TextToSpeech`** read-aloud (`P5.3`)
  * - Auto-saved `ReadingProgressDao` + `ReadingSessionDao` duration/character telemetry
  */
 @OptIn(
@@ -283,6 +308,8 @@ fun UnifiedReaderScreen(
     onOpenNetworkDiagnostics: () -> Unit = {},
     onNavigateBack: () -> Unit,
     lineBreaker: ParagraphLineBreaker = AndroidStaticLayoutLineBreaker,
+    speechEngineAdapter: SpeechEngineAdapter? = null,
+    artbookImageFileResolver: (suspend (String) -> File?)? = null,
     ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
     computeDispatcher: CoroutineDispatcher = Dispatchers.Default,
     modifier: Modifier = Modifier,
@@ -332,6 +359,8 @@ fun UnifiedReaderScreen(
     var isTocSheetOpen by rememberSaveable { mutableStateOf(false) }
     var isPageModeSheetOpen by rememberSaveable { mutableStateOf(false) }
     var isBookmarksSheetOpen by rememberSaveable { mutableStateOf(false) }
+    var isSearchSheetOpen by rememberSaveable { mutableStateOf(false) }
+    var activeArtbookState by remember { mutableStateOf<ReaderActiveArtbookState?>(null) }
 
     // Brightness HUD pill state.
     var brightnessFraction by remember {
@@ -537,9 +566,27 @@ fun UnifiedReaderScreen(
         }
     }
 
-    val isAnyModalOpen = isTocSheetOpen || isPageModeSheetOpen || isBookmarksSheetOpen
+    var pendingTtsAutoContinueAfterCid by remember { mutableIntStateOf(0) }
+    val ttsController = remember(launchRequest.aid, speechEngineAdapter) {
+        val adapter = speechEngineAdapter ?: AndroidTextToSpeechEngineAdapter(context.applicationContext)
+        ReaderTtsController(
+            engineAdapter = adapter,
+            scope = coroutineScope,
+            onChapterFinished = { completedCid ->
+                pendingTtsAutoContinueAfterCid = completedCid
+            },
+        )
+    }
+    DisposableEffect(ttsController) {
+        onDispose { ttsController.close() }
+    }
+    val ttsUiState by ttsController.uiState.collectAsStateWithLifecycle()
 
-    BackHandler {
+    val isAnyModalOpen =
+        isTocSheetOpen || isPageModeSheetOpen || isBookmarksSheetOpen || isSearchSheetOpen ||
+            activeArtbookState != null
+
+    BackHandler(enabled = activeArtbookState == null) {
         when {
             isTypographyPanelOpen -> {
                 activeDraggingSlider = null
@@ -550,13 +597,18 @@ fun UnifiedReaderScreen(
                 isHudVisible = false
             }
             else -> {
+                ttsController.stopAndDismiss()
                 onNavigateBack()
             }
         }
     }
 
     val latestVolumeKeyPagingEnabled by rememberUpdatedState(preferences.volumeKeyPagingEnabled)
-    val latestIsModalOrStudioOpen by rememberUpdatedState(isAnyModalOpen || isTypographyPanelOpen)
+    // Bypass volume-key page turning while any modal/artbook is open OR while TTS is actively
+    // speaking so hardware volume keys naturally adjust speech audio volume!
+    val latestIsModalOrStudioOpen by rememberUpdatedState(
+        isAnyModalOpen || isTypographyPanelOpen || ttsUiState.isSpeaking,
+    )
     val latestSnapshotForKey by rememberUpdatedState(snapshot)
 
     val handleAndroidVolumeKeyEvent: (AndroidKeyEvent) -> Boolean = remember(windowBuffer, coroutineScope) {
@@ -607,10 +659,10 @@ fun UnifiedReaderScreen(
             0.587f * MaterialTheme.colorScheme.surfaceContainer.green +
             0.114f * MaterialTheme.colorScheme.surfaceContainer.blue
         )
-    val shouldUseLightBarAppearance = if (isHudVisible && activeDraggingSlider == null) {
-        surfaceBgLuminance > 0.5f
-    } else {
-        !palette.isDarkPalette
+    val shouldUseLightBarAppearance = when {
+        activeArtbookState != null -> false
+        isHudVisible && activeDraggingSlider == null -> surfaceBgLuminance > 0.5f
+        else -> !palette.isDarkPalette
     }
     DisposableEffect(context, view) {
         val window = context.findHostActivity()?.window
@@ -784,25 +836,120 @@ fun UnifiedReaderScreen(
                 )
             }
             coroutineScope.launch {
-                val meta = snapshot.orderedToc.firstOrNull { it.cid == targetCid }
+                val loadedCur = snapshot.currentSlot as? ChapterWindowSlot.Loaded
+                if (prevChapter?.cid == targetCid && loadedCur != null) {
+                    val resolvedLocal = loadedCur.layout.resolvePageIndexForAnchor(targetAnchor)
+                    val targetVirtual = snapshot.prevPageCount + resolvedLocal
+                    pagerState.scrollToPage(targetVirtual)
+                    windowBuffer.onVirtualPageSettled(targetVirtual)
+                } else {
+                    val meta = snapshot.orderedToc.firstOrNull { it.cid == targetCid }
+                    windowBuffer.openChapter(
+                        cid = targetCid,
+                        initialAnchor = targetAnchor,
+                        layoutConfig = currentLayoutConfig,
+                        fallbackVid = meta?.vid ?: launchRequest.vid,
+                        fallbackVolumeTitle = meta?.volumeTitle ?: launchRequest.volumeTitle,
+                        fallbackChapterTitle = meta?.chapterTitle ?: launchRequest.chapterTitle,
+                    )
+                }
+            }
+        }
+
+        val activeChapterAst = remember(snapshot.currentSlot) {
+            (snapshot.currentSlot as? ChapterWindowSlot.Loaded)?.layout?.ast
+        }
+
+        val currentIllustrations = remember(activeChapterAst) {
+            activeChapterAst?.illustrationBlocks?.map { it.imageUrl }.orEmpty()
+        }
+
+        fun openArtbookGallery(chapterTitle: String, urls: List<String>, clickedIdx: Int) {
+            if (urls.isEmpty()) return
+            val safeIdx = clickedIdx.coerceIn(0, urls.lastIndex)
+            activeArtbookState = ReaderActiveArtbookState(
+                chapterTitle = chapterTitle,
+                imageUrls = urls,
+                initialIndex = safeIdx,
+            )
+            onIllustrationClicked(chapterTitle, urls, safeIdx)
+        }
+
+        // Honor `ReaderLaunchRequest.startWithTts` from NovelDetailScreen's `"朗读本章 (TTS)"` action,
+        // and continue automatically into the next chapter when an utterance stream finishes.
+        var didAutoStartInitialTts by remember(launchRequest.aid, launchRequest.cid, launchRequest.startWithTts) {
+            mutableStateOf(false)
+        }
+        var pendingTtsStartOnCid by remember { mutableIntStateOf(0) }
+
+        LaunchedEffect(activeChapterAst, launchRequest.startWithTts, pendingTtsStartOnCid) {
+            val ast = activeChapterAst ?: return@LaunchedEffect
+            if (launchRequest.startWithTts && !didAutoStartInitialTts && ast.cid == launchRequest.cid) {
+                didAutoStartInitialTts = true
+                val startBlock = snapshot.activeReaderPage?.startAnchor?.paragraphIndex ?: 0
+                ttsController.startChapter(
+                    ast = ast,
+                    startFromBlockIndex = startBlock,
+                    appLanguage = latestAppLang,
+                )
+            } else if (pendingTtsStartOnCid != 0 && ast.cid == pendingTtsStartOnCid) {
+                pendingTtsStartOnCid = 0
+                ttsController.startChapter(
+                    ast = ast,
+                    startFromBlockIndex = 0,
+                    appLanguage = latestAppLang,
+                )
+            }
+        }
+
+        LaunchedEffect(pendingTtsAutoContinueAfterCid) {
+            val finishedCid = pendingTtsAutoContinueAfterCid
+            if (finishedCid == 0) return@LaunchedEffect
+            pendingTtsAutoContinueAfterCid = 0
+            val curIdx = snapshot.orderedToc.indexOfFirst { it.cid == finishedCid }
+            val nextCid = snapshot.nextSlot?.chapter?.cid
+                ?: if (curIdx >= 0 && curIdx + 1 < snapshot.orderedToc.size) {
+                    snapshot.orderedToc[curIdx + 1].cid
+                } else {
+                    null
+                }
+            if (nextCid != null) {
+                pendingTtsStartOnCid = nextCid
+                val meta = snapshot.orderedToc.firstOrNull { it.cid == nextCid }
                 windowBuffer.openChapter(
-                    cid = targetCid,
-                    initialAnchor = targetAnchor,
+                    cid = nextCid,
+                    initialAnchor = ReadingAnchor(),
                     layoutConfig = currentLayoutConfig,
                     fallbackVid = meta?.vid ?: launchRequest.vid,
                     fallbackVolumeTitle = meta?.volumeTitle ?: launchRequest.volumeTitle,
                     fallbackChapterTitle = meta?.chapterTitle ?: launchRequest.chapterTitle,
                 )
+            } else {
+                ttsController.stopAndDismiss()
+                snackbarHostState.showSnackbar("本章已朗读完毕")
             }
         }
 
-        val currentIllustrations = remember(snapshot.currentSlot) {
-            (snapshot.currentSlot as? ChapterWindowSlot.Loaded)
-                ?.layout
-                ?.ast
-                ?.illustrationBlocks
-                ?.map { it.imageUrl }
-                .orEmpty()
+        // Automatically flip pages to follow the currently spoken paragraph during active TTS!
+        LaunchedEffect(ttsUiState.isSpeaking, ttsUiState.activeCid, ttsUiState.activeBlockIndex) {
+            if (!ttsUiState.isSpeaking) return@LaunchedEffect
+            val loadedCur = snapshot.currentSlot as? ChapterWindowSlot.Loaded ?: return@LaunchedEffect
+            if (loadedCur.chapter.cid != ttsUiState.activeCid) return@LaunchedEffect
+            val spokenAnchor = ReadingAnchor(paragraphIndex = ttsUiState.activeBlockIndex, charOffset = 0)
+            val targetLocalPage = loadedCur.layout.resolvePageIndexForAnchor(spokenAnchor)
+            if (targetLocalPage != snapshot.activePageIndexInCurrentChapter) {
+                val targetVirtual = snapshot.prevPageCount + targetLocalPage
+                if (targetVirtual in 0 until snapshot.totalVirtualPages) {
+                    val instantFlip = isEinkMode ||
+                        preferences.readerPageTurnMode == ReaderPageTurnMode.EINK_INSTANT
+                    if (instantFlip) {
+                        pagerState.scrollToPage(targetVirtual)
+                    } else {
+                        runCatching { pagerState.animateScrollToPage(targetVirtual) }
+                    }
+                    windowBuffer.onVirtualPageSettled(targetVirtual)
+                }
+            }
         }
 
         val currentChapterBookmark = remember(
@@ -860,10 +1007,10 @@ fun UnifiedReaderScreen(
                 } else {
                     listOf(clickedUrl)
                 }
-                onIllustrationClicked(
-                    snapshot.activeChapter?.chapterTitle ?: launchRequest.chapterTitle,
-                    urls,
-                    clickedIdx.coerceIn(0, (urls.size - 1).coerceAtLeast(0)),
+                openArtbookGallery(
+                    chapterTitle = snapshot.activeChapter?.chapterTitle ?: launchRequest.chapterTitle,
+                    urls = urls,
+                    clickedIdx = clickedIdx,
                 )
             },
             onContinuousScrollAnchorChanged = { scrollAnchor, _ ->
@@ -977,10 +1124,10 @@ fun UnifiedReaderScreen(
                     if (currentIllustrations.isNotEmpty()) {
                         AssistChip(
                             onClick = {
-                                onIllustrationClicked(
-                                    snapshot.activeChapter?.chapterTitle ?: launchRequest.chapterTitle,
-                                    currentIllustrations,
-                                    0,
+                                openArtbookGallery(
+                                    chapterTitle = snapshot.activeChapter?.chapterTitle ?: launchRequest.chapterTitle,
+                                    urls = currentIllustrations,
+                                    clickedIdx = 0,
                                 )
                             },
                             leadingIcon = {
@@ -989,10 +1136,20 @@ fun UnifiedReaderScreen(
                                     contentDescription = null,
                                 )
                             },
-                            label = { Text("查看大图 (${currentIllustrations.size})") },
+                            label = { Text("插图 (${currentIllustrations.size})") },
                             modifier = Modifier
-                                .padding(end = 4.dp)
+                                .padding(end = 2.dp)
                                 .testTag(ReaderTestTags.HUD_VIEW_ILLUSTRATIONS_CHIP),
+                        )
+                    }
+
+                    IconButton(
+                        onClick = { isSearchSheetOpen = true },
+                        modifier = Modifier.testTag(ReaderTestTags.HUD_SEARCH_BUTTON),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.Search,
+                            contentDescription = "书内搜索",
                         )
                     }
 
@@ -1075,7 +1232,7 @@ fun UnifiedReaderScreen(
             }
         }
 
-        // Bottom HUD: Snackbar + Undo Pill + Scrubber + M3e HorizontalFloatingToolbar OR Typography Studio / Opaque Capsule!
+        // Bottom HUD: Snackbar + TTS Playback Bar + Undo Pill + Scrubber + M3e HorizontalFloatingToolbar OR Typography Studio!
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier
@@ -1088,6 +1245,18 @@ fun UnifiedReaderScreen(
                 hostState = snackbarHostState,
                 modifier = Modifier.padding(bottom = 8.dp),
             )
+
+            if (ttsUiState.isSessionOpen && activeDraggingSlider == null && !isTypographyPanelOpen) {
+                ReaderTtsFloatingBar(
+                    state = ttsUiState,
+                    onTogglePlayPause = { ttsController.togglePlayPause(latestAppLang) },
+                    onSkipPrevious = { ttsController.skipPrevious(latestAppLang) },
+                    onSkipNext = { ttsController.skipNext(latestAppLang) },
+                    onCycleSpeechRate = { ttsController.cycleSpeechRate(latestAppLang) },
+                    onStopAndDismiss = { ttsController.stopAndDismiss() },
+                    modifier = Modifier.padding(bottom = 8.dp),
+                )
+            }
 
             // 5-second `"↩ 还原至第 N 页"` pill after scrubbing or jumping chapters.
             val activeUndo = undoJumpState
@@ -1305,6 +1474,27 @@ fun UnifiedReaderScreen(
                         label = "书签",
                         tag = ReaderTestTags.ACTION_BOOKMARKS,
                         onClick = { isBookmarksSheetOpen = true },
+                    )
+                    ReaderToolbarActionButton(
+                        icon = Icons.Outlined.GraphicEq,
+                        label = if (ttsUiState.isSpeaking) "朗读中" else "朗读",
+                        tag = ReaderTestTags.ACTION_TTS,
+                        onClick = {
+                            if (ttsUiState.isSessionOpen) {
+                                ttsController.togglePlayPause(latestAppLang)
+                            } else {
+                                val ast = activeChapterAst
+                                if (ast != null) {
+                                    val startBlock = snapshot.activeReaderPage?.startAnchor?.paragraphIndex ?: 0
+                                    isHudVisible = false
+                                    ttsController.startChapter(
+                                        ast = ast,
+                                        startFromBlockIndex = startBlock,
+                                        appLanguage = latestAppLang,
+                                    )
+                                }
+                            }
+                        },
                     )
                     val isCurrentlyNight = preferences.readerPaperPreset.isDark
                     ReaderToolbarActionButton(
@@ -1556,6 +1746,50 @@ fun UnifiedReaderScreen(
                     }
                 }
             }
+        }
+
+        // In-Book Search Sheet (`当前章节` & `已缓存全书`)
+        if (isSearchSheetOpen) {
+            ReaderInBookSearchSheet(
+                activeChapterAst = activeChapterAst,
+                orderedToc = snapshot.orderedToc,
+                cachedChapterIds = cachedChapterIds,
+                chapterContentDao = database.chapterContentDao(),
+                ioDispatcher = ioDispatcher,
+                onJumpToResult = { hit ->
+                    isSearchSheetOpen = false
+                    isHudVisible = false
+                    jumpToChapterWithUndo(
+                        targetCid = hit.cid,
+                        targetAnchor = ReadingAnchor(
+                            paragraphIndex = hit.match.blockIndex,
+                            charOffset = hit.match.startCharOffset,
+                        ),
+                    )
+                },
+                onDismiss = { isSearchSheetOpen = false },
+            )
+        }
+
+        // Full-Screen Artbook Lightbox (`BitmapRegionDecoder` 4x Tiling + `跨页拼合` Spreads)
+        val openArtbook = activeArtbookState
+        if (openArtbook != null) {
+            val appAssetRoots = remember(context) {
+                (context.applicationContext as? Wenku8V2Application)
+                    ?.appContainer
+                    ?.resolveLocalAssetRoots()
+                    ?: listOf(context.filesDir)
+            }
+            ArtbookLightboxOverlay(
+                novelTitle = launchRequest.novelTitle,
+                chapterTitle = openArtbook.chapterTitle,
+                imageUrls = openArtbook.imageUrls,
+                initialImageIndex = openArtbook.initialIndex,
+                assetSearchRoots = appAssetRoots,
+                imageFileResolver = artbookImageFileResolver,
+                ioDispatcher = ioDispatcher,
+                onDismiss = { activeArtbookState = null },
+            )
         }
     }
 }

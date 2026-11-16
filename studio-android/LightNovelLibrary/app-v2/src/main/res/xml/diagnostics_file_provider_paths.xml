@@ -3,4 +3,7 @@
     <cache-path
         name="diagnostics_reports"
         path="diagnostics/" />
+    <cache-path
+        name="artbook_share"
+        path="artbook_share/" />
 </paths>
