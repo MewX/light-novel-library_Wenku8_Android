@@ -243,6 +243,12 @@ interface WenkuCatalogGateway {
         rid: Int,
         content: String,
     ): WenkuApiResult<Unit> = WenkuApiResult.ApiNotConfigured
+
+    /**
+     * Fetches raw binary image bytes (novel covers or inline chapter illustrations) via the active
+     * [WenkuTransport] so offline downloads save permanent files under `filesDir/saves/imgs/`.
+     */
+    suspend fun downloadBinaryBytes(url: String): ByteArray? = null
 }
 
 /**
@@ -275,6 +281,12 @@ class WenkuApiClient(
     }
 
     override fun findBadWord(text: String): String? = paramsFactory.findBadWord(text)
+
+    override suspend fun downloadBinaryBytes(url: String): ByteArray? {
+        val cleanUrl = url.trim()
+        if (cleanUrl.isEmpty()) return null
+        return transport.getBytes(cleanUrl)
+    }
 
     override suspend fun fetchNovelListPage(
         sortedBy: Wenku8API.NovelSortedBy,

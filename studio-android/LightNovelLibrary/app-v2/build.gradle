@@ -166,6 +166,9 @@ dependencies {
     // WorkManager for atomic background novel downloads (Phase 4)
     implementation 'androidx.work:work-runtime-ktx:2.11.0'
 
+    // Minimal server-support inline banner exclusively on NovelDetailScreen (Phase 4)
+    implementation 'com.google.android.gms:play-services-ads:23.6.0'
+
     // Debug Compose tooling
     debugImplementation 'androidx.compose.ui:ui-tooling'
     debugImplementation 'androidx.compose.ui:ui-test-manifest'

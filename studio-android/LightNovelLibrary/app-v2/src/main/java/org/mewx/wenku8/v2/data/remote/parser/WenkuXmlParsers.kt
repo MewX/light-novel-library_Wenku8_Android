@@ -20,6 +20,7 @@ data class ParsedNovelFullMeta(
     val lastUpdate: String = "",
     val latestSectionCid: Int = 0,
     val latestSectionName: String = "",
+    val tagsCsv: String = "",
 )
 
 data class ParsedNovelListItem(
@@ -119,6 +120,7 @@ object WenkuXmlParsers {
             var lastUpdate = ""
             var latestCid = 0
             var latestName = ""
+            var tagsCsv = ""
 
             var eventType = parser.eventType
             while (eventType != XmlPullParser.END_DOCUMENT) {
@@ -144,6 +146,7 @@ object WenkuXmlParsers {
                         "BookStatus" -> bookStatus = parser.readValueAttributeOrText()
                         "BookLength" -> bookLength = parser.readValueAttributeOrText().toSafeInt()
                         "LastUpdate" -> lastUpdate = parser.readValueAttributeOrText()
+                        "Tags" -> tagsCsv = parser.readValueAttributeOrText()
                         "LatestSection" -> {
                             val rawCid = parser.getAttributeValue(null, "cid")
                                 ?: parser.safePositionalAttribute(1)
@@ -172,6 +175,7 @@ object WenkuXmlParsers {
                     lastUpdate = lastUpdate,
                     latestSectionCid = latestCid,
                     latestSectionName = latestName,
+                    tagsCsv = tagsCsv,
                 )
             }
         } catch (_: Exception) {

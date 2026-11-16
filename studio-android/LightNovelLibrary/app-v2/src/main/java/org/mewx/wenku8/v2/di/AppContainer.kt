@@ -224,6 +224,25 @@ class AppContainer(context: Context) {
         )
     }
 
+    val novelDetailRepository: org.mewx.wenku8.v2.data.repository.NovelDetailRepository by lazy {
+        org.mewx.wenku8.v2.data.repository.NovelDetailRepository(
+            database = database,
+            catalogGateway = wenkuApiClient,
+            novelTocSyncRepository = novelTocSyncRepository,
+        )
+    }
+
+    val novelDownloadRepository: org.mewx.wenku8.v2.data.download.NovelDownloadRepository by lazy {
+        org.mewx.wenku8.v2.data.download.NovelDownloadRepository(
+            database = database,
+            catalogGateway = wenkuApiClient,
+            novelTocSyncRepository = novelTocSyncRepository,
+            assetRootsProvider = ::resolveLocalAssetRoots,
+            applicationScope = applicationScope,
+            appContext = appContext,
+        )
+    }
+
     val legacyV1StorageMigrator: LegacyV1StorageMigrator by lazy {
         LegacyV1StorageMigrator(database, userPreferencesRepository)
     }

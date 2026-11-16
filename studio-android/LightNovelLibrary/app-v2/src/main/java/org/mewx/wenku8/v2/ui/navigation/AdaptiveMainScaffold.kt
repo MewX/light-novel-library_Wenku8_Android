@@ -60,18 +60,23 @@ import org.mewx.wenku8.v2.data.local.preferences.Wenku8UserPreferences
 import org.mewx.wenku8.v2.data.migration.LegacyV1StorageMigrator
 import org.mewx.wenku8.v2.data.remote.diagnostics.AutoRoutingModeState
 import org.mewx.wenku8.v2.data.remote.diagnostics.RelayRouteController
+import org.mewx.wenku8.v2.data.download.NovelDownloadRepository
 import org.mewx.wenku8.v2.data.repository.BackupArchiveRepository
 import org.mewx.wenku8.v2.data.repository.BookshelfRepository
 import org.mewx.wenku8.v2.data.repository.BookshelfSortMode
 import org.mewx.wenku8.v2.data.repository.BookshelfViewMode
 import org.mewx.wenku8.v2.data.repository.DiscoveryRepository
+import org.mewx.wenku8.v2.data.repository.NovelDetailRepository
 import org.mewx.wenku8.v2.data.repository.ReviewThreadCardItem
 import org.mewx.wenku8.v2.data.repository.ReviewsRepository
 import org.mewx.wenku8.v2.data.repository.ServerNoticeAndUpdateRepository
 import org.mewx.wenku8.v2.data.repository.StorageAndCacheRepository
 import org.mewx.wenku8.v2.data.repository.UserSessionRepository
 import org.mewx.wenku8.v2.domain.model.DiscoveryNovelCardItem
+import org.mewx.wenku8.v2.domain.model.UnifiedSearchMode
 import org.mewx.wenku8.v2.ui.bookshelf.BookshelfScreen
+import org.mewx.wenku8.v2.ui.detail.NovelDetailScreen
+import org.mewx.wenku8.v2.ui.detail.ReaderLaunchRequest
 import org.mewx.wenku8.v2.ui.diagnostics.NetworkDiagnosticsScreen
 import org.mewx.wenku8.v2.ui.diagnostics.NetworkDiagnosticsViewModel
 import org.mewx.wenku8.v2.ui.discovery.LatestScreen
@@ -125,6 +130,8 @@ fun AdaptiveMainScaffold(
     backupArchiveRepository: BackupArchiveRepository? = null,
     reviewsRepository: ReviewsRepository? = null,
     bookshelfRepository: BookshelfRepository? = null,
+    novelDetailRepository: NovelDetailRepository? = null,
+    novelDownloadRepository: NovelDownloadRepository? = null,
     legacyV1StorageMigrator: LegacyV1StorageMigrator? = null,
     appLanguage: Wenku8API.AppLanguage = Wenku8API.AppLanguage.SC,
     networkDiagnosticsViewModelFactory: NetworkDiagnosticsViewModel.Factory? = null,
@@ -149,6 +156,7 @@ fun AdaptiveMainScaffold(
     initialOpenReviewsTitle: String = "",
     onOpenSearch: () -> Unit = {},
     onNovelClicked: (DiscoveryNovelCardItem) -> Unit = {},
+    onOpenReader: (ReaderLaunchRequest) -> Unit = {},
     onOpenNetworkDiagnostics: () -> Unit = {},
 ) {
     val effectivePreferences = userPreferences ?: Wenku8UserPreferences(
@@ -192,11 +200,23 @@ fun AdaptiveMainScaffold(
     var isSearchStudioOpen by rememberSaveable {
         mutableStateOf(false)
     }
+    var searchInitialQuery by rememberSaveable {
+        mutableStateOf("")
+    }
+    var searchInitialMode by rememberSaveable {
+        mutableStateOf(UnifiedSearchMode.NOVEL_TITLE)
+    }
     var isNetworkDiagnosticsOpen by rememberSaveable {
         mutableStateOf(false)
     }
     var isLoginBottomSheetOpen by rememberSaveable {
         mutableStateOf(false)
+    }
+    var activeDetailNovelAid by rememberSaveable {
+        mutableStateOf(0)
+    }
+    var activeDetailSeedItem by androidx.compose.runtime.remember {
+        mutableStateOf<DiscoveryNovelCardItem?>(null)
     }
     var activeReviewsAid by rememberSaveable {
         mutableStateOf(initialOpenReviewsAid)
@@ -211,7 +231,28 @@ fun AdaptiveMainScaffold(
     val handleOpenSearch = {
         onOpenSearch()
         if (discoveryRepository != null) {
+            searchInitialQuery = ""
+            searchInitialMode = UnifiedSearchMode.NOVEL_TITLE
             isSearchStudioOpen = true
+        }
+    }
+
+    val handleOpenSearchWithSeed: (String, UnifiedSearchMode) -> Unit = { query, mode ->
+        onOpenSearch()
+        if (discoveryRepository != null) {
+            activeDetailNovelAid = 0
+            activeDetailSeedItem = null
+            searchInitialQuery = query
+            searchInitialMode = mode
+            isSearchStudioOpen = true
+        }
+    }
+
+    val handleNovelClicked: (DiscoveryNovelCardItem) -> Unit = { item ->
+        onNovelClicked(item)
+        if (novelDetailRepository != null && bookshelfRepository != null && novelDownloadRepository != null) {
+            activeDetailSeedItem = item
+            activeDetailNovelAid = item.aid
         }
     }
 
@@ -229,6 +270,12 @@ fun AdaptiveMainScaffold(
     ) {
         val isCompactWidth = maxWidth < MediumWindowWidthBreakpoint
         val isExpandedRailWidth = maxWidth >= ExpandedWindowWidthBreakpoint
+        val showTwoPaneExpandedDetail = isExpandedRailWidth &&
+            !isSearchStudioOpen &&
+            activeDetailNovelAid > 0 &&
+            novelDetailRepository != null &&
+            bookshelfRepository != null &&
+            novelDownloadRepository != null
 
         if (isCompactWidth) {
             Scaffold(
@@ -302,7 +349,7 @@ fun AdaptiveMainScaffold(
                     appLanguage = appLanguage,
                     onOpenSearch = handleOpenSearch,
                     onOpenLoginSheet = { isLoginBottomSheetOpen = true },
-                    onNovelClicked = onNovelClicked,
+                    onNovelClicked = handleNovelClicked,
                     onOpenNetworkDiagnostics = handleOpenNetworkDiagnostics,
                     contentPadding = innerPadding,
                 )
@@ -329,7 +376,11 @@ fun AdaptiveMainScaffold(
                         WideNavigationRailItem(
                             railExpanded = isExpandedRailWidth,
                             selected = isSelected,
-                            onClick = { selectedDestination = destination },
+                            onClick = {
+                                selectedDestination = destination
+                                activeDetailNovelAid = 0
+                                activeDetailSeedItem = null
+                            },
                             icon = {
                                 Icon(
                                     imageVector = if (isSelected) {
@@ -349,7 +400,7 @@ fun AdaptiveMainScaffold(
                 }
 
                 Scaffold(
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.weight(if (showTwoPaneExpandedDetail) 0.44f else 1f),
                     contentWindowInsets = WindowInsets.safeDrawing,
                 ) { innerPadding ->
                     MainDestinationBody(
@@ -390,9 +441,42 @@ fun AdaptiveMainScaffold(
                         appLanguage = appLanguage,
                         onOpenSearch = handleOpenSearch,
                         onOpenLoginSheet = { isLoginBottomSheetOpen = true },
-                        onNovelClicked = onNovelClicked,
+                        onNovelClicked = handleNovelClicked,
                         onOpenNetworkDiagnostics = handleOpenNetworkDiagnostics,
                         contentPadding = innerPadding,
+                    )
+                }
+
+                if (showTwoPaneExpandedDetail) {
+                    NovelDetailScreen(
+                        aid = activeDetailNovelAid,
+                        novelDetailRepository = novelDetailRepository,
+                        bookshelfRepository = bookshelfRepository,
+                        novelDownloadRepository = novelDownloadRepository,
+                        appLanguage = appLanguage,
+                        themeMode = effectivePreferences.themeMode,
+                        useCoverTheme = effectivePreferences.useDynamicColor,
+                        seedDiscoveryItem = activeDetailSeedItem?.takeIf { it.aid == activeDetailNovelAid },
+                        showBackButton = true,
+                        onNavigateBack = {
+                            activeDetailNovelAid = 0
+                            activeDetailSeedItem = null
+                        },
+                        onOpenReader = onOpenReader,
+                        onOpenReviews = { aid, title ->
+                            activeReviewsAid = aid
+                            activeReviewsNovelTitle = title
+                            activeReviewThread = null
+                        },
+                        onAuthorClicked = { author ->
+                            handleOpenSearchWithSeed(author, UnifiedSearchMode.AUTHOR_NAME)
+                        },
+                        onTagClicked = { tag ->
+                            handleOpenSearchWithSeed(tag, UnifiedSearchMode.NOVEL_TITLE)
+                        },
+                        modifier = Modifier
+                            .weight(0.56f)
+                            .fillMaxHeight(),
                     )
                 }
             }
@@ -402,9 +486,48 @@ fun AdaptiveMainScaffold(
             UnifiedSearchScreen(
                 discoveryRepository = discoveryRepository,
                 appLanguage = appLanguage,
-                onNavigateBack = { isSearchStudioOpen = false },
-                onNovelClicked = onNovelClicked,
+                initialQuery = searchInitialQuery,
+                initialMode = searchInitialMode,
+                onNavigateBack = {
+                    isSearchStudioOpen = false
+                    searchInitialQuery = ""
+                },
+                onNovelClicked = handleNovelClicked,
                 onOpenNetworkDiagnostics = handleOpenNetworkDiagnostics,
+            )
+        }
+
+        if (activeDetailNovelAid > 0 &&
+            !showTwoPaneExpandedDetail &&
+            novelDetailRepository != null &&
+            bookshelfRepository != null &&
+            novelDownloadRepository != null
+        ) {
+            NovelDetailScreen(
+                aid = activeDetailNovelAid,
+                novelDetailRepository = novelDetailRepository,
+                bookshelfRepository = bookshelfRepository,
+                novelDownloadRepository = novelDownloadRepository,
+                appLanguage = appLanguage,
+                themeMode = effectivePreferences.themeMode,
+                useCoverTheme = effectivePreferences.useDynamicColor,
+                seedDiscoveryItem = activeDetailSeedItem?.takeIf { it.aid == activeDetailNovelAid },
+                onNavigateBack = {
+                    activeDetailNovelAid = 0
+                    activeDetailSeedItem = null
+                },
+                onOpenReader = onOpenReader,
+                onOpenReviews = { aid, title ->
+                    activeReviewsAid = aid
+                    activeReviewsNovelTitle = title
+                    activeReviewThread = null
+                },
+                onAuthorClicked = { author ->
+                    handleOpenSearchWithSeed(author, UnifiedSearchMode.AUTHOR_NAME)
+                },
+                onTagClicked = { tag ->
+                    handleOpenSearchWithSeed(tag, UnifiedSearchMode.NOVEL_TITLE)
+                },
             )
         }
 

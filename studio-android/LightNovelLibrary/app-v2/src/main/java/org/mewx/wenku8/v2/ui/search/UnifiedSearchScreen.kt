@@ -121,7 +121,9 @@ fun UnifiedSearchScreen(
     onNovelClicked: (DiscoveryNovelCardItem) -> Unit,
     onOpenNetworkDiagnostics: () -> Unit,
     modifier: Modifier = Modifier,
-    autoFocusInputOnEntry: Boolean = true,
+    initialQuery: String = "",
+    initialMode: UnifiedSearchMode = UnifiedSearchMode.NOVEL_TITLE,
+    autoFocusInputOnEntry: Boolean = initialQuery.isBlank(),
 ) {
     BackHandler(onBack = onNavigateBack)
 
@@ -130,8 +132,9 @@ fun UnifiedSearchScreen(
     val focusRequester = remember { FocusRequester() }
     val isEink = LocalEinkMode.current
 
-    var queryText by rememberSaveable { mutableStateOf("") }
-    var selectedMode by rememberSaveable { mutableStateOf(UnifiedSearchMode.NOVEL_TITLE) }
+    var queryText by rememberSaveable(initialQuery) { mutableStateOf(initialQuery) }
+    var selectedMode by rememberSaveable(initialMode) { mutableStateOf(initialMode) }
+    var hasDispatchedInitialQuery by rememberSaveable(initialQuery, initialMode) { mutableStateOf(false) }
     var showDirectAidValidationError by rememberSaveable { mutableStateOf(false) }
     var localShelfMatches by remember { mutableStateOf<List<DiscoveryNovelCardItem>>(emptyList()) }
 
@@ -169,6 +172,14 @@ fun UnifiedSearchScreen(
             mode = mode,
             appLanguage = appLanguage,
         )
+    }
+
+    LaunchedEffect(initialQuery, initialMode) {
+        val trimmedInitial = initialQuery.trim()
+        if (trimmedInitial.isNotEmpty() && !hasDispatchedInitialQuery) {
+            hasDispatchedInitialQuery = true
+            triggerOnlineSearch(targetQuery = trimmedInitial, mode = initialMode)
+        }
     }
 
     Scaffold(

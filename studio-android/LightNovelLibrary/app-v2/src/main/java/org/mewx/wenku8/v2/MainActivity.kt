@@ -93,6 +93,8 @@ class MainActivity : AppCompatActivity() {
                         backupArchiveRepository = appContainer.backupArchiveRepository,
                         reviewsRepository = appContainer.reviewsRepository,
                         bookshelfRepository = appContainer.bookshelfRepository,
+                        novelDetailRepository = appContainer.novelDetailRepository,
+                        novelDownloadRepository = appContainer.novelDownloadRepository,
                         legacyV1StorageMigrator = appContainer.legacyV1StorageMigrator,
                         appLanguage = loadedPreferences.appLanguage,
                         networkDiagnosticsViewModelFactory = appContainer.networkDiagnosticsViewModelFactory,

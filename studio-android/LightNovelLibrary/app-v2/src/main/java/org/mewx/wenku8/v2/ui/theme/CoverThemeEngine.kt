@@ -1,5 +1,6 @@
 package org.mewx.wenku8.v2.ui.theme
 
+import android.graphics.Bitmap
 import androidx.compose.material3.ColorScheme
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
@@ -18,6 +19,105 @@ import kotlin.math.min
  * foreground text contrast is guaranteed `>= 4.5:1` regardless of cover artwork.
  */
 object CoverThemeEngine {
+
+    /**
+     * Deterministic editorial fallback seed color keyed by [aid] before cover artwork finishes
+     * decoding (or when offline without a cached cover JPEG).
+     */
+    fun deterministicSeedColorForAid(aid: Int): Color {
+        val safeAid = abs(aid)
+        val hueDegrees = ((safeAid * 47) % 360).toFloat()
+        return hslToColor(hueDegrees = hueDegrees, saturation = 0.42f, lightness = 0.46f)
+    }
+
+    /**
+     * Extracts a chromatic seed [Color] from a decoded cover [Bitmap] using a lightweight `16x16`
+     * center-weighted sample grid (zero third-party `androidx.palette` dependency).
+     *
+     * Favors chromatic mid-luminance pixels (`saturation >= 0.14` and `lightness in 0.12..0.88`)
+     * so white Bunkobon obi/margins and black typography never wash out the cover's true hue.
+     */
+    fun extractSeedColorFromBitmap(bitmap: Bitmap): Color {
+        if (bitmap.width <= 0 || bitmap.height <= 0 || bitmap.isRecycled) {
+            return hslToColor(hueDegrees = 28f, saturation = 0.40f, lightness = 0.45f)
+        }
+
+        val needsSoftwareCopy = android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O &&
+            bitmap.config == Bitmap.Config.HARDWARE
+        val readableBitmap = if (needsSoftwareCopy) {
+            bitmap.copy(Bitmap.Config.ARGB_8888, false)
+                ?: return hslToColor(hueDegrees = 28f, saturation = 0.40f, lightness = 0.45f)
+        } else {
+            bitmap
+        }
+
+        try {
+            val width = readableBitmap.width
+            val height = readableBitmap.height
+            val gridSteps = 16
+            var weightedRed = 0f
+            var weightedGreen = 0f
+            var weightedBlue = 0f
+            var totalWeight = 0f
+
+            var fallbackRed = 0f
+            var fallbackGreen = 0f
+            var fallbackBlue = 0f
+            var sampleCount = 0
+
+            for (gx in 0 until gridSteps) {
+                val x = ((gx + 0.5f) * width / gridSteps).toInt().coerceIn(0, width - 1)
+                val centerWeightX = 1f - 0.45f * abs((gx + 0.5f) / gridSteps * 2f - 1f)
+                for (gy in 0 until gridSteps) {
+                    val y = ((gy + 0.5f) * height / gridSteps).toInt().coerceIn(0, height - 1)
+                    val argb = readableBitmap.getPixel(x, y)
+                    val alpha = ((argb ushr 24) and 0xFF) / 255f
+                    if (alpha < 0.5f) continue
+
+                    val r = ((argb ushr 16) and 0xFF) / 255f
+                    val g = ((argb ushr 8) and 0xFF) / 255f
+                    val b = (argb and 0xFF) / 255f
+
+                    fallbackRed += r
+                    fallbackGreen += g
+                    fallbackBlue += b
+                    sampleCount++
+
+                    val (_, sat, light) = rgbToHsl(Color(r, g, b, 1f))
+                    if (sat >= 0.14f && light in 0.12f..0.88f) {
+                        val centerWeightY = 1f - 0.35f * abs((gy + 0.5f) / gridSteps * 2f - 1f)
+                        val pixelWeight = sat * centerWeightX * centerWeightY
+                        weightedRed += r * pixelWeight
+                        weightedGreen += g * pixelWeight
+                        weightedBlue += b * pixelWeight
+                        totalWeight += pixelWeight
+                    }
+                }
+            }
+
+            return if (totalWeight > 1e-4f) {
+                Color(
+                    red = (weightedRed / totalWeight).coerceIn(0f, 1f),
+                    green = (weightedGreen / totalWeight).coerceIn(0f, 1f),
+                    blue = (weightedBlue / totalWeight).coerceIn(0f, 1f),
+                    alpha = 1f,
+                )
+            } else if (sampleCount > 0) {
+                Color(
+                    red = (fallbackRed / sampleCount).coerceIn(0f, 1f),
+                    green = (fallbackGreen / sampleCount).coerceIn(0f, 1f),
+                    blue = (fallbackBlue / sampleCount).coerceIn(0f, 1f),
+                    alpha = 1f,
+                )
+            } else {
+                hslToColor(hueDegrees = 28f, saturation = 0.40f, lightness = 0.45f)
+            }
+        } finally {
+            if (readableBitmap !== bitmap && !readableBitmap.isRecycled) {
+                readableBitmap.recycle()
+            }
+        }
+    }
 
     /**
      * Produces a scoped [ColorScheme] overriding primary/secondary/tertiary accent tokens from
