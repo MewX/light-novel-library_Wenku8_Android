@@ -25,12 +25,12 @@
 ## Phase-by-Phase Checklist
 
 ### Phase 0: Foundation, M3e Theme, Atomic Room SQLite & Legacy `v1.31` Migrator
-- [~] **`P0.1` — `:app-v2` Module Scaffold, M3 Expressive (`M3e`) Theme & 4-Tab Adaptive Shell**
-  - Create `:app-v2` (`org.mewx.wenku8.v2dev`, `minSdk = 23`, `--user 0` install option, `alpha`/`baidu`/`playstore` flavors).
-  - Implement `Wenku8ExpressiveTheme` (Archival Day `#F6F5EF`, Carbon Night `#111312`, Pure AMOLED, E-Ink `1.dp` `#111111` border + zero-animation mode, Monet dynamic color, scoped `CoverThemeEngine`).
-  - Implement `AdaptiveMainScaffold` (`ShortNavigationBar` + `WideNavigationRail` for `书架 · 最新 · 排行 · 我的`, defaulting to `最新` with configurable `本地书架` home & smart offline fallback).
-  - Verify JVM tests (`:api` + `-DforceApiStub`) + live install/launch/screenshot on Pixel 8 (`--user 0`).
-- [ ] **`P0.2` — Unified Room SQLite (`wenku8_v2.db` WAL), Atomic `@Upsert` TOC Sync & Full Settings DataStore**
+- [x] **`P0.1` — `:app-v2` Module Scaffold, M3 Expressive (`M3e`) Theme & 4-Tab Adaptive Shell**
+  - Created `:app-v2` (`org.mewx.wenku8.v2dev`, `minSdk = 24` per official `androidx.compose.material3:1.5.0-rc01` M3e manifest floor, `--user 0` install option, `alpha`/`baidu`/`playstore` flavors).
+  - Implemented `Wenku8ExpressiveTheme` (`MaterialExpressiveTheme`, `EinkZeroMotionScheme`, Archival Day `#F6F5EF`, Carbon Night `#111312`, Pure AMOLED, E-Ink `1.dp` `#111111` border + zero-animation mode, Monet dynamic color, scoped WCAG-AA `CoverThemeEngine`).
+  - Implemented `AdaptiveMainScaffold` (`ShortNavigationBar` + `WideNavigationRail` for `书架 · 最新 · 排行 · 我的`, defaulting to `最新` with configurable `本地书架` home & smart offline fallback).
+  - Verified 8/8 JVM + Robolectric Compose UI tests (`:api` + `-DforceApiStub`), `:app` regression build, and live install/launch/screenshot strictly on Pixel 8 `User 0` (`User 10` empty).
+- [~] **`P0.2` — Unified Room SQLite (`wenku8_v2.db` WAL), Atomic `@Upsert` TOC Sync & Full Settings DataStore**
   - All 9 Room entities with decoupled FKs (`CHAPTER_CONTENTS`, `READING_PROGRESS`, `BOOKMARKS_NOTES` → `NOVELS(aid)`).
   - `NovelTocSyncRepository.syncNovelIndexAtomically` (`@Upsert`, stale-response guard, SHA-256 fast-path, monotonic `toc_version`, `READING_PROGRESS.vid` auto-healing, single-row `2 MB CursorWindow` guard).
   - `UserPreferencesRepository` (`settings.preferences_pb`) preserving 100% of `v1.31` `SettingItems` + `DefaultHomeTab` (`LATEST` default / `BOOKSHELF`) + `autoOptimizeConnection`.

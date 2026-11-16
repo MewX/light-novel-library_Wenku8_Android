@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">轻小说文库 v2 Dev</string>
+
+    <!-- 4 Top-Level Navigation Destinations -->
+    <string name="nav_bookshelf">书架</string>
+    <string name="nav_latest">最新</string>
+    <string name="nav_rankings">排行</string>
+    <string name="nav_profile">我的</string>
+
+    <!-- Smart Offline Fallback Banner -->
+    <string name="offline_fallback_bookshelf_banner">当前离线，已自动切换至本地书架</string>
+    <string name="action_search_novels">搜索全站小说、作者或直达 AID</string>
+    <string name="action_network_diagnostics">网络检测</string>
+
+    <!-- Destination Headers & Subtitles -->
+    <string name="bookshelf_headline">本地书架</string>
+    <string name="bookshelf_subtitle">离线优先阅读中心 · 支持本地标签、云书架双向同步与断点续读</string>
+    <string name="latest_headline">最新</string>
+    <string name="latest_subtitle">最近更新 · 最新入库 · 完结精品</string>
+    <string name="rankings_headline">排行榜</string>
+    <string name="rankings_subtitle">多维热度矩阵 · 总榜 / 月榜 / 周榜 / 日榜</string>
+    <string name="profile_headline">我的与工作室</string>
+    <string name="profile_subtitle">账号签到 · 阅读排版 · 自动优化连接 · 备份与存储管理</string>
+
+    <!-- Theme & Home Preview Controls -->
+    <string name="theme_section_title">阅读主题与墨水屏预览 (M3 Expressive)</string>
+    <string name="theme_mode_system">跟随系统</string>
+    <string name="theme_mode_archival_day">典藏暖白</string>
+    <string name="theme_mode_carbon_night">碳墨深色</string>
+    <string name="theme_mode_pure_amoled">纯黑省电</string>
+    <string name="theme_mode_eink">墨水屏高对比</string>
+    <string name="setting_default_home_title">默认启动页</string>
+    <string name="setting_default_home_latest">最新更新 (默认)</string>
+    <string name="setting_default_home_bookshelf">本地书架</string>
+</resources>
