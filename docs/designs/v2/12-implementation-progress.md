@@ -41,9 +41,9 @@
 ### Phase 1: Discovery Feeds (`最新` · `排行`) & Unified Search Studio (`5s` Cooldown Queue)
 - [x] **`P1.1` — `:api` Coroutine Gateway (`WenkuApiClient`) & Paginated Feed Engine** *(Completed: pluggable `WenkuTransport` + `LegacyLightNetworkTransport`, stub- & JNI-safe `WenkuApiClient` / `WenkuCatalogGateway`, all 13 `NovelSortedBy` feed mappings, completeness-monotonic `DiscoveryRepository` card cache, `<result>` root gateway validation, instant local Room filter, & auto-queued `5s` online search cooldown coordinator; verified across real `:api` & `-DforceApiStub`)*
   - Clean Kotlin repository wrapping `Wenku8API` + `LightNetwork` / `RelayHttpTransport` + `Wenku8Parser` / `NovelListWithInfoParser` with `api-stub` safety.
-- [~] **`P1.2` — `LatestScreen` (`最近更新 · 最新入库 · 完结精品`) & `RankingsScreen` (2D Metric × Period Matrix)**
+- [x] **`P1.2` — `LatestScreen` (`最近更新 · 最新入库 · 完结精品`) & `RankingsScreen` (2D Metric × Period Matrix)** *(Completed: M3e `LatestScreen` `PrimaryTabRow`, `RankingsScreen` `SingleChoiceSegmentedButtonRow` × `FilterChip` matrix with `#1..#N` rank badges, `DiscoveryNovelCard` & `PaginatedNovelFeedContent` with pull-to-refresh, infinite pagination, E-Ink `1.dp` border + static progress compliance, `[ 网络检测 ]` error card, and `Wenku8API.AppVer = BuildConfig.API_PROTOCOL_VERSION` (`"1.31"`, register `"2.0"` in `:api` + `wenku8-relay` at final cutover); verified live Wenku8 relay feeds & covers on Pixel 8 `User 0` + Robolectric UI tests across `:api` & `-DforceApiStub`)*
   - Real data loading, pagination, pull-to-refresh, E-Ink card compliance, and contextual `[ 🩺 网络检测 ]` error chip.
-- [ ] **`P1.3` — `UnifiedSearchScreen` (`0ms` Local Room Shelf Filter + Auto-Queued `5s` Online Search & History)**
+- [~] **`P1.3` — `UnifiedSearchScreen` (`0ms` Local Room Shelf Filter + Auto-Queued `5s` Online Search & History)**
   - Title (`articlename`), Author (`author`), and numeric `AID` jump + live `5s` server cooldown countdown queue + 20-item Room search history.
 
 ### Phase 2: `OkHttpProbeTransport`, `RelayHttpTransport`, `"自动优化连接"` & `NetworkDiagnosticsScreen`

@@ -20,6 +20,9 @@ android {
         targetSdkVersion rootProject.targetSdkVersion
         versionCode 20000
         versionName "2.0.0-dev"
+        // Protocol version registered in :api's TokenManager during parallel v2 development.
+        // Update alongside :api + relay secret registration at final v2.0 cutover.
+        buildConfigField "String", "API_PROTOCOL_VERSION", "\"1.31\""
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {

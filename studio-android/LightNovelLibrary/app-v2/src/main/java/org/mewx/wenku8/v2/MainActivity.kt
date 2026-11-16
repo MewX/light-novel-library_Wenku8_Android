@@ -40,9 +40,9 @@ class MainActivity : AppCompatActivity() {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
 
-        val preferencesRepository = (application as Wenku8V2Application)
-            .appContainer
-            .userPreferencesRepository
+        val appContainer = (application as Wenku8V2Application).appContainer
+        val preferencesRepository = appContainer.userPreferencesRepository
+        val discoveryRepository = appContainer.discoveryRepository
         val hasActiveNetworkOnColdStart = checkActiveNetworkConnectivity(this)
 
         setContent {
@@ -80,6 +80,8 @@ class MainActivity : AppCompatActivity() {
                                 preferencesRepository.setDefaultHomeDestination(selectedHome)
                             }
                         },
+                        discoveryRepository = discoveryRepository,
+                        appLanguage = loadedPreferences.appLanguage,
                     )
                 }
             }

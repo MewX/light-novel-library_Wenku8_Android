@@ -49,7 +49,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import org.mewx.wenku8.api.Wenku8API
 import org.mewx.wenku8.v2.R
+import org.mewx.wenku8.v2.data.repository.DiscoveryRepository
+import org.mewx.wenku8.v2.domain.model.DiscoveryNovelCardItem
+import org.mewx.wenku8.v2.ui.discovery.LatestScreen
+import org.mewx.wenku8.v2.ui.discovery.PersistentSearchEntryPill
+import org.mewx.wenku8.v2.ui.discovery.RankingsScreen
 import org.mewx.wenku8.v2.ui.theme.Wenku8ThemeMode
 import org.mewx.wenku8.v2.ui.theme.einkHairlineBorder
 
@@ -83,6 +89,11 @@ fun AdaptiveMainScaffold(
     onThemeModeSelected: (Wenku8ThemeMode) -> Unit,
     onDefaultHomeSelected: (DefaultHomeDestination) -> Unit,
     modifier: Modifier = Modifier,
+    discoveryRepository: DiscoveryRepository? = null,
+    appLanguage: Wenku8API.AppLanguage = Wenku8API.AppLanguage.SC,
+    onOpenSearch: () -> Unit = {},
+    onNovelClicked: (DiscoveryNovelCardItem) -> Unit = {},
+    onOpenNetworkDiagnostics: () -> Unit = {},
 ) {
     val initialResolution = rememberSaveable(
         inputs = arrayOf(preferredHomeDestination.name),
@@ -159,6 +170,11 @@ fun AdaptiveMainScaffold(
                     onThemeModeSelected = onThemeModeSelected,
                     preferredHomeDestination = preferredHomeDestination,
                     onDefaultHomeSelected = onDefaultHomeSelected,
+                    discoveryRepository = discoveryRepository,
+                    appLanguage = appLanguage,
+                    onOpenSearch = onOpenSearch,
+                    onNovelClicked = onNovelClicked,
+                    onOpenNetworkDiagnostics = onOpenNetworkDiagnostics,
                     contentPadding = innerPadding,
                 )
             }
@@ -215,6 +231,11 @@ fun AdaptiveMainScaffold(
                         onThemeModeSelected = onThemeModeSelected,
                         preferredHomeDestination = preferredHomeDestination,
                         onDefaultHomeSelected = onDefaultHomeSelected,
+                        discoveryRepository = discoveryRepository,
+                        appLanguage = appLanguage,
+                        onOpenSearch = onOpenSearch,
+                        onNovelClicked = onNovelClicked,
+                        onOpenNetworkDiagnostics = onOpenNetworkDiagnostics,
                         contentPadding = innerPadding,
                     )
                 }
@@ -233,8 +254,43 @@ private fun MainDestinationBody(
     onThemeModeSelected: (Wenku8ThemeMode) -> Unit,
     preferredHomeDestination: DefaultHomeDestination,
     onDefaultHomeSelected: (DefaultHomeDestination) -> Unit,
+    discoveryRepository: DiscoveryRepository?,
+    appLanguage: Wenku8API.AppLanguage,
+    onOpenSearch: () -> Unit,
+    onNovelClicked: (DiscoveryNovelCardItem) -> Unit,
+    onOpenNetworkDiagnostics: () -> Unit,
     contentPadding: PaddingValues,
 ) {
+    if (discoveryRepository != null && selectedDestination == TopLevelDestination.LATEST) {
+        LatestScreen(
+            discoveryRepository = discoveryRepository,
+            appLanguage = appLanguage,
+            onOpenSearch = onOpenSearch,
+            onNovelClicked = onNovelClicked,
+            onOpenNetworkDiagnostics = onOpenNetworkDiagnostics,
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(contentPadding)
+                .testTag(MainScaffoldTestTags.DESTINATION_SCREEN_PREFIX + selectedDestination.routeKey),
+        )
+        return
+    }
+
+    if (discoveryRepository != null && selectedDestination == TopLevelDestination.RANKINGS) {
+        RankingsScreen(
+            discoveryRepository = discoveryRepository,
+            appLanguage = appLanguage,
+            onOpenSearch = onOpenSearch,
+            onNovelClicked = onNovelClicked,
+            onOpenNetworkDiagnostics = onOpenNetworkDiagnostics,
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(contentPadding)
+                .testTag(MainScaffoldTestTags.DESTINATION_SCREEN_PREFIX + selectedDestination.routeKey),
+        )
+        return
+    }
+
     val headlineText = when (selectedDestination) {
         TopLevelDestination.BOOKSHELF -> stringResource(R.string.bookshelf_headline)
         TopLevelDestination.LATEST -> stringResource(R.string.latest_headline)
@@ -302,29 +358,7 @@ private fun MainDestinationBody(
             selectedDestination == TopLevelDestination.RANKINGS
         ) {
             item(key = "persistent_search_pill") {
-                Surface(
-                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                    shape = MaterialTheme.shapes.extraLarge,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .einkHairlineBorder(MaterialTheme.shapes.extraLarge),
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 18.dp, vertical = 14.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Icon(
-                            imageVector = Icons.Outlined.Search,
-                            contentDescription = null,
-                        )
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Text(
-                            text = stringResource(R.string.action_search_novels),
-                            style = MaterialTheme.typography.bodyMedium,
-                        )
-                    }
-                }
+                PersistentSearchEntryPill(onOpenSearch = onOpenSearch)
             }
         }
 
@@ -352,7 +386,7 @@ private fun MainDestinationBody(
                     )
                     Spacer(modifier = Modifier.height(14.dp))
                     AssistChip(
-                        onClick = { /* Wired to NetworkDiagnosticsScreen in Phase 2 */ },
+                        onClick = onOpenNetworkDiagnostics,
                         label = { Text(text = stringResource(R.string.action_network_diagnostics)) },
                         leadingIcon = {
                             Icon(
