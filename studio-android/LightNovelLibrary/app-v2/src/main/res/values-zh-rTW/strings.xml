@@ -137,4 +137,51 @@
     <string name="diag_share_excluded_notice">已嚴格剔除：用戶端與候選伺服器原始 IP（僅保留如 cf-v4-01 代號）、Wi-Fi 名稱/BSSID、裝置序號、登入 Cookie 與書架記錄。</string>
     <string name="diag_share_note_label">城市或電信商備註（選填，隨報告一併匯出）</string>
     <string name="diag_share_confirm_export">確認匯出 JSON 報告</string>
+
+    <!-- Account Session, NoticeString & App Version Check (P3.1) -->
+    <string name="notice_card_title">文庫公告</string>
+    <string name="notice_action_dismiss">關閉此則公告</string>
+
+    <string name="auth_card_title_signed_out">文庫帳號</string>
+    <string name="auth_card_subtitle_signed_out">登入後可同步雲端書架、發表書評並領取每日簽到積分</string>
+    <string name="auth_card_unavailable_stub">目前版本未設定帳號介面 (api-stub 模式)</string>
+    <string name="auth_action_open_login">登入帳號</string>
+    <string name="auth_action_register_web">網頁註冊</string>
+    <string name="auth_restoring_format">正在恢復已儲存帳號：%1$s…</string>
+    <string name="auth_offline_saved_title_format">已儲存帳號：%1$s（目前離線）</string>
+    <string name="auth_offline_saved_subtitle">網路恢復後可點擊重新整理驗證工作階段，本地憑證與頭像已妥善保留</string>
+    <string name="auth_stat_uid">UID</string>
+    <string name="auth_stat_score">積分</string>
+    <string name="auth_stat_experience">經驗</string>
+    <string name="auth_username_format">使用者名稱：%1$s</string>
+    <string name="auth_action_daily_sign">每日簽到</string>
+    <string name="auth_daily_sign_success">簽到成功，積分與經驗已重新整理！</string>
+    <string name="auth_daily_sign_already">今日已簽到或暫不可重複簽到（每 24 小時可簽一次）</string>
+    <string name="auth_daily_sign_failed">簽到失敗，請檢查網路連線後重試</string>
+    <string name="auth_action_logout">登出帳號</string>
+    <string name="auth_logout_confirm_title">確認登出帳號？</string>
+    <string name="auth_logout_confirm_body">登出後將清除本機儲存的登入憑證與工作階段 Cookie，本地已下載小說與書架不受影響。</string>
+    <string name="auth_logout_confirm_action">確認登出</string>
+    <string name="auth_register_dialog_title">前往網頁註冊帳號</string>
+    <string name="auth_register_dialog_body">文庫新帳號需在瀏覽器網頁端完成驗證碼註冊，註冊完成後返回本應用程式登入即可。</string>
+    <string name="auth_register_dialog_confirm">開啟瀏覽器</string>
+
+    <string name="auth_sheet_title">登入輕小說文庫</string>
+    <string name="auth_field_identifier_label">使用者名稱或綁定信箱</string>
+    <string name="auth_field_password_label">登入密碼</string>
+    <string name="auth_toggle_show_password">顯示或隱藏密碼</string>
+    <string name="auth_action_submit_login">立即登入</string>
+    <string name="auth_action_logging_in">正在登入…</string>
+    <string name="auth_error_length">使用者名稱/信箱與密碼均不可為空，且長度不超過 30 個字元</string>
+    <string name="auth_error_username">使用者名稱或信箱不存在，請核對後重試</string>
+    <string name="auth_error_password">密碼不正確，請重新輸入</string>
+    <string name="auth_error_network">登入失敗，無法連線伺服器或服務繁忙</string>
+
+    <string name="update_action_check">檢查應用程式更新</string>
+    <string name="update_checking">正在檢查新版本…</string>
+    <string name="update_up_to_date_format">目前已是最新版本 (Build %1$d)</string>
+    <string name="update_available_title">發現新版本</string>
+    <string name="update_available_body_format">偵測到新版本 (Build %2$d，目前 Build %1$d)，可前往發布頁下載更新。</string>
+    <string name="update_action_download">前往下載頁</string>
+    <string name="update_check_failed">檢查更新失敗，請稍後重試</string>
 </resources>

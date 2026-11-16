@@ -29,6 +29,7 @@ class Wenku8V2Application : Application(), SingletonImageLoader.Factory {
         }
         appContainer = AppContainer(this)
         appContainer.triggerAutomaticInternalMigrationIfNeeded()
+        appContainer.triggerStartupAccountAndNoticeSync()
     }
 
     override fun newImageLoader(context: PlatformContext): ImageLoader {

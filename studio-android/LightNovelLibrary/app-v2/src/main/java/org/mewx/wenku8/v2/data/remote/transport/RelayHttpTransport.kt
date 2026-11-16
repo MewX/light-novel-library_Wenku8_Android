@@ -95,10 +95,24 @@ object DefaultSystemDnsRouteProvider : RelayRouteProvider {
 interface WenkuSessionCookieStore {
     fun getPhpSessionId(): String
     fun setPhpSessionId(sessionId: String)
+    fun clearPhpSessionId() {}
 }
 
 object NativeLightUserSessionCookieStore : WenkuSessionCookieStore {
+    /**
+     * `LightUserSession.setSession("")` ignores empty strings (`if (s != null && !s.isEmpty())`),
+     * so we track an explicit local clear flag on logout and only re-enable reading `PHPSESSID`
+     * once a fresh `Set-Cookie: PHPSESSID=...` arrives via [setPhpSessionId].
+     */
+    @Volatile
+    private var clearedLocally: Boolean = false
+
+    @Volatile
+    private var localSessionOverride: String? = null
+
     override fun getPhpSessionId(): String {
+        if (clearedLocally) return ""
+        localSessionOverride?.let { if (it.isNotEmpty()) return it }
         return try {
             LightUserSession.getSession().orEmpty()
         } catch (_: LinkageError) {
@@ -110,6 +124,8 @@ object NativeLightUserSessionCookieStore : WenkuSessionCookieStore {
 
     override fun setPhpSessionId(sessionId: String) {
         if (sessionId.isBlank()) return
+        clearedLocally = false
+        localSessionOverride = sessionId
         try {
             LightUserSession.setSession(sessionId)
         } catch (_: LinkageError) {
@@ -117,6 +133,11 @@ object NativeLightUserSessionCookieStore : WenkuSessionCookieStore {
         } catch (_: UnsupportedOperationException) {
             // Ignored on api-stub
         }
+    }
+
+    override fun clearPhpSessionId() {
+        clearedLocally = true
+        localSessionOverride = null
     }
 }
 
@@ -324,6 +345,53 @@ class RelayHttpTransport(
         } finally {
             routeProvider.onForegroundCallFinished()
         }
+    }
+
+    private val cookieFreeGetClient: OkHttpClient by lazy {
+        baseOkHttpClient.newBuilder()
+            .cookieJar(CookieJar.NO_COOKIES)
+            .dns(systemDns)
+            .connectTimeout(connectTimeoutMillis, TimeUnit.MILLISECONDS)
+            .readTimeout(readTimeoutMillis, TimeUnit.MILLISECONDS)
+            .callTimeout(totalPostDeadlineMillis, TimeUnit.MILLISECONDS)
+            .build()
+    }
+
+    override suspend fun getBytes(url: String): ByteArray? {
+        val trimmed = url.trim()
+        if (trimmed.isEmpty() ||
+            trimmed.equals(LegacyLightNetworkTransport.UNKNOWN_ENDPOINT_SENTINEL, ignoreCase = true)
+        ) {
+            return null
+        }
+        return withContext(ioDispatcher) {
+            val request = try {
+                Request.Builder()
+                    .url(trimmed)
+                    .header("Accept-Encoding", "gzip")
+                    .get()
+                    .build()
+            } catch (_: IllegalArgumentException) {
+                return@withContext null
+            }
+
+            val call = cookieFreeGetClient.newCall(request)
+            try {
+                awaitCall(call).use { response ->
+                    if (response.code != 200) return@use null
+                    readDecodedResponseBytes(response)
+                }
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                call.cancel()
+                throw cancelled
+            } catch (_: IOException) {
+                null
+            }
+        }
+    }
+
+    override fun clearSessionCookie() {
+        sessionCookieStore.clearPhpSessionId()
     }
 
     internal fun activeConnectionPoolForTesting(): ConnectionPool? =

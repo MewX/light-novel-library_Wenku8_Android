@@ -42,6 +42,7 @@ import androidx.compose.material3.rememberWideNavigationRailState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -49,16 +50,25 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import kotlinx.coroutines.launch
 import org.mewx.wenku8.api.Wenku8API
 import org.mewx.wenku8.v2.R
+import org.mewx.wenku8.v2.data.repository.AccountSessionState
 import org.mewx.wenku8.v2.data.repository.DiscoveryRepository
+import org.mewx.wenku8.v2.data.repository.ServerNoticeAndUpdateRepository
+import org.mewx.wenku8.v2.data.repository.UserSessionRepository
 import org.mewx.wenku8.v2.domain.model.DiscoveryNovelCardItem
 import org.mewx.wenku8.v2.ui.diagnostics.NetworkDiagnosticsScreen
 import org.mewx.wenku8.v2.ui.diagnostics.NetworkDiagnosticsViewModel
 import org.mewx.wenku8.v2.ui.discovery.LatestScreen
 import org.mewx.wenku8.v2.ui.discovery.PersistentSearchEntryPill
 import org.mewx.wenku8.v2.ui.discovery.RankingsScreen
+import org.mewx.wenku8.v2.ui.profile.AccountLoginBottomSheet
+import org.mewx.wenku8.v2.ui.profile.AccountProfileCard
+import org.mewx.wenku8.v2.ui.profile.AppUpdateCheckCard
+import org.mewx.wenku8.v2.ui.profile.ServerNoticeBannerCard
 import org.mewx.wenku8.v2.ui.search.UnifiedSearchScreen
 import org.mewx.wenku8.v2.ui.theme.Wenku8ThemeMode
 import org.mewx.wenku8.v2.ui.theme.einkHairlineBorder
@@ -94,6 +104,8 @@ fun AdaptiveMainScaffold(
     onDefaultHomeSelected: (DefaultHomeDestination) -> Unit,
     modifier: Modifier = Modifier,
     discoveryRepository: DiscoveryRepository? = null,
+    userSessionRepository: UserSessionRepository? = null,
+    serverNoticeAndUpdateRepository: ServerNoticeAndUpdateRepository? = null,
     appLanguage: Wenku8API.AppLanguage = Wenku8API.AppLanguage.SC,
     networkDiagnosticsViewModelFactory: NetworkDiagnosticsViewModel.Factory? = null,
     autoOptimizeConnectionEnabled: Boolean = true,
@@ -130,6 +142,9 @@ fun AdaptiveMainScaffold(
         mutableStateOf(false)
     }
     var isNetworkDiagnosticsOpen by rememberSaveable {
+        mutableStateOf(false)
+    }
+    var isLoginBottomSheetOpen by rememberSaveable {
         mutableStateOf(false)
     }
 
@@ -198,8 +213,11 @@ fun AdaptiveMainScaffold(
                     preferredHomeDestination = preferredHomeDestination,
                     onDefaultHomeSelected = onDefaultHomeSelected,
                     discoveryRepository = discoveryRepository,
+                    userSessionRepository = userSessionRepository,
+                    serverNoticeAndUpdateRepository = serverNoticeAndUpdateRepository,
                     appLanguage = appLanguage,
                     onOpenSearch = handleOpenSearch,
+                    onOpenLoginSheet = { isLoginBottomSheetOpen = true },
                     onNovelClicked = onNovelClicked,
                     onOpenNetworkDiagnostics = handleOpenNetworkDiagnostics,
                     contentPadding = innerPadding,
@@ -259,8 +277,11 @@ fun AdaptiveMainScaffold(
                         preferredHomeDestination = preferredHomeDestination,
                         onDefaultHomeSelected = onDefaultHomeSelected,
                         discoveryRepository = discoveryRepository,
+                        userSessionRepository = userSessionRepository,
+                        serverNoticeAndUpdateRepository = serverNoticeAndUpdateRepository,
                         appLanguage = appLanguage,
                         onOpenSearch = handleOpenSearch,
+                        onOpenLoginSheet = { isLoginBottomSheetOpen = true },
                         onNovelClicked = onNovelClicked,
                         onOpenNetworkDiagnostics = handleOpenNetworkDiagnostics,
                         contentPadding = innerPadding,
@@ -290,6 +311,17 @@ fun AdaptiveMainScaffold(
                 onNavigateBack = { isNetworkDiagnosticsOpen = false },
             )
         }
+
+        if (isLoginBottomSheetOpen && userSessionRepository != null) {
+            AccountLoginBottomSheet(
+                registerPageUrl = userSessionRepository.registerPageUrl,
+                onSubmitLogin = { identifier, password ->
+                    userSessionRepository.loginWithCredentials(identifier, password)
+                },
+                onDismiss = { isLoginBottomSheetOpen = false },
+                onLoginSuccess = { isLoginBottomSheetOpen = false },
+            )
+        }
     }
 }
 
@@ -304,8 +336,11 @@ private fun MainDestinationBody(
     preferredHomeDestination: DefaultHomeDestination,
     onDefaultHomeSelected: (DefaultHomeDestination) -> Unit,
     discoveryRepository: DiscoveryRepository?,
+    userSessionRepository: UserSessionRepository?,
+    serverNoticeAndUpdateRepository: ServerNoticeAndUpdateRepository?,
     appLanguage: Wenku8API.AppLanguage,
     onOpenSearch: () -> Unit,
+    onOpenLoginSheet: () -> Unit,
     onNovelClicked: (DiscoveryNovelCardItem) -> Unit,
     onOpenNetworkDiagnostics: () -> Unit,
     contentPadding: PaddingValues,
@@ -338,6 +373,20 @@ private fun MainDestinationBody(
                 .testTag(MainScaffoldTestTags.DESTINATION_SCREEN_PREFIX + selectedDestination.routeKey),
         )
         return
+    }
+
+    val coroutineScope = rememberCoroutineScope()
+    val activeNotice = if (serverNoticeAndUpdateRepository != null) {
+        val state by serverNoticeAndUpdateRepository.activeNotice.collectAsStateWithLifecycle()
+        state
+    } else {
+        null
+    }
+    val sessionState = if (userSessionRepository != null) {
+        val state by userSessionRepository.sessionState.collectAsStateWithLifecycle()
+        state
+    } else {
+        null
     }
 
     val headlineText = when (selectedDestination) {
@@ -402,6 +451,22 @@ private fun MainDestinationBody(
             }
         }
 
+        if (selectedDestination == TopLevelDestination.PROFILE &&
+            activeNotice != null &&
+            serverNoticeAndUpdateRepository != null
+        ) {
+            item(key = "profile_server_notice_banner") {
+                ServerNoticeBannerCard(
+                    notice = activeNotice,
+                    onDismiss = {
+                        coroutineScope.launch {
+                            serverNoticeAndUpdateRepository.dismissCurrentNotice()
+                        }
+                    },
+                )
+            }
+        }
+
         if (selectedDestination == TopLevelDestination.BOOKSHELF ||
             selectedDestination == TopLevelDestination.LATEST ||
             selectedDestination == TopLevelDestination.RANKINGS
@@ -445,6 +510,28 @@ private fun MainDestinationBody(
                         },
                     )
                 }
+            }
+        }
+
+        if (selectedDestination == TopLevelDestination.PROFILE &&
+            userSessionRepository != null &&
+            sessionState != null
+        ) {
+            item(key = "profile_account_card") {
+                AccountProfileCard(
+                    sessionState = sessionState,
+                    registerPageUrl = userSessionRepository.registerPageUrl,
+                    onOpenLoginSheet = onOpenLoginSheet,
+                    onPerformDailySignIn = { userSessionRepository.performDailySignIn() },
+                    onRefreshProfile = {
+                        if (sessionState is AccountSessionState.OfflineWithSavedAccount) {
+                            userSessionRepository.initializeSessionOnStartup()
+                        } else {
+                            userSessionRepository.refreshProfile()
+                        }
+                    },
+                    onLogoutConfirmed = { userSessionRepository.logout() },
+                )
             }
         }
 
@@ -498,6 +585,16 @@ private fun MainDestinationBody(
                         }
                     }
                 }
+            }
+        }
+
+        if (selectedDestination == TopLevelDestination.PROFILE &&
+            serverNoticeAndUpdateRepository != null
+        ) {
+            item(key = "profile_update_check_card") {
+                AppUpdateCheckCard(
+                    onCheckForUpdate = { serverNoticeAndUpdateRepository.checkForAppUpdate() },
+                )
             }
         }
     }

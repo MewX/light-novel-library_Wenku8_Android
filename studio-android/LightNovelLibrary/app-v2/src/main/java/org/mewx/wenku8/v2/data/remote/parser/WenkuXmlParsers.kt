@@ -48,6 +48,15 @@ data class ParsedCloudBookshelfEntry(
     val latestChapterName: String = "",
 )
 
+data class ParsedUserInfo(
+    val username: String,
+    val nickname: String = "",
+    val uid: Int = 0,
+    val score: Int = 0,
+    val experience: Int = 0,
+    val rank: String = "",
+)
+
 /**
  * Clean, fault-tolerant Kotlin parsers for Wenku8 XML endpoints and legacy `v1.31` cached files.
  *
@@ -497,6 +506,63 @@ object WenkuXmlParsers {
             }
 
             if (sawResultRoot) orderedUniqueAids.toList() else null
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    /**
+     * Parses `Wenku8API.getUserInfoParams()` (`<metadata><item name="uname">...</item>...</metadata>`).
+     *
+     * Rejects well-formed non-userinfo XML (such as captive portals or CDN interstitials) unless
+     * both `<metadata>` and a non-empty `<item name="uname">` element are present.
+     */
+    fun parseUserInfo(rawXml: String?): ParsedUserInfo? {
+        if (rawXml.isNullOrBlank()) return null
+
+        return try {
+            val parser = newPullParser(rawXml)
+            var sawMetadataRoot = false
+            var username: String? = null
+            var nickname = ""
+            var uid = 0
+            var score = 0
+            var experience = 0
+            var rank = ""
+
+            var eventType = parser.eventType
+            while (eventType != XmlPullParser.END_DOCUMENT) {
+                if (eventType == XmlPullParser.START_TAG) {
+                    when (parser.name) {
+                        "metadata" -> sawMetadataRoot = true
+                        "item" -> if (sawMetadataRoot) {
+                            val attrName = parser.getAttributeValue(null, "name")
+                                ?: parser.safePositionalAttribute(0)
+                            when (attrName) {
+                                "uname" -> username = parser.nextText().trim()
+                                "nickname" -> nickname = parser.nextText().trim()
+                                "uid" -> uid = parser.nextText().toSafeInt()
+                                "score" -> score = parser.nextText().toSafeInt()
+                                "experience" -> experience = parser.nextText().toSafeInt()
+                                "rank" -> rank = parser.nextText().trim()
+                            }
+                        }
+                    }
+                }
+                eventType = parser.next()
+            }
+
+            val resolvedUsername = username?.takeIf { it.isNotEmpty() } ?: return null
+            if (!sawMetadataRoot) return null
+
+            ParsedUserInfo(
+                username = resolvedUsername,
+                nickname = nickname.ifEmpty { resolvedUsername },
+                uid = uid,
+                score = score,
+                experience = experience,
+                rank = rank,
+            )
         } catch (_: Exception) {
             null
         }

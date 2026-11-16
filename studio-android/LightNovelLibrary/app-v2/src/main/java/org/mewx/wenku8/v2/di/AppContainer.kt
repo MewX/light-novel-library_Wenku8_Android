@@ -37,6 +37,8 @@ import org.mewx.wenku8.v2.data.remote.transport.RelayHttpTransport
 import org.mewx.wenku8.v2.data.remote.transport.WenkuTransport
 import org.mewx.wenku8.v2.data.repository.DiscoveryRepository
 import org.mewx.wenku8.v2.data.repository.NovelTocSyncRepository
+import org.mewx.wenku8.v2.data.repository.ServerNoticeAndUpdateRepository
+import org.mewx.wenku8.v2.data.repository.UserSessionRepository
 import org.mewx.wenku8.v2.ui.diagnostics.NetworkDiagnosticsViewModel
 import android.os.SystemClock
 import java.io.File
@@ -174,6 +176,20 @@ class AppContainer(context: Context) {
         NovelTocSyncRepository(database)
     }
 
+    val userSessionRepository: UserSessionRepository by lazy {
+        UserSessionRepository(
+            transport = wenkuTransport,
+            assetRootsProvider = ::resolveLocalAssetRoots,
+        )
+    }
+
+    val serverNoticeAndUpdateRepository: ServerNoticeAndUpdateRepository by lazy {
+        ServerNoticeAndUpdateRepository(
+            transport = wenkuTransport,
+            assetRootsProvider = ::resolveLocalAssetRoots,
+        )
+    }
+
     val legacyV1StorageMigrator: LegacyV1StorageMigrator by lazy {
         LegacyV1StorageMigrator(database, userPreferencesRepository)
     }
@@ -201,6 +217,24 @@ class AppContainer(context: Context) {
                 add(OfflineFirstWenkuImageFetcher.Factory(::resolveLocalAssetRoots))
             }
             .build()
+    }
+
+    /**
+     * Restores any saved `saves/cert.wk8` session and keeps `NoticeString` synchronized with the
+     * user's active Simplified/Traditional Chinese language preference in the background.
+     */
+    fun triggerStartupAccountAndNoticeSync() {
+        applicationScope.launch {
+            userSessionRepository.initializeSessionOnStartup()
+        }
+        applicationScope.launch {
+            userPreferencesRepository.preferencesFlow
+                .map { it.appLanguage }
+                .distinctUntilChanged()
+                .collect { appLanguage ->
+                    serverNoticeAndUpdateRepository.loadAndRefreshNotice(appLanguage)
+                }
+        }
     }
 
     /**

@@ -38,6 +38,18 @@ interface WenkuTransport {
         formParams: ContentValues,
         isIdempotentReadOnly: Boolean,
     ): ByteArray? = postForm(endpointUrl, formParams)
+
+    /**
+     * Fetches raw HTTP 200 payload bytes via GET (used for server notices, version checks, and
+     * account avatars) without attaching session cookies to third-party or CDN hosts.
+     */
+    suspend fun getBytes(url: String): ByteArray? = null
+
+    /**
+     * Clears any active `PHPSESSID` session cookie held by the transport so explicit logout never
+     * leaks a prior session token onto subsequent requests.
+     */
+    fun clearSessionCookie() {}
 }
 
 /**
@@ -66,6 +78,21 @@ class LegacyLightNetworkTransport(
         return withContext(ioDispatcher) {
             try {
                 LightNetwork.LightHttpPostConnection(endpointUrl, formParams)
+            } catch (_: LinkageError) {
+                null
+            } catch (_: Exception) {
+                null
+            }
+        }
+    }
+
+    override suspend fun getBytes(url: String): ByteArray? {
+        if (url.isBlank() || url.equals(UNKNOWN_ENDPOINT_SENTINEL, ignoreCase = true)) {
+            return null
+        }
+        return withContext(ioDispatcher) {
+            try {
+                LightNetwork.LightHttpDownload(url)
             } catch (_: LinkageError) {
                 null
             } catch (_: Exception) {

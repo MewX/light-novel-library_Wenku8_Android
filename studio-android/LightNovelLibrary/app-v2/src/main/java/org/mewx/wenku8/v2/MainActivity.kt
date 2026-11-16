@@ -81,6 +81,8 @@ class MainActivity : AppCompatActivity() {
                             }
                         },
                         discoveryRepository = discoveryRepository,
+                        userSessionRepository = appContainer.userSessionRepository,
+                        serverNoticeAndUpdateRepository = appContainer.serverNoticeAndUpdateRepository,
                         appLanguage = loadedPreferences.appLanguage,
                         networkDiagnosticsViewModelFactory = appContainer.networkDiagnosticsViewModelFactory,
                         autoOptimizeConnectionEnabled = loadedPreferences.autoOptimizeConnectionEnabled,

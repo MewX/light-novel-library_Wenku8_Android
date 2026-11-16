@@ -55,8 +55,8 @@
   - Scoped `FLAG_KEEP_SCREEN_ON`, rotation survival, E-Ink static progress, `EventListener` attempt breakdown, and `FileProvider` read-only JSON export.
 
 ### Phase 3: Community Reviews 2.0, Profile, Account Auth, Settings Studio & `.wk8backup.zip`
-- [~] **`P3.1` — Account Auth Lifecycle (`UserSessionRepository`), Login Sheet, `每日签到` & `NoticeString`**
-- [ ] **`P3.2` — `ProfileAndStudioScreen` (100% `v1.31` Settings UI, Header Wallpaper, Fast/Deep Cache Clean & `.wk8backup.zip` Export/Smart-Merge)**
+- [x] **`P3.1` — Account Auth Lifecycle (`UserSessionRepository`), Login Sheet, `每日签到` & `NoticeString`** *(Completed: `WenkuXmlParsers.parseUserInfo`, `UserSessionRepository` with 100% `saves/cert.wk8` & `saves/avatar.jpg` compatibility, `1..30` char validation, single bounded re-login on `SYSTEM_4_NOT_LOGGED_IN`, offline credential preservation, and `RelayHttpTransport.clearSessionCookie()`; `ServerNoticeAndUpdateRepository` with `<a href>` chip extraction, SHA-256 dismissal persistence, & `/version` update check; M3e `AccountAndNoticeComponents` wired into `AdaptiveMainScaffold` `Tab 4 · 我的`; verified 44/44 tests across `:api` & `-DforceApiStub` + live Pixel 8 `User 0`)*
+- [~] **`P3.2` — `ProfileAndStudioScreen` (100% `v1.31` Settings UI, Header Wallpaper, Fast/Deep Cache Clean & `.wk8backup.zip` Export/Smart-Merge)**
 - [ ] **`P3.3` — `ReviewListScreen` & `ReviewThreadScreen` (UID Avatars, Floor Quotes, `10s` Cooldown & Auto-Saved `REVIEW_DRAFTS`)**
 
 ### Phase 4: Bookshelf 2.0, `NovelDetailScreen`, Atomic 4-Mode Downloader & Server-Support Ad
