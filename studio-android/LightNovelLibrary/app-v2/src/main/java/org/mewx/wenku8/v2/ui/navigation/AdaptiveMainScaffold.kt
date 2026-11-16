@@ -56,6 +56,7 @@ import org.mewx.wenku8.v2.domain.model.DiscoveryNovelCardItem
 import org.mewx.wenku8.v2.ui.discovery.LatestScreen
 import org.mewx.wenku8.v2.ui.discovery.PersistentSearchEntryPill
 import org.mewx.wenku8.v2.ui.discovery.RankingsScreen
+import org.mewx.wenku8.v2.ui.search.UnifiedSearchScreen
 import org.mewx.wenku8.v2.ui.theme.Wenku8ThemeMode
 import org.mewx.wenku8.v2.ui.theme.einkHairlineBorder
 
@@ -119,6 +120,16 @@ fun AdaptiveMainScaffold(
     var showOfflineFallbackBanner by rememberSaveable {
         mutableStateOf(initialResolution.triggeredOfflineFallbackToBookshelf)
     }
+    var isSearchStudioOpen by rememberSaveable {
+        mutableStateOf(false)
+    }
+
+    val handleOpenSearch = {
+        onOpenSearch()
+        if (discoveryRepository != null) {
+            isSearchStudioOpen = true
+        }
+    }
 
     BoxWithConstraints(
         modifier = modifier
@@ -172,7 +183,7 @@ fun AdaptiveMainScaffold(
                     onDefaultHomeSelected = onDefaultHomeSelected,
                     discoveryRepository = discoveryRepository,
                     appLanguage = appLanguage,
-                    onOpenSearch = onOpenSearch,
+                    onOpenSearch = handleOpenSearch,
                     onNovelClicked = onNovelClicked,
                     onOpenNetworkDiagnostics = onOpenNetworkDiagnostics,
                     contentPadding = innerPadding,
@@ -233,13 +244,23 @@ fun AdaptiveMainScaffold(
                         onDefaultHomeSelected = onDefaultHomeSelected,
                         discoveryRepository = discoveryRepository,
                         appLanguage = appLanguage,
-                        onOpenSearch = onOpenSearch,
+                        onOpenSearch = handleOpenSearch,
                         onNovelClicked = onNovelClicked,
                         onOpenNetworkDiagnostics = onOpenNetworkDiagnostics,
                         contentPadding = innerPadding,
                     )
                 }
             }
+        }
+
+        if (isSearchStudioOpen && discoveryRepository != null) {
+            UnifiedSearchScreen(
+                discoveryRepository = discoveryRepository,
+                appLanguage = appLanguage,
+                onNavigateBack = { isSearchStudioOpen = false },
+                onNovelClicked = onNovelClicked,
+                onOpenNetworkDiagnostics = onOpenNetworkDiagnostics,
+            )
         }
     }
 }

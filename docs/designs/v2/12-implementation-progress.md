@@ -43,11 +43,11 @@
   - Clean Kotlin repository wrapping `Wenku8API` + `LightNetwork` / `RelayHttpTransport` + `Wenku8Parser` / `NovelListWithInfoParser` with `api-stub` safety.
 - [x] **`P1.2` — `LatestScreen` (`最近更新 · 最新入库 · 完结精品`) & `RankingsScreen` (2D Metric × Period Matrix)** *(Completed: M3e `LatestScreen` `PrimaryTabRow`, `RankingsScreen` `SingleChoiceSegmentedButtonRow` × `FilterChip` matrix with `#1..#N` rank badges, `DiscoveryNovelCard` & `PaginatedNovelFeedContent` with pull-to-refresh, infinite pagination, E-Ink `1.dp` border + static progress compliance, `[ 网络检测 ]` error card, and `Wenku8API.AppVer = BuildConfig.API_PROTOCOL_VERSION` (`"1.31"`, register `"2.0"` in `:api` + `wenku8-relay` at final cutover); verified live Wenku8 relay feeds & covers on Pixel 8 `User 0` + Robolectric UI tests across `:api` & `-DforceApiStub`)*
   - Real data loading, pagination, pull-to-refresh, E-Ink card compliance, and contextual `[ 🩺 网络检测 ]` error chip.
-- [~] **`P1.3` — `UnifiedSearchScreen` (`0ms` Local Room Shelf Filter + Auto-Queued `5s` Online Search & History)**
+- [x] **`P1.3` — `UnifiedSearchScreen` (`0ms` Local Room Shelf Filter + Auto-Queued `5s` Online Search & History)** *(Completed: full-screen M3e `UnifiedSearchScreen` wired into `AdaptiveMainScaffold`, `< 1ms` local Room bookshelf match section on every keystroke, 3-way `SingleChoiceSegmentedButtonRow` (`按小说标题 · 按作者名称 · AID 编号直达`) with non-numeric AID validation, 20-item search history chips with per-item delete & clear-all, and auto-queued `5s` server cooldown countdown banner with `[ 取消 ]` & E-Ink static progress compliance; verified Robolectric Compose tests across `:api` & `-DforceApiStub` + live Pixel 8 `User 0`)*
   - Title (`articlename`), Author (`author`), and numeric `AID` jump + live `5s` server cooldown countdown queue + 20-item Room search history.
 
 ### Phase 2: `OkHttpProbeTransport`, `RelayHttpTransport`, `"自动优化连接"` & `NetworkDiagnosticsScreen`
-- [ ] **`P2.1` — `IpLiteralParser`, `DiagnosticsEndpointConfig`, `OkHttpProbeTransport` & `RelayHttpTransport`**
+- [~] **`P2.1` — `IpLiteralParser`, `DiagnosticsEndpointConfig`, `OkHttpProbeTransport` & `RelayHttpTransport`**
   - DNS-free literal IPv4/IPv6 parser (`InetAddress.getByAddress`), `Accept-Encoding: identity` probe adapter, route-generation `ConnectionPool`s (`fastFallback(true)` default vs. `fastFallback(false)` pinned), and `EventListener.requestHeadersStart` fallback/replay rules.
 - [ ] **`P2.2` — `DiagnosticsRunner`, `DiagnosticsNetworkMonitor`, `ManifestRepository` & `RelayRouteController`**
   - Shared 2-slot stalled-DNS bound, `<= 6`-call bootstrap recovery, `<= 18`-probe / `25s` compact idle tournament (`5+6+1` warm-reuse guard), and rolling 24h `120/60` budget store.
