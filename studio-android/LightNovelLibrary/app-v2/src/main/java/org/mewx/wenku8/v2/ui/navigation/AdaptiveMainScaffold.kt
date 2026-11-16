@@ -55,9 +55,15 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.launch
 import org.mewx.wenku8.api.Wenku8API
 import org.mewx.wenku8.v2.R
-import org.mewx.wenku8.v2.data.repository.AccountSessionState
+import org.mewx.wenku8.v2.data.local.db.Wenku8Database
+import org.mewx.wenku8.v2.data.local.preferences.Wenku8UserPreferences
+import org.mewx.wenku8.v2.data.migration.LegacyV1StorageMigrator
+import org.mewx.wenku8.v2.data.remote.diagnostics.AutoRoutingModeState
+import org.mewx.wenku8.v2.data.remote.diagnostics.RelayRouteController
+import org.mewx.wenku8.v2.data.repository.BackupArchiveRepository
 import org.mewx.wenku8.v2.data.repository.DiscoveryRepository
 import org.mewx.wenku8.v2.data.repository.ServerNoticeAndUpdateRepository
+import org.mewx.wenku8.v2.data.repository.StorageAndCacheRepository
 import org.mewx.wenku8.v2.data.repository.UserSessionRepository
 import org.mewx.wenku8.v2.domain.model.DiscoveryNovelCardItem
 import org.mewx.wenku8.v2.ui.diagnostics.NetworkDiagnosticsScreen
@@ -66,9 +72,7 @@ import org.mewx.wenku8.v2.ui.discovery.LatestScreen
 import org.mewx.wenku8.v2.ui.discovery.PersistentSearchEntryPill
 import org.mewx.wenku8.v2.ui.discovery.RankingsScreen
 import org.mewx.wenku8.v2.ui.profile.AccountLoginBottomSheet
-import org.mewx.wenku8.v2.ui.profile.AccountProfileCard
-import org.mewx.wenku8.v2.ui.profile.AppUpdateCheckCard
-import org.mewx.wenku8.v2.ui.profile.ServerNoticeBannerCard
+import org.mewx.wenku8.v2.ui.profile.ProfileAndStudioScreen
 import org.mewx.wenku8.v2.ui.search.UnifiedSearchScreen
 import org.mewx.wenku8.v2.ui.theme.Wenku8ThemeMode
 import org.mewx.wenku8.v2.ui.theme.einkHairlineBorder
@@ -103,17 +107,44 @@ fun AdaptiveMainScaffold(
     onThemeModeSelected: (Wenku8ThemeMode) -> Unit,
     onDefaultHomeSelected: (DefaultHomeDestination) -> Unit,
     modifier: Modifier = Modifier,
+    userPreferences: Wenku8UserPreferences? = null,
+    database: Wenku8Database? = null,
+    relayRouteController: RelayRouteController? = null,
     discoveryRepository: DiscoveryRepository? = null,
     userSessionRepository: UserSessionRepository? = null,
     serverNoticeAndUpdateRepository: ServerNoticeAndUpdateRepository? = null,
+    storageAndCacheRepository: StorageAndCacheRepository? = null,
+    backupArchiveRepository: BackupArchiveRepository? = null,
+    legacyV1StorageMigrator: LegacyV1StorageMigrator? = null,
     appLanguage: Wenku8API.AppLanguage = Wenku8API.AppLanguage.SC,
     networkDiagnosticsViewModelFactory: NetworkDiagnosticsViewModel.Factory? = null,
     autoOptimizeConnectionEnabled: Boolean = true,
     onAutoOptimizeConnectionChanged: (Boolean) -> Unit = {},
+    onAppLanguageSelected: (Wenku8API.AppLanguage) -> Unit = {},
+    onEinkModeChanged: (Boolean) -> Unit = {},
+    onUseDynamicColorChanged: (Boolean) -> Unit = {},
+    onMenuBackgroundChanged: (presetId: Int, customPath: String) -> Unit = { _, _ -> },
+    onReaderTypographyChanged: (
+        fontSizeSp: Int,
+        lineDistanceDp: Int,
+        paragraphDistanceDp: Int,
+        pageEdgeDistanceDp: Int,
+    ) -> Unit = { _, _, _, _ -> },
+    onReaderCustomFontPathChanged: (String) -> Unit = {},
+    onReaderCustomBackgroundPathChanged: (String) -> Unit = {},
+    onVolumeKeyPagingChanged: (Boolean) -> Unit = {},
     onOpenSearch: () -> Unit = {},
     onNovelClicked: (DiscoveryNovelCardItem) -> Unit = {},
     onOpenNetworkDiagnostics: () -> Unit = {},
 ) {
+    val effectivePreferences = userPreferences ?: Wenku8UserPreferences(
+        appLanguage = appLanguage,
+        themeMode = currentThemeMode,
+        einkModeEnabled = currentThemeMode == Wenku8ThemeMode.E_INK,
+        defaultHomeDestination = preferredHomeDestination,
+        autoOptimizeConnectionEnabled = autoOptimizeConnectionEnabled,
+    )
+
     val initialResolution = rememberSaveable(
         inputs = arrayOf(preferredHomeDestination.name),
         saver = androidx.compose.runtime.saveable.Saver(
@@ -208,13 +239,26 @@ fun AdaptiveMainScaffold(
                     selectedDestination = selectedDestination,
                     showOfflineFallbackBanner = showOfflineFallbackBanner,
                     onDismissOfflineBanner = { showOfflineFallbackBanner = false },
-                    currentThemeMode = currentThemeMode,
+                    preferences = effectivePreferences,
                     onThemeModeSelected = onThemeModeSelected,
-                    preferredHomeDestination = preferredHomeDestination,
                     onDefaultHomeSelected = onDefaultHomeSelected,
+                    onAutoOptimizeConnectionChanged = onAutoOptimizeConnectionChanged,
+                    onAppLanguageSelected = onAppLanguageSelected,
+                    onEinkModeChanged = onEinkModeChanged,
+                    onUseDynamicColorChanged = onUseDynamicColorChanged,
+                    onMenuBackgroundChanged = onMenuBackgroundChanged,
+                    onReaderTypographyChanged = onReaderTypographyChanged,
+                    onReaderCustomFontPathChanged = onReaderCustomFontPathChanged,
+                    onReaderCustomBackgroundPathChanged = onReaderCustomBackgroundPathChanged,
+                    onVolumeKeyPagingChanged = onVolumeKeyPagingChanged,
+                    database = database,
+                    relayRouteController = relayRouteController,
                     discoveryRepository = discoveryRepository,
                     userSessionRepository = userSessionRepository,
                     serverNoticeAndUpdateRepository = serverNoticeAndUpdateRepository,
+                    storageAndCacheRepository = storageAndCacheRepository,
+                    backupArchiveRepository = backupArchiveRepository,
+                    legacyV1StorageMigrator = legacyV1StorageMigrator,
                     appLanguage = appLanguage,
                     onOpenSearch = handleOpenSearch,
                     onOpenLoginSheet = { isLoginBottomSheetOpen = true },
@@ -272,13 +316,26 @@ fun AdaptiveMainScaffold(
                         selectedDestination = selectedDestination,
                         showOfflineFallbackBanner = showOfflineFallbackBanner,
                         onDismissOfflineBanner = { showOfflineFallbackBanner = false },
-                        currentThemeMode = currentThemeMode,
+                        preferences = effectivePreferences,
                         onThemeModeSelected = onThemeModeSelected,
-                        preferredHomeDestination = preferredHomeDestination,
                         onDefaultHomeSelected = onDefaultHomeSelected,
+                        onAutoOptimizeConnectionChanged = onAutoOptimizeConnectionChanged,
+                        onAppLanguageSelected = onAppLanguageSelected,
+                        onEinkModeChanged = onEinkModeChanged,
+                        onUseDynamicColorChanged = onUseDynamicColorChanged,
+                        onMenuBackgroundChanged = onMenuBackgroundChanged,
+                        onReaderTypographyChanged = onReaderTypographyChanged,
+                        onReaderCustomFontPathChanged = onReaderCustomFontPathChanged,
+                        onReaderCustomBackgroundPathChanged = onReaderCustomBackgroundPathChanged,
+                        onVolumeKeyPagingChanged = onVolumeKeyPagingChanged,
+                        database = database,
+                        relayRouteController = relayRouteController,
                         discoveryRepository = discoveryRepository,
                         userSessionRepository = userSessionRepository,
                         serverNoticeAndUpdateRepository = serverNoticeAndUpdateRepository,
+                        storageAndCacheRepository = storageAndCacheRepository,
+                        backupArchiveRepository = backupArchiveRepository,
+                        legacyV1StorageMigrator = legacyV1StorageMigrator,
                         appLanguage = appLanguage,
                         onOpenSearch = handleOpenSearch,
                         onOpenLoginSheet = { isLoginBottomSheetOpen = true },
@@ -306,7 +363,7 @@ fun AdaptiveMainScaffold(
             )
             NetworkDiagnosticsScreen(
                 viewModel = diagnosticsViewModel,
-                autoOptimizeEnabled = autoOptimizeConnectionEnabled,
+                autoOptimizeEnabled = effectivePreferences.autoOptimizeConnectionEnabled,
                 onAutoOptimizeChanged = onAutoOptimizeConnectionChanged,
                 onNavigateBack = { isNetworkDiagnosticsOpen = false },
             )
@@ -325,19 +382,36 @@ fun AdaptiveMainScaffold(
     }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun MainDestinationBody(
     selectedDestination: TopLevelDestination,
     showOfflineFallbackBanner: Boolean,
     onDismissOfflineBanner: () -> Unit,
-    currentThemeMode: Wenku8ThemeMode,
+    preferences: Wenku8UserPreferences,
     onThemeModeSelected: (Wenku8ThemeMode) -> Unit,
-    preferredHomeDestination: DefaultHomeDestination,
     onDefaultHomeSelected: (DefaultHomeDestination) -> Unit,
+    onAutoOptimizeConnectionChanged: (Boolean) -> Unit,
+    onAppLanguageSelected: (Wenku8API.AppLanguage) -> Unit,
+    onEinkModeChanged: (Boolean) -> Unit,
+    onUseDynamicColorChanged: (Boolean) -> Unit,
+    onMenuBackgroundChanged: (presetId: Int, customPath: String) -> Unit,
+    onReaderTypographyChanged: (
+        fontSizeSp: Int,
+        lineDistanceDp: Int,
+        paragraphDistanceDp: Int,
+        pageEdgeDistanceDp: Int,
+    ) -> Unit,
+    onReaderCustomFontPathChanged: (String) -> Unit,
+    onReaderCustomBackgroundPathChanged: (String) -> Unit,
+    onVolumeKeyPagingChanged: (Boolean) -> Unit,
+    database: Wenku8Database?,
+    relayRouteController: RelayRouteController?,
     discoveryRepository: DiscoveryRepository?,
     userSessionRepository: UserSessionRepository?,
     serverNoticeAndUpdateRepository: ServerNoticeAndUpdateRepository?,
+    storageAndCacheRepository: StorageAndCacheRepository?,
+    backupArchiveRepository: BackupArchiveRepository?,
+    legacyV1StorageMigrator: LegacyV1StorageMigrator?,
     appLanguage: Wenku8API.AppLanguage,
     onOpenSearch: () -> Unit,
     onOpenLoginSheet: () -> Unit,
@@ -375,18 +449,75 @@ private fun MainDestinationBody(
         return
     }
 
-    val coroutineScope = rememberCoroutineScope()
-    val activeNotice = if (serverNoticeAndUpdateRepository != null) {
-        val state by serverNoticeAndUpdateRepository.activeNotice.collectAsStateWithLifecycle()
-        state
-    } else {
-        null
-    }
-    val sessionState = if (userSessionRepository != null) {
-        val state by userSessionRepository.sessionState.collectAsStateWithLifecycle()
-        state
-    } else {
-        null
+    if (selectedDestination == TopLevelDestination.PROFILE) {
+        val totalReadingSeconds = if (database != null) {
+            val s by database.readingSessionDao()
+                .observeTotalReadingSeconds()
+                .collectAsStateWithLifecycle(initialValue = 0L)
+            s
+        } else {
+            0L
+        }
+        val totalCharactersRead = if (database != null) {
+            val c by database.readingSessionDao()
+                .observeTotalCharactersRead()
+                .collectAsStateWithLifecycle(initialValue = 0L)
+            c
+        } else {
+            0L
+        }
+        val totalBookmarkNotes = if (database != null) {
+            val n by database.bookmarkNoteDao()
+                .observeTotalBookmarkNoteCount()
+                .collectAsStateWithLifecycle(initialValue = 0)
+            n
+        } else {
+            0
+        }
+        val autoRoutingState = if (relayRouteController != null) {
+            val r by relayRouteController.uiState.collectAsStateWithLifecycle()
+            r
+        } else if (preferences.autoOptimizeConnectionEnabled) {
+            AutoRoutingModeState.EnabledUsingDefault
+        } else {
+            AutoRoutingModeState.DisabledByUser
+        }
+
+        ProfileAndStudioScreen(
+            preferences = preferences,
+            onThemeModeSelected = onThemeModeSelected,
+            onDefaultHomeSelected = onDefaultHomeSelected,
+            showOfflineFallbackBanner = showOfflineFallbackBanner,
+            onDismissOfflineBanner = onDismissOfflineBanner,
+            totalReadingSeconds = totalReadingSeconds,
+            totalCharactersRead = totalCharactersRead,
+            totalBookmarkNoteCount = totalBookmarkNotes,
+            autoRoutingState = autoRoutingState,
+            onAutoOptimizeConnectionChanged = onAutoOptimizeConnectionChanged,
+            onResetDefaultConnection = {
+                relayRouteController?.resetToDefaultAndReevaluate(triggerTournamentNow = true)
+            },
+            onOpenNetworkDiagnostics = onOpenNetworkDiagnostics,
+            onAppLanguageSelected = onAppLanguageSelected,
+            onEinkModeChanged = onEinkModeChanged,
+            onUseDynamicColorChanged = onUseDynamicColorChanged,
+            onMenuBackgroundChanged = onMenuBackgroundChanged,
+            onReaderTypographyChanged = onReaderTypographyChanged,
+            onReaderCustomFontPathChanged = onReaderCustomFontPathChanged,
+            onReaderCustomBackgroundPathChanged = onReaderCustomBackgroundPathChanged,
+            onVolumeKeyPagingChanged = onVolumeKeyPagingChanged,
+            userSessionRepository = userSessionRepository,
+            serverNoticeAndUpdateRepository = serverNoticeAndUpdateRepository,
+            storageAndCacheRepository = storageAndCacheRepository,
+            backupArchiveRepository = backupArchiveRepository,
+            legacyV1StorageMigrator = legacyV1StorageMigrator,
+            onOpenLoginSheet = onOpenLoginSheet,
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(contentPadding)
+                .testTag(MainScaffoldTestTags.DESTINATION_SCREEN_PREFIX + selectedDestination.routeKey),
+        )
+        return
     }
 
     val headlineText = when (selectedDestination) {
@@ -451,29 +582,8 @@ private fun MainDestinationBody(
             }
         }
 
-        if (selectedDestination == TopLevelDestination.PROFILE &&
-            activeNotice != null &&
-            serverNoticeAndUpdateRepository != null
-        ) {
-            item(key = "profile_server_notice_banner") {
-                ServerNoticeBannerCard(
-                    notice = activeNotice,
-                    onDismiss = {
-                        coroutineScope.launch {
-                            serverNoticeAndUpdateRepository.dismissCurrentNotice()
-                        }
-                    },
-                )
-            }
-        }
-
-        if (selectedDestination == TopLevelDestination.BOOKSHELF ||
-            selectedDestination == TopLevelDestination.LATEST ||
-            selectedDestination == TopLevelDestination.RANKINGS
-        ) {
-            item(key = "persistent_search_pill") {
-                PersistentSearchEntryPill(onOpenSearch = onOpenSearch)
-            }
+        item(key = "persistent_search_pill") {
+            PersistentSearchEntryPill(onOpenSearch = onOpenSearch)
         }
 
         item(key = "destination_editorial_header") {
@@ -510,91 +620,6 @@ private fun MainDestinationBody(
                         },
                     )
                 }
-            }
-        }
-
-        if (selectedDestination == TopLevelDestination.PROFILE &&
-            userSessionRepository != null &&
-            sessionState != null
-        ) {
-            item(key = "profile_account_card") {
-                AccountProfileCard(
-                    sessionState = sessionState,
-                    registerPageUrl = userSessionRepository.registerPageUrl,
-                    onOpenLoginSheet = onOpenLoginSheet,
-                    onPerformDailySignIn = { userSessionRepository.performDailySignIn() },
-                    onRefreshProfile = {
-                        if (sessionState is AccountSessionState.OfflineWithSavedAccount) {
-                            userSessionRepository.initializeSessionOnStartup()
-                        } else {
-                            userSessionRepository.refreshProfile()
-                        }
-                    },
-                    onLogoutConfirmed = { userSessionRepository.logout() },
-                )
-            }
-        }
-
-        if (selectedDestination == TopLevelDestination.PROFILE) {
-            item(key = "profile_theme_and_home_controls") {
-                Card(
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceContainer,
-                    ),
-                    shape = MaterialTheme.shapes.large,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .einkHairlineBorder(MaterialTheme.shapes.large),
-                ) {
-                    Column(modifier = Modifier.padding(20.dp)) {
-                        Text(
-                            text = stringResource(R.string.theme_section_title),
-                            style = MaterialTheme.typography.titleMedium,
-                        )
-                        Spacer(modifier = Modifier.height(10.dp))
-                        FlowRow(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp),
-                        ) {
-                            Wenku8ThemeMode.entries.forEach { mode ->
-                                FilterChip(
-                                    selected = mode == currentThemeMode,
-                                    onClick = { onThemeModeSelected(mode) },
-                                    label = { Text(stringResource(mode.displayNameResId)) },
-                                )
-                            }
-                        }
-
-                        Spacer(modifier = Modifier.height(18.dp))
-                        Text(
-                            text = stringResource(R.string.setting_default_home_title),
-                            style = MaterialTheme.typography.titleMedium,
-                        )
-                        Spacer(modifier = Modifier.height(10.dp))
-                        FlowRow(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp),
-                        ) {
-                            DefaultHomeDestination.entries.forEach { option ->
-                                FilterChip(
-                                    selected = option == preferredHomeDestination,
-                                    onClick = { onDefaultHomeSelected(option) },
-                                    label = { Text(stringResource(option.optionLabelResId)) },
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        if (selectedDestination == TopLevelDestination.PROFILE &&
-            serverNoticeAndUpdateRepository != null
-        ) {
-            item(key = "profile_update_check_card") {
-                AppUpdateCheckCard(
-                    onCheckForUpdate = { serverNoticeAndUpdateRepository.checkForAppUpdate() },
-                )
             }
         }
     }

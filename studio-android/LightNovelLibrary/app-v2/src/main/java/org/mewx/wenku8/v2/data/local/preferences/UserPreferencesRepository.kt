@@ -98,7 +98,11 @@ class UserPreferencesRepository(
         .map { prefs -> mapPreferences(prefs) }
 
     suspend fun setAppLanguage(language: Wenku8API.AppLanguage) {
-        Wenku8API.CurrentLang = language
+        try {
+            Wenku8API.CurrentLang = language
+        } catch (_: LinkageError) {
+            // Ignored on host-JVM unit tests without Android JNI
+        }
         dataStore.edit { it[Keys.APP_LANGUAGE] = language.name }
     }
 
@@ -204,7 +208,11 @@ class UserPreferencesRepository(
                 } else {
                     Wenku8API.AppLanguage.SC
                 }
-                Wenku8API.CurrentLang = resolvedLang
+                try {
+                    Wenku8API.CurrentLang = resolvedLang
+                } catch (_: LinkageError) {
+                    // Ignored on host-JVM unit tests without Android JNI
+                }
                 prefs[Keys.APP_LANGUAGE] = resolvedLang.name
             }
 
@@ -258,6 +266,46 @@ class UserPreferencesRepository(
                 prefs[Keys.CACHED_NOTICE_TEXT] = cachedNoticeText
             }
             prefs[Keys.LEGACY_V1_MIGRATION_VERSION] = migrationVersion
+        }
+    }
+
+    /**
+     * Atomically applies portable user preferences imported from a `.wk8backup.zip` archive.
+     */
+    suspend fun applyImportedPortablePreferences(imported: Wenku8UserPreferences) {
+        try {
+            Wenku8API.CurrentLang = imported.appLanguage
+        } catch (_: LinkageError) {
+            // Ignored on host-JVM unit tests without Android JNI
+        }
+        dataStore.edit { prefs ->
+            prefs[Keys.APP_LANGUAGE] = imported.appLanguage.name
+            prefs[Keys.THEME_MODE] = imported.themeMode.name
+            prefs[Keys.EINK_MODE_ENABLED] = imported.einkModeEnabled
+            prefs[Keys.USE_DYNAMIC_COLOR] = imported.useDynamicColor
+            prefs[Keys.DEFAULT_HOME_DESTINATION] = imported.defaultHomeDestination.name
+            prefs[Keys.MENU_BG_PRESET_ID] = imported.menuBackgroundPresetId.coerceIn(0, 5)
+            prefs[Keys.MENU_BG_CUSTOM_PATH] = imported.menuBackgroundCustomPath
+            prefs[Keys.READER_FONT_SIZE_SP] = imported.readerFontSizeSp.coerceIn(
+                Wenku8UserPreferences.MIN_READER_FONT_SIZE_SP,
+                Wenku8UserPreferences.MAX_READER_FONT_SIZE_SP,
+            )
+            prefs[Keys.READER_LINE_DISTANCE_DP] = imported.readerLineDistanceDp.coerceIn(
+                Wenku8UserPreferences.MIN_READER_LINE_DISTANCE_DP,
+                Wenku8UserPreferences.MAX_READER_LINE_DISTANCE_DP,
+            )
+            prefs[Keys.READER_PARAGRAPH_DISTANCE_DP] = imported.readerParagraphDistanceDp.coerceIn(
+                Wenku8UserPreferences.MIN_READER_PARAGRAPH_DISTANCE_DP,
+                Wenku8UserPreferences.MAX_READER_PARAGRAPH_DISTANCE_DP,
+            )
+            prefs[Keys.READER_PAGE_EDGE_DISTANCE_DP] = imported.readerPageEdgeDistanceDp.coerceIn(
+                Wenku8UserPreferences.MIN_READER_PAGE_EDGE_DISTANCE_DP,
+                Wenku8UserPreferences.MAX_READER_PAGE_EDGE_DISTANCE_DP,
+            )
+            prefs[Keys.READER_CUSTOM_FONT_PATH] = imported.readerCustomFontPath
+            prefs[Keys.READER_CUSTOM_BG_PATH] = imported.readerCustomBackgroundPath
+            prefs[Keys.VOLUME_KEY_PAGING_ENABLED] = imported.volumeKeyPagingEnabled
+            prefs[Keys.AUTO_OPTIMIZE_CONNECTION_ENABLED] = imported.autoOptimizeConnectionEnabled
         }
     }
 

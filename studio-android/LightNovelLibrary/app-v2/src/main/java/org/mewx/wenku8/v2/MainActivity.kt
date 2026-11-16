@@ -8,6 +8,7 @@ import android.os.Bundle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
+import androidx.appcompat.app.AppCompatDelegate
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -15,8 +16,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
+import androidx.core.os.LocaleListCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.launch
+import org.mewx.wenku8.api.Wenku8API
 import org.mewx.wenku8.v2.data.local.preferences.Wenku8UserPreferences
 import org.mewx.wenku8.v2.ui.navigation.AdaptiveMainScaffold
 import org.mewx.wenku8.v2.ui.theme.Wenku8ExpressiveTheme
@@ -80,15 +83,68 @@ class MainActivity : AppCompatActivity() {
                                 preferencesRepository.setDefaultHomeDestination(selectedHome)
                             }
                         },
+                        userPreferences = loadedPreferences,
+                        database = appContainer.database,
+                        relayRouteController = appContainer.relayRouteController,
                         discoveryRepository = discoveryRepository,
                         userSessionRepository = appContainer.userSessionRepository,
                         serverNoticeAndUpdateRepository = appContainer.serverNoticeAndUpdateRepository,
+                        storageAndCacheRepository = appContainer.storageAndCacheRepository,
+                        backupArchiveRepository = appContainer.backupArchiveRepository,
+                        legacyV1StorageMigrator = appContainer.legacyV1StorageMigrator,
                         appLanguage = loadedPreferences.appLanguage,
                         networkDiagnosticsViewModelFactory = appContainer.networkDiagnosticsViewModelFactory,
                         autoOptimizeConnectionEnabled = loadedPreferences.autoOptimizeConnectionEnabled,
                         onAutoOptimizeConnectionChanged = { enabled ->
                             coroutineScope.launch {
                                 preferencesRepository.setAutoOptimizeConnectionEnabled(enabled)
+                            }
+                        },
+                        onAppLanguageSelected = { newLanguage ->
+                            coroutineScope.launch {
+                                preferencesRepository.setAppLanguage(newLanguage)
+                            }
+                            val bcp47Tag = if (newLanguage == Wenku8API.AppLanguage.TC) "zh-TW" else "zh-CN"
+                            AppCompatDelegate.setApplicationLocales(LocaleListCompat.forLanguageTags(bcp47Tag))
+                        },
+                        onEinkModeChanged = { enabled ->
+                            coroutineScope.launch {
+                                preferencesRepository.setEinkModeEnabled(enabled)
+                            }
+                        },
+                        onUseDynamicColorChanged = { enabled ->
+                            coroutineScope.launch {
+                                preferencesRepository.setUseDynamicColor(enabled)
+                            }
+                        },
+                        onMenuBackgroundChanged = { presetId, customPath ->
+                            coroutineScope.launch {
+                                preferencesRepository.setMenuBackground(presetId, customPath)
+                            }
+                        },
+                        onReaderTypographyChanged = { fontSizeSp, lineDistDp, paraDistDp, edgeDistDp ->
+                            coroutineScope.launch {
+                                preferencesRepository.setReaderTypography(
+                                    fontSizeSp = fontSizeSp,
+                                    lineDistanceDp = lineDistDp,
+                                    paragraphDistanceDp = paraDistDp,
+                                    pageEdgeDistanceDp = edgeDistDp,
+                                )
+                            }
+                        },
+                        onReaderCustomFontPathChanged = { path ->
+                            coroutineScope.launch {
+                                preferencesRepository.setReaderCustomFontPath(path)
+                            }
+                        },
+                        onReaderCustomBackgroundPathChanged = { path ->
+                            coroutineScope.launch {
+                                preferencesRepository.setReaderCustomBackgroundPath(path)
+                            }
+                        },
+                        onVolumeKeyPagingChanged = { enabled ->
+                            coroutineScope.launch {
+                                preferencesRepository.setVolumeKeyPagingEnabled(enabled)
                             }
                         },
                     )

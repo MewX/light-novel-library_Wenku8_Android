@@ -190,6 +190,23 @@ class AppContainer(context: Context) {
         )
     }
 
+    val storageAndCacheRepository: org.mewx.wenku8.v2.data.repository.StorageAndCacheRepository by lazy {
+        org.mewx.wenku8.v2.data.repository.StorageAndCacheRepository(
+            database = database,
+            cacheRootProvider = { appContext.cacheDir },
+            assetRootsProvider = ::resolveLocalAssetRoots,
+        )
+    }
+
+    val backupArchiveRepository: org.mewx.wenku8.v2.data.repository.BackupArchiveRepository by lazy {
+        org.mewx.wenku8.v2.data.repository.BackupArchiveRepository(
+            database = database,
+            userPreferencesRepository = userPreferencesRepository,
+            cacheRootProvider = { appContext.cacheDir },
+            assetRootsProvider = ::resolveLocalAssetRoots,
+        )
+    }
+
     val legacyV1StorageMigrator: LegacyV1StorageMigrator by lazy {
         LegacyV1StorageMigrator(database, userPreferencesRepository)
     }

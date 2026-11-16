@@ -32,6 +32,9 @@ interface ReadingProgressDao {
     @Query("SELECT * FROM reading_progress")
     fun observeAllProgress(): Flow<List<ReadingProgressEntity>>
 
+    @Query("SELECT * FROM reading_progress")
+    suspend fun getAllProgress(): List<ReadingProgressEntity>
+
     @Query(
         """
         UPDATE reading_progress
@@ -61,6 +64,12 @@ interface BookmarkNoteDao {
     @Query("SELECT * FROM bookmarks_notes WHERE aid = :aid AND cid = :cid ORDER BY start_paragraph ASC, start_char ASC")
     fun observeNotesForChapter(aid: Int, cid: Int): Flow<List<BookmarkNoteEntity>>
 
+    @Query("SELECT COUNT(*) FROM bookmarks_notes")
+    fun observeTotalBookmarkNoteCount(): Flow<Int>
+
+    @Query("SELECT * FROM bookmarks_notes")
+    suspend fun getAllBookmarkNotes(): List<BookmarkNoteEntity>
+
     @Query("DELETE FROM bookmarks_notes WHERE id = :id")
     suspend fun deleteBookmarkNoteById(id: Long)
 }
@@ -73,6 +82,9 @@ interface ReadingSessionDao {
 
     @Query("SELECT * FROM reading_sessions WHERE date_epoch_day >= :fromEpochDay ORDER BY date_epoch_day ASC")
     fun observeSessionsSince(fromEpochDay: Long): Flow<List<ReadingSessionEntity>>
+
+    @Query("SELECT * FROM reading_sessions")
+    suspend fun getAllSessions(): List<ReadingSessionEntity>
 
     @Query("SELECT COALESCE(SUM(duration_seconds), 0) FROM reading_sessions")
     fun observeTotalReadingSeconds(): Flow<Long>
@@ -89,6 +101,9 @@ interface ReviewDraftDao {
 
     @Query("SELECT * FROM review_drafts WHERE aid = :aid AND rid = :rid LIMIT 1")
     suspend fun getDraft(aid: Int, rid: Int): ReviewDraftEntity?
+
+    @Query("SELECT * FROM review_drafts")
+    suspend fun getAllDrafts(): List<ReviewDraftEntity>
 
     @Query("DELETE FROM review_drafts WHERE aid = :aid AND rid = :rid")
     suspend fun deleteDraft(aid: Int, rid: Int)

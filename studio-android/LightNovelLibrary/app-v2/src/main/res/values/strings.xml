@@ -16,6 +16,7 @@
     <string name="action_refresh">刷新</string>
     <string name="action_clear">清空</string>
     <string name="action_cancel">取消</string>
+    <string name="action_close">关闭</string>
     <string name="action_back">返回</string>
 
     <!-- Destination Headers & Subtitles -->
@@ -184,4 +185,75 @@
     <string name="update_available_body_format">检测到新版本 (Build %2$d，当前 Build %1$d)，可前往发布页下载更新。</string>
     <string name="update_action_download">前往下载页</string>
     <string name="update_check_failed">检查更新失败，请稍后重试</string>
+
+    <!-- Profile & Studio Screen (P3.2 — 100% v1.31 Settings + .wk8backup.zip) -->
+    <string name="profile_footprint_title">阅读足迹与书签</string>
+    <string name="profile_footprint_minutes_format">%1$d 分钟</string>
+    <string name="profile_footprint_minutes_label">累计阅读</string>
+    <string name="profile_footprint_chars_label">累计字数</string>
+    <string name="profile_footprint_notes_label">书签笔记</string>
+
+    <string name="profile_network_card_title">网络与中转连接</string>
+    <string name="profile_network_open_diag">网络检测与诊断报告</string>
+    <string name="profile_network_reset_default">恢复默认连接</string>
+
+    <string name="profile_appearance_title">外观、启动与全局偏好</string>
+    <string name="profile_lang_title">文库内容与界面语言</string>
+    <string name="profile_lang_sc">简体中文</string>
+    <string name="profile_lang_tc">繁體中文</string>
+    <string name="profile_eink_switch">墨水屏高对比模式</string>
+    <string name="profile_eink_subtitle">启用 1dp 实体边框并关闭过渡动画，适配电子纸刷新</string>
+    <string name="profile_dynamic_color_switch">系统壁纸动态取色 (Material You)</string>
+    <string name="profile_header_bg_title">个人主页头图壁纸</string>
+    <string name="profile_header_bg_pure">M3e 纯净卡片</string>
+    <string name="profile_header_bg_preset_format">经典预设 %1$d</string>
+    <string name="profile_header_bg_custom">自定义头图…</string>
+    <string name="profile_header_bg_custom_active">自定义头图 (已启用)</string>
+
+    <string name="profile_reader_studio_title">阅读器默认排版与交互</string>
+    <string name="profile_reader_preview_sample">「奇诺，人类真是一种不可思议的生物呢。」艾尔梅斯静静地说道。</string>
+    <string name="profile_reader_font_size_format">字号大小：%1$d sp</string>
+    <string name="profile_reader_line_dist_format">行间距：%1$d dp</string>
+    <string name="profile_reader_para_dist_format">段间距：%1$d dp</string>
+    <string name="profile_reader_edge_dist_format">页边距：%1$d dp</string>
+    <string name="profile_reader_reset_typography">恢复默认字号与间距</string>
+    <string name="profile_reader_font_title">阅读正文自定义字体</string>
+    <string name="profile_reader_font_default">系统默认字体</string>
+    <string name="profile_reader_font_pick">选择 .ttf/.otf 字体…</string>
+    <string name="profile_reader_font_custom_active">已启用自定义字体</string>
+    <string name="profile_reader_font_invalid">所选文件不是有效的 TTF/OTF 字体文件</string>
+    <string name="profile_reader_bg_title">阅读日间自定义纸张背景</string>
+    <string name="profile_reader_bg_default">主题默认纸页</string>
+    <string name="profile_reader_bg_pick">选择背景图片…</string>
+    <string name="profile_reader_bg_custom_active">已启用自定义日间背景</string>
+    <string name="profile_reader_volume_paging">音量键翻页</string>
+
+    <string name="profile_storage_title">存储、缓存清理与存档管理</string>
+    <string name="profile_cache_fast_action">快速清理</string>
+    <string name="profile_cache_fast_desc">清理临时网络缓存与非书架封面</string>
+    <string name="profile_cache_deep_action">深度清理</string>
+    <string name="profile_cache_deep_desc">扫描并清理无离线章节引用的孤立插图</string>
+    <string name="profile_cache_deep_running_title">正在深度扫描插图缓存…</string>
+    <string name="profile_cache_deep_progress_format">已扫描 %1$d / %2$d 张插图 · 已清理孤立文件 %3$d 个</string>
+    <string name="profile_cache_result_format">清理完成：移除 %1$d 个缓存文件，释放 %2$s 空间</string>
+    <string name="profile_backup_export_action">导出存档 (.wk8backup)</string>
+    <string name="profile_backup_import_action">导入 / 智能合并</string>
+    <string name="profile_backup_mode_dialog_title">选择备份归档模式</string>
+    <string name="profile_backup_mode_light_title">轻量存档备份 (推荐)</string>
+    <string name="profile_backup_mode_light_desc">包含书架、阅读进度、书签笔记、个人设置与自定义字体/背景（约 150 KB – 2 MB，不含登录凭证与本地章节正文）</string>
+    <string name="profile_backup_mode_full_title">完整离线全量归档</string>
+    <string name="profile_backup_mode_full_desc">额外打包全部已下载章节正文与离线封面/插图，适合跨设备完整离线迁移</string>
+    <string name="profile_backup_export_success_format">已导出备份归档：%1$s（含 %2$d 张离线图片）</string>
+    <string name="profile_backup_import_success_format">智能合并完成：书架 %1$d 部 · 进度 %2$d 条 · 书签 %3$d 条 · 章节 %4$d 章</string>
+    <string name="profile_backup_failed">备份或导入操作未完成，请检查所选归档文件是否完整</string>
+    <string name="profile_legacy_saf_import_action">从外部文件夹导入旧版 v1.x 存档</string>
+    <string name="profile_legacy_saf_import_success_format">旧版存档导入完成：书架 %1$d 部 · 离线章节 %2$d 章 · 进度 %3$d 条</string>
+
+    <string name="profile_about_section_title">更新、开源许可与关于</string>
+    <string name="profile_license_action">开源许可声明</string>
+    <string name="profile_license_dialog_title">开源许可与版权声明</string>
+    <string name="profile_about_action">关于轻小说文库</string>
+    <string name="profile_about_dialog_title">关于轻小说文库 v2</string>
+    <string name="profile_about_body_format">版本：%1$s (Build %2$d · 协议兼容 %3$s)\n架构：Kotlin + Jetpack Compose M3 Expressive + Room WAL\n致敬每一位热爱轻小说与纸页阅读的旅人。</string>
+    <string name="profile_about_easter_egg">✨ 旅途愉快！愿每一本轻小说都为你留下一段奇诺般的风景 (5/5)</string>
 </resources>
