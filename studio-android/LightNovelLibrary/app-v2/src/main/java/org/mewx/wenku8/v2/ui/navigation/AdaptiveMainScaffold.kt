@@ -49,10 +49,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import org.mewx.wenku8.api.Wenku8API
 import org.mewx.wenku8.v2.R
 import org.mewx.wenku8.v2.data.repository.DiscoveryRepository
 import org.mewx.wenku8.v2.domain.model.DiscoveryNovelCardItem
+import org.mewx.wenku8.v2.ui.diagnostics.NetworkDiagnosticsScreen
+import org.mewx.wenku8.v2.ui.diagnostics.NetworkDiagnosticsViewModel
 import org.mewx.wenku8.v2.ui.discovery.LatestScreen
 import org.mewx.wenku8.v2.ui.discovery.PersistentSearchEntryPill
 import org.mewx.wenku8.v2.ui.discovery.RankingsScreen
@@ -92,6 +95,9 @@ fun AdaptiveMainScaffold(
     modifier: Modifier = Modifier,
     discoveryRepository: DiscoveryRepository? = null,
     appLanguage: Wenku8API.AppLanguage = Wenku8API.AppLanguage.SC,
+    networkDiagnosticsViewModelFactory: NetworkDiagnosticsViewModel.Factory? = null,
+    autoOptimizeConnectionEnabled: Boolean = true,
+    onAutoOptimizeConnectionChanged: (Boolean) -> Unit = {},
     onOpenSearch: () -> Unit = {},
     onNovelClicked: (DiscoveryNovelCardItem) -> Unit = {},
     onOpenNetworkDiagnostics: () -> Unit = {},
@@ -123,11 +129,21 @@ fun AdaptiveMainScaffold(
     var isSearchStudioOpen by rememberSaveable {
         mutableStateOf(false)
     }
+    var isNetworkDiagnosticsOpen by rememberSaveable {
+        mutableStateOf(false)
+    }
 
     val handleOpenSearch = {
         onOpenSearch()
         if (discoveryRepository != null) {
             isSearchStudioOpen = true
+        }
+    }
+
+    val handleOpenNetworkDiagnostics = {
+        onOpenNetworkDiagnostics()
+        if (networkDiagnosticsViewModelFactory != null) {
+            isNetworkDiagnosticsOpen = true
         }
     }
 
@@ -185,7 +201,7 @@ fun AdaptiveMainScaffold(
                     appLanguage = appLanguage,
                     onOpenSearch = handleOpenSearch,
                     onNovelClicked = onNovelClicked,
-                    onOpenNetworkDiagnostics = onOpenNetworkDiagnostics,
+                    onOpenNetworkDiagnostics = handleOpenNetworkDiagnostics,
                     contentPadding = innerPadding,
                 )
             }
@@ -246,7 +262,7 @@ fun AdaptiveMainScaffold(
                         appLanguage = appLanguage,
                         onOpenSearch = handleOpenSearch,
                         onNovelClicked = onNovelClicked,
-                        onOpenNetworkDiagnostics = onOpenNetworkDiagnostics,
+                        onOpenNetworkDiagnostics = handleOpenNetworkDiagnostics,
                         contentPadding = innerPadding,
                     )
                 }
@@ -259,7 +275,19 @@ fun AdaptiveMainScaffold(
                 appLanguage = appLanguage,
                 onNavigateBack = { isSearchStudioOpen = false },
                 onNovelClicked = onNovelClicked,
-                onOpenNetworkDiagnostics = onOpenNetworkDiagnostics,
+                onOpenNetworkDiagnostics = handleOpenNetworkDiagnostics,
+            )
+        }
+
+        if (isNetworkDiagnosticsOpen && networkDiagnosticsViewModelFactory != null) {
+            val diagnosticsViewModel: NetworkDiagnosticsViewModel = viewModel(
+                factory = networkDiagnosticsViewModelFactory,
+            )
+            NetworkDiagnosticsScreen(
+                viewModel = diagnosticsViewModel,
+                autoOptimizeEnabled = autoOptimizeConnectionEnabled,
+                onAutoOptimizeChanged = onAutoOptimizeConnectionChanged,
+                onNavigateBack = { isNetworkDiagnosticsOpen = false },
             )
         }
     }

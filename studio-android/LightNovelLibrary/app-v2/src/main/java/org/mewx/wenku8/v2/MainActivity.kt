@@ -82,6 +82,13 @@ class MainActivity : AppCompatActivity() {
                         },
                         discoveryRepository = discoveryRepository,
                         appLanguage = loadedPreferences.appLanguage,
+                        networkDiagnosticsViewModelFactory = appContainer.networkDiagnosticsViewModelFactory,
+                        autoOptimizeConnectionEnabled = loadedPreferences.autoOptimizeConnectionEnabled,
+                        onAutoOptimizeConnectionChanged = { enabled ->
+                            coroutineScope.launch {
+                                preferencesRepository.setAutoOptimizeConnectionEnabled(enabled)
+                            }
+                        },
                     )
                 }
             }

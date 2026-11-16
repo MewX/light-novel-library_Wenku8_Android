@@ -78,4 +78,63 @@
     <string name="setting_default_home_title">預設啟動頁</string>
     <string name="setting_default_home_latest">最新更新 (預設)</string>
     <string name="setting_default_home_bookshelf">本地書架</string>
+
+    <!-- Network Diagnostics & Auto-Routing (P2.3) -->
+    <string name="diag_title">網路檢測</string>
+    <string name="diag_network_card_title">目前網路與自動最佳化連線</string>
+    <string name="diag_label_transport">底層傳輸</string>
+    <string name="diag_label_vpn">VPN 狀態</string>
+    <string name="diag_vpn_active">已開啟</string>
+    <string name="diag_vpn_none">未偵測到</string>
+    <string name="diag_transport_wifi_unmetered">Wi-Fi (未計費)</string>
+    <string name="diag_transport_wifi_metered">Wi-Fi (計費熱點)</string>
+    <string name="diag_transport_cellular">行動網路</string>
+    <string name="diag_transport_ethernet">乙太網路</string>
+    <string name="diag_transport_offline">目前離線</string>
+    <string name="diag_transport_unknown">未知傳輸</string>
+    <string name="diag_auto_opt_switch">自動最佳化連線</string>
+    <string name="diag_auto_status_unavailable_stub">此版本未設定中轉檢測服務</string>
+    <string name="diag_auto_status_disabled">自動最佳化連線：關閉 · 使用預設連線</string>
+    <string name="diag_auto_status_default">自動最佳化連線：開啟 · 使用預設連線</string>
+    <string name="diag_auto_status_comparing">正在比較連線…</string>
+    <string name="diag_auto_status_optimized_speed">已最佳化目前網路連線（節點 %1$s · 樣本 %2$d 次 · 中位數降低 %3$d%%）</string>
+    <string name="diag_auto_status_optimized_reliability">已最佳化目前網路連線（節點 %1$s · 可用性復原）</string>
+    <string name="diag_auto_status_restored_default">已恢復預設連線</string>
+    <string name="diag_action_reset_reevaluate">恢復預設連線並重新評估</string>
+
+    <string name="diag_quick_card_title">中轉連線快速檢測</string>
+    <string name="diag_quick_idle_desc">測量目前網路至文庫中轉服務的連通性與回應延遲（10 次請求，間隔 1 秒）。僅傳送固定診斷封包，不攜帶登入 Cookie，不讀取帳號與書架內容。</string>
+    <string name="diag_action_start_quick">開始快速檢測</string>
+    <string name="diag_running_progress_format">正在檢測 · 已完成 %1$d / %2$d 次（成功 %3$d · 失敗 %4$d）</string>
+    <string name="diag_action_stop_keep_partial">停止檢測（保留已完成結果）</string>
+
+    <string name="diag_metric_success_attempts">成功 / 嘗試次數</string>
+    <string name="diag_metric_success_value_format">%1$d / %2$d 次</string>
+    <string name="diag_metric_median_full">完整回應中位數</string>
+    <string name="diag_metric_median_headers">回應標頭到達中位數</string>
+    <string name="diag_metric_min_max">最快 / 最慢</string>
+    <string name="diag_scope_disclaimer">此結果僅測量目前網路至中轉服務的連線，不包含書籍伺服器處理、章節載入及封面/插圖直連 CDN。</string>
+    <string name="diag_action_copy_summary">複製摘要</string>
+    <string name="diag_copied_toast">已複製診斷摘要</string>
+    <string name="diag_action_share_report">分享報告</string>
+    <string name="diag_action_retest">重新檢測</string>
+
+    <string name="diag_details_toggle_format">檢視詳情（%1$d 筆記錄 · 首請求與重用獨立標註）</string>
+    <string name="diag_sample_badge_cold">首請求 · 新建連線</string>
+    <string name="diag_sample_badge_reused">連線已重用</string>
+    <string name="diag_sample_badge_failed">失敗</string>
+    <string name="diag_sample_colo_format">入境節點 %1$s</string>
+
+    <string name="diag_lab_title">進階對比實驗（單軸對比）</string>
+    <string name="diag_lab_happy_eyeballs">Happy Eyeballs vs 順序 DNS</string>
+    <string name="diag_lab_ipv4_ipv6">IPv4 Only vs IPv6 Only</string>
+    <string name="diag_lab_h2_h1">HTTP/2 vs HTTP/1.1 交替突發</string>
+    <string name="diag_lab_api_unsupported_stub">此版本不支援實際介面檢測</string>
+
+    <string name="diag_share_sheet_title">匯出並分享診斷報告</string>
+    <string name="diag_share_disclosed_network_format">報告將包含觀測到的國家/地區：%1$s · 網路自治系統 (ASN)：%2$s</string>
+    <string name="diag_share_asn_notice">說明：ASN 可能代表寬頻電信商，也可能代表目前開啟的 VPN / 代理服務商，不一定等同於手機實體 SIM 卡電信商。</string>
+    <string name="diag_share_excluded_notice">已嚴格剔除：用戶端與候選伺服器原始 IP（僅保留如 cf-v4-01 代號）、Wi-Fi 名稱/BSSID、裝置序號、登入 Cookie 與書架記錄。</string>
+    <string name="diag_share_note_label">城市或電信商備註（選填，隨報告一併匯出）</string>
+    <string name="diag_share_confirm_export">確認匯出 JSON 報告</string>
 </resources>

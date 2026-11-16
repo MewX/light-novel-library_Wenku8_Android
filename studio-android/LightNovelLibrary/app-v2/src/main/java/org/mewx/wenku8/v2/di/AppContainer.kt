@@ -20,12 +20,16 @@ import org.mewx.wenku8.v2.data.media.OfflineFirstWenkuImageFetcher
 import org.mewx.wenku8.v2.data.migration.InternalFileSaveSource
 import org.mewx.wenku8.v2.data.migration.LegacyMigrationProgress
 import org.mewx.wenku8.v2.data.migration.LegacyV1StorageMigrator
+import org.mewx.wenku8.api.Wenku8API
 import org.mewx.wenku8.v2.data.remote.api.WenkuApiClient
+import org.mewx.wenku8.v2.data.remote.api.WenkuApiResult
 import org.mewx.wenku8.v2.data.remote.diagnostics.DiagnosticsEndpointConfig
+import org.mewx.wenku8.v2.data.remote.diagnostics.DiagnosticsEndpointResolution
 import org.mewx.wenku8.v2.data.remote.diagnostics.DiagnosticsNetworkMonitor
 import org.mewx.wenku8.v2.data.remote.diagnostics.DiagnosticsRunner
 import org.mewx.wenku8.v2.data.remote.diagnostics.ManifestRepository
 import org.mewx.wenku8.v2.data.remote.diagnostics.OkHttpProbeTransport
+import org.mewx.wenku8.v2.data.remote.diagnostics.ReadOnlyApiDiagnosticCapability
 import org.mewx.wenku8.v2.data.remote.diagnostics.RelayRouteController
 import org.mewx.wenku8.v2.data.remote.diagnostics.RoutingLocalStore
 import org.mewx.wenku8.v2.data.remote.diagnostics.StalledDnsGuard
@@ -33,6 +37,8 @@ import org.mewx.wenku8.v2.data.remote.transport.RelayHttpTransport
 import org.mewx.wenku8.v2.data.remote.transport.WenkuTransport
 import org.mewx.wenku8.v2.data.repository.DiscoveryRepository
 import org.mewx.wenku8.v2.data.repository.NovelTocSyncRepository
+import org.mewx.wenku8.v2.ui.diagnostics.NetworkDiagnosticsViewModel
+import android.os.SystemClock
 import java.io.File
 
 /**
@@ -117,6 +123,44 @@ class AppContainer(context: Context) {
 
     val wenkuApiClient: WenkuApiClient by lazy {
         WenkuApiClient(transport = wenkuTransport)
+    }
+
+    val readOnlyApiDiagnosticCapability: ReadOnlyApiDiagnosticCapability by lazy {
+        object : ReadOnlyApiDiagnosticCapability {
+            override val isSupportedInCurrentBuild: Boolean
+                get() = DiagnosticsEndpointConfig.resolveFromCompiledApi() is DiagnosticsEndpointResolution.Available &&
+                    wenkuApiClient.isApiConfigured
+
+            override suspend fun runBoundedReadOnlyApiSample(): Result<Long> {
+                if (!isSupportedInCurrentBuild) {
+                    return Result.failure(IllegalStateException("此版本不支持实际接口检测"))
+                }
+                val startMs = SystemClock.elapsedRealtime()
+                return when (
+                    val res = wenkuApiClient.fetchNovelListPage(
+                        sortedBy = Wenku8API.NovelSortedBy.lastUpdate,
+                        pageNumber = 1,
+                        appLanguage = Wenku8API.AppLanguage.SC,
+                    )
+                ) {
+                    is WenkuApiResult.Success -> Result.success((SystemClock.elapsedRealtime() - startMs).coerceAtLeast(0L))
+                    WenkuApiResult.ApiNotConfigured -> Result.failure(IllegalStateException("此版本不支持实际接口检测"))
+                    is WenkuApiResult.NetworkError -> Result.failure(IllegalStateException(res.debugDetail ?: "network_error"))
+                    is WenkuApiResult.ServerErrorCode -> Result.failure(IllegalStateException("server_code_${res.numericCode}"))
+                    is WenkuApiResult.ParseError -> Result.failure(IllegalStateException("parse_error"))
+                }
+            }
+        }
+    }
+
+    val networkDiagnosticsViewModelFactory: NetworkDiagnosticsViewModel.Factory by lazy {
+        NetworkDiagnosticsViewModel.Factory(
+            endpointResolutionProvider = { DiagnosticsEndpointConfig.resolveFromCompiledApi() },
+            diagnosticsRunner = diagnosticsRunner,
+            relayRouteController = relayRouteController,
+            networkObserver = diagnosticsNetworkMonitor,
+            readOnlyApiCapability = readOnlyApiDiagnosticCapability,
+        )
     }
 
     val discoveryRepository: DiscoveryRepository by lazy {
