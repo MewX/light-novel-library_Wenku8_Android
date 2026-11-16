@@ -207,6 +207,14 @@ class AppContainer(context: Context) {
         )
     }
 
+    val reviewsRepository: org.mewx.wenku8.v2.data.repository.ReviewsRepository by lazy {
+        org.mewx.wenku8.v2.data.repository.ReviewsRepository(
+            database = database,
+            catalogGateway = wenkuApiClient,
+            userSessionRepository = userSessionRepository,
+        )
+    }
+
     val legacyV1StorageMigrator: LegacyV1StorageMigrator by lazy {
         LegacyV1StorageMigrator(database, userPreferencesRepository)
     }

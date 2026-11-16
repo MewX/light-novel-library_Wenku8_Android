@@ -57,6 +57,33 @@ data class ParsedUserInfo(
     val rank: String = "",
 )
 
+data class ParsedReviewThreadItem(
+    val rid: Int,
+    val title: String,
+    val uid: Int,
+    val userName: String,
+    val replyCount: Int,
+    val postTimeFormatted: String,
+    val lastReplyTimeFormatted: String,
+)
+
+data class ParsedReviewThreadPage(
+    val totalPages: Int,
+    val items: List<ParsedReviewThreadItem>,
+)
+
+data class ParsedReviewReplyItem(
+    val uid: Int,
+    val userName: String,
+    val replyTimeFormatted: String,
+    val content: String,
+)
+
+data class ParsedReviewReplyPage(
+    val totalPages: Int,
+    val items: List<ParsedReviewReplyItem>,
+)
+
 /**
  * Clean, fault-tolerant Kotlin parsers for Wenku8 XML endpoints and legacy `v1.31` cached files.
  *
@@ -566,6 +593,197 @@ object WenkuXmlParsers {
         } catch (_: Exception) {
             null
         }
+    }
+
+    /**
+     * Parses `Wenku8API.getCommentListParams(aid, page)` (`action=review&do=list`).
+     *
+     * Rejects captive-portal / interstitial HTML unless `<page>`, `<metadata>`, `<package>`, or
+     * `<result>` is encountered.
+     */
+    fun parseReviewThreadListPage(rawXml: String?): ParsedReviewThreadPage? {
+        if (rawXml.isNullOrBlank()) return null
+
+        return try {
+            val parser = newPullParser(rawXml)
+            var sawValidRoot = false
+            var totalPages = 1
+            val items = ArrayList<ParsedReviewThreadItem>()
+
+            var inItem = false
+            var currentRid = 0
+            var currentReplyCount = 0
+            var currentPostTime = ""
+            var currentReplyTime = ""
+            var currentUid = 0
+            var currentUserName = ""
+            var currentTitle = ""
+
+            var eventType = parser.eventType
+            while (eventType != XmlPullParser.END_DOCUMENT) {
+                when (eventType) {
+                    XmlPullParser.START_TAG -> when (parser.name) {
+                        "metadata", "package", "result" -> sawValidRoot = true
+                        "page" -> {
+                            sawValidRoot = true
+                            val parsedPages = (parser.getAttributeValue(null, "num")
+                                ?: parser.safePositionalAttribute(0)).toSafeInt()
+                            if (parsedPages >= 0) {
+                                totalPages = parsedPages.coerceAtLeast(1)
+                            }
+                        }
+                        "item" -> {
+                            sawValidRoot = true
+                            inItem = true
+                            currentRid = parser.getAttributeValue(null, "rid").toSafeInt()
+                            currentReplyCount = parser.getAttributeValue(null, "replies").toSafeInt()
+                            currentPostTime = formatCompactWenkuTimestamp(
+                                parser.getAttributeValue(null, "posttime"),
+                            )
+                            currentReplyTime = formatCompactWenkuTimestamp(
+                                parser.getAttributeValue(null, "replytime"),
+                            )
+                            currentUid = 0
+                            currentUserName = ""
+                            currentTitle = ""
+                        }
+                        "user" -> if (inItem) {
+                            currentUid = (parser.getAttributeValue(null, "uid")
+                                ?: parser.safePositionalAttribute(0)).toSafeInt()
+                            currentUserName = parser.nextText().trim()
+                        }
+                        "content" -> if (inItem) {
+                            currentTitle = parser.nextText().trim()
+                        }
+                    }
+
+                    XmlPullParser.END_TAG -> if (parser.name == "item" && inItem) {
+                        inItem = false
+                        if (currentRid > 0) {
+                            items.add(
+                                ParsedReviewThreadItem(
+                                    rid = currentRid,
+                                    title = currentTitle,
+                                    uid = currentUid,
+                                    userName = currentUserName,
+                                    replyCount = currentReplyCount.coerceAtLeast(0),
+                                    postTimeFormatted = currentPostTime,
+                                    lastReplyTimeFormatted = currentReplyTime.ifEmpty { currentPostTime },
+                                ),
+                            )
+                        }
+                    }
+                }
+                eventType = parser.next()
+            }
+
+            if (sawValidRoot) {
+                ParsedReviewThreadPage(
+                    totalPages = totalPages,
+                    items = items,
+                )
+            } else {
+                null
+            }
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    /**
+     * Parses `Wenku8API.getCommentContentParams(rid, page)` (`action=review&do=show`).
+     */
+    fun parseReviewReplyPage(rawXml: String?): ParsedReviewReplyPage? {
+        if (rawXml.isNullOrBlank()) return null
+
+        return try {
+            val parser = newPullParser(rawXml)
+            var sawValidRoot = false
+            var totalPages = 1
+            val items = ArrayList<ParsedReviewReplyItem>()
+
+            var inItem = false
+            var currentReplyTime = ""
+            var currentUid = 0
+            var currentUserName = ""
+            var currentContent = ""
+
+            var eventType = parser.eventType
+            while (eventType != XmlPullParser.END_DOCUMENT) {
+                when (eventType) {
+                    XmlPullParser.START_TAG -> when (parser.name) {
+                        "metadata", "package", "result" -> sawValidRoot = true
+                        "page" -> {
+                            sawValidRoot = true
+                            val parsedPages = (parser.getAttributeValue(null, "num")
+                                ?: parser.safePositionalAttribute(0)).toSafeInt()
+                            if (parsedPages >= 0) {
+                                totalPages = parsedPages.coerceAtLeast(1)
+                            }
+                        }
+                        "item" -> {
+                            sawValidRoot = true
+                            inItem = true
+                            currentReplyTime = formatCompactWenkuTimestamp(
+                                parser.getAttributeValue(null, "timestamp"),
+                            )
+                            currentUid = 0
+                            currentUserName = ""
+                            currentContent = ""
+                        }
+                        "user" -> if (inItem) {
+                            currentUid = (parser.getAttributeValue(null, "uid")
+                                ?: parser.safePositionalAttribute(0)).toSafeInt()
+                            currentUserName = parser.nextText().trim()
+                        }
+                        "content" -> if (inItem) {
+                            currentContent = parser.nextText().trim()
+                        }
+                    }
+
+                    XmlPullParser.END_TAG -> if (parser.name == "item" && inItem) {
+                        inItem = false
+                        items.add(
+                            ParsedReviewReplyItem(
+                                uid = currentUid,
+                                userName = currentUserName,
+                                replyTimeFormatted = currentReplyTime,
+                                content = currentContent,
+                            ),
+                        )
+                    }
+                }
+                eventType = parser.next()
+            }
+
+            if (sawValidRoot) {
+                ParsedReviewReplyPage(
+                    totalPages = totalPages,
+                    items = items,
+                )
+            } else {
+                null
+            }
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    /**
+     * Converts Wenku8's compact `YYYYMMDDHHmmss` timestamp (`20240518143022`) into
+     * `"2024-05-18 14:30"` without legacy `GregorianCalendar` mutability or timezone drift.
+     */
+    internal fun formatCompactWenkuTimestamp(raw: String?): String {
+        val clean = raw?.trim().orEmpty()
+        if (clean.length >= 12 && clean.take(12).all { it.isDigit() }) {
+            val year = clean.substring(0, 4)
+            val month = clean.substring(4, 6)
+            val day = clean.substring(6, 8)
+            val hour = clean.substring(8, 10)
+            val minute = clean.substring(10, 12)
+            return "$year-$month-$day $hour:$minute"
+        }
+        return clean
     }
 
     /**

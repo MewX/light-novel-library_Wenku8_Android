@@ -6,6 +6,8 @@ import org.mewx.wenku8.v2.data.remote.parser.ParsedCloudBookshelfEntry
 import org.mewx.wenku8.v2.data.remote.parser.ParsedNovelFullMeta
 import org.mewx.wenku8.v2.data.remote.parser.ParsedNovelListItem
 import org.mewx.wenku8.v2.data.remote.parser.ParsedNovelListPage
+import org.mewx.wenku8.v2.data.remote.parser.ParsedReviewReplyPage
+import org.mewx.wenku8.v2.data.remote.parser.ParsedReviewThreadPage
 import org.mewx.wenku8.v2.data.remote.parser.WenkuXmlParsers
 import org.mewx.wenku8.v2.data.remote.transport.LegacyLightNetworkTransport
 import org.mewx.wenku8.v2.data.remote.transport.WenkuTransport
@@ -48,6 +50,9 @@ enum class OnlineSearchField {
 interface WenkuParamsFactory {
     fun baseUrlOrUnknown(): String
     fun resolveCoverUrl(aid: Int): String
+    fun resolveAvatarUrl(uid: Int): String = ""
+    fun findBadWord(text: String): String? = null
+    fun minReplyTextLength(): Int = 7
     fun novelListWithInfo(sortedBy: Wenku8API.NovelSortedBy, page: Int, lang: Wenku8API.AppLanguage): ContentValues?
     fun searchByNovelName(query: String, lang: Wenku8API.AppLanguage): ContentValues?
     fun searchByAuthorName(query: String, lang: Wenku8API.AppLanguage): ContentValues?
@@ -57,6 +62,10 @@ interface WenkuParamsFactory {
     fun novelIndex(aid: Int, lang: Wenku8API.AppLanguage): ContentValues?
     fun novelContent(aid: Int, cid: Int, lang: Wenku8API.AppLanguage): ContentValues?
     fun bookshelfListParams(lang: Wenku8API.AppLanguage): ContentValues?
+    fun commentListParams(aid: Int, page: Int, lang: Wenku8API.AppLanguage): ContentValues? = null
+    fun commentContentParams(rid: Int, page: Int, lang: Wenku8API.AppLanguage): ContentValues? = null
+    fun commentNewThreadParams(aid: Int, title: String, content: String): ContentValues? = null
+    fun commentReplyParams(rid: Int, content: String): ContentValues? = null
 }
 
 object NativeWenkuParamsFactory : WenkuParamsFactory {
@@ -66,6 +75,18 @@ object NativeWenkuParamsFactory : WenkuParamsFactory {
 
     override fun resolveCoverUrl(aid: Int): String = safeCall("") {
         Wenku8API.getCoverURL(aid).orEmpty()
+    }
+
+    override fun resolveAvatarUrl(uid: Int): String = safeCall("") {
+        if (uid <= 0) "" else Wenku8API.getAvatarURL(uid).orEmpty()
+    }
+
+    override fun findBadWord(text: String): String? = safeCall(null) {
+        Wenku8API.searchBadWords(text)
+    }
+
+    override fun minReplyTextLength(): Int = safeCall(7) {
+        Wenku8API.MIN_REPLY_TEXT.takeIf { it > 0 } ?: 7
     }
 
     override fun novelListWithInfo(
@@ -100,6 +121,24 @@ object NativeWenkuParamsFactory : WenkuParamsFactory {
     override fun bookshelfListParams(lang: Wenku8API.AppLanguage): ContentValues? =
         safeCall(null) { Wenku8API.getBookshelfListParams(lang) }
 
+    override fun commentListParams(aid: Int, page: Int, lang: Wenku8API.AppLanguage): ContentValues? =
+        safeCall(null) {
+            Wenku8API.CurrentLang = lang
+            Wenku8API.getCommentListParams(aid, page)
+        }
+
+    override fun commentContentParams(rid: Int, page: Int, lang: Wenku8API.AppLanguage): ContentValues? =
+        safeCall(null) {
+            Wenku8API.CurrentLang = lang
+            Wenku8API.getCommentContentParams(rid, page)
+        }
+
+    override fun commentNewThreadParams(aid: Int, title: String, content: String): ContentValues? =
+        safeCall(null) { Wenku8API.getCommentNewThreadParams(aid, title, content) }
+
+    override fun commentReplyParams(rid: Int, content: String): ContentValues? =
+        safeCall(null) { Wenku8API.getCommentReplyParams(rid, content) }
+
     private inline fun <T> safeCall(fallback: T, block: () -> T): T {
         return try {
             block()
@@ -117,7 +156,12 @@ object NativeWenkuParamsFactory : WenkuParamsFactory {
  */
 interface WenkuCatalogGateway {
     val isApiConfigured: Boolean
+    val minReplyTextLength: Int
+        get() = 7
+
     fun resolveCoverUrl(aid: Int): String
+    fun resolveAvatarUrl(uid: Int): String = ""
+    fun findBadWord(text: String): String? = null
 
     suspend fun fetchNovelListPage(
         sortedBy: Wenku8API.NovelSortedBy,
@@ -160,6 +204,29 @@ interface WenkuCatalogGateway {
     suspend fun fetchCloudBookshelf(
         appLanguage: Wenku8API.AppLanguage,
     ): WenkuApiResult<List<ParsedCloudBookshelfEntry>>
+
+    suspend fun fetchReviewThreadListPage(
+        aid: Int,
+        pageNumber: Int,
+        appLanguage: Wenku8API.AppLanguage,
+    ): WenkuApiResult<ParsedReviewThreadPage> = WenkuApiResult.ApiNotConfigured
+
+    suspend fun fetchReviewReplyPage(
+        rid: Int,
+        pageNumber: Int,
+        appLanguage: Wenku8API.AppLanguage,
+    ): WenkuApiResult<ParsedReviewReplyPage> = WenkuApiResult.ApiNotConfigured
+
+    suspend fun postNewReviewThread(
+        aid: Int,
+        title: String,
+        content: String,
+    ): WenkuApiResult<Unit> = WenkuApiResult.ApiNotConfigured
+
+    suspend fun postReviewReply(
+        rid: Int,
+        content: String,
+    ): WenkuApiResult<Unit> = WenkuApiResult.ApiNotConfigured
 }
 
 /**
@@ -178,10 +245,20 @@ class WenkuApiClient(
                 url != LegacyLightNetworkTransport.UNKNOWN_ENDPOINT_SENTINEL
         }
 
+    override val minReplyTextLength: Int
+        get() = paramsFactory.minReplyTextLength()
+
     override fun resolveCoverUrl(aid: Int): String {
         if (aid <= 0) return ""
         return paramsFactory.resolveCoverUrl(aid)
     }
+
+    override fun resolveAvatarUrl(uid: Int): String {
+        if (uid <= 0) return ""
+        return paramsFactory.resolveAvatarUrl(uid)
+    }
+
+    override fun findBadWord(text: String): String? = paramsFactory.findBadWord(text)
 
     override suspend fun fetchNovelListPage(
         sortedBy: Wenku8API.NovelSortedBy,
@@ -290,6 +367,79 @@ class WenkuApiClient(
 
         return executeXmlRequest(params, isIdempotentReadOnly = true) { rawXml ->
             WenkuXmlParsers.parseCloudBookshelfList(rawXml)
+        }
+    }
+
+    override suspend fun fetchReviewThreadListPage(
+        aid: Int,
+        pageNumber: Int,
+        appLanguage: Wenku8API.AppLanguage,
+    ): WenkuApiResult<ParsedReviewThreadPage> {
+        if (!isApiConfigured) return WenkuApiResult.ApiNotConfigured
+        val params = paramsFactory.commentListParams(aid, pageNumber.coerceAtLeast(1), appLanguage)
+            ?: return WenkuApiResult.ApiNotConfigured
+
+        return executeXmlRequest(params, isIdempotentReadOnly = true) { rawXml ->
+            WenkuXmlParsers.parseReviewThreadListPage(rawXml)
+        }
+    }
+
+    override suspend fun fetchReviewReplyPage(
+        rid: Int,
+        pageNumber: Int,
+        appLanguage: Wenku8API.AppLanguage,
+    ): WenkuApiResult<ParsedReviewReplyPage> {
+        if (!isApiConfigured) return WenkuApiResult.ApiNotConfigured
+        val params = paramsFactory.commentContentParams(rid, pageNumber.coerceAtLeast(1), appLanguage)
+            ?: return WenkuApiResult.ApiNotConfigured
+
+        return executeXmlRequest(params, isIdempotentReadOnly = true) { rawXml ->
+            WenkuXmlParsers.parseReviewReplyPage(rawXml)
+        }
+    }
+
+    override suspend fun postNewReviewThread(
+        aid: Int,
+        title: String,
+        content: String,
+    ): WenkuApiResult<Unit> {
+        if (!isApiConfigured) return WenkuApiResult.ApiNotConfigured
+        val params = paramsFactory.commentNewThreadParams(aid, title, content)
+            ?: return WenkuApiResult.ApiNotConfigured
+        return executeNumericMutationRequest(params)
+    }
+
+    override suspend fun postReviewReply(
+        rid: Int,
+        content: String,
+    ): WenkuApiResult<Unit> {
+        if (!isApiConfigured) return WenkuApiResult.ApiNotConfigured
+        val params = paramsFactory.commentReplyParams(rid, content)
+            ?: return WenkuApiResult.ApiNotConfigured
+        return executeNumericMutationRequest(params)
+    }
+
+    private suspend fun executeNumericMutationRequest(formParams: ContentValues): WenkuApiResult<Unit> {
+        val endpointUrl = paramsFactory.baseUrlOrUnknown()
+        if (!transport.isEndpointConfigured ||
+            endpointUrl.isBlank() ||
+            endpointUrl == LegacyLightNetworkTransport.UNKNOWN_ENDPOINT_SENTINEL
+        ) {
+            return WenkuApiResult.ApiNotConfigured
+        }
+
+        val responseBytes = transport.postForm(
+            endpointUrl = endpointUrl,
+            formParams = formParams,
+            isIdempotentReadOnly = false,
+        ) ?: return WenkuApiResult.NetworkError()
+
+        val trimmed = String(responseBytes, StandardCharsets.UTF_8).trim()
+        val code = trimmed.toIntOrNull() ?: return WenkuApiResult.ParseError(trimmed.take(120))
+        return if (code == 1) {
+            WenkuApiResult.Success(Unit)
+        } else {
+            WenkuApiResult.ServerErrorCode(code)
         }
     }
 

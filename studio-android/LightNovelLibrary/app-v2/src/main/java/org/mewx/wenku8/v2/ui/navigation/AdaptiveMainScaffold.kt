@@ -62,6 +62,8 @@ import org.mewx.wenku8.v2.data.remote.diagnostics.AutoRoutingModeState
 import org.mewx.wenku8.v2.data.remote.diagnostics.RelayRouteController
 import org.mewx.wenku8.v2.data.repository.BackupArchiveRepository
 import org.mewx.wenku8.v2.data.repository.DiscoveryRepository
+import org.mewx.wenku8.v2.data.repository.ReviewThreadCardItem
+import org.mewx.wenku8.v2.data.repository.ReviewsRepository
 import org.mewx.wenku8.v2.data.repository.ServerNoticeAndUpdateRepository
 import org.mewx.wenku8.v2.data.repository.StorageAndCacheRepository
 import org.mewx.wenku8.v2.data.repository.UserSessionRepository
@@ -73,6 +75,8 @@ import org.mewx.wenku8.v2.ui.discovery.PersistentSearchEntryPill
 import org.mewx.wenku8.v2.ui.discovery.RankingsScreen
 import org.mewx.wenku8.v2.ui.profile.AccountLoginBottomSheet
 import org.mewx.wenku8.v2.ui.profile.ProfileAndStudioScreen
+import org.mewx.wenku8.v2.ui.reviews.ReviewListScreen
+import org.mewx.wenku8.v2.ui.reviews.ReviewThreadScreen
 import org.mewx.wenku8.v2.ui.search.UnifiedSearchScreen
 import org.mewx.wenku8.v2.ui.theme.Wenku8ThemeMode
 import org.mewx.wenku8.v2.ui.theme.einkHairlineBorder
@@ -115,6 +119,7 @@ fun AdaptiveMainScaffold(
     serverNoticeAndUpdateRepository: ServerNoticeAndUpdateRepository? = null,
     storageAndCacheRepository: StorageAndCacheRepository? = null,
     backupArchiveRepository: BackupArchiveRepository? = null,
+    reviewsRepository: ReviewsRepository? = null,
     legacyV1StorageMigrator: LegacyV1StorageMigrator? = null,
     appLanguage: Wenku8API.AppLanguage = Wenku8API.AppLanguage.SC,
     networkDiagnosticsViewModelFactory: NetworkDiagnosticsViewModel.Factory? = null,
@@ -133,6 +138,8 @@ fun AdaptiveMainScaffold(
     onReaderCustomFontPathChanged: (String) -> Unit = {},
     onReaderCustomBackgroundPathChanged: (String) -> Unit = {},
     onVolumeKeyPagingChanged: (Boolean) -> Unit = {},
+    initialOpenReviewsAid: Int = 0,
+    initialOpenReviewsTitle: String = "",
     onOpenSearch: () -> Unit = {},
     onNovelClicked: (DiscoveryNovelCardItem) -> Unit = {},
     onOpenNetworkDiagnostics: () -> Unit = {},
@@ -177,6 +184,15 @@ fun AdaptiveMainScaffold(
     }
     var isLoginBottomSheetOpen by rememberSaveable {
         mutableStateOf(false)
+    }
+    var activeReviewsAid by rememberSaveable {
+        mutableStateOf(initialOpenReviewsAid)
+    }
+    var activeReviewsNovelTitle by rememberSaveable {
+        mutableStateOf(initialOpenReviewsTitle)
+    }
+    var activeReviewThread by androidx.compose.runtime.remember {
+        mutableStateOf<ReviewThreadCardItem?>(null)
     }
 
     val handleOpenSearch = {
@@ -355,6 +371,39 @@ fun AdaptiveMainScaffold(
                 onNovelClicked = onNovelClicked,
                 onOpenNetworkDiagnostics = handleOpenNetworkDiagnostics,
             )
+        }
+
+        if (activeReviewsAid > 0 && reviewsRepository != null) {
+            val selectedThread = activeReviewThread
+            if (selectedThread == null) {
+                ReviewListScreen(
+                    aid = activeReviewsAid,
+                    novelTitle = activeReviewsNovelTitle,
+                    reviewsRepository = reviewsRepository,
+                    appLanguage = appLanguage,
+                    userSessionRepository = userSessionRepository,
+                    onNavigateBack = {
+                        activeReviewsAid = 0
+                        activeReviewsNovelTitle = ""
+                        activeReviewThread = null
+                    },
+                    onOpenThread = { thread -> activeReviewThread = thread },
+                    onOpenLoginSheet = { isLoginBottomSheetOpen = true },
+                    onOpenNetworkDiagnostics = handleOpenNetworkDiagnostics,
+                )
+            } else {
+                ReviewThreadScreen(
+                    aid = activeReviewsAid,
+                    novelTitle = activeReviewsNovelTitle,
+                    thread = selectedThread,
+                    reviewsRepository = reviewsRepository,
+                    appLanguage = appLanguage,
+                    userSessionRepository = userSessionRepository,
+                    onNavigateBack = { activeReviewThread = null },
+                    onOpenLoginSheet = { isLoginBottomSheetOpen = true },
+                    onOpenNetworkDiagnostics = handleOpenNetworkDiagnostics,
+                )
+            }
         }
 
         if (isNetworkDiagnosticsOpen && networkDiagnosticsViewModelFactory != null) {

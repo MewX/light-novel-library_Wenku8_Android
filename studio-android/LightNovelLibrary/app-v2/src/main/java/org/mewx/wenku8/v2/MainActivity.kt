@@ -91,6 +91,7 @@ class MainActivity : AppCompatActivity() {
                         serverNoticeAndUpdateRepository = appContainer.serverNoticeAndUpdateRepository,
                         storageAndCacheRepository = appContainer.storageAndCacheRepository,
                         backupArchiveRepository = appContainer.backupArchiveRepository,
+                        reviewsRepository = appContainer.reviewsRepository,
                         legacyV1StorageMigrator = appContainer.legacyV1StorageMigrator,
                         appLanguage = loadedPreferences.appLanguage,
                         networkDiagnosticsViewModelFactory = appContainer.networkDiagnosticsViewModelFactory,

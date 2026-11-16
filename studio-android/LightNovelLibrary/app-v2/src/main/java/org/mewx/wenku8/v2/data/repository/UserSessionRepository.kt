@@ -479,6 +479,51 @@ class UserSessionRepository(
         }
     }
 
+    /**
+     * Performs a bounded single re-login using stored `saves/cert.wk8` credentials when another
+     * authenticated endpoint (e.g., review posting or cloud bookcase sync) receives
+     * `SYSTEM_4_NOT_LOGGED_IN` (`4`) due to an expired `PHPSESSID` cookie.
+     *
+     * Never retries more than once per caller request, and wipes local credentials only if the
+     * server explicitly rejects the username (`SYSTEM_2`) or password (`SYSTEM_3`).
+     */
+    suspend fun reauthenticateFromSavedCredentialsIfPossible(): Boolean = withContext(ioDispatcher) {
+        authMutex.withLock {
+            if (!isAuthSupported) return@withLock false
+            val creds = cachedCredentials ?: loadCredentialsFromDisk() ?: return@withLock false
+            cachedCredentials = creds
+            authGateway.syncInMemoryCredentials(creds.identifier, creds.password)
+
+            when (executeLoginCallLocked(creds.identifier, creds.password)) {
+                Wenku8Error.ErrorCode.SYSTEM_1_SUCCEEDED -> {
+                    val (freshInfo, freshAvatar) = fetchUserInfoAndAvatarLocked(allowSingleRelogin = false)
+                    val currentSignedIn = _sessionState.value as? AccountSessionState.SignedIn
+                    val profile = freshInfo ?: currentSignedIn?.profile ?: ParsedUserInfo(
+                        username = creds.identifier,
+                        nickname = creds.identifier,
+                    )
+                    _sessionState.value = AccountSessionState.SignedIn(
+                        profile = profile,
+                        cachedAvatarFile = freshAvatar ?: currentSignedIn?.cachedAvatarFile ?: findExistingAvatarFile(),
+                        avatarCacheBusterMs = System.currentTimeMillis(),
+                        dailySignStatus = currentSignedIn?.dailySignStatus ?: DailySignStatus.IDLE,
+                    )
+                    true
+                }
+
+                Wenku8Error.ErrorCode.SYSTEM_2_ERROR_USERNAME,
+                Wenku8Error.ErrorCode.SYSTEM_3_ERROR_PASSWORD,
+                -> {
+                    wipeStoredAccountFilesAndMemoryLocked()
+                    _sessionState.value = AccountSessionState.SignedOut
+                    false
+                }
+
+                else -> false
+            }
+        }
+    }
+
     private suspend fun executeLoginCallLocked(
         identifier: String,
         password: String,
