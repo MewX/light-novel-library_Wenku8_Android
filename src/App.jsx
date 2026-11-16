@@ -680,7 +680,7 @@ const DisqusComments = ({ darkMode }) => {
     useEffect(() => {
         // Define global config if not already defined
         window.disqus_config = function () {
-            this.page.url = 'http://wenku8.mewx.org/';
+            this.page.url = 'https://wenku8.app/';
             this.page.identifier = 'wenku8android';
         };
 
