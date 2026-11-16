@@ -1,15 +1,19 @@
 package org.mewx.wenku8.v2
 
 import android.app.Application
+import coil3.ImageLoader
+import coil3.PlatformContext
+import coil3.SingletonImageLoader
 import org.mewx.wenku8.v2.di.AppContainer
 
 /**
  * Application entry point for Wenku8 `:app-v2`.
  *
- * Exposes lazy [appContainer] (`wenku8_v2.db` WAL + `settings.preferences_pb` DataStore) with zero
- * blocking I/O on `onCreate`.
+ * Implements Coil 3 [SingletonImageLoader.Factory] so every `AsyncImage` checks permanent offline
+ * illustrations (`filesDir/saves/imgs/` & `filesDir/imgs/`) before touching OkHttp, and schedules
+ * background `v1.31 -> v2.0` internal-storage migration off the main thread on first upgrade launch.
  */
-class Wenku8V2Application : Application() {
+class Wenku8V2Application : Application(), SingletonImageLoader.Factory {
 
     lateinit var appContainer: AppContainer
         private set
@@ -17,5 +21,10 @@ class Wenku8V2Application : Application() {
     override fun onCreate() {
         super.onCreate()
         appContainer = AppContainer(this)
+        appContainer.triggerAutomaticInternalMigrationIfNeeded()
+    }
+
+    override fun newImageLoader(context: PlatformContext): ImageLoader {
+        return appContainer.buildOfflineFirstImageLoader()
     }
 }

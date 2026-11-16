@@ -34,12 +34,12 @@
   - Implemented all 9 Room entities + exported `v1` schema JSON with decoupled FKs (`CHAPTER_CONTENTS`, `READING_PROGRESS`, `BOOKMARKS_NOTES` → `NOVELS(aid)`).
   - Implemented `NovelTocSyncRepository.syncNovelIndexAtomically` (`@Upsert`, stale-response guard, SHA-256 fast-path, monotonic `toc_version`, 400-ID chunked pruning, `READING_PROGRESS.vid` auto-healing, and `SUBSTR` `2 MB CursorWindow`-safe reader).
   - Implemented `UserPreferencesRepository` (`settings.preferences_pb`) preserving 100% of `v1.31` `SettingItems` + `DefaultHomeDestination` (`LATEST` default / `BOOKSHELF`) + `autoOptimizeConnectionEnabled` and wired `MainActivity`.
-- [~] **`P0.3` — Legacy `v1.31` Internal-Storage & SAF Migrator (`LegacyV1StorageMigrator`) + XML Parsers**
+- [x] **`P0.3` — Legacy `v1.31` Internal-Storage & SAF Migrator (`LegacyV1StorageMigrator`) + XML Parsers** *(Completed: `WenkuXmlParsers` with mixed-CDATA volume titles, stray-tag recovery, BOM/whitespace sanitization, & cloud shelf empty-vs-invalid disambiguation; Coil 3 `OfflineFirstWenkuImageFetcher` serving `saves/imgs/` & `imgs/` in place without copying; idempotent `LegacyV1StorageMigrator` migrating all 11 settings, `bookshelf_local.wk8`, `intro/{aid}-*.xml`, `novel/{cid}.xml` in 50-chapter batches, `read_saves_v1.wk8` / `read_saves.wk8`, & `search_history.wk8` + SAF `importLegacyBackupTree`; verified 31/31 unit/Robolectric tests across `:api` & `-DforceApiStub` + Pixel 8 `User 0`)*
   - Parse `settings.wk8` (`||||` & `::::`), `bookshelf_local.wk8`, `intro/{aid}-{intro,introfull,volume}.xml`, `novel/{cid}.xml` (25-chapter WAL batches + `imageUrlsJson`), `read_saves_v1.wk8` (`:`), `read_saves.wk8` (`,,`), and `search_history.wk8` (`[0/1...]`).
   - `OfflineFirstWenkuImageFetcher` reading `filesDir/saves/imgs/` & `filesDir/imgs/` before network.
 
 ### Phase 1: Discovery Feeds (`最新` · `排行`) & Unified Search Studio (`5s` Cooldown Queue)
-- [ ] **`P1.1` — `:api` Coroutine Gateway (`WenkuApiClient`) & Paginated Feed Engine**
+- [~] **`P1.1` — `:api` Coroutine Gateway (`WenkuApiClient`) & Paginated Feed Engine**
   - Clean Kotlin repository wrapping `Wenku8API` + `LightNetwork` / `RelayHttpTransport` + `Wenku8Parser` / `NovelListWithInfoParser` with `api-stub` safety.
 - [ ] **`P1.2` — `LatestScreen` (`最近更新 · 最新入库 · 完结精品`) & `RankingsScreen` (2D Metric × Period Matrix)**
   - Real data loading, pagination, pull-to-refresh, E-Ink card compliance, and contextual `[ 🩺 网络检测 ]` error chip.

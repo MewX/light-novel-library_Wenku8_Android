@@ -1,0 +1,458 @@
+package org.mewx.wenku8.v2.data.remote.parser
+
+import org.mewx.wenku8.v2.data.repository.ParsedChapterToc
+import org.mewx.wenku8.v2.data.repository.ParsedVolumeToc
+import org.xmlpull.v1.XmlPullParser
+import org.xmlpull.v1.XmlPullParserFactory
+import java.io.StringReader
+
+data class ParsedNovelFullMeta(
+    val aid: Int,
+    val title: String,
+    val author: String = "",
+    val dayHitsCount: Int = 0,
+    val totalHitsCount: Int = 0,
+    val pushCount: Int = 0,
+    val favCount: Int = 0,
+    val pressId: String = "",
+    val bookStatus: String = "",
+    val bookLength: Int = 0,
+    val lastUpdate: String = "",
+    val latestSectionCid: Int = 0,
+    val latestSectionName: String = "",
+)
+
+data class ParsedNovelListItem(
+    val aid: Int,
+    val title: String = "",
+    val author: String = "",
+    val bookStatus: String = "",
+    val lastUpdate: String = "",
+    val tagsCsv: String = "",
+    val introShort: String = "",
+    val totalHits: Int = 0,
+    val pushCount: Int = 0,
+    val favCount: Int = 0,
+)
+
+data class ParsedNovelListPage(
+    val totalPages: Int,
+    val items: List<ParsedNovelListItem>,
+)
+
+data class ParsedCloudBookshelfEntry(
+    val aid: Int,
+    val lastUpdateDate: String = "",
+    val title: String = "",
+    val latestChapterCid: Int = 0,
+    val latestChapterName: String = "",
+)
+
+/**
+ * Clean, fault-tolerant Kotlin parsers for Wenku8 XML endpoints and legacy `v1.31` cached files.
+ *
+ * Preserves every real-world protocol quirk documented in `:app`'s `Wenku8Parser`,
+ * `NovelListWithInfoParser`, `BookshelfListParser`, and `OldNovelContentParser`:
+ * - Named attribute lookups (`getAttributeValue(null, "name")`) with positional fallbacks.
+ * - Rejects well-formed non-novel XML lacking a `<data name="Title">` element.
+ * - Handles unclosed CDATA text inside `<volume vid="..."><![CDATA[Volume Title]]>\n<chapter ...>`
+ *   as well as stray `</volume>` tags.
+ * - Flattens ideographic spaces (`U+3000`) and hard line breaks in `IntroPreview`.
+ */
+object WenkuXmlParsers {
+
+    private const val CHAPTER_IMAGE_DELIMITER = "<!--image-->"
+    private val IDEOGRAPHIC_AND_ASCII_WHITESPACE = Regex("[\\s\\u3000]+")
+
+    fun parseNovelFullMeta(rawXml: String?): ParsedNovelFullMeta? {
+        if (rawXml.isNullOrBlank()) return null
+
+        return try {
+            val parser = newPullParser(rawXml)
+            var foundTitle = false
+            var aid = 0
+            var title = ""
+            var author = ""
+            var dayHits = 0
+            var totalHits = 0
+            var pushCount = 0
+            var favCount = 0
+            var pressId = ""
+            var bookStatus = ""
+            var bookLength = 0
+            var lastUpdate = ""
+            var latestCid = 0
+            var latestName = ""
+
+            var eventType = parser.eventType
+            while (eventType != XmlPullParser.END_DOCUMENT) {
+                if (eventType == XmlPullParser.START_TAG && parser.name == "data") {
+                    val fieldName = parser.getAttributeValue(null, "name")
+                        ?: parser.safePositionalAttribute(0)
+                    when (fieldName) {
+                        "Title" -> {
+                            val rawAid = parser.getAttributeValue(null, "aid")
+                                ?: parser.safePositionalAttribute(1)
+                            aid = rawAid.toSafeInt()
+                            title = parser.nextText().trim()
+                            if (aid > 0 && title.isNotEmpty()) {
+                                foundTitle = true
+                            }
+                        }
+                        "Author" -> author = parser.readValueAttributeOrText()
+                        "DayHitsCount" -> dayHits = parser.readValueAttributeOrText().toSafeInt()
+                        "TotalHitsCount" -> totalHits = parser.readValueAttributeOrText().toSafeInt()
+                        "PushCount" -> pushCount = parser.readValueAttributeOrText().toSafeInt()
+                        "FavCount" -> favCount = parser.readValueAttributeOrText().toSafeInt()
+                        "PressId" -> pressId = parser.readValueAttributeOrText()
+                        "BookStatus" -> bookStatus = parser.readValueAttributeOrText()
+                        "BookLength" -> bookLength = parser.readValueAttributeOrText().toSafeInt()
+                        "LastUpdate" -> lastUpdate = parser.readValueAttributeOrText()
+                        "LatestSection" -> {
+                            val rawCid = parser.getAttributeValue(null, "cid")
+                                ?: parser.safePositionalAttribute(1)
+                            latestCid = rawCid.toSafeInt()
+                            latestName = parser.nextText().trim()
+                        }
+                    }
+                }
+                eventType = parser.next()
+            }
+
+            if (!foundTitle) {
+                null
+            } else {
+                ParsedNovelFullMeta(
+                    aid = aid,
+                    title = title,
+                    author = author,
+                    dayHitsCount = dayHits,
+                    totalHitsCount = totalHits,
+                    pushCount = pushCount,
+                    favCount = favCount,
+                    pressId = pressId,
+                    bookStatus = bookStatus,
+                    bookLength = bookLength,
+                    lastUpdate = lastUpdate,
+                    latestSectionCid = latestCid,
+                    latestSectionName = latestName,
+                )
+            }
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    /**
+     * Parses `do=list` (`{aid}-volume.xml`) into ordered [ParsedVolumeToc] entries.
+     *
+     * Wenku8's `do=list` XML embeds each volume's title as mixed text/CDATA directly inside
+     * `<volume vid="41748"><![CDATA[第一卷 ...]]>` immediately followed by child `<chapter>`
+     * elements. Capturing `XmlPullParser.TEXT` events while inside `<volume>` (before `<chapter>`
+     * starts) cleanly extracts the volume title without fragile substring indexing, while keeping
+     * `Wenku8Parser`'s `CDATA[` fallback as a secondary safety net.
+     */
+    fun parseVolumeTocList(rawXml: String?): List<ParsedVolumeToc> {
+        if (rawXml.isNullOrBlank()) return emptyList()
+
+        val parsedVolumes = ArrayList<MutableVolumeAccumulator>()
+        var activeVolume: MutableVolumeAccumulator? = null
+        try {
+            val parser = newPullParser(rawXml)
+            var insideChapterTag = false
+
+            var eventType = parser.eventType
+            while (eventType != XmlPullParser.END_DOCUMENT) {
+                when (eventType) {
+                    XmlPullParser.START_TAG -> {
+                        when (parser.name) {
+                            "volume" -> {
+                                val vid = (parser.getAttributeValue(null, "vid")
+                                    ?: parser.safePositionalAttribute(0)).toSafeInt()
+                                activeVolume = if (vid > 0) MutableVolumeAccumulator(vid) else null
+                            }
+                            "chapter" -> {
+                                insideChapterTag = true
+                                val cid = (parser.getAttributeValue(null, "cid")
+                                    ?: parser.safePositionalAttribute(0)).toSafeInt()
+                                val chapterTitle = parser.nextText().trim()
+                                insideChapterTag = false
+                                if (cid > 0) {
+                                    activeVolume?.chapters?.add(
+                                        ParsedChapterToc(cid = cid, chapterTitle = chapterTitle),
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    XmlPullParser.TEXT -> {
+                        if (!insideChapterTag && activeVolume != null && activeVolume.titleBuilder.isEmpty()) {
+                            val trimmedText = parser.text?.trim().orEmpty()
+                            if (trimmedText.isNotEmpty()) {
+                                activeVolume.titleBuilder.append(trimmedText)
+                            }
+                        }
+                    }
+                    XmlPullParser.END_TAG -> {
+                        if (parser.name == "volume") {
+                            activeVolume?.let { parsedVolumes.add(it) }
+                            activeVolume = null
+                        }
+                    }
+                }
+                eventType = parser.next()
+            }
+        } catch (_: Exception) {
+            // Preserve all completed volumes (and any in-progress volume that already collected
+            // valid chapters) when server-side malformed tail XML or stray closing tags occur.
+            activeVolume?.takeIf { it.chapters.isNotEmpty() }?.let { parsedVolumes.add(it) }
+        }
+
+        // Secondary fallback matching legacy Wenku8Parser in case a custom pull parser skipped
+        // mixed CDATA text before child tags.
+        var searchCursor = 0
+        for (accumulator in parsedVolumes) {
+            val volumeTagPos = rawXml.indexOf("volume", searchCursor)
+            if (volumeTagPos == -1) break
+            val cdataPos = rawXml.indexOf("CDATA[", volumeTagPos)
+            if (cdataPos == -1) break
+            val cdataEnd = rawXml.indexOf("]]", cdataPos + 6)
+            if (cdataEnd == -1) break
+            if (accumulator.titleBuilder.isEmpty()) {
+                accumulator.titleBuilder.append(rawXml.substring(cdataPos + 6, cdataEnd).trim())
+            }
+            searchCursor = cdataEnd + 2
+        }
+
+        return parsedVolumes.map { accumulator ->
+            ParsedVolumeToc(
+                vid = accumulator.vid,
+                volumeTitle = accumulator.titleBuilder.toString(),
+                chapters = accumulator.chapters.toList(),
+            )
+        }
+    }
+
+    fun parseNovelListWithInfo(rawXml: String?): ParsedNovelListPage? {
+        if (rawXml.isNullOrBlank()) return null
+
+        return try {
+            val parser = newPullParser(rawXml)
+            var totalPages = 0
+            val items = ArrayList<ParsedNovelListItem>()
+            var currentAid = 0
+            var insideItem = false
+            var title = ""
+            var author = ""
+            var status = ""
+            var lastUpdate = ""
+            var tags = ""
+            var introShort = ""
+            var totalHits = 0
+            var pushCount = 0
+            var favCount = 0
+
+            var eventType = parser.eventType
+            while (eventType != XmlPullParser.END_DOCUMENT) {
+                when (eventType) {
+                    XmlPullParser.START_TAG -> {
+                        when (parser.name) {
+                            "page" -> {
+                                totalPages = parser.getAttributeValue(null, "num").toSafeInt()
+                            }
+                            "item" -> {
+                                currentAid = parser.getAttributeValue(null, "aid").toSafeInt()
+                                insideItem = currentAid > 0
+                                title = ""
+                                author = ""
+                                status = ""
+                                lastUpdate = ""
+                                tags = ""
+                                introShort = ""
+                                totalHits = 0
+                                pushCount = 0
+                                favCount = 0
+                            }
+                            "data" -> if (insideItem) {
+                                when (parser.getAttributeValue(null, "name")) {
+                                    "Title" -> title = parser.readValueAttributeOrText()
+                                    "Author" -> author = parser.readValueAttributeOrText()
+                                    "BookStatus" -> status = parser.readValueAttributeOrText()
+                                    "LastUpdate" -> lastUpdate = parser.readValueAttributeOrText()
+                                    "Tags" -> tags = parser.readValueAttributeOrText()
+                                    "IntroPreview" -> {
+                                        introShort = parser.readValueAttributeOrText()
+                                            .replace(IDEOGRAPHIC_AND_ASCII_WHITESPACE, " ")
+                                            .trim()
+                                    }
+                                    "TotalHitsCount" -> totalHits = parser.readValueAttributeOrText().toSafeInt()
+                                    "PushCount" -> pushCount = parser.readValueAttributeOrText().toSafeInt()
+                                    "FavCount" -> favCount = parser.readValueAttributeOrText().toSafeInt()
+                                }
+                            }
+                        }
+                    }
+                    XmlPullParser.END_TAG -> {
+                        if (parser.name == "item" && insideItem) {
+                            items.add(
+                                ParsedNovelListItem(
+                                    aid = currentAid,
+                                    title = title,
+                                    author = author,
+                                    bookStatus = status,
+                                    lastUpdate = lastUpdate,
+                                    tagsCsv = tags,
+                                    introShort = introShort,
+                                    totalHits = totalHits,
+                                    pushCount = pushCount,
+                                    favCount = favCount,
+                                ),
+                            )
+                            insideItem = false
+                        }
+                    }
+                }
+                eventType = parser.next()
+            }
+
+            ParsedNovelListPage(totalPages = totalPages, items = items)
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    /**
+     * Parses `action=bookcase` XML. Returns `emptyList()` for a genuinely empty shelf (`<metadata/>`)
+     * and `null` for non-bookshelf or malformed XML so cloud sync never misinterprets an error page
+     * as an empty account shelf.
+     */
+    fun parseCloudBookshelfList(rawXml: String?): List<ParsedCloudBookshelfEntry>? {
+        if (rawXml.isNullOrBlank()) return null
+
+        return try {
+            val parser = newPullParser(rawXml)
+            var sawMetadataRoot = false
+            val entries = ArrayList<ParsedCloudBookshelfEntry>()
+            var activeAid = 0
+            var activeDate = ""
+            var activeName = ""
+            var activeLatestCid = 0
+            var activeLatestChapterName = ""
+
+            var eventType = parser.eventType
+            while (eventType != XmlPullParser.END_DOCUMENT) {
+                when (eventType) {
+                    XmlPullParser.START_TAG -> {
+                        when (parser.name) {
+                            "metadata" -> sawMetadataRoot = true
+                            "book" -> {
+                                activeAid = parser.getAttributeValue(null, "aid").toSafeInt()
+                                activeDate = parser.getAttributeValue(null, "date")?.trim().orEmpty()
+                                activeName = ""
+                                activeLatestCid = 0
+                                activeLatestChapterName = ""
+                            }
+                            "name" -> if (activeAid > 0) {
+                                activeName = parser.nextText().trim()
+                            }
+                            "chapter" -> if (activeAid > 0) {
+                                activeLatestCid = parser.getAttributeValue(null, "cid").toSafeInt()
+                                activeLatestChapterName = parser.nextText().trim()
+                            }
+                        }
+                    }
+                    XmlPullParser.END_TAG -> {
+                        if (parser.name == "book" && activeAid > 0) {
+                            entries.add(
+                                ParsedCloudBookshelfEntry(
+                                    aid = activeAid,
+                                    lastUpdateDate = activeDate,
+                                    title = activeName,
+                                    latestChapterCid = activeLatestCid,
+                                    latestChapterName = activeLatestChapterName,
+                                ),
+                            )
+                            activeAid = 0
+                        }
+                    }
+                }
+                eventType = parser.next()
+            }
+
+            if (sawMetadataRoot) entries else null
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    /**
+     * Extracts all inline `<!--image-->URL<!--image-->` illustration URLs from a chapter body.
+     */
+    fun extractChapterImageUrls(rawChapterText: String): List<String> {
+        if (!rawChapterText.contains(CHAPTER_IMAGE_DELIMITER)) return emptyList()
+        val urls = ArrayList<String>()
+        var searchOffset = 0
+        while (true) {
+            val openMarkerIndex = rawChapterText.indexOf(CHAPTER_IMAGE_DELIMITER, searchOffset)
+            if (openMarkerIndex == -1) break
+            val urlStart = openMarkerIndex + CHAPTER_IMAGE_DELIMITER.length
+            val closeMarkerIndex = rawChapterText.indexOf(CHAPTER_IMAGE_DELIMITER, urlStart)
+            if (closeMarkerIndex == -1) break
+            val extractedUrl = rawChapterText.substring(urlStart, closeMarkerIndex).trim()
+            if (extractedUrl.isNotEmpty()) {
+                urls.add(extractedUrl)
+            }
+            searchOffset = closeMarkerIndex + CHAPTER_IMAGE_DELIMITER.length
+        }
+        return urls
+    }
+
+    /**
+     * Exact 1:1 port of `GlobalConfig.generateImageFileNameByURL(url)` so `v2.0` locates every
+     * offline illustration saved by `v1.31` in `saves/imgs/` without renaming or copying files!
+     *
+     * Example:
+     * `http://pic.wenku8.cn/pictures/1/1305/41759/50471.jpg` -> `pictures113054175950471.jpg`
+     */
+    fun generateLegacyImageFileName(imageUrl: String): String {
+        val cleanUrl = imageUrl.substringBefore('?').trim()
+        val segments = cleanUrl.split("/")
+        val builder = StringBuilder()
+        var passedDomainSegment = false
+        for (segment in segments) {
+            if (!passedDomainSegment && segment.contains(".")) {
+                passedDomainSegment = true
+            } else if (passedDomainSegment) {
+                builder.append(segment)
+            }
+        }
+        return builder.toString()
+    }
+
+    private class MutableVolumeAccumulator(val vid: Int) {
+        val titleBuilder = StringBuilder()
+        val chapters = ArrayList<ParsedChapterToc>()
+    }
+
+    private fun newPullParser(xml: String): XmlPullParser {
+        val sanitizedXml = xml.trimStart('\uFEFF', ' ', '\t', '\r', '\n')
+        val factory = XmlPullParserFactory.newInstance()
+        return factory.newPullParser().apply {
+            setInput(StringReader(sanitizedXml))
+        }
+    }
+
+    private fun XmlPullParser.safePositionalAttribute(index: Int): String? {
+        return if (index in 0 until attributeCount) getAttributeValue(index) else null
+    }
+
+    private fun XmlPullParser.readValueAttributeOrText(): String {
+        val attrValue = getAttributeValue(null, "value")
+        return (attrValue ?: nextText()).trim()
+    }
+
+    private fun String?.toSafeInt(): Int {
+        if (this.isNullOrBlank()) return 0
+        return this.trim().toIntOrNull() ?: 0
+    }
+}
