@@ -1,12 +1,21 @@
 package org.mewx.wenku8.v2
 
 import android.app.Application
+import org.mewx.wenku8.v2.di.AppContainer
 
 /**
  * Application entry point for Wenku8 `:app-v2`.
  *
- * Keeps cold-start `onCreate` lightweight (zero blocking I/O or third-party SDK initialization on
- * the main thread). Room WAL database, DataStore preferences, and legacy `v1.31` migrator graph
- * attach lazily in Phase `P0.2` / `P0.3`.
+ * Exposes lazy [appContainer] (`wenku8_v2.db` WAL + `settings.preferences_pb` DataStore) with zero
+ * blocking I/O on `onCreate`.
  */
-class Wenku8V2Application : Application()
+class Wenku8V2Application : Application() {
+
+    lateinit var appContainer: AppContainer
+        private set
+
+    override fun onCreate() {
+        super.onCreate()
+        appContainer = AppContainer(this)
+    }
+}

@@ -8,14 +8,18 @@ import android.os.Bundle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.Modifier
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import kotlinx.coroutines.launch
+import org.mewx.wenku8.v2.data.local.preferences.Wenku8UserPreferences
 import org.mewx.wenku8.v2.ui.navigation.AdaptiveMainScaffold
-import org.mewx.wenku8.v2.ui.navigation.DefaultHomeDestination
 import org.mewx.wenku8.v2.ui.theme.Wenku8ExpressiveTheme
-import org.mewx.wenku8.v2.ui.theme.Wenku8ThemeMode
 
 /**
  * Single-Activity Compose host for Wenku8 `:app-v2`.
@@ -36,26 +40,48 @@ class MainActivity : AppCompatActivity() {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
 
+        val preferencesRepository = (application as Wenku8V2Application)
+            .appContainer
+            .userPreferencesRepository
         val hasActiveNetworkOnColdStart = checkActiveNetworkConnectivity(this)
 
         setContent {
-            var currentThemeMode by rememberSaveable {
-                mutableStateOf(Wenku8ThemeMode.SYSTEM)
-            }
-            var preferredHomeDestination by rememberSaveable {
-                mutableStateOf(DefaultHomeDestination.LATEST)
-            }
+            val nullablePreferences by preferencesRepository.preferencesFlow
+                .collectAsStateWithLifecycle(initialValue = null)
+            val coroutineScope = rememberCoroutineScope()
+            val activePreferences = nullablePreferences ?: Wenku8UserPreferences()
 
             Wenku8ExpressiveTheme(
-                themeMode = currentThemeMode,
+                themeMode = activePreferences.themeMode,
+                einkModeOverride = activePreferences.einkModeEnabled,
+                useDynamicColor = activePreferences.useDynamicColor,
             ) {
-                AdaptiveMainScaffold(
-                    preferredHomeDestination = preferredHomeDestination,
-                    isNetworkAvailableOnColdStart = hasActiveNetworkOnColdStart,
-                    currentThemeMode = currentThemeMode,
-                    onThemeModeSelected = { selectedMode -> currentThemeMode = selectedMode },
-                    onDefaultHomeSelected = { selectedHome -> preferredHomeDestination = selectedHome },
-                )
+                // Wait for the initial DataStore snapshot (~1-3ms off disk) before locking in the
+                // cold-start destination so a user who chose "本地书架" never flashes "最新" first.
+                val loadedPreferences = nullablePreferences
+                if (loadedPreferences == null) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(MaterialTheme.colorScheme.background),
+                    )
+                } else {
+                    AdaptiveMainScaffold(
+                        preferredHomeDestination = loadedPreferences.defaultHomeDestination,
+                        isNetworkAvailableOnColdStart = hasActiveNetworkOnColdStart,
+                        currentThemeMode = loadedPreferences.themeMode,
+                        onThemeModeSelected = { selectedMode ->
+                            coroutineScope.launch {
+                                preferencesRepository.setThemeMode(selectedMode)
+                            }
+                        },
+                        onDefaultHomeSelected = { selectedHome ->
+                            coroutineScope.launch {
+                                preferencesRepository.setDefaultHomeDestination(selectedHome)
+                            }
+                        },
+                    )
+                }
             }
         }
     }
