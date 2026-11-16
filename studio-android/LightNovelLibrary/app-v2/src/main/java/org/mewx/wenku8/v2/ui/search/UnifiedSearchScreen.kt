@@ -78,7 +78,9 @@ import org.mewx.wenku8.v2.domain.model.UnifiedSearchMode
 import org.mewx.wenku8.v2.ui.discovery.DiscoveryFeedErrorCard
 import org.mewx.wenku8.v2.ui.discovery.DiscoveryNovelCard
 import org.mewx.wenku8.v2.ui.theme.LocalEinkMode
+import org.mewx.wenku8.v2.ui.theme.Wenku8SharedElementKeys
 import org.mewx.wenku8.v2.ui.theme.einkHairlineBorder
+import org.mewx.wenku8.v2.ui.theme.wenku8SharedSearchBarBounds
 
 object UnifiedSearchTestTags {
     const val SCREEN_ROOT = "unified_search_screen_root"
@@ -124,6 +126,8 @@ fun UnifiedSearchScreen(
     initialQuery: String = "",
     initialMode: UnifiedSearchMode = UnifiedSearchMode.NOVEL_TITLE,
     autoFocusInputOnEntry: Boolean = initialQuery.isBlank(),
+    searchBarSharedOrigin: String = Wenku8SharedElementKeys.SEARCH_BAR_DEFAULT_ORIGIN,
+    onNovelClickedWithOrigin: ((DiscoveryNovelCardItem, String) -> Unit)? = null,
 ) {
     BackHandler(onBack = onNavigateBack)
 
@@ -216,6 +220,7 @@ fun UnifiedSearchScreen(
                         )
                     }
 
+                    val searchFieldShape = MaterialTheme.shapes.extraLarge
                     OutlinedTextField(
                         value = queryText,
                         onValueChange = { queryText = it },
@@ -249,13 +254,17 @@ fun UnifiedSearchScreen(
                             }
                         },
                         singleLine = true,
-                        shape = MaterialTheme.shapes.extraLarge,
+                        shape = searchFieldShape,
                         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                         keyboardActions = KeyboardActions(
                             onSearch = { triggerOnlineSearch() },
                         ),
                         modifier = Modifier
                             .weight(1f)
+                            .wenku8SharedSearchBarBounds(
+                                origin = searchBarSharedOrigin,
+                                clipShape = searchFieldShape,
+                            )
                             .focusRequester(focusRequester)
                             .testTag(UnifiedSearchTestTags.QUERY_INPUT),
                     )
@@ -360,9 +369,14 @@ fun UnifiedSearchScreen(
                         items = localShelfMatches,
                         key = { "local_${it.aid}" },
                     ) { matchCard ->
+                        val localOrigin = Wenku8SharedElementKeys.NOVEL_SEARCH_LOCAL_ORIGIN
                         DiscoveryNovelCard(
                             item = matchCard,
-                            onClick = { onNovelClicked(matchCard) },
+                            sharedTransitionOrigin = localOrigin,
+                            onClick = {
+                                onNovelClickedWithOrigin?.invoke(matchCard, localOrigin)
+                                    ?: onNovelClicked(matchCard)
+                            },
                         )
                     }
                 }
@@ -555,9 +569,14 @@ fun UnifiedSearchScreen(
                             items = onlineSearchState.results,
                             key = { "online_${it.aid}" },
                         ) { onlineItem ->
+                            val onlineOrigin = Wenku8SharedElementKeys.NOVEL_SEARCH_ONLINE_ORIGIN
                             DiscoveryNovelCard(
                                 item = onlineItem,
-                                onClick = { onNovelClicked(onlineItem) },
+                                sharedTransitionOrigin = onlineOrigin,
+                                onClick = {
+                                    onNovelClickedWithOrigin?.invoke(onlineItem, onlineOrigin)
+                                        ?: onNovelClicked(onlineItem)
+                                },
                             )
                         }
                     }

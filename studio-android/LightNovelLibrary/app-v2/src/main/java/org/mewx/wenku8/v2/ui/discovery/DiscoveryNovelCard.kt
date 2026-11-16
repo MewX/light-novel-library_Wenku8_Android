@@ -60,7 +60,11 @@ import org.mewx.wenku8.v2.domain.model.DiscoveryFeedErrorKind
 import org.mewx.wenku8.v2.domain.model.DiscoveryNovelCardItem
 import org.mewx.wenku8.v2.domain.model.PaginatedNovelFeedState
 import org.mewx.wenku8.v2.ui.theme.LocalEinkMode
+import org.mewx.wenku8.v2.ui.theme.Wenku8SharedElementKeys
 import org.mewx.wenku8.v2.ui.theme.einkHairlineBorder
+import org.mewx.wenku8.v2.ui.theme.wenku8SharedNovelCover
+import org.mewx.wenku8.v2.ui.theme.wenku8SharedNovelTitle
+import org.mewx.wenku8.v2.ui.theme.wenku8SharedSearchBarBounds
 
 object DiscoveryTestTags {
     const val PERSISTENT_SEARCH_PILL = "discovery_persistent_search_pill"
@@ -77,16 +81,22 @@ object DiscoveryTestTags {
 fun PersistentSearchEntryPill(
     onOpenSearch: () -> Unit,
     modifier: Modifier = Modifier,
+    sharedTransitionOrigin: String = Wenku8SharedElementKeys.SEARCH_BAR_DEFAULT_ORIGIN,
 ) {
+    val pillShape = MaterialTheme.shapes.extraLarge
     Surface(
         onClick = onOpenSearch,
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
         contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-        shape = MaterialTheme.shapes.extraLarge,
+        shape = pillShape,
         modifier = modifier
             .fillMaxWidth()
+            .wenku8SharedSearchBarBounds(
+                origin = sharedTransitionOrigin,
+                clipShape = pillShape,
+            )
             .testTag(DiscoveryTestTags.PERSISTENT_SEARCH_PILL)
-            .einkHairlineBorder(MaterialTheme.shapes.extraLarge),
+            .einkHairlineBorder(pillShape),
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 18.dp, vertical = 12.dp),
@@ -114,8 +124,10 @@ fun DiscoveryNovelCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     rankNumber: Int? = null,
+    sharedTransitionOrigin: String = Wenku8SharedElementKeys.NOVEL_DEFAULT_ORIGIN,
 ) {
     val isEink = LocalEinkMode.current
+    val coverShape = MaterialTheme.shapes.medium
     Card(
         onClick = onClick,
         colors = CardDefaults.cardColors(
@@ -139,13 +151,18 @@ fun DiscoveryNovelCard(
             horizontalArrangement = Arrangement.spacedBy(14.dp),
             verticalAlignment = Alignment.Top,
         ) {
-            // 2:3 Light Novel Book Cover with Offline-First Coil 3 + Typographic Fallback
+            // 2:3 Light Novel Book Cover with Offline-First Coil 3 + Shared-Element Morph
             Box(
                 modifier = Modifier
                     .size(width = 76.dp, height = 110.dp)
-                    .clip(MaterialTheme.shapes.medium)
+                    .wenku8SharedNovelCover(
+                        origin = sharedTransitionOrigin,
+                        aid = item.aid,
+                        clipShape = coverShape,
+                    )
+                    .clip(coverShape)
                     .background(MaterialTheme.colorScheme.surfaceContainerHighest)
-                    .einkHairlineBorder(MaterialTheme.shapes.medium),
+                    .einkHairlineBorder(coverShape),
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
@@ -202,6 +219,10 @@ fun DiscoveryNovelCard(
                     color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.wenku8SharedNovelTitle(
+                        origin = sharedTransitionOrigin,
+                        aid = item.aid,
+                    ),
                 )
 
                 Row(
@@ -312,6 +333,7 @@ fun PaginatedNovelFeedContent(
     onNovelClicked: (DiscoveryNovelCardItem) -> Unit,
     onOpenNetworkDiagnostics: () -> Unit,
     modifier: Modifier = Modifier,
+    sharedTransitionOrigin: String = Wenku8SharedElementKeys.NOVEL_DEFAULT_ORIGIN,
 ) {
     val isEink = LocalEinkMode.current
     val listState = rememberLazyListState()
@@ -392,6 +414,7 @@ fun PaginatedNovelFeedContent(
                             item = item,
                             rankNumber = if (showRankNumbers) index + 1 else null,
                             onClick = { onNovelClicked(item) },
+                            sharedTransitionOrigin = sharedTransitionOrigin,
                         )
                     }
 

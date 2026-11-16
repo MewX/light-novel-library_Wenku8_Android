@@ -111,7 +111,11 @@ import org.mewx.wenku8.v2.data.repository.CloudBookshelfSyncOutcome
 import org.mewx.wenku8.v2.domain.model.DiscoveryNovelCardItem
 import org.mewx.wenku8.v2.ui.navigation.MainScaffoldTestTags
 import org.mewx.wenku8.v2.ui.theme.LocalEinkMode
+import org.mewx.wenku8.v2.ui.theme.Wenku8SharedElementKeys
 import org.mewx.wenku8.v2.ui.theme.einkHairlineBorder
+import org.mewx.wenku8.v2.ui.theme.wenku8SharedNovelCover
+import org.mewx.wenku8.v2.ui.theme.wenku8SharedNovelTitle
+import org.mewx.wenku8.v2.ui.theme.wenku8SharedSearchBarBounds
 import kotlin.math.max
 
 /** Semantic UI test tags for Robolectric and device tests on `BookshelfScreen` (`P4.1`). */
@@ -187,6 +191,7 @@ fun BookshelfScreen(
     onOpenSearch: () -> Unit = {},
     onOpenLoginSheet: () -> Unit = {},
     onNovelClicked: (DiscoveryNovelCardItem) -> Unit = {},
+    onNovelClickedWithOrigin: ((DiscoveryNovelCardItem, String) -> Unit)? = null,
     onContinueReadingClicked: (BookshelfItemModel) -> Unit = { item ->
         onNovelClicked(item.toDiscoveryCardItem())
     },
@@ -386,7 +391,12 @@ fun BookshelfScreen(
                 item(key = "continue_reading_carousel") {
                     ContinueReadingCarouselSection(
                         items = snapshot.continueReadingItems,
-                        onCardClick = { item -> onNovelClicked(item.toDiscoveryCardItem()) },
+                        onCardClick = { item ->
+                            val cardItem = item.toDiscoveryCardItem()
+                            val origin = Wenku8SharedElementKeys.NOVEL_BOOKSHELF_CAROUSEL_ORIGIN
+                            onNovelClickedWithOrigin?.invoke(cardItem, origin)
+                                ?: onNovelClicked(cardItem)
+                        },
                         onContinueReadingClick = onContinueReadingClicked,
                     )
                 }
@@ -446,7 +456,10 @@ fun BookshelfScreen(
                                                 coroutineScope.launch {
                                                     bookshelfRepository.clearUnreadUpdateBadge(item.aid)
                                                 }
-                                                onNovelClicked(item.toDiscoveryCardItem())
+                                                val cardItem = item.toDiscoveryCardItem()
+                                                val origin = Wenku8SharedElementKeys.NOVEL_BOOKSHELF_CARD_ORIGIN
+                                                onNovelClickedWithOrigin?.invoke(cardItem, origin)
+                                                    ?: onNovelClicked(cardItem)
                                             }
                                         },
                                         onLongClick = { toggleSelection(item.aid) },
@@ -476,7 +489,10 @@ fun BookshelfScreen(
                                         coroutineScope.launch {
                                             bookshelfRepository.clearUnreadUpdateBadge(item.aid)
                                         }
-                                        onNovelClicked(item.toDiscoveryCardItem())
+                                        val cardItem = item.toDiscoveryCardItem()
+                                        val origin = Wenku8SharedElementKeys.NOVEL_BOOKSHELF_CARD_ORIGIN
+                                        onNovelClickedWithOrigin?.invoke(cardItem, origin)
+                                            ?: onNovelClicked(cardItem)
                                     }
                                 },
                                 onLongClick = { toggleSelection(item.aid) },
@@ -501,7 +517,10 @@ fun BookshelfScreen(
                                         coroutineScope.launch {
                                             bookshelfRepository.clearUnreadUpdateBadge(item.aid)
                                         }
-                                        onNovelClicked(item.toDiscoveryCardItem())
+                                        val cardItem = item.toDiscoveryCardItem()
+                                        val origin = Wenku8SharedElementKeys.NOVEL_BOOKSHELF_CARD_ORIGIN
+                                        onNovelClickedWithOrigin?.invoke(cardItem, origin)
+                                            ?: onNovelClicked(cardItem)
                                     }
                                 },
                                 onItemLongClick = { item -> toggleSelection(item.aid) },
@@ -647,13 +666,18 @@ private fun BookshelfSearchBarRow(
     onLocalQueryChange: (String) -> Unit,
     onOpenOnlineSearch: () -> Unit,
 ) {
+    val barShape = MaterialTheme.shapes.extraLarge
     Surface(
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
         contentColor = MaterialTheme.colorScheme.onSurface,
-        shape = MaterialTheme.shapes.extraLarge,
+        shape = barShape,
         modifier = Modifier
             .fillMaxWidth()
-            .einkHairlineBorder(MaterialTheme.shapes.extraLarge),
+            .wenku8SharedSearchBarBounds(
+                origin = Wenku8SharedElementKeys.SEARCH_BAR_BOOKSHELF_ORIGIN,
+                clipShape = barShape,
+            )
+            .einkHairlineBorder(barShape),
     ) {
         Row(
             modifier = Modifier
@@ -970,12 +994,18 @@ private fun ContinueReadingCarouselSection(
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
+                    val carouselCoverShape = MaterialTheme.shapes.small
                     Box(
                         contentAlignment = Alignment.Center,
                         modifier = Modifier
                             .fillMaxHeight()
                             .aspectRatio(0.71f)
-                            .clip(MaterialTheme.shapes.small)
+                            .wenku8SharedNovelCover(
+                                origin = Wenku8SharedElementKeys.NOVEL_BOOKSHELF_CAROUSEL_ORIGIN,
+                                aid = item.aid,
+                                clipShape = carouselCoverShape,
+                            )
+                            .clip(carouselCoverShape)
                             .background(MaterialTheme.colorScheme.surfaceContainerHighest),
                     ) {
                         Icon(
@@ -1007,6 +1037,10 @@ private fun ContinueReadingCarouselSection(
                                 fontWeight = FontWeight.SemiBold,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.wenku8SharedNovelTitle(
+                                    origin = Wenku8SharedElementKeys.NOVEL_BOOKSHELF_CAROUSEL_ORIGIN,
+                                    aid = item.aid,
+                                ),
                             )
                             val chapterLabel = item.readingProgress?.chapterTitle?.takeIf { it.isNotBlank() }
                                 ?: item.novel.latestSectionName
@@ -1203,11 +1237,17 @@ private fun BookshelfGridItemCard(
             .testTag(BookshelfTestTags.BOOK_CARD_PREFIX + item.aid),
     ) {
         Column(modifier = Modifier.padding(8.dp)) {
+            val gridCoverShape = MaterialTheme.shapes.small
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .aspectRatio(0.71f)
-                    .clip(MaterialTheme.shapes.small)
+                    .wenku8SharedNovelCover(
+                        origin = Wenku8SharedElementKeys.NOVEL_BOOKSHELF_CARD_ORIGIN,
+                        aid = item.aid,
+                        clipShape = gridCoverShape,
+                    )
+                    .clip(gridCoverShape)
                     .background(MaterialTheme.colorScheme.surfaceContainerHighest),
             ) {
                 Icon(
@@ -1259,6 +1299,10 @@ private fun BookshelfGridItemCard(
                 minLines = 2,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.wenku8SharedNovelTitle(
+                    origin = Wenku8SharedElementKeys.NOVEL_BOOKSHELF_CARD_ORIGIN,
+                    aid = item.aid,
+                ),
             )
 
             Spacer(modifier = Modifier.height(4.dp))
@@ -1309,11 +1353,17 @@ private fun BookshelfDetailListCard(
                 .padding(12.dp),
             horizontalArrangement = Arrangement.spacedBy(14.dp),
         ) {
+            val detailCoverShape = MaterialTheme.shapes.small
             Box(
                 modifier = Modifier
                     .width(76.dp)
                     .aspectRatio(0.71f)
-                    .clip(MaterialTheme.shapes.small)
+                    .wenku8SharedNovelCover(
+                        origin = Wenku8SharedElementKeys.NOVEL_BOOKSHELF_CARD_ORIGIN,
+                        aid = item.aid,
+                        clipShape = detailCoverShape,
+                    )
+                    .clip(detailCoverShape)
                     .background(MaterialTheme.colorScheme.surfaceContainerHighest),
             ) {
                 Icon(
@@ -1360,7 +1410,12 @@ private fun BookshelfDetailListCard(
                         fontWeight = FontWeight.SemiBold,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier
+                            .weight(1f)
+                            .wenku8SharedNovelTitle(
+                                origin = Wenku8SharedElementKeys.NOVEL_BOOKSHELF_CARD_ORIGIN,
+                                aid = item.aid,
+                            ),
                     )
                     if (item.novel.hasUnreadUpdate) {
                         NewChapterPillBadge(aid = item.aid)
@@ -1470,10 +1525,11 @@ private fun BookshelfSpineShelfRow(
                         .joinToString("\n")
                 }
 
+                val spineShape = MaterialTheme.shapes.small
                 Surface(
                     color = spineTone,
                     contentColor = contentTone,
-                    shape = MaterialTheme.shapes.small,
+                    shape = spineShape,
                     border = if (isSelected) {
                         BorderStroke(2.dp, MaterialTheme.colorScheme.primary)
                     } else {
@@ -1482,12 +1538,17 @@ private fun BookshelfSpineShelfRow(
                     modifier = Modifier
                         .weight(1f)
                         .fillMaxHeight(if (item.aid % 2 == 0) 0.96f else 1.0f)
-                        .clip(MaterialTheme.shapes.small)
+                        .wenku8SharedNovelCover(
+                            origin = Wenku8SharedElementKeys.NOVEL_BOOKSHELF_CARD_ORIGIN,
+                            aid = item.aid,
+                            clipShape = spineShape,
+                        )
+                        .clip(spineShape)
                         .combinedClickable(
                             onClick = { onItemClick(item) },
                             onLongClick = { onItemLongClick(item) },
                         )
-                        .einkHairlineBorder(MaterialTheme.shapes.small)
+                        .einkHairlineBorder(spineShape)
                         .testTag(BookshelfTestTags.BOOK_CARD_PREFIX + item.aid),
                 ) {
                     Column(

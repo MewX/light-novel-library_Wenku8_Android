@@ -126,8 +126,11 @@ import org.mewx.wenku8.v2.data.repository.VolumeAccordionModel
 import org.mewx.wenku8.v2.domain.model.DiscoveryNovelCardItem
 import org.mewx.wenku8.v2.ui.theme.CoverThemeEngine
 import org.mewx.wenku8.v2.ui.theme.LocalEinkMode
+import org.mewx.wenku8.v2.ui.theme.Wenku8SharedElementKeys
 import org.mewx.wenku8.v2.ui.theme.Wenku8ThemeMode
 import org.mewx.wenku8.v2.ui.theme.einkHairlineBorder
+import org.mewx.wenku8.v2.ui.theme.wenku8SharedNovelCover
+import org.mewx.wenku8.v2.ui.theme.wenku8SharedNovelTitle
 import java.util.Locale
 
 object NovelDetailTestTags {
@@ -202,6 +205,7 @@ fun NovelDetailScreen(
     themeMode: Wenku8ThemeMode,
     useCoverTheme: Boolean = true,
     seedDiscoveryItem: DiscoveryNovelCardItem? = null,
+    sharedTransitionOrigin: String = Wenku8SharedElementKeys.NOVEL_DEFAULT_ORIGIN,
     showBackButton: Boolean = true,
     onNavigateBack: () -> Unit = {},
     onOpenReader: (ReaderLaunchRequest) -> Unit = {},
@@ -545,16 +549,19 @@ fun NovelDetailScreen(
                     }
                 }
 
-                // 1. Editorial Hero Header with CoverThemeEngine ambient glow
+                // 1. Editorial Hero Header with CoverThemeEngine ambient glow & shared-element morph
                 item(key = "detail_hero_header") {
                     NovelHeroHeaderCard(
                         aid = aid,
                         title = displayTitle,
                         author = displayAuthor,
                         novel = snapshot.novel,
-                        coverUrl = snapshot.coverUrl,
+                        coverUrl = snapshot.coverUrl.ifBlank {
+                            seedDiscoveryItem?.coverUrl.orEmpty()
+                        },
                         tags = snapshot.tags,
                         isEinkMode = isEinkMode,
+                        sharedTransitionOrigin = sharedTransitionOrigin,
                         onCoverSeedExtracted = { extracted -> coverSeedColor = extracted },
                         onTitleClicked = { showFullTitleDialog = true },
                         onAuthorClicked = {
@@ -910,6 +917,7 @@ private fun NovelHeroHeaderCard(
     coverUrl: String,
     tags: List<String>,
     isEinkMode: Boolean,
+    sharedTransitionOrigin: String,
     onCoverSeedExtracted: (Color) -> Unit,
     onTitleClicked: () -> Unit,
     onAuthorClicked: () -> Unit,
@@ -941,14 +949,20 @@ private fun NovelHeroHeaderCard(
                 .padding(16.dp),
             horizontalArrangement = Arrangement.spacedBy(16.dp),
         ) {
+            val heroCoverShape = MaterialTheme.shapes.medium
             Surface(
-                shape = MaterialTheme.shapes.medium,
+                shape = heroCoverShape,
                 color = MaterialTheme.colorScheme.surfaceContainerHighest,
                 tonalElevation = if (isEinkMode) 0.dp else 4.dp,
                 modifier = Modifier
                     .width(116.dp)
                     .height(164.dp)
-                    .einkHairlineBorder(MaterialTheme.shapes.medium),
+                    .wenku8SharedNovelCover(
+                        origin = sharedTransitionOrigin,
+                        aid = aid,
+                        clipShape = heroCoverShape,
+                    )
+                    .einkHairlineBorder(heroCoverShape),
             ) {
                 if (coverUrl.isNotBlank()) {
                     val coverRequest = remember(context, coverUrl) {
@@ -1028,6 +1042,10 @@ private fun NovelHeroHeaderCard(
                     maxLines = 3,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier
+                        .wenku8SharedNovelTitle(
+                            origin = sharedTransitionOrigin,
+                            aid = aid,
+                        )
                         .clip(MaterialTheme.shapes.small)
                         .clickable(onClick = onTitleClicked)
                         .padding(vertical = 2.dp)

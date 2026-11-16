@@ -91,7 +91,10 @@ import org.mewx.wenku8.v2.data.local.db.entity.ReadingSessionEntity
 import org.mewx.wenku8.v2.domain.model.DiscoveryNovelCardItem
 import org.mewx.wenku8.v2.ui.detail.ReaderLaunchRequest
 import org.mewx.wenku8.v2.ui.theme.LocalEinkMode
+import org.mewx.wenku8.v2.ui.theme.Wenku8SharedElementKeys
 import org.mewx.wenku8.v2.ui.theme.einkHairlineBorder
+import org.mewx.wenku8.v2.ui.theme.wenku8SharedNovelCover
+import org.mewx.wenku8.v2.ui.theme.wenku8SharedNovelTitle
 import java.io.File
 import java.io.FileOutputStream
 import java.time.Instant
@@ -1089,14 +1092,20 @@ private fun ReadingHistoryTabContent(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(14.dp),
                 ) {
+                    val historyCoverShape = MaterialTheme.shapes.small
                     AsyncImage(
                         model = coverUrl,
                         contentDescription = item.novelTitle,
                         contentScale = ContentScale.Crop,
                         modifier = Modifier
                             .size(width = 60.dp, height = 84.dp)
-                            .clip(MaterialTheme.shapes.small)
-                            .einkHairlineBorder(MaterialTheme.shapes.small),
+                            .wenku8SharedNovelCover(
+                                origin = Wenku8SharedElementKeys.NOVEL_FOOTPRINT_HISTORY_ORIGIN,
+                                aid = item.aid,
+                                clipShape = historyCoverShape,
+                            )
+                            .clip(historyCoverShape)
+                            .einkHairlineBorder(historyCoverShape),
                     )
 
                     Column(modifier = Modifier.weight(1f)) {
@@ -1106,6 +1115,10 @@ private fun ReadingHistoryTabContent(
                             fontWeight = FontWeight.SemiBold,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.wenku8SharedNovelTitle(
+                                origin = Wenku8SharedElementKeys.NOVEL_FOOTPRINT_HISTORY_ORIGIN,
+                                aid = item.aid,
+                            ),
                         )
                         Spacer(modifier = Modifier.height(2.dp))
                         Text(

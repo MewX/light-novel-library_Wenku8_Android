@@ -1,5 +1,15 @@
 package org.mewx.wenku8.v2.ui.navigation
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.SharedTransitionLayout
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -50,6 +60,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -96,6 +107,11 @@ import org.mewx.wenku8.v2.ui.reader.UnifiedReaderScreen
 import org.mewx.wenku8.v2.ui.reviews.ReviewListScreen
 import org.mewx.wenku8.v2.ui.reviews.ReviewThreadScreen
 import org.mewx.wenku8.v2.ui.search.UnifiedSearchScreen
+import org.mewx.wenku8.v2.ui.theme.LocalEinkMode
+import org.mewx.wenku8.v2.ui.theme.ProvideWenku8SharedTransition
+import org.mewx.wenku8.v2.ui.theme.Wenku8ScreenTransitions
+import org.mewx.wenku8.v2.ui.theme.Wenku8ScreenTransitions.hierarchicalScreenTransform
+import org.mewx.wenku8.v2.ui.theme.Wenku8SharedElementKeys
 import org.mewx.wenku8.v2.ui.theme.Wenku8ThemeMode
 import org.mewx.wenku8.v2.ui.theme.einkHairlineBorder
 
@@ -112,6 +128,61 @@ object MainScaffoldTestTags {
 private val MediumWindowWidthBreakpoint = 600.dp
 private val ExpandedWindowWidthBreakpoint = 840.dp
 
+@OptIn(ExperimentalSharedTransitionApi::class)
+private sealed interface ScaffoldSceneState {
+    val depth: Int
+
+    data object HomeShell : ScaffoldSceneState {
+        override val depth: Int = 0
+    }
+
+    data class SearchStudio(
+        val initialQuery: String,
+        val initialMode: UnifiedSearchMode,
+        val searchBarOrigin: String,
+    ) : ScaffoldSceneState {
+        override val depth: Int = 1
+    }
+
+    data class ReadingFootprint(
+        val initialTab: ReadingFootprintTab,
+    ) : ScaffoldSceneState {
+        override val depth: Int = 1
+    }
+
+    data class CompactNovelDetail(
+        val aid: Int,
+        val sharedOrigin: String,
+    ) : ScaffoldSceneState {
+        override val depth: Int = 2
+    }
+
+    data class ReviewList(
+        val aid: Int,
+        val novelTitle: String,
+    ) : ScaffoldSceneState {
+        override val depth: Int = 3
+    }
+
+    data class ReviewThread(
+        val aid: Int,
+        val novelTitle: String,
+        val thread: ReviewThreadCardItem,
+    ) : ScaffoldSceneState {
+        override val depth: Int = 4
+    }
+
+    data class Reader(
+        val request: ReaderLaunchRequest,
+    ) : ScaffoldSceneState {
+        override val depth: Int = 5
+    }
+
+    data object NetworkDiagnostics : ScaffoldSceneState {
+        override val depth: Int = 6
+    }
+}
+
 /**
  * Adaptive Material 3 Expressive (`M3e`) 4-destination shell for Wenku8 `:app-v2`.
  *
@@ -120,7 +191,11 @@ private val ExpandedWindowWidthBreakpoint = 840.dp
  * - **Medium / Expanded width (`>= 600.dp`, foldables, tablets, landscape)**: Switches seamlessly
  *   to M3e [WideNavigationRail] (collapsed on `600..839.dp`, expanded with labels on `>= 840.dp`)
  *   while preserving active destination state.
+ * - **Shared-Element & Hierarchical Motion**: Encloses both the 4-tab home shell and full-screen
+ *   sub-destinations in [SharedTransitionLayout] + [AnimatedContent] so the Searchbox pill/input
+ *   and Light Novel Cover + Title morph smoothly across screens (and snap in `0ms` in E-Ink mode).
  */
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 fun AdaptiveMainScaffold(
     preferredHomeDestination: DefaultHomeDestination,
@@ -224,6 +299,9 @@ fun AdaptiveMainScaffold(
     var searchInitialMode by rememberSaveable {
         mutableStateOf(UnifiedSearchMode.NOVEL_TITLE)
     }
+    var activeSearchBarOrigin by rememberSaveable {
+        mutableStateOf(Wenku8SharedElementKeys.SEARCH_BAR_DEFAULT_ORIGIN)
+    }
     var isNetworkDiagnosticsOpen by rememberSaveable {
         mutableStateOf(false)
     }
@@ -232,6 +310,9 @@ fun AdaptiveMainScaffold(
     }
     var activeDetailNovelAid by rememberSaveable {
         mutableStateOf(0)
+    }
+    var activeDetailSharedOrigin by rememberSaveable {
+        mutableStateOf(Wenku8SharedElementKeys.NOVEL_DEFAULT_ORIGIN)
     }
     var activeDetailSeedItem by androidx.compose.runtime.remember {
         mutableStateOf<DiscoveryNovelCardItem?>(null)
@@ -269,13 +350,23 @@ fun AdaptiveMainScaffold(
         }
     }
 
-    val handleOpenSearch = {
+    val handleOpenSearchWithOrigin: (String) -> Unit = { barOrigin ->
         onOpenSearch()
         if (discoveryRepository != null) {
+            activeSearchBarOrigin = barOrigin
             searchInitialQuery = ""
             searchInitialMode = UnifiedSearchMode.NOVEL_TITLE
             isSearchStudioOpen = true
         }
+    }
+
+    val handleOpenSearch = {
+        val inferredOrigin = if (selectedDestination == TopLevelDestination.BOOKSHELF) {
+            Wenku8SharedElementKeys.SEARCH_BAR_BOOKSHELF_ORIGIN
+        } else {
+            Wenku8SharedElementKeys.SEARCH_BAR_DEFAULT_ORIGIN
+        }
+        handleOpenSearchWithOrigin(inferredOrigin)
     }
 
     val handleOpenSearchWithSeed: (String, UnifiedSearchMode) -> Unit = { query, mode ->
@@ -283,18 +374,28 @@ fun AdaptiveMainScaffold(
         if (discoveryRepository != null) {
             activeDetailNovelAid = 0
             activeDetailSeedItem = null
+            activeSearchBarOrigin = if (selectedDestination == TopLevelDestination.BOOKSHELF) {
+                Wenku8SharedElementKeys.SEARCH_BAR_BOOKSHELF_ORIGIN
+            } else {
+                Wenku8SharedElementKeys.SEARCH_BAR_DEFAULT_ORIGIN
+            }
             searchInitialQuery = query
             searchInitialMode = mode
             isSearchStudioOpen = true
         }
     }
 
-    val handleNovelClicked: (DiscoveryNovelCardItem) -> Unit = { item ->
+    val handleNovelClickedWithOrigin: (DiscoveryNovelCardItem, String) -> Unit = { item, origin ->
         onNovelClicked(item)
         if (novelDetailRepository != null && bookshelfRepository != null && novelDownloadRepository != null) {
             activeDetailSeedItem = item
+            activeDetailSharedOrigin = origin
             activeDetailNovelAid = item.aid
         }
+    }
+
+    val handleNovelClicked: (DiscoveryNovelCardItem) -> Unit = { item ->
+        handleNovelClickedWithOrigin(item, Wenku8SharedElementKeys.NOVEL_DEFAULT_ORIGIN)
     }
 
     val handleContinueReadingClicked: (BookshelfItemModel) -> Unit = { item ->
@@ -315,7 +416,7 @@ fun AdaptiveMainScaffold(
                 ),
             )
         } else {
-            handleNovelClicked(
+            handleNovelClickedWithOrigin(
                 DiscoveryNovelCardItem(
                     aid = item.aid,
                     title = item.novel.title,
@@ -326,6 +427,7 @@ fun AdaptiveMainScaffold(
                     tags = item.tags,
                     introShort = item.novel.introShort,
                 ),
+                Wenku8SharedElementKeys.NOVEL_BOOKSHELF_CAROUSEL_ORIGIN,
             )
         }
     }
@@ -344,6 +446,7 @@ fun AdaptiveMainScaffold(
     ) {
         val isCompactWidth = maxWidth < MediumWindowWidthBreakpoint
         val isExpandedRailWidth = maxWidth >= ExpandedWindowWidthBreakpoint
+        val isEink = LocalEinkMode.current
         val showTwoPaneExpandedDetail = isExpandedRailWidth &&
             !isSearchStudioOpen &&
             activeDetailNovelAid > 0 &&
@@ -351,349 +454,499 @@ fun AdaptiveMainScaffold(
             bookshelfRepository != null &&
             novelDownloadRepository != null
 
-        if (isCompactWidth) {
-            Scaffold(
-                contentWindowInsets = WindowInsets.safeDrawing,
-                bottomBar = {
-                    ShortNavigationBar(
-                        modifier = Modifier
-                            .testTag(MainScaffoldTestTags.COMPACT_SHORT_NAV_BAR)
-                            .einkHairlineBorder(MaterialTheme.shapes.extraSmall),
-                    ) {
-                        TopLevelDestination.entries.forEach { destination ->
-                            val isSelected = destination == selectedDestination
-                            val labelText = stringResource(destination.labelResId)
-                            ShortNavigationBarItem(
-                                selected = isSelected,
-                                onClick = { selectedDestination = destination },
-                                icon = {
-                                    Icon(
-                                        imageVector = if (isSelected) {
-                                            destination.selectedIcon
-                                        } else {
-                                            destination.unselectedIcon
+        val activeScene: ScaffoldSceneState = when {
+            isNetworkDiagnosticsOpen && networkDiagnosticsViewModelFactory != null -> {
+                ScaffoldSceneState.NetworkDiagnostics
+            }
+            activeReaderRequest != null &&
+                database != null &&
+                catalogGateway != null &&
+                novelTocSyncRepository != null -> {
+                ScaffoldSceneState.Reader(activeReaderRequest!!)
+            }
+            activeReviewsAid > 0 && reviewsRepository != null -> {
+                val thread = activeReviewThread
+                if (thread != null) {
+                    ScaffoldSceneState.ReviewThread(
+                        aid = activeReviewsAid,
+                        novelTitle = activeReviewsNovelTitle,
+                        thread = thread,
+                    )
+                } else {
+                    ScaffoldSceneState.ReviewList(
+                        aid = activeReviewsAid,
+                        novelTitle = activeReviewsNovelTitle,
+                    )
+                }
+            }
+            activeDetailNovelAid > 0 &&
+                !showTwoPaneExpandedDetail &&
+                novelDetailRepository != null &&
+                bookshelfRepository != null &&
+                novelDownloadRepository != null -> {
+                ScaffoldSceneState.CompactNovelDetail(
+                    aid = activeDetailNovelAid,
+                    sharedOrigin = activeDetailSharedOrigin,
+                )
+            }
+            activeFootprintTab != null && database != null -> {
+                ScaffoldSceneState.ReadingFootprint(activeFootprintTab!!)
+            }
+            isSearchStudioOpen && discoveryRepository != null -> {
+                ScaffoldSceneState.SearchStudio(
+                    initialQuery = searchInitialQuery,
+                    initialMode = searchInitialMode,
+                    searchBarOrigin = activeSearchBarOrigin,
+                )
+            }
+            else -> ScaffoldSceneState.HomeShell
+        }
+
+        SharedTransitionLayout(modifier = Modifier.fillMaxSize()) {
+            AnimatedContent(
+                targetState = activeScene,
+                transitionSpec = {
+                    val isSearchMorph = initialState is ScaffoldSceneState.SearchStudio ||
+                        targetState is ScaffoldSceneState.SearchStudio
+                    val isReaderMorph = initialState is ScaffoldSceneState.Reader ||
+                        targetState is ScaffoldSceneState.Reader
+                    hierarchicalScreenTransform(
+                        initialDepth = initialState.depth,
+                        targetDepth = targetState.depth,
+                        isEinkMode = isEink,
+                        isSearchTransition = isSearchMorph,
+                        isReaderTransition = isReaderMorph,
+                    )
+                },
+                label = "Wenku8HierarchicalSceneTransition",
+                modifier = Modifier.fillMaxSize(),
+            ) { scene ->
+                ProvideWenku8SharedTransition(
+                    sharedTransitionScope = this@SharedTransitionLayout,
+                    animatedVisibilityScope = this@AnimatedContent,
+                ) {
+                    when (scene) {
+                        ScaffoldSceneState.HomeShell -> {
+                            if (isCompactWidth) {
+                                Scaffold(
+                                    contentWindowInsets = WindowInsets.safeDrawing,
+                                    bottomBar = {
+                                        ShortNavigationBar(
+                                            modifier = Modifier
+                                                .testTag(MainScaffoldTestTags.COMPACT_SHORT_NAV_BAR)
+                                                .einkHairlineBorder(MaterialTheme.shapes.extraSmall),
+                                        ) {
+                                            TopLevelDestination.entries.forEach { destination ->
+                                                val isSelected = destination == selectedDestination
+                                                val labelText = stringResource(destination.labelResId)
+                                                ShortNavigationBarItem(
+                                                    selected = isSelected,
+                                                    onClick = { selectedDestination = destination },
+                                                    icon = {
+                                                        Icon(
+                                                            imageVector = if (isSelected) {
+                                                                destination.selectedIcon
+                                                            } else {
+                                                                destination.unselectedIcon
+                                                            },
+                                                            contentDescription = labelText,
+                                                        )
+                                                    },
+                                                    label = { Text(text = labelText) },
+                                                    modifier = Modifier.testTag(
+                                                        MainScaffoldTestTags.NAV_ITEM_PREFIX + destination.routeKey,
+                                                    ),
+                                                )
+                                            }
+                                        }
+                                    },
+                                ) { innerPadding ->
+                                    AnimatedContent(
+                                        targetState = selectedDestination,
+                                        transitionSpec = {
+                                            Wenku8ScreenTransitions.topLevelTabTransform(
+                                                initialOrdinal = initialState.ordinal,
+                                                targetOrdinal = targetState.ordinal,
+                                                isEinkMode = isEink,
+                                            )
                                         },
-                                        contentDescription = labelText,
-                                    )
-                                },
-                                label = { Text(text = labelText) },
-                                modifier = Modifier.testTag(
-                                    MainScaffoldTestTags.NAV_ITEM_PREFIX + destination.routeKey,
-                                ),
-                            )
+                                        label = "Wenku8CompactTabTransition",
+                                        modifier = Modifier.fillMaxSize(),
+                                    ) { destination ->
+                                        MainDestinationBody(
+                                            selectedDestination = destination,
+                                            showOfflineFallbackBanner = showOfflineFallbackBanner,
+                                            onDismissOfflineBanner = { showOfflineFallbackBanner = false },
+                                            preferences = effectivePreferences,
+                                            onThemeModeSelected = onThemeModeSelected,
+                                            onDefaultHomeSelected = onDefaultHomeSelected,
+                                            onAutoOptimizeConnectionChanged = onAutoOptimizeConnectionChanged,
+                                            onAppLanguageSelected = onAppLanguageSelected,
+                                            onEinkModeChanged = onEinkModeChanged,
+                                            onUseDynamicColorChanged = onUseDynamicColorChanged,
+                                            onMenuBackgroundChanged = onMenuBackgroundChanged,
+                                            onReaderTypographyChanged = onReaderTypographyChanged,
+                                            onReaderCustomFontPathChanged = onReaderCustomFontPathChanged,
+                                            onReaderCustomBackgroundPathChanged = onReaderCustomBackgroundPathChanged,
+                                            onVolumeKeyPagingChanged = onVolumeKeyPagingChanged,
+                                            database = database,
+                                            relayRouteController = relayRouteController,
+                                            discoveryRepository = discoveryRepository,
+                                            userSessionRepository = userSessionRepository,
+                                            serverNoticeAndUpdateRepository = serverNoticeAndUpdateRepository,
+                                            storageAndCacheRepository = storageAndCacheRepository,
+                                            backupArchiveRepository = backupArchiveRepository,
+                                            bookshelfRepository = bookshelfRepository,
+                                            bookshelfViewMode = localBookshelfViewMode,
+                                            onBookshelfViewModeSelected = { mode ->
+                                                localBookshelfViewMode = mode
+                                                onBookshelfViewModeSelected(mode)
+                                            },
+                                            bookshelfSortMode = localBookshelfSortMode,
+                                            onBookshelfSortModeSelected = { sort ->
+                                                localBookshelfSortMode = sort
+                                                onBookshelfSortModeSelected(sort)
+                                            },
+                                            legacyV1StorageMigrator = legacyV1StorageMigrator,
+                                            appLanguage = appLanguage,
+                                            onOpenSearch = handleOpenSearch,
+                                            onOpenSearchWithOrigin = handleOpenSearchWithOrigin,
+                                            onOpenLoginSheet = { isLoginBottomSheetOpen = true },
+                                            onOpenReadingFootprint = { tab -> activeFootprintTab = tab },
+                                            onNovelClicked = handleNovelClicked,
+                                            onNovelClickedWithOrigin = handleNovelClickedWithOrigin,
+                                            onContinueReadingClicked = handleContinueReadingClicked,
+                                            onOpenNetworkDiagnostics = handleOpenNetworkDiagnostics,
+                                            contentPadding = innerPadding,
+                                        )
+                                    }
+                                }
+                            } else {
+                                val railState = rememberWideNavigationRailState(
+                                    initialValue = if (isExpandedRailWidth) {
+                                        WideNavigationRailValue.Expanded
+                                    } else {
+                                        WideNavigationRailValue.Collapsed
+                                    },
+                                )
+                                Row(modifier = Modifier.fillMaxSize()) {
+                                    WideNavigationRail(
+                                        state = railState,
+                                        modifier = Modifier
+                                            .fillMaxHeight()
+                                            .testTag(MainScaffoldTestTags.EXPANDED_WIDE_NAV_RAIL)
+                                            .einkHairlineBorder(MaterialTheme.shapes.extraSmall),
+                                    ) {
+                                        TopLevelDestination.entries.forEach { destination ->
+                                            val isSelected = destination == selectedDestination
+                                            val labelText = stringResource(destination.labelResId)
+                                            WideNavigationRailItem(
+                                                railExpanded = isExpandedRailWidth,
+                                                selected = isSelected,
+                                                onClick = {
+                                                    selectedDestination = destination
+                                                    activeDetailNovelAid = 0
+                                                    activeDetailSeedItem = null
+                                                },
+                                                icon = {
+                                                    Icon(
+                                                        imageVector = if (isSelected) {
+                                                            destination.selectedIcon
+                                                        } else {
+                                                            destination.unselectedIcon
+                                                        },
+                                                        contentDescription = labelText,
+                                                    )
+                                                },
+                                                label = { Text(text = labelText) },
+                                                modifier = Modifier.testTag(
+                                                    MainScaffoldTestTags.NAV_ITEM_PREFIX + destination.routeKey,
+                                                ),
+                                            )
+                                        }
+                                    }
+
+                                    Scaffold(
+                                        modifier = Modifier.weight(if (showTwoPaneExpandedDetail) 0.44f else 1f),
+                                        contentWindowInsets = WindowInsets.safeDrawing,
+                                    ) { innerPadding ->
+                                        AnimatedContent(
+                                            targetState = selectedDestination,
+                                            transitionSpec = {
+                                                Wenku8ScreenTransitions.topLevelTabTransform(
+                                                    initialOrdinal = initialState.ordinal,
+                                                    targetOrdinal = targetState.ordinal,
+                                                    isEinkMode = isEink,
+                                                )
+                                            },
+                                            label = "Wenku8ExpandedTabTransition",
+                                            modifier = Modifier.fillMaxSize(),
+                                        ) { destination ->
+                                            MainDestinationBody(
+                                                selectedDestination = destination,
+                                                showOfflineFallbackBanner = showOfflineFallbackBanner,
+                                                onDismissOfflineBanner = { showOfflineFallbackBanner = false },
+                                                preferences = effectivePreferences,
+                                                onThemeModeSelected = onThemeModeSelected,
+                                                onDefaultHomeSelected = onDefaultHomeSelected,
+                                                onAutoOptimizeConnectionChanged = onAutoOptimizeConnectionChanged,
+                                                onAppLanguageSelected = onAppLanguageSelected,
+                                                onEinkModeChanged = onEinkModeChanged,
+                                                onUseDynamicColorChanged = onUseDynamicColorChanged,
+                                                onMenuBackgroundChanged = onMenuBackgroundChanged,
+                                                onReaderTypographyChanged = onReaderTypographyChanged,
+                                                onReaderCustomFontPathChanged = onReaderCustomFontPathChanged,
+                                                onReaderCustomBackgroundPathChanged = onReaderCustomBackgroundPathChanged,
+                                                onVolumeKeyPagingChanged = onVolumeKeyPagingChanged,
+                                                database = database,
+                                                relayRouteController = relayRouteController,
+                                                discoveryRepository = discoveryRepository,
+                                                userSessionRepository = userSessionRepository,
+                                                serverNoticeAndUpdateRepository = serverNoticeAndUpdateRepository,
+                                                storageAndCacheRepository = storageAndCacheRepository,
+                                                backupArchiveRepository = backupArchiveRepository,
+                                                bookshelfRepository = bookshelfRepository,
+                                                bookshelfViewMode = localBookshelfViewMode,
+                                                onBookshelfViewModeSelected = { mode ->
+                                                    localBookshelfViewMode = mode
+                                                    onBookshelfViewModeSelected(mode)
+                                                },
+                                                bookshelfSortMode = localBookshelfSortMode,
+                                                onBookshelfSortModeSelected = { sort ->
+                                                    localBookshelfSortMode = sort
+                                                    onBookshelfSortModeSelected(sort)
+                                                },
+                                                legacyV1StorageMigrator = legacyV1StorageMigrator,
+                                                appLanguage = appLanguage,
+                                                onOpenSearch = handleOpenSearch,
+                                                onOpenSearchWithOrigin = handleOpenSearchWithOrigin,
+                                                onOpenLoginSheet = { isLoginBottomSheetOpen = true },
+                                                onOpenReadingFootprint = { tab -> activeFootprintTab = tab },
+                                                onNovelClicked = handleNovelClicked,
+                                                onNovelClickedWithOrigin = handleNovelClickedWithOrigin,
+                                                onContinueReadingClicked = handleContinueReadingClicked,
+                                                onOpenNetworkDiagnostics = handleOpenNetworkDiagnostics,
+                                                contentPadding = innerPadding,
+                                            )
+                                        }
+                                    }
+
+                                    AnimatedVisibility(
+                                        visible = showTwoPaneExpandedDetail,
+                                        enter = if (isEink) {
+                                            androidx.compose.animation.EnterTransition.None
+                                        } else {
+                                            fadeIn(tween(180)) + slideInHorizontally(
+                                                animationSpec = spring<IntOffset>(dampingRatio = 0.9f, stiffness = 420f),
+                                                initialOffsetX = { it / 6 },
+                                            )
+                                        },
+                                        exit = if (isEink) {
+                                            androidx.compose.animation.ExitTransition.None
+                                        } else {
+                                            fadeOut(tween(140)) + slideOutHorizontally(
+                                                animationSpec = spring<IntOffset>(dampingRatio = 0.9f, stiffness = 420f),
+                                                targetOffsetX = { it / 6 },
+                                            )
+                                        },
+                                        modifier = Modifier
+                                            .weight(0.56f)
+                                            .fillMaxHeight(),
+                                    ) {
+                                        if (novelDetailRepository != null &&
+                                            bookshelfRepository != null &&
+                                            novelDownloadRepository != null &&
+                                            activeDetailNovelAid > 0
+                                        ) {
+                                            NovelDetailScreen(
+                                                aid = activeDetailNovelAid,
+                                                novelDetailRepository = novelDetailRepository,
+                                                bookshelfRepository = bookshelfRepository,
+                                                novelDownloadRepository = novelDownloadRepository,
+                                                appLanguage = appLanguage,
+                                                themeMode = effectivePreferences.themeMode,
+                                                useCoverTheme = effectivePreferences.useDynamicColor,
+                                                seedDiscoveryItem = activeDetailSeedItem?.takeIf {
+                                                    it.aid == activeDetailNovelAid
+                                                },
+                                                sharedTransitionOrigin = activeDetailSharedOrigin,
+                                                showBackButton = true,
+                                                onNavigateBack = {
+                                                    activeDetailNovelAid = 0
+                                                    activeDetailSeedItem = null
+                                                },
+                                                onOpenReader = handleOpenReader,
+                                                onOpenReviews = { aid, title ->
+                                                    activeReviewsAid = aid
+                                                    activeReviewsNovelTitle = title
+                                                    activeReviewThread = null
+                                                },
+                                                onAuthorClicked = { author ->
+                                                    handleOpenSearchWithSeed(author, UnifiedSearchMode.AUTHOR_NAME)
+                                                },
+                                                onTagClicked = { tag ->
+                                                    handleOpenSearchWithSeed(tag, UnifiedSearchMode.NOVEL_TITLE)
+                                                },
+                                                modifier = Modifier.fillMaxSize(),
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        is ScaffoldSceneState.SearchStudio -> {
+                            if (discoveryRepository != null) {
+                                UnifiedSearchScreen(
+                                    discoveryRepository = discoveryRepository,
+                                    appLanguage = appLanguage,
+                                    initialQuery = scene.initialQuery,
+                                    initialMode = scene.initialMode,
+                                    searchBarSharedOrigin = scene.searchBarOrigin,
+                                    onNavigateBack = {
+                                        isSearchStudioOpen = false
+                                        searchInitialQuery = ""
+                                    },
+                                    onNovelClicked = handleNovelClicked,
+                                    onNovelClickedWithOrigin = handleNovelClickedWithOrigin,
+                                    onOpenNetworkDiagnostics = handleOpenNetworkDiagnostics,
+                                )
+                            }
+                        }
+
+                        is ScaffoldSceneState.ReadingFootprint -> {
+                            if (database != null) {
+                                ReadingFootprintScreen(
+                                    database = database,
+                                    initialTab = scene.initialTab,
+                                    onNavigateBack = { activeFootprintTab = null },
+                                    onOpenReader = handleOpenReader,
+                                    onOpenNovelDetail = { item ->
+                                        if (isExpandedRailWidth) {
+                                            activeFootprintTab = null
+                                        }
+                                        handleNovelClickedWithOrigin(
+                                            item,
+                                            Wenku8SharedElementKeys.NOVEL_FOOTPRINT_HISTORY_ORIGIN,
+                                        )
+                                    },
+                                )
+                            }
+                        }
+
+                        is ScaffoldSceneState.CompactNovelDetail -> {
+                            if (novelDetailRepository != null &&
+                                bookshelfRepository != null &&
+                                novelDownloadRepository != null
+                            ) {
+                                NovelDetailScreen(
+                                    aid = scene.aid,
+                                    novelDetailRepository = novelDetailRepository,
+                                    bookshelfRepository = bookshelfRepository,
+                                    novelDownloadRepository = novelDownloadRepository,
+                                    appLanguage = appLanguage,
+                                    themeMode = effectivePreferences.themeMode,
+                                    useCoverTheme = effectivePreferences.useDynamicColor,
+                                    seedDiscoveryItem = activeDetailSeedItem?.takeIf { it.aid == scene.aid },
+                                    sharedTransitionOrigin = scene.sharedOrigin,
+                                    onNavigateBack = {
+                                        activeDetailNovelAid = 0
+                                        activeDetailSeedItem = null
+                                    },
+                                    onOpenReader = handleOpenReader,
+                                    onOpenReviews = { aid, title ->
+                                        activeReviewsAid = aid
+                                        activeReviewsNovelTitle = title
+                                        activeReviewThread = null
+                                    },
+                                    onAuthorClicked = { author ->
+                                        handleOpenSearchWithSeed(author, UnifiedSearchMode.AUTHOR_NAME)
+                                    },
+                                    onTagClicked = { tag ->
+                                        handleOpenSearchWithSeed(tag, UnifiedSearchMode.NOVEL_TITLE)
+                                    },
+                                )
+                            }
+                        }
+
+                        is ScaffoldSceneState.ReviewList -> {
+                            if (reviewsRepository != null) {
+                                ReviewListScreen(
+                                    aid = scene.aid,
+                                    novelTitle = scene.novelTitle,
+                                    reviewsRepository = reviewsRepository,
+                                    appLanguage = appLanguage,
+                                    userSessionRepository = userSessionRepository,
+                                    onNavigateBack = {
+                                        activeReviewsAid = 0
+                                        activeReviewsNovelTitle = ""
+                                        activeReviewThread = null
+                                    },
+                                    onOpenThread = { thread -> activeReviewThread = thread },
+                                    onOpenLoginSheet = { isLoginBottomSheetOpen = true },
+                                    onOpenNetworkDiagnostics = handleOpenNetworkDiagnostics,
+                                )
+                            }
+                        }
+
+                        is ScaffoldSceneState.ReviewThread -> {
+                            if (reviewsRepository != null) {
+                                ReviewThreadScreen(
+                                    aid = scene.aid,
+                                    novelTitle = scene.novelTitle,
+                                    thread = scene.thread,
+                                    reviewsRepository = reviewsRepository,
+                                    appLanguage = appLanguage,
+                                    userSessionRepository = userSessionRepository,
+                                    onNavigateBack = { activeReviewThread = null },
+                                    onOpenLoginSheet = { isLoginBottomSheetOpen = true },
+                                    onOpenNetworkDiagnostics = handleOpenNetworkDiagnostics,
+                                )
+                            }
+                        }
+
+                        is ScaffoldSceneState.Reader -> {
+                            if (database != null &&
+                                catalogGateway != null &&
+                                novelTocSyncRepository != null
+                            ) {
+                                UnifiedReaderScreen(
+                                    launchRequest = scene.request,
+                                    database = database,
+                                    catalogGateway = catalogGateway,
+                                    novelTocSyncRepository = novelTocSyncRepository,
+                                    preferences = effectivePreferences,
+                                    storageAndCacheRepository = storageAndCacheRepository,
+                                    onReaderTypographyChanged = onReaderTypographyChanged,
+                                    onReaderCustomFontPathChanged = onReaderCustomFontPathChanged,
+                                    onReaderCustomBackgroundPathChanged = onReaderCustomBackgroundPathChanged,
+                                    onReaderPageTurnModeChanged = onReaderPageTurnModeChanged,
+                                    onReaderPaperPresetChanged = onReaderPaperPresetChanged,
+                                    onReaderKeepScreenOnChanged = onReaderKeepScreenOnChanged,
+                                    onReaderEdgeBrightnessDragChanged = onReaderEdgeBrightnessDragChanged,
+                                    onVolumeKeyPagingChanged = onVolumeKeyPagingChanged,
+                                    onOpenNetworkDiagnostics = handleOpenNetworkDiagnostics,
+                                    onNavigateBack = { activeReaderRequest = null },
+                                )
+                            }
+                        }
+
+                        ScaffoldSceneState.NetworkDiagnostics -> {
+                            if (networkDiagnosticsViewModelFactory != null) {
+                                val diagnosticsViewModel: NetworkDiagnosticsViewModel = viewModel(
+                                    factory = networkDiagnosticsViewModelFactory,
+                                )
+                                NetworkDiagnosticsScreen(
+                                    viewModel = diagnosticsViewModel,
+                                    autoOptimizeEnabled = effectivePreferences.autoOptimizeConnectionEnabled,
+                                    onAutoOptimizeChanged = onAutoOptimizeConnectionChanged,
+                                    onNavigateBack = { isNetworkDiagnosticsOpen = false },
+                                )
+                            }
                         }
                     }
-                },
-            ) { innerPadding ->
-                MainDestinationBody(
-                    selectedDestination = selectedDestination,
-                    showOfflineFallbackBanner = showOfflineFallbackBanner,
-                    onDismissOfflineBanner = { showOfflineFallbackBanner = false },
-                    preferences = effectivePreferences,
-                    onThemeModeSelected = onThemeModeSelected,
-                    onDefaultHomeSelected = onDefaultHomeSelected,
-                    onAutoOptimizeConnectionChanged = onAutoOptimizeConnectionChanged,
-                    onAppLanguageSelected = onAppLanguageSelected,
-                    onEinkModeChanged = onEinkModeChanged,
-                    onUseDynamicColorChanged = onUseDynamicColorChanged,
-                    onMenuBackgroundChanged = onMenuBackgroundChanged,
-                    onReaderTypographyChanged = onReaderTypographyChanged,
-                    onReaderCustomFontPathChanged = onReaderCustomFontPathChanged,
-                    onReaderCustomBackgroundPathChanged = onReaderCustomBackgroundPathChanged,
-                    onVolumeKeyPagingChanged = onVolumeKeyPagingChanged,
-                    database = database,
-                    relayRouteController = relayRouteController,
-                    discoveryRepository = discoveryRepository,
-                    userSessionRepository = userSessionRepository,
-                    serverNoticeAndUpdateRepository = serverNoticeAndUpdateRepository,
-                    storageAndCacheRepository = storageAndCacheRepository,
-                    backupArchiveRepository = backupArchiveRepository,
-                    bookshelfRepository = bookshelfRepository,
-                    bookshelfViewMode = localBookshelfViewMode,
-                    onBookshelfViewModeSelected = { mode ->
-                        localBookshelfViewMode = mode
-                        onBookshelfViewModeSelected(mode)
-                    },
-                    bookshelfSortMode = localBookshelfSortMode,
-                    onBookshelfSortModeSelected = { sort ->
-                        localBookshelfSortMode = sort
-                        onBookshelfSortModeSelected(sort)
-                    },
-                    legacyV1StorageMigrator = legacyV1StorageMigrator,
-                    appLanguage = appLanguage,
-                    onOpenSearch = handleOpenSearch,
-                    onOpenLoginSheet = { isLoginBottomSheetOpen = true },
-                    onOpenReadingFootprint = { tab -> activeFootprintTab = tab },
-                    onNovelClicked = handleNovelClicked,
-                    onContinueReadingClicked = handleContinueReadingClicked,
-                    onOpenNetworkDiagnostics = handleOpenNetworkDiagnostics,
-                    contentPadding = innerPadding,
-                )
-            }
-        } else {
-            val railState = rememberWideNavigationRailState(
-                initialValue = if (isExpandedRailWidth) {
-                    WideNavigationRailValue.Expanded
-                } else {
-                    WideNavigationRailValue.Collapsed
-                },
-            )
-            Row(modifier = Modifier.fillMaxSize()) {
-                WideNavigationRail(
-                    state = railState,
-                    modifier = Modifier
-                        .fillMaxHeight()
-                        .testTag(MainScaffoldTestTags.EXPANDED_WIDE_NAV_RAIL)
-                        .einkHairlineBorder(MaterialTheme.shapes.extraSmall),
-                ) {
-                    TopLevelDestination.entries.forEach { destination ->
-                        val isSelected = destination == selectedDestination
-                        val labelText = stringResource(destination.labelResId)
-                        WideNavigationRailItem(
-                            railExpanded = isExpandedRailWidth,
-                            selected = isSelected,
-                            onClick = {
-                                selectedDestination = destination
-                                activeDetailNovelAid = 0
-                                activeDetailSeedItem = null
-                            },
-                            icon = {
-                                Icon(
-                                    imageVector = if (isSelected) {
-                                        destination.selectedIcon
-                                    } else {
-                                        destination.unselectedIcon
-                                    },
-                                    contentDescription = labelText,
-                                )
-                            },
-                            label = { Text(text = labelText) },
-                            modifier = Modifier.testTag(
-                                MainScaffoldTestTags.NAV_ITEM_PREFIX + destination.routeKey,
-                            ),
-                        )
-                    }
-                }
-
-                Scaffold(
-                    modifier = Modifier.weight(if (showTwoPaneExpandedDetail) 0.44f else 1f),
-                    contentWindowInsets = WindowInsets.safeDrawing,
-                ) { innerPadding ->
-                    MainDestinationBody(
-                        selectedDestination = selectedDestination,
-                        showOfflineFallbackBanner = showOfflineFallbackBanner,
-                        onDismissOfflineBanner = { showOfflineFallbackBanner = false },
-                        preferences = effectivePreferences,
-                        onThemeModeSelected = onThemeModeSelected,
-                        onDefaultHomeSelected = onDefaultHomeSelected,
-                        onAutoOptimizeConnectionChanged = onAutoOptimizeConnectionChanged,
-                        onAppLanguageSelected = onAppLanguageSelected,
-                        onEinkModeChanged = onEinkModeChanged,
-                        onUseDynamicColorChanged = onUseDynamicColorChanged,
-                        onMenuBackgroundChanged = onMenuBackgroundChanged,
-                        onReaderTypographyChanged = onReaderTypographyChanged,
-                        onReaderCustomFontPathChanged = onReaderCustomFontPathChanged,
-                        onReaderCustomBackgroundPathChanged = onReaderCustomBackgroundPathChanged,
-                        onVolumeKeyPagingChanged = onVolumeKeyPagingChanged,
-                        database = database,
-                        relayRouteController = relayRouteController,
-                        discoveryRepository = discoveryRepository,
-                        userSessionRepository = userSessionRepository,
-                        serverNoticeAndUpdateRepository = serverNoticeAndUpdateRepository,
-                        storageAndCacheRepository = storageAndCacheRepository,
-                        backupArchiveRepository = backupArchiveRepository,
-                        bookshelfRepository = bookshelfRepository,
-                        bookshelfViewMode = localBookshelfViewMode,
-                        onBookshelfViewModeSelected = { mode ->
-                            localBookshelfViewMode = mode
-                            onBookshelfViewModeSelected(mode)
-                        },
-                        bookshelfSortMode = localBookshelfSortMode,
-                        onBookshelfSortModeSelected = { sort ->
-                            localBookshelfSortMode = sort
-                            onBookshelfSortModeSelected(sort)
-                        },
-                        legacyV1StorageMigrator = legacyV1StorageMigrator,
-                        appLanguage = appLanguage,
-                        onOpenSearch = handleOpenSearch,
-                        onOpenLoginSheet = { isLoginBottomSheetOpen = true },
-                        onOpenReadingFootprint = { tab -> activeFootprintTab = tab },
-                        onNovelClicked = handleNovelClicked,
-                        onContinueReadingClicked = handleContinueReadingClicked,
-                        onOpenNetworkDiagnostics = handleOpenNetworkDiagnostics,
-                        contentPadding = innerPadding,
-                    )
-                }
-
-                if (showTwoPaneExpandedDetail) {
-                    NovelDetailScreen(
-                        aid = activeDetailNovelAid,
-                        novelDetailRepository = novelDetailRepository,
-                        bookshelfRepository = bookshelfRepository,
-                        novelDownloadRepository = novelDownloadRepository,
-                        appLanguage = appLanguage,
-                        themeMode = effectivePreferences.themeMode,
-                        useCoverTheme = effectivePreferences.useDynamicColor,
-                        seedDiscoveryItem = activeDetailSeedItem?.takeIf { it.aid == activeDetailNovelAid },
-                        showBackButton = true,
-                        onNavigateBack = {
-                            activeDetailNovelAid = 0
-                            activeDetailSeedItem = null
-                        },
-                        onOpenReader = handleOpenReader,
-                        onOpenReviews = { aid, title ->
-                            activeReviewsAid = aid
-                            activeReviewsNovelTitle = title
-                            activeReviewThread = null
-                        },
-                        onAuthorClicked = { author ->
-                            handleOpenSearchWithSeed(author, UnifiedSearchMode.AUTHOR_NAME)
-                        },
-                        onTagClicked = { tag ->
-                            handleOpenSearchWithSeed(tag, UnifiedSearchMode.NOVEL_TITLE)
-                        },
-                        modifier = Modifier
-                            .weight(0.56f)
-                            .fillMaxHeight(),
-                    )
                 }
             }
-        }
-
-        if (isSearchStudioOpen && discoveryRepository != null) {
-            UnifiedSearchScreen(
-                discoveryRepository = discoveryRepository,
-                appLanguage = appLanguage,
-                initialQuery = searchInitialQuery,
-                initialMode = searchInitialMode,
-                onNavigateBack = {
-                    isSearchStudioOpen = false
-                    searchInitialQuery = ""
-                },
-                onNovelClicked = handleNovelClicked,
-                onOpenNetworkDiagnostics = handleOpenNetworkDiagnostics,
-            )
-        }
-
-        val currentFootprintTab = activeFootprintTab
-        if (currentFootprintTab != null && database != null) {
-            ReadingFootprintScreen(
-                database = database,
-                initialTab = currentFootprintTab,
-                onNavigateBack = { activeFootprintTab = null },
-                onOpenReader = handleOpenReader,
-                onOpenNovelDetail = { item ->
-                    if (isExpandedRailWidth) {
-                        activeFootprintTab = null
-                    }
-                    handleNovelClicked(item)
-                },
-            )
-        }
-
-        if (activeDetailNovelAid > 0 &&
-            !showTwoPaneExpandedDetail &&
-            novelDetailRepository != null &&
-            bookshelfRepository != null &&
-            novelDownloadRepository != null
-        ) {
-            NovelDetailScreen(
-                aid = activeDetailNovelAid,
-                novelDetailRepository = novelDetailRepository,
-                bookshelfRepository = bookshelfRepository,
-                novelDownloadRepository = novelDownloadRepository,
-                appLanguage = appLanguage,
-                themeMode = effectivePreferences.themeMode,
-                useCoverTheme = effectivePreferences.useDynamicColor,
-                seedDiscoveryItem = activeDetailSeedItem?.takeIf { it.aid == activeDetailNovelAid },
-                onNavigateBack = {
-                    activeDetailNovelAid = 0
-                    activeDetailSeedItem = null
-                },
-                onOpenReader = handleOpenReader,
-                onOpenReviews = { aid, title ->
-                    activeReviewsAid = aid
-                    activeReviewsNovelTitle = title
-                    activeReviewThread = null
-                },
-                onAuthorClicked = { author ->
-                    handleOpenSearchWithSeed(author, UnifiedSearchMode.AUTHOR_NAME)
-                },
-                onTagClicked = { tag ->
-                    handleOpenSearchWithSeed(tag, UnifiedSearchMode.NOVEL_TITLE)
-                },
-            )
-        }
-
-        if (activeReviewsAid > 0 && reviewsRepository != null) {
-            val selectedThread = activeReviewThread
-            if (selectedThread == null) {
-                ReviewListScreen(
-                    aid = activeReviewsAid,
-                    novelTitle = activeReviewsNovelTitle,
-                    reviewsRepository = reviewsRepository,
-                    appLanguage = appLanguage,
-                    userSessionRepository = userSessionRepository,
-                    onNavigateBack = {
-                        activeReviewsAid = 0
-                        activeReviewsNovelTitle = ""
-                        activeReviewThread = null
-                    },
-                    onOpenThread = { thread -> activeReviewThread = thread },
-                    onOpenLoginSheet = { isLoginBottomSheetOpen = true },
-                    onOpenNetworkDiagnostics = handleOpenNetworkDiagnostics,
-                )
-            } else {
-                ReviewThreadScreen(
-                    aid = activeReviewsAid,
-                    novelTitle = activeReviewsNovelTitle,
-                    thread = selectedThread,
-                    reviewsRepository = reviewsRepository,
-                    appLanguage = appLanguage,
-                    userSessionRepository = userSessionRepository,
-                    onNavigateBack = { activeReviewThread = null },
-                    onOpenLoginSheet = { isLoginBottomSheetOpen = true },
-                    onOpenNetworkDiagnostics = handleOpenNetworkDiagnostics,
-                )
-            }
-        }
-
-        val currentReaderRequest = activeReaderRequest
-        if (currentReaderRequest != null &&
-            database != null &&
-            catalogGateway != null &&
-            novelTocSyncRepository != null
-        ) {
-            UnifiedReaderScreen(
-                launchRequest = currentReaderRequest,
-                database = database,
-                catalogGateway = catalogGateway,
-                novelTocSyncRepository = novelTocSyncRepository,
-                preferences = effectivePreferences,
-                storageAndCacheRepository = storageAndCacheRepository,
-                onReaderTypographyChanged = onReaderTypographyChanged,
-                onReaderCustomFontPathChanged = onReaderCustomFontPathChanged,
-                onReaderCustomBackgroundPathChanged = onReaderCustomBackgroundPathChanged,
-                onReaderPageTurnModeChanged = onReaderPageTurnModeChanged,
-                onReaderPaperPresetChanged = onReaderPaperPresetChanged,
-                onReaderKeepScreenOnChanged = onReaderKeepScreenOnChanged,
-                onReaderEdgeBrightnessDragChanged = onReaderEdgeBrightnessDragChanged,
-                onVolumeKeyPagingChanged = onVolumeKeyPagingChanged,
-                onOpenNetworkDiagnostics = handleOpenNetworkDiagnostics,
-                onNavigateBack = { activeReaderRequest = null },
-            )
-        }
-
-        if (isNetworkDiagnosticsOpen && networkDiagnosticsViewModelFactory != null) {
-            val diagnosticsViewModel: NetworkDiagnosticsViewModel = viewModel(
-                factory = networkDiagnosticsViewModelFactory,
-            )
-            NetworkDiagnosticsScreen(
-                viewModel = diagnosticsViewModel,
-                autoOptimizeEnabled = effectivePreferences.autoOptimizeConnectionEnabled,
-                onAutoOptimizeChanged = onAutoOptimizeConnectionChanged,
-                onNavigateBack = { isNetworkDiagnosticsOpen = false },
-            )
         }
 
         if (isLoginBottomSheetOpen && userSessionRepository != null) {
@@ -746,9 +999,11 @@ private fun MainDestinationBody(
     legacyV1StorageMigrator: LegacyV1StorageMigrator?,
     appLanguage: Wenku8API.AppLanguage,
     onOpenSearch: () -> Unit,
+    onOpenSearchWithOrigin: (String) -> Unit,
     onOpenLoginSheet: () -> Unit,
     onOpenReadingFootprint: (ReadingFootprintTab) -> Unit,
     onNovelClicked: (DiscoveryNovelCardItem) -> Unit,
+    onNovelClickedWithOrigin: (DiscoveryNovelCardItem, String) -> Unit,
     onContinueReadingClicked: (BookshelfItemModel) -> Unit,
     onOpenNetworkDiagnostics: () -> Unit,
     contentPadding: PaddingValues,
@@ -763,9 +1018,12 @@ private fun MainDestinationBody(
             onSortModeSelected = onBookshelfSortModeSelected,
             showOfflineFallbackBanner = showOfflineFallbackBanner,
             onDismissOfflineBanner = onDismissOfflineBanner,
-            onOpenSearch = onOpenSearch,
+            onOpenSearch = {
+                onOpenSearchWithOrigin(Wenku8SharedElementKeys.SEARCH_BAR_BOOKSHELF_ORIGIN)
+            },
             onOpenLoginSheet = onOpenLoginSheet,
             onNovelClicked = onNovelClicked,
+            onNovelClickedWithOrigin = onNovelClickedWithOrigin,
             onContinueReadingClicked = onContinueReadingClicked,
             modifier = Modifier
                 .fillMaxSize()
@@ -779,8 +1037,12 @@ private fun MainDestinationBody(
         LatestScreen(
             discoveryRepository = discoveryRepository,
             appLanguage = appLanguage,
-            onOpenSearch = onOpenSearch,
-            onNovelClicked = onNovelClicked,
+            onOpenSearch = {
+                onOpenSearchWithOrigin(Wenku8SharedElementKeys.SEARCH_BAR_DEFAULT_ORIGIN)
+            },
+            onNovelClicked = { item ->
+                onNovelClickedWithOrigin(item, Wenku8SharedElementKeys.NOVEL_DEFAULT_ORIGIN)
+            },
             onOpenNetworkDiagnostics = onOpenNetworkDiagnostics,
             modifier = Modifier
                 .fillMaxSize()
@@ -794,8 +1056,12 @@ private fun MainDestinationBody(
         RankingsScreen(
             discoveryRepository = discoveryRepository,
             appLanguage = appLanguage,
-            onOpenSearch = onOpenSearch,
-            onNovelClicked = onNovelClicked,
+            onOpenSearch = {
+                onOpenSearchWithOrigin(Wenku8SharedElementKeys.SEARCH_BAR_DEFAULT_ORIGIN)
+            },
+            onNovelClicked = { item ->
+                onNovelClickedWithOrigin(item, Wenku8SharedElementKeys.NOVEL_DEFAULT_ORIGIN)
+            },
             onOpenNetworkDiagnostics = onOpenNetworkDiagnostics,
             modifier = Modifier
                 .fillMaxSize()
