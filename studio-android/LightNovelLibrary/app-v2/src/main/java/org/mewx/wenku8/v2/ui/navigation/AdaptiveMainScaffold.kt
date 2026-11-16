@@ -40,6 +40,7 @@ import androidx.compose.material3.WideNavigationRailItem
 import androidx.compose.material3.WideNavigationRailValue
 import androidx.compose.material3.rememberWideNavigationRailState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.rememberCoroutineScope
@@ -89,6 +90,8 @@ import org.mewx.wenku8.v2.ui.discovery.PersistentSearchEntryPill
 import org.mewx.wenku8.v2.ui.discovery.RankingsScreen
 import org.mewx.wenku8.v2.ui.profile.AccountLoginBottomSheet
 import org.mewx.wenku8.v2.ui.profile.ProfileAndStudioScreen
+import org.mewx.wenku8.v2.ui.profile.ReadingFootprintScreen
+import org.mewx.wenku8.v2.ui.profile.ReadingFootprintTab
 import org.mewx.wenku8.v2.ui.reader.UnifiedReaderScreen
 import org.mewx.wenku8.v2.ui.reviews.ReviewListScreen
 import org.mewx.wenku8.v2.ui.reviews.ReviewThreadScreen
@@ -166,6 +169,9 @@ fun AdaptiveMainScaffold(
     onVolumeKeyPagingChanged: (Boolean) -> Unit = {},
     initialOpenReviewsAid: Int = 0,
     initialOpenReviewsTitle: String = "",
+    externalReaderLaunchRequest: ReaderLaunchRequest? = null,
+    externalOpenBookshelf: Boolean = false,
+    onExternalLaunchConsumed: () -> Unit = {},
     onOpenSearch: () -> Unit = {},
     onNovelClicked: (DiscoveryNovelCardItem) -> Unit = {},
     onOpenReader: (ReaderLaunchRequest) -> Unit = {},
@@ -242,11 +248,24 @@ fun AdaptiveMainScaffold(
     var activeReaderRequest by androidx.compose.runtime.remember {
         mutableStateOf<ReaderLaunchRequest?>(null)
     }
+    var activeFootprintTab by rememberSaveable {
+        mutableStateOf<ReadingFootprintTab?>(null)
+    }
 
     val handleOpenReader: (ReaderLaunchRequest) -> Unit = { request ->
         onOpenReader(request)
         if (database != null && catalogGateway != null && novelTocSyncRepository != null) {
             activeReaderRequest = request
+        }
+    }
+
+    LaunchedEffect(externalReaderLaunchRequest, externalOpenBookshelf) {
+        if (externalReaderLaunchRequest != null) {
+            handleOpenReader(externalReaderLaunchRequest)
+            onExternalLaunchConsumed()
+        } else if (externalOpenBookshelf) {
+            selectedDestination = TopLevelDestination.BOOKSHELF
+            onExternalLaunchConsumed()
         }
     }
 
@@ -404,6 +423,7 @@ fun AdaptiveMainScaffold(
                     appLanguage = appLanguage,
                     onOpenSearch = handleOpenSearch,
                     onOpenLoginSheet = { isLoginBottomSheetOpen = true },
+                    onOpenReadingFootprint = { tab -> activeFootprintTab = tab },
                     onNovelClicked = handleNovelClicked,
                     onContinueReadingClicked = handleContinueReadingClicked,
                     onOpenNetworkDiagnostics = handleOpenNetworkDiagnostics,
@@ -497,6 +517,7 @@ fun AdaptiveMainScaffold(
                         appLanguage = appLanguage,
                         onOpenSearch = handleOpenSearch,
                         onOpenLoginSheet = { isLoginBottomSheetOpen = true },
+                        onOpenReadingFootprint = { tab -> activeFootprintTab = tab },
                         onNovelClicked = handleNovelClicked,
                         onContinueReadingClicked = handleContinueReadingClicked,
                         onOpenNetworkDiagnostics = handleOpenNetworkDiagnostics,
@@ -551,6 +572,22 @@ fun AdaptiveMainScaffold(
                 },
                 onNovelClicked = handleNovelClicked,
                 onOpenNetworkDiagnostics = handleOpenNetworkDiagnostics,
+            )
+        }
+
+        val currentFootprintTab = activeFootprintTab
+        if (currentFootprintTab != null && database != null) {
+            ReadingFootprintScreen(
+                database = database,
+                initialTab = currentFootprintTab,
+                onNavigateBack = { activeFootprintTab = null },
+                onOpenReader = handleOpenReader,
+                onOpenNovelDetail = { item ->
+                    if (isExpandedRailWidth) {
+                        activeFootprintTab = null
+                    }
+                    handleNovelClicked(item)
+                },
             )
         }
 
@@ -710,6 +747,7 @@ private fun MainDestinationBody(
     appLanguage: Wenku8API.AppLanguage,
     onOpenSearch: () -> Unit,
     onOpenLoginSheet: () -> Unit,
+    onOpenReadingFootprint: (ReadingFootprintTab) -> Unit,
     onNovelClicked: (DiscoveryNovelCardItem) -> Unit,
     onContinueReadingClicked: (BookshelfItemModel) -> Unit,
     onOpenNetworkDiagnostics: () -> Unit,
@@ -810,6 +848,7 @@ private fun MainDestinationBody(
             totalReadingSeconds = totalReadingSeconds,
             totalCharactersRead = totalCharactersRead,
             totalBookmarkNoteCount = totalBookmarkNotes,
+            onOpenReadingFootprint = onOpenReadingFootprint,
             autoRoutingState = autoRoutingState,
             onAutoOptimizeConnectionChanged = onAutoOptimizeConnectionChanged,
             onResetDefaultConnection = {

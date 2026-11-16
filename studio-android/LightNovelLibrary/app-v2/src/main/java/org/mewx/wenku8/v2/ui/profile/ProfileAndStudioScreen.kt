@@ -112,6 +112,8 @@ object ProfileStudioTestTags {
     const val LIST = "profile_studio_list"
     const val TOP_ABOUT_BUTTON = "profile_top_about_button"
     const val FOOTPRINT_CARD = "profile_footprint_card"
+    const val OPEN_FOOTPRINT_STATS_BUTTON = "profile_open_footprint_stats_button"
+    const val OPEN_FOOTPRINT_BOOKMARKS_BUTTON = "profile_open_footprint_bookmarks_button"
     const val AUTO_ROUTING_SWITCH = "profile_auto_routing_switch"
     const val OPEN_DIAGNOSTICS_BUTTON = "profile_open_diagnostics_button"
     const val RESET_DEFAULT_ROUTE_BUTTON = "profile_reset_default_route_button"
@@ -144,7 +146,7 @@ object ProfileStudioTestTags {
  * Guarantees **100% `v1.31` Settings Parity ("More, Never Less")** plus `v2.0` upgrades:
  * - Header wallpaper (`menu_bg_id` `1..5`, custom SAF wallpaper, or M3e Pure Card)
  * - `NoticeString` banner + `AccountProfileCard` (`cert.wk8` / daily sign-in / avatar)
- * - Reading Footprint summary (`累计阅读` / `累计字数` / `书签笔记`)
+ * - Reading Footprint summary (`累计阅读` / `累计字数` / `书签笔记`) + 1-tap Heatmap / History / Bookmarks Hub
  * - Network & Auto-Routing quick controls (`自动优化连接` toggle + status + `网络检测` + `恢复默认连接`)
  * - Language (`SC` / `TC`), Startup Home (`最新` / `书架`), Theme (`6` modes), E-Ink high-contrast, Dynamic Color
  * - Reader default typography (`8..36 sp`, line `0..32 dp`, paragraph `0..48 dp`, edge `0..32 dp`,
@@ -165,6 +167,7 @@ fun ProfileAndStudioScreen(
     totalReadingSeconds: Long = 0L,
     totalCharactersRead: Long = 0L,
     totalBookmarkNoteCount: Int = 0,
+    onOpenReadingFootprint: (ReadingFootprintTab) -> Unit = {},
     autoRoutingState: AutoRoutingModeState = AutoRoutingModeState.EnabledUsingDefault,
     onAutoOptimizeConnectionChanged: (Boolean) -> Unit = {},
     onResetDefaultConnection: () -> Unit = {},
@@ -451,6 +454,7 @@ fun ProfileAndStudioScreen(
                 totalReadingSeconds = totalReadingSeconds,
                 totalCharactersRead = totalCharactersRead,
                 totalBookmarkNoteCount = totalBookmarkNoteCount,
+                onOpenReadingFootprint = onOpenReadingFootprint,
             )
         }
 
@@ -751,9 +755,11 @@ private fun ReadingFootprintCard(
     totalReadingSeconds: Long,
     totalCharactersRead: Long,
     totalBookmarkNoteCount: Int,
+    onOpenReadingFootprint: (ReadingFootprintTab) -> Unit,
 ) {
     val totalMinutes = (totalReadingSeconds / 60L).coerceAtLeast(0L)
     Card(
+        onClick = { onOpenReadingFootprint(ReadingFootprintTab.STATS) },
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceContainer,
         ),
@@ -788,6 +794,33 @@ private fun ReadingFootprintCard(
                     labelText = stringResource(R.string.profile_footprint_notes_label),
                     modifier = Modifier.weight(1f),
                 )
+            }
+            Spacer(modifier = Modifier.height(12.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                FilledTonalButton(
+                    onClick = { onOpenReadingFootprint(ReadingFootprintTab.STATS) },
+                    modifier = Modifier
+                        .weight(1f)
+                        .testTag(ProfileStudioTestTags.OPEN_FOOTPRINT_STATS_BUTTON),
+                ) {
+                    Text(text = stringResource(R.string.profile_footprint_open_stats))
+                }
+                OutlinedButton(
+                    onClick = { onOpenReadingFootprint(ReadingFootprintTab.BOOKMARKS) },
+                    modifier = Modifier
+                        .weight(1f)
+                        .testTag(ProfileStudioTestTags.OPEN_FOOTPRINT_BOOKMARKS_BUTTON),
+                ) {
+                    Text(
+                        text = stringResource(
+                            R.string.profile_footprint_open_bookmarks_format,
+                            totalBookmarkNoteCount,
+                        ),
+                    )
+                }
             }
         }
     }

@@ -123,6 +123,7 @@ import org.mewx.wenku8.v2.data.local.db.entity.BookmarkNoteEntity
 import org.mewx.wenku8.v2.data.local.db.entity.NovelEntity
 import org.mewx.wenku8.v2.data.local.db.entity.ReadingProgressEntity
 import org.mewx.wenku8.v2.data.local.db.entity.ReadingSessionEntity
+import org.mewx.wenku8.v2.widget.ContinueReadingWidgetUpdater
 import org.mewx.wenku8.v2.data.local.preferences.Wenku8UserPreferences
 import org.mewx.wenku8.v2.data.remote.api.WenkuCatalogGateway
 import org.mewx.wenku8.v2.data.repository.CustomAssetSlot
@@ -494,12 +495,13 @@ fun UnifiedReaderScreen(
         }
     }
 
-    // Flush active reading session cleanly when exiting UnifiedReaderScreen.
+    // Flush active reading session cleanly and refresh placed Home-Screen Widgets when exiting.
     DisposableEffect(launchRequest.aid) {
         onDispose {
             val closingCid = sessionCid
             coroutineScope.launch(NonCancellable) {
                 flushReadingSessionIfNonTrivial(closingCid)
+                ContinueReadingWidgetUpdater.requestUpdate(context)
             }
         }
     }

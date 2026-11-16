@@ -405,4 +405,38 @@
     <string name="download_done_snackbar_format">離線快取完成：共儲存 %1$d 章</string>
     <string name="download_partial_snackbar_format">已快取 %1$d 章，%2$d 章下載未成功（可稍後用「僅下載未快取章節」補齊）</string>
     <string name="download_cancelled_snackbar">已取消離線快取任務</string>
+
+    <!-- Reading Footprint, Heatmap, Bookmarks Hub & Home Widget (P5.4) -->
+    <string name="profile_footprint_open_stats">熱力圖與歷史</string>
+    <string name="profile_footprint_open_bookmarks_format">書籤筆記 (%1$d)</string>
+    <string name="footprint_screen_title">閱讀足跡與書籤</string>
+    <string name="footprint_action_share_poster">產生閱讀卡片</string>
+    <string name="footprint_tab_stats">閱讀統計</string>
+    <string name="footprint_tab_history">歷史紀錄</string>
+    <string name="footprint_tab_bookmarks">書籤筆記</string>
+    <string name="footprint_streak_current_label">目前連續閱讀</string>
+    <string name="footprint_streak_longest_label">最長連續紀錄</string>
+    <string name="footprint_streak_days_format">%1$d 天</string>
+    <string name="footprint_active_days_label">活躍天數</string>
+    <string name="footprint_speed_label">平均閱讀速度</string>
+    <string name="footprint_speed_cpm_format">%1$d 字/分</string>
+    <string name="footprint_heatmap_title">近 16 週閱讀活躍熱力圖</string>
+    <string name="footprint_heatmap_legend_less">少</string>
+    <string name="footprint_heatmap_legend_more">多</string>
+    <string name="footprint_heatmap_selected_day_format">%1$s · 閱讀 %2$d 分鐘 · %3$s 字</string>
+    <string name="footprint_history_empty">暫無閱讀歷史，開啟任意小說章節後將自動記錄進度</string>
+    <string name="footprint_history_continue_action">繼續閱讀</string>
+    <string name="footprint_bookmarks_search_placeholder">搜尋書名、章節、摘錄或筆記…</string>
+    <string name="footprint_bookmarks_filter_all">全部作品</string>
+    <string name="footprint_bookmarks_empty">暫無書籤或摘錄筆記，閱讀時可在底欄工具列一鍵新增書籤</string>
+    <string name="footprint_bookmarks_jump_action">跳轉此頁</string>
+    <string name="footprint_bookmarks_delete_desc">刪除書籤</string>
+
+    <string name="widget_continue_reading_label">輕小說文庫 · 繼續閱讀</string>
+    <string name="widget_continue_reading_description">在桌面顯示最近閱讀的輕小說封面、章節進度，一鍵直達閱讀器斷點續讀</string>
+    <string name="widget_continue_badge">繼續閱讀 · 輕小說文庫</string>
+    <string name="widget_continue_empty_title">輕小說文庫</string>
+    <string name="widget_continue_empty_subtitle">點此開啟本地書架或探索最新輕小說</string>
+    <string name="widget_continue_action_resume">繼續閱讀</string>
+    <string name="widget_continue_action_open_shelf">開啟書架</string>
 </resources>

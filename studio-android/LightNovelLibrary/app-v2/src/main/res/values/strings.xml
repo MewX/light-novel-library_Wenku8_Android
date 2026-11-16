@@ -405,4 +405,38 @@
     <string name="download_done_snackbar_format">离线缓存完成：共保存 %1$d 章</string>
     <string name="download_partial_snackbar_format">已缓存 %1$d 章，%2$d 章下载未成功（可稍后用「仅下载未缓存章节」补齐）</string>
     <string name="download_cancelled_snackbar">已取消离线缓存任务</string>
+
+    <!-- Reading Footprint, Heatmap, Bookmarks Hub & Home Widget (P5.4) -->
+    <string name="profile_footprint_open_stats">热力图与历史</string>
+    <string name="profile_footprint_open_bookmarks_format">书签笔记 (%1$d)</string>
+    <string name="footprint_screen_title">阅读足迹与书签</string>
+    <string name="footprint_action_share_poster">生成阅读卡片</string>
+    <string name="footprint_tab_stats">阅读统计</string>
+    <string name="footprint_tab_history">历史记录</string>
+    <string name="footprint_tab_bookmarks">书签笔记</string>
+    <string name="footprint_streak_current_label">当前连续阅读</string>
+    <string name="footprint_streak_longest_label">最长连续纪录</string>
+    <string name="footprint_streak_days_format">%1$d 天</string>
+    <string name="footprint_active_days_label">活跃天数</string>
+    <string name="footprint_speed_label">平均阅读速度</string>
+    <string name="footprint_speed_cpm_format">%1$d 字/分</string>
+    <string name="footprint_heatmap_title">近 16 周阅读活跃热力图</string>
+    <string name="footprint_heatmap_legend_less">少</string>
+    <string name="footprint_heatmap_legend_more">多</string>
+    <string name="footprint_heatmap_selected_day_format">%1$s · 阅读 %2$d 分钟 · %3$s 字</string>
+    <string name="footprint_history_empty">暂无阅读历史，打开任意小说章节后将自动记录进度</string>
+    <string name="footprint_history_continue_action">继续阅读</string>
+    <string name="footprint_bookmarks_search_placeholder">搜索书名、章节、摘录或笔记…</string>
+    <string name="footprint_bookmarks_filter_all">全部作品</string>
+    <string name="footprint_bookmarks_empty">暂无书签或摘录笔记，阅读时可在底栏工具条一键添加书签</string>
+    <string name="footprint_bookmarks_jump_action">跳转此页</string>
+    <string name="footprint_bookmarks_delete_desc">删除书签</string>
+
+    <string name="widget_continue_reading_label">轻小说文库 · 继续阅读</string>
+    <string name="widget_continue_reading_description">在桌面展示最近阅读的轻小说封面、章节进度，一键直达阅读器断点续读</string>
+    <string name="widget_continue_badge">继续阅读 · 轻小说文库</string>
+    <string name="widget_continue_empty_title">轻小说文库</string>
+    <string name="widget_continue_empty_subtitle">点此打开本地书架或发现最新轻小说</string>
+    <string name="widget_continue_action_resume">继续阅读</string>
+    <string name="widget_continue_action_open_shelf">打开书架</string>
 </resources>
