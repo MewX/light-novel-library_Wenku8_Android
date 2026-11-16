@@ -9,8 +9,11 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
+import okhttp3.OkHttpClient
 import org.mewx.wenku8.v2.data.local.db.Wenku8Database
 import org.mewx.wenku8.v2.data.local.preferences.UserPreferencesRepository
 import org.mewx.wenku8.v2.data.media.OfflineFirstWenkuImageFetcher
@@ -18,7 +21,15 @@ import org.mewx.wenku8.v2.data.migration.InternalFileSaveSource
 import org.mewx.wenku8.v2.data.migration.LegacyMigrationProgress
 import org.mewx.wenku8.v2.data.migration.LegacyV1StorageMigrator
 import org.mewx.wenku8.v2.data.remote.api.WenkuApiClient
-import org.mewx.wenku8.v2.data.remote.transport.LegacyLightNetworkTransport
+import org.mewx.wenku8.v2.data.remote.diagnostics.DiagnosticsEndpointConfig
+import org.mewx.wenku8.v2.data.remote.diagnostics.DiagnosticsNetworkMonitor
+import org.mewx.wenku8.v2.data.remote.diagnostics.DiagnosticsRunner
+import org.mewx.wenku8.v2.data.remote.diagnostics.ManifestRepository
+import org.mewx.wenku8.v2.data.remote.diagnostics.OkHttpProbeTransport
+import org.mewx.wenku8.v2.data.remote.diagnostics.RelayRouteController
+import org.mewx.wenku8.v2.data.remote.diagnostics.RoutingLocalStore
+import org.mewx.wenku8.v2.data.remote.diagnostics.StalledDnsGuard
+import org.mewx.wenku8.v2.data.remote.transport.RelayHttpTransport
 import org.mewx.wenku8.v2.data.remote.transport.WenkuTransport
 import org.mewx.wenku8.v2.data.repository.DiscoveryRepository
 import org.mewx.wenku8.v2.data.repository.NovelTocSyncRepository
@@ -41,8 +52,67 @@ class AppContainer(context: Context) {
         UserPreferencesRepository.create(appContext, applicationScope)
     }
 
+    val sharedBaseOkHttpClient: OkHttpClient by lazy {
+        OkHttpProbeTransport.defaultSharedBaseOkHttpClient()
+    }
+
+    val stalledDnsGuard: StalledDnsGuard by lazy {
+        StalledDnsGuard(maxConcurrentProbePermits = 2)
+    }
+
+    val diagnosticsNetworkMonitor: DiagnosticsNetworkMonitor by lazy {
+        DiagnosticsNetworkMonitor(appContext)
+    }
+
+    val routingLocalStore: RoutingLocalStore by lazy {
+        RoutingLocalStore.create(appContext, applicationScope)
+    }
+
+    val manifestRepository: ManifestRepository by lazy {
+        ManifestRepository(
+            localStore = routingLocalStore,
+            baseOkHttpClient = sharedBaseOkHttpClient,
+        )
+    }
+
+    val okHttpProbeTransport: OkHttpProbeTransport by lazy {
+        OkHttpProbeTransport(baseOkHttpClient = sharedBaseOkHttpClient)
+    }
+
+    val diagnosticsRunner: DiagnosticsRunner by lazy {
+        DiagnosticsRunner(
+            probeTransport = okHttpProbeTransport,
+            networkObserver = diagnosticsNetworkMonitor,
+            stalledDnsGuard = stalledDnsGuard,
+        )
+    }
+
+    val relayRouteController: RelayRouteController by lazy {
+        RelayRouteController(
+            applicationScope = applicationScope,
+            endpointResolutionProvider = { DiagnosticsEndpointConfig.resolveFromCompiledApi() },
+            probeTransport = okHttpProbeTransport,
+            manifestRepository = manifestRepository,
+            routingLocalStore = routingLocalStore,
+            networkObserver = diagnosticsNetworkMonitor,
+            stalledDnsGuard = stalledDnsGuard,
+        ).also { controller ->
+            applicationScope.launch {
+                userPreferencesRepository.preferencesFlow
+                    .map { it.autoOptimizeConnectionEnabled }
+                    .distinctUntilChanged()
+                    .collect { enabled ->
+                        controller.setAutoOptimizeEnabled(enabled)
+                    }
+            }
+        }
+    }
+
     val wenkuTransport: WenkuTransport by lazy {
-        LegacyLightNetworkTransport()
+        RelayHttpTransport(
+            baseOkHttpClient = sharedBaseOkHttpClient,
+            routeProvider = relayRouteController,
+        )
     }
 
     val wenkuApiClient: WenkuApiClient by lazy {
