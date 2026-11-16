@@ -5,6 +5,7 @@
 .kiro/
 .DS_Store
 /build
+/skills/
 
 # distributions
 baidu/
