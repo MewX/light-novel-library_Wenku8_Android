@@ -214,7 +214,7 @@ class WenkuApiClient(
             OnlineSearchField.AUTHOR_NAME -> paramsFactory.searchByAuthorName(trimmedQuery, appLanguage)
         } ?: return WenkuApiResult.ApiNotConfigured
 
-        return executeXmlRequest(params) { rawXml ->
+        return executeXmlRequest(params, isIdempotentReadOnly = false) { rawXml ->
             WenkuXmlParsers.parseSearchResultAidList(rawXml)
         }
     }
@@ -227,7 +227,7 @@ class WenkuApiClient(
         val params = paramsFactory.novelShortInfo(aid, appLanguage)
             ?: return WenkuApiResult.ApiNotConfigured
 
-        return executeXmlRequest(params) { rawXml ->
+        return executeXmlRequest(params, isIdempotentReadOnly = true) { rawXml ->
             WenkuXmlParsers.parseNovelShortInfoUpdate(rawXml)
         }
     }
@@ -240,7 +240,7 @@ class WenkuApiClient(
         val params = paramsFactory.novelFullMeta(aid, appLanguage)
             ?: return WenkuApiResult.ApiNotConfigured
 
-        return executeXmlRequest(params) { rawXml ->
+        return executeXmlRequest(params, isIdempotentReadOnly = true) { rawXml ->
             WenkuXmlParsers.parseNovelFullMeta(rawXml)
         }
     }
@@ -253,7 +253,7 @@ class WenkuApiClient(
         val params = paramsFactory.novelFullIntro(aid, appLanguage)
             ?: return WenkuApiResult.ApiNotConfigured
 
-        return executeRawTextRequest(params)
+        return executeRawTextRequest(params, isIdempotentReadOnly = true)
     }
 
     override suspend fun fetchNovelVolumeToc(
@@ -264,7 +264,7 @@ class WenkuApiClient(
         val params = paramsFactory.novelIndex(aid, appLanguage)
             ?: return WenkuApiResult.ApiNotConfigured
 
-        return executeXmlRequest(params) { rawXml ->
+        return executeXmlRequest(params, isIdempotentReadOnly = true) { rawXml ->
             WenkuXmlParsers.parseVolumeTocList(rawXml).takeIf { it.isNotEmpty() }
         }
     }
@@ -278,7 +278,7 @@ class WenkuApiClient(
         val params = paramsFactory.novelContent(aid, cid, appLanguage)
             ?: return WenkuApiResult.ApiNotConfigured
 
-        return executeRawTextRequest(params)
+        return executeRawTextRequest(params, isIdempotentReadOnly = true)
     }
 
     override suspend fun fetchCloudBookshelf(
@@ -288,13 +288,14 @@ class WenkuApiClient(
         val params = paramsFactory.bookshelfListParams(appLanguage)
             ?: return WenkuApiResult.ApiNotConfigured
 
-        return executeXmlRequest(params) { rawXml ->
+        return executeXmlRequest(params, isIdempotentReadOnly = true) { rawXml ->
             WenkuXmlParsers.parseCloudBookshelfList(rawXml)
         }
     }
 
     private suspend fun <T : Any> executeXmlRequest(
         formParams: ContentValues,
+        isIdempotentReadOnly: Boolean = true,
         parserBlock: (String) -> T?,
     ): WenkuApiResult<T> {
         val endpointUrl = paramsFactory.baseUrlOrUnknown()
@@ -305,8 +306,11 @@ class WenkuApiClient(
             return WenkuApiResult.ApiNotConfigured
         }
 
-        val responseBytes = transport.postForm(endpointUrl, formParams)
-            ?: return WenkuApiResult.NetworkError()
+        val responseBytes = transport.postForm(
+            endpointUrl = endpointUrl,
+            formParams = formParams,
+            isIdempotentReadOnly = isIdempotentReadOnly,
+        ) ?: return WenkuApiResult.NetworkError()
 
         val rawString = String(responseBytes, StandardCharsets.UTF_8).trim()
         if (rawString.isEmpty()) {
@@ -326,7 +330,10 @@ class WenkuApiClient(
         }
     }
 
-    private suspend fun executeRawTextRequest(formParams: ContentValues): WenkuApiResult<String> {
+    private suspend fun executeRawTextRequest(
+        formParams: ContentValues,
+        isIdempotentReadOnly: Boolean = true,
+    ): WenkuApiResult<String> {
         val endpointUrl = paramsFactory.baseUrlOrUnknown()
         if (!transport.isEndpointConfigured ||
             endpointUrl.isBlank() ||
@@ -335,8 +342,11 @@ class WenkuApiClient(
             return WenkuApiResult.ApiNotConfigured
         }
 
-        val responseBytes = transport.postForm(endpointUrl, formParams)
-            ?: return WenkuApiResult.NetworkError()
+        val responseBytes = transport.postForm(
+            endpointUrl = endpointUrl,
+            formParams = formParams,
+            isIdempotentReadOnly = isIdempotentReadOnly,
+        ) ?: return WenkuApiResult.NetworkError()
 
         val rawText = String(responseBytes, StandardCharsets.UTF_8)
         val trimmed = rawText.trim()

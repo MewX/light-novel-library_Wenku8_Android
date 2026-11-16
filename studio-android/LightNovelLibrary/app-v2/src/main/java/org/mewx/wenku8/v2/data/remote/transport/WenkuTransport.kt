@@ -27,6 +27,17 @@ interface WenkuTransport {
      * UTF-8/binary payload bytes on HTTP 200 or `null` when unreachable / unconfigured.
      */
     suspend fun postForm(endpointUrl: String, formParams: ContentValues): ByteArray?
+
+    /**
+     * Overload allowing audited read-only operations to opt into at-most-once post-send fallback
+     * replay when a pinned candidate route fails mid-flight. Unknown or mutating calls default to
+     * `isIdempotentReadOnly = false` (never replayed once `requestHeadersStart` has fired).
+     */
+    suspend fun postForm(
+        endpointUrl: String,
+        formParams: ContentValues,
+        isIdempotentReadOnly: Boolean,
+    ): ByteArray? = postForm(endpointUrl, formParams)
 }
 
 /**

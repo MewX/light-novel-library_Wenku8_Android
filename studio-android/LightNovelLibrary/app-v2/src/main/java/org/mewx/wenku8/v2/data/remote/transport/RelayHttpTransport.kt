@@ -1,0 +1,561 @@
+package org.mewx.wenku8.v2.data.remote.transport
+
+import android.content.ContentValues
+import android.os.SystemClock
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.withContext
+import okhttp3.Call
+import okhttp3.Callback
+import okhttp3.ConnectionPool
+import okhttp3.CookieJar
+import okhttp3.Dns
+import okhttp3.EventListener
+import okhttp3.Handshake
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.OkHttpClient
+import okhttp3.Protocol
+import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
+import okhttp3.Response
+import org.mewx.wenku8.api.Wenku8API
+import org.mewx.wenku8.network.LightUserSession
+import org.mewx.wenku8.v2.data.remote.diagnostics.DiagnosticsEndpointConfig
+import org.mewx.wenku8.v2.data.remote.diagnostics.DiagnosticsEndpointResolution
+import org.mewx.wenku8.v2.data.remote.diagnostics.OkHttpProbeTransport
+import java.io.BufferedInputStream
+import java.io.ByteArrayOutputStream
+import java.io.IOException
+import java.net.InetAddress
+import java.net.InetSocketAddress
+import java.net.Proxy
+import java.net.URI
+import java.nio.charset.StandardCharsets
+import java.util.Locale
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
+import java.util.zip.GZIPInputStream
+import kotlin.coroutines.resume
+
+data class PinnedRelayCandidate(
+    val candidateId: String,
+    val relayHost: String,
+    val rawIpBytes: ByteArray,
+    val warmConnectionPool: ConnectionPool? = null,
+)
+
+data class ActiveRelayRoute(
+    val generationId: Long,
+    val pinnedCandidate: PinnedRelayCandidate? = null,
+)
+
+/**
+ * Narrow routing hook consumed by [RelayHttpTransport] (`P2.1`) and implemented by
+ * `RelayRouteController` (`P2.2`).
+ */
+interface RelayRouteProvider {
+    fun currentRouteForHost(host: String): ActiveRelayRoute
+
+    fun fallbackRouteAfterCandidateFailure(
+        failedGenerationId: Long,
+        failedCandidateId: String,
+        failureBeforeSend: Boolean,
+    ): ActiveRelayRoute
+
+    fun onPassiveCallCompleted(
+        generationId: Long,
+        candidateId: String?,
+        succeeded: Boolean,
+        connectionSetupMs: Long?,
+    ) {}
+
+    fun onForegroundCallStarted() {}
+    fun onForegroundCallFinished() {}
+}
+
+object DefaultSystemDnsRouteProvider : RelayRouteProvider {
+    private val defaultRoute = ActiveRelayRoute(generationId = 1L, pinnedCandidate = null)
+
+    override fun currentRouteForHost(host: String): ActiveRelayRoute = defaultRoute
+
+    override fun fallbackRouteAfterCandidateFailure(
+        failedGenerationId: Long,
+        failedCandidateId: String,
+        failureBeforeSend: Boolean,
+    ): ActiveRelayRoute = defaultRoute
+}
+
+/**
+ * Abstracts `LightUserSession` `PHPSESSID` cookie state so JVM `MockWebServer` tests run cleanly
+ * while production requests stay 100% synchronized with `:api`'s [LightUserSession].
+ */
+interface WenkuSessionCookieStore {
+    fun getPhpSessionId(): String
+    fun setPhpSessionId(sessionId: String)
+}
+
+object NativeLightUserSessionCookieStore : WenkuSessionCookieStore {
+    override fun getPhpSessionId(): String {
+        return try {
+            LightUserSession.getSession().orEmpty()
+        } catch (_: LinkageError) {
+            ""
+        } catch (_: UnsupportedOperationException) {
+            ""
+        }
+    }
+
+    override fun setPhpSessionId(sessionId: String) {
+        if (sessionId.isBlank()) return
+        try {
+            LightUserSession.setSession(sessionId)
+        } catch (_: LinkageError) {
+            // Ignored on host JVM without JNI
+        } catch (_: UnsupportedOperationException) {
+            // Ignored on api-stub
+        }
+    }
+}
+
+/**
+ * Production OkHttp 5 transport implementing [WenkuTransport] with:
+ * - One dedicated `OkHttpClient` + `ConnectionPool` per active route generation (`fastFallback(true)`
+ *   Happy Eyeballs on default system DNS; `fastFallback(false)` + DNS-free `InetAddress.getByAddress`
+ *   on pinned candidate routes) and idle pool eviction (`evictAll()`) on route switches.
+ * - Full wire & `PHPSESSID` session compatibility with `LightNetwork.LightHttpPostConnection`.
+ * - Exact `EventListener.requestHeadersStart` pre-send vs post-send fallback & replay boundary
+ *   within a shared `10s` total POST deadline (`3s` connect, `5s` read).
+ */
+class RelayHttpTransport(
+    private val baseOkHttpClient: OkHttpClient = OkHttpProbeTransport.defaultSharedBaseOkHttpClient(),
+    private val routeProvider: RelayRouteProvider = DefaultSystemDnsRouteProvider,
+    private val sessionCookieStore: WenkuSessionCookieStore = NativeLightUserSessionCookieStore,
+    private val systemDns: Dns = Dns.SYSTEM,
+    private val endpointConfiguredResolver: () -> Boolean = {
+        DiagnosticsEndpointConfig.resolveFromCompiledApi() is DiagnosticsEndpointResolution.Available
+    },
+    private val allowedRelayHostsProvider: () -> Set<String> = { defaultAllowedRelayHosts() },
+    private val monotonicClockMillis: () -> Long = { SystemClock.elapsedRealtime() },
+    private val connectTimeoutMillis: Long = 3_000L,
+    private val readTimeoutMillis: Long = 5_000L,
+    private val totalPostDeadlineMillis: Long = 10_000L,
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+) : WenkuTransport {
+
+    companion object {
+        private val FORM_MEDIA_TYPE = "application/x-www-form-urlencoded".toMediaType()
+        private const val MIN_REMAINING_BUDGET_FOR_FALLBACK_MS: Long = 350L
+
+        fun defaultAllowedRelayHosts(): Set<String> {
+            val dynamicHost = try {
+                val base = Wenku8API.BASE_URL.orEmpty()
+                URI(base).host?.lowercase(Locale.ROOT)
+            } catch (_: Throwable) {
+                null
+            }
+            return buildSet {
+                add("wenku8-relay.mewx.org")
+                add("wenku8-android.mewx.org")
+                if (!dynamicHost.isNullOrBlank()) {
+                    add(dynamicHost)
+                }
+            }
+        }
+
+        internal fun encodeFormBodyBytes(values: ContentValues): ByteArray {
+            // Preserves LightNetwork.LightHttpPostConnection's exact `&k1=v1&k2=v2` wire format.
+            val sb = StringBuilder()
+            for (key in values.keySet()) {
+                val rawVal = values.get(key)
+                if (rawVal is String) {
+                    sb.append('&').append(key).append('=').append(rawVal)
+                }
+            }
+            return sb.toString().toByteArray(StandardCharsets.UTF_8)
+        }
+
+        internal fun extractPhpSessionId(setCookieHeaders: List<String>): String? {
+            for (header in setCookieHeaders) {
+                val markerIndex = header.indexOf("PHPSESSID=")
+                if (markerIndex >= 0) {
+                    val valueStart = markerIndex + "PHPSESSID=".length
+                    val semicolonIndex = header.indexOf(';', startIndex = valueStart)
+                    val token = if (semicolonIndex >= 0) {
+                        header.substring(valueStart, semicolonIndex)
+                    } else {
+                        header.substring(valueStart)
+                    }.trim()
+                    if (token.isNotEmpty()) {
+                        return token
+                    }
+                }
+            }
+            return null
+        }
+    }
+
+    private class GenerationClientEntry(
+        val generationId: Long,
+        val candidateId: String?,
+        val client: OkHttpClient,
+        val connectionPool: ConnectionPool,
+    ) {
+        val inFlightCount = AtomicInteger(0)
+        val retired = AtomicBoolean(false)
+
+        fun acquire() {
+            inFlightCount.incrementAndGet()
+        }
+
+        fun release() {
+            if (inFlightCount.decrementAndGet() <= 0 && retired.get()) {
+                connectionPool.evictAll()
+            }
+        }
+
+        fun markRetiredAndEvictIfIdle() {
+            if (retired.compareAndSet(false, true) && inFlightCount.get() <= 0) {
+                connectionPool.evictAll()
+            }
+        }
+    }
+
+    private val generationLock = Any()
+    @Volatile private var activeGenerationEntry: GenerationClientEntry? = null
+    private val retiredEntries = ConcurrentHashMap<Long, GenerationClientEntry>()
+
+    override val isEndpointConfigured: Boolean
+        get() = endpointConfiguredResolver()
+
+    override suspend fun postForm(endpointUrl: String, formParams: ContentValues): ByteArray? {
+        return postForm(
+            endpointUrl = endpointUrl,
+            formParams = formParams,
+            isIdempotentReadOnly = false,
+        )
+    }
+
+    override suspend fun postForm(
+        endpointUrl: String,
+        formParams: ContentValues,
+        isIdempotentReadOnly: Boolean,
+    ): ByteArray? {
+        if (endpointUrl.isBlank() ||
+            endpointUrl.equals(LegacyLightNetworkTransport.UNKNOWN_ENDPOINT_SENTINEL, ignoreCase = true)
+        ) {
+            return null
+        }
+
+        val targetHost = try {
+            URI(endpointUrl).host?.trim()?.trimEnd('.')?.lowercase(Locale.ROOT)
+        } catch (_: Exception) {
+            null
+        } ?: return null
+
+        val requestBodyBytes = encodeFormBodyBytes(formParams)
+        val overallStartedAtMs = monotonicClockMillis()
+        val isScopedRelayHost = allowedRelayHostsProvider().contains(targetHost)
+
+        routeProvider.onForegroundCallStarted()
+        return try {
+            withContext(ioDispatcher) {
+                val initialRoute = if (isScopedRelayHost) {
+                    routeProvider.currentRouteForHost(targetHost)
+                } else {
+                    ActiveRelayRoute(generationId = 0L, pinnedCandidate = null)
+                }
+
+                val firstAttempt = executeSingleAttempt(
+                    endpointUrl = endpointUrl,
+                    requestBodyBytes = requestBodyBytes,
+                    route = initialRoute,
+                    remainingCallBudgetMs = totalPostDeadlineMillis,
+                )
+
+                when (firstAttempt) {
+                    is AttemptOutcome.HttpSuccess -> firstAttempt.bodyBytes
+
+                    is AttemptOutcome.HttpNon200 -> {
+                        // Never rotate candidate IPs or replay on HTTP 4xx/5xx/429!
+                        null
+                    }
+
+                    is AttemptOutcome.TransportFailure -> {
+                        val failedCandidate = initialRoute.pinnedCandidate
+                        if (failedCandidate == null) {
+                            return@withContext null
+                        }
+
+                        // Notify RelayRouteController to revoke/quarantine the broken candidate.
+                        val fallbackRoute = routeProvider.fallbackRouteAfterCandidateFailure(
+                            failedGenerationId = initialRoute.generationId,
+                            failedCandidateId = failedCandidate.candidateId,
+                            failureBeforeSend = !firstAttempt.didStartSendingRequest,
+                        )
+
+                        // Replay policy:
+                        // - Pre-send failure (`!didStartSendingRequest`): safe to fall back once for ALL calls.
+                        // - Post-send failure (`didStartSendingRequest`): replay once ONLY if `isIdempotentReadOnly`.
+                        val mayFallbackInSameCall =
+                            !firstAttempt.didStartSendingRequest || isIdempotentReadOnly
+                        if (!mayFallbackInSameCall) {
+                            return@withContext null
+                        }
+
+                        val elapsedMs = (monotonicClockMillis() - overallStartedAtMs).coerceAtLeast(0L)
+                        val remainingMs = totalPostDeadlineMillis - elapsedMs
+                        if (remainingMs < MIN_REMAINING_BUDGET_FOR_FALLBACK_MS) {
+                            return@withContext null
+                        }
+
+                        val secondAttempt = executeSingleAttempt(
+                            endpointUrl = endpointUrl,
+                            requestBodyBytes = requestBodyBytes,
+                            route = fallbackRoute,
+                            remainingCallBudgetMs = remainingMs,
+                        )
+                        (secondAttempt as? AttemptOutcome.HttpSuccess)?.bodyBytes
+                    }
+                }
+            }
+        } finally {
+            routeProvider.onForegroundCallFinished()
+        }
+    }
+
+    internal fun activeConnectionPoolForTesting(): ConnectionPool? =
+        activeGenerationEntry?.connectionPool
+
+    private sealed interface AttemptOutcome {
+        data class HttpSuccess(val bodyBytes: ByteArray) : AttemptOutcome
+        data class HttpNon200(val statusCode: Int) : AttemptOutcome
+        data class TransportFailure(
+            val didStartSendingRequest: Boolean,
+            val cause: IOException,
+        ) : AttemptOutcome
+    }
+
+    private suspend fun executeSingleAttempt(
+        endpointUrl: String,
+        requestBodyBytes: ByteArray,
+        route: ActiveRelayRoute,
+        remainingCallBudgetMs: Long,
+    ): AttemptOutcome {
+        val entry = obtainGenerationClient(route)
+        entry.acquire()
+
+        val boundaryTracker = CallSendBoundaryTracker(monotonicClockMillis)
+        val perAttemptClient = entry.client.newBuilder()
+            .callTimeout(remainingCallBudgetMs.coerceAtLeast(1L), TimeUnit.MILLISECONDS)
+            .eventListener(boundaryTracker)
+            .build()
+
+        val requestBuilder = Request.Builder()
+            .url(endpointUrl)
+            .header("Accept-Encoding", "gzip")
+            .post(requestBodyBytes.toRequestBody(FORM_MEDIA_TYPE))
+
+        val sessionId = sessionCookieStore.getPhpSessionId()
+        if (sessionId.isNotEmpty()) {
+            requestBuilder.header("Cookie", "PHPSESSID=$sessionId")
+        }
+
+        val call = perAttemptClient.newCall(requestBuilder.build())
+        try {
+            val response = awaitCall(call)
+            response.use { httpResponse ->
+                // Sync updated PHPSESSID session cookie back to LightUserSession
+                extractPhpSessionId(httpResponse.headers("Set-Cookie"))?.let { updatedSession ->
+                    sessionCookieStore.setPhpSessionId(updatedSession)
+                }
+
+                if (httpResponse.code != 200) {
+                    routeProvider.onPassiveCallCompleted(
+                        generationId = route.generationId,
+                        candidateId = route.pinnedCandidate?.candidateId,
+                        succeeded = true,
+                        connectionSetupMs = boundaryTracker.connectSetupDurationMs,
+                    )
+                    return AttemptOutcome.HttpNon200(httpResponse.code)
+                }
+
+                val payloadBytes = readDecodedResponseBytes(httpResponse)
+                routeProvider.onPassiveCallCompleted(
+                    generationId = route.generationId,
+                    candidateId = route.pinnedCandidate?.candidateId,
+                    succeeded = true,
+                    connectionSetupMs = boundaryTracker.connectSetupDurationMs,
+                )
+                return AttemptOutcome.HttpSuccess(payloadBytes)
+            }
+        } catch (cancelled: kotlinx.coroutines.CancellationException) {
+            call.cancel()
+            throw cancelled
+        } catch (ioError: IOException) {
+            routeProvider.onPassiveCallCompleted(
+                generationId = route.generationId,
+                candidateId = route.pinnedCandidate?.candidateId,
+                succeeded = false,
+                connectionSetupMs = boundaryTracker.connectSetupDurationMs,
+            )
+            return AttemptOutcome.TransportFailure(
+                didStartSendingRequest = boundaryTracker.sawRequestSendStarted.get(),
+                cause = ioError,
+            )
+        } finally {
+            entry.release()
+            cleanupRetiredPools()
+        }
+    }
+
+    private fun obtainGenerationClient(route: ActiveRelayRoute): GenerationClientEntry {
+        synchronized(generationLock) {
+            val current = activeGenerationEntry
+            if (current != null &&
+                current.generationId == route.generationId &&
+                current.candidateId == route.pinnedCandidate?.candidateId
+            ) {
+                return current
+            }
+
+            if (current != null) {
+                retiredEntries[current.generationId] = current
+                current.markRetiredAndEvictIfIdle()
+            }
+
+            val pinned = route.pinnedCandidate
+            val pool = pinned?.warmConnectionPool ?: ConnectionPool(5, 5, TimeUnit.MINUTES)
+            val dnsAdapter = if (pinned == null) {
+                systemDns
+            } else {
+                Dns { hostname ->
+                    if (hostname.trimEnd('.').equals(pinned.relayHost, ignoreCase = true)) {
+                        listOf(
+                            InetAddress.getByAddress(
+                                pinned.relayHost,
+                                pinned.rawIpBytes.clone(),
+                            ),
+                        )
+                    } else {
+                        systemDns.lookup(hostname)
+                    }
+                }
+            }
+
+            val client = baseOkHttpClient.newBuilder()
+                .cookieJar(CookieJar.NO_COOKIES) // Managed explicitly via WenkuSessionCookieStore
+                .connectionPool(pool)
+                .dns(dnsAdapter)
+                .fastFallback(pinned == null)
+                .retryOnConnectionFailure(false)
+                .followRedirects(pinned == null)
+                .followSslRedirects(pinned == null)
+                .connectTimeout(connectTimeoutMillis, TimeUnit.MILLISECONDS)
+                .readTimeout(readTimeoutMillis, TimeUnit.MILLISECONDS)
+                .writeTimeout(readTimeoutMillis, TimeUnit.MILLISECONDS)
+                .build()
+
+            val created = GenerationClientEntry(
+                generationId = route.generationId,
+                candidateId = pinned?.candidateId,
+                client = client,
+                connectionPool = pool,
+            )
+            activeGenerationEntry = created
+            return created
+        }
+    }
+
+    private fun cleanupRetiredPools() {
+        val iterator = retiredEntries.entries.iterator()
+        while (iterator.hasNext()) {
+            val (_, entry) = iterator.next()
+            if (entry.inFlightCount.get() <= 0) {
+                entry.connectionPool.evictAll()
+                iterator.remove()
+            }
+        }
+    }
+
+    private fun readDecodedResponseBytes(response: Response): ByteArray {
+        val contentEncoding = response.header("Content-Encoding")?.lowercase(Locale.ROOT).orEmpty()
+        val rawStream = response.body.byteStream()
+        val effectiveStream = if (contentEncoding.contains("gzip")) {
+            GZIPInputStream(BufferedInputStream(rawStream))
+        } else {
+            rawStream
+        }
+        effectiveStream.use { input ->
+            val out = ByteArrayOutputStream()
+            val buffer = ByteArray(4096)
+            while (true) {
+                val read = input.read(buffer)
+                if (read == -1) break
+                out.write(buffer, 0, read)
+            }
+            return out.toByteArray()
+        }
+    }
+
+    private suspend fun awaitCall(call: Call): Response =
+        suspendCancellableCoroutine { continuation ->
+            continuation.invokeOnCancellation { call.cancel() }
+            call.enqueue(
+                object : Callback {
+                    override fun onFailure(call: Call, e: IOException) {
+                        if (continuation.isActive) {
+                            continuation.resumeWith(Result.failure(e))
+                        }
+                    }
+
+                    override fun onResponse(call: Call, response: Response) {
+                        if (continuation.isActive) {
+                            continuation.resume(response)
+                        } else {
+                            response.close()
+                        }
+                    }
+                },
+            )
+        }
+
+    private class CallSendBoundaryTracker(
+        private val clockMillis: () -> Long,
+    ) : EventListener() {
+        private var connectStartedAtMs: Long? = null
+        @Volatile var connectSetupDurationMs: Long? = null
+        val sawRequestSendStarted = AtomicBoolean(false)
+
+        override fun connectStart(call: Call, inetSocketAddress: InetSocketAddress, proxy: Proxy) {
+            connectStartedAtMs = clockMillis()
+        }
+
+        override fun connectEnd(
+            call: Call,
+            inetSocketAddress: InetSocketAddress,
+            proxy: Proxy,
+            protocol: Protocol?,
+        ) {
+            connectStartedAtMs?.let { started ->
+                connectSetupDurationMs = (clockMillis() - started).coerceAtLeast(0L)
+            }
+        }
+
+        override fun secureConnectEnd(call: Call, handshake: Handshake?) {
+            connectStartedAtMs?.let { started ->
+                connectSetupDurationMs = (clockMillis() - started).coerceAtLeast(0L)
+            }
+        }
+
+        override fun requestHeadersStart(call: Call) {
+            sawRequestSendStarted.set(true)
+        }
+
+        override fun requestBodyStart(call: Call) {
+            sawRequestSendStarted.set(true)
+        }
+    }
+}

@@ -47,9 +47,9 @@
   - Title (`articlename`), Author (`author`), and numeric `AID` jump + live `5s` server cooldown countdown queue + 20-item Room search history.
 
 ### Phase 2: `OkHttpProbeTransport`, `RelayHttpTransport`, `"自动优化连接"` & `NetworkDiagnosticsScreen`
-- [~] **`P2.1` — `IpLiteralParser`, `DiagnosticsEndpointConfig`, `OkHttpProbeTransport` & `RelayHttpTransport`**
+- [x] **`P2.1` — `IpLiteralParser`, `DiagnosticsEndpointConfig`, `OkHttpProbeTransport` & `RelayHttpTransport`** *(Completed: DNS-free `IpLiteralParser` with RFC 6890 public-unicast enforcement, stub-safe `DiagnosticsEndpointConfig`, `OkHttpProbeTransport` with `EventListener` cold-vs-reuse/proxy/socket-family telemetry & Android/JVM-safe `JSONObject` null validation, and `RelayHttpTransport` with per-generation `ConnectionPool` isolation, `PHPSESSID` sync, gzip decoding, and `requestHeadersStart` pre-send/post-send fallback replay boundary; verified `MockWebServer` tests across `:api` & `-DforceApiStub`)*
   - DNS-free literal IPv4/IPv6 parser (`InetAddress.getByAddress`), `Accept-Encoding: identity` probe adapter, route-generation `ConnectionPool`s (`fastFallback(true)` default vs. `fastFallback(false)` pinned), and `EventListener.requestHeadersStart` fallback/replay rules.
-- [ ] **`P2.2` — `DiagnosticsRunner`, `DiagnosticsNetworkMonitor`, `ManifestRepository` & `RelayRouteController`**
+- [~] **`P2.2` — `DiagnosticsRunner`, `DiagnosticsNetworkMonitor`, `ManifestRepository` & `RelayRouteController`**
   - Shared 2-slot stalled-DNS bound, `<= 6`-call bootstrap recovery, `<= 18`-probe / `25s` compact idle tournament (`5+6+1` warm-reuse guard), and rolling 24h `120/60` budget store.
 - [ ] **`P2.3` — `NetworkDiagnosticsScreen` M3e UI & Pre-Share Privacy `ModalBottomSheet` (`wenku8-network-report-v1`)**
   - Scoped `FLAG_KEEP_SCREEN_ON`, rotation survival, E-Ink static progress, `EventListener` attempt breakdown, and `FileProvider` read-only JSON export.
