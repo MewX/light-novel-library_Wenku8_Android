@@ -190,3 +190,20 @@ Inspired by **Legado** and **Moon+ Reader**, the reader viewport supports a cust
 - **Tap on Inline `<!--image-->` Illustration**: Intercepted before the tap-zone grid—triggers an M3 Expressive **`Modifier.sharedBounds()`** expansion into the **In-Reader Artbook Lightbox** (with pinch-to-zoom, double-tap 2.5× zoom, double-page spread toggle, and one-tap save to MediaStore).
 - **Predictive-Back-Safe Left Edge Brightness Drag (Optional)**: Inset to `24.dp..72.dp` from the left screen edge so the outer `0..24.dp` system bezel always triggers Android 15/16 Predictive Back cleanly without accidental brightness jumps.
 - **Opaque Active-Slider Capsule Preview**: While dragging any typography slider in the `排版` sheet, non-active rows fade to `0%` while the active slider remains inside a `92%`-opaque `surfaceContainerHighest` pill capsule, preventing text-on-text overlap over the live reflowing page.
+
+---
+
+## 7. Complete `v1.31` `WenkuReaderSettingV1` Parity & Offline Illustration Resolution
+
+1. **Zero-Regression Settings Preservation**:
+   - Every user setting in `WenkuReaderSettingV1` and `Wenku8ReaderActivityV1` is preserved and migrated from `filesDir/saves/settings.wk8` into `settings.preferences_pb`:
+     - `reader_font_size`: **`8–36 sp`** (default `18 sp`, preserving `v1.31`'s full `8–32 sp` range without clamping).
+     - `reader_line_distance`: **`0–32 dp`** (default `16 dp`).
+     - `reader_paragraph_distance`: **`0–48 dp`** (default `20 dp`).
+     - `reader_paragraph_edge_distance`: **`0–32 dp`** (default `8 dp`).
+     - `reader_font_path`: System default or custom `.ttf` / `.otf` typeface (`filesDir/custom/reader_font`).
+     - `reader_background_path`: M3e paper presets (`羊皮纸` / `纯白` / `护眼绿` / `暗夜黑` / `纯黑 AMOLED`) **plus custom day-mode background image** (`filesDir/custom/reader_background`).
+     - Hardware volume-key page turning (`KEYCODE_VOLUME_UP` / `DOWN`, single-step non-repeating), day/night toggle, chapter progress scrubber, and `[查看大图]` toolbar shortcut.
+2. **Zero-Copy Offline Illustration Resolution (`OfflineFirstWenkuImageFetcher`)**:
+   - Coil 3 registers a lightweight `Fetcher.Factory` ahead of its network fetcher that checks `File(filesDir, "saves/imgs/${generateImageFileNameByURL(url)}")` (and `File(filesDir, "imgs/$aid.jpg")` for covers) **first**.
+   - Downloaded offline illustrations from `v1.31` work immediately after an in-place Play Store upgrade without copying files, are **never LRU-evicted** by temporary browsing cache, and remain cleanable via **Deep Cache Clean (`深度清理`)** against `CHAPTER_CONTENTS.image_urls_json`.

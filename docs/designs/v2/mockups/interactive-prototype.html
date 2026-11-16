@@ -425,7 +425,7 @@
 
     <div class="viewport">
       <!-- TAB 1: BOOKSHELF (书架) -->
-      <section class="screen active" id="screen-bookshelf">
+      <section class="screen" id="screen-bookshelf">
         <div class="m3-search-bar" onclick="alert('展开统一搜索工作室：\n• 0ms 本地书架即时匹配\n• 在线按书名 / 按作者 / 作品编号直达（含 5s 冷却自动排队）')">
           <span>🔍 搜索本地书架、在线书名/作者或编号…</span>
           <div class="m3-avatar" onclick="event.stopPropagation();switchScreen('profile', document.querySelectorAll('.m3-nav-item')[3])">M</div>
@@ -489,7 +489,7 @@
       </section>
 
       <!-- TAB 2: LATEST (最新 — lastUpdate / postDate / fullFlag) -->
-      <section class="screen" id="screen-latest">
+      <section class="screen active" id="screen-latest">
         <div class="m3-search-bar">
           <span>🔍 按小说标题或作者名称搜索在线文库…</span>
           <div class="m3-avatar">M</div>
@@ -639,10 +639,10 @@
             <button class="m3-switch" id="autoOptSwitch" onclick="toggleAutoOpt()">已开启</button>
           </div>
           <div style="font-size:12px;font-weight:700;color:var(--md-sys-color-primary);margin-top:6px;" id="autoOptStatus">
-            状态：已优化当前网络连接 · 优选线路 cf-v4-02 (中位数降低 34% · 14:12 对比 5 次)
+            状态：已优化当前网络连接 · 线路 cf-v4-02 (中转延迟降低 34% · 14:12 对比 3 次)
           </div>
           <div style="font-size:11px;color:var(--md-sys-color-on-surface-variant);margin-top:4px;">
-            空闲时自动优选更快的文库中转连接，不修改系统网络，不自动上传诊断数据。
+            空闲时执行紧凑优选 (<=18次/25s)，不修改系统网络，不自动上传诊断数据。
           </div>
           <div style="display:flex;gap:8px;margin-top:12px;">
             <button class="m3-tonal-btn" style="flex:1;" onclick="openDiagnostics()">🩺 网络检测与诊断 ›</button>
@@ -650,15 +650,33 @@
           </div>
         </div>
 
-        <!-- SQLite Backup & Archive Card -->
+        <!-- Startup Home & Full v1.31 Settings Parity Card -->
+        <div class="m3-card-filled" style="padding:16px;margin-bottom:12px;">
+          <div style="font-size:15px;font-weight:800;margin-bottom:8px;">启动与完整个性化设置 (100% 保留 v1 设置)</div>
+          <div style="display:flex;justify-content:space-between;align-items:center;font-size:12px;margin-bottom:8px;">
+            <span>默认启动页 (离线自动回退书架)</span>
+            <button class="m3-assist-chip active" id="homeTabBtn" onclick="toggleDefaultHome(this)">⚡ 最新更新 (默认)</button>
+          </div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;">
+            <button class="m3-assist-chip" onclick="alert('完整保留 v1 侧栏壁纸：可选 M3e 纯净卡片、经典预设壁纸 1–5 或自定义图片 (custom/menu_bg)')">🖼 主页头图壁纸</button>
+            <button class="m3-assist-chip" onclick="alert('即时切换简体中文 (SC) / 繁體中文 (TC)，无需重启 Activity')">🌐 简繁切换</button>
+            <button class="m3-assist-chip" onclick="alert('查看 R.raw.license 开源许可声明与检查新版本')">📜 开源许可与更新</button>
+          </div>
+        </div>
+
+        <!-- SQLite Backup, Cache Clean & Internal Upgrade Migration Card -->
         <div class="m3-card-filled" style="padding:16px;">
-          <div style="font-size:15px;font-weight:800;margin-bottom:4px;">内置数据库与存档备份</div>
+          <div style="font-size:15px;font-weight:800;margin-bottom:4px;">存储、双模式清缓存与存档备份</div>
           <div style="font-size:12px;color:var(--md-sys-color-on-surface-variant);margin-bottom:10px;">
-            64 本书架收藏 · 离线正文 42 MB · 支持轻量存档与含正文全量归档 (.wk8backup)
+            Play 商店覆盖升级自动无感迁移内部存档 (filesDir/saves/) · 64 本书架 · 离线正文 42 MB
+          </div>
+          <div style="display:flex;gap:8px;margin-bottom:8px;">
+            <button class="m3-tonal-btn" style="flex:1;" onclick="alert('快速清理：清除临时图片缓存与非书架封面，保留全部书架与已下载插图')">⚡ 快速清理缓存</button>
+            <button class="m3-tonal-btn" style="flex:1;" onclick="alert('深度清理：扫描 CHAPTER_CONTENTS 插图索引，精准回收无引用的孤立插图文件')">🔍 深度清理缓存</button>
           </div>
           <div style="display:flex;gap:8px;">
             <button class="m3-tonal-btn" style="flex:1;" onclick="alert('通过 SAF 导出一致性 VACUUM INTO 备份包 (.wk8backup.zip)')">📤 导出存档</button>
-            <button class="m3-tonal-btn" style="flex:1;" onclick="alert('支持智能合并 .wk8backup.zip 或导入旧版 v1.x wenku8 文件夹')">📥 导入 / 合并</button>
+            <button class="m3-tonal-btn" style="flex:1;" onclick="alert('支持智能合并 .wk8backup.zip 或通过 SAF 导入旧手机外部 wenku8 文件夹')">📥 导入 / 外部迁移</button>
           </div>
         </div>
       </section>
@@ -681,15 +699,20 @@
         </div>
         <div class="m3-slider-capsule">
           <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:700;margin-bottom:6px;">
-            <span>字号大小</span>
-            <span id="fontLabel" style="color:var(--md-sys-color-primary);">19 sp</span>
+            <span>字号大小 (完整覆盖 8–36 sp)</span>
+            <span id="fontLabel" style="color:var(--md-sys-color-primary);">18 sp</span>
           </div>
           <input
-            type="range" min="15" max="26" value="19" style="width:100%;"
+            type="range" min="8" max="36" value="18" style="width:100%;"
             onpointerdown="document.getElementById('readerSheet').classList.add('scrubbing')"
             onpointerup="document.getElementById('readerSheet').classList.remove('scrubbing')"
             oninput="document.getElementById('readerBody').style.fontSize=this.value+'px';document.getElementById('fontLabel').textContent=this.value+' sp';"
           />
+        </div>
+        <div class="hide-on-scrub" style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;">
+          <button class="m3-assist-chip" onclick="alert('支持自定义 .ttf / .otf 字体文件 (继承 reader_font_path)')">🔤 自定义字体</button>
+          <button class="m3-assist-chip" onclick="alert('支持预设羊皮纸/护眼绿/纯黑 及 自定义日间背景图片 (继承 reader_background_path)')">🖼 自定义背景图</button>
+          <button class="m3-assist-chip active">🔊 音量键翻页: 开</button>
         </div>
       </div>
     </div>
@@ -750,11 +773,11 @@
 
     <!-- Canonical M3 Expressive 4-Tab ShortNavigationBar (64dp) -->
     <nav class="m3e-short-nav-bar">
-      <div class="m3-nav-item active" onclick="switchScreen('bookshelf', this)">
+      <div class="m3-nav-item" onclick="switchScreen('bookshelf', this)">
         <div class="m3-nav-pill">📚</div>
         <span>书架</span>
       </div>
-      <div class="m3-nav-item" onclick="switchScreen('latest', this)">
+      <div class="m3-nav-item active" onclick="switchScreen('latest', this)">
         <div class="m3-nav-pill">⚡</div>
         <span>最新</span>
       </div>
@@ -771,6 +794,12 @@
 
   <script>
     let autoOptOn = true;
+    let defaultHomeLatest = true;
+
+    function toggleDefaultHome(btn) {
+      defaultHomeLatest = !defaultHomeLatest;
+      btn.textContent = defaultHomeLatest ? '⚡ 最新更新 (默认)' : '📚 本地书架';
+    }
     let loggedIn = true;
     let diagTimer = null;
 

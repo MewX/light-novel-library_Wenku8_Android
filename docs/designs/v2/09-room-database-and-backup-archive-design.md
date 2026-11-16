@@ -1,32 +1,32 @@
-# 09 · Built-In Room SQLite Database, Atomic TOC Versioning & Backup Archive Design (Retiring `.wk8`)
+# 09 · Built-In Room SQLite Database, Atomic TOC Versioning & In-Place `v1.x` Migration (Retiring `.wk8`)
 
-> **Core Mandate**: Retire all legacy `.wk8` custom-delimiter text files (`bookshelf_local.wk8`, `read_saves.wk8`, `read_saves_v1.wk8`, `search_history.wk8`, `settings.wk8`) and loose XML files (`intro/*.xml`, `novel/*.xml`). Consolidate all structured records and offline chapter text into a single **official AndroidX Room SQLite database (`wenku8_v2.db` in WAL mode)** + **AndroidX Preferences DataStore**, governed by **atomic `@Upsert` TOC versioning (zero destructive `REPLACE` cascades)**, a **`.wk8backup.zip` Export/Import Archive**, and **non-destructive `v1.x` migration**.
+> **Core Mandate**: Retire all legacy `.wk8` custom-delimiter text files (`bookshelf_local.wk8`, `read_saves.wk8`, `read_saves_v1.wk8`, `search_history.wk8`, `settings.wk8`) and loose XML files (`intro/*.xml`, `novel/*.xml`). Consolidate all structured records and offline chapter text into a single **official AndroidX Room SQLite database (`wenku8_v2.db` in WAL mode)** + **AndroidX Preferences DataStore**, governed by **atomic `@Upsert` TOC versioning (zero destructive `REPLACE` cascades)**, **automatic in-place internal-storage migration for Play Store upgrades (`org.mewx.wenku8`)**, and a **`.wk8backup.zip` Export/Import Archive**.
 
 ---
 
 ## 1. Why the Legacy `.wk8` & Loose-XML Format Is Retired
 
-In `studio-android` (`v1.31`), user state and offline content were split across custom plain-text files inside [`GlobalConfig.java`](file:///home/mewx/codes/light-novel-library_Wenku8_Android/studio-android/LightNovelLibrary/app/src/main/java/org/mewx/wenku8/global/GlobalConfig.java) and [`LightCache.java`](file:///home/mewx/codes/light-novel-library_Wenku8_Android/studio-android/LightNovelLibrary/app/src/main/java/org/mewx/wenku8/util/LightCache.java):
+In `studio-android` (`v1.31`), user state and offline content were split across custom plain-text files inside [`GlobalConfig.java`](file:///home/mewx/codes/light-novel-library_Wenku8_Android/studio-android/LightNovelLibrary/app/src/main/java/org/mewx/wenku8/global/GlobalConfig.java), [`SettingsStore.java`](file:///home/mewx/codes/light-novel-library_Wenku8_Android/studio-android/LightNovelLibrary/app/src/main/java/org/mewx/wenku8/global/SettingsStore.java), and [`LightCache.java`](file:///home/mewx/codes/light-novel-library_Wenku8_Android/studio-android/LightNovelLibrary/app/src/main/java/org/mewx/wenku8/util/LightCache.java):
 
-| Legacy `v1.x` File | Exact Legacy Format & Separator | Critical Reliability Defects |
+| Legacy `v1.x` File (under `filesDir/`) | Exact `v1.31` Format & Delimiter | Critical Reliability Defects |
 | :--- | :--- | :--- |
-| `bookshelf_local.wk8` | `aid1\|\|aid2\|\|aid3` | Full-file overwrite on every add/remove/tap-reorder; no transaction isolation; stores only `aid` ints while metadata lives in separate `intro/{aid}-intro.xml` & `intro/{aid}-volume.xml` files that can desynchronize. |
-| `read_saves_v1.wk8` & `read_saves.wk8` | V1: `aid:vid:cid:lineId:wordId\|\|...`<br>V0: `cid,,pos,,height\|\|...` | Rewritten from scratch on every reader exit; stores screen/font-dependent `lineId`/`wordId` or pixel offsets; two incompatible save files across Paged vs. Vertical readers. |
-| `search_history.wk8` | `[0query][1query]...` (`0`=Title, `1`=Author) | Breaks or drops input when search text contains `[` or `]`; full-file rewrite on every search. |
-| `settings.wk8` | `key::::value\|\|key2::::value2` | Hand-rolled string splitting (`\|\|` and `::::`); unvalidated string-to-enum parsing; no reactive `Flow` observation. |
-| `novel/{cid}.xml` & `intro/{aid}-*.xml` | Raw XML/text files written via `LightCache.saveFile()` | Truncates destination before writing without atomic temp-file-and-rename, leaving 0-byte or half-written chapters when network or battery drops mid-download. |
+| `saves/bookshelf_local.wk8` | `aid1\|\|aid2\|\|aid3` | Full-file overwrite on every add/remove/tap-reorder; stores only `aid` ints while metadata lives in separate `saves/intro/{aid}-*.xml` files that can desynchronize. |
+| `saves/read_saves_v1.wk8` & `saves/read_saves.wk8` | V1: `aid:vid:cid:lineId:wordId\|\|...`<br>V0: `cid,,pos,,height\|\|...` | Rewritten from scratch on every reader exit; stores screen/font-dependent `lineId`/`wordId` or pixel offsets; two separate live files across Paged vs. Vertical readers. |
+| `saves/search_history.wk8` | `[0query][1query]...` (`0`=Title, `1`=Author) | Drops input containing `[` or `]`; full-file rewrite on every search. |
+| `saves/settings.wk8` | `key::::value\|\|\|\|key2::::value2` *(4 colons & 4 pipes!)* | Hand-rolled string splitting with zero escaping; unvalidated string-to-enum parsing; no reactive `Flow` observation. |
+| `saves/intro/{aid}-intro.xml`, `{aid}-introfull.xml`, `{aid}-volume.xml` & `saves/novel/{cid}.xml` | Raw XML files written via `LightCache.saveFile()` | Truncates destination before writing without atomic temp-file-and-rename, leaving 0-byte or half-written chapters on interrupted downloads; thousands of tiny files slow down backup and orphan scanning. |
 
 ---
 
-## 2. Official AndroidX Persistence Stack
+## 2. Official AndroidX Persistence & Offline Asset Layout
 
-`v2.0` (`minSdk = 23`) uses **100% official Google AndroidX persistence libraries**:
-
-| Artifact Coordinate | Role in `v2.0` |
-| :--- | :--- |
-| `androidx.room:room-runtime:2.7.0+` & `room-ktx` | Official AndroidX SQLite ORM with compile-time SQL verification, `@Upsert`, `@Transaction` coroutines, and reactive `Flow<T>` queries |
-| `androidx.sqlite:sqlite-framework:2.5.0+` | Native Android SQLite configured in **WAL (Write-Ahead Logging)** mode (`JournalMode.WRITE_AHEAD_LOGGING`) for concurrent reads during background downloads |
-| `androidx.datastore:datastore-preferences:1.1.2+` | Atomic key-value storage split into `settings.preferences_pb` (user preferences, included in backup) and `network_routing_local.preferences_pb` (device-local relay leases & probe budgets, **excluded** from backup) |
+| Storage Component | Location in `org.mewx.wenku8` | Role in `v2.0` (`minSdk = 23`) |
+| :--- | :--- | :--- |
+| **`wenku8_v2.db` (`Room 2.7+` WAL)** | `context.getDatabasePath("wenku8_v2.db")` | Stores all novels, volumes, chapters, offline `chapter_contents`, `reading_progress`, `bookmarks_notes`, `reading_sessions`, `review_drafts`, and `search_history`. |
+| **`settings.preferences_pb`** | `DataStore` (`filesDir/datastore/`) | Stores all migrated `v1.31` settings + `default_home_tab` (`LATEST` default / `BOOKSHELF`) + `auto_optimize_connection` toggle (included in backup). |
+| **`network_routing_local.preferences_pb`** | `DataStore` (`filesDir/datastore/`) | Device-local relay candidate leases, 24h probe budgets, and rollout bucket (**excluded** from `.wk8backup.zip` and Auto Backup). |
+| **`saves/cert.wk8` & `saves/avatar.jpg`** | `filesDir/saves/` *(migrated to encrypted/private session store while keeping backward-compatible reader)* | Preserves active `LightUserSession` credentials across `v1.31 → v2.0` Play Store updates so users **stay logged in** seamlessly. |
+| **`saves/imgs/` & `imgs/` & `custom/`** | `filesDir/saves/imgs/`, `filesDir/imgs/`, `filesDir/custom/` | Persistent offline chapter illustrations (`pictures*.jpg`), bookshelf covers (`{aid}.jpg`), and custom user fonts/wallpapers/backgrounds—read **in place** by Coil 3's `OfflineFirstWenkuImageFetcher` with **zero file duplication** on upgrade and **zero LRU cache eviction**! |
 
 ---
 
@@ -34,7 +34,7 @@ In `studio-android` (`v1.31`), user state and offline content were split across 
 
 > [!IMPORTANT]
 > **Foreign-Key Isolation Rule (Preventing Cascade Data Loss During Chapter-List Updates):**
-> `CHAPTER_CONTENTS`, `READING_PROGRESS`, and `BOOKMARKS_NOTES` reference **`NOVELS(aid)`** (NOT `ON DELETE CASCADE` on `VOLUMES` or `CHAPTERS`)! When Wenku8 editors reorganize chapters (e.g., moving serialized web chapters into a newly compiled Bunkobon volume with a new `vid`) or when the table of contents (`do=list`) is refreshed, updating `VOLUMES` and `CHAPTERS` **never** cascade-deletes downloaded chapter text, reading progress, or user highlights/bookmarks.
+> `CHAPTER_CONTENTS`, `READING_PROGRESS`, and `BOOKMARKS_NOTES` reference **`NOVELS(aid)`** (NOT `ON DELETE CASCADE` on `VOLUMES` or `CHAPTERS`)! When Wenku8 editors reorganize chapters (e.g., moving serialized web chapters into a newly compiled Bunkobon volume with a new `vid`) or when `do=list` is refreshed, updating `VOLUMES` and `CHAPTERS` **never** cascade-deletes downloaded chapter text, reading progress, or user highlights/bookmarks.
 
 ```mermaid
 erDiagram
@@ -71,7 +71,7 @@ erDiagram
         string shelf_category "Default or custom user shelf category"
         boolean cloud_synced "Synced with action=bookcase"
         boolean has_unread_update "True when cloud latest_cid > local"
-        int shelf_sort_order "Manual/pinned sort rank"
+        int shelf_sort_order "Manual/pinned sort rank (0..N from bookshelf_local.wk8)"
         long last_accessed_ms "Timestamp for LRU non-shelf cache cleanup"
     }
 
@@ -97,7 +97,7 @@ erDiagram
         string content_lang "SC or TC script of cached text"
         string content_text "Full UTF-8 text from do=text (Queried single-row ONLY)"
         int byte_length "UTF-8 byte size for storage accounting"
-        string image_urls_json "JSON array of extracted <!--image--> URLs"
+        string image_urls_json "JSON array of extracted <!--image--> URLs (Fast Deep-Clean scan!)"
         int image_count "Total inline illustrations in chapter"
         string sha256_checksum "Integrity hash of content_text"
         long downloaded_at_ms "Cache timestamp"
@@ -161,11 +161,9 @@ erDiagram
 
 ## 4. Atomic TOC / Chapter-List Synchronization, Versioning & Conflict Rules
 
-Updating a novel's volume and chapter list (`do=list` + `do=meta`) concurrently from `BookshelfSync`, `NovelDetailScreen`, and `WorkManager` downloads is the highest-risk write path in a novel reader. `v2.0` enforces **five strict SQLite invariants**:
-
 ### 4.1 Ban `OnConflictStrategy.REPLACE` — Always Use `@Upsert` (`ON CONFLICT DO UPDATE`)
-- In SQLite, `INSERT OR REPLACE` is implemented as **`DELETE` followed by `INSERT`**, which triggers `ON DELETE CASCADE` on child tables and resets unmentioned columns!
-- All DAOs for `NOVELS`, `VOLUMES`, `CHAPTERS`, and `CHAPTER_CONTENTS` strictly use Room's **`@Upsert`** (`INSERT ... ON CONFLICT DO UPDATE`) or explicit targeted `UPDATE` statements, preserving user-owned columns (`in_bookshelf`, `shelf_category`, `shelf_sort_order`, `cloud_synced`).
+- In SQLite, `INSERT OR REPLACE` executes **`DELETE` followed by `INSERT`**, triggering `ON DELETE CASCADE` on child tables and wiping unmentioned user columns!
+- All DAOs for `NOVELS`, `VOLUMES`, `CHAPTERS`, and `CHAPTER_CONTENTS` strictly use Room's **`@Upsert`** (`INSERT ... ON CONFLICT DO UPDATE`) or explicit targeted `UPDATE` statements.
 
 ### 4.2 Single-`@Transaction` TOC Diff-Upsert & Stale-Response Rejection
 
@@ -180,12 +178,12 @@ suspend fun syncNovelIndexAtomically(
 ): TocSyncResult {
     val current = novelDao.getSyncHeader(aid)
 
-    // 1. Reject out-of-order stale network responses (e.g., slow UI fetch finishing after background sync)
+    // 1. Reject out-of-order stale network responses
     if (current != null && current.metaSyncedAtMs > requestStartedAtMs) {
         return TocSyncResult.SkippedStaleResponse(current.tocVersion)
     }
 
-    // 2. Fast-path no-op if the normalized TOC hash & language match
+    // 2. Fast-path no-op if normalized TOC hash & script match
     if (current != null && current.tocSha256 == normalizedTocSha256 && current.contentLang == lang.name) {
         novelDao.touchMetaSyncedAt(aid, requestStartedAtMs)
         return TocSyncResult.Unchanged(current.tocVersion)
@@ -203,7 +201,7 @@ suspend fun syncNovelIndexAtomically(
     if (liveCids.isNotEmpty()) tocDao.deleteChaptersNotIn(aid, liveCids)
     if (liveVids.isNotEmpty()) tocDao.deleteVolumesNotIn(aid, liveVids)
 
-    // 5. Auto-heal READING_PROGRESS.vid if the saved cid moved into a recompiled volume!
+    // 5. Auto-heal READING_PROGRESS.vid if saved cid moved into a recompiled volume!
     val progress = progressDao.getForNovel(aid)
     if (progress != null) {
         val newOwnerVid = tocDao.findVidForCid(aid, progress.cid)
@@ -219,43 +217,48 @@ suspend fun syncNovelIndexAtomically(
 }
 ```
 
-### 4.3 `CursorWindow` (`2 MB`) Protection for `CHAPTER_CONTENTS`
-- Android's Binder-backed SQLite `CursorWindow` enforces a **2 MB hard ceiling** per cursor window (`SQLiteBlobTooBigException`).
-- **Rule 1**: List, TOC, and cache-badge queries **never** select `CHAPTER_CONTENTS.content_text`; cache status is derived via a lightweight `EXISTS(SELECT 1 FROM chapter_contents cc WHERE cc.cid = chapters.cid)` projection (`ChapterSummaryView`).
-- **Rule 2**: `ReaderViewModel` fetches `content_text` strictly **one `cid` at a time** (`@Query("SELECT content_text, image_urls_json FROM chapter_contents WHERE cid = :cid")`). For extreme omnibus single-chapter volumes (`> 1.5 MB` UTF-8), `SUBSTR(content_text, :offset, :chunkLen)` streaming prevents `CursorWindow` overflow completely.
-
-### 4.4 Simplified / Traditional (`SC` ↔ `TC`) Script Tracking
-- Both `NOVELS.content_lang` and `CHAPTER_CONTENTS.content_lang` record whether the cached text was fetched under `AppLanguage.SC` (`t=0`) or `TC` (`t=1`). Switching language in `ProfileAndStudioScreen` triggers lazy background re-hydration when opening a chapter whose `content_lang != currentLang` (while offline mode continues serving the cached script cleanly rather than failing).
+### 4.3 `CursorWindow` (`2 MB`) Protection & Instant Deep-Clean Illustration Index
+- List, TOC, and cache-badge queries **never** select `CHAPTER_CONTENTS.content_text`; `ReaderViewModel` fetches `content_text` strictly **one `cid` at a time** (with `SUBSTR` chunking fallback for `> 1.5 MB` omnibus chapters).
+- Because `CHAPTER_CONTENTS.image_urls_json` pre-indexes every `<!--image-->` URL at save time, **Deep Cache Clean (`深度清理`)** computes the live illustration set via `SELECT image_urls_json FROM chapter_contents` in milliseconds rather than re-parsing thousands of XML files on disk!
 
 ---
 
-## 5. Portable Export & Import Backup System (`.wk8backup.zip`)
+## 5. Seamless Play Store Upgrade Migration (`LegacyV1InternalStorageMigrator`)
 
-All user state exports/imports cleanly via Android's **Storage Access Framework (`CreateDocument` / `OpenDocument`)** with zero storage permissions:
+Because `v2.0` updates `org.mewx.wenku8` **in place** from Google Play / GitHub Releases, existing users already hold their saves inside **app-private internal storage** (`context.getFilesDir()`, i.e. `SaveFileMigration.getInternalSavePath()`, with optional legacy fallback `/sdcard/wenku8/` per [`StorageRoots.java`](file:///home/mewx/codes/light-novel-library_Wenku8_Android/studio-android/LightNovelLibrary/app/src/main/java/org/mewx/wenku8/global/StorageRoots.java)).
+
+### 5.1 Automatic Zero-Prompt Internal Storage Migration Pipeline
+On first `v2.0` launch (`legacy_v1_internal_migrated_version < 2`), `LegacyV1InternalStorageMigrator` resolves `primaryRoot = context.getFilesDir()` and `backupRoot = legacyExternalIfReadable` (matching `StorageRoots` probe order) and executes:
+
+1. **All 11 `settings.wk8` Keys → `settings.preferences_pb`**:
+   - Splits `saves/settings.wk8` on **`||||` (`RECORD_SEPARATOR = "\\|\\|\\|\\|"`)** and **`::::` (`FIELD_SEPARATOR`)**.
+   - Migrates `language` (`SC`/`TC`), `eink_mode` (`0`/`1`), `menu_bg_id` (`0`..`5`), `menu_bg_path`, `reader_font_size` (`8..32`), `reader_line_distance` (`0..32`), `reader_paragraph_distance` (`0..48`), `reader_paragraph_edge_distance` (`0..32`), `reader_font_path`, and `reader_background_path`.
+   - **Custom Asset Path Re-Anchoring**: If `menu_bg_path`, `reader_font_path`, or `reader_background_path` still points to an old `/sdcard/wenku8/custom/{name}` string from before Android 11 migration, automatically re-anchors it to `File(context.filesDir, "custom/$name")` when present!
+2. **Account Session & Notice Continuity (`cert.wk8`, `avatar.jpg`, `notice.wk8`)**:
+   - Reads `saves/cert.wk8` + `saves/avatar.jpg` in place so `LightUserSession` keeps the user logged in across the `v1.31 → v2.0` upgrade with **zero forced re-login**, and imports `saves/notice.wk8` as initial `NoticeString` cache.
+3. **Bookshelf & Cached Novel Metadata (`bookshelf_local.wk8` + `saves/intro/*.xml`)**:
+   - Parses `saves/bookshelf_local.wk8` (`aid1||aid2||...`), preserving exact shelf order (`shelf_sort_order = index`).
+   - Scans **all** `saves/intro/{aid}-intro.xml`, `{aid}-introfull.xml`, and `{aid}-volume.xml` files (both bookshelf and recently viewed novels!), parsing them via `Wenku8Parser.parseNovelFullMeta` and `Wenku8Parser.getVolumeList` into `NOVELS`, `VOLUMES`, and `CHAPTERS` inside a Room `@Transaction`. (If a bookshelf `aid` has a damaged/missing intro XML, inserts a stub `NOVELS(aid, in_bookshelf = true)` row queued for immediate cloud metadata hydration so no shelf book is ever dropped!)
+4. **Chunked Offline Chapter Import (`saves/novel/{cid}.xml` → `CHAPTER_CONTENTS`)**:
+   - Enumerates `saves/novel/*.xml`, maps `cid → aid` via the migrated `CHAPTERS` index, extracts `<!--image-->` URLs into `image_urls_json`, computes SHA-256, and `@Upsert`s in **streaming batches of 25 chapters per WAL transaction** (emitting non-blocking progress if `> 100` chapters exist so even a 3,000-chapter offline library migrates without `OutOfMemoryError` or ANR).
+5. **Dual Reader Progress (`read_saves_v1.wk8` & `read_saves.wk8`) & Search History (`search_history.wk8`)**:
+   - Imports `saves/read_saves_v1.wk8` (`aid:vid:cid:lineId:wordId||...`) → `(paragraph_index = lineId, char_offset = wordId)`.
+   - Imports `saves/read_saves.wk8` (`cid,,pos,,height||...`) for any novel without a V1 save (resolving `cid → (aid, vid)` via `CHAPTERS` and storing `legacy_scroll_px = pos` + estimated `progress_permille = pos * 1000 / max(1, height)`).
+   - Imports `saves/search_history.wk8` (`[0query][1query]...`), stripping `'0'` (`articlename`) / `'1'` (`author`) prefixes cleanly.
+6. **Zero-Copy In-Place Retention (`STORAGE_MIGRATION_PLAN.md` Rule 1)**:
+   - Offline illustrations (`filesDir/saves/imgs/*`, `filesDir/imgs/*`) and custom files (`filesDir/custom/*`) remain **in place** as live `v2.0` asset directories.
+   - Original `.wk8`, `saves/intro/`, and `saves/novel/` files are **never deleted in `v2.0`**—left untouched in place for at least one full release cycle (`v2.1+` optional space-reclaim button) and logged (`recordsIn` vs. `recordsOut`) via `CrashReporter`.
+
+### 5.2 Manual External Folder Import (`SAF`) for Cross-Device `/sdcard/wenku8` Restores
+- Alongside automatic internal-storage migration, **我的 → 从外部文件夹导入旧版 `v1.x` 存档** retains `ACTION_OPEN_DOCUMENT_TREE` (`DocumentFile`) feeding the exact same parser pipeline for users migrating an old `/sdcard/wenku8` folder onto a new phone.
+
+---
+
+## 6. Portable Export & Import Backup System (`.wk8backup.zip`)
 
 | Backup Mode | File Name | Contents | Typical Size |
 | :--- | :--- | :--- | :--- |
-| **轻量存档备份 (Default)** | `wenku8-save-YYYYMMDD.wk8backup.zip` | `manifest.json` + `wenku8_v2_light.db` (`VACUUM INTO` snapshot with `DELETE FROM chapter_contents; VACUUM;`) + `settings.json` *(excludes `network_routing_local`)* | **150 KB – 800 KB** |
-| **完整离线全量归档** | `wenku8-full-YYYYMMDD.wk8backup.zip` | `manifest.json` + full `wenku8_v2_full.db` (**including** `chapter_contents`) + `settings.json` + cached `covers/` & `illustrations/` | **20 MB – 500 MB** |
+| **轻量存档备份 (Default)** | `wenku8-save-YYYYMMDD.wk8backup.zip` | `manifest.json` + `wenku8_v2_light.db` (`VACUUM INTO` snapshot without `chapter_contents`) + `settings.json` + `custom/` *(excludes `network_routing_local` & `cert.wk8`)* | **150 KB – 2 MB** |
+| **完整离线全量归档** | `wenku8-full-YYYYMMDD.wk8backup.zip` | `manifest.json` + full `wenku8_v2_full.db` (**including** `chapter_contents`) + `settings.json` + `custom/` + `saves/imgs/` & `imgs/` | **20 MB – 500 MB** |
 
-- **Smart Merge Import (`智能合并`, Default)**: Unions `in_bookshelf = 1` novels, keeps `MAX(updated_at_ms)` per `aid` for `reading_progress`, unions `bookmarks_notes` and `chapter_contents`, and runs `PRAGMA integrity_check` before touching live data.
-- **Android 12+ Auto Backup (`data_extraction_rules.xml`)**: Includes `settings.preferences_pb` while excluding bulky cached images and `network_routing_local.preferences_pb` so cloud device-restore stays well under Google's 25 MB quota.
-
----
-
-## 6. Safe, Non-Destructive Legacy `v1.x` Migration (`LegacyWk8Migrator`)
-
-Cross-checked against [`GlobalConfig.java`](file:///home/mewx/codes/light-novel-library_Wenku8_Android/studio-android/LightNovelLibrary/app/src/main/java/org/mewx/wenku8/global/GlobalConfig.java) and [`STORAGE_MIGRATION_PLAN.md`](file:///home/mewx/codes/light-novel-library_Wenku8_Android/studio-android/LightNovelLibrary/STORAGE_MIGRATION_PLAN.md):
-
-1. **Exact `v1.x` File & Delimiter Parsing**:
-   - **Bookshelf**: Reads **`saves/bookshelf_local.wk8`** (`aid1||aid2||...`), preserving exact array index as `shelf_sort_order` and hydrating metadata from `saves/intro/{aid}-intro.xml`, `{aid}-introfull.xml`, and `{aid}-volume.xml`.
-   - **Reading Progress (Both V1 & V0)**:
-     - Reads **`saves/read_saves_v1.wk8`** using `||` record separator and **`:` field separator** (`aid:vid:cid:lineId:wordId`), mapping `(lineId, wordId)` to `(paragraph_index, char_offset)`.
-     - Also reads legacy **`saves/read_saves.wk8`** (`cid,,pos,,height||...`) for any `cid` belonging to a bookshelf novel without a V1 save, preserving `pos` in `legacy_scroll_px` so `VerticalReaderActivity` users lose zero progress!
-   - **Search History**: Reads **`saves/search_history.wk8`** (`[0query][1query]...`), stripping the leading `'0'` (`articlename`) / `'1'` (`author`) type prefix into `(query, search_type)`.
-   - **Offline Chapters**: Imports valid `saves/novel/{cid}.xml` files into `CHAPTER_CONTENTS` with SHA-256 checksums, skipping 0-byte or truncated files (`recordsIn` vs. `recordsOut` logged via `CrashReporter`).
-2. **Non-Destructive Retention (`STORAGE_MIGRATION_PLAN.md` Rule 1)**:
-   - Migration is **idempotent, resumable, and one-way versioned** (`legacy_wk8_migration_v2_done = true` in DataStore).
-   - **Original `.wk8` and `saves/` files are left untouched in place** during the `v2.0` migration release (never deleted in the same release that migrates them), and are only reclaimed in a subsequent `v2.1+` cleanup option.
-3. **Manual Legacy Folder Import (`ACTION_OPEN_DOCUMENT_TREE`)**:
-   - Preserves `v1.31`'s SAF directory picker under **我的 → 导入旧版 `wenku8` 存档文件夹** so users upgrading from an old phone's `/sdcard/wenku8` folder on Android 13–16 can import directly into `wenku8_v2.db`.
+- **Smart Merge Import (`智能合并`, Default)**: Verifies `PRAGMA integrity_check`, unions `in_bookshelf = 1` novels, keeps `MAX(updated_at_ms)` per `aid` for `reading_progress`, unions `bookmarks_notes` and `chapter_contents`, and merges `saves/imgs/`.

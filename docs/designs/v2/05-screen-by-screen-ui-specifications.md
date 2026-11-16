@@ -1,13 +1,14 @@
-# 05 — Screen-by-Screen Material 3 Expressive (`M3e`) UI Specifications (`v2.0`)
+# 05 · Screen-by-Screen UI Specifications (`v2.0` M3 Expressive)
 
-**Status:** Screen Wireframes & Component Hierarchy  
-**Target SDK / Design Language:** `minSdk = 23` · **Material 3 Expressive (`material3:1.4+`)** · Clean User-Facing Localization (`values`, `values-zh-rTW`, `values-zh-rHK` — **zero internal API/SQLite jargon in production UI strings**)
+> **Localization & Production Copy Rule**: All user-facing UI strings must live in `res/values/strings.xml`, `res/values-zh-rTW/strings.xml`, and `res/values-zh-rHK/strings.xml` without developer annotations (`Room FTS`, `articlename`, `do=list`, `StaticLayout`, `<!--image-->`). Every interactive touch target enforces `>= 48 × 48.dp` (`Modifier.minimumInteractiveComponentSize()`).  
+> **Settings Preservation Rule**: Every valid user setting from `v1.31` (`GlobalConfig.SettingItems`, `ConfigFragment`, `MenuBackgroundSelectorActivity`, and `WenkuReaderSettingV1`) is 100% preserved and expanded—never removed!
 
 ---
 
-## Screen 1: `AdaptiveMainScaffold` (Root M3e Shell)
+## Screen 1: Adaptive Root Shell (`AdaptiveMainScaffold` — 4 Destinations, Default Home = `最新`)
 
-### 1.1 Compact Portrait Layout (Phones `< 600.dp`)
+### 1.1 Compact Phone Portrait (`< 600.dp`)
+
 ```text
 +-------------------------------------------------------------------+
 | [Status Bar - Edge-to-Edge Transparent]                           |
@@ -15,17 +16,19 @@
 | | 🔍 搜索本地书架、在线书名/作者 或 输入作品编号…        [Avatar]| | <- M3e Docked SearchBar (56dp)
 | +---------------------------------------------------------------+ |
 |                                                                   |
-|   [ Active Tab: 1·书架 / 2·最新 / 3·排行 / 4·我的 ]               |
+|   [ Active Tab: Default 2·最新 (or user-configured 1·书架) ]      |
 |                                                                   |
 | +---------------------------------------------------------------+ |
 | | 📥 正在智能更新《败犬女主》 第7卷 (8/12章)  [~~~Wavy~~~]  [×] | | <- Non-blocking Active Job Pill
 | +---------------------------------------------------------------+ |
 | +---------------------------------------------------------------+ |
-| |    [ 📚 书架 ]     [ ⚡ 最新 ]     [ 🏆 排行 ]     [ 👤 我的 ]  | | <- M3e ShortNavigationBar (64dp)
+| |    [ 📚 书架 ]    [ ⚡ 最新* ]    [ 🏆 排行 ]    [ 👤 我的 ]   | | <- M3e ShortNavigationBar (64dp)
 | +---------------------------------------------------------------+ |
 | [Gesture Navigation Bar Inset]                                    |
 +-------------------------------------------------------------------+
 ```
+
+- **Default Startup Home (`默认启动页`)**: Boots into **`Tab 2 · 最新` (`LatestScreen`)** by default (matching `v1.31`), while allowing users to switch their default home to **`Tab 1 · 书架` (`本地书架`)** in `我的 → 外观与启动设置`. When `默认启动页 == 最新` and the device starts completely offline, automatically opens `书架` with a subtle non-blocking hint (`当前离线，已自动打开本地书架`).
 
 ### 1.2 Medium / Expanded Layout (Foldables & Tablets `>= 600.dp`)
 - Uses `NavigationSuiteScaffold`: `ShortNavigationBarMedium` (horizontal icon+label `40.dp` pills) on medium portrait, or spring-expandable **`WideNavigationRail`** (`WideNavigationRailState`) + **`ListDetailPaneScaffold` (`44% List | 56% NovelDetail`)** on unfolded foldables and tablets.
@@ -42,17 +45,17 @@
   - Hero card displays cover backdrop, current volume/chapter, **flat** M3 `LinearProgressIndicator` (`68%`), and a 1-tap `▶ 继续阅读` pill triggering the **T2 3D Book-Cover Opening** straight into `UnifiedReaderScreen`.
 - **Local Filter & Sort Rail**:
   - `FilterChip`s: `全部`, `有新章节` (diffed via `BookshelfListParser`), `已缓存`, `连载中`, `已完成`, plus local cached `#标签` / `文库` chips and custom user shelf categories.
-  - Sort selector: `按最近阅读` *(updated only when opening a chapter in Reader, never on mere Detail inspection)* · `按更新时间` · `手动置顶排序` · `书名拼音`.
+  - Sort selector: `按最近阅读` *(updated only when opening a chapter in Reader, never on mere Detail inspection)* · `按更新时间` · `手动置顶排序` *(preserves migrated `bookshelf_local.wk8` order)* · `书名拼音`.
 - **Progress Indicator Rule**: Resting shelf cards always use **flat** `LinearProgressIndicator` for reading progress; **`LinearWavyProgressIndicator`** appears **only** on books actively downloading or syncing!
 - **Contextual Multi-Select Mode**: Long-pressing a book card morphs a contextual **`HorizontalFloatingToolbar`** into view (`全选 · 智能更新 · 清理缓存 · 移出书架 · 完成`).
 
 ---
 
-## Screen 3A: `LatestScreen` (`Tab 2 · 最新`)
+## Screen 3A: `LatestScreen` (`Tab 2 · 最新` — Default Home Screen)
 
 Replaces `v1.31`'s `LatestFragment` while surfacing the 3 non-ranking chronological feeds from `Wenku8API.NovelSortedBy`:
 - **Top `SearchBar`** + **`PrimaryTabRow`**:
-  1. **`最近更新`** (`NovelSortedBy.lastUpdate`)
+  1. **`最近更新`** (`NovelSortedBy.lastUpdate` — initial sub-tab)
   2. **`最新入库`** (`NovelSortedBy.postDate`)
   3. **`完结精品`** (`NovelSortedBy.fullFlag`)
 - **Card Content**: Renders `Title`, `Author`, `BookStatus`, `LastUpdate`, `Tags` chips, and 2-line `IntroPreview` (`NovelListWithInfoParser`) in borderless M3e Filled Cards (`1.dp` `#111111` outline in E-Ink mode).
@@ -83,7 +86,7 @@ Replaces `v1.31`'s 12-tab `RKListFragment` `ViewPager` with an instant 1-tap 2D 
 |   [ 狼与香辛料 · 已读至第17卷 68% ·                 [▶ 继续阅读] ]|
 | 🌐 在线文库搜索结果                    [ ⏳ 冷却中，2s 后自动搜 ] |
 |   [ Paginated Online Cards with Shared-Element Cover & Title ]    |
-| 🕒 最近搜索记录                                       [清空记录]  |
+| 🕒 最近搜索记录 (上限 20 条，从 search_history.wk8 完整迁移) [清空]|
 |   ( 支仓冻砂 )   ( 狼与香辛料 )   ( 败犬女主 )   ( 刀剑神域 )     |
 +-------------------------------------------------------------------+
 ```
@@ -135,11 +138,9 @@ Replaces `v1.31`'s 12-tab `RKListFragment` `ViewPager` with an instant 1-tap 2D 
 +-------------------------------------------------------------------+
 ```
 
-- **M3e `SplitButtonLayout` Separation**: Leading button resumes reading; trailing `▾` menu offers `"从头开始阅读"`, `"选择阅读模式"`, and `"朗读本章 (TTS)"`. `[ ✓ 已在书架 ]`, `[ ↓ 离线缓存 ]` (opening the 4-Mode `NovelDownloader` `ModalBottomSheet`), and `[ 💬 书评 ]` sit cleanly on their own row so `360.dp` screens and large CJK fonts never clip. *(Dead stub `投推荐票` is excluded.)*
-- **Tap Title Dialog**: Tapping a long truncated title opens a clean copyable M3 dialog showing full `AID` and untruncated title (preserving `v1.31` `NovelInfoActivity` behavior).
-- **Minimal, Non-UX-Harming Server-Support Ad Placement**:
-  - **Single Inline Slot Only**: Appears *exclusively* on `NovelDetailScreen` in the natural pause between **Synopsis** and **Volume Directory**—never inside the Reader, never sticky/floating, and well separated from `继续阅读` and chapter rows to prevent accidental taps.
-  - **Zero Layout Shift (CLS = 0) & Clean Degradation**: Fixed container height (`surfaceContainerLow`, `16.dp` radius) is pre-allocated *only* when online and `GoogleServicesHelper` confirms Play Services availability; collapses cleanly before layout when offline, on GMS-free ROMs, or on ad load failure, and initializes `MobileAds` lazily after the first UI frame.
+- **M3e `SplitButtonLayout` Separation**: Leading button resumes reading; trailing `▾` menu offers `"从头开始阅读"`, `"选择阅读模式"`, and `"朗读本章 (TTS)"`. `[ ✓ 已在书架 ]`, `[ ↓ 离线缓存 ]` (opening the 4-Mode `NovelDownloader` `ModalBottomSheet`), and `[ 💬 书评 ]` sit cleanly on their own row.
+- **Tap Title Dialog**: Tapping a long truncated title opens a copyable M3 dialog showing full `AID` and untruncated title (preserving `v1.31` `NovelInfoActivity` behavior).
+- **Minimal, Non-UX-Harming Server-Support Ad Placement**: Appears *exclusively* on `NovelDetailScreen` between **Synopsis** and **Volume Directory** (fixed pre-reserved height when online + GMS available for **CLS = 0**, lazy post-frame `MobileAds` init, instant collapse offline or on GMS-free ROMs).
 
 ---
 
@@ -150,21 +151,29 @@ Replaces `v1.31`'s 12-tab `RKListFragment` `ViewPager` with an instant 1-tap 2D 
 
 ---
 
-## Screen 7: `UnifiedReaderScreen` (`沉浸阅读器 2.0`)
+## Screen 7: `UnifiedReaderScreen` (`沉浸阅读器 2.0` — 100% `v1.31` Customization Preserved)
 
-- **Contextual M3e `HorizontalFloatingToolbar` HUD**: Summoned on center tap (`目录 · 排版 · 模式 · 查找 · 书签 · 夜间`), paired with a chapter progress scrubber and 5-second `"↩ 还原至第 N 页"` undo pill.
-- **Opaque Active-Slider Capsule Preview (`排版` Sheet)**: While dragging Font Size (`8–32sp`), Line/Paragraph Spacing, or Margins, inactive controls and the sheet backdrop fade to `0%` while **only the active slider row stays inside a crisp `92%`-opaque `surfaceContainerHighest` pill**, letting 90% of the live chapter reflow underneath with zero text-on-text overlap!
-- **Predictive Back Safe Edge Zones**: Left-edge vertical brightness slide (optional) is inset to `24.dp..72.dp` so the outer `0..24.dp` bezel reliably triggers Android 15/16 Predictive Back.
+- **Contextual M3e `HorizontalFloatingToolbar` HUD**: Summoned on center tap (`目录 · 排版 · 模式 · 查找 · 书签 · 夜间`), paired with a chapter progress scrubber, `[查看大图]` shortcut when the current page contains an illustration, and 5-second `"↩ 还原至第 N 页"` undo pill.
+- **Full `WenkuReaderSettingV1` Parity + New M3e Controls (`排版` Sheet)**:
+  - **Sliders with Opaque Active-Slider Capsule Preview**:
+    - **字号大小 (`reader_font_size`)**: **`8–36 sp`** (default `18 sp`, covering `v1.31`'s full `8–32 sp` range without clamping!).
+    - **行间距 (`reader_line_distance`)**: **`0–32 dp`** (default `16 dp`).
+    - **段间距 (`reader_paragraph_distance`)**: **`0–48 dp`** (default `20 dp`).
+    - **页边距 (`reader_paragraph_edge_distance`)**: **`0–32 dp`** (default `8 dp`).
+    - *During any slider drag, non-active rows fade to `0%` while the active slider stays inside a `92%`-opaque `surfaceContainerHighest` pill so 90% of the live reflowing page stays legible underneath.*
+  - **字体选择 (`reader_font_path`)**: `系统默认字体` or `选择自定义字体 (.ttf / .otf)` (migrated from `filesDir/custom/reader_font`).
+  - **阅读背景 (`reader_background_path`)**: M3e presets (`日间羊皮纸` / `纯净白` / `护眼绿` / `暗夜黑` / `纯黑 AMOLED`) **plus `自定义日间背景图片`** (migrated directly from `v1.31` `filesDir/custom/reader_background`!).
+  - **硬件交互与阅读辅助**: `音量键翻页` (`ON` by default, matching `Wenku8ReaderActivityV1`), `保持屏幕常亮`, and optional `左侧边缘上下滑动调节亮度` (inset to `24.dp..72.dp` so `0..24.dp` Predictive Back never collides).
 
 ---
 
 ## Screen 8: `ArtbookLightboxOverlay` (`插图画集与跨页模式`)
 
-- Expands via `sharedBounds` from any inline `<!--image-->` Art Card or `<chapter>插图</chapter>` chip, featuring `BitmapRegionDecoder` 4× tiling zoom, **`跨页拼合` (`口绘` double-page spread stitching)**, `90°` spring rotation, `HorizontalMultiBrowseCarousel` filmstrip, SAF save/share, and vertical drag-to-dismiss.
+- Expands via `sharedBounds` from any inline `<!--image-->` Art Card or `<chapter>插图</chapter>` chip, featuring `BitmapRegionDecoder` 4× tiling zoom, **`跨页拼合` (`口绘` double-page spread stitching)**, `90°` spring rotation, `HorizontalMultiBrowseCarousel` filmstrip, MediaStore/SAF save & share, and vertical drag-to-dismiss.
 
 ---
 
-## Screen 9: `ProfileAndStudioScreen` (`Tab 4 · 我的`) & `NetworkDiagnosticsScreen`
+## Screen 9: `ProfileAndStudioScreen` (`Tab 4 · 我的`) & Full `v1.31` Settings Preservation
 
 ```text
 +-------------------------------------------------------------------+
@@ -173,6 +182,7 @@ Replaces `v1.31`'s 12-tab `RKListFragment` `ViewPager` with an instant 1-tap 2D 
 | 📢 服务器公告 (Dismissible M3 Tonal Banner when NoticeString != "")|
 +-------------------------------------------------------------------+
 | +---------------------------------------------------------------+ |
+| | [Optional Header Wallpaper: M3e Tonal / Classic 1-5 / Custom] | | <- Preserves menu_bg_id & menu_bg_path!
 | | [Logged In]  (Avatar) MewX · 轻国骑士          [🎉 每日签到]  | |
 | |              UID: 12345 · 积分 1,284 · 经验 4,520  [退出登录] | |
 | | [Logged Out] 登录轻小说文库账号以同步云端书架与发表书评       | |
@@ -182,22 +192,29 @@ Replaces `v1.31`'s 12-tab `RKListFragment` `ViewPager` with an instant 1-tap 2D 
 | 📊 阅读足迹与书签                      [历史记录] [书签笔记 (18)] |
 |                                                                   |
 | 🌐 网络与中转连接 (See Doc 11 for full NetworkDiagnosticsScreen)  |
-| ├─ 自动优化连接 (已优化当前网络连接 · cf-v4-02)          [ ON  ]  |
+| ├─ 自动优化连接 (自动优化连接：开启 · 已优化当前网络连接) [ ON  ] |
 | └─ [ 🩺 网络检测与诊断报告 › ]                [ ↺ 恢复默认重测 ]  |
 |                                                                   |
-| 🎨 外观与主题工作室                                               |
-| ├─ 深色模式: [ 跟随系统 ] [ 日间纸页 ] [ 夜间墨色 ] [ 纯黑省电 ]  |
-| ├─ 墨水屏专享模式 (高对比 1dp 边框 · 全局零动画):        [ OFF ]  |
-| ├─ 系统壁纸动态取色 (Monet) / 详情页封面氛围取色:        [ ON  ]  |
-| ├─ 主题色板: (●经典蓝) (●雾松绿) (●胭脂红) (●麦穗金) (●鸢尾紫)    |
-| └─ 文库语言切换: [ 简体中文 ]  [ 繁體中文 ]  (无重启即时生效)     |
+| 🎨 外观、启动与阅读全局偏好                                       |
+| ├─ 默认启动页:   [ ✓ 最新更新 (默认) ]     [ 本地书架 ]           | <- Configurable Home Tab!
+| ├─ 文库语言切换: [ ✓ 简体中文 ]  [ 繁體中文 ]  (无重启即时生效)   |
+| ├─ 深色模式:     [ 跟随系统 ] [ 日间纸页 ] [ 夜间墨色 ] [ 纯黑 ]  |
+| ├─ 墨水屏模式 (高对比 1dp 边框 · 零动画 · 继承 v1):      [ OFF ]  |
+| ├─ 动态取色 (系统壁纸 Monet / 详情页封面氛围色):         [ ON  ]  |
+| ├─ 个人主页头图壁纸: [ M3e 纯净 / 经典预设 1-5 / 自定义图片 › ]   | <- Preserves MenuBackgroundSelector!
+| └─ 阅读器默认排版 (字号/间距/自定义字体/自定义背景图片/音量翻页) ›|
 |                                                                   |
-| 💾 内置数据库与存档管理 (Room SQLite · wenku8_v2.db)              |
-| ├─ [📤 导出存档 (.wk8backup)]      [📥 导入 / 智能合并存档]       |
-| ├─ [📂 导入旧版 v1.x 文件夹]       [🧹 清理非书架小说与插图缓存]  |
-| └─ 🔄 检查新版本 · 开源许可与免责声明 · 关于 v2.0 (5击彩蛋)       |
+| 💾 存储、缓存清理与存档管理 (Room SQLite · wenku8_v2.db)          |
+| ├─ 清除缓存: [ ⚡ 快速清理 (临时与非书架封面) ] [ 🔍 深度清理 › ]  | <- Both v1.31 Cache Wipe Modes!
+| ├─ 备份归档: [ 📤 导出存档 (.wk8backup) ] [ 📥 导入/智能合并 ]    |
+| ├─ 外部迁移: [ 📂 从外部文件夹导入旧版 v1.x 存档 (SAF) ]          | <- Internal saves auto-migrate!
+| └─ 🔄 检查新版本 · 📜 开源许可声明 · ℹ️ 关于轻小说文库 (5击彩蛋)  |
 +-------------------------------------------------------------------+
 ```
 
-- **Complete Account Sheet**: Tapping `[ 🔑 登录账号 ]` opens an M3e `ModalBottomSheet` supporting **Username or Email** (`<= 30` chars, routing automatically to `getUserLoginParams` vs. `getUserLoginEmailParams`), password visibility toggle, non-blocking loading state, and `REGISTER_URL` browser launch dialog. If startup re-auth (`cert.wk8`) fails, a clear `"登录状态已过期，请重新登录"` banner appears at the top of the card.
-- **Full `NetworkDiagnosticsScreen` Specification**: See **[`11-network-diagnostics-and-auto-routing-ui.md`](./11-network-diagnostics-and-auto-routing-ui.md)**.
+- **100% `v1.31` Settings Parity**:
+  - **Profile Header Wallpaper (`个人主页头图壁纸`)**: Preserves `menu_bg_id` (`"1"`..`"5"` classic `bg_avatar_01..05` artworks or `"0"` custom user image `filesDir/custom/menu_bg`) as an optional banner backdrop on the `我的` Account Card (and `WideNavigationRail` header), alongside a clean `"M3e 纯净卡片"` option.
+  - **Two-Mode Cache Cleanup (`清除缓存` — Matching `ConfigFragment`)**:
+    1. **`快速清理` (`Fast Clean`)**: Clears temporary Coil HTTP disk cache + non-bookshelf cover files (`imgs/{aid}.jpg` where `aid` is not in `BOOKSHELF`).
+    2. **`深度清理` (`Deep Orphan Clean`, Cancellable)**: Runs Fast Clean **plus** scans all Room `CHAPTER_CONTENTS` `image_urls_json` entries and deletes orphaned illustration files inside `filesDir/saves/imgs/` not referenced by any saved chapter.
+  - **About, Open-Source License & Update Check**: Preserves `CheckAppNewVersion`, the full `R.raw.license` Open-Source Statement dialog (`开源许可声明`), `NoticeString` with real `<a href>` link opening, and `About` screen.
