@@ -61,6 +61,9 @@ import org.mewx.wenku8.v2.data.migration.LegacyV1StorageMigrator
 import org.mewx.wenku8.v2.data.remote.diagnostics.AutoRoutingModeState
 import org.mewx.wenku8.v2.data.remote.diagnostics.RelayRouteController
 import org.mewx.wenku8.v2.data.repository.BackupArchiveRepository
+import org.mewx.wenku8.v2.data.repository.BookshelfRepository
+import org.mewx.wenku8.v2.data.repository.BookshelfSortMode
+import org.mewx.wenku8.v2.data.repository.BookshelfViewMode
 import org.mewx.wenku8.v2.data.repository.DiscoveryRepository
 import org.mewx.wenku8.v2.data.repository.ReviewThreadCardItem
 import org.mewx.wenku8.v2.data.repository.ReviewsRepository
@@ -68,6 +71,7 @@ import org.mewx.wenku8.v2.data.repository.ServerNoticeAndUpdateRepository
 import org.mewx.wenku8.v2.data.repository.StorageAndCacheRepository
 import org.mewx.wenku8.v2.data.repository.UserSessionRepository
 import org.mewx.wenku8.v2.domain.model.DiscoveryNovelCardItem
+import org.mewx.wenku8.v2.ui.bookshelf.BookshelfScreen
 import org.mewx.wenku8.v2.ui.diagnostics.NetworkDiagnosticsScreen
 import org.mewx.wenku8.v2.ui.diagnostics.NetworkDiagnosticsViewModel
 import org.mewx.wenku8.v2.ui.discovery.LatestScreen
@@ -120,11 +124,14 @@ fun AdaptiveMainScaffold(
     storageAndCacheRepository: StorageAndCacheRepository? = null,
     backupArchiveRepository: BackupArchiveRepository? = null,
     reviewsRepository: ReviewsRepository? = null,
+    bookshelfRepository: BookshelfRepository? = null,
     legacyV1StorageMigrator: LegacyV1StorageMigrator? = null,
     appLanguage: Wenku8API.AppLanguage = Wenku8API.AppLanguage.SC,
     networkDiagnosticsViewModelFactory: NetworkDiagnosticsViewModel.Factory? = null,
     autoOptimizeConnectionEnabled: Boolean = true,
     onAutoOptimizeConnectionChanged: (Boolean) -> Unit = {},
+    onBookshelfViewModeSelected: (BookshelfViewMode) -> Unit = {},
+    onBookshelfSortModeSelected: (BookshelfSortMode) -> Unit = {},
     onAppLanguageSelected: (Wenku8API.AppLanguage) -> Unit = {},
     onEinkModeChanged: (Boolean) -> Unit = {},
     onUseDynamicColorChanged: (Boolean) -> Unit = {},
@@ -175,6 +182,12 @@ fun AdaptiveMainScaffold(
     }
     var showOfflineFallbackBanner by rememberSaveable {
         mutableStateOf(initialResolution.triggeredOfflineFallbackToBookshelf)
+    }
+    var localBookshelfViewMode by rememberSaveable(effectivePreferences.bookshelfViewMode) {
+        mutableStateOf(effectivePreferences.bookshelfViewMode)
+    }
+    var localBookshelfSortMode by rememberSaveable(effectivePreferences.bookshelfSortMode) {
+        mutableStateOf(effectivePreferences.bookshelfSortMode)
     }
     var isSearchStudioOpen by rememberSaveable {
         mutableStateOf(false)
@@ -274,6 +287,17 @@ fun AdaptiveMainScaffold(
                     serverNoticeAndUpdateRepository = serverNoticeAndUpdateRepository,
                     storageAndCacheRepository = storageAndCacheRepository,
                     backupArchiveRepository = backupArchiveRepository,
+                    bookshelfRepository = bookshelfRepository,
+                    bookshelfViewMode = localBookshelfViewMode,
+                    onBookshelfViewModeSelected = { mode ->
+                        localBookshelfViewMode = mode
+                        onBookshelfViewModeSelected(mode)
+                    },
+                    bookshelfSortMode = localBookshelfSortMode,
+                    onBookshelfSortModeSelected = { sort ->
+                        localBookshelfSortMode = sort
+                        onBookshelfSortModeSelected(sort)
+                    },
                     legacyV1StorageMigrator = legacyV1StorageMigrator,
                     appLanguage = appLanguage,
                     onOpenSearch = handleOpenSearch,
@@ -351,6 +375,17 @@ fun AdaptiveMainScaffold(
                         serverNoticeAndUpdateRepository = serverNoticeAndUpdateRepository,
                         storageAndCacheRepository = storageAndCacheRepository,
                         backupArchiveRepository = backupArchiveRepository,
+                        bookshelfRepository = bookshelfRepository,
+                        bookshelfViewMode = localBookshelfViewMode,
+                        onBookshelfViewModeSelected = { mode ->
+                            localBookshelfViewMode = mode
+                            onBookshelfViewModeSelected(mode)
+                        },
+                        bookshelfSortMode = localBookshelfSortMode,
+                        onBookshelfSortModeSelected = { sort ->
+                            localBookshelfSortMode = sort
+                            onBookshelfSortModeSelected(sort)
+                        },
                         legacyV1StorageMigrator = legacyV1StorageMigrator,
                         appLanguage = appLanguage,
                         onOpenSearch = handleOpenSearch,
@@ -460,6 +495,11 @@ private fun MainDestinationBody(
     serverNoticeAndUpdateRepository: ServerNoticeAndUpdateRepository?,
     storageAndCacheRepository: StorageAndCacheRepository?,
     backupArchiveRepository: BackupArchiveRepository?,
+    bookshelfRepository: BookshelfRepository?,
+    bookshelfViewMode: BookshelfViewMode,
+    onBookshelfViewModeSelected: (BookshelfViewMode) -> Unit,
+    bookshelfSortMode: BookshelfSortMode,
+    onBookshelfSortModeSelected: (BookshelfSortMode) -> Unit,
     legacyV1StorageMigrator: LegacyV1StorageMigrator?,
     appLanguage: Wenku8API.AppLanguage,
     onOpenSearch: () -> Unit,
@@ -468,6 +508,27 @@ private fun MainDestinationBody(
     onOpenNetworkDiagnostics: () -> Unit,
     contentPadding: PaddingValues,
 ) {
+    if (bookshelfRepository != null && selectedDestination == TopLevelDestination.BOOKSHELF) {
+        BookshelfScreen(
+            bookshelfRepository = bookshelfRepository,
+            appLanguage = appLanguage,
+            viewMode = bookshelfViewMode,
+            onViewModeSelected = onBookshelfViewModeSelected,
+            sortMode = bookshelfSortMode,
+            onSortModeSelected = onBookshelfSortModeSelected,
+            showOfflineFallbackBanner = showOfflineFallbackBanner,
+            onDismissOfflineBanner = onDismissOfflineBanner,
+            onOpenSearch = onOpenSearch,
+            onOpenLoginSheet = onOpenLoginSheet,
+            onNovelClicked = onNovelClicked,
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(contentPadding)
+                .testTag(MainScaffoldTestTags.DESTINATION_SCREEN_PREFIX + selectedDestination.routeKey),
+        )
+        return
+    }
+
     if (discoveryRepository != null && selectedDestination == TopLevelDestination.LATEST) {
         LatestScreen(
             discoveryRepository = discoveryRepository,

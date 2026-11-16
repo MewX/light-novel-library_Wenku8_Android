@@ -17,6 +17,8 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.map
 import org.mewx.wenku8.api.Wenku8API
+import org.mewx.wenku8.v2.data.repository.BookshelfSortMode
+import org.mewx.wenku8.v2.data.repository.BookshelfViewMode
 import org.mewx.wenku8.v2.ui.navigation.DefaultHomeDestination
 import org.mewx.wenku8.v2.ui.theme.Wenku8ThemeMode
 import java.io.IOException
@@ -37,8 +39,8 @@ import java.io.IOException
  * - `reader_font_path` (`""` = system default) -> [readerCustomFontPath]
  * - `reader_background_path` (`""` = system default) -> [readerCustomBackgroundPath]
  * - Plus `v2.0`: [themeMode], [useDynamicColor], [defaultHomeDestination] (`LATEST` default /
- *   `BOOKSHELF`), [volumeKeyPagingEnabled], [autoOptimizeConnectionEnabled], and
- *   [legacyV1InternalMigrationVersion].
+ *   `BOOKSHELF`), [bookshelfViewMode], [bookshelfSortMode], [volumeKeyPagingEnabled],
+ *   [autoOptimizeConnectionEnabled], and [legacyV1InternalMigrationVersion].
  */
 data class Wenku8UserPreferences(
     val appLanguage: Wenku8API.AppLanguage = Wenku8API.AppLanguage.SC,
@@ -46,6 +48,8 @@ data class Wenku8UserPreferences(
     val einkModeEnabled: Boolean = false,
     val useDynamicColor: Boolean = false,
     val defaultHomeDestination: DefaultHomeDestination = DefaultHomeDestination.LATEST,
+    val bookshelfViewMode: BookshelfViewMode = BookshelfViewMode.GRID,
+    val bookshelfSortMode: BookshelfSortMode = BookshelfSortMode.MANUAL_ORDER,
     val menuBackgroundPresetId: Int = DEFAULT_MENU_BG_PRESET_ID,
     val menuBackgroundCustomPath: String = "",
     val readerFontSizeSp: Int = DEFAULT_READER_FONT_SIZE_SP,
@@ -134,6 +138,14 @@ class UserPreferencesRepository(
 
     suspend fun setDefaultHomeDestination(destination: DefaultHomeDestination) {
         dataStore.edit { it[Keys.DEFAULT_HOME_DESTINATION] = destination.name }
+    }
+
+    suspend fun setBookshelfViewMode(viewMode: BookshelfViewMode) {
+        dataStore.edit { it[Keys.BOOKSHELF_VIEW_MODE] = viewMode.name }
+    }
+
+    suspend fun setBookshelfSortMode(sortMode: BookshelfSortMode) {
+        dataStore.edit { it[Keys.BOOKSHELF_SORT_MODE] = sortMode.name }
     }
 
     suspend fun setMenuBackground(presetId: Int, customPath: String = "") {
@@ -284,6 +296,8 @@ class UserPreferencesRepository(
             prefs[Keys.EINK_MODE_ENABLED] = imported.einkModeEnabled
             prefs[Keys.USE_DYNAMIC_COLOR] = imported.useDynamicColor
             prefs[Keys.DEFAULT_HOME_DESTINATION] = imported.defaultHomeDestination.name
+            prefs[Keys.BOOKSHELF_VIEW_MODE] = imported.bookshelfViewMode.name
+            prefs[Keys.BOOKSHELF_SORT_MODE] = imported.bookshelfSortMode.name
             prefs[Keys.MENU_BG_PRESET_ID] = imported.menuBackgroundPresetId.coerceIn(0, 5)
             prefs[Keys.MENU_BG_CUSTOM_PATH] = imported.menuBackgroundCustomPath
             prefs[Keys.READER_FONT_SIZE_SP] = imported.readerFontSizeSp.coerceIn(
@@ -322,6 +336,14 @@ class UserPreferencesRepository(
             raw = prefs[Keys.DEFAULT_HOME_DESTINATION],
             default = DefaultHomeDestination.LATEST,
         )
+        val bookshelfView = enumValueOrDefault(
+            raw = prefs[Keys.BOOKSHELF_VIEW_MODE],
+            default = BookshelfViewMode.GRID,
+        )
+        val bookshelfSort = enumValueOrDefault(
+            raw = prefs[Keys.BOOKSHELF_SORT_MODE],
+            default = BookshelfSortMode.MANUAL_ORDER,
+        )
         val einkEnabled = prefs[Keys.EINK_MODE_ENABLED] ?: (themeMode == Wenku8ThemeMode.E_INK)
 
         return Wenku8UserPreferences(
@@ -330,6 +352,8 @@ class UserPreferencesRepository(
             einkModeEnabled = einkEnabled,
             useDynamicColor = prefs[Keys.USE_DYNAMIC_COLOR] ?: false,
             defaultHomeDestination = defaultHome,
+            bookshelfViewMode = bookshelfView,
+            bookshelfSortMode = bookshelfSort,
             menuBackgroundPresetId = (prefs[Keys.MENU_BG_PRESET_ID]
                 ?: Wenku8UserPreferences.DEFAULT_MENU_BG_PRESET_ID).coerceIn(0, 5),
             menuBackgroundCustomPath = prefs[Keys.MENU_BG_CUSTOM_PATH] ?: "",
@@ -373,6 +397,8 @@ class UserPreferencesRepository(
         val EINK_MODE_ENABLED = booleanPreferencesKey("eink_mode_enabled")
         val USE_DYNAMIC_COLOR = booleanPreferencesKey("use_dynamic_color")
         val DEFAULT_HOME_DESTINATION = stringPreferencesKey("default_home_destination")
+        val BOOKSHELF_VIEW_MODE = stringPreferencesKey("bookshelf_view_mode")
+        val BOOKSHELF_SORT_MODE = stringPreferencesKey("bookshelf_sort_mode")
         val MENU_BG_PRESET_ID = intPreferencesKey("menu_bg_preset_id")
         val MENU_BG_CUSTOM_PATH = stringPreferencesKey("menu_bg_custom_path")
         val READER_FONT_SIZE_SP = intPreferencesKey("reader_font_size_sp")

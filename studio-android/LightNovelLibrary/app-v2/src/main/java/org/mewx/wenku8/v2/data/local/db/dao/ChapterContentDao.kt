@@ -22,6 +22,11 @@ data class ChapterContentHeader(
     @ColumnInfo(name = "downloaded_at_ms") val downloadedAtMs: Long,
 )
 
+data class NovelCachedChapterCount(
+    @ColumnInfo(name = "aid") val aid: Int,
+    @ColumnInfo(name = "cached_count") val cachedCount: Int,
+)
+
 /**
  * DAO for `chapter_contents` with strict `2 MB` `CursorWindow` protection.
  *
@@ -47,6 +52,9 @@ interface ChapterContentDao {
 
     @Query("SELECT cid FROM chapter_contents WHERE aid = :aid")
     suspend fun getCachedChapterIdsForNovel(aid: Int): List<Int>
+
+    @Query("SELECT aid, COUNT(*) AS cached_count FROM chapter_contents GROUP BY aid")
+    fun observeCachedChapterCountsByNovel(): Flow<List<NovelCachedChapterCount>>
 
     @Query(
         """
@@ -90,6 +98,9 @@ interface ChapterContentDao {
 
     @Query("DELETE FROM chapter_contents WHERE aid = :aid")
     suspend fun deleteAllChapterContentsForNovel(aid: Int)
+
+    @Query("DELETE FROM chapter_contents WHERE aid IN (:aids)")
+    suspend fun deleteChapterContentsForNovels(aids: List<Int>)
 
     /**
      * CursorWindow-safe single-chapter reader: fetches normal chapters (`<= 256,000` chars) in one

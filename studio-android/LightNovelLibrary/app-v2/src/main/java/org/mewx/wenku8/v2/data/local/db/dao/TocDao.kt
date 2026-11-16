@@ -58,6 +58,9 @@ interface TocDao {
     @Query("SELECT cid, aid FROM chapters")
     suspend fun getAllChapterToNovelMappings(): List<ChapterNovelMapping>
 
+    @Query("SELECT aid, COUNT(*) AS total_count FROM chapters GROUP BY aid")
+    fun observeTotalChapterCountsByNovel(): Flow<List<NovelTotalChapterCount>>
+
     @Query("DELETE FROM chapters WHERE aid = :aid AND cid IN (:obsoleteCids)")
     suspend fun deleteChaptersByIdsChunk(aid: Int, obsoleteCids: List<Int>)
 
@@ -101,4 +104,9 @@ interface TocDao {
 data class ChapterNovelMapping(
     @ColumnInfo(name = "cid") val cid: Int,
     @ColumnInfo(name = "aid") val aid: Int,
+)
+
+data class NovelTotalChapterCount(
+    @ColumnInfo(name = "aid") val aid: Int,
+    @ColumnInfo(name = "total_count") val totalCount: Int,
 )

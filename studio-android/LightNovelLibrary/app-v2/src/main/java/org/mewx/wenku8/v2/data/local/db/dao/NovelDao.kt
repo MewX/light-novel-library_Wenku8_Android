@@ -115,6 +115,35 @@ interface NovelDao {
         cloudSynced: Boolean,
     )
 
+    @Query("SELECT * FROM novels WHERE in_bookshelf = 1 ORDER BY shelf_sort_order ASC, last_accessed_ms DESC")
+    suspend fun getBookshelfNovelsSnapshot(): List<NovelEntity>
+
+    @Query("SELECT COALESCE(MAX(shelf_sort_order), 0) FROM novels WHERE in_bookshelf = 1")
+    suspend fun getMaxBookshelfSortOrder(): Int
+
+    @Query("SELECT COALESCE(MIN(shelf_sort_order), 0) FROM novels WHERE in_bookshelf = 1")
+    suspend fun getMinBookshelfSortOrder(): Int
+
+    @Query("UPDATE novels SET cloud_synced = :cloudSynced WHERE aid = :aid")
+    suspend fun setCloudSynced(aid: Int, cloudSynced: Boolean)
+
+    @Query("UPDATE novels SET shelf_sort_order = :sortOrder WHERE aid = :aid")
+    suspend fun updateShelfSortOrder(aid: Int, sortOrder: Int)
+
+    @Query("UPDATE novels SET shelf_category = :category WHERE aid IN (:aids)")
+    suspend fun updateShelfCategoryForNovels(aids: List<Int>, category: String)
+
+    @Query(
+        """
+        UPDATE novels
+        SET in_bookshelf = 0,
+            cloud_synced = 0,
+            has_unread_update = 0
+        WHERE aid IN (:aids)
+        """,
+    )
+    suspend fun removeNovelsFromBookshelf(aids: List<Int>)
+
     @Query("UPDATE novels SET has_unread_update = :hasUnreadUpdate WHERE aid = :aid")
     suspend fun setHasUnreadUpdate(aid: Int, hasUnreadUpdate: Boolean)
 

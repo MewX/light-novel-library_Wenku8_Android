@@ -215,6 +215,15 @@ class AppContainer(context: Context) {
         )
     }
 
+    val bookshelfRepository: org.mewx.wenku8.v2.data.repository.BookshelfRepository by lazy {
+        org.mewx.wenku8.v2.data.repository.BookshelfRepository(
+            database = database,
+            catalogGateway = wenkuApiClient,
+            novelTocSyncRepository = novelTocSyncRepository,
+            userSessionRepository = userSessionRepository,
+        )
+    }
+
     val legacyV1StorageMigrator: LegacyV1StorageMigrator by lazy {
         LegacyV1StorageMigrator(database, userPreferencesRepository)
     }

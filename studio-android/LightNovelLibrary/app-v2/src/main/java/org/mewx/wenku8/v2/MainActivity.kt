@@ -92,6 +92,7 @@ class MainActivity : AppCompatActivity() {
                         storageAndCacheRepository = appContainer.storageAndCacheRepository,
                         backupArchiveRepository = appContainer.backupArchiveRepository,
                         reviewsRepository = appContainer.reviewsRepository,
+                        bookshelfRepository = appContainer.bookshelfRepository,
                         legacyV1StorageMigrator = appContainer.legacyV1StorageMigrator,
                         appLanguage = loadedPreferences.appLanguage,
                         networkDiagnosticsViewModelFactory = appContainer.networkDiagnosticsViewModelFactory,
@@ -99,6 +100,16 @@ class MainActivity : AppCompatActivity() {
                         onAutoOptimizeConnectionChanged = { enabled ->
                             coroutineScope.launch {
                                 preferencesRepository.setAutoOptimizeConnectionEnabled(enabled)
+                            }
+                        },
+                        onBookshelfViewModeSelected = { selectedViewMode ->
+                            coroutineScope.launch {
+                                preferencesRepository.setBookshelfViewMode(selectedViewMode)
+                            }
+                        },
+                        onBookshelfSortModeSelected = { selectedSortMode ->
+                            coroutineScope.launch {
+                                preferencesRepository.setBookshelfSortMode(selectedSortMode)
                             }
                         },
                         onAppLanguageSelected = { newLanguage ->

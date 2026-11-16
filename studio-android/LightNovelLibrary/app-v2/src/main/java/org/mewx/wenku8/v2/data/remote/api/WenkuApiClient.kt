@@ -62,6 +62,8 @@ interface WenkuParamsFactory {
     fun novelIndex(aid: Int, lang: Wenku8API.AppLanguage): ContentValues?
     fun novelContent(aid: Int, cid: Int, lang: Wenku8API.AppLanguage): ContentValues?
     fun bookshelfListParams(lang: Wenku8API.AppLanguage): ContentValues?
+    fun bookshelfAddParams(aid: Int): ContentValues? = null
+    fun bookshelfDelParams(aid: Int): ContentValues? = null
     fun commentListParams(aid: Int, page: Int, lang: Wenku8API.AppLanguage): ContentValues? = null
     fun commentContentParams(rid: Int, page: Int, lang: Wenku8API.AppLanguage): ContentValues? = null
     fun commentNewThreadParams(aid: Int, title: String, content: String): ContentValues? = null
@@ -120,6 +122,12 @@ object NativeWenkuParamsFactory : WenkuParamsFactory {
 
     override fun bookshelfListParams(lang: Wenku8API.AppLanguage): ContentValues? =
         safeCall(null) { Wenku8API.getBookshelfListParams(lang) }
+
+    override fun bookshelfAddParams(aid: Int): ContentValues? =
+        safeCall(null) { Wenku8API.getAddToBookshelfParams(aid) }
+
+    override fun bookshelfDelParams(aid: Int): ContentValues? =
+        safeCall(null) { Wenku8API.getDelFromBookshelfParams(aid) }
 
     override fun commentListParams(aid: Int, page: Int, lang: Wenku8API.AppLanguage): ContentValues? =
         safeCall(null) {
@@ -204,6 +212,14 @@ interface WenkuCatalogGateway {
     suspend fun fetchCloudBookshelf(
         appLanguage: Wenku8API.AppLanguage,
     ): WenkuApiResult<List<ParsedCloudBookshelfEntry>>
+
+    suspend fun addToCloudBookshelf(
+        aid: Int,
+    ): WenkuApiResult<Unit> = WenkuApiResult.ApiNotConfigured
+
+    suspend fun removeFromCloudBookshelf(
+        aid: Int,
+    ): WenkuApiResult<Unit> = WenkuApiResult.ApiNotConfigured
 
     suspend fun fetchReviewThreadListPage(
         aid: Int,
@@ -368,6 +384,20 @@ class WenkuApiClient(
         return executeXmlRequest(params, isIdempotentReadOnly = true) { rawXml ->
             WenkuXmlParsers.parseCloudBookshelfList(rawXml)
         }
+    }
+
+    override suspend fun addToCloudBookshelf(aid: Int): WenkuApiResult<Unit> {
+        if (!isApiConfigured) return WenkuApiResult.ApiNotConfigured
+        val params = paramsFactory.bookshelfAddParams(aid)
+            ?: return WenkuApiResult.ApiNotConfigured
+        return executeNumericMutationRequest(params)
+    }
+
+    override suspend fun removeFromCloudBookshelf(aid: Int): WenkuApiResult<Unit> {
+        if (!isApiConfigured) return WenkuApiResult.ApiNotConfigured
+        val params = paramsFactory.bookshelfDelParams(aid)
+            ?: return WenkuApiResult.ApiNotConfigured
+        return executeNumericMutationRequest(params)
     }
 
     override suspend fun fetchReviewThreadListPage(
