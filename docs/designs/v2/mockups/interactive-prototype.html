@@ -3,109 +3,128 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Wenku8 Android v2.0 — Material Design 3 Expressive Interactive Prototype</title>
+  <title>Wenku8 Android v2.0 — Material 3 Expressive (M3e) Interactive Prototype</title>
   <style>
     :root {
-      /* Canonical Material Design 3 HCT Tonal Palette (Seed: Wenku8 Blue #3B608F) */
-      --md-sys-color-surface: #FAF8FF;
-      --md-sys-color-surface-container-low: #F4F3FA;
-      --md-sys-color-surface-container: #EEEDF4;
-      --md-sys-color-surface-container-high: #E8E7EF;
-      --md-sys-color-surface-container-highest: #E2E2E9;
-      --md-sys-color-on-surface: #1A1B20;
-      --md-sys-color-on-surface-variant: #44474F;
-      --md-sys-color-primary: #3B608F;
+      /* Default Archival Day + Wenku Classic Azure M3e Tonal Palette */
+      --md-sys-color-surface: #F6F5EF;
+      --md-sys-color-surface-container-low: #EFECE4;
+      --md-sys-color-surface-container: #E9E6DD;
+      --md-sys-color-surface-container-high: #E2DFD5;
+      --md-sys-color-surface-container-highest: #DBD8CE;
+      --md-sys-color-on-surface: #1C1D1B;
+      --md-sys-color-on-surface-variant: #454743;
+      --md-sys-color-primary: #2B5EA7;
       --md-sys-color-on-primary: #FFFFFF;
-      --md-sys-color-primary-container: #D4E3FF;
-      --md-sys-color-on-primary-container: #001C3A;
+      --md-sys-color-primary-container: #D6E3FF;
+      --md-sys-color-on-primary-container: #001B3E;
       --md-sys-color-secondary-container: #D8E3F8;
       --md-sys-color-on-secondary-container: #111C2B;
       --md-sys-color-tertiary-container: #F6D9FF;
       --md-sys-color-on-tertiary-container: #271431;
       --md-sys-color-outline: #74777F;
-      --md-sys-color-outline-variant: #C4C6D0;
+      --md-sys-color-outline-variant: #C5C6C0;
+      --card-border: none;
       --md-spring-spatial: cubic-bezier(0.22, 1.28, 0.36, 1);
       --md-spring-fast: cubic-bezier(0.2, 0.9, 0.3, 1);
-      --md-duration: 380ms;
+      --md-duration: 340ms;
     }
 
     body[data-theme="dark"] {
-      --md-sys-color-surface: #111318;
-      --md-sys-color-surface-container-low: #191C20;
-      --md-sys-color-surface-container: #1D2024;
-      --md-sys-color-surface-container-high: #282A2F;
-      --md-sys-color-surface-container-highest: #33353A;
-      --md-sys-color-on-surface: #E2E2E9;
-      --md-sys-color-on-surface-variant: #C4C6D0;
-      --md-sys-color-primary: #A4C9FE;
-      --md-sys-color-on-primary: #00315D;
-      --md-sys-color-primary-container: #214876;
-      --md-sys-color-on-primary-container: #D4E3FF;
+      --md-sys-color-surface: #111312;
+      --md-sys-color-surface-container-low: #181A19;
+      --md-sys-color-surface-container: #1D201E;
+      --md-sys-color-surface-container-high: #272A28;
+      --md-sys-color-surface-container-highest: #323533;
+      --md-sys-color-on-surface: #E2E3DF;
+      --md-sys-color-on-surface-variant: #C4C7C1;
+      --md-sys-color-primary: #A6C8FF;
+      --md-sys-color-on-primary: #003061;
+      --md-sys-color-primary-container: #08458E;
+      --md-sys-color-on-primary-container: #D6E3FF;
       --md-sys-color-secondary-container: #3C4758;
       --md-sys-color-on-secondary-container: #D8E3F8;
       --md-sys-color-tertiary-container: #543F5E;
       --md-sys-color-on-tertiary-container: #F6D9FF;
-      --md-sys-color-outline: #8E9099;
-      --md-sys-color-outline-variant: #44474F;
+      --md-sys-color-outline: #8E918C;
+      --md-sys-color-outline-variant: #444743;
     }
 
-    body[data-seed="amber"] {
-      --md-sys-color-surface: #FFF8F4;
-      --md-sys-color-surface-container-low: #FAF2EC;
-      --md-sys-color-surface-container: #F4ECE5;
-      --md-sys-color-surface-container-high: #EEE6DF;
+    /* E-Ink High-Contrast Zero-Animation Mode */
+    body[data-theme="eink"] {
+      --md-sys-color-surface: #FFFFFF;
+      --md-sys-color-surface-container-low: #FFFFFF;
+      --md-sys-color-surface-container: #FFFFFF;
+      --md-sys-color-surface-container-high: #FFFFFF;
+      --md-sys-color-surface-container-highest: #FFFFFF;
+      --md-sys-color-on-surface: #000000;
+      --md-sys-color-on-surface-variant: #111111;
+      --md-sys-color-primary: #000000;
+      --md-sys-color-on-primary: #FFFFFF;
+      --md-sys-color-primary-container: #EAEAEA;
+      --md-sys-color-on-primary-container: #000000;
+      --md-sys-color-secondary-container: #E5E5E5;
+      --md-sys-color-on-secondary-container: #000000;
+      --md-sys-color-tertiary-container: #EFEFEF;
+      --md-sys-color-on-tertiary-container: #000000;
+      --md-sys-color-outline: #111111;
+      --md-sys-color-outline-variant: #111111;
+      --card-border: 1px solid #111111;
+      --md-duration: 0ms;
+    }
+
+    /* Scoped CoverThemeEngine (Applied ONLY to #screen-detail!) */
+    #screen-detail[data-cover-seed="on"] {
       --md-sys-color-primary: #8C4F1A;
+      --md-sys-color-on-primary: #FFFFFF;
       --md-sys-color-primary-container: #FFDCC2;
       --md-sys-color-on-primary-container: #2E1500;
       --md-sys-color-secondary-container: #F7DDCA;
       --md-sys-color-on-secondary-container: #2B1A0E;
     }
-
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-      user-select: none;
+    body[data-theme="dark"] #screen-detail[data-cover-seed="on"] {
+      --md-sys-color-primary: #FFB77C;
+      --md-sys-color-on-primary: #4D2600;
+      --md-sys-color-primary-container: #6D3903;
+      --md-sys-color-on-primary-container: #FFDCC2;
+      --md-sys-color-secondary-container: #534337;
+      --md-sys-color-on-secondary-container: #F7DDCA;
     }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
 
     body {
       font-family: "Roboto", "Google Sans", "Noto Sans CJK SC", sans-serif;
-      background: linear-gradient(135deg, #EAE6F5 0%, #DCE6F7 100%);
+      background: linear-gradient(135deg, #E8E5DC 0%, #D9E2EC 100%);
       color: var(--md-sys-color-on-surface);
       min-height: 100vh;
       display: flex;
       flex-direction: column;
       align-items: center;
-      padding: 20px;
+      padding: 18px;
     }
 
-    /* Top Control Bar */
     .m3-workbench {
       width: 100%;
       max-width: 1040px;
-      background: rgba(255, 255, 255, 0.85);
+      background: rgba(255, 255, 255, 0.9);
       backdrop-filter: blur(16px);
       border-radius: 24px;
       padding: 14px 22px;
-      margin-bottom: 20px;
+      margin-bottom: 18px;
       display: flex;
       flex-wrap: wrap;
       align-items: center;
       justify-content: space-between;
-      gap: 12px;
+      gap: 10px;
       box-shadow: 0 8px 28px rgba(26, 27, 32, 0.08);
     }
-
-    .m3-workbench-controls {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-    }
+    .m3-workbench-controls { display: flex; flex-wrap: wrap; gap: 8px; }
 
     .m3-assist-chip {
-      height: 34px;
+      min-height: 36px;
       padding: 0 14px;
-      border-radius: 8px;
+      border-radius: 10px;
       border: 1px solid #C4C6D0;
       background: #FAF8FF;
       color: #1A1B20;
@@ -115,29 +134,22 @@
       display: inline-flex;
       align-items: center;
       gap: 6px;
-      transition: all 0.2s ease;
     }
-    .m3-assist-chip.active {
-      background: #D8E3F8;
-      color: #111C2B;
-      border-color: transparent;
-    }
+    .m3-assist-chip.active { background: #D6E3FF; color: #001B3E; border-color: transparent; }
 
-    /* Android 16 Pixel Device Frame */
     .pixel-frame {
       width: 412px;
-      height: 880px;
+      height: 892px;
       background: var(--md-sys-color-surface);
       color: var(--md-sys-color-on-surface);
       border-radius: 48px;
-      border: 6px solid #74777F;
+      border: 6px solid #5F6368;
       box-shadow: 0 24px 64px rgba(0, 0, 0, 0.22);
       position: relative;
       overflow: hidden;
       display: flex;
       flex-direction: column;
-      transition: width var(--md-duration) var(--md-spring-spatial),
-                  background-color 0.25s ease;
+      transition: background-color var(--md-duration) ease;
     }
 
     .status-bar {
@@ -155,7 +167,7 @@
       flex: 1;
       overflow-y: auto;
       overflow-x: hidden;
-      padding-bottom: 100px;
+      padding-bottom: 84px;
     }
 
     .screen {
@@ -163,302 +175,229 @@
       padding: 4px 16px 24px;
       animation: m3SharedAxisY var(--md-duration) var(--md-spring-spatial);
     }
-    .screen.active {
-      display: block;
-    }
+    .screen.active { display: block; }
 
     @keyframes m3SharedAxisY {
-      from { opacity: 0; transform: translateY(20px) scale(0.98); }
-      to { opacity: 1; transform: translateY(0) scale(1); }
+      from { opacity: 0; transform: translateY(14px); }
+      to { opacity: 1; transform: translateY(0); }
     }
 
-    /* Canonical M3 Docked SearchBar */
     .m3-search-bar {
       height: 56px;
       background: var(--md-sys-color-surface-container-high);
+      border: var(--card-border);
       border-radius: 28px;
       padding: 0 16px;
       display: flex;
       align-items: center;
-      gap: 14px;
-      margin-bottom: 16px;
+      gap: 12px;
+      margin-bottom: 14px;
       cursor: pointer;
     }
-    .m3-search-bar span {
-      flex: 1;
-      font-size: 15px;
-      color: var(--md-sys-color-on-surface-variant);
-    }
+    .m3-search-bar span { flex: 1; font-size: 14px; color: var(--md-sys-color-on-surface-variant); }
     .m3-avatar {
-      width: 32px;
-      height: 32px;
-      border-radius: 50%;
+      width: 34px; height: 34px; border-radius: 50%;
       background: var(--md-sys-color-primary-container);
       color: var(--md-sys-color-on-primary-container);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-weight: 700;
-      font-size: 14px;
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 700; font-size: 14px;
     }
 
-    /* Canonical M3 HorizontalMultiBrowseCarousel */
-    .m3-carousel {
-      display: flex;
-      gap: 10px;
-      height: 156px;
-      margin: 10px 0 16px;
-    }
+    .m3-carousel { display: flex; gap: 10px; height: 150px; margin: 8px 0 14px; }
     .m3-carousel-item {
-      border-radius: 24px;
-      overflow: hidden;
-      position: relative;
-      cursor: pointer;
-      transition: flex var(--md-duration) var(--md-spring-spatial);
-      background-size: cover;
-      background-position: center;
-      display: flex;
-      flex-direction: column;
-      justify-content: flex-end;
-      padding: 14px;
-      color: #FFFFFF;
+      border-radius: 24px; border: var(--card-border);
+      overflow: hidden; position: relative; cursor: pointer;
+      display: flex; flex-direction: column; justify-content: flex-end;
+      padding: 14px; color: #FFFFFF;
     }
-    .m3-carousel-item.hero {
-      flex: 2.2;
-      background: linear-gradient(180deg, rgba(16,28,48,0.15) 0%, rgba(12,22,38,0.92) 100%),
-                  linear-gradient(135deg, #3B608F, #1B2E4B);
-    }
-    .m3-carousel-item.medium {
-      flex: 1.1;
-      background: linear-gradient(180deg, rgba(40,20,48,0.15) 0%, rgba(28,14,36,0.9) 100%),
-                  linear-gradient(135deg, #6D5677, #32203B);
-    }
-    .m3-carousel-item.small {
-      flex: 0.55;
-      background: linear-gradient(135deg, #545F71, #232A36);
-    }
+    body[data-theme="eink"] .m3-carousel-item { color: #000000; background: #F5F5F5 !important; }
+    .m3-carousel-item.hero { flex: 2.2; background: linear-gradient(155deg, #2B5EA7, #142B4D); }
+    .m3-carousel-item.medium { flex: 1.05; background: linear-gradient(155deg, #6D5677, #2E1F36); }
+    .m3-carousel-item.small { flex: 0.45; background: linear-gradient(155deg, #545F71, #232A36); }
 
-    /* Canonical M3 FilterChips */
-    .m3-chip-row {
-      display: flex;
-      gap: 8px;
-      overflow-x: auto;
-      padding-bottom: 12px;
+    .m3-flat-progress {
+      height: 6px; border-radius: 3px; background: rgba(255,255,255,0.28);
+      margin-top: 8px; overflow: hidden;
     }
+    body[data-theme="eink"] .m3-flat-progress { background: #DDDDDD; border: 1px solid #000; }
+    .m3-flat-progress > div { height: 100%; background: #FFFFFF; border-radius: 3px; }
+    body[data-theme="eink"] .m3-flat-progress > div { background: #000000; }
+
+    .m3-chip-row { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 10px; }
     .m3-filter-chip {
-      height: 32px;
-      padding: 0 12px;
-      border-radius: 8px;
+      min-height: 36px; padding: 0 12px; border-radius: 8px;
       border: 1px solid var(--md-sys-color-outline-variant);
       color: var(--md-sys-color-on-surface-variant);
-      font-size: 13px;
-      font-weight: 600;
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      white-space: nowrap;
-      cursor: pointer;
+      font-size: 13px; font-weight: 600;
+      display: inline-flex; align-items: center; gap: 6px;
+      white-space: nowrap; cursor: pointer;
     }
     .m3-filter-chip.selected {
       background: var(--md-sys-color-secondary-container);
       color: var(--md-sys-color-on-secondary-container);
-      border-color: transparent;
+      border-color: var(--md-sys-color-outline);
     }
 
-    /* Canonical M3 Filled Cards (surfaceContainerLow, zero borders!) */
-    .m3-grid {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 10px;
+    /* M3e Connected ButtonGroup */
+    .m3e-btn-group { display: flex; gap: 3px; margin-bottom: 10px; }
+    .m3e-toggle-btn {
+      flex: 1; height: 40px; border: var(--card-border);
+      background: var(--md-sys-color-surface-container-high);
+      color: var(--md-sys-color-on-surface-variant);
+      font-size: 13px; font-weight: 700; border-radius: 8px;
+      cursor: pointer; transition: flex var(--md-duration) var(--md-spring-fast);
     }
+    .m3e-toggle-btn:first-child { border-radius: 20px 6px 6px 20px; }
+    .m3e-toggle-btn:last-child { border-radius: 6px 20px 20px 6px; }
+    .m3e-toggle-btn.active {
+      flex: 1.35; border-radius: 20px;
+      background: var(--md-sys-color-primary);
+      color: var(--md-sys-color-on-primary);
+    }
+
+    .m3-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
     .m3-card-filled {
       background: var(--md-sys-color-surface-container-low);
+      border: var(--card-border);
       border-radius: 16px;
       overflow: hidden;
       cursor: pointer;
-      transition: transform 0.2s var(--md-spring-fast);
-    }
-    .m3-card-filled:hover {
-      transform: translateY(-3px);
     }
     .m3-card-cover {
-      height: 140px;
-      border-radius: 16px;
-      padding: 8px;
-      display: flex;
-      justify-content: flex-end;
-      align-items: flex-start;
+      height: 134px; border-radius: 16px; padding: 8px;
+      display: flex; justify-content: flex-end; align-items: flex-start;
     }
+    body[data-theme="eink"] .m3-card-cover { background: #EEEEEE !important; border-bottom: 1px solid #111; }
     .m3-tonal-badge {
-      padding: 3px 8px;
-      border-radius: 10px;
-      font-size: 10px;
-      font-weight: 700;
+      padding: 3px 8px; border-radius: 10px; font-size: 11px; font-weight: 700;
       background: var(--md-sys-color-secondary-container);
       color: var(--md-sys-color-on-secondary-container);
+      border: var(--card-border);
     }
     .m3-tonal-badge.tertiary {
       background: var(--md-sys-color-tertiary-container);
       color: var(--md-sys-color-on-tertiary-container);
     }
-    .m3-card-body {
-      padding: 8px 10px 10px;
-    }
-    .m3-card-title {
-      font-size: 13px;
-      font-weight: 700;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-    .m3-card-sub {
-      font-size: 11px;
-      color: var(--md-sys-color-on-surface-variant);
-      margin-top: 2px;
-    }
+    .m3-card-body { padding: 8px 10px 10px; }
+    .m3-card-title { font-size: 13px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .m3-card-sub { font-size: 11px; color: var(--md-sys-color-on-surface-variant); margin-top: 2px; }
 
-    /* Canonical M3 Expressive SplitButton */
-    .m3-split-btn {
-      display: flex;
-      gap: 3px;
-      margin: 14px 0;
-    }
+    /* M3e Reading-Only SplitButton + Secondary Action Row */
+    .m3-split-btn { display: flex; gap: 3px; margin: 12px 0 8px; }
     .m3-split-leading {
-      flex: 1;
-      height: 52px;
-      border: none;
-      border-radius: 26px 4px 4px 26px;
-      background: var(--md-sys-color-primary);
-      color: var(--md-sys-color-on-primary);
-      font-size: 15px;
-      font-weight: 700;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
-      cursor: pointer;
+      flex: 1; height: 50px; border: var(--card-border);
+      border-radius: 25px 4px 4px 25px;
+      background: var(--md-sys-color-primary); color: var(--md-sys-color-on-primary);
+      font-size: 15px; font-weight: 700; cursor: pointer;
     }
     .m3-split-trailing {
-      width: 48px;
-      height: 52px;
-      border: none;
-      border-radius: 4px 26px 26px 4px;
-      background: var(--md-sys-color-primary);
-      color: var(--md-sys-color-on-primary);
-      cursor: pointer;
+      width: 48px; height: 50px; border: var(--card-border);
+      border-radius: 4px 25px 25px 4px;
+      background: var(--md-sys-color-primary); color: var(--md-sys-color-on-primary);
+      font-size: 16px; cursor: pointer;
+    }
+    .m3-secondary-actions { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 14px; }
+    .m3-tonal-btn {
+      height: 42px; border-radius: 21px; border: var(--card-border);
+      background: var(--md-sys-color-secondary-container);
+      color: var(--md-sys-color-on-secondary-container);
+      font-size: 13px; font-weight: 700; cursor: pointer;
     }
 
-    /* Canonical M3 PrimaryTabs */
-    .m3-tabs {
-      display: flex;
-      border-bottom: 1px solid var(--md-sys-color-outline-variant);
-      margin-bottom: 12px;
-    }
-    .m3-tab {
-      flex: 1;
-      text-align: center;
-      padding: 12px 0;
-      font-size: 14px;
-      font-weight: 600;
-      color: var(--md-sys-color-on-surface-variant);
-      position: relative;
-      cursor: pointer;
-    }
-    .m3-tab.active {
-      color: var(--md-sys-color-primary);
-    }
-    .m3-tab.active::after {
-      content: "";
-      position: absolute;
-      bottom: 0;
-      left: 22%;
-      right: 22%;
-      height: 3px;
-      border-radius: 3px 3px 0 0;
-      background: var(--md-sys-color-primary);
-    }
-
-    /* Canonical M3 NavigationBar (80dp bottom bar with 64x32dp indicator pill) */
-    .m3-nav-bar {
-      position: absolute;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      height: 80px;
-      background: var(--md-sys-color-surface-container);
+    /* Non-Intrusive Inline Server-Support Banner (NovelDetail Only, Zero CLS) */
+    .m3-support-ad-slot {
+      height: 62px;
+      border-radius: 14px;
+      background: var(--md-sys-color-surface-container-low);
+      border: 1px dashed var(--md-sys-color-outline-variant);
+      padding: 8px 14px;
+      margin: 12px 0 14px;
       display: flex;
       align-items: center;
-      justify-content: space-around;
-      z-index: 30;
-      transition: all var(--md-duration) var(--md-spring-spatial);
+      justify-content: space-between;
+      font-size: 12px;
+      color: var(--md-sys-color-on-surface-variant);
     }
-    .m3-nav-bar.floating {
-      left: 16px;
-      right: 16px;
-      bottom: 16px;
+
+    .m3-tabs { display: flex; border-bottom: 1px solid var(--md-sys-color-outline-variant); margin-bottom: 12px; }
+    .m3-tab {
+      flex: 1; text-align: center; padding: 12px 0; font-size: 14px; font-weight: 600;
+      color: var(--md-sys-color-on-surface-variant); position: relative; cursor: pointer;
+    }
+    .m3-tab.active { color: var(--md-sys-color-primary); font-weight: 700; }
+    .m3-tab.active::after {
+      content: ""; position: absolute; bottom: 0; left: 22%; right: 22%; height: 3px;
+      border-radius: 3px 3px 0 0; background: var(--md-sys-color-primary);
+    }
+
+    /* Canonical M3 Expressive ShortNavigationBar (64dp height, 56x32dp indicator) */
+    .m3e-short-nav-bar {
+      position: absolute; left: 0; right: 0; bottom: 0;
       height: 64px;
-      border-radius: 32px;
-      background: var(--md-sys-color-surface-container-high);
-      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.16);
+      background: var(--md-sys-color-surface-container);
+      border-top: var(--card-border);
+      display: flex; align-items: center; justify-content: space-around;
+      z-index: 30;
     }
     .m3-nav-item {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 4px;
-      cursor: pointer;
-      color: var(--md-sys-color-on-surface-variant);
-      font-size: 12px;
-      font-weight: 600;
+      display: flex; flex-direction: column; align-items: center; gap: 2px;
+      cursor: pointer; color: var(--md-sys-color-on-surface-variant);
+      font-size: 11px; font-weight: 600; min-width: 64px;
     }
     .m3-nav-pill {
-      width: 64px;
-      height: 32px;
-      border-radius: 16px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      transition: background-color 0.2s ease;
+      width: 56px; height: 30px; border-radius: 15px;
+      display: flex; align-items: center; justify-content: center; font-size: 15px;
     }
     .m3-nav-item.active .m3-nav-pill {
       background: var(--md-sys-color-secondary-container);
       color: var(--md-sys-color-on-secondary-container);
+      border: var(--card-border);
     }
-    .m3-nav-item.active {
-      color: var(--md-sys-color-on-surface);
-      font-weight: 700;
-    }
+    .m3-nav-item.active { color: var(--md-sys-color-on-surface); font-weight: 700; }
 
-    /* Reader Modal + M3 ModalBottomSheet with Drag Handle */
-    .m3-reader-overlay {
-      position: absolute;
-      inset: 0;
+    /* Overlays (Reader & Network Diagnostics) */
+    .m3-overlay {
+      position: absolute; inset: 0;
       background: var(--md-sys-color-surface);
       color: var(--md-sys-color-on-surface);
-      z-index: 50;
-      display: none;
-      flex-direction: column;
+      z-index: 50; display: none; flex-direction: column;
     }
-    .m3-reader-overlay.open {
-      display: flex;
-    }
+    .m3-overlay.open { display: flex; }
+
+    /* Opaque-Capsule Active Slider Sheet in Reader */
     .m3-bottom-sheet {
       background: var(--md-sys-color-surface-container-low);
+      border-top: var(--card-border);
       border-radius: 28px 28px 0 0;
-      padding: 12px 20px 24px;
+      padding: 12px 18px 22px;
       box-shadow: 0 -8px 28px rgba(0, 0, 0, 0.12);
-      transition: opacity 0.2s ease;
+      transition: background-color 0.16s ease, box-shadow 0.16s ease;
     }
-    .m3-bottom-sheet.transparent-preview {
-      opacity: 0.22;
+    .m3-bottom-sheet.scrubbing {
+      background: transparent;
+      box-shadow: none;
+      border-top: none;
     }
-    .m3-drag-handle {
-      width: 32px;
-      height: 4px;
-      border-radius: 2px;
-      background: var(--md-sys-color-on-surface-variant);
-      opacity: 0.4;
-      margin: 0 auto 14px;
+    .m3-bottom-sheet.scrubbing .hide-on-scrub { opacity: 0; pointer-events: none; }
+    .m3-slider-capsule {
+      padding: 10px 14px;
+      border-radius: 20px;
+      transition: background-color 0.16s ease;
+    }
+    .m3-bottom-sheet.scrubbing .m3-slider-capsule {
+      background: var(--md-sys-color-surface-container-highest);
+      border: var(--card-border);
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18);
+    }
+
+    .m3-switch {
+      padding: 4px 12px; border-radius: 16px; font-size: 12px; font-weight: 700;
+      background: var(--md-sys-color-primary); color: var(--md-sys-color-on-primary);
+      border: var(--card-border); cursor: pointer;
+    }
+    .m3-switch.off {
+      background: var(--md-sys-color-surface-container-highest);
+      color: var(--md-sys-color-on-surface-variant);
     }
   </style>
 </head>
@@ -466,67 +405,59 @@
 
   <div class="m3-workbench">
     <div>
-      <div style="font-size:12px;font-weight:700;color:#3B608F;">MATERIAL DESIGN 3 EXPRESSIVE PROTOTYPE</div>
-      <div style="font-size:18px;font-weight:800;color:#1A1B20;">Wenku8 Android v2.0 — Material You Interactive Sandbox</div>
+      <div style="font-size:12px;font-weight:700;color:#2B5EA7;">MATERIAL 3 EXPRESSIVE (M3e) · API 23+ · ROOM SQLITE</div>
+      <div style="font-size:18px;font-weight:800;color:#1A1B20;">Wenku8 Android v2.0 — 4-Tab M3e & Network Optimization Sandbox</div>
     </div>
     <div class="m3-workbench-controls">
-      <button class="m3-assist-chip active" onclick="setTheme('light', this)">☀ M3 Light</button>
-      <button class="m3-assist-chip" onclick="setTheme('dark', this)">☾ M3 Dark</button>
-      <button class="m3-assist-chip" onclick="toggleSeed(this)">🎨 封面动态取色 (Amber Seed)</button>
-      <button class="m3-assist-chip" onclick="toggleFloatingNav(this)">▭ 切换 M3 悬浮导航栏</button>
+      <button class="m3-assist-chip active" onclick="setTheme('light', this)">☀ 日间纸页</button>
+      <button class="m3-assist-chip" onclick="setTheme('dark', this)">☾ 夜间墨色</button>
+      <button class="m3-assist-chip" onclick="setTheme('eink', this)">✒ 墨水屏 (1dp/零动画)</button>
+      <button class="m3-assist-chip active" id="seedBtn" onclick="toggleCoverSeed(this)">🎨 详情页封面取色: 开</button>
+      <button class="m3-assist-chip" onclick="openDiagnostics()">🩺 打开网络检测</button>
     </div>
   </div>
 
-  <div class="pixel-frame" id="pixelFrame">
+  <div class="pixel-frame">
     <div class="status-bar">
       <span>14:20</span>
-      <span>5G · 100%</span>
+      <span>Wi-Fi · 100%</span>
     </div>
 
     <div class="viewport">
-      <!-- SCREEN 1: BOOKSHELF -->
+      <!-- TAB 1: BOOKSHELF (书架) -->
       <section class="screen active" id="screen-bookshelf">
-        <div class="m3-search-bar" onclick="switchScreen('explore')">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
-          <span>搜索书架、在线文库或输入 AID...</span>
-          <div class="m3-avatar">M</div>
+        <div class="m3-search-bar" onclick="alert('展开统一搜索工作室：\n• 0ms 本地书架即时匹配\n• 在线按书名 / 按作者 / 作品编号直达（含 5s 冷却自动排队）')">
+          <span>🔍 搜索本地书架、在线书名/作者或编号…</span>
+          <div class="m3-avatar" onclick="event.stopPropagation();switchScreen('profile', document.querySelectorAll('.m3-nav-item')[3])">M</div>
         </div>
 
         <div style="display:flex;justify-content:space-between;align-items:center;">
-          <span style="font-size:17px;font-weight:700;">继续阅读</span>
-          <span style="font-size:13px;font-weight:700;color:var(--md-sys-color-primary);">全部记录</span>
+          <span style="font-size:16px;font-weight:800;">继续阅读</span>
+          <span style="font-size:12px;font-weight:700;color:var(--md-sys-color-primary);cursor:pointer;" onclick="alert('触发非阻塞云端书架双向同步 (BookshelfSync)')">☁ 云书架同步</span>
         </div>
 
-        <!-- Canonical M3 HorizontalMultiBrowseCarousel -->
         <div class="m3-carousel">
           <div class="m3-carousel-item hero" onclick="openReader()">
             <div style="font-size:15px;font-weight:700;">狼与香辛料 (第十七卷)</div>
-            <div style="font-size:12px;opacity:0.85;margin-top:2px;">第三话 太阳之金币 · 68%</div>
+            <div style="font-size:12px;opacity:0.9;margin-top:2px;">第三话 太阳之金币 · 68%</div>
+            <div class="m3-flat-progress"><div style="width:68%;"></div></div>
           </div>
           <div class="m3-carousel-item medium" onclick="switchScreen('detail')">
             <div style="font-size:13px;font-weight:700;">败犬女主</div>
-            <div style="font-size:11px;opacity:0.85;">第7卷 · 45%</div>
+            <div style="font-size:11px;opacity:0.9;">第7卷 · 45%</div>
+            <div class="m3-flat-progress"><div style="width:45%;"></div></div>
           </div>
           <div class="m3-carousel-item small" onclick="switchScreen('detail')"></div>
         </div>
 
         <div class="m3-chip-row">
           <div class="m3-filter-chip selected">✓ 全部 (64)</div>
-          <div class="m3-filter-chip">连载更新 (3)</div>
+          <div class="m3-filter-chip">有新章节 (3)</div>
           <div class="m3-filter-chip">已缓存 (42)</div>
-          <div class="m3-filter-chip">电击文库</div>
+          <div class="m3-filter-chip">#奇幻 (本地)</div>
         </div>
 
         <div class="m3-grid">
-          <div class="m3-card-filled" onclick="switchScreen('detail')">
-            <div class="m3-card-cover" style="background:linear-gradient(135deg,#3B608F,#192E4A);">
-              <span class="m3-tonal-badge tertiary">有更新</span>
-            </div>
-            <div class="m3-card-body">
-              <div class="m3-card-title">败犬女主太多了！</div>
-              <div class="m3-card-sub">第7卷 · 45%</div>
-            </div>
-          </div>
           <div class="m3-card-filled" onclick="switchScreen('detail')">
             <div class="m3-card-cover" style="background:linear-gradient(135deg,#8C4F1A,#3E2007);">
               <span class="m3-tonal-badge">已缓存</span>
@@ -537,173 +468,298 @@
             </div>
           </div>
           <div class="m3-card-filled" onclick="switchScreen('detail')">
+            <div class="m3-card-cover" style="background:linear-gradient(135deg,#2B5EA7,#152C4E);">
+              <span class="m3-tonal-badge tertiary">新章节</span>
+            </div>
+            <div class="m3-card-body">
+              <div class="m3-card-title">败犬女主太多了！</div>
+              <div class="m3-card-sub">第7卷 · 45%</div>
+            </div>
+          </div>
+          <div class="m3-card-filled" onclick="switchScreen('detail')">
             <div class="m3-card-cover" style="background:linear-gradient(135deg,#43685A,#193026);">
               <span class="m3-tonal-badge">已缓存</span>
             </div>
             <div class="m3-card-body">
               <div class="m3-card-title">刀剑神域进击篇</div>
-              <div class="m3-card-sub">第27卷 · 90%</div>
-            </div>
-          </div>
-          <div class="m3-card-filled" onclick="switchScreen('detail')">
-            <div class="m3-card-cover" style="background:linear-gradient(135deg,#6D5677,#2E1F36);">
-              <span class="m3-tonal-badge">完结</span>
-            </div>
-            <div class="m3-card-body">
-              <div class="m3-card-title">无职转生</div>
-              <div class="m3-card-sub">第26卷 · 已读完</div>
-            </div>
-          </div>
-          <div class="m3-card-filled" onclick="switchScreen('detail')">
-            <div class="m3-card-cover" style="background:linear-gradient(135deg,#874553,#3B161E);">
-              <span class="m3-tonal-badge tertiary">有更新</span>
-            </div>
-            <div class="m3-card-body">
-              <div class="m3-card-title">欢迎来到实力至上</div>
-              <div class="m3-card-sub">二年级篇 · 80%</div>
-            </div>
-          </div>
-          <div class="m3-card-filled" onclick="switchScreen('detail')">
-            <div class="m3-card-cover" style="background:linear-gradient(135deg,#545F71,#212833);">
-              <span class="m3-tonal-badge">已缓存</span>
-            </div>
-            <div class="m3-card-body">
-              <div class="m3-card-title">古典部系列：冰菓</div>
-              <div class="m3-card-sub">第6卷 · 30%</div>
+              <div class="m3-card-sub">第8卷 · 90%</div>
             </div>
           </div>
         </div>
       </section>
 
-      <!-- SCREEN 2: EXPLORE & RANKINGS -->
-      <section class="screen" id="screen-explore">
+      <!-- TAB 2: LATEST (最新 — lastUpdate / postDate / fullFlag) -->
+      <section class="screen" id="screen-latest">
         <div class="m3-search-bar">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
-          <span>搜索全站轻小说、文库分类、标签...</span>
+          <span>🔍 按小说标题或作者名称搜索在线文库…</span>
           <div class="m3-avatar">M</div>
         </div>
 
         <div class="m3-tabs">
-          <div class="m3-tab active">热门排行</div>
-          <div class="m3-tab">动画化企划</div>
-          <div class="m3-tab">今日更新</div>
+          <div class="m3-tab active">最近更新</div>
+          <div class="m3-tab">最新入库</div>
           <div class="m3-tab">完结精品</div>
         </div>
 
-        <div class="m3-chip-row">
-          <div class="m3-filter-chip selected">✓ 周榜排行</div>
-          <div class="m3-filter-chip">月榜排行</div>
-          <div class="m3-filter-chip">总榜经典</div>
-          <div class="m3-filter-chip">字数排行</div>
+        <div class="m3-card-filled" style="padding:14px;margin-bottom:10px;" onclick="switchScreen('detail')">
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <span class="m3-tonal-badge tertiary">连载中</span>
+            <span style="font-size:12px;color:var(--md-sys-color-on-surface-variant);">更新于 2026-11-15</span>
+          </div>
+          <div style="font-size:16px;font-weight:700;margin:6px 0 2px;">败犬女主太多了！</div>
+          <div style="font-size:13px;color:var(--md-sys-color-on-surface-variant);">作者：雨森焚火 · 校园 / 青春 / 恋爱 / 喜剧</div>
+          <div style="font-size:12px;color:var(--md-sys-color-on-surface-variant);margin-top:6px;">明明是背景人物的我，为什么会被败犬女主们包围……</div>
         </div>
 
         <div class="m3-card-filled" style="padding:14px;margin-bottom:10px;" onclick="switchScreen('detail')">
-          <span class="m3-tonal-badge">#1 周榜第一</span>
-          <div style="font-size:16px;font-weight:700;margin:6px 0 2px;">败犬女主太多了！</div>
-          <div style="font-size:13px;color:var(--md-sys-color-on-surface-variant);">雨森焚火 · 小学馆GAGAGA文库 · 第 7 卷连载中</div>
-        </div>
-        <div class="m3-card-filled" style="padding:14px;margin-bottom:10px;" onclick="switchScreen('detail')">
-          <span class="m3-tonal-badge">#2 周榜第二</span>
-          <div style="font-size:16px;font-weight:700;margin:6px 0 2px;">狼与香辛料 Spring Log</div>
-          <div style="font-size:13px;color:var(--md-sys-color-on-surface-variant);">支仓冻砂 · 电击文库 · 第 24 卷连载中</div>
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <span class="m3-tonal-badge">已完成</span>
+            <span style="font-size:12px;color:var(--md-sys-color-on-surface-variant);">更新于 2026-11-12</span>
+          </div>
+          <div style="font-size:16px;font-weight:700;margin:6px 0 2px;">狼与香辛料</div>
+          <div style="font-size:13px;color:var(--md-sys-color-on-surface-variant);">作者：支仓冻砂 · 奇幻 / 旅行 / 经商</div>
         </div>
       </section>
 
-      <!-- SCREEN 3: NOVEL DETAIL -->
-      <section class="screen" id="screen-detail">
-        <div style="display:flex;align-items:center;gap:12px;margin:8px 0 16px;">
-          <button class="m3-assist-chip" onclick="switchScreen('bookshelf')">← 返回</button>
-          <span style="font-size:18px;font-weight:700;">作品详情</span>
+      <!-- TAB 3: RANKINGS (排行 — 2D Metric × Period Matrix) -->
+      <section class="screen" id="screen-rankings">
+        <div class="m3-search-bar">
+          <span>🔍 按小说标题或作者名称搜索在线文库…</span>
+          <div class="m3-avatar">M</div>
         </div>
 
-        <div style="display:flex;gap:16px;">
-          <div style="width:112px;height:156px;border-radius:18px;background:linear-gradient(135deg,#8C4F1A,#3E2007);flex-shrink:0;"></div>
+        <div class="m3e-btn-group">
+          <button class="m3e-toggle-btn active">点击榜</button>
+          <button class="m3e-toggle-btn">推荐榜</button>
+          <button class="m3e-toggle-btn">总收藏</button>
+          <button class="m3e-toggle-btn">字数榜</button>
+        </div>
+
+        <div class="m3-chip-row">
+          <div class="m3-filter-chip selected">✓ 周榜</div>
+          <div class="m3-filter-chip">日榜</div>
+          <div class="m3-filter-chip">月榜</div>
+          <div class="m3-filter-chip">总榜</div>
+        </div>
+
+        <div class="m3-card-filled" style="padding:14px;margin-bottom:10px;" onclick="switchScreen('detail')">
+          <span class="m3-tonal-badge">#1 周点击榜</span>
+          <div style="font-size:16px;font-weight:700;margin:6px 0 2px;">败犬女主太多了！</div>
+          <div style="font-size:13px;color:var(--md-sys-color-on-surface-variant);">作者：雨森焚火 · 连载中 · 校园 恋爱 喜剧</div>
+        </div>
+        <div class="m3-card-filled" style="padding:14px;margin-bottom:10px;" onclick="switchScreen('detail')">
+          <span class="m3-tonal-badge">#2 周点击榜</span>
+          <div style="font-size:16px;font-weight:700;margin:6px 0 2px;">狼与羊皮纸</div>
+          <div style="font-size:13px;color:var(--md-sys-color-on-surface-variant);">作者：支仓冻砂 · 连载中 · 奇幻 冒险 续作</div>
+        </div>
+      </section>
+
+      <!-- NOVEL DETAIL SCREEN (Scoped Cover Seed + Inline Support Ad + Atomic TOC) -->
+      <section class="screen" id="screen-detail" data-cover-seed="on">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin:6px 0 14px;">
+          <button class="m3-assist-chip" onclick="switchScreen('bookshelf', document.querySelectorAll('.m3-nav-item')[0])">← 返回</button>
+          <span style="font-size:16px;font-weight:800;">作品详情 · #0005</span>
+          <span style="font-size:13px;color:var(--md-sys-color-primary);cursor:pointer;" onclick="alert('分享《狼与香辛料》链接')">分享</span>
+        </div>
+
+        <div style="display:flex;gap:14px;">
+          <div style="width:104px;height:146px;border-radius:16px;background:linear-gradient(135deg,#8C4F1A,#3E2007);flex-shrink:0;border:var(--card-border);"></div>
           <div>
-            <span class="m3-tonal-badge">电击文库 · 已完结</span>
-            <h2 style="font-size:22px;font-weight:800;margin:6px 0 4px;">狼与香辛料</h2>
-            <div style="font-size:14px;font-weight:700;color:var(--md-sys-color-primary);">作者：支仓冻砂</div>
-            <div style="font-size:13px;color:var(--md-sys-color-on-surface-variant);margin-top:4px;">插画：文仓十 · 全 17 卷</div>
+            <span class="m3-tonal-badge">电击文库 · 已完成</span>
+            <h2 style="font-size:20px;font-weight:800;margin:6px 0 4px;cursor:pointer;" onclick="alert('作品编号 #5：狼与香辛料')">狼与香辛料</h2>
+            <div style="font-size:13px;font-weight:700;color:var(--md-sys-color-primary);cursor:pointer;" onclick="alert('跳转按作者搜索：支仓冻砂')">作者：支仓冻砂 ›</div>
+            <div style="font-size:12px;color:var(--md-sys-color-on-surface-variant);margin-top:4px;">全文 200.4 万字 · 总点击 231.6万 · 收藏 1.4万</div>
           </div>
         </div>
 
+        <!-- M3e Reading-Only SplitButton + Separate Secondary Row -->
         <div class="m3-split-btn">
-          <button class="m3-split-leading" onclick="openReader()">▶ 继续阅读 · 第3卷 第2话</button>
-          <button class="m3-split-trailing" onclick="alert('打开 M3 ModalBottomSheet 离线缓存面板')">▾</button>
+          <button class="m3-split-leading" onclick="openReader()">▶ 继续阅读 · 第三卷 第二话 (42%)</button>
+          <button class="m3-split-trailing" onclick="alert('阅读菜单：\n• 从第一卷序章开始阅读\n• 选择阅读引擎模式\n• 朗读本章 (TTS)')">▾</button>
+        </div>
+        <div class="m3-secondary-actions">
+          <button class="m3-tonal-btn">✓ 已在书架</button>
+          <button class="m3-tonal-btn" onclick="alert('打开非阻塞 4 模式缓存面板：\n1. 智能更新 (推荐)\n2. 检查并下载更新\n3. 分卷自由勾选\n4. 全量覆盖重下\n(使用 SQLite @Upsert 原子更新目录版本，绝不误删正文缓存)')">↓ 离线缓存</button>
+          <button class="m3-tonal-btn" onclick="alert('打开书评专区 (共 142 条讨论)')">💬 书评 (142)</button>
         </div>
 
-        <div class="m3-tabs">
-          <div class="m3-tab active">目录与分卷 (17)</div>
-          <div class="m3-tab">书评讨论 (38)</div>
-          <div class="m3-tab">插图画廊</div>
+        <div class="m3-card-filled" style="padding:12px 14px;font-size:13px;line-height:1.55;">
+          <strong>内容简介：</strong>从教会都市出发的商人罗伦斯，在装满麦子的马车上发现了熟睡的丰收贤狼赫萝。一段围绕中世纪经济学与北方故乡的漫长旅途就此展开……
         </div>
 
-        <div class="m3-card-filled" style="padding:14px;margin-bottom:8px;">
-          <div style="display:flex;justify-content:space-between;font-weight:700;font-size:15px;">
+        <!-- Minimal Non-UX-Harming Server-Support Ad Slot (NovelDetail ONLY, Zero CLS) -->
+        <div class="m3-support-ad-slot">
+          <div>
+            <div style="font-weight:700;">赞助推广 · 支持文库中转服务器运营</div>
+            <div style="font-size:11px;opacity:0.8;">仅在详情页静默展示 · 阅读器零广告 · 离线自动折叠</div>
+          </div>
+          <span class="m3-tonal-badge">Ad</span>
+        </div>
+
+        <div style="font-size:15px;font-weight:800;margin-bottom:8px;">目录与分卷 (共 17 卷)</div>
+        <div class="m3-card-filled" style="padding:12px 14px;margin-bottom:8px;">
+          <div style="display:flex;justify-content:space-between;font-weight:700;font-size:14px;">
             <span>第一卷 旅途的开端</span>
             <span class="m3-tonal-badge">已缓存 8/8</span>
           </div>
         </div>
-        <div class="m3-card-filled" style="padding:14px;background:var(--md-sys-color-surface-container-high);">
-          <div style="font-weight:700;font-size:15px;margin-bottom:8px;">第三卷 狼与黄铁矿 (已展开)</div>
-          <div style="padding:10px;border-radius:12px;background:var(--md-sys-color-primary-container);color:var(--md-sys-color-on-primary-container);font-weight:700;font-size:13px;cursor:pointer;" onclick="openReader()">
+        <div class="m3-card-filled" style="padding:12px 14px;background:var(--md-sys-color-surface-container-high);">
+          <div style="font-weight:700;font-size:14px;margin-bottom:8px;">▼ 第三卷 狼与黄铁矿 (上次读到)</div>
+          <div style="padding:10px 12px;border-radius:12px;background:var(--md-sys-color-primary-container);color:var(--md-sys-color-on-primary-container);font-weight:700;font-size:13px;cursor:pointer;" onclick="openReader()">
             ▶ 第二话 真实与冒牌货 (正在阅读 · 42%)
+          </div>
+          <div style="margin-top:8px;font-size:12px;font-weight:700;color:var(--md-sys-color-primary);cursor:pointer;" onclick="alert('展开本卷《插图》画集 (12张彩页 · 支持口绘双页跨页拼合)')">
+            🖼 本卷《插图》章节 (12P · 支持跨页拼合) ›
           </div>
         </div>
       </section>
 
-      <!-- SCREEN 4: PROFILE & SETTINGS -->
+      <!-- TAB 4: PROFILE, NETWORK OPTIMIZATION & BACKUP (我的) -->
       <section class="screen" id="screen-profile">
-        <h2 style="font-size:24px;font-weight:800;margin:8px 0 16px;">我的与设置</h2>
-        <div class="m3-card-filled" style="padding:18px;margin-bottom:14px;background:var(--md-sys-color-surface-container-high);">
-          <div style="font-size:18px;font-weight:800;">MewX · 轻国骑士</div>
-          <div style="font-size:13px;color:var(--md-sys-color-on-surface-variant);margin:4px 0 12px;">UID: 12345 · 积分: 1,284</div>
-          <span class="m3-tonal-badge">✓ 今日已签到 (+1 积分)</span>
+        <h2 style="font-size:22px;font-weight:800;margin:6px 0 12px;">我的与设置</h2>
+
+        <!-- Account Card (Supports Login/Register/Logout + Daily Sign-In) -->
+        <div class="m3-card-filled" style="padding:16px;margin-bottom:12px;background:var(--md-sys-color-surface-container-high);">
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <div>
+              <div style="font-size:17px;font-weight:800;" id="acctName">MewX · 轻国骑士</div>
+              <div style="font-size:12px;color:var(--md-sys-color-on-surface-variant);margin-top:2px;" id="acctSub">UID: 12345 · 积分: 1,284 · 经验: 4,520</div>
+            </div>
+            <button class="m3-assist-chip" onclick="toggleAuthState()" id="authBtn">退出登录</button>
+          </div>
+          <div style="margin-top:10px;display:flex;gap:8px;" id="signRow">
+            <span class="m3-tonal-badge">✓ 今日已签到 (+1 积分)</span>
+          </div>
         </div>
+
+        <!-- Network & Automatic Connection Optimization Card -->
+        <div class="m3-card-filled" style="padding:16px;margin-bottom:12px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <span style="font-size:15px;font-weight:800;">自动优化连接</span>
+            <button class="m3-switch" id="autoOptSwitch" onclick="toggleAutoOpt()">已开启</button>
+          </div>
+          <div style="font-size:12px;font-weight:700;color:var(--md-sys-color-primary);margin-top:6px;" id="autoOptStatus">
+            状态：已优化当前网络连接 · 优选线路 cf-v4-02 (中位数降低 34% · 14:12 对比 5 次)
+          </div>
+          <div style="font-size:11px;color:var(--md-sys-color-on-surface-variant);margin-top:4px;">
+            空闲时自动优选更快的文库中转连接，不修改系统网络，不自动上传诊断数据。
+          </div>
+          <div style="display:flex;gap:8px;margin-top:12px;">
+            <button class="m3-tonal-btn" style="flex:1;" onclick="openDiagnostics()">🩺 网络检测与诊断 ›</button>
+            <button class="m3-tonal-btn" style="flex:1;" onclick="resetAutoOpt()">↺ 恢复默认重测</button>
+          </div>
+        </div>
+
+        <!-- SQLite Backup & Archive Card -->
         <div class="m3-card-filled" style="padding:16px;">
-          <div style="font-weight:700;margin-bottom:6px;">Material You 动态壁纸与封面取色</div>
-          <div style="font-size:13px;color:var(--md-sys-color-on-surface-variant);">支持浅色日间、深色夜间、纯黑 AMOLED 与墨水屏无动画模式。</div>
+          <div style="font-size:15px;font-weight:800;margin-bottom:4px;">内置数据库与存档备份</div>
+          <div style="font-size:12px;color:var(--md-sys-color-on-surface-variant);margin-bottom:10px;">
+            64 本书架收藏 · 离线正文 42 MB · 支持轻量存档与含正文全量归档 (.wk8backup)
+          </div>
+          <div style="display:flex;gap:8px;">
+            <button class="m3-tonal-btn" style="flex:1;" onclick="alert('通过 SAF 导出一致性 VACUUM INTO 备份包 (.wk8backup.zip)')">📤 导出存档</button>
+            <button class="m3-tonal-btn" style="flex:1;" onclick="alert('支持智能合并 .wk8backup.zip 或导入旧版 v1.x wenku8 文件夹')">📥 导入 / 合并</button>
+          </div>
         </div>
       </section>
     </div>
 
-    <!-- M3 READER OVERLAY + M3 MODAL BOTTOM SHEET -->
-    <div class="m3-reader-overlay" id="readerOverlay">
-      <div style="height:56px;padding:0 16px;background:var(--md-sys-color-surface-container);display:flex;align-items:center;justify-content:space-between;">
+    <!-- OVERLAY 1: UNIFIED READER + OPAQUE-CAPSULE SLIDER PREVIEW -->
+    <div class="m3-overlay" id="readerOverlay">
+      <div style="height:54px;padding:0 16px;background:var(--md-sys-color-surface-container);display:flex;align-items:center;justify-content:space-between;border-bottom:var(--card-border);">
         <button class="m3-assist-chip" onclick="closeReader()">← 返回</button>
-        <span style="font-size:15px;font-weight:700;">第三卷 · 第二话 真实与冒牌货</span>
+        <span style="font-size:14px;font-weight:700;">第三卷 · 第二话 真实与冒牌货</span>
       </div>
-      <div id="readerBody" style="flex:1;padding:20px 24px;font-size:19px;line-height:1.75;overflow-y:auto;">
+      <div id="readerBody" style="flex:1;padding:20px 24px;font-size:19px;line-height:1.78;overflow-y:auto;">
         <p style="text-indent:2em;margin-bottom:14px;">旅行于各地贩卖并收购物品的商人克拉福，在结束了坎梅尔森的黄铁矿骚动之后，握着缰绳望向北方灰白色的天空。</p>
         <p style="text-indent:2em;margin-bottom:14px;">「呐，汝怎么又露出一副算盘打不响的苦瓜脸呀？」</p>
-        <p style="text-indent:2em;margin-bottom:14px;">坐在身旁的贤狼赫萝晃动着琥珀色的双耳，用蓬松的大尾巴轻轻拍了拍车板。</p>
+        <p style="text-indent:2em;margin-bottom:14px;">坐在身旁的贤狼赫萝晃动着琥珀色的双耳，用蓬松的大尾巴轻轻拍了拍车板。熟透的麦香混合着果酒的气息在冷冽的晨风中弥漫开来。</p>
       </div>
       <div class="m3-bottom-sheet" id="readerSheet">
-        <div class="m3-drag-handle"></div>
-        <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:700;margin-bottom:8px;">
-          <span>字号大小 (拖动时面板半透明实时预览)</span>
-          <span id="fontLabel" style="color:var(--md-sys-color-primary);">19 sp</span>
+        <div class="hide-on-scrub" style="font-size:12px;color:var(--md-sys-color-on-surface-variant);margin-bottom:6px;text-align:center;">
+          按住拖动滑块：其余控件自动隐藏，当前滑块保持不透明胶囊清晰可读
         </div>
-        <input
-          type="range" min="15" max="26" value="19" style="width:100%;"
-          onmousedown="document.getElementById('readerSheet').classList.add('transparent-preview')"
-          onmouseup="document.getElementById('readerSheet').classList.remove('transparent-preview')"
-          oninput="document.getElementById('readerBody').style.fontSize=this.value+'px';document.getElementById('fontLabel').textContent=this.value+' sp';"
-        />
+        <div class="m3-slider-capsule">
+          <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:700;margin-bottom:6px;">
+            <span>字号大小</span>
+            <span id="fontLabel" style="color:var(--md-sys-color-primary);">19 sp</span>
+          </div>
+          <input
+            type="range" min="15" max="26" value="19" style="width:100%;"
+            onpointerdown="document.getElementById('readerSheet').classList.add('scrubbing')"
+            onpointerup="document.getElementById('readerSheet').classList.remove('scrubbing')"
+            oninput="document.getElementById('readerBody').style.fontSize=this.value+'px';document.getElementById('fontLabel').textContent=this.value+' sp';"
+          />
+        </div>
       </div>
     </div>
 
-    <!-- Canonical M3 NavigationBar -->
-    <nav class="m3-nav-bar" id="m3NavBar">
+    <!-- OVERLAY 2: NETWORK DIAGNOSTICS SCREEN (网络检测) -->
+    <div class="m3-overlay" id="diagOverlay">
+      <div style="height:54px;padding:0 16px;background:var(--md-sys-color-surface-container);display:flex;align-items:center;justify-content:space-between;border-bottom:var(--card-border);">
+        <button class="m3-assist-chip" onclick="closeDiagnostics()">← 返回</button>
+        <span style="font-size:15px;font-weight:800;">网络检测与连接优化</span>
+        <span style="font-size:13px;font-weight:700;color:var(--md-sys-color-primary);cursor:pointer;" onclick="previewShareReport()">分享报告</span>
+      </div>
+      <div style="flex:1;padding:14px 16px;overflow-y:auto;">
+        <div class="m3-card-filled" style="padding:14px;margin-bottom:12px;">
+          <div style="font-size:13px;font-weight:700;">底层网络：Wi-Fi (未计费) · VPN：未检测到</div>
+          <div style="font-size:12px;color:var(--md-sys-color-on-surface-variant);margin-top:4px;" id="diagRouteLabel">
+            当前策略：自动优化连接已开启 (优选线路 cf-v4-02)
+          </div>
+        </div>
+
+        <div class="m3-card-filled" style="padding:16px;margin-bottom:12px;background:var(--md-sys-color-surface-container);">
+          <div style="font-size:15px;font-weight:800;" id="diagHeadline">准备就绪 · 快速检测 (10 次请求)</div>
+          <div style="font-size:12px;color:var(--md-sys-color-on-surface-variant);margin-top:4px;" id="diagSub">
+            仅传输固定大小诊断包，不携带登录 Cookie，不读取账号或书架。
+          </div>
+
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:12px 0;" id="diagMetrics">
+            <div class="m3-card-filled" style="padding:10px;">
+              <div style="font-size:11px;color:var(--md-sys-color-on-surface-variant);">成功 / 尝试次数</div>
+              <div style="font-size:16px;font-weight:800;margin-top:2px;" id="mSuccess">— / 10 次</div>
+            </div>
+            <div class="m3-card-filled" style="padding:10px;">
+              <div style="font-size:11px;color:var(--md-sys-color-on-surface-variant);">完整响应中位数</div>
+              <div style="font-size:16px;font-weight:800;margin-top:2px;" id="mMedian">—</div>
+            </div>
+            <div class="m3-card-filled" style="padding:10px;">
+              <div style="font-size:11px;color:var(--md-sys-color-on-surface-variant);">响应头到达中位数</div>
+              <div style="font-size:16px;font-weight:800;margin-top:2px;" id="mHeader">—</div>
+            </div>
+            <div class="m3-card-filled" style="padding:10px;">
+              <div style="font-size:11px;color:var(--md-sys-color-on-surface-variant);">最快 / 最慢</div>
+              <div style="font-size:15px;font-weight:800;margin-top:2px;" id="mRange">—</div>
+            </div>
+          </div>
+
+          <button class="m3-split-leading" style="width:100%;border-radius:25px;height:46px;" id="diagActionBtn" onclick="runMockBenchmark()">
+            ▶ 开始快速检测
+          </button>
+          <div style="font-size:11px;color:var(--md-sys-color-on-surface-variant);margin-top:10px;">
+            注：仅测量手机到中转服务的连接延迟，不含源站处理及封面/插图直连 CDN 加载时间。
+          </div>
+        </div>
+
+        <div class="m3-card-filled" style="padding:14px;font-size:12px;line-height:1.65;" id="diagSamples">
+          <strong>样本记录：</strong>点击上方「开始快速检测」查看首请求与连接复用明细。
+        </div>
+      </div>
+    </div>
+
+    <!-- Canonical M3 Expressive 4-Tab ShortNavigationBar (64dp) -->
+    <nav class="m3e-short-nav-bar">
       <div class="m3-nav-item active" onclick="switchScreen('bookshelf', this)">
         <div class="m3-nav-pill">📚</div>
         <span>书架</span>
       </div>
-      <div class="m3-nav-item" onclick="switchScreen('explore', this)">
-        <div class="m3-nav-pill">🧭</div>
-        <span>发现</span>
+      <div class="m3-nav-item" onclick="switchScreen('latest', this)">
+        <div class="m3-nav-pill">⚡</div>
+        <span>最新</span>
       </div>
-      <div class="m3-nav-item" onclick="switchScreen('explore', this)">
-        <div class="m3-nav-pill">📊</div>
+      <div class="m3-nav-item" onclick="switchScreen('rankings', this)">
+        <div class="m3-nav-pill">🏆</div>
         <span>排行</span>
       </div>
       <div class="m3-nav-item" onclick="switchScreen('profile', this)">
@@ -714,22 +770,28 @@
   </div>
 
   <script>
+    let autoOptOn = true;
+    let loggedIn = true;
+    let diagTimer = null;
+
     function setTheme(theme, btn) {
       document.body.setAttribute('data-theme', theme);
       btn.parentElement.querySelectorAll('.m3-assist-chip').forEach(c => {
-        if (c.textContent.includes('M3')) c.classList.remove('active');
+        if (c.textContent.includes('日间') || c.textContent.includes('夜间') || c.textContent.includes('墨水屏')) {
+          c.classList.remove('active');
+        }
       });
       btn.classList.add('active');
     }
-    function toggleSeed(btn) {
-      const cur = document.body.getAttribute('data-seed');
-      document.body.setAttribute('data-seed', cur === 'amber' ? '' : 'amber');
-      btn.classList.toggle('active');
+
+    function toggleCoverSeed(btn) {
+      const detail = document.getElementById('screen-detail');
+      const next = detail.getAttribute('data-cover-seed') === 'on' ? 'off' : 'on';
+      detail.setAttribute('data-cover-seed', next);
+      btn.classList.toggle('active', next === 'on');
+      btn.textContent = next === 'on' ? '🎨 详情页封面取色: 开' : '🎨 详情页封面取色: 关';
     }
-    function toggleFloatingNav(btn) {
-      document.getElementById('m3NavBar').classList.toggle('floating');
-      btn.classList.toggle('active');
-    }
+
     function switchScreen(id, navEl) {
       document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
       document.getElementById('screen-' + id).classList.add('active');
@@ -738,11 +800,102 @@
         navEl.classList.add('active');
       }
     }
-    function openReader() {
-      document.getElementById('readerOverlay').classList.add('open');
+
+    function toggleAuthState() {
+      loggedIn = !loggedIn;
+      document.getElementById('acctName').textContent = loggedIn ? 'MewX · 轻国骑士' : '未登录账号';
+      document.getElementById('acctSub').textContent = loggedIn
+        ? 'UID: 12345 · 积分: 1,284 · 经验: 4,520'
+        : '支持用户名或邮箱登录 (<=30字符) · 同步云端书架与发表书评';
+      document.getElementById('authBtn').textContent = loggedIn ? '退出登录' : '登录 / 注册';
+      document.getElementById('signRow').innerHTML = loggedIn
+        ? '<span class="m3-tonal-badge">✓ 今日已签到 (+1 积分)</span>'
+        : '<span class="m3-tonal-badge tertiary">支持网页端注册跳转</span>';
     }
-    function closeReader() {
-      document.getElementById('readerOverlay').classList.remove('open');
+
+    function toggleAutoOpt() {
+      autoOptOn = !autoOptOn;
+      const btn = document.getElementById('autoOptSwitch');
+      btn.textContent = autoOptOn ? '已开启' : '已关闭';
+      btn.classList.toggle('off', !autoOptOn);
+      document.getElementById('autoOptStatus').textContent = autoOptOn
+        ? '状态：自动优化连接：开启 · 使用默认连接（空闲时自动比较优选线路）'
+        : '状态：自动优化连接：关闭 · 始终使用系统默认 DNS 连接';
+      document.getElementById('diagRouteLabel').textContent = autoOptOn
+        ? '当前策略：自动优化连接已开启'
+        : '当前策略：已关闭自动优化（使用系统默认连接）';
+    }
+
+    function resetAutoOpt() {
+      autoOptOn = true;
+      const btn = document.getElementById('autoOptSwitch');
+      btn.textContent = '已开启';
+      btn.classList.remove('off');
+      document.getElementById('autoOptStatus').textContent = '状态：已恢复默认连接 · 将在网络空闲时重新评估候选线路';
+    }
+
+    function openReader() { document.getElementById('readerOverlay').classList.add('open'); }
+    function closeReader() { document.getElementById('readerOverlay').classList.remove('open'); }
+    function openDiagnostics() { document.getElementById('diagOverlay').classList.add('open'); }
+    function closeDiagnostics() {
+      if (diagTimer) { clearInterval(diagTimer); diagTimer = null; }
+      document.getElementById('diagOverlay').classList.remove('open');
+    }
+
+    function runMockBenchmark() {
+      if (diagTimer) {
+        clearInterval(diagTimer);
+        diagTimer = null;
+        document.getElementById('diagHeadline').textContent = '部分完成 (用户手动停止)';
+        document.getElementById('diagActionBtn').textContent = '↻ 重新检测';
+        return;
+      }
+      let step = 0;
+      document.getElementById('diagActionBtn').textContent = '■ 停止检测 (保留结果)';
+      document.getElementById('mMedian').textContent = '—';
+      document.getElementById('mHeader').textContent = '—';
+      document.getElementById('mRange').textContent = '—';
+      document.getElementById('diagSamples').innerHTML = '<strong>样本记录 (实时更新)：</strong><br/>';
+
+      const sampleRows = [
+        '#01 [首请求] 268 ms (响应头 210 ms · 握手 152 ms) · HTTP/2 · IPv6 · 入境 HKG',
+        '#02 [连接已复用] 179 ms (响应头 138 ms) · HTTP/2 · IPv6 · 入境 HKG',
+        '#03 [连接已复用] 184 ms (响应头 142 ms) · HTTP/2 · IPv6 · 入境 HKG',
+        '#04 [连接已复用] 162 ms (响应头 129 ms) · HTTP/2 · IPv6 · 入境 HKG',
+        '#05 [连接已复用] 191 ms (响应头 148 ms) · HTTP/2 · IPv6 · 入境 HKG',
+        '#06 [失败] — · 读取超时 (read_timeout · 5001 ms)',
+        '#07 [首请求] 244 ms (响应头 195 ms) · HTTP/2 · IPv6 · 入境 HKG',
+        '#08 [连接已复用] 156 ms (响应头 124 ms) · HTTP/2 · IPv6 · 入境 HKG',
+        '#09 [连接已复用] 188 ms (响应头 144 ms) · HTTP/2 · IPv6 · 入境 HKG',
+        '#10 [连接已复用] 176 ms (响应头 136 ms) · HTTP/2 · IPv6 · 入境 HKG'
+      ];
+
+      diagTimer = setInterval(() => {
+        step++;
+        const ok = step >= 6 ? step - 1 : step;
+        document.getElementById('diagHeadline').textContent = `正在检测中转连接 · 已完成 ${step} / 10 次`;
+        document.getElementById('mSuccess').textContent = `${ok} / ${step} 次`;
+        document.getElementById('diagSamples').innerHTML += sampleRows[step - 1] + '<br/>';
+        if (step === 10) {
+          clearInterval(diagTimer);
+          diagTimer = null;
+          document.getElementById('diagHeadline').textContent = '✅ 检测完成 · Wi-Fi · 14:20';
+          document.getElementById('mSuccess').textContent = '9 / 10 次 (1 超时)';
+          document.getElementById('mMedian').textContent = '184 ms';
+          document.getElementById('mHeader').textContent = '142 ms';
+          document.getElementById('mRange').textContent = '156 / 268 ms';
+          document.getElementById('diagActionBtn').textContent = '↻ 重新检测';
+        }
+      }, 280);
+    }
+
+    function previewShareReport() {
+      alert(
+        '分享诊断报告前预览 (wenku8-network-report-v1)：\n\n' +
+        '• 包含：网络类型 (Wi-Fi)、Cloudflare 识别地区 (CN) 与 ASN (AS4134)、10次探测耗时与优选线路代号 (cf-v4-02)\n' +
+        '• 严格排除：真实公网/局域网 IP、Wi-Fi SSID、设备号、账号 Cookie、书架与阅读记录\n' +
+        '• 通过 FileProvider 只读临时授权导出 JSON 附件'
+      );
     }
   </script>
 </body>

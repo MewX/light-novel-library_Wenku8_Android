@@ -106,7 +106,7 @@ flowchart TD
    - Per-book 3-dot menu (`ibNovelOption`): **Delete Cached Volumes** or **Remove from Bookshelf** (local + cloud).
    - Also supports a local bookshelf text filter bar (`a83881c`).
 3. **`LatestFragment` (Recently Updated Novels)**:
-   - Paginated list of `NovelSortedBy.lastUpdate` via `Wenku8API.getNovelListWithInfo()`, with an embedded AdMob `NativeAdView` header and a floating search button (`btn_search`) that transitions into `SearchActivity`.
+   - Paginated list of `NovelSortedBy.lastUpdate` via `Wenku8API.getNovelListWithInfo()`, with an optional `relay_warning` banner (`mRelayWarningView`), update check button, and floating search access (`SearchActivity`). *(Note: active AdMob `BANNER` `AdView` lives on `NovelInfoActivity`, while `ad_unified.xml` is unused.)*
 4. **`RKListFragment` (12 Ranking Lists)**:
    - Uses `PagerSlidingTabStrip` + `ViewPager` to host 12 `NovelItemListFragment` tabs:
      - `dayVisit` (日排行榜), `dayVote` (日推荐榜), `weekVisit` (周排行榜), `weekVote` (周推荐榜), `monthVisit` (月排行榜), `monthVote` (月推荐榜), `allVisit` (总排行榜), `allVote` (总推荐榜), `postDate` (最新入库), `goodNum` (总收藏榜), `size` (字数排行), `fullFlag` (完结列表).

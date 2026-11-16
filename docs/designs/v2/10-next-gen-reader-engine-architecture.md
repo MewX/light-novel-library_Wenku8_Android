@@ -159,7 +159,7 @@ Users can switch between 6 page-turning modes inside the Reader Typography `Moda
 | Mode Name | Delegate Class | Official AndroidX Implementation | Best For |
 | :--- | :--- | :--- | :--- |
 | **1. 覆盖翻页 (Default)** | `CoverSlideDelegate` | Official `HorizontalPager` + `Modifier.graphicsLayer`: Outgoing page translates horizontally (`translationX = 0f`), while the underlying incoming page stays pinned (`translationX = -pageOffset * width`) with a soft ambient gradient spine shadow (`24.dp`) cast by the top page. | Classic Kindle / Legado /微信读书 one-handed light novel reading |
-| **2. 仿真卷曲** | `SimulationCurlDelegate` | Self-built 2D Bezier cylinder-projection on Compose `Canvas` + Android 13+ `android.graphics.RuntimeShader` (AGSL paper crease specular & back-of-page mirrored text bleed-through), with pure `Canvas` path fallback on API 26–32. | Physical Bunkobon paper book immersion |
+| **2. 仿真卷曲** | `SimulationCurlDelegate` | Self-built 2D Bezier cylinder-projection on Compose `Canvas` + Android 13+ `android.graphics.RuntimeShader` (AGSL paper crease specular & back-of-page mirrored text bleed-through), with pure `Canvas` path fallback on API 23–32 (`minSdk = 23`). | Physical Bunkobon paper book immersion |
 | **3. 平滑滑动** | `SpringSlideDelegate` | Official `HorizontalPager` with `PagerDefaults.flingBehavior(snapAnimationSpec = MotionScheme.expressive().fastSpatialSpec())`. | Crisp modern Material 3 Expressive feel |
 | **4. 上下卷轴 (条漫流)** | `ContinuousScrollDelegate` | Official `LazyColumn` rendering continuous `ChapterBlock`s across chapters with sticky chapter headers and full-width inline `<!--image-->` illustrations. | Web-novel style scrolling & illustration-heavy chapters |
 | **5. 日式文库竖排** | `VerticalBunkobonDelegate` | Custom `Canvas` vertical column layout (top-to-bottom, right-to-left columns, CJK vertical glyph substitutions `「」→﹁﹂`, `…→⋮`, `—→︱`) inside an RTL `HorizontalPager` (`reverseLayout = true`). | Traditional Chinese (`AppLanguage.TC`) & Japanese Bunkobon enthusiasts |
@@ -188,4 +188,5 @@ Inspired by **Legado** and **Moon+ Reader**, the reader viewport supports a cust
 ```
 
 - **Tap on Inline `<!--image-->` Illustration**: Intercepted before the tap-zone grid—triggers an M3 Expressive **`Modifier.sharedBounds()`** expansion into the **In-Reader Artbook Lightbox** (with pinch-to-zoom, double-tap 2.5× zoom, double-page spread toggle, and one-tap save to MediaStore).
-- **Left/Right Edge Vertical Drag (Optional)**: Slide along the left screen edge to adjust in-reader brightness (`WindowManager.LayoutParams.screenBrightness`) without opening the HUD.
+- **Predictive-Back-Safe Left Edge Brightness Drag (Optional)**: Inset to `24.dp..72.dp` from the left screen edge so the outer `0..24.dp` system bezel always triggers Android 15/16 Predictive Back cleanly without accidental brightness jumps.
+- **Opaque Active-Slider Capsule Preview**: While dragging any typography slider in the `排版` sheet, non-active rows fade to `0%` while the active slider remains inside a `92%`-opaque `surfaceContainerHighest` pill capsule, preventing text-on-text overlap over the live reflowing page.

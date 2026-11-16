@@ -1,126 +1,73 @@
-# 05 — Screen-by-Screen UI/UX, Wireframe & Micro-Interaction Specifications (`v2.0`)
+# 05 — Screen-by-Screen Material 3 Expressive (`M3e`) UI Specifications (`v2.0`)
 
-**Status:** Design Specification  
-**Scope:** Complete visual layout, component hierarchy, shared-element keys, and gesture choreography for all 9 screens in Wenku8 Android `v2.0`.
+**Status:** Screen Wireframes & Component Hierarchy  
+**Target SDK / Design Language:** `minSdk = 23` · **Material 3 Expressive (`material3:1.4+`)** · Clean User-Facing Localization (`values`, `values-zh-rTW`, `values-zh-rHK` — **zero internal API/SQLite jargon in production UI strings**)
 
 ---
 
-## Screen 1: `AdaptiveMainScaffold` (Root Shell & Chrome)
+## Screen 1: `AdaptiveMainScaffold` (Root M3e Shell)
 
 ### 1.1 Compact Portrait Layout (Phones `< 600.dp`)
 ```text
 +-------------------------------------------------------------------+
 | [Status Bar - Edge-to-Edge Transparent]                           |
-| 01 / PERSONAL ARCHIVE                      [🔍 Search] [☁️] [⋮]  |
-| 书架 Bookshelf (64)                                               |
-| ~~~ Progressive Blur Header Underlay ~~~~~~~~~~~~~~~~~~~~~~~~~~~~ |
-|                                                                   |
-|   [ Active Tab Content: Bookshelf / Explore / Profile ]           |
-|                                                                   |
-| ~~~ Progressive Blur Bottom Underlay ~~~~~~~~~~~~~~~~~~~~~~~~~~~~ |
 | +---------------------------------------------------------------+ |
-| | 📥 正在智能更新《狼与香辛料》 (第17卷 4/12)   [~~~Wavy~~~] [×] | | <- Non-blocking Mini-Bar
+| | 🔍 搜索本地书架、在线书名/作者 或 输入作品编号…        [Avatar]| | <- M3e Docked SearchBar (56dp)
 | +---------------------------------------------------------------+ |
-|      +------------------------------------------+   +--------+    |
-|      |  [📚 书架]     [🧭 发现]     [👤 我的]   |   |  🔍+   |    | <- HorizontalFloatingToolbar + FAB
-|      +------------------------------------------+   +--------+    |
+|                                                                   |
+|   [ Active Tab: 1·书架 / 2·最新 / 3·排行 / 4·我的 ]               |
+|                                                                   |
+| +---------------------------------------------------------------+ |
+| | 📥 正在智能更新《败犬女主》 第7卷 (8/12章)  [~~~Wavy~~~]  [×] | | <- Non-blocking Active Job Pill
+| +---------------------------------------------------------------+ |
+| +---------------------------------------------------------------+ |
+| |    [ 📚 书架 ]     [ ⚡ 最新 ]     [ 🏆 排行 ]     [ 👤 我的 ]  | | <- M3e ShortNavigationBar (64dp)
+| +---------------------------------------------------------------+ |
 | [Gesture Navigation Bar Inset]                                    |
 +-------------------------------------------------------------------+
 ```
 
 ### 1.2 Medium / Expanded Layout (Foldables & Tablets `>= 600.dp`)
-```text
-+-----------------------------------------------------------------------------------+
-| [NavRail] | [Master Pane: 42% Width]        || [Detail Pane: 58% Width]           |
-|           | 01 / PERSONAL ARCHIVE   [🔍][☁️] || DETAIL / WK-00005        [⭐] [⬇️] |
-|  [📚]     | +-----------------------------+ || +-------+  狼与香辛料               |
-|  书架     | | Continue Reading Hero Card  | || | Cover |  支仓冻砂 · 电击文库      |
-|           | +-----------------------------+ || | Glow  |  [奇幻] [旅行] [经商]     |
-|  [🧭]     | [全部] [在读] [有更新] [已缓存] || +-------+                          |
-|  发现     | +--------+ +--------+ +-------+ || [ ▶ 继续阅读 · 第17卷 (68%) | ▾ ]  |
-|           | | Cover1 | | Cover2 | |Cover3 | || ---------------------------------- |
-|  [👤]     | +--------+ +--------+ +-------+ || ▼ 第一卷 (11章 · 已缓存)           |
-|  我的     | | Cover4 | | Cover5 | |Cover6 | || ▶ 第二卷 (12章 · 已缓存)           |
-|           | +--------+ +--------+ +-------+ || ▶ 第三卷 (11章 · 未缓存)           |
-|  -------  |                                 ||                                    |
-|  [Mini    |                                 ||                                    |
-|   Resume] |                                 ||                                    |
-+-----------------------------------------------------------------------------------+
-```
-
-- **Scroll-Coupled Floating Chrome**:
-  - Scrolling down hides the `HorizontalFloatingToolbar` with a spring slide (`translationY` + `fastSpatialSpec()`); scrolling up by `> 12.dp` or reaching the top springs it back into view.
-  - Re-tapping the currently active tab icon smoothly scrolls the active list/grid back to item `0` (`animateScrollToItem(0)`).
+- Uses `NavigationSuiteScaffold`: `ShortNavigationBarMedium` (horizontal icon+label `40.dp` pills) on medium portrait, or spring-expandable **`WideNavigationRail`** (`WideNavigationRailState`) + **`ListDetailPaneScaffold` (`44% List | 56% NovelDetail`)** on unfolded foldables and tablets.
+- Re-tapping the active destination smoothly scrolls its list to item `0`.
 
 ---
 
-## Screen 2: `BookshelfScreen` (`01 / PERSONAL ARCHIVE`)
+## Screen 2: `BookshelfScreen` (`Tab 1 · 书架`)
 
-### 2.1 Header & Filter Rail
-- **Masthead**: `01 / PERSONAL ARCHIVE` monospace label above `书架` title with live book count badge.
-- **Top Actions**:
-  - `🔍 Search Pill`: Expands via `sharedBounds("search-bar")` into `UnifiedSearchScreen` (pre-focused on local shelf + online).
-  - `☁️ Cloud Sync Button`: Triggers `BookshelfSync` (rotates icon `180°` with spring + shows non-blocking `LinearWavyProgressIndicator`).
-  - `⬇️ Batch Update SplitButton`: Default action runs **Smart Update (智能更新)**; dropdown menu offers *Check Updates (检查更新)*, *Download All (下载全部)*, and *Force Update (覆盖下载)*.
-  - `⊞ View Switcher`: Cycles through **Cover Grid (`2–4` cols)**, **Editorial List**, and **3D Perspective Spine Carousel** using `AnimatedContent` scale + fade.
-- **Filter & Sort Chips Row**:
-  - Connected `ToggleButton` chips: `全部 (All)`, `🔥 在读 (Reading)`, `✨ 有更新 (Updated)`, `💾 已缓存 (Cached)`, plus user-created category tags.
-  - Trailing sort chip: `最近阅读` / `最近更新` / `手动排序` / `书名拼音`.
-
-### 2.2 "Continue Reading" Hero Card (Pinned at Top of Shelf)
-- Displays the most recently read novel with a subtle horizontal cover-derived gradient, cover thumbnail (`sharedElement("cover-image-{aid}")`), current volume & chapter title (`第三卷 · 第二话 命与心`), a `LinearWavyProgressIndicator` or pill bar showing chapter percentage (`68%`), and a 1-tap **`继续阅读 ▶`** button that triggers the **T2 3D Book-Cover Opening Transition** straight into `ReaderScreen`.
-
-### 2.3 Three Switchable Shelf Views
-1. **Cover Grid View (Default)**:
-   - `3` columns on phones, `4–6` on foldables/tablets.
-   - Each card displays:
-     - Cover image (`aspectRatio(0.71f)`, `RoundedCornerShape(8.dp)`) with subtle inner border.
-     - Top-right badge: Unread new-chapter dot (`✨ 有新章节`) or cached indicator (`💾`).
-     - Bottom overlay gradient with reading progress bar (`0–100%`).
-     - 2-line title (`titleSmall`) + 1-line latest read/published chapter (`bodySmall`).
-2. **Editorial List View**:
-   - Upgraded version of `1.x`'s `view_novel_item.xml`:
-     - Cover (`72.dp × 100.dp`), Archive Code (`WK-01749`), Title, Author, Latest Chapter (`最新: 第十七卷 插图`), Last Update Date, and status pills (`已读至 第3卷 42%`, `已缓存 5/17 卷`).
-     - **Swipe Actions (`SwipeToDismissBox`)**: Swipe right to **Continue Reading**; swipe left to open **Download / Clean Cache / Remove** sheet.
-3. **3D Perspective Spine Carousel (`ArchiveSpineCarousel`)**:
-   - Interactive horizontal 3D shelf (`graphicsLayer` with perspective camera).
-   - Dragging horizontally scrubs through vertical book spines with `SEGMENT_FREQUENT_TICK` haptics; the centered spine pulls out and rotates open to `0°`, displaying a floating glass inspection card with `"继续阅读"` and `"作品详情"`.
-
-### 2.4 Long-Press Batch Management Bar
-- Long-pressing any book card morphs its corner badge into a `Cookie9Sided` checkmark and replaces the bottom floating toolbar with a **Batch Action Dock**:
-  - `全选 (Select All)` · `更新所选 (Update)` · `清理缓存 (Clear Cache)` · `移出书架 (Remove)` · `完成 (Done)`.
+- **Header Actions**:
+  - Top M3e `SearchBar` (filters local shelf in `< 1ms` per keystroke and expands via `sharedBounds` into `UnifiedSearchScreen`).
+  - Shelf Header Row (`我的书架 (64)`): **Cloud Sync** (`☁️` icon button, separated from avatar to guarantee `48×48.dp` touch targets), **Batch Download `SplitButtonLayout`** (`智能更新 | ▾`), and **View Mode `ButtonGroup`** (`网格` · `详情列表` · `3D书脊`).
+- **"Continue Reading" `HorizontalMultiBrowseCarousel`**:
+  - Hero card displays cover backdrop, current volume/chapter, **flat** M3 `LinearProgressIndicator` (`68%`), and a 1-tap `▶ 继续阅读` pill triggering the **T2 3D Book-Cover Opening** straight into `UnifiedReaderScreen`.
+- **Local Filter & Sort Rail**:
+  - `FilterChip`s: `全部`, `有新章节` (diffed via `BookshelfListParser`), `已缓存`, `连载中`, `已完成`, plus local cached `#标签` / `文库` chips and custom user shelf categories.
+  - Sort selector: `按最近阅读` *(updated only when opening a chapter in Reader, never on mere Detail inspection)* · `按更新时间` · `手动置顶排序` · `书名拼音`.
+- **Progress Indicator Rule**: Resting shelf cards always use **flat** `LinearProgressIndicator` for reading progress; **`LinearWavyProgressIndicator`** appears **only** on books actively downloading or syncing!
+- **Contextual Multi-Select Mode**: Long-pressing a book card morphs a contextual **`HorizontalFloatingToolbar`** into view (`全选 · 智能更新 · 清理缓存 · 移出书架 · 完成`).
 
 ---
 
-## Screen 3: `ExploreScreen` (`02 / WENKU CATALOG`)
+## Screen 3A: `LatestScreen` (`Tab 2 · 最新`)
 
-### 3.1 Unified Discovery Modes (Top Segmented Rail)
-```text
-+-------------------------------------------------------------------+
-| 02 / WENKU CATALOG                           [🔍 搜索书名/作者/#标签] |
-| 发现与榜单                                            [网格/列表] |
-+-------------------------------------------------------------------+
-| [⚡ 最近更新] [🏆 热门榜单] [🏛️ 文库分类] [🏷️ 题材标签] [✅ 完结精品] |
-+-------------------------------------------------------------------+
-| (When 🏆 热门榜单 is active:)                                      |
-| 维度: [🔥 人气点击] [👍 读者推荐] [⭐ 收藏人数] [📏 总字数]         |
-| 周期: ( 今日 Day )  ( 本周 Week )  ( 本月 Month )  ( 总榜 All )     |
-+-------------------------------------------------------------------+
-| #01 (Sunny Polygon Badge)                                         |
-| +--------+  败犬女主太多了！(Make Heroine ga Oosugiru!)           |
-| | Cover  |  雨森焚火 · 小学馆 · 连载中 · 2026-10-18               |
-| | 104x146|  [校园] [恋爱] [喜剧] [青梅竹马]                       |
-| +--------+  "明明是背景人物的我，为什么会被败犬女主们包围……"       |
-+-------------------------------------------------------------------+
-```
+Replaces `v1.31`'s `LatestFragment` while surfacing the 3 non-ranking chronological feeds from `Wenku8API.NovelSortedBy`:
+- **Top `SearchBar`** + **`PrimaryTabRow`**:
+  1. **`最近更新`** (`NovelSortedBy.lastUpdate`)
+  2. **`最新入库`** (`NovelSortedBy.postDate`)
+  3. **`完结精品`** (`NovelSortedBy.fullFlag`)
+- **Card Content**: Renders `Title`, `Author`, `BookStatus`, `LastUpdate`, `Tags` chips, and 2-line `IntroPreview` (`NovelListWithInfoParser`) in borderless M3e Filled Cards (`1.dp` `#111111` outline in E-Ink mode).
+- **Network Failure State**: Inline M3e error card with `[ ↻ 重试 ]` and **`[ 🩺 网络检测 ]`** (`AssistChip` navigating to `NetworkDiagnosticsScreen`).
 
-- **1-Tap 2D Ranking Matrix**:
-  - Replaces `1.x`'s 12-tab `RKListFragment` `ViewPager`. Selecting any Metric (`Visit`, `Vote`, `Fav`, `Size`) + Period (`Day`, `Week`, `Month`, `All`) fetches the corresponding `Wenku8API.NovelSortedBy` feed with morphing skeleton placeholders and a `35ms` staggered item cascade.
-  - Top 3 items in any ranking display distinctive Material 3 Expressive polygon rank badges (`#01` Gold `Sunny`, `#02` Silver `Cookie9Sided`, `#03` Bronze `Clover4Leaf`).
-- **Press / Imprint Browser (`🏛️ 文库分类`)**:
-  - Visual grid of Japanese light novel publishers (`电击文库`, `MF文库J`, `角川Sneaker`, `富士见Fantasia`, `Fami通文库`, `GA文库`, `集英社Super Dash`, `讲谈社`, `HJ文库`, `小学馆Gagaga`, `一迅社`, `其他文库`).
-- **Multi-Tag Intersection Explorer (`🏷️ 题材标签`)**:
-  - Interactive tag cloud grouped by theme (*Genre*, *Protagonist*, *Setting*, *Tone*). Selecting multiple tags filters novels containing **all** chosen tags, with a long-press option to add any tag to **Blocked Tags (`屏蔽标签`)**.
+---
+
+## Screen 3B: `RankingsScreen` (`Tab 3 · 排行`)
+
+Replaces `v1.31`'s 12-tab `RKListFragment` `ViewPager` with an instant 1-tap 2D M3 Expressive matrix:
+- **Row 1 — Metric Connected `ButtonGroup`**:
+  - `🔥 点击榜` (`Visit`) · `👍 推荐榜` (`Vote`) · `⭐ 总收藏` (`goodNum`) · `📏 字数榜` (`size`)
+- **Row 2 — Period `FilterChip` Row** *(visible when `点击榜` or `推荐榜` is active)*:
+  - `周榜` (`week`) · `日榜` (`day`) · `月榜` (`month`) · `总榜` (`all`)
+- **Expressive Rank Badges**: Top 3 entries display `Sunny` / `Cookie9Sided` `MaterialShapes` badges (`#1`, `#2`, `#3`). *(Unparsed hit/push counters are omitted on list cards per `NovelListWithInfoParser`.)*
 
 ---
 
@@ -128,203 +75,129 @@
 
 ```text
 +-------------------------------------------------------------------+
-| [←]  🔍 输入书名、作者、#标签 或 AID编号 (如 1749)           [×]  |
+| [←]  🔍 输入小说标题、作者名称 或 作品编号 (如 1749)          [×] |
 +-------------------------------------------------------------------+
-| 搜索范围: [ 全部 ]  [ 📖 书名 ]  [ ✍️ 作者 ]  [ #️⃣ 标签 ]  [ 🔢 AID ] |
+| 在线搜索范围:  [ ✓ 按小说标题 ]    [ 按作者名称 ]    [ 编号直达 ] |
 +-------------------------------------------------------------------+
-| 🕒 历史搜索                                          [清空全部 🗑️] |
-| ( 狼与香辛料 )  ( 支仓冻砂 )  ( #校园 #恋爱 )  ( 刀剑神域 )        |
-+-------------------------------------------------------------------+
-| 📚 本地书架匹配 (2)                                               |
-|   [Compact Novel Row: 狼与香辛料 · 已读至第17卷 · 点击继续阅读]    |
-| 🌐 在线文库搜索结果                                               |
-|   [Paginated Online Novel Cards with Shared-Element Cover/Title]  |
+| 📚 本地书架即时匹配 (2)                                           |
+|   [ 狼与香辛料 · 已读至第17卷 68% ·                 [▶ 继续阅读] ]|
+| 🌐 在线文库搜索结果                    [ ⏳ 冷却中，2s 后自动搜 ] |
+|   [ Paginated Online Cards with Shared-Element Cover & Title ]    |
+| 🕒 最近搜索记录                                       [清空记录]  |
+|   ( 支仓冻砂 )   ( 狼与香辛料 )   ( 败犬女主 )   ( 刀剑神域 )     |
 +-------------------------------------------------------------------+
 ```
 
-- **Fixes `1.x` Search History Bugs**:
-  - Stored in Room (`search_history` table) instead of the bracket-delimited `search_history.wk8` file (eliminating the `[` phantom-entry and freeze bugs documented in `STABILITY_PLAN.md` lines 66–76!).
-- **Dual Instant + Online Results**:
-  - As the user types, local bookshelf matches (`BookshelfFilter.filter`) appear **instantly (< 5ms)** in a top collapsible section, while pressing Search (or pausing typing) queries `Wenku8API.searchNovelByNovelName` / `AuthorName`.
-  - If the query is numeric (e.g. `1749`), a top card offers **1-tap direct jump to `AID 1749`**.
+- **Auto-Queued `5s` Cooldown**: When refining an online query inside Wenku8's `5s` server cooldown, the query is queued automatically with a live countdown pill rather than failing with an error toast.
 
 ---
 
-## Screen 5: `NovelDetailScreen` (`DETAIL / WK-{AID}`)
+## Screen 5: `NovelDetailScreen` (`作品详情`)
 
 ```text
 +-------------------------------------------------------------------+
-| [←]  DETAIL / WK-00005                        [💬 书评] [🔗 分享] |
+| [←]  作品详情 · #0005                                 [🔗]  [⋮]  |
 |                                                                   |
-|   +------------+   狼与香辛料(狼与辛香料)                         |
-|   |   Cover    |   ✍️ 支仓冻砂 [›]     🏛️ 电击文库 [›]             |
-|   | 120 x 168  |   ✅ 已完结 · 200.4万字 · 更新于 2012-02-08      |
-|   | (3D Shared |   🔥 总点击 39.4万 · 👍 推荐 2.29万 · ⭐ 收藏 6003|
-|   | + Glow)    |                                                  |
-|   +------------+   [❤️ 已在书架]  [👍 投推荐票]  [🖼️ 封面大图]    |
+|   +------------+   [电击文库]  [已完成]                           |
+|   |   Cover    |   狼与香辛料                                     |
+|   | 120 x 168  |   作者：支仓冻砂 ›                               |
+|   | (3D Shared |   全文 200.4 万字 · 更新于 2026-02-18            |
+|   | + Glow)    |   (#奇幻) (#旅行) (#经商) (#贤狼)                |
+|   +------------+                                                  |
+| +---------------+---------------+---------------+---------------+ |
+| | 总点击 (日+26)| 总推荐        | 总收藏        | 最新章节      | |
+| | 231.6 万      | 15.3 万       | 14,416        | 第17卷 插图   | |
+| +---------------+---------------+---------------+---------------+ |
 |                                                                   |
-| +---------------------------------------------------------------+ |
-| |        ▶ 继续阅读 · 第3卷 第2话 (42%)          |      ▾       | | <- SplitButtonLayout
-| +---------------------------------------------------------------+ |
-|                                                                   |
-| 🏷️ 作品标签: (#奇幻) (#旅行) (#经商) (#兽耳) (#贤狼赫萝)          |
+| +-------------------------------------------------------+-------+ |
+| |            ▶ 继续阅读 · 第三卷 第二话 (42%)           |   ▾   | | <- Reading-Only SplitButton!
+| +-------------------------------------------------------+-------+ |
+| +--------------------+ +--------------------+ +-----------------+ |
+| |   ✓ 已在书架       | |   ↓ 离线缓存       | |  💬 书评 (142)  | | <- Balanced 3-Button Row
+| +--------------------+ +--------------------+ +-----------------+ |
 |                                                                   |
 | 📖 内容简介                                          [展开全部 ▾] |
-| 旅行于各地贩卖并收购物品的商人克拉福·罗伦斯，拜访帕斯罗村并离开   |
-| 后，在自己的马车上发现了不知从哪里跑来的东西……                    |
+| 从教会都市出发的商人罗伦斯，在装满麦子的马车上发现了熟睡的贤狼……  |
 |                                                                   |
-| 💬 热门书评 (142条讨论)                              [查看全部 ›] |
 | +---------------------------------------------------------------+ |
-| | "十几年过去了，赫萝依然是最有魅力的女主角" — @MewX · 38回复   | |
+| | [赞助 · 支持中转服务器运营]     (Non-Intrusive Inline AdCard) | | <- Zero CLS · Collapses Offline
 | +---------------------------------------------------------------+ |
 |                                                                   |
-| 📚 分卷与章节目录 (共17卷)     [🔍 搜章节] [⇅ 正序/倒序] [⬇️ 缓存]|
+| 📚 目录与分卷 (共 17 卷)                   [🔍 搜章节] [⇅ 正倒序] |
 | +---------------------------------------------------------------+ |
-| | ▼ 第三卷 (共11章 · 已缓存 11/11)                   [🗑️] [✅]  | | <- Auto-expanded current volume
-| |   ├─ 【序章】Prologue                                    ✓    | |
-| |   ├─ 【第一话】First Story 妹妹和传说                    ✓    | |
-| |   ├─ 👉 【第二话】Second Story 真实与冒牌货 (上次读到)   ✓    | |
-| |   └─ 【插图】Illustrations                               🖼️   | |
+| | ▶ 第一卷 旅途的开端                  [🖼 插图章节] [已缓存 8/8]| |
 | +---------------------------------------------------------------+ |
-| | ▶ 第四卷 (共10章 · 未缓存)                         [⬇️ 下载本卷]| |
+| | ▼ 第三卷 狼与黄铁矿 (上次读到)                             ▲  | |
+| |   ├─ 序幕 庆典中的北方城镇                             已读完 | |
+| |   ├─ ▶ 第二话 真实与冒牌货                     正在阅读 · 42% | |
+| |   └─ 🖼 本卷《插图》画集 (12 张彩页与黑白插画 · 支持跨页拼合) ›| |
 | +---------------------------------------------------------------+ |
 +-------------------------------------------------------------------+
 ```
 
-- **Key UX Upgrades over `1.x` `NovelInfoActivity`**:
-  1. **Dynamic Cover Theme (`CoverThemeEngine`)**: Radial blurred cover backdrop (`CoverGlow`) and tonal surface containers smoothly adapt to the book cover's palette.
-  2. **No More Right-Side Drawer Conflict**: Volumes expand inline as Material 3 Expressive accordions; the volume with saved reading progress auto-expands and highlights the active chapter.
-  3. **`SplitButtonLayout` Primary CTA**: Main area resumes reading immediately; trailing split chevron opens `"从头开始阅读"`, `"切换阅读引擎 (仿真翻页 / 连续卷轴 / 竖排右翻)"`, or `"朗读本章 (TTS)"`.
-  4. **Granular Per-Volume & 4-Mode Offline Caching**: Each volume card has a 1-tap download/delete icon (`CircularWavyProgressIndicator` while downloading), and the section header's `[⬇️ 缓存]` button opens the 4-mode download sheet (*Smart Update*, *Select Volumes with Checkboxes*, *Check Updates*, *Force Overwrite*).
+- **M3e `SplitButtonLayout` Separation**: Leading button resumes reading; trailing `▾` menu offers `"从头开始阅读"`, `"选择阅读模式"`, and `"朗读本章 (TTS)"`. `[ ✓ 已在书架 ]`, `[ ↓ 离线缓存 ]` (opening the 4-Mode `NovelDownloader` `ModalBottomSheet`), and `[ 💬 书评 ]` sit cleanly on their own row so `360.dp` screens and large CJK fonts never clip. *(Dead stub `投推荐票` is excluded.)*
+- **Tap Title Dialog**: Tapping a long truncated title opens a clean copyable M3 dialog showing full `AID` and untruncated title (preserving `v1.31` `NovelInfoActivity` behavior).
+- **Minimal, Non-UX-Harming Server-Support Ad Placement**:
+  - **Single Inline Slot Only**: Appears *exclusively* on `NovelDetailScreen` in the natural pause between **Synopsis** and **Volume Directory**—never inside the Reader, never sticky/floating, and well separated from `继续阅读` and chapter rows to prevent accidental taps.
+  - **Zero Layout Shift (CLS = 0) & Clean Degradation**: Fixed container height (`surfaceContainerLow`, `16.dp` radius) is pre-allocated *only* when online and `GoogleServicesHelper` confirms Play Services availability; collapses cleanly before layout when offline, on GMS-free ROMs, or on ad load failure, and initializes `MobileAds` lazily after the first UI frame.
 
 ---
 
-## Screen 6: `ReviewListScreen` & `ReviewThreadScreen` (`COMMUNITY FORUM`)
+## Screen 6: `ReviewListScreen` & `ReviewThreadScreen` (`书评讨论`)
 
-- **`ReviewListScreen`**:
-  - Header shows novel cover thumbnail, title, and total thread count.
-  - Review cards (`MaterialCardView` with `sharedBounds("review-card-{rid}")`) show:
-    - Thread Title (`titleMedium`), Author avatar/badge (`userName` + `uid`), Post Time & Last Reply Time, and a pill badge for Reply Count (`💬 38`).
-  - Bottom-right `ExtendedFloatingActionButton` (`✍️ 发表书评`) morphs (`sharedBounds`) into the New Review Composer sheet/screen.
-- **`ReviewThreadScreen` (Replaces `NovelReviewReplyListActivity`)**:
-  - Top card (`01 / ORIGINAL POST`) is the expanded container of the tapped review card.
-  - Floor replies (`#2`, `#3`...) cascade in with floor number badges, relative/exact timestamps, and 1-tap `复制 (Copy)` or `引用回复 (Quote #N)` actions.
-  - **Bottom Docked Composer**:
-    - Auto-saves draft text (`400ms` debounce) per `(aid, rid)`.
-    - Live character counter (`>= 7 chars` required by Wenku8) and **live `Wenku8API.searchBadWords()` validation** (highlights restricted words inline with a soft warning chip before submission).
+- **`ReviewListScreen`**: Real user avatars via `Wenku8API.getAvatarURL(uid)` (`api-stub` returns `""` fallback icon), reply count pills, and bottom-right `✍️ 发表书评` FAB.
+- **`ReviewThreadScreen`**: `1楼 (楼主)` pinned header + floor replies (`2楼`, `3楼`...) with 1-tap `复制` and `回复 N楼 @user` quote chips. Bottom composer shows live status chips (`✓ 字数 >= 7`, `✓ 无敏感词`, `✓ 10秒间隔就绪`) and `400ms` auto-saved drafts (`REVIEW_DRAFTS`).
 
 ---
 
-## Screen 7: `UnifiedReaderScreen` (`IMMERSIVE READER 2.0`)
+## Screen 7: `UnifiedReaderScreen` (`沉浸阅读器 2.0`)
 
-### 7.1 Immersive Viewport & 9-Zone Customizable Tap Grid
-```text
-+-------------------------------------------------------------------+
-| VOL.03  第三卷                                     第二话 命与心  | <- Top Marginalia Header
-| +-------------------+-----------------------+-------------------+ |
-| |                   |                       |                   | |
-| |     PREV PAGE     |      PREV PAGE /      |     NEXT PAGE     | |
-| |     (Zone 1)      |      HUD TOGGLE       |     (Zone 3)      | |
-| |                   |       (Zone 2)        |                   | |
-| +-------------------+-----------------------+-------------------+ |
-| |                   |                       |                   | |
-| |     PREV PAGE     |     TOGGLE READER     |     NEXT PAGE     | |
-| |     (Zone 4)      |      FLOATING HUD     |     (Zone 6)      | |
-| |                   |       (Zone 5)        |                   | |
-| +-------------------+-----------------------+-------------------+ |
-| |                   |                       |                   | |
-| |     PREV PAGE     |      NEXT PAGE /      |     NEXT PAGE     | |
-| |     (Zone 7)      |      HUD TOGGLE       |     (Zone 9)      | |
-| |                   |       (Zone 8)        |                   | |
-| +-------------------+-----------------------+-------------------+ |
-| 🔋 84% · 14:20                                    第 12 / 34 页 (35%)| <- Bottom Status Footer
-+-------------------------------------------------------------------+
-```
-
-### 7.2 Floating HUD Overlay (Summoned on Center Tap)
-```text
-+-------------------------------------------------------------------+
-| [←]  狼与香辛料 · 第三卷 第二话             [🎧 听书] [🔖] [🖼️]  | <- Floating Top Pill Bar
-+-------------------------------------------------------------------+
-|                                                                   |
-|                    ( Live Chapter Content )                       |
-|                                                                   |
-+-------------------------------------------------------------------+
-|   [ ↩ 还原跳转位置 (第4页) ]                                      | <- Appears for 5s after scrubbing
-| +---------------------------------------------------------------+ |
-| | [⏮ 上一章]   ~~~~~~●~~~~~~~~~~~~~~~~~~~~ 35%       [下一章 ⏭] | | <- Wavy Chapter Scrubber
-| +---------------------------------------------------------------+ |
-| +---------------------------------------------------------------+ |
-| |  [📑 目录]  [🎨 外观]  [⚙️ 模式]  [🔍 查找]  [✏️ 笔记]  [🌙 夜读] | | <- HorizontalFloatingToolbar
-| +---------------------------------------------------------------+ |
-+-------------------------------------------------------------------+
-```
-
-### 7.3 The 4 Unified Layout Engines & CJK Typography Polish
-1. **Horizontal Paged Engine (`WenkuReaderPaginator` 2.0)**:
-   - Upgrades `1.x`'s paginator with full **CJK Kinsoku Shori (禁则处理)**: closing punctuation (`，。！？；：”’）】》」』`) never wraps to the first character of a new line, and opening brackets (`“‘（【《「『`) never hang at the end of a line!
-   - Supports **Dual-Page Spread** automatically on unfolded foldables and landscape tablets.
-2. **3D Curved Page-Peel Engine (`AGSL RuntimeShader` / Mesh)**:
-   - Interactive finger-tracking page curl with realistic paper backside bleed-through and cast shadow.
-3. **Continuous Multi-Chapter Scroll Stream**:
-   - Replaces legacy `VerticalReaderActivity` (`ScrollView` + `LinearLayout`) with a virtualized `LazyColumn` that streams paragraphs and high-res illustrations at 120fps and seamlessly loads the next/previous chapter across volume boundaries without stopping scroll momentum.
-4. **Vertical Right-to-Left CJK Engine (`竖排右翻`)**:
-   - Authentic traditional light-novel vertical typesetting with rotated CJK punctuation, Ruby furigana support, and right-to-left page turning.
-
-### 7.4 Live Transparent Jelly Sheet (`🎨 外观 Appearance`)
-- Contains:
-  - **Paper Presets**: `奶白 (#F6F5EF)` · `羊皮纸 (#EDE2CA)` · `浅苔 (#E4EBDD)` · `夜读 (#111312)` · `纯黑 (#000000)` · `墨水屏 (#FFFFFF)` · `+ 自定义背景图`.
-  - **Font Family**: `系统默认` · `方正书宋 (Bundled)` · `思源宋体` · `霞鹜文楷` · `+ 导入本地 TTF/OTF`.
-  - **Sliders**: `字号 (8–32sp)` · `行距 (0–32dp)` · `段距 (0–48dp)` · `页边距 (0–32dp)` · `夜间对比度 (35–100%)`.
-  - **Scope Toggle**: `应用到全局 (Global)` vs `仅当前作品 (This Book Only)`.
-- **Signature Interaction**: While the user's finger drags any slider, the sheet background fades to `10%` opacity and hides other controls so the live page reflows directly beneath their thumb.
+- **Contextual M3e `HorizontalFloatingToolbar` HUD**: Summoned on center tap (`目录 · 排版 · 模式 · 查找 · 书签 · 夜间`), paired with a chapter progress scrubber and 5-second `"↩ 还原至第 N 页"` undo pill.
+- **Opaque Active-Slider Capsule Preview (`排版` Sheet)**: While dragging Font Size (`8–32sp`), Line/Paragraph Spacing, or Margins, inactive controls and the sheet backdrop fade to `0%` while **only the active slider row stays inside a crisp `92%`-opaque `surfaceContainerHighest` pill**, letting 90% of the live chapter reflow underneath with zero text-on-text overlap!
+- **Predictive Back Safe Edge Zones**: Left-edge vertical brightness slide (optional) is inset to `24.dp..72.dp` so the outer `0..24.dp` bezel reliably triggers Android 15/16 Predictive Back.
 
 ---
 
-## Screen 8: `ImageDetailScreen` (`ILLUSTRATION LIGHTBOX`)
+## Screen 8: `ArtbookLightboxOverlay` (`插图画集与跨页模式`)
 
-- **Seamless Entry**: Shared-element morph (`sharedElement("image-{urlOrPath}")`) from any inline chapter illustration or novel cover.
-- **Floating Glass Controls**:
-  - `🔄 旋转 90°`: Smooth spring-driven 90° rotation (`animateFloatAsState` with `defaultSpatialSpec()`).
-  - `🖼️ 章节画廊 (1/8)`: Horizontal filmstrip thumbnail scrubber at the bottom to flip through all illustrations in the current volume without leaving the lightbox!
-  - `💾 保存原图` & `🔗 分享`: One-tap save via Android SAF (`MediaStore` / `ACTION_CREATE_DOCUMENT`) or share sheet.
-- **Gesture Dismiss**: Vertical drag scales and translates the image with finger movement while fading the dark backdrop scrim, snapping back into the exact page/detail slot on release.
+- Expands via `sharedBounds` from any inline `<!--image-->` Art Card or `<chapter>插图</chapter>` chip, featuring `BitmapRegionDecoder` 4× tiling zoom, **`跨页拼合` (`口绘` double-page spread stitching)**, `90°` spring rotation, `HorizontalMultiBrowseCarousel` filmstrip, SAF save/share, and vertical drag-to-dismiss.
 
 ---
 
-## Screen 9: `ProfileAndStudioScreen` (`03 / READER STUDIO`)
+## Screen 9: `ProfileAndStudioScreen` (`Tab 4 · 我的`) & `NetworkDiagnosticsScreen`
 
 ```text
 +-------------------------------------------------------------------+
-| 03 / READER STUDIO                                    [⚙️] [ℹ️]   |
-| 我的与设置                                                        |
+| 我的与设置                                            [ℹ️ 关于]   |
++-------------------------------------------------------------------+
+| 📢 服务器公告 (Dismissible M3 Tonal Banner when NoticeString != "")|
 +-------------------------------------------------------------------+
 | +---------------------------------------------------------------+ |
-| |  (Avatar)   MewX (UID: 12345 · 轻国骑士)       [🎉 每日签到]  | |
-| |  Morphing   积分: 1,284 (+1)   经验: 4,520                    | |
+| | [Logged In]  (Avatar) MewX · 轻国骑士          [🎉 每日签到]  | |
+| |              UID: 12345 · 积分 1,284 · 经验 4,520  [退出登录] | |
+| | [Logged Out] 登录轻小说文库账号以同步云端书架与发表书评       | |
+| |              [ 🔑 登录账号 (用户名/邮箱) ]    [ 🌐 网页注册 ] | |
 | +---------------------------------------------------------------+ |
 |                                                                   |
-| 📊 阅读统计与足迹                                  [生成分享卡 ›] |
-| +-------------------+ +-------------------+ +-------------------+ |
-| | 今日阅读 48 分钟  | | 连续阅读 12 天 🔥 | | 已读完 26 卷 📚   | |
-| +-------------------+ +-------------------+ +-------------------+ |
-| [ 🕒 最近阅读历史 (32) ]              [ 🔖 书签与划线笔记 (18) ]  |
+| 📊 阅读足迹与书签                      [历史记录] [书签笔记 (18)] |
 |                                                                   |
-| 🎨 视觉与主题工作室 (Theme & Palette Studio)                      |
-| ├─ 外观模式: ( 跟随系统 ) ( ☀️ 日间纸页 ) ( 🌙 夜间 ) ( 📱 纯黑 ) |
-| ├─ 墨水屏专享模式 (E-Ink Zero-Animation):                  [ OFF ]|
-| ├─ 动态取色 (Monet / 封面氛围光效):                        [ ON  ]|
-| ├─ 主题色板: (● 经典蓝) (● 雾松绿) (● 胭脂红) (● 麦穗金) (+取色)  |
-| └─ 简繁转换: ( 简体中文 SC )  ( 繁體中文 TC )                     |
+| 🌐 网络与中转连接 (See Doc 11 for full NetworkDiagnosticsScreen)  |
+| ├─ 自动优化连接 (已优化当前网络连接 · cf-v4-02)          [ ON  ]  |
+| └─ [ 🩺 网络检测与诊断报告 › ]                [ ↺ 恢复默认重测 ]  |
 |                                                                   |
-| 💾 存储与缓存管理                                                 |
-| ├─ 已用空间: 小说正文 42 MB · 插图与封面 185 MB                   |
-| ├─ [⚡ 快速清理非书架图片缓存]    [🧹 深度清理非书架小说缓存]     |
-| └─ [📦 导出备份 (.wk8backup)]     [📥 导入恢复备份]               |
+| 🎨 外观与主题工作室                                               |
+| ├─ 深色模式: [ 跟随系统 ] [ 日间纸页 ] [ 夜间墨色 ] [ 纯黑省电 ]  |
+| ├─ 墨水屏专享模式 (高对比 1dp 边框 · 全局零动画):        [ OFF ]  |
+| ├─ 系统壁纸动态取色 (Monet) / 详情页封面氛围取色:        [ ON  ]  |
+| ├─ 主题色板: (●经典蓝) (●雾松绿) (●胭脂红) (●麦穗金) (●鸢尾紫)    |
+| └─ 文库语言切换: [ 简体中文 ]  [ 繁體中文 ]  (无重启即时生效)     |
 |                                                                   |
-| ℹ️ 关于轻小说文库 v2.0 (Tap 5x Easter Egg) · 检查更新 · 开源许可  |
+| 💾 内置数据库与存档管理 (Room SQLite · wenku8_v2.db)              |
+| ├─ [📤 导出存档 (.wk8backup)]      [📥 导入 / 智能合并存档]       |
+| ├─ [📂 导入旧版 v1.x 文件夹]       [🧹 清理非书架小说与插图缓存]  |
+| └─ 🔄 检查新版本 · 开源许可与免责声明 · 关于 v2.0 (5击彩蛋)       |
 +-------------------------------------------------------------------+
 ```
 
-- **Solves Backup & Reading-Position Loss (`STABILITY_PLAN.md` line 222)**:
-  - Adds a 1-tap **Export / Import Backup (`.wk8backup` ZIP bundle)** containing the user's bookshelf, reading positions (`read_saves_v1`), search history, bookmarks/notes, and settings via SAF, plus proper `android:fullBackupContent` / `dataExtractionRules` that include the small database/settings files while excluding multi-megabyte cached chapter images so Android Auto Backup never exceeds the 25MB quota!
+- **Complete Account Sheet**: Tapping `[ 🔑 登录账号 ]` opens an M3e `ModalBottomSheet` supporting **Username or Email** (`<= 30` chars, routing automatically to `getUserLoginParams` vs. `getUserLoginEmailParams`), password visibility toggle, non-blocking loading state, and `REGISTER_URL` browser launch dialog. If startup re-auth (`cert.wk8`) fails, a clear `"登录状态已过期，请重新登录"` banner appears at the top of the card.
+- **Full `NetworkDiagnosticsScreen` Specification**: See **[`11-network-diagnostics-and-auto-routing-ui.md`](./11-network-diagnostics-and-auto-routing-ui.md)**.
