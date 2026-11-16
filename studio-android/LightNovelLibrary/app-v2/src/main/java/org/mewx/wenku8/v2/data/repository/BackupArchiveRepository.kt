@@ -25,6 +25,8 @@ import org.mewx.wenku8.v2.data.local.db.entity.SearchHistoryEntity
 import org.mewx.wenku8.v2.data.local.db.entity.VolumeEntity
 import org.mewx.wenku8.v2.data.local.preferences.UserPreferencesRepository
 import org.mewx.wenku8.v2.data.local.preferences.Wenku8UserPreferences
+import org.mewx.wenku8.v2.reader.model.ReaderPageTurnMode
+import org.mewx.wenku8.v2.reader.model.ReaderPaperPreset
 import org.mewx.wenku8.v2.ui.navigation.DefaultHomeDestination
 import org.mewx.wenku8.v2.ui.theme.Wenku8ThemeMode
 import java.io.BufferedInputStream
@@ -611,6 +613,10 @@ class BackupArchiveRepository(
             put("readerPageEdgeDistanceDp", prefs.readerPageEdgeDistanceDp)
             put("readerCustomFontToken", portableCustomToken(prefs.readerCustomFontPath, CustomAssetSlot.READER_FONT))
             put("readerCustomBgToken", portableCustomToken(prefs.readerCustomBackgroundPath, CustomAssetSlot.READER_BACKGROUND))
+            put("readerPageTurnMode", prefs.readerPageTurnMode.name)
+            put("readerPaperPreset", prefs.readerPaperPreset.name)
+            put("readerKeepScreenOn", prefs.readerKeepScreenOn)
+            put("readerEdgeBrightnessDragEnabled", prefs.readerEdgeBrightnessDragEnabled)
             put("volumeKeyPagingEnabled", prefs.volumeKeyPagingEnabled)
             put("autoOptimizeConnectionEnabled", prefs.autoOptimizeConnectionEnabled)
         }.toString(2)
@@ -633,6 +639,12 @@ class BackupArchiveRepository(
         val home = runCatching {
             DefaultHomeDestination.valueOf(obj.optString("defaultHomeDestination", DefaultHomeDestination.LATEST.name))
         }.getOrDefault(DefaultHomeDestination.LATEST)
+        val pageTurnMode = runCatching {
+            ReaderPageTurnMode.valueOf(obj.optString("readerPageTurnMode", ReaderPageTurnMode.COVER_SLIDE.name))
+        }.getOrDefault(ReaderPageTurnMode.COVER_SLIDE)
+        val paperPreset = runCatching {
+            ReaderPaperPreset.valueOf(obj.optString("readerPaperPreset", ReaderPaperPreset.PARCHMENT.name))
+        }.getOrDefault(ReaderPaperPreset.PARCHMENT)
 
         return Wenku8UserPreferences(
             appLanguage = lang,
@@ -648,6 +660,10 @@ class BackupArchiveRepository(
             readerPageEdgeDistanceDp = obj.optInt("readerPageEdgeDistanceDp", Wenku8UserPreferences.DEFAULT_READER_PAGE_EDGE_DISTANCE_DP),
             readerCustomFontPath = resolveCustomToken(obj.optString("readerCustomFontToken", ""), CustomAssetSlot.READER_FONT),
             readerCustomBackgroundPath = resolveCustomToken(obj.optString("readerCustomBgToken", ""), CustomAssetSlot.READER_BACKGROUND),
+            readerPageTurnMode = pageTurnMode,
+            readerPaperPreset = paperPreset,
+            readerKeepScreenOn = obj.optBoolean("readerKeepScreenOn", false),
+            readerEdgeBrightnessDragEnabled = obj.optBoolean("readerEdgeBrightnessDragEnabled", false),
             volumeKeyPagingEnabled = obj.optBoolean("volumeKeyPagingEnabled", true),
             autoOptimizeConnectionEnabled = obj.optBoolean("autoOptimizeConnectionEnabled", true),
         )

@@ -19,6 +19,8 @@ import kotlinx.coroutines.flow.map
 import org.mewx.wenku8.api.Wenku8API
 import org.mewx.wenku8.v2.data.repository.BookshelfSortMode
 import org.mewx.wenku8.v2.data.repository.BookshelfViewMode
+import org.mewx.wenku8.v2.reader.model.ReaderPageTurnMode
+import org.mewx.wenku8.v2.reader.model.ReaderPaperPreset
 import org.mewx.wenku8.v2.ui.navigation.DefaultHomeDestination
 import org.mewx.wenku8.v2.ui.theme.Wenku8ThemeMode
 import java.io.IOException
@@ -39,8 +41,9 @@ import java.io.IOException
  * - `reader_font_path` (`""` = system default) -> [readerCustomFontPath]
  * - `reader_background_path` (`""` = system default) -> [readerCustomBackgroundPath]
  * - Plus `v2.0`: [themeMode], [useDynamicColor], [defaultHomeDestination] (`LATEST` default /
- *   `BOOKSHELF`), [bookshelfViewMode], [bookshelfSortMode], [volumeKeyPagingEnabled],
- *   [autoOptimizeConnectionEnabled], and [legacyV1InternalMigrationVersion].
+ *   `BOOKSHELF`), [bookshelfViewMode], [bookshelfSortMode], [readerPageTurnMode],
+ *   [readerPaperPreset], [readerKeepScreenOn], [readerEdgeBrightnessDragEnabled],
+ *   [volumeKeyPagingEnabled], [autoOptimizeConnectionEnabled], and [legacyV1InternalMigrationVersion].
  */
 data class Wenku8UserPreferences(
     val appLanguage: Wenku8API.AppLanguage = Wenku8API.AppLanguage.SC,
@@ -58,6 +61,10 @@ data class Wenku8UserPreferences(
     val readerPageEdgeDistanceDp: Int = DEFAULT_READER_PAGE_EDGE_DISTANCE_DP,
     val readerCustomFontPath: String = "",
     val readerCustomBackgroundPath: String = "",
+    val readerPageTurnMode: ReaderPageTurnMode = ReaderPageTurnMode.COVER_SLIDE,
+    val readerPaperPreset: ReaderPaperPreset = ReaderPaperPreset.PARCHMENT,
+    val readerKeepScreenOn: Boolean = false,
+    val readerEdgeBrightnessDragEnabled: Boolean = false,
     val volumeKeyPagingEnabled: Boolean = true,
     val autoOptimizeConnectionEnabled: Boolean = true,
     val cachedNoticeText: String = "",
@@ -192,6 +199,22 @@ class UserPreferencesRepository(
         dataStore.edit { it[Keys.READER_CUSTOM_BG_PATH] = normalized }
     }
 
+    suspend fun setReaderPageTurnMode(mode: ReaderPageTurnMode) {
+        dataStore.edit { it[Keys.READER_PAGE_TURN_MODE] = mode.name }
+    }
+
+    suspend fun setReaderPaperPreset(preset: ReaderPaperPreset) {
+        dataStore.edit { it[Keys.READER_PAPER_PRESET] = preset.name }
+    }
+
+    suspend fun setReaderKeepScreenOn(enabled: Boolean) {
+        dataStore.edit { it[Keys.READER_KEEP_SCREEN_ON] = enabled }
+    }
+
+    suspend fun setReaderEdgeBrightnessDragEnabled(enabled: Boolean) {
+        dataStore.edit { it[Keys.READER_EDGE_BRIGHTNESS_DRAG] = enabled }
+    }
+
     suspend fun setVolumeKeyPagingEnabled(enabled: Boolean) {
         dataStore.edit { it[Keys.VOLUME_KEY_PAGING_ENABLED] = enabled }
     }
@@ -318,6 +341,10 @@ class UserPreferencesRepository(
             )
             prefs[Keys.READER_CUSTOM_FONT_PATH] = imported.readerCustomFontPath
             prefs[Keys.READER_CUSTOM_BG_PATH] = imported.readerCustomBackgroundPath
+            prefs[Keys.READER_PAGE_TURN_MODE] = imported.readerPageTurnMode.name
+            prefs[Keys.READER_PAPER_PRESET] = imported.readerPaperPreset.name
+            prefs[Keys.READER_KEEP_SCREEN_ON] = imported.readerKeepScreenOn
+            prefs[Keys.READER_EDGE_BRIGHTNESS_DRAG] = imported.readerEdgeBrightnessDragEnabled
             prefs[Keys.VOLUME_KEY_PAGING_ENABLED] = imported.volumeKeyPagingEnabled
             prefs[Keys.AUTO_OPTIMIZE_CONNECTION_ENABLED] = imported.autoOptimizeConnectionEnabled
         }
@@ -343,6 +370,14 @@ class UserPreferencesRepository(
         val bookshelfSort = enumValueOrDefault(
             raw = prefs[Keys.BOOKSHELF_SORT_MODE],
             default = BookshelfSortMode.MANUAL_ORDER,
+        )
+        val pageTurnMode = enumValueOrDefault(
+            raw = prefs[Keys.READER_PAGE_TURN_MODE],
+            default = ReaderPageTurnMode.COVER_SLIDE,
+        )
+        val paperPreset = enumValueOrDefault(
+            raw = prefs[Keys.READER_PAPER_PRESET],
+            default = ReaderPaperPreset.PARCHMENT,
         )
         val einkEnabled = prefs[Keys.EINK_MODE_ENABLED] ?: (themeMode == Wenku8ThemeMode.E_INK)
 
@@ -379,6 +414,10 @@ class UserPreferencesRepository(
             ),
             readerCustomFontPath = prefs[Keys.READER_CUSTOM_FONT_PATH] ?: "",
             readerCustomBackgroundPath = prefs[Keys.READER_CUSTOM_BG_PATH] ?: "",
+            readerPageTurnMode = pageTurnMode,
+            readerPaperPreset = paperPreset,
+            readerKeepScreenOn = prefs[Keys.READER_KEEP_SCREEN_ON] ?: false,
+            readerEdgeBrightnessDragEnabled = prefs[Keys.READER_EDGE_BRIGHTNESS_DRAG] ?: false,
             volumeKeyPagingEnabled = prefs[Keys.VOLUME_KEY_PAGING_ENABLED] ?: true,
             autoOptimizeConnectionEnabled = prefs[Keys.AUTO_OPTIMIZE_CONNECTION_ENABLED] ?: true,
             cachedNoticeText = prefs[Keys.CACHED_NOTICE_TEXT] ?: "",
@@ -407,6 +446,10 @@ class UserPreferencesRepository(
         val READER_PAGE_EDGE_DISTANCE_DP = intPreferencesKey("reader_page_edge_distance_dp")
         val READER_CUSTOM_FONT_PATH = stringPreferencesKey("reader_custom_font_path")
         val READER_CUSTOM_BG_PATH = stringPreferencesKey("reader_custom_bg_path")
+        val READER_PAGE_TURN_MODE = stringPreferencesKey("reader_page_turn_mode")
+        val READER_PAPER_PRESET = stringPreferencesKey("reader_paper_preset")
+        val READER_KEEP_SCREEN_ON = booleanPreferencesKey("reader_keep_screen_on")
+        val READER_EDGE_BRIGHTNESS_DRAG = booleanPreferencesKey("reader_edge_brightness_drag")
         val VOLUME_KEY_PAGING_ENABLED = booleanPreferencesKey("volume_key_paging_enabled")
         val AUTO_OPTIMIZE_CONNECTION_ENABLED = booleanPreferencesKey("auto_optimize_connection_enabled")
         val CACHED_NOTICE_TEXT = stringPreferencesKey("cached_notice_text")

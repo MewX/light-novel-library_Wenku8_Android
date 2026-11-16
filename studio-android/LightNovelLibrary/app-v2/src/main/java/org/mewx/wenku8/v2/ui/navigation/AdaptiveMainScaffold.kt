@@ -58,15 +58,18 @@ import org.mewx.wenku8.v2.R
 import org.mewx.wenku8.v2.data.local.db.Wenku8Database
 import org.mewx.wenku8.v2.data.local.preferences.Wenku8UserPreferences
 import org.mewx.wenku8.v2.data.migration.LegacyV1StorageMigrator
+import org.mewx.wenku8.v2.data.remote.api.WenkuCatalogGateway
 import org.mewx.wenku8.v2.data.remote.diagnostics.AutoRoutingModeState
 import org.mewx.wenku8.v2.data.remote.diagnostics.RelayRouteController
 import org.mewx.wenku8.v2.data.download.NovelDownloadRepository
 import org.mewx.wenku8.v2.data.repository.BackupArchiveRepository
+import org.mewx.wenku8.v2.data.repository.BookshelfItemModel
 import org.mewx.wenku8.v2.data.repository.BookshelfRepository
 import org.mewx.wenku8.v2.data.repository.BookshelfSortMode
 import org.mewx.wenku8.v2.data.repository.BookshelfViewMode
 import org.mewx.wenku8.v2.data.repository.DiscoveryRepository
 import org.mewx.wenku8.v2.data.repository.NovelDetailRepository
+import org.mewx.wenku8.v2.data.repository.NovelTocSyncRepository
 import org.mewx.wenku8.v2.data.repository.ReviewThreadCardItem
 import org.mewx.wenku8.v2.data.repository.ReviewsRepository
 import org.mewx.wenku8.v2.data.repository.ServerNoticeAndUpdateRepository
@@ -74,6 +77,8 @@ import org.mewx.wenku8.v2.data.repository.StorageAndCacheRepository
 import org.mewx.wenku8.v2.data.repository.UserSessionRepository
 import org.mewx.wenku8.v2.domain.model.DiscoveryNovelCardItem
 import org.mewx.wenku8.v2.domain.model.UnifiedSearchMode
+import org.mewx.wenku8.v2.reader.model.ReaderPageTurnMode
+import org.mewx.wenku8.v2.reader.model.ReaderPaperPreset
 import org.mewx.wenku8.v2.ui.bookshelf.BookshelfScreen
 import org.mewx.wenku8.v2.ui.detail.NovelDetailScreen
 import org.mewx.wenku8.v2.ui.detail.ReaderLaunchRequest
@@ -84,6 +89,7 @@ import org.mewx.wenku8.v2.ui.discovery.PersistentSearchEntryPill
 import org.mewx.wenku8.v2.ui.discovery.RankingsScreen
 import org.mewx.wenku8.v2.ui.profile.AccountLoginBottomSheet
 import org.mewx.wenku8.v2.ui.profile.ProfileAndStudioScreen
+import org.mewx.wenku8.v2.ui.reader.UnifiedReaderScreen
 import org.mewx.wenku8.v2.ui.reviews.ReviewListScreen
 import org.mewx.wenku8.v2.ui.reviews.ReviewThreadScreen
 import org.mewx.wenku8.v2.ui.search.UnifiedSearchScreen
@@ -122,6 +128,8 @@ fun AdaptiveMainScaffold(
     modifier: Modifier = Modifier,
     userPreferences: Wenku8UserPreferences? = null,
     database: Wenku8Database? = null,
+    catalogGateway: WenkuCatalogGateway? = null,
+    novelTocSyncRepository: NovelTocSyncRepository? = null,
     relayRouteController: RelayRouteController? = null,
     discoveryRepository: DiscoveryRepository? = null,
     userSessionRepository: UserSessionRepository? = null,
@@ -151,6 +159,10 @@ fun AdaptiveMainScaffold(
     ) -> Unit = { _, _, _, _ -> },
     onReaderCustomFontPathChanged: (String) -> Unit = {},
     onReaderCustomBackgroundPathChanged: (String) -> Unit = {},
+    onReaderPageTurnModeChanged: (ReaderPageTurnMode) -> Unit = {},
+    onReaderPaperPresetChanged: (ReaderPaperPreset) -> Unit = {},
+    onReaderKeepScreenOnChanged: (Boolean) -> Unit = {},
+    onReaderEdgeBrightnessDragChanged: (Boolean) -> Unit = {},
     onVolumeKeyPagingChanged: (Boolean) -> Unit = {},
     initialOpenReviewsAid: Int = 0,
     initialOpenReviewsTitle: String = "",
@@ -227,6 +239,16 @@ fun AdaptiveMainScaffold(
     var activeReviewThread by androidx.compose.runtime.remember {
         mutableStateOf<ReviewThreadCardItem?>(null)
     }
+    var activeReaderRequest by androidx.compose.runtime.remember {
+        mutableStateOf<ReaderLaunchRequest?>(null)
+    }
+
+    val handleOpenReader: (ReaderLaunchRequest) -> Unit = { request ->
+        onOpenReader(request)
+        if (database != null && catalogGateway != null && novelTocSyncRepository != null) {
+            activeReaderRequest = request
+        }
+    }
 
     val handleOpenSearch = {
         onOpenSearch()
@@ -253,6 +275,39 @@ fun AdaptiveMainScaffold(
         if (novelDetailRepository != null && bookshelfRepository != null && novelDownloadRepository != null) {
             activeDetailSeedItem = item
             activeDetailNovelAid = item.aid
+        }
+    }
+
+    val handleContinueReadingClicked: (BookshelfItemModel) -> Unit = { item ->
+        val prog = item.readingProgress
+        if (prog != null && prog.cid > 0 &&
+            database != null && catalogGateway != null && novelTocSyncRepository != null
+        ) {
+            handleOpenReader(
+                ReaderLaunchRequest(
+                    aid = item.aid,
+                    vid = prog.vid,
+                    cid = prog.cid,
+                    novelTitle = item.novel.title,
+                    volumeTitle = prog.volumeTitle,
+                    chapterTitle = prog.chapterTitle,
+                    initialParagraphIndex = prog.paragraphIndex,
+                    initialCharOffset = prog.charOffset,
+                ),
+            )
+        } else {
+            handleNovelClicked(
+                DiscoveryNovelCardItem(
+                    aid = item.aid,
+                    title = item.novel.title,
+                    coverUrl = item.coverUrl,
+                    author = item.novel.author,
+                    bookStatus = item.novel.bookStatus,
+                    lastUpdate = item.novel.lastUpdate,
+                    tags = item.tags,
+                    introShort = item.novel.introShort,
+                ),
+            )
         }
     }
 
@@ -350,6 +405,7 @@ fun AdaptiveMainScaffold(
                     onOpenSearch = handleOpenSearch,
                     onOpenLoginSheet = { isLoginBottomSheetOpen = true },
                     onNovelClicked = handleNovelClicked,
+                    onContinueReadingClicked = handleContinueReadingClicked,
                     onOpenNetworkDiagnostics = handleOpenNetworkDiagnostics,
                     contentPadding = innerPadding,
                 )
@@ -442,6 +498,7 @@ fun AdaptiveMainScaffold(
                         onOpenSearch = handleOpenSearch,
                         onOpenLoginSheet = { isLoginBottomSheetOpen = true },
                         onNovelClicked = handleNovelClicked,
+                        onContinueReadingClicked = handleContinueReadingClicked,
                         onOpenNetworkDiagnostics = handleOpenNetworkDiagnostics,
                         contentPadding = innerPadding,
                     )
@@ -462,7 +519,7 @@ fun AdaptiveMainScaffold(
                             activeDetailNovelAid = 0
                             activeDetailSeedItem = null
                         },
-                        onOpenReader = onOpenReader,
+                        onOpenReader = handleOpenReader,
                         onOpenReviews = { aid, title ->
                             activeReviewsAid = aid
                             activeReviewsNovelTitle = title
@@ -516,7 +573,7 @@ fun AdaptiveMainScaffold(
                     activeDetailNovelAid = 0
                     activeDetailSeedItem = null
                 },
-                onOpenReader = onOpenReader,
+                onOpenReader = handleOpenReader,
                 onOpenReviews = { aid, title ->
                     activeReviewsAid = aid
                     activeReviewsNovelTitle = title
@@ -562,6 +619,32 @@ fun AdaptiveMainScaffold(
                     onOpenNetworkDiagnostics = handleOpenNetworkDiagnostics,
                 )
             }
+        }
+
+        val currentReaderRequest = activeReaderRequest
+        if (currentReaderRequest != null &&
+            database != null &&
+            catalogGateway != null &&
+            novelTocSyncRepository != null
+        ) {
+            UnifiedReaderScreen(
+                launchRequest = currentReaderRequest,
+                database = database,
+                catalogGateway = catalogGateway,
+                novelTocSyncRepository = novelTocSyncRepository,
+                preferences = effectivePreferences,
+                storageAndCacheRepository = storageAndCacheRepository,
+                onReaderTypographyChanged = onReaderTypographyChanged,
+                onReaderCustomFontPathChanged = onReaderCustomFontPathChanged,
+                onReaderCustomBackgroundPathChanged = onReaderCustomBackgroundPathChanged,
+                onReaderPageTurnModeChanged = onReaderPageTurnModeChanged,
+                onReaderPaperPresetChanged = onReaderPaperPresetChanged,
+                onReaderKeepScreenOnChanged = onReaderKeepScreenOnChanged,
+                onReaderEdgeBrightnessDragChanged = onReaderEdgeBrightnessDragChanged,
+                onVolumeKeyPagingChanged = onVolumeKeyPagingChanged,
+                onOpenNetworkDiagnostics = handleOpenNetworkDiagnostics,
+                onNavigateBack = { activeReaderRequest = null },
+            )
         }
 
         if (isNetworkDiagnosticsOpen && networkDiagnosticsViewModelFactory != null) {
@@ -628,6 +711,7 @@ private fun MainDestinationBody(
     onOpenSearch: () -> Unit,
     onOpenLoginSheet: () -> Unit,
     onNovelClicked: (DiscoveryNovelCardItem) -> Unit,
+    onContinueReadingClicked: (BookshelfItemModel) -> Unit,
     onOpenNetworkDiagnostics: () -> Unit,
     contentPadding: PaddingValues,
 ) {
@@ -644,6 +728,7 @@ private fun MainDestinationBody(
             onOpenSearch = onOpenSearch,
             onOpenLoginSheet = onOpenLoginSheet,
             onNovelClicked = onNovelClicked,
+            onContinueReadingClicked = onContinueReadingClicked,
             modifier = Modifier
                 .fillMaxSize()
                 .padding(contentPadding)

@@ -5,6 +5,7 @@ import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.os.Build
 import android.os.Bundle
+import android.view.KeyEvent
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
@@ -22,6 +23,7 @@ import kotlinx.coroutines.launch
 import org.mewx.wenku8.api.Wenku8API
 import org.mewx.wenku8.v2.data.local.preferences.Wenku8UserPreferences
 import org.mewx.wenku8.v2.ui.navigation.AdaptiveMainScaffold
+import org.mewx.wenku8.v2.ui.reader.HardwareVolumeKeyHost
 import org.mewx.wenku8.v2.ui.theme.Wenku8ExpressiveTheme
 
 /**
@@ -31,7 +33,20 @@ import org.mewx.wenku8.v2.ui.theme.Wenku8ExpressiveTheme
  * provides seamless in-app Simplified / Traditional Chinese (`zh-CN` / `zh-TW` / `zh-HK`) switching
  * across API 24–37 without restarting the process on Android 13+.
  */
-class MainActivity : AppCompatActivity() {
+class MainActivity : AppCompatActivity(), HardwareVolumeKeyHost {
+
+    override var activeVolumeKeyInterceptor: ((KeyEvent) -> Boolean)? = null
+
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        if (event.keyCode == KeyEvent.KEYCODE_VOLUME_UP ||
+            event.keyCode == KeyEvent.KEYCODE_VOLUME_DOWN
+        ) {
+            if (activeVolumeKeyInterceptor?.invoke(event) == true) {
+                return true
+            }
+        }
+        return super.dispatchKeyEvent(event)
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         if (BuildConfig.DEBUG && intent?.getBooleanExtra(EXTRA_DEBUG_SHOW_WHEN_LOCKED, false) == true) {
@@ -85,6 +100,8 @@ class MainActivity : AppCompatActivity() {
                         },
                         userPreferences = loadedPreferences,
                         database = appContainer.database,
+                        catalogGateway = appContainer.wenkuApiClient,
+                        novelTocSyncRepository = appContainer.novelTocSyncRepository,
                         relayRouteController = appContainer.relayRouteController,
                         discoveryRepository = discoveryRepository,
                         userSessionRepository = appContainer.userSessionRepository,
@@ -154,6 +171,26 @@ class MainActivity : AppCompatActivity() {
                         onReaderCustomBackgroundPathChanged = { path ->
                             coroutineScope.launch {
                                 preferencesRepository.setReaderCustomBackgroundPath(path)
+                            }
+                        },
+                        onReaderPageTurnModeChanged = { mode ->
+                            coroutineScope.launch {
+                                preferencesRepository.setReaderPageTurnMode(mode)
+                            }
+                        },
+                        onReaderPaperPresetChanged = { preset ->
+                            coroutineScope.launch {
+                                preferencesRepository.setReaderPaperPreset(preset)
+                            }
+                        },
+                        onReaderKeepScreenOnChanged = { enabled ->
+                            coroutineScope.launch {
+                                preferencesRepository.setReaderKeepScreenOn(enabled)
+                            }
+                        },
+                        onReaderEdgeBrightnessDragChanged = { enabled ->
+                            coroutineScope.launch {
+                                preferencesRepository.setReaderEdgeBrightnessDragEnabled(enabled)
                             }
                         },
                         onVolumeKeyPagingChanged = { enabled ->

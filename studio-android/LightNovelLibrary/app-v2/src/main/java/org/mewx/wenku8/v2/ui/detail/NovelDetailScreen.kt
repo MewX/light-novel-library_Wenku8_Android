@@ -175,6 +175,8 @@ data class ReaderLaunchRequest(
     val volumeTitle: String,
     val chapterTitle: String,
     val startWithTts: Boolean = false,
+    val initialParagraphIndex: Int = -1,
+    val initialCharOffset: Int = 0,
 )
 
 /**
@@ -372,28 +374,35 @@ fun NovelDetailScreen(
     val inBookshelf = snapshot.novel?.inBookshelf == true
 
     val launchReaderSnackbarTemplate = stringResource(R.string.detail_reader_launch_snackbar_format)
-    val invokeReaderTarget: (vid: Int, cid: Int, volumeTitle: String, chapterTitle: String, tts: Boolean) -> Unit =
-        { vid, cid, volTitle, chapTitle, tts ->
-            val req = ReaderLaunchRequest(
-                aid = aid,
-                vid = vid,
-                cid = cid,
-                novelTitle = displayTitle,
-                volumeTitle = volTitle,
-                chapterTitle = chapTitle,
-                startWithTts = tts,
+    val invokeReaderTarget: (
+        vid: Int,
+        cid: Int,
+        volumeTitle: String,
+        chapterTitle: String,
+        tts: Boolean,
+        initialParagraphIndex: Int,
+    ) -> Unit = { vid, cid, volTitle, chapTitle, tts, initialParaIdx ->
+        val req = ReaderLaunchRequest(
+            aid = aid,
+            vid = vid,
+            cid = cid,
+            novelTitle = displayTitle,
+            volumeTitle = volTitle,
+            chapterTitle = chapTitle,
+            startWithTts = tts,
+            initialParagraphIndex = initialParaIdx,
+        )
+        onOpenReader(req)
+        coroutineScope.launch {
+            snackbarHostState.showSnackbar(
+                String.format(
+                    Locale.getDefault(),
+                    launchReaderSnackbarTemplate,
+                    "$volTitle · $chapTitle".trim(' ', '·'),
+                ),
             )
-            onOpenReader(req)
-            coroutineScope.launch {
-                snackbarHostState.showSnackbar(
-                    String.format(
-                        Locale.getDefault(),
-                        launchReaderSnackbarTemplate,
-                        "$volTitle · $chapTitle".trim(' ', '·'),
-                    ),
-                )
-            }
         }
+    }
 
     val filteredAndOrderedVolumes = remember(
         snapshot.volumes,
@@ -579,6 +588,7 @@ fun NovelDetailScreen(
                                     prog.volumeTitle,
                                     prog.chapterTitle,
                                     false,
+                                    -1,
                                 )
                             } else {
                                 val firstVol = snapshot.volumes.firstOrNull { it.chapters.isNotEmpty() }
@@ -590,6 +600,7 @@ fun NovelDetailScreen(
                                         firstVol.volumeTitle,
                                         firstChap.chapterTitle,
                                         false,
+                                        0,
                                     )
                                 }
                             }
@@ -605,6 +616,7 @@ fun NovelDetailScreen(
                                     firstVol.volumeTitle,
                                     firstChap.chapterTitle,
                                     false,
+                                    0,
                                 )
                             }
                         },
@@ -619,6 +631,7 @@ fun NovelDetailScreen(
                                     lastVol.volumeTitle,
                                     lastChap.chapterTitle,
                                     false,
+                                    0,
                                 )
                             }
                         },
@@ -634,6 +647,7 @@ fun NovelDetailScreen(
                                     prog.volumeTitle,
                                     prog.chapterTitle,
                                     true,
+                                    -1,
                                 )
                             } else if (firstVol != null && firstChap != null) {
                                 invokeReaderTarget(
@@ -642,6 +656,7 @@ fun NovelDetailScreen(
                                     firstVol.volumeTitle,
                                     firstChap.chapterTitle,
                                     true,
+                                    0,
                                 )
                             }
                         },
@@ -773,6 +788,7 @@ fun NovelDetailScreen(
                                     volume.volumeTitle,
                                     illusChap.chapterTitle,
                                     false,
+                                    0,
                                 )
                             },
                             onChapterClicked = { chap ->
@@ -782,6 +798,7 @@ fun NovelDetailScreen(
                                     volume.volumeTitle,
                                     chap.chapterTitle,
                                     false,
+                                    -1,
                                 )
                             },
                         )
