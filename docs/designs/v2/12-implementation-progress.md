@@ -39,9 +39,9 @@
   - `OfflineFirstWenkuImageFetcher` reading `filesDir/saves/imgs/` & `filesDir/imgs/` before network.
 
 ### Phase 1: Discovery Feeds (`最新` · `排行`) & Unified Search Studio (`5s` Cooldown Queue)
-- [~] **`P1.1` — `:api` Coroutine Gateway (`WenkuApiClient`) & Paginated Feed Engine**
+- [x] **`P1.1` — `:api` Coroutine Gateway (`WenkuApiClient`) & Paginated Feed Engine** *(Completed: pluggable `WenkuTransport` + `LegacyLightNetworkTransport`, stub- & JNI-safe `WenkuApiClient` / `WenkuCatalogGateway`, all 13 `NovelSortedBy` feed mappings, completeness-monotonic `DiscoveryRepository` card cache, `<result>` root gateway validation, instant local Room filter, & auto-queued `5s` online search cooldown coordinator; verified across real `:api` & `-DforceApiStub`)*
   - Clean Kotlin repository wrapping `Wenku8API` + `LightNetwork` / `RelayHttpTransport` + `Wenku8Parser` / `NovelListWithInfoParser` with `api-stub` safety.
-- [ ] **`P1.2` — `LatestScreen` (`最近更新 · 最新入库 · 完结精品`) & `RankingsScreen` (2D Metric × Period Matrix)**
+- [~] **`P1.2` — `LatestScreen` (`最近更新 · 最新入库 · 完结精品`) & `RankingsScreen` (2D Metric × Period Matrix)**
   - Real data loading, pagination, pull-to-refresh, E-Ink card compliance, and contextual `[ 🩺 网络检测 ]` error chip.
 - [ ] **`P1.3` — `UnifiedSearchScreen` (`0ms` Local Room Shelf Filter + Auto-Queued `5s` Online Search & History)**
   - Title (`articlename`), Author (`author`), and numeric `AID` jump + live `5s` server cooldown countdown queue + 20-item Room search history.

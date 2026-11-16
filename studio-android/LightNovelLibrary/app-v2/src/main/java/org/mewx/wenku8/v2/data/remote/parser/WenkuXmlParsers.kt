@@ -238,6 +238,7 @@ object WenkuXmlParsers {
 
         return try {
             val parser = newPullParser(rawXml)
+            var sawResultRoot = false
             var totalPages = 0
             val items = ArrayList<ParsedNovelListItem>()
             var currentAid = 0
@@ -257,7 +258,9 @@ object WenkuXmlParsers {
                 when (eventType) {
                     XmlPullParser.START_TAG -> {
                         when (parser.name) {
+                            "result" -> sawResultRoot = true
                             "page" -> {
+                                sawResultRoot = true
                                 totalPages = parser.getAttributeValue(null, "num").toSafeInt()
                             }
                             "item" -> {
@@ -315,7 +318,7 @@ object WenkuXmlParsers {
                 eventType = parser.next()
             }
 
-            ParsedNovelListPage(totalPages = totalPages, items = items)
+            if (sawResultRoot) ParsedNovelListPage(totalPages = totalPages, items = items) else null
         } catch (_: Exception) {
             null
         }
@@ -380,6 +383,120 @@ object WenkuXmlParsers {
             }
 
             if (sawMetadataRoot) entries else null
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    /**
+     * Parses `do=bookinfo` (`Wenku8API.getNovelShortInfoUpdate_CV`) used to hydrate bare `aid`
+     * search results and repair sparse feed rows. Rejects non-`<metadata>` or title-less XML.
+     */
+    fun parseNovelShortInfoUpdate(rawXml: String?): ParsedNovelListItem? {
+        if (rawXml.isNullOrBlank()) return null
+
+        return try {
+            val parser = newPullParser(rawXml)
+            var sawMetadataRoot = false
+            var aid = 0
+            var title = ""
+            var author = ""
+            var bookStatus = ""
+            var lastUpdate = ""
+            var introShort = ""
+
+            var eventType = parser.eventType
+            while (eventType != XmlPullParser.END_DOCUMENT) {
+                if (eventType == XmlPullParser.START_TAG) {
+                    when (parser.name) {
+                        "metadata" -> sawMetadataRoot = true
+                        "data" -> if (sawMetadataRoot) {
+                            val fieldName = parser.getAttributeValue(null, "name")
+                                ?: parser.safePositionalAttribute(0)
+                            when (fieldName) {
+                                "Title" -> {
+                                    val rawAid = parser.getAttributeValue(null, "aid")
+                                        ?: parser.safePositionalAttribute(1)
+                                    aid = rawAid.toSafeInt()
+                                    title = parser.nextText().trim()
+                                }
+                                "Author" -> {
+                                    author = (parser.getAttributeValue(null, "value")
+                                        ?: parser.safePositionalAttribute(1)
+                                        ?: parser.nextText()).trim()
+                                }
+                                "BookStatus" -> {
+                                    bookStatus = (parser.getAttributeValue(null, "value")
+                                        ?: parser.safePositionalAttribute(1)
+                                        ?: parser.nextText()).trim()
+                                }
+                                "LastUpdate" -> {
+                                    lastUpdate = (parser.getAttributeValue(null, "value")
+                                        ?: parser.safePositionalAttribute(1)
+                                        ?: parser.nextText()).trim()
+                                }
+                                "IntroPreview" -> {
+                                    introShort = parser.readValueAttributeOrText()
+                                        .replace(IDEOGRAPHIC_AND_ASCII_WHITESPACE, " ")
+                                        .trim()
+                                }
+                            }
+                        }
+                    }
+                }
+                eventType = parser.next()
+            }
+
+            if (!sawMetadataRoot || aid <= 0 || title.isEmpty()) {
+                null
+            } else {
+                ParsedNovelListItem(
+                    aid = aid,
+                    title = title,
+                    author = author,
+                    bookStatus = bookStatus,
+                    lastUpdate = lastUpdate,
+                    introShort = introShort,
+                )
+            }
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    /**
+     * Parses `action=search` XML (`<result><item aid='1306'/>...</result>`).
+     *
+     * Returns `emptyList()` when a valid `<result>` document contains zero matches, and `null`
+     * when the payload is an error code (e.g. `"0"` / `"11"` cooldown) or gateway HTML.
+     */
+    fun parseSearchResultAidList(rawXml: String?): List<Int>? {
+        if (rawXml.isNullOrBlank()) return null
+
+        return try {
+            val parser = newPullParser(rawXml)
+            var sawResultRoot = false
+            val orderedUniqueAids = LinkedHashSet<Int>()
+
+            var eventType = parser.eventType
+            while (eventType != XmlPullParser.END_DOCUMENT) {
+                if (eventType == XmlPullParser.START_TAG) {
+                    when (parser.name) {
+                        "result", "metadata", "package" -> sawResultRoot = true
+                        "item" -> {
+                            sawResultRoot = true
+                            val aid = (parser.getAttributeValue(null, "aid")
+                                ?: parser.safePositionalAttribute(0)).toSafeInt()
+                            if (aid > 0) {
+                                orderedUniqueAids.add(aid)
+                            }
+                        }
+                    }
+                }
+                eventType = parser.next()
+            }
+
+            if (sawResultRoot) orderedUniqueAids.toList() else null
         } catch (_: Exception) {
             null
         }

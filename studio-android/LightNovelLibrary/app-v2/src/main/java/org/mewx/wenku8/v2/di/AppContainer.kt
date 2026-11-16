@@ -17,6 +17,10 @@ import org.mewx.wenku8.v2.data.media.OfflineFirstWenkuImageFetcher
 import org.mewx.wenku8.v2.data.migration.InternalFileSaveSource
 import org.mewx.wenku8.v2.data.migration.LegacyMigrationProgress
 import org.mewx.wenku8.v2.data.migration.LegacyV1StorageMigrator
+import org.mewx.wenku8.v2.data.remote.api.WenkuApiClient
+import org.mewx.wenku8.v2.data.remote.transport.LegacyLightNetworkTransport
+import org.mewx.wenku8.v2.data.remote.transport.WenkuTransport
+import org.mewx.wenku8.v2.data.repository.DiscoveryRepository
 import org.mewx.wenku8.v2.data.repository.NovelTocSyncRepository
 import java.io.File
 
@@ -35,6 +39,21 @@ class AppContainer(context: Context) {
 
     val userPreferencesRepository: UserPreferencesRepository by lazy {
         UserPreferencesRepository.create(appContext, applicationScope)
+    }
+
+    val wenkuTransport: WenkuTransport by lazy {
+        LegacyLightNetworkTransport()
+    }
+
+    val wenkuApiClient: WenkuApiClient by lazy {
+        WenkuApiClient(transport = wenkuTransport)
+    }
+
+    val discoveryRepository: DiscoveryRepository by lazy {
+        DiscoveryRepository(
+            database = database,
+            apiClient = wenkuApiClient,
+        )
     }
 
     val novelTocSyncRepository: NovelTocSyncRepository by lazy {
