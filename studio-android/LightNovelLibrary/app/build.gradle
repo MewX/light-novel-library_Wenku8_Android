@@ -98,7 +98,7 @@ android {
         targetCompatibility JavaVersion.VERSION_17
         coreLibraryDesugaringEnabled true
     }
-    namespace 'org.mewx.wenku8'
+    namespace 'org.mewx.wenku8.v1'
     buildFeatures {
         buildConfig true
     }

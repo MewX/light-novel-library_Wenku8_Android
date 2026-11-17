@@ -4,7 +4,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@color/myWindowBackground"
-    tools:context="org.mewx.wenku8.fragment.LatestFragment">
+    tools:context="org.mewx.wenku8.v1.fragment.LatestFragment">
 
     <!-- Novel List -->
     <androidx.recyclerview.widget.RecyclerView

@@ -5,7 +5,7 @@
     android:layout_height="match_parent"
     android:background="@color/reader_default_bg_yellow" >
 
-    <org.mewx.wenku8.component.ScrollViewNoFling
+    <org.mewx.wenku8.v1.component.ScrollViewNoFling
         android:id="@+id/content_scrollview"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
@@ -21,7 +21,7 @@
             android:layout_height="match_parent"
             android:orientation="vertical" >
         </LinearLayout>
-    </org.mewx.wenku8.component.ScrollViewNoFling>
+    </org.mewx.wenku8.v1.component.ScrollViewNoFling>
 
     <!--
     <ListView

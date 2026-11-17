@@ -13,7 +13,7 @@
         android:orientation="vertical"
         android:paddingTop="8dp"
         android:paddingBottom="8dp"
-        tools:context="org.mewx.wenku8.fragment.ConfigFragment">
+        tools:context="org.mewx.wenku8.v1.fragment.ConfigFragment">
 
         <RelativeLayout
             android:id="@+id/notice_layout"

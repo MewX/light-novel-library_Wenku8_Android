@@ -4,7 +4,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
-    <!--<org.mewx.wenku8.reader.view.WenkuReaderPageView-->
+    <!--<org.mewx.wenku8.v1.reader.view.WenkuReaderPageView-->
         <!--android:id="@+id/sliding_page"-->
         <!--android:layout_width="match_parent"-->
         <!--android:layout_height="match_parent" />-->

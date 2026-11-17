@@ -5,9 +5,9 @@
     android:layout_height="match_parent"
     android:background="@color/default_activity_background"
     android:orientation="vertical"
-    tools:context="org.mewx.wenku8.fragment.RKListFragment">
+    tools:context="org.mewx.wenku8.v1.fragment.RKListFragment">
 
-    <org.mewx.wenku8.component.PagerSlidingTabStrip
+    <org.mewx.wenku8.v1.component.PagerSlidingTabStrip
         android:id="@+id/rklist_tabs"
         android:layout_width="match_parent"
         android:layout_height="?android:attr/actionBarSize"
@@ -21,5 +21,5 @@
         android:id="@+id/rklist_pager"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        tools:context="org.mewx.wenku8.fragment.RKListFragment"/>
+        tools:context="org.mewx.wenku8.v1.fragment.RKListFragment"/>
 </LinearLayout>

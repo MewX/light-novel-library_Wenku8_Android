@@ -371,7 +371,7 @@
         </RelativeLayout>
     </RelativeLayout>
 
-    <!--<org.mewx.wenku8.reader.slider.SlidingLayout-->
+    <!--<org.mewx.wenku8.v1.reader.slider.SlidingLayout-->
         <!--android:id="@+id/sliding_layout"-->
         <!--android:layout_height="match_parent"-->
         <!--android:layout_width="match_parent" />-->

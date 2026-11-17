@@ -20,7 +20,7 @@
 
     <!-- Application Setting -->
     <application
-        android:name="org.mewx.wenku8.MyApp"
+        android:name="org.mewx.wenku8.v1.MyApp"
         android:allowBackup="true"
         android:description="@string/app_description"
         android:icon="@drawable/ic_launcher"
@@ -34,7 +34,7 @@
 
         <!-- Activity list -->
         <activity
-            android:name="org.mewx.wenku8.activity.MainActivity"
+            android:name="org.mewx.wenku8.v1.activity.MainActivity"
             android:screenOrientation="unspecified"
             android:exported="true">
 
@@ -45,85 +45,85 @@
         </activity>
 
         <!-- Search Activity -->
-        <activity android:name="org.mewx.wenku8.activity.SearchActivity"
+        <activity android:name="org.mewx.wenku8.v1.activity.SearchActivity"
             android:label="@string/action_search"
             android:screenOrientation="unspecified">
         </activity>
 
         <!-- Bookshelf Search Activity -->
-        <activity android:name="org.mewx.wenku8.activity.BookshelfSearchActivity"
+        <activity android:name="org.mewx.wenku8.v1.activity.BookshelfSearchActivity"
             android:label="@string/bookshelf_search_hint"
             android:screenOrientation="unspecified">
         </activity>
 
         <!-- Search Result Activity -->
-        <activity android:name="org.mewx.wenku8.activity.SearchResultActivity"
+        <activity android:name="org.mewx.wenku8.v1.activity.SearchResultActivity"
             android:label="@string/action_search"
             android:screenOrientation="unspecified">
         </activity>
 
         <!-- Novel Info Activity -->
-        <activity android:name="org.mewx.wenku8.activity.NovelInfoActivity"
+        <activity android:name="org.mewx.wenku8.v1.activity.NovelInfoActivity"
             android:label="@string/action_novel_info"
             android:screenOrientation="unspecified">
         </activity>
 
         <!-- Novel Review List Activity -->
-        <activity android:name="org.mewx.wenku8.activity.NovelReviewListActivity"
+        <activity android:name="org.mewx.wenku8.v1.activity.NovelReviewListActivity"
             android:label="@string/action_review_list"
             android:screenOrientation="unspecified">
         </activity>
 
         <!-- Novel Review New Post Activity -->
-        <activity android:name="org.mewx.wenku8.activity.NovelReviewNewPostActivity"
+        <activity android:name="org.mewx.wenku8.v1.activity.NovelReviewNewPostActivity"
             android:label="@string/action_review_new_post"
             android:screenOrientation="unspecified">
         </activity>
 
         <!-- Novel Review Reply List Activity -->
-        <activity android:name="org.mewx.wenku8.activity.NovelReviewReplyListActivity"
+        <activity android:name="org.mewx.wenku8.v1.activity.NovelReviewReplyListActivity"
             android:label="@string/action_review_reply_list"
             android:screenOrientation="unspecified">
         </activity>
 
         <!-- Novel Content Activity (Vertical Old Engine) -->
-        <activity android:name="org.mewx.wenku8.activity.VerticalReaderActivity"
+        <activity android:name="org.mewx.wenku8.v1.activity.VerticalReaderActivity"
             android:label="@string/action_old_vertical_reader"
             android:screenOrientation="unspecified">
         </activity>
 
         <!-- Novel Content Activity (Horizontal Ver 1) allow multiple instance -->
-        <activity android:name="org.mewx.wenku8.reader.activity.Wenku8ReaderActivityV1"
+        <activity android:name="org.mewx.wenku8.v1.reader.activity.Wenku8ReaderActivityV1"
             android:label="@string/action_horizontal_reader_v1"
             android:screenOrientation="portrait">
         </activity>
 
         <!-- View Image Detail Activity -->
-        <activity android:name="org.mewx.wenku8.activity.ViewImageDetailActivity"
+        <activity android:name="org.mewx.wenku8.v1.activity.ViewImageDetailActivity"
             android:label="@string/action_watch_image"
             android:screenOrientation="unspecified">
         </activity>
 
         <!-- User Login Activity -->
-        <activity android:name="org.mewx.wenku8.activity.UserLoginActivity"
+        <activity android:name="org.mewx.wenku8.v1.activity.UserLoginActivity"
             android:label="@string/action_user_login"
             android:screenOrientation="unspecified">
         </activity>
 
         <!-- User Info Activity -->
-        <activity android:name="org.mewx.wenku8.activity.UserInfoActivity"
+        <activity android:name="org.mewx.wenku8.v1.activity.UserInfoActivity"
             android:label="@string/action_user_info"
             android:screenOrientation="unspecified">
         </activity>
 
         <!-- Menu Background Selector Activity -->
-        <activity android:name="org.mewx.wenku8.activity.MenuBackgroundSelectorActivity"
+        <activity android:name="org.mewx.wenku8.v1.activity.MenuBackgroundSelectorActivity"
             android:label="@string/action_menu_background_selector"
             android:screenOrientation="unspecified">
         </activity>
 
         <!-- Menu Background Selector Activity -->
-        <activity android:name="org.mewx.wenku8.activity.AboutActivity"
+        <activity android:name="org.mewx.wenku8.v1.activity.AboutActivity"
             android:label="@string/action_about"
             android:screenOrientation="unspecified">
         </activity>
