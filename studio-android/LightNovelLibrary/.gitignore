@@ -6,6 +6,7 @@
 .DS_Store
 /build
 /skills/
+.kotlin/
 
 # distributions
 baidu/
