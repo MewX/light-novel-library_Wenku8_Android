@@ -62,6 +62,7 @@ interface WenkuParamsFactory {
     fun novelIndex(aid: Int, lang: Wenku8API.AppLanguage): ContentValues?
     fun novelContent(aid: Int, cid: Int, lang: Wenku8API.AppLanguage): ContentValues?
     fun bookshelfListParams(lang: Wenku8API.AppLanguage): ContentValues?
+    fun bookshelfListAidParams(lang: Wenku8API.AppLanguage): ContentValues? = null
     fun bookshelfAddParams(aid: Int): ContentValues? = null
     fun bookshelfDelParams(aid: Int): ContentValues? = null
     fun commentListParams(aid: Int, page: Int, lang: Wenku8API.AppLanguage): ContentValues? = null
@@ -122,6 +123,9 @@ object NativeWenkuParamsFactory : WenkuParamsFactory {
 
     override fun bookshelfListParams(lang: Wenku8API.AppLanguage): ContentValues? =
         safeCall(null) { Wenku8API.getBookshelfListParams(lang) }
+
+    override fun bookshelfListAidParams(lang: Wenku8API.AppLanguage): ContentValues? =
+        safeCall(null) { Wenku8API.getBookshelfListAid(lang) }
 
     override fun bookshelfAddParams(aid: Int): ContentValues? =
         safeCall(null) { Wenku8API.getAddToBookshelfParams(aid) }
@@ -212,6 +216,10 @@ interface WenkuCatalogGateway {
     suspend fun fetchCloudBookshelf(
         appLanguage: Wenku8API.AppLanguage,
     ): WenkuApiResult<List<ParsedCloudBookshelfEntry>>
+
+    suspend fun fetchCloudBookshelfAidList(
+        appLanguage: Wenku8API.AppLanguage,
+    ): WenkuApiResult<List<Int>> = WenkuApiResult.ApiNotConfigured
 
     suspend fun addToCloudBookshelf(
         aid: Int,
@@ -393,8 +401,35 @@ class WenkuApiClient(
         val params = paramsFactory.bookshelfListParams(appLanguage)
             ?: return WenkuApiResult.ApiNotConfigured
 
-        return executeXmlRequest(params, isIdempotentReadOnly = true) { rawXml ->
+        val richResult = executeXmlRequest(params, isIdempotentReadOnly = true) { rawXml ->
             WenkuXmlParsers.parseCloudBookshelfList(rawXml)
+        }
+        if (richResult !is WenkuApiResult.ParseError) {
+            return richResult
+        }
+
+        // Fallback to compact `action=bookcase&do=list` (`Wenku8API.getBookshelfListAid`) if an
+        // unescaped character in a book title/chapter broke rich `action=bookcase` XML parsing.
+        return when (val aidResult = fetchCloudBookshelfAidList(appLanguage)) {
+            is WenkuApiResult.Success -> WenkuApiResult.Success(
+                aidResult.data.map { aid -> ParsedCloudBookshelfEntry(aid = aid) },
+            )
+            WenkuApiResult.ApiNotConfigured -> richResult
+            is WenkuApiResult.NetworkError -> aidResult
+            is WenkuApiResult.ServerErrorCode -> aidResult
+            is WenkuApiResult.ParseError -> richResult
+        }
+    }
+
+    override suspend fun fetchCloudBookshelfAidList(
+        appLanguage: Wenku8API.AppLanguage,
+    ): WenkuApiResult<List<Int>> {
+        if (!isApiConfigured) return WenkuApiResult.ApiNotConfigured
+        val params = paramsFactory.bookshelfListAidParams(appLanguage)
+            ?: return WenkuApiResult.ApiNotConfigured
+
+        return executeXmlRequest(params, isIdempotentReadOnly = true) { rawXml ->
+            WenkuXmlParsers.parseCloudBookshelfAidList(rawXml)
         }
     }
 

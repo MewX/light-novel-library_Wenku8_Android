@@ -252,14 +252,28 @@ fun BookshelfScreen(
                 )
             ) {
                 is CloudBookshelfSyncOutcome.Success -> {
-                    val message = if (outcome.cloudShelfFullReached) {
-                        context.getString(
+                    val message = when {
+                        outcome.cloudShelfFullReached -> context.getString(
                             R.string.bookshelf_sync_full_warning_format,
                             outcome.pulledFromCloudCount,
                             outcome.pushedToCloudCount,
                         )
-                    } else {
-                        context.getString(
+
+                        outcome.failedHydrationCount > 0 -> context.getString(
+                            R.string.bookshelf_sync_partial_warning_format,
+                            outcome.pulledFromCloudCount,
+                            outcome.pushedToCloudCount,
+                            outcome.failedHydrationCount,
+                        )
+
+                        outcome.removedRemotelyDeletedCount > 0 || outcome.deletedFromCloudCount > 0 -> context.getString(
+                            R.string.bookshelf_sync_success_with_removals_format,
+                            outcome.pulledFromCloudCount,
+                            outcome.pushedToCloudCount,
+                            outcome.deletedFromCloudCount + outcome.removedRemotelyDeletedCount,
+                        )
+
+                        else -> context.getString(
                             R.string.bookshelf_sync_success_format,
                             outcome.pulledFromCloudCount,
                             outcome.pushedToCloudCount,

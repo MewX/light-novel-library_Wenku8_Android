@@ -96,6 +96,7 @@ class BackupArchiveRepository(
 
         private val FORBIDDEN_FILE_NAMES = setOf(
             "cert.wk8",
+            "account_uname.wk8",
             "avatar.jpg",
             "notice_dismissed.sha256",
             "network_routing_local.preferences_pb",
@@ -277,14 +278,17 @@ class BackupArchiveRepository(
             }
         }
 
-        if (!includeChapterContents) {
-            SQLiteDatabase.openDatabase(
-                targetFile.absolutePath,
-                null,
-                SQLiteDatabase.OPEN_READWRITE,
-            ).use { lightDb ->
-                lightDb.execSQL("DELETE FROM chapter_contents")
-                lightDb.execSQL("VACUUM")
+        SQLiteDatabase.openDatabase(
+            targetFile.absolutePath,
+            null,
+            SQLiteDatabase.OPEN_READWRITE,
+        ).use { snapshotDb ->
+            // Portable backups deliberately omit account credentials (cert.wk8), so strip
+            // per-account cloud sync ledger rows as well.
+            runCatching { snapshotDb.execSQL("DELETE FROM cloud_bookcase_ledger") }
+            if (!includeChapterContents) {
+                snapshotDb.execSQL("DELETE FROM chapter_contents")
+                snapshotDb.execSQL("VACUUM")
             }
         }
     }
@@ -343,18 +347,29 @@ class BackupArchiveRepository(
                 val sessionDao = database.readingSessionDao()
                 val draftDao = database.reviewDraftDao()
                 val historyDao = database.searchHistoryDao()
+                val ledgerDao = database.cloudBookcaseLedgerDao()
 
                 val aidsAcceptingBackupToc = HashSet<Int>()
+                val newlyRestoredShelfAids = ArrayList<Int>()
 
                 // 1. Smart-merge novels (union in_bookshelf = 1, never drop shelf membership)
                 for (incoming in incomingNovels) {
                     currentCoroutineContext().ensureActive()
                     val local = novelDao.getNovelByAid(incoming.aid)
-                    val unionShelf = (local?.inBookshelf == true) || incoming.inBookshelf
+                    val wasAlreadyOnLocalShelf = local?.inBookshelf == true
+                    val unionShelf = wasAlreadyOnLocalShelf || incoming.inBookshelf
                     if (unionShelf) mergedShelfCount++
+                    if (incoming.inBookshelf && !wasAlreadyOnLocalShelf) {
+                        newlyRestoredShelfAids.add(incoming.aid)
+                    }
 
                     if (local == null) {
-                        novelDao.upsertNovel(incoming.copy(inBookshelf = unionShelf))
+                        novelDao.upsertNovel(
+                            incoming.copy(
+                                inBookshelf = unionShelf,
+                                cloudSynced = false,
+                            ),
+                        )
                         aidsAcceptingBackupToc.add(incoming.aid)
                     } else {
                         val incomingIsNewer = incoming.metaSyncedAtMs >= local.metaSyncedAtMs
@@ -365,7 +380,7 @@ class BackupArchiveRepository(
                             inBookshelf = unionShelf,
                             shelfCategory = if (local.inBookshelf) local.shelfCategory else incoming.shelfCategory,
                             shelfSortOrder = if (local.inBookshelf) local.shelfSortOrder else incoming.shelfSortOrder,
-                            cloudSynced = local.cloudSynced || incoming.cloudSynced,
+                            cloudSynced = if (wasAlreadyOnLocalShelf) local.cloudSynced else false,
                             tocVersion = maxOf(local.tocVersion, incoming.tocVersion),
                             tocSha256 = if (incoming.tocVersion >= local.tocVersion && incoming.tocSha256.isNotEmpty()) {
                                 incoming.tocSha256
@@ -379,6 +394,9 @@ class BackupArchiveRepository(
                         )
                         novelDao.upsertNovel(mergedNovel)
                     }
+                }
+                if (newlyRestoredShelfAids.isNotEmpty()) {
+                    ledgerDao.clearEntriesForAids(newlyRestoredShelfAids)
                 }
 
                 // Also accept TOC rows for novels that locally had 0 volumes

@@ -406,15 +406,17 @@ object WenkuXmlParsers {
                     }
                     XmlPullParser.END_TAG -> {
                         if (parser.name == "book" && activeAid > 0) {
-                            entries.add(
-                                ParsedCloudBookshelfEntry(
-                                    aid = activeAid,
-                                    lastUpdateDate = activeDate,
-                                    title = activeName,
-                                    latestChapterCid = activeLatestCid,
-                                    latestChapterName = activeLatestChapterName,
-                                ),
-                            )
+                            if (entries.none { it.aid == activeAid }) {
+                                entries.add(
+                                    ParsedCloudBookshelfEntry(
+                                        aid = activeAid,
+                                        lastUpdateDate = activeDate,
+                                        title = activeName,
+                                        latestChapterCid = activeLatestCid,
+                                        latestChapterName = activeLatestChapterName,
+                                    ),
+                                )
+                            }
                             activeAid = 0
                         }
                     }
@@ -426,6 +428,30 @@ object WenkuXmlParsers {
         } catch (_: Exception) {
             null
         }
+    }
+
+    private val CLOUD_AID_ATTRIBUTE_REGEX = Regex("""\baid\s*=\s*["']([^"']*)["']""")
+
+    /**
+     * Parses `action=bookcase&do=list` (`Wenku8API.getBookshelfListAid`), the bare-ID sibling
+     * endpoint used as a fault-tolerant fallback when `action=bookcase` contains malformed `<name>`
+     * or `<chapter>` CDATA (`FavFragment.fetchShelfAidsFromIdsOnlyEndpoint` parity).
+     *
+     * Requires a `<metadata` root tag so captive-portal HTML or gateway errors return `null`
+     * instead of `emptyList()`.
+     */
+    fun parseCloudBookshelfAidList(rawXml: String?): List<Int>? {
+        if (rawXml.isNullOrBlank()) return null
+        if (!rawXml.contains("<metadata", ignoreCase = true)) return null
+
+        val orderedUniqueAids = LinkedHashSet<Int>()
+        for (match in CLOUD_AID_ATTRIBUTE_REGEX.findAll(rawXml)) {
+            val aid = match.groupValues.getOrNull(1)?.trim()?.toIntOrNull() ?: continue
+            if (aid > 0) {
+                orderedUniqueAids.add(aid)
+            }
+        }
+        return orderedUniqueAids.toList()
     }
 
     /**
@@ -443,6 +469,7 @@ object WenkuXmlParsers {
             var author = ""
             var bookStatus = ""
             var lastUpdate = ""
+            var tags = ""
             var introShort = ""
 
             var eventType = parser.eventType
@@ -475,6 +502,9 @@ object WenkuXmlParsers {
                                         ?: parser.safePositionalAttribute(1)
                                         ?: parser.nextText()).trim()
                                 }
+                                "Tags" -> {
+                                    tags = parser.readValueAttributeOrText()
+                                }
                                 "IntroPreview" -> {
                                     introShort = parser.readValueAttributeOrText()
                                         .replace(IDEOGRAPHIC_AND_ASCII_WHITESPACE, " ")
@@ -496,6 +526,7 @@ object WenkuXmlParsers {
                     author = author,
                     bookStatus = bookStatus,
                     lastUpdate = lastUpdate,
+                    tagsCsv = tags,
                     introShort = introShort,
                 )
             }

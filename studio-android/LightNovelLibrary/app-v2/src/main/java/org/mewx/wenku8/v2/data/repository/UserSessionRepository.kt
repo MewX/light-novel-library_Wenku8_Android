@@ -242,6 +242,7 @@ class UserSessionRepository(
         const val MAX_CREDENTIAL_LENGTH: Int = 30
         const val SAVES_FOLDER_NAME: String = "saves"
         const val CERT_FILE_NAME: String = "cert.wk8"
+        const val CANONICAL_UNAME_FILE_NAME: String = "account_uname.wk8"
         const val AVATAR_FILE_NAME: String = "avatar.jpg"
 
         fun isValidCredentialLength(identifier: String, password: String): Boolean {
@@ -249,10 +250,16 @@ class UserSessionRepository(
             return cleanId.length in 1..MAX_CREDENTIAL_LENGTH &&
                 password.length in 1..MAX_CREDENTIAL_LENGTH
         }
+
+        fun normalizeAccountKey(rawIdentifier: String): String =
+            rawIdentifier.trim().lowercase(java.util.Locale.ROOT)
     }
 
     private val authMutex = Mutex()
+    @Volatile
     private var cachedCredentials: StoredAccountCredentials? = null
+    @Volatile
+    private var cachedCanonicalUsername: String? = null
 
     private val _sessionState = MutableStateFlow<AccountSessionState>(
         if (authGateway.isAuthConfigured && authGateway.baseUrlOrEmpty.isNotEmpty() && transport.isEndpointConfigured) {
@@ -272,6 +279,74 @@ class UserSessionRepository(
         get() = authGateway.registerUrlOrEmpty
 
     /**
+     * Returns the normalized (`lowercase`) canonical Wenku8 account key for the active or saved
+     * session, or `null` when signed out / stubbed.
+     *
+     * Prefers the server-resolved `uname` (`ParsedUserInfo.username`, persisted in
+     * `saves/account_uname.wk8` across offline restarts) over an email login identifier so
+     * `cloud_bookcase_ledger` entries stay bound to the same key online and offline.
+     */
+    fun activeAccountKeyOrNull(): String? {
+        return when (val state = _sessionState.value) {
+            is AccountSessionState.SignedIn -> {
+                val uname = cachedCanonicalUsername?.takeIf { it.isNotBlank() }
+                    ?: state.profile.username.takeIf { it.isNotBlank() }
+                uname?.let(::normalizeAccountKey)
+            }
+
+            is AccountSessionState.OfflineWithSavedAccount -> {
+                val uname = cachedCanonicalUsername?.takeIf { it.isNotBlank() }
+                    ?: loadCanonicalUsernameFromDisk()
+                    ?: state.identifierHint.takeIf { it.isNotBlank() }
+                uname?.let(::normalizeAccountKey)
+            }
+
+            is AccountSessionState.RestoringSession -> {
+                val uname = cachedCanonicalUsername?.takeIf { it.isNotBlank() }
+                    ?: loadCanonicalUsernameFromDisk()
+                    ?: state.identifierHint.takeIf { it.isNotBlank() }
+                uname?.let(::normalizeAccountKey)
+            }
+
+            AccountSessionState.SignedOut -> {
+                if (!isAuthSupported) {
+                    null
+                } else {
+                    val persistedCreds = cachedCredentials ?: loadCredentialsFromDisk()
+                    if (persistedCreds == null) {
+                        null
+                    } else {
+                        val uname = cachedCanonicalUsername?.takeIf { it.isNotBlank() }
+                            ?: loadCanonicalUsernameFromDisk()
+                            ?: persistedCreds.identifier.takeIf { it.isNotBlank() }
+                        uname?.let(::normalizeAccountKey)
+                    }
+                }
+            }
+
+            AccountSessionState.UnavailableStub -> null
+        }
+    }
+
+    /**
+     * Returns the normalized (`lowercase`) raw login identifier (`username` or `email`) from
+     * `cert.wk8` when available, allowing [BookshelfRepository] to migrate any ledger rows recorded
+     * under an email hint before the canonical `uname` was first resolved.
+     */
+    fun rawSavedIdentifierKeyOrNull(): String? {
+        val raw = cachedCredentials?.identifier?.takeIf { it.isNotBlank() }
+            ?: when (val state = _sessionState.value) {
+                is AccountSessionState.OfflineWithSavedAccount -> state.identifierHint
+                is AccountSessionState.RestoringSession -> state.identifierHint
+                AccountSessionState.SignedOut -> {
+                    if (isAuthSupported) loadCredentialsFromDisk()?.identifier else null
+                }
+                else -> null
+            }
+        return raw?.takeIf { it.isNotBlank() }?.let(::normalizeAccountKey)
+    }
+
+    /**
      * Restores any saved `saves/cert.wk8` session on startup without blocking cold start.
      */
     suspend fun initializeSessionOnStartup() = withContext(ioDispatcher) {
@@ -283,11 +358,13 @@ class UserSessionRepository(
 
             val loadedCreds = loadCredentialsFromDisk()
             if (loadedCreds == null) {
+                cachedCanonicalUsername = null
                 _sessionState.value = AccountSessionState.SignedOut
                 return@withLock
             }
 
             cachedCredentials = loadedCreds
+            cachedCanonicalUsername = loadCanonicalUsernameFromDisk()
             authGateway.syncInMemoryCredentials(loadedCreds.identifier, loadedCreds.password)
             val existingAvatar = findExistingAvatarFile()
             _sessionState.value = AccountSessionState.RestoringSession(
@@ -298,9 +375,15 @@ class UserSessionRepository(
             when (val restoreCode = executeLoginCallLocked(loadedCreds.identifier, loadedCreds.password)) {
                 Wenku8Error.ErrorCode.SYSTEM_1_SUCCEEDED -> {
                     val infoResult = fetchUserInfoAndAvatarLocked(allowSingleRelogin = false)
+                    val resolvedUname = infoResult.first?.username?.takeIf { it.isNotBlank() }
+                        ?: cachedCanonicalUsername
+                        ?: loadedCreds.identifier.takeIf { !it.contains('@') }
+                    if (!resolvedUname.isNullOrBlank()) {
+                        persistCanonicalUsernameLocked(resolvedUname)
+                    }
                     val profile = infoResult.first ?: ParsedUserInfo(
-                        username = loadedCreds.identifier,
-                        nickname = loadedCreds.identifier,
+                        username = resolvedUname ?: loadedCreds.identifier,
+                        nickname = resolvedUname ?: loadedCreds.identifier,
                     )
                     _sessionState.value = AccountSessionState.SignedIn(
                         profile = profile,
@@ -349,15 +432,27 @@ class UserSessionRepository(
 
             when (val code = executeLoginCallLocked(cleanIdentifier, rawPassword)) {
                 Wenku8Error.ErrorCode.SYSTEM_1_SUCCEEDED -> {
+                    val previousIdentifier = cachedCredentials?.identifier
+                    if (previousIdentifier == null ||
+                        normalizeAccountKey(previousIdentifier) != normalizeAccountKey(cleanIdentifier)
+                    ) {
+                        clearCanonicalUsernameLocked()
+                    }
                     val creds = StoredAccountCredentials(cleanIdentifier, rawPassword)
                     cachedCredentials = creds
                     authGateway.syncInMemoryCredentials(cleanIdentifier, rawPassword)
                     persistCredentialsToDisk(creds)
 
                     val (fetchedInfo, avatarFile) = fetchUserInfoAndAvatarLocked(allowSingleRelogin = false)
+                    val resolvedUname = fetchedInfo?.username?.takeIf { it.isNotBlank() }
+                        ?: cachedCanonicalUsername
+                        ?: cleanIdentifier.takeIf { !it.contains('@') }
+                    if (!resolvedUname.isNullOrBlank()) {
+                        persistCanonicalUsernameLocked(resolvedUname)
+                    }
                     val resolvedProfile = fetchedInfo ?: ParsedUserInfo(
-                        username = cleanIdentifier,
-                        nickname = cleanIdentifier,
+                        username = resolvedUname ?: cleanIdentifier,
+                        nickname = resolvedUname ?: cleanIdentifier,
                     )
                     _sessionState.value = AccountSessionState.SignedIn(
                         profile = resolvedProfile,
@@ -384,6 +479,9 @@ class UserSessionRepository(
             if (!isAuthSupported) return@withLock false
             val (info, avatar) = fetchUserInfoAndAvatarLocked(allowSingleRelogin = true)
             if (info != null) {
+                if (info.username.isNotBlank()) {
+                    persistCanonicalUsernameLocked(info.username)
+                }
                 val previousSignStatus = (_sessionState.value as? AccountSessionState.SignedIn)
                     ?.dailySignStatus ?: DailySignStatus.IDLE
                 _sessionState.value = AccountSessionState.SignedIn(
@@ -425,9 +523,16 @@ class UserSessionRepository(
             when (signCode) {
                 Wenku8Error.ErrorCode.SYSTEM_1_SUCCEEDED -> {
                     val (freshInfo, freshAvatar) = fetchUserInfoAndAvatarLocked(allowSingleRelogin = false)
+                    val resolvedUname = freshInfo?.username?.takeIf { it.isNotBlank() }
+                        ?: cachedCanonicalUsername
+                        ?: currentSignedIn?.profile?.username?.takeIf { it.isNotBlank() }
+                        ?: creds?.identifier?.takeIf { !it.contains('@') }
+                    if (!resolvedUname.isNullOrBlank()) {
+                        persistCanonicalUsernameLocked(resolvedUname)
+                    }
                     val updatedProfile = freshInfo ?: currentSignedIn?.profile ?: ParsedUserInfo(
-                        username = creds?.identifier.orEmpty(),
-                        nickname = creds?.identifier.orEmpty(),
+                        username = resolvedUname ?: creds?.identifier.orEmpty(),
+                        nickname = resolvedUname ?: creds?.identifier.orEmpty(),
                     )
                     _sessionState.value = AccountSessionState.SignedIn(
                         profile = updatedProfile,
@@ -498,9 +603,16 @@ class UserSessionRepository(
                 Wenku8Error.ErrorCode.SYSTEM_1_SUCCEEDED -> {
                     val (freshInfo, freshAvatar) = fetchUserInfoAndAvatarLocked(allowSingleRelogin = false)
                     val currentSignedIn = _sessionState.value as? AccountSessionState.SignedIn
+                    val resolvedUname = freshInfo?.username?.takeIf { it.isNotBlank() }
+                        ?: cachedCanonicalUsername
+                        ?: currentSignedIn?.profile?.username?.takeIf { it.isNotBlank() && !it.contains('@') }
+                        ?: creds.identifier.takeIf { !it.contains('@') }
+                    if (!resolvedUname.isNullOrBlank()) {
+                        persistCanonicalUsernameLocked(resolvedUname)
+                    }
                     val profile = freshInfo ?: currentSignedIn?.profile ?: ParsedUserInfo(
-                        username = creds.identifier,
-                        nickname = creds.identifier,
+                        username = resolvedUname ?: creds.identifier,
+                        nickname = resolvedUname ?: creds.identifier,
                     )
                     _sessionState.value = AccountSessionState.SignedIn(
                         profile = profile,
@@ -638,6 +750,38 @@ class UserSessionRepository(
         }
     }
 
+    private fun loadCanonicalUsernameFromDisk(): String? {
+        for (root in assetRootsProvider()) {
+            val unameFile = File(File(root, SAVES_FOLDER_NAME), CANONICAL_UNAME_FILE_NAME)
+            if (unameFile.isFile && unameFile.canRead()) {
+                val uname = runCatching { unameFile.readText(StandardCharsets.UTF_8).trim() }.getOrNull()
+                if (!uname.isNullOrBlank()) {
+                    return uname
+                }
+            }
+        }
+        return null
+    }
+
+    private fun persistCanonicalUsernameLocked(canonicalUsername: String) {
+        val trimmed = canonicalUsername.trim()
+        if (trimmed.isEmpty()) return
+        cachedCanonicalUsername = trimmed
+        val primaryRoot = assetRootsProvider().firstOrNull() ?: return
+        val savesDir = File(primaryRoot, SAVES_FOLDER_NAME).apply { mkdirs() }
+        runCatching {
+            File(savesDir, CANONICAL_UNAME_FILE_NAME).writeText(trimmed, StandardCharsets.UTF_8)
+        }
+    }
+
+    private fun clearCanonicalUsernameLocked() {
+        cachedCanonicalUsername = null
+        for (root in assetRootsProvider()) {
+            val savesDir = File(root, SAVES_FOLDER_NAME)
+            runCatching { File(savesDir, CANONICAL_UNAME_FILE_NAME).delete() }
+        }
+    }
+
     private fun findExistingAvatarFile(): File? {
         for (root in assetRootsProvider()) {
             val avatarFile = File(File(root, SAVES_FOLDER_NAME), AVATAR_FILE_NAME)
@@ -657,12 +801,14 @@ class UserSessionRepository(
 
     private fun wipeStoredAccountFilesAndMemoryLocked() {
         cachedCredentials = null
+        cachedCanonicalUsername = null
         authGateway.clearInMemorySession()
         transport.clearSessionCookie()
         sessionClearCallback()
         for (root in assetRootsProvider()) {
             val savesDir = File(root, SAVES_FOLDER_NAME)
             runCatching { File(savesDir, CERT_FILE_NAME).delete() }
+            runCatching { File(savesDir, CANONICAL_UNAME_FILE_NAME).delete() }
             runCatching { File(savesDir, AVATAR_FILE_NAME).delete() }
         }
     }

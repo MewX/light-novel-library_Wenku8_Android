@@ -330,6 +330,8 @@
     <string name="bookshelf_remove_confirm_title">移出本地书架</string>
     <string name="bookshelf_remove_confirm_body_format">确定将所选的 %1$d 本作品移出书架吗？（若已登录，也将同步从云端书架移除）</string>
     <string name="bookshelf_sync_success_format">云端同步完成：拉取 %1$d 部 · 上传 %2$d 部 · 更新 %3$d 部</string>
+    <string name="bookshelf_sync_success_with_removals_format">云端同步完成：拉取 %1$d 部 · 上传 %2$d 部 · 同步移除 %3$d 部</string>
+    <string name="bookshelf_sync_partial_warning_format">已拉取 %1$d 部 · 上传 %2$d 部（%3$d 部获取详情未完成，稍后再同步即可重试）</string>
     <string name="bookshelf_sync_full_warning_format">云端书架容量已满（拉取 %1$d 部 · 上传 %2$d 部），其余本地藏书已完整保留</string>
     <string name="bookshelf_sync_login_required">请先登录轻小说文库账号再同步云端书架</string>
     <string name="bookshelf_sync_failed">云端书架同步未完成，请检查网络连接</string>

@@ -1,6 +1,8 @@
 package org.mewx.wenku8.v2.ui.bookshelf
 
+import android.content.ContentValues
 import android.content.Context
+import android.database.sqlite.SQLiteDatabase
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -14,6 +16,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTouchInput
 import androidx.room.Room
+import androidx.sqlite.db.framework.FrameworkSQLiteOpenHelperFactory
 import androidx.test.core.app.ApplicationProvider
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
@@ -22,35 +25,49 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.mewx.wenku8.api.Wenku8API
+import org.mewx.wenku8.api.Wenku8Error
 import org.mewx.wenku8.v2.data.local.db.Wenku8Database
 import org.mewx.wenku8.v2.data.local.db.entity.ChapterContentEntity
+import org.mewx.wenku8.v2.data.local.db.entity.CloudBookcaseLedgerEntity
 import org.mewx.wenku8.v2.data.local.db.entity.NovelEntity
 import org.mewx.wenku8.v2.data.local.db.entity.ReadingProgressEntity
 import org.mewx.wenku8.v2.data.remote.api.OnlineSearchField
+import org.mewx.wenku8.v2.data.remote.api.WenkuApiClient
 import org.mewx.wenku8.v2.data.remote.api.WenkuApiResult
 import org.mewx.wenku8.v2.data.remote.api.WenkuCatalogGateway
+import org.mewx.wenku8.v2.data.remote.api.WenkuParamsFactory
 import org.mewx.wenku8.v2.data.remote.parser.ParsedCloudBookshelfEntry
 import org.mewx.wenku8.v2.data.remote.parser.ParsedNovelFullMeta
 import org.mewx.wenku8.v2.data.remote.parser.ParsedNovelListItem
 import org.mewx.wenku8.v2.data.remote.parser.ParsedNovelListPage
+import org.mewx.wenku8.v2.data.remote.parser.WenkuXmlParsers
+import org.mewx.wenku8.v2.data.remote.transport.WenkuTransport
+import org.mewx.wenku8.v2.data.repository.AccountAuthGateway
 import org.mewx.wenku8.v2.data.repository.BookshelfFilter
 import org.mewx.wenku8.v2.data.repository.BookshelfRepository
 import org.mewx.wenku8.v2.data.repository.BookshelfSortMode
 import org.mewx.wenku8.v2.data.repository.BookshelfViewMode
 import org.mewx.wenku8.v2.data.repository.CloudBookshelfSyncOutcome
+import org.mewx.wenku8.v2.data.repository.LoginOutcome
 import org.mewx.wenku8.v2.data.repository.NovelTocSyncRepository
 import org.mewx.wenku8.v2.data.repository.ParsedChapterToc
 import org.mewx.wenku8.v2.data.repository.ParsedVolumeToc
+import org.mewx.wenku8.v2.data.repository.StoredAccountCredentials
+import org.mewx.wenku8.v2.data.repository.UserSessionRepository
 import org.mewx.wenku8.v2.ui.theme.Wenku8ExpressiveTheme
 import org.mewx.wenku8.v2.ui.theme.Wenku8ThemeMode
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import java.io.File
+import java.nio.charset.StandardCharsets
+import java.nio.file.Files
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], qualifiers = "w412dp-h892dp")
@@ -181,6 +198,342 @@ class BookshelfScreenAndSyncTest {
         assertTrue(pulledCloud.inBookshelf)
         assertTrue(pulledCloud.cloudSynced)
         assertEquals("败犬女主太多了！", pulledCloud.title)
+    }
+
+    @Test
+    fun offlineLocalDelete_plusCachePurge_replaysCloudDeleteAndNeverResurrectsDeletedNovel() = runTest {
+        val gateway = FakeBookshelfCatalogGateway().apply {
+            cloudBookshelfEntries = listOf(
+                ParsedCloudBookshelfEntry(
+                    aid = 3001,
+                    lastUpdateDate = "2026-03-01",
+                    title = "春物语",
+                    latestChapterCid = 301,
+                    latestChapterName = "第十四卷 后记",
+                ),
+            )
+        }
+        val repository = BookshelfRepository(
+            database = database,
+            catalogGateway = gateway,
+            novelTocSyncRepository = tocSyncRepository,
+        )
+
+        // 1. Initial sync pulls 3001 onto the local bookshelf
+        val initialSync = repository.syncWithCloudBookcase(Wenku8API.AppLanguage.SC)
+        assertTrue(initialSync is CloudBookshelfSyncOutcome.Success)
+        assertEquals(listOf(3001), database.novelDao().getBookshelfNovelIds())
+
+        // 2. User goes offline, deletes 3001 locally, AND triggers browse-cache purge
+        gateway.removeResponsesByAid[3001] = WenkuApiResult.NetworkError("offline")
+        repository.removeNovelsFromBookshelf(listOf(3001))
+        database.novelDao().deleteAllNonBookshelfNovels()
+        assertNull(database.novelDao().getNovelByAid(3001))
+
+        // Durable tombstone MUST survive deleteAllNonBookshelfNovels()!
+        val tombstone = database.cloudBookcaseLedgerDao().getEntry(
+            accountKey = CloudBookcaseLedgerEntity.DEFAULT_TEST_ACCOUNT_KEY,
+            aid = 3001,
+        )
+        assertNotNull(tombstone)
+        assertEquals(CloudBookcaseLedgerEntity.STATE_PENDING_DELETE, tombstone!!.syncState)
+
+        // 3. First sync attempt while `do=del` STILL transiently fails, even though `fetchCloudBookshelf`
+        //    succeeds and still lists 3001: 3001 MUST NOT resurrect onto the local shelf!
+        val flakySync = repository.syncWithCloudBookcase(Wenku8API.AppLanguage.SC)
+        assertTrue(flakySync is CloudBookshelfSyncOutcome.Success)
+        assertTrue(database.novelDao().getBookshelfNovelIds().isEmpty())
+        assertEquals(
+            CloudBookcaseLedgerEntity.STATE_PENDING_DELETE,
+            database.cloudBookcaseLedgerDao().getEntry(
+                CloudBookcaseLedgerEntity.DEFAULT_TEST_ACCOUNT_KEY,
+                3001,
+            )?.syncState,
+        )
+
+        // 4. Connection stabilizes -> `do=del` succeeds; tombstone clears & 3001 stays deleted forever!
+        gateway.removeResponsesByAid[3001] = WenkuApiResult.Success(Unit)
+        val cleanSync = repository.syncWithCloudBookcase(Wenku8API.AppLanguage.SC) as CloudBookshelfSyncOutcome.Success
+        assertEquals(1, cleanSync.deletedFromCloudCount)
+        assertTrue(3001 in gateway.removedAidsFromCloud)
+        assertTrue(database.novelDao().getBookshelfNovelIds().isEmpty())
+        assertNull(
+            database.cloudBookcaseLedgerDao().getEntry(
+                CloudBookcaseLedgerEntity.DEFAULT_TEST_ACCOUNT_KEY,
+                3001,
+            ),
+        )
+    }
+
+    @Test
+    fun remoteCloudDeletion_removesSyncedNovelWithoutReuploading_whilePreservingProgressAndUnsyncedBooks() = runTest {
+        val gateway = FakeBookshelfCatalogGateway().apply {
+            cloudBookshelfEntries = listOf(
+                ParsedCloudBookshelfEntry(aid = 4001, lastUpdateDate = "2026-03-05", title = "刀剑神域", latestChapterCid = 41),
+                ParsedCloudBookshelfEntry(aid = 4002, lastUpdateDate = "2026-03-06", title = "加速世界", latestChapterCid = 42),
+            )
+        }
+        val repository = BookshelfRepository(
+            database = database,
+            catalogGateway = gateway,
+            novelTocSyncRepository = tocSyncRepository,
+        )
+
+        // 1. Sync 4001 & 4002 down from cloud
+        repository.syncWithCloudBookcase(Wenku8API.AppLanguage.SC)
+        assertEquals(setOf(4001, 4002), database.novelDao().getBookshelfNovelIds().toSet())
+
+        // Seed reading progress + cached chapter on 4001, and add offline local-only 4003
+        database.readingProgressDao().upsertProgress(
+            ReadingProgressEntity(
+                aid = 4001,
+                vid = 40010,
+                cid = 40011,
+                volumeTitle = "第一卷",
+                chapterTitle = "第一话",
+                progressPermille = 750,
+                updatedAtMs = 99_000L,
+            ),
+        )
+        gateway.addResponsesByAid[4003] = WenkuApiResult.NetworkError("offline during add")
+        repository.addNovelToBookshelf(
+            NovelEntity(aid = 4003, title = "离线新加作品", author = "作者丙"),
+            syncToCloudIfSignedIn = true,
+        )
+        gateway.pushedAidsToCloud.clear()
+        gateway.addResponsesByAid[4003] = WenkuApiResult.Success(Unit)
+
+        // 2. Simulate user deleting 4001 on Wenku8 Web (`action=bookcase` now returns only 4002)
+        gateway.cloudBookshelfEntries = listOf(
+            ParsedCloudBookshelfEntry(aid = 4002, lastUpdateDate = "2026-03-06", title = "加速世界", latestChapterCid = 42),
+        )
+
+        val syncAfterRemoteDelete =
+            repository.syncWithCloudBookcase(Wenku8API.AppLanguage.SC) as CloudBookshelfSyncOutcome.Success
+
+        // 4001 must be removed locally (`removedRemotelyDeletedCount == 1`) and NEVER re-uploaded!
+        assertEquals(1, syncAfterRemoteDelete.removedRemotelyDeletedCount)
+        assertEquals(1, syncAfterRemoteDelete.pushedToCloudCount)
+        assertEquals(listOf(4003), gateway.pushedAidsToCloud)
+        assertEquals(setOf(4002, 4003), database.novelDao().getBookshelfNovelIds().toSet())
+
+        // Reading progress on remotely-removed 4001 must remain completely intact!
+        val preservedProgress = database.readingProgressDao().getProgressForNovel(4001)
+        assertNotNull(preservedProgress)
+        assertEquals(750, preservedProgress!!.progressPermille)
+    }
+
+    @Test
+    fun accountSwitchIsolation_keepsPreviousAccountLocalBooksWithoutPollutingNewAccountCloud() = runTest {
+        val tempRoot = File(context.cacheDir, "acct_switch_test_${System.nanoTime()}").apply { mkdirs() }
+        try {
+            val fakeAuthTransport = FakeAccountSwitchTransport()
+            val fakeAuthGateway = FakeAccountSwitchAuthGateway(fakeAuthTransport)
+            val sessionRepo = UserSessionRepository(
+                transport = fakeAuthTransport,
+                assetRootsProvider = { listOf(tempRoot) },
+                authGateway = fakeAuthGateway,
+            )
+            val gateway = FakeBookshelfCatalogGateway()
+            val repository = BookshelfRepository(
+                database = database,
+                catalogGateway = gateway,
+                novelTocSyncRepository = tocSyncRepository,
+                userSessionRepository = sessionRepo,
+            )
+
+            // 1. Sign in as Alice (via email -> server resolves canonical username "alice") and sync 5001
+            fakeAuthTransport.activeServerUsername = "alice"
+            val aliceLogin = sessionRepo.loginWithCredentials("alice@example.com", "secret1")
+            assertTrue(aliceLogin is LoginOutcome.Success)
+            assertEquals("alice", sessionRepo.activeAccountKeyOrNull())
+
+            gateway.cloudBookshelfEntries = listOf(
+                ParsedCloudBookshelfEntry(aid = 5001, lastUpdateDate = "2026-03-10", title = "Alice专属藏书", latestChapterCid = 10),
+            )
+            val aliceSync = repository.syncWithCloudBookcase(Wenku8API.AppLanguage.SC) as CloudBookshelfSyncOutcome.Success
+            assertEquals(1, aliceSync.pulledFromCloudCount)
+            assertEquals(listOf(5001), database.novelDao().getBookshelfNovelIds())
+
+            // 2. Alice logs out; Bob signs in whose cloud bookcase has ONLY 6001
+            sessionRepo.logout()
+            fakeAuthTransport.activeServerUsername = "bob"
+            val bobLogin = sessionRepo.loginWithCredentials("bob", "secret2")
+            assertTrue(bobLogin is LoginOutcome.Success)
+            assertEquals("bob", sessionRepo.activeAccountKeyOrNull())
+
+            gateway.pushedAidsToCloud.clear()
+            gateway.cloudBookshelfEntries = listOf(
+                ParsedCloudBookshelfEntry(aid = 6001, lastUpdateDate = "2026-03-11", title = "Bob专属藏书", latestChapterCid = 20),
+            )
+
+            val bobSync = repository.syncWithCloudBookcase(Wenku8API.AppLanguage.SC) as CloudBookshelfSyncOutcome.Success
+            assertEquals(1, bobSync.pulledFromCloudCount)
+            assertEquals(0, bobSync.pushedToCloudCount)
+            assertEquals(0, bobSync.removedRemotelyDeletedCount)
+
+            // Alice's 5001 is neither wiped locally nor silently uploaded to Bob's cloud bookcase!
+            assertTrue(gateway.pushedAidsToCloud.isEmpty())
+            assertEquals(setOf(5001, 6001), database.novelDao().getBookshelfNovelIds().toSet())
+        } finally {
+            tempRoot.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun partialNetworkFailureAndReAdd_commitsAllOrNothing_hydratesTags_andClearsTombstoneOnReAdd() = runTest {
+        val gateway = FakeBookshelfCatalogGateway().apply {
+            cloudBookshelfEntries = listOf(
+                ParsedCloudBookshelfEntry(aid = 7001, lastUpdateDate = "2026-03-12", title = "葬送的芙莉莲", latestChapterCid = 71),
+                ParsedCloudBookshelfEntry(aid = 7002, lastUpdateDate = "2026-03-13", title = "迷宫饭", latestChapterCid = 72),
+            )
+            shortInfoTagsByAid[7001] = "奇幻 冒险 精灵"
+            failTocForAids += 7002
+        }
+        val repository = BookshelfRepository(
+            database = database,
+            catalogGateway = gateway,
+            novelTocSyncRepository = tocSyncRepository,
+        )
+
+        // 1. First sync: 7001 succeeds (with tags hydrated!); 7002 TOC fails -> NOT committed as stub!
+        val firstSync = repository.syncWithCloudBookcase(Wenku8API.AppLanguage.SC) as CloudBookshelfSyncOutcome.Success
+        assertEquals(1, firstSync.pulledFromCloudCount)
+        assertEquals(1, firstSync.failedHydrationCount)
+        assertEquals(listOf(7001), database.novelDao().getBookshelfNovelIds())
+        assertEquals("奇幻 冒险 精灵", database.novelDao().getNovelByAid(7001)?.tagsCsv)
+        assertNull(database.novelDao().getNovelByAid(7002))
+
+        // 2. Network recovers -> second sync pulls 7002 cleanly
+        gateway.failTocForAids.clear()
+        val secondSync = repository.syncWithCloudBookcase(Wenku8API.AppLanguage.SC) as CloudBookshelfSyncOutcome.Success
+        assertEquals(1, secondSync.pulledFromCloudCount)
+        assertEquals(0, secondSync.failedHydrationCount)
+        assertEquals(setOf(7001, 7002), database.novelDao().getBookshelfNovelIds().toSet())
+
+        // 3. Offline delete followed by offline re-add of 7001 clears tombstone -> pushes up when needed
+        gateway.removeResponsesByAid[7001] = WenkuApiResult.NetworkError("offline")
+        repository.removeNovelsFromBookshelf(listOf(7001))
+        gateway.addResponsesByAid[7001] = WenkuApiResult.NetworkError("offline")
+        repository.addNovelToBookshelf(NovelEntity(aid = 7001, title = "葬送的芙莉莲", shelfCategory = "最爱"))
+
+        gateway.pushedAidsToCloud.clear()
+        gateway.removedAidsFromCloud.clear()
+        gateway.addResponsesByAid[7001] = WenkuApiResult.Success(Unit)
+        // Simulate 7001 also absent on cloud before sync so re-add must push it up instead of deleting!
+        gateway.cloudBookshelfEntries = listOf(
+            ParsedCloudBookshelfEntry(aid = 7002, lastUpdateDate = "2026-03-13", title = "迷宫饭", latestChapterCid = 72),
+        )
+        val thirdSync = repository.syncWithCloudBookcase(Wenku8API.AppLanguage.SC) as CloudBookshelfSyncOutcome.Success
+        assertEquals(0, thirdSync.deletedFromCloudCount)
+        assertEquals(1, thirdSync.pushedToCloudCount)
+        assertEquals(listOf(7001), gateway.pushedAidsToCloud)
+        assertEquals("最爱", database.novelDao().getNovelByAid(7001)?.shelfCategory)
+    }
+
+    @Test
+    fun wenkuApiClient_fallsBackToBookshelfAidListOnRichXmlParseError_andMigration1To2PreservesData() = runTest {
+        // Part A: Verify WenkuApiClient.fetchCloudBookshelf falls back to `do=list` when rich XML breaks
+        val transport = object : WenkuTransport {
+            override val isEndpointConfigured: Boolean = true
+            override suspend fun postForm(
+                endpointUrl: String,
+                formParams: ContentValues,
+            ): ByteArray {
+                return if (formParams.getAsString("do") == "list") {
+                    """<?xml version="1.0" encoding="utf-8"?><metadata><package aid="101"/><package aid="202"/></metadata>"""
+                        .toByteArray(StandardCharsets.UTF_8)
+                } else {
+                    // Malformed rich XML (unescaped raw '<' / broken tag)
+                    "<package><item aid=\"101\"><name>Broken <Unclosed".toByteArray(StandardCharsets.UTF_8)
+                }
+            }
+            override suspend fun getBytes(url: String): ByteArray? = null
+            override fun clearSessionCookie() = Unit
+        }
+        val paramsFactory = object : WenkuParamsFactory {
+            override fun baseUrlOrUnknown(): String = "https://relay.example.test/android.php"
+            override fun resolveCoverUrl(aid: Int): String = ""
+            override fun novelListWithInfo(sortedBy: Wenku8API.NovelSortedBy, page: Int, lang: Wenku8API.AppLanguage): ContentValues? = null
+            override fun searchByNovelName(query: String, lang: Wenku8API.AppLanguage): ContentValues? = null
+            override fun searchByAuthorName(query: String, lang: Wenku8API.AppLanguage): ContentValues? = null
+            override fun novelShortInfo(aid: Int, lang: Wenku8API.AppLanguage): ContentValues? = null
+            override fun novelFullMeta(aid: Int, lang: Wenku8API.AppLanguage): ContentValues? = null
+            override fun novelFullIntro(aid: Int, lang: Wenku8API.AppLanguage): ContentValues? = null
+            override fun novelIndex(aid: Int, lang: Wenku8API.AppLanguage): ContentValues? = null
+            override fun novelContent(aid: Int, cid: Int, lang: Wenku8API.AppLanguage): ContentValues? = null
+            override fun bookshelfListParams(lang: Wenku8API.AppLanguage): ContentValues = ContentValues().apply {
+                put("action", "bookcase")
+            }
+            override fun bookshelfListAidParams(lang: Wenku8API.AppLanguage): ContentValues = ContentValues().apply {
+                put("action", "bookcase")
+                put("do", "list")
+            }
+        }
+        val apiClient = WenkuApiClient(transport = transport, paramsFactory = paramsFactory)
+        val fallbackRes = apiClient.fetchCloudBookshelf(Wenku8API.AppLanguage.SC)
+        assertTrue(fallbackRes is WenkuApiResult.Success)
+        assertEquals(listOf(101, 202), (fallbackRes as WenkuApiResult.Success).data.map { it.aid })
+
+        // Part B: Verify Room MIGRATION_1_2 upgrades a physical SQLite v1 DB built from 1.json cleanly
+        val dbFile = File(context.cacheDir, "mig_1_2_${System.nanoTime()}.db")
+        try {
+            val schemaV1File = sequenceOf(
+                File("schemas/org.mewx.wenku8.v2.data.local.db.Wenku8Database/1.json"),
+                File("app-v2/schemas/org.mewx.wenku8.v2.data.local.db.Wenku8Database/1.json"),
+            ).first { it.isFile }
+            val dbJson = org.json.JSONObject(schemaV1File.readText(StandardCharsets.UTF_8))
+                .getJSONObject("database")
+
+            val rawV1 = SQLiteDatabase.openOrCreateDatabase(dbFile, null)
+            val entities = dbJson.getJSONArray("entities")
+            for (i in 0 until entities.length()) {
+                val entityObj = entities.getJSONObject(i)
+                val tableName = entityObj.getString("tableName")
+                rawV1.execSQL(entityObj.getString("createSql").replace("\${TABLE_NAME}", tableName))
+                val indices = entityObj.optJSONArray("indices")
+                if (indices != null) {
+                    for (j in 0 until indices.length()) {
+                        rawV1.execSQL(
+                            indices.getJSONObject(j).getString("createSql")
+                                .replace("\${TABLE_NAME}", tableName),
+                        )
+                    }
+                }
+            }
+            val setupQueries = dbJson.optJSONArray("setupQueries")
+            if (setupQueries != null) {
+                for (i in 0 until setupQueries.length()) {
+                    rawV1.execSQL(setupQueries.getString(i))
+                }
+            }
+            rawV1.execSQL("INSERT INTO `novels` VALUES (888, 'SC', 1, 'sha', 100, '升级保留作品', '作者', '连载中', '电击', 1000, '2026-01-01', 1, '第一话', 0, 0, 0, 0, '', '', '', 1, '默认书架', 1, 0, 1, 100)")
+            rawV1.version = 1
+            rawV1.close()
+
+            val directExecutor = java.util.concurrent.Executor { it.run() }
+            val migratedDb = Room.databaseBuilder(context, Wenku8Database::class.java, dbFile.absolutePath)
+                .openHelperFactory(FrameworkSQLiteOpenHelperFactory())
+                .addMigrations(Wenku8Database.MIGRATION_1_2)
+                .allowMainThreadQueries()
+                .setQueryExecutor(directExecutor)
+                .setTransactionExecutor(directExecutor)
+                .build()
+            try {
+                assertEquals("升级保留作品", migratedDb.novelDao().getNovelByAid(888)?.title)
+                migratedDb.cloudBookcaseLedgerDao().upsertEntry(
+                    CloudBookcaseLedgerEntity("acct", 888, CloudBookcaseLedgerEntity.STATE_SYNCED, 200L),
+                )
+                assertEquals(
+                    CloudBookcaseLedgerEntity.STATE_SYNCED,
+                    migratedDb.cloudBookcaseLedgerDao().getEntry("acct", 888)?.syncState,
+                )
+            } finally {
+                migratedDb.close()
+            }
+        } finally {
+            dbFile.delete()
+        }
     }
 
     @Test
@@ -451,11 +804,160 @@ class BookshelfScreenAndSyncTest {
         assertEquals(listOf(5), remainingAids)
     }
 
+    @Test
+    fun coldStartOfflineDeleteBeforeSessionInitAndShortInfoTagsParseCleanly() = runBlocking {
+        // 1. Verify `do=bookinfo` XML with `<data name="Tags">` populates `tagsCsv`.
+        val parsedShortInfo = WenkuXmlParsers.parseNovelShortInfoUpdate(
+            """
+            <?xml version="1.0" encoding="utf-8"?>
+            <metadata>
+                <data name="Title" aid="1305"><![CDATA[绝对双刃absolute duo]]></data>
+                <data name="Author" value="柊★巧"/>
+                <data name="BookStatus" value="连载中"/>
+                <data name="LastUpdate" value="2020-04-01"/>
+                <data name="Tags" value="校园 异能 战斗"/>
+                <data name="IntroPreview"><![CDATA[　　「焰牙」——测试简介]]></data>
+            </metadata>
+            """.trimIndent(),
+        )
+        assertNotNull(parsedShortInfo)
+        assertEquals("校园 异能 战斗", parsedShortInfo?.tagsCsv)
+
+        // 2. Sign in via email ("alice@example.test" -> canonical server uname "alice") to write saves/cert.wk8 + saves/account_uname.wk8.
+        val tempRoot = Files.createTempDirectory("cold_start_ledger_test").toFile()
+        try {
+            val authTransport = FakeAccountSwitchTransport().apply { activeServerUsername = "alice" }
+            val authGateway = FakeAccountSwitchAuthGateway(authTransport)
+            val initialSession = UserSessionRepository(
+                transport = authTransport,
+                assetRootsProvider = { listOf(tempRoot) },
+                authGateway = authGateway,
+            )
+            initialSession.loginWithCredentials("alice@example.test", "secret12")
+            assertEquals("alice", initialSession.activeAccountKeyOrNull())
+
+            // Simulate a brand-new cold process start BEFORE `initializeSessionOnStartup()` executes on IO.
+            val coldStartSession = UserSessionRepository(
+                transport = authTransport,
+                assetRootsProvider = { listOf(tempRoot) },
+                authGateway = authGateway,
+            )
+            assertEquals("alice", coldStartSession.activeAccountKeyOrNull())
+            assertEquals("alice@example.test", coldStartSession.rawSavedIdentifierKeyOrNull())
+
+            val gateway = FakeBookshelfCatalogGateway().apply {
+                removeResponsesByAid[1305] = WenkuApiResult.NetworkError("offline_cold_start")
+            }
+            val coldStartRepo = BookshelfRepository(
+                database = database,
+                catalogGateway = gateway,
+                novelTocSyncRepository = NovelTocSyncRepository(database),
+                userSessionRepository = coldStartSession,
+            )
+            database.novelDao().upsertNovel(
+                NovelEntity(
+                    aid = 1305,
+                    title = "绝对双刃",
+                    inBookshelf = true,
+                    cloudSynced = true,
+                ),
+            )
+            database.cloudBookcaseLedgerDao().upsertEntry(
+                CloudBookcaseLedgerEntity(
+                    accountKey = "alice",
+                    aid = 1305,
+                    syncState = CloudBookcaseLedgerEntity.STATE_SYNCED,
+                    updatedAtMs = 100L,
+                ),
+            )
+
+            // User immediately deletes novel on cold start while offline -> tombstone MUST be persisted!
+            coldStartRepo.removeNovelsFromBookshelf(listOf(1305))
+            assertEquals(
+                CloudBookcaseLedgerEntity.STATE_PENDING_DELETE,
+                database.cloudBookcaseLedgerDao().getEntry("alice", 1305)?.syncState,
+            )
+        } finally {
+            tempRoot.deleteRecursively()
+        }
+    }
+
+    private class FakeAccountSwitchTransport : WenkuTransport {
+        override val isEndpointConfigured: Boolean = true
+        var activeServerUsername: String = "alice"
+
+        override suspend fun postForm(
+            endpointUrl: String,
+            formParams: ContentValues,
+        ): ByteArray {
+            val action = formParams.getAsString("action")
+            return when (action) {
+                "login", "logout" -> "1".toByteArray(StandardCharsets.UTF_8)
+                "userinfo" -> """
+                    <?xml version="1.0" encoding="utf-8"?>
+                    <metadata>
+                        <item name="uid">100</item>
+                        <item name="uname"><![CDATA[$activeServerUsername]]></item>
+                        <item name="nickname"><![CDATA[$activeServerUsername]]></item>
+                        <item name="score">10</item>
+                        <item name="experience">20</item>
+                        <item name="rank">新手</item>
+                    </metadata>
+                """.trimIndent().toByteArray(StandardCharsets.UTF_8)
+                else -> "1".toByteArray(StandardCharsets.UTF_8)
+            }
+        }
+
+        override suspend fun getBytes(url: String): ByteArray? = null
+        override fun clearSessionCookie() = Unit
+    }
+
+    private class FakeAccountSwitchAuthGateway(
+        private val transport: FakeAccountSwitchTransport,
+    ) : AccountAuthGateway {
+        override val isAuthConfigured: Boolean = true
+        override val baseUrlOrEmpty: String = "https://relay.example.test/android.php"
+        override val registerUrlOrEmpty: String = ""
+
+        override fun loginParams(identifier: String, password: String): ContentValues =
+            ContentValues().apply { put("action", "login") }
+
+        override fun logoutParams(): ContentValues =
+            ContentValues().apply { put("action", "logout") }
+
+        override fun userInfoParams(): ContentValues =
+            ContentValues().apply { put("action", "userinfo") }
+
+        override fun userSignParams(): ContentValues =
+            ContentValues().apply { put("action", "sign") }
+
+        override fun avatarUrlForUid(uid: Int): String = ""
+
+        override fun mapServerErrorCode(rawCode: Int): Wenku8Error.ErrorCode =
+            if (rawCode == 1) Wenku8Error.ErrorCode.SYSTEM_1_SUCCEEDED else Wenku8Error.ErrorCode.ERROR_DEFAULT
+
+        override fun decodeCertBlob(rawCertContent: String): StoredAccountCredentials? {
+            val parts = rawCertContent.split(":", limit = 2)
+            return if (parts.size == 2) StoredAccountCredentials(parts[0], parts[1]) else null
+        }
+
+        override fun encodeCertBlob(identifier: String, password: String): String = "$identifier:$password"
+        override fun syncInMemoryCredentials(identifier: String, password: String) = Unit
+        override fun clearInMemorySession() {
+            transport.clearSessionCookie()
+        }
+    }
+
     private class FakeBookshelfCatalogGateway : WenkuCatalogGateway {
         override val isApiConfigured: Boolean = true
 
         var cloudBookshelfEntries: List<ParsedCloudBookshelfEntry> = emptyList()
         val addResponsesByAid = mutableMapOf<Int, WenkuApiResult<Unit>>()
+        val removeResponsesByAid = mutableMapOf<Int, WenkuApiResult<Unit>>()
+        val pushedAidsToCloud = mutableListOf<Int>()
+        val removedAidsFromCloud = mutableListOf<Int>()
+        val shortInfoTagsByAid = mutableMapOf<Int, String>()
+        val failTocForAids = mutableSetOf<Int>()
         val tocByAid = mutableMapOf<Int, List<ParsedVolumeToc>>()
         val chapterTextByCid = mutableMapOf<Int, String>()
         val fetchedChapterCids = mutableListOf<Int>()
@@ -477,7 +979,16 @@ class BookshelfScreenAndSyncTest {
         override suspend fun fetchNovelShortInfo(
             aid: Int,
             appLanguage: Wenku8API.AppLanguage,
-        ): WenkuApiResult<ParsedNovelListItem> = WenkuApiResult.ApiNotConfigured
+        ): WenkuApiResult<ParsedNovelListItem> {
+            val tags = shortInfoTagsByAid[aid] ?: return WenkuApiResult.ApiNotConfigured
+            return WenkuApiResult.Success(
+                ParsedNovelListItem(
+                    aid = aid,
+                    title = "作品 $aid",
+                    tagsCsv = tags,
+                ),
+            )
+        }
 
         override suspend fun fetchNovelFullMeta(
             aid: Int,
@@ -507,6 +1018,9 @@ class BookshelfScreenAndSyncTest {
             aid: Int,
             appLanguage: Wenku8API.AppLanguage,
         ): WenkuApiResult<List<ParsedVolumeToc>> {
+            if (aid in failTocForAids) {
+                return WenkuApiResult.NetworkError("simulated toc failure for $aid")
+            }
             val volumes = tocByAid[aid] ?: listOf(
                 ParsedVolumeToc(
                     vid = aid * 10,
@@ -532,11 +1046,13 @@ class BookshelfScreenAndSyncTest {
         ): WenkuApiResult<List<ParsedCloudBookshelfEntry>> = WenkuApiResult.Success(cloudBookshelfEntries)
 
         override suspend fun addToCloudBookshelf(aid: Int): WenkuApiResult<Unit> {
+            pushedAidsToCloud += aid
             return addResponsesByAid[aid] ?: WenkuApiResult.Success(Unit)
         }
 
         override suspend fun removeFromCloudBookshelf(aid: Int): WenkuApiResult<Unit> {
-            return WenkuApiResult.Success(Unit)
+            removedAidsFromCloud += aid
+            return removeResponsesByAid[aid] ?: WenkuApiResult.Success(Unit)
         }
     }
 }

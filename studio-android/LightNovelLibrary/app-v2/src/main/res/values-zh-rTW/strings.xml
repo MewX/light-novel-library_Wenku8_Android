@@ -330,6 +330,8 @@
     <string name="bookshelf_remove_confirm_title">移出本地書架</string>
     <string name="bookshelf_remove_confirm_body_format">確定將所選的 %1$d 本作品移出書架嗎？（若已登入，也將同步從雲端書架移除）</string>
     <string name="bookshelf_sync_success_format">雲端同步完成：拉取 %1$d 部 · 上傳 %2$d 部 · 更新 %3$d 部</string>
+    <string name="bookshelf_sync_success_with_removals_format">雲端同步完成：拉取 %1$d 部 · 上傳 %2$d 部 · 同步移除 %3$d 部</string>
+    <string name="bookshelf_sync_partial_warning_format">已拉取 %1$d 部 · 上傳 %2$d 部（%3$d 部取得詳情未完成，稍後再同步即可重試）</string>
     <string name="bookshelf_sync_full_warning_format">雲端書架容量已滿（拉取 %1$d 部 · 上傳 %2$d 部），其餘本地藏書已完整保留</string>
     <string name="bookshelf_sync_login_required">請先登入輕小說文庫帳號再同步雲端書架</string>
     <string name="bookshelf_sync_failed">雲端書架同步未完成，請檢查網路連線</string>
