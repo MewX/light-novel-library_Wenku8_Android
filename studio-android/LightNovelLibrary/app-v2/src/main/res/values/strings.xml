@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">轻小说文库 v2 Dev</string>
+    <string name="app_name">轻小说文库</string>
 
     <!-- 4 Top-Level Navigation Destinations -->
     <string name="nav_bookshelf">书架</string>

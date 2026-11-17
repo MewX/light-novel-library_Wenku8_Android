@@ -16,8 +16,8 @@ android {
         // requires minSdk 24 (Android 7.0 Nougat) per AndroidX's 2026 baseline.
         minSdkVersion 24
         targetSdkVersion rootProject.targetSdkVersion
-        versionCode 20000
-        versionName "2.0.0-dev"
+        versionCode 100
+        versionName "2.0.0"
         // Protocol version registered in :api's TokenManager during parallel v2 development.
         // Update alongside :api + relay secret registration at final v2.0 cutover.
         buildConfigField "String", "API_PROTOCOL_VERSION", "\"1.31\""

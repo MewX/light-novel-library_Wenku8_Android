@@ -83,6 +83,7 @@ import coil3.compose.AsyncImage
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.mewx.wenku8.BuildConfig
 import org.mewx.wenku8.R
 import org.mewx.wenku8.data.local.db.Wenku8Database
 import org.mewx.wenku8.data.local.db.dao.BookmarkNoteWithNovel
@@ -399,7 +400,7 @@ fun renderReadingPosterBitmap(
     }
 
     canvas.drawText(
-        "Wenku8 Android v2.0 · Material 3 Expressive",
+        "Wenku8 Android v${BuildConfig.VERSION_NAME} · Material 3 Expressive",
         112f,
         height - 104f,
         metricLabelPaint,
