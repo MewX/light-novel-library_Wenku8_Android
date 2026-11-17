@@ -17,7 +17,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -35,12 +38,15 @@ import org.mewx.wenku8.v2.domain.model.DiscoveryNovelCardItem
 import org.mewx.wenku8.v2.domain.model.RankingMetric
 import org.mewx.wenku8.v2.domain.model.RankingPeriod
 import org.mewx.wenku8.v2.domain.model.resolveRankingSortedBy
+import org.mewx.wenku8.v2.ui.theme.LocalEinkMode
 
 /**
  * `Tab 3 · 排行` (`RankingsScreen`) replacing `v1.31`'s 12-tab horizontal strip with a 2D
  * **Metric × Period** M3e selector:
  * - Metric selector: `点击榜` · `推荐榜` · `总收藏` · `字数榜`
  * - Period filter chips (when metric supports time windows): `周榜` (default) · `日榜` · `月榜` · `总榜`
+ * - Independently preserves scroll progress per `(Metric × Period)` ranking without cross-anchoring
+ *   overlapping novel `aid`s, and scrolls back to top when re-tapping the active ranking button.
  */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -51,14 +57,46 @@ fun RankingsScreen(
     onNovelClicked: (DiscoveryNovelCardItem) -> Unit,
     onOpenNetworkDiagnostics: () -> Unit,
     modifier: Modifier = Modifier,
+    reselectScrollToTopTrigger: Int = 0,
 ) {
-    var selectedMetric by rememberSaveable { mutableStateOf(RankingMetric.VISITS) }
-    var selectedPeriod by rememberSaveable { mutableStateOf(RankingPeriod.WEEK) }
+    val isEink = LocalEinkMode.current
+    var selectedMetric by rememberSaveable {
+        mutableStateOf(discoveryRepository.activeRankingMetric)
+    }
+    var selectedPeriod by rememberSaveable {
+        mutableStateOf(discoveryRepository.activeRankingPeriod)
+    }
+    LaunchedEffect(selectedMetric, selectedPeriod) {
+        discoveryRepository.activeRankingMetric = selectedMetric
+        discoveryRepository.activeRankingPeriod = selectedPeriod
+    }
+
     val activeSortedBy = resolveRankingSortedBy(selectedMetric, selectedPeriod)
+    // Keying StateFlow collection on `activeSortedBy` guarantees `feedState` switches synchronously
+    // on the exact same frame as `activeListState`, preventing a 1-frame `produceState` lag from
+    // clamping or cross-coupling two different rankings' scroll states.
+    val feedState by key(activeSortedBy) {
+        discoveryRepository.observeFeedState(activeSortedBy).collectAsStateWithLifecycle()
+    }
+    val feedScrollHolder = rememberDiscoveryFeedScrollStateHolder(discoveryRepository)
+    val activeListState = feedScrollHolder.listStateFor(feedState.sortedBy)
 
     val coroutineScope = rememberCoroutineScope()
-    val feedState by discoveryRepository.observeFeedState(activeSortedBy)
-        .collectAsStateWithLifecycle()
+
+    val scrollActiveRankingToTop = {
+        val targetSort = activeSortedBy
+        coroutineScope.launch {
+            feedScrollHolder.scrollToTop(targetSort, isEink)
+        }
+    }
+
+    var handledReselectTrigger by remember { mutableIntStateOf(reselectScrollToTopTrigger) }
+    LaunchedEffect(reselectScrollToTopTrigger) {
+        if (reselectScrollToTopTrigger != handledReselectTrigger) {
+            handledReselectTrigger = reselectScrollToTopTrigger
+            feedScrollHolder.scrollToTop(activeSortedBy, isEink)
+        }
+    }
 
     LaunchedEffect(activeSortedBy, appLanguage) {
         discoveryRepository.loadInitialOrRefreshFeed(
@@ -83,7 +121,14 @@ fun RankingsScreen(
             metrics.forEachIndexed { index, metric ->
                 SegmentedButton(
                     selected = metric == selectedMetric,
-                    onClick = { selectedMetric = metric },
+                    onClick = {
+                        if (metric == selectedMetric) {
+                            scrollActiveRankingToTop()
+                        } else {
+                            selectedMetric = metric
+                            discoveryRepository.activeRankingMetric = metric
+                        }
+                    },
                     shape = SegmentedButtonDefaults.itemShape(index = index, count = metrics.size),
                     label = {
                         Text(
@@ -107,7 +152,14 @@ fun RankingsScreen(
                 RankingPeriod.entries.forEach { period ->
                     FilterChip(
                         selected = period == selectedPeriod,
-                        onClick = { selectedPeriod = period },
+                        onClick = {
+                            if (period == selectedPeriod) {
+                                scrollActiveRankingToTop()
+                            } else {
+                                selectedPeriod = period
+                                discoveryRepository.activeRankingPeriod = period
+                            }
+                        },
                         label = { Text(text = stringResource(period.labelResId())) },
                         modifier = Modifier.testTag(DiscoveryTestTags.RANKING_PERIOD_PREFIX + period.name),
                     )
@@ -115,22 +167,30 @@ fun RankingsScreen(
             }
         }
 
+        val currentFeedSort = feedState.sortedBy
         PaginatedNovelFeedContent(
             feedState = feedState,
             showRankNumbers = true,
+            listState = activeListState,
+            onScrollPositionChanged = { index, offset ->
+                feedScrollHolder.recordScrollPosition(currentFeedSort, index, offset)
+            },
             onRefresh = {
+                val targetSort = activeSortedBy
                 coroutineScope.launch {
                     discoveryRepository.loadInitialOrRefreshFeed(
-                        sortedBy = activeSortedBy,
+                        sortedBy = targetSort,
                         appLanguage = appLanguage,
                         forceRefresh = true,
                     )
+                    feedScrollHolder.scrollToTop(targetSort, isEink)
                 }
             },
             onLoadNextPage = {
+                val targetSort = activeSortedBy
                 coroutineScope.launch {
                     discoveryRepository.loadNextFeedPage(
-                        sortedBy = activeSortedBy,
+                        sortedBy = targetSort,
                         appLanguage = appLanguage,
                     )
                 }

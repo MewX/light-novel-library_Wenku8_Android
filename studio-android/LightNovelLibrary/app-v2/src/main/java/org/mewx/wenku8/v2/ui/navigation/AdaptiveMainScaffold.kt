@@ -332,6 +332,9 @@ fun AdaptiveMainScaffold(
     var activeFootprintTab by rememberSaveable {
         mutableStateOf<ReadingFootprintTab?>(null)
     }
+    var homeTabReselectCounter by androidx.compose.runtime.remember {
+        androidx.compose.runtime.mutableIntStateOf(0)
+    }
 
     val handleOpenReader: (ReaderLaunchRequest) -> Unit = { request ->
         onOpenReader(request)
@@ -541,7 +544,13 @@ fun AdaptiveMainScaffold(
                                                 val labelText = stringResource(destination.labelResId)
                                                 ShortNavigationBarItem(
                                                     selected = isSelected,
-                                                    onClick = { selectedDestination = destination },
+                                                    onClick = {
+                                                        if (destination == selectedDestination) {
+                                                            homeTabReselectCounter++
+                                                        } else {
+                                                            selectedDestination = destination
+                                                        }
+                                                    },
                                                     icon = {
                                                         Icon(
                                                             imageVector = if (isSelected) {
@@ -575,6 +584,7 @@ fun AdaptiveMainScaffold(
                                     ) { destination ->
                                         MainDestinationBody(
                                             selectedDestination = destination,
+                                            reselectScrollToTopTrigger = homeTabReselectCounter,
                                             showOfflineFallbackBanner = showOfflineFallbackBanner,
                                             onDismissOfflineBanner = { showOfflineFallbackBanner = false },
                                             preferences = effectivePreferences,
@@ -644,9 +654,13 @@ fun AdaptiveMainScaffold(
                                                 railExpanded = isExpandedRailWidth,
                                                 selected = isSelected,
                                                 onClick = {
-                                                    selectedDestination = destination
-                                                    activeDetailNovelAid = 0
-                                                    activeDetailSeedItem = null
+                                                    if (destination == selectedDestination) {
+                                                        homeTabReselectCounter++
+                                                    } else {
+                                                        selectedDestination = destination
+                                                        activeDetailNovelAid = 0
+                                                        activeDetailSeedItem = null
+                                                    }
                                                 },
                                                 icon = {
                                                     Icon(
@@ -684,6 +698,7 @@ fun AdaptiveMainScaffold(
                                         ) { destination ->
                                             MainDestinationBody(
                                                 selectedDestination = destination,
+                                                reselectScrollToTopTrigger = homeTabReselectCounter,
                                                 showOfflineFallbackBanner = showOfflineFallbackBanner,
                                                 onDismissOfflineBanner = { showOfflineFallbackBanner = false },
                                                 preferences = effectivePreferences,
@@ -965,6 +980,7 @@ fun AdaptiveMainScaffold(
 @Composable
 private fun MainDestinationBody(
     selectedDestination: TopLevelDestination,
+    reselectScrollToTopTrigger: Int,
     showOfflineFallbackBanner: Boolean,
     onDismissOfflineBanner: () -> Unit,
     preferences: Wenku8UserPreferences,
@@ -1044,6 +1060,7 @@ private fun MainDestinationBody(
                 onNovelClickedWithOrigin(item, Wenku8SharedElementKeys.NOVEL_DEFAULT_ORIGIN)
             },
             onOpenNetworkDiagnostics = onOpenNetworkDiagnostics,
+            reselectScrollToTopTrigger = reselectScrollToTopTrigger,
             modifier = Modifier
                 .fillMaxSize()
                 .padding(contentPadding)
@@ -1063,6 +1080,7 @@ private fun MainDestinationBody(
                 onNovelClickedWithOrigin(item, Wenku8SharedElementKeys.NOVEL_DEFAULT_ORIGIN)
             },
             onOpenNetworkDiagnostics = onOpenNetworkDiagnostics,
+            reselectScrollToTopTrigger = reselectScrollToTopTrigger,
             modifier = Modifier
                 .fillMaxSize()
                 .padding(contentPadding)

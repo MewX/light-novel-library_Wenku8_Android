@@ -12,7 +12,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -27,6 +30,7 @@ import org.mewx.wenku8.v2.R
 import org.mewx.wenku8.v2.data.repository.DiscoveryRepository
 import org.mewx.wenku8.v2.domain.model.DiscoveryNovelCardItem
 import org.mewx.wenku8.v2.domain.model.LatestFeedCategory
+import org.mewx.wenku8.v2.ui.theme.LocalEinkMode
 
 /**
  * `Tab 2 · 最新` (`LatestScreen`) hosting Wenku8's three freshness feeds:
@@ -43,17 +47,36 @@ fun LatestScreen(
     onNovelClicked: (DiscoveryNovelCardItem) -> Unit,
     onOpenNetworkDiagnostics: () -> Unit,
     modifier: Modifier = Modifier,
+    reselectScrollToTopTrigger: Int = 0,
 ) {
+    val isEink = LocalEinkMode.current
     var selectedCategory by rememberSaveable {
-        mutableStateOf(LatestFeedCategory.RECENT_UPDATES)
+        mutableStateOf(discoveryRepository.activeLatestCategory)
     }
+    LaunchedEffect(selectedCategory) {
+        discoveryRepository.activeLatestCategory = selectedCategory
+    }
+
+    val activeSortedBy = selectedCategory.sortedBy
+    val feedState by key(activeSortedBy) {
+        discoveryRepository.observeFeedState(activeSortedBy).collectAsStateWithLifecycle()
+    }
+    val feedScrollHolder = rememberDiscoveryFeedScrollStateHolder(discoveryRepository)
+    val activeListState = feedScrollHolder.listStateFor(feedState.sortedBy)
+
     val coroutineScope = rememberCoroutineScope()
-    val feedState by discoveryRepository.observeFeedState(selectedCategory.sortedBy)
-        .collectAsStateWithLifecycle()
+
+    var handledReselectTrigger by remember { mutableIntStateOf(reselectScrollToTopTrigger) }
+    LaunchedEffect(reselectScrollToTopTrigger) {
+        if (reselectScrollToTopTrigger != handledReselectTrigger) {
+            handledReselectTrigger = reselectScrollToTopTrigger
+            feedScrollHolder.scrollToTop(activeSortedBy, isEink)
+        }
+    }
 
     LaunchedEffect(selectedCategory, appLanguage) {
         discoveryRepository.loadInitialOrRefreshFeed(
-            sortedBy = selectedCategory.sortedBy,
+            sortedBy = activeSortedBy,
             appLanguage = appLanguage,
             forceRefresh = false,
         )
@@ -72,29 +95,47 @@ fun LatestScreen(
             LatestFeedCategory.entries.forEach { category ->
                 Tab(
                     selected = category == selectedCategory,
-                    onClick = { selectedCategory = category },
+                    onClick = {
+                        if (category == selectedCategory) {
+                            val targetSort = activeSortedBy
+                            coroutineScope.launch {
+                                feedScrollHolder.scrollToTop(targetSort, isEink)
+                            }
+                        } else {
+                            selectedCategory = category
+                            discoveryRepository.activeLatestCategory = category
+                        }
+                    },
                     text = { Text(text = stringResource(category.labelResId())) },
                     modifier = Modifier.testTag(DiscoveryTestTags.LATEST_TAB_PREFIX + category.name),
                 )
             }
         }
 
+        val currentFeedSort = feedState.sortedBy
         PaginatedNovelFeedContent(
             feedState = feedState,
             showRankNumbers = false,
+            listState = activeListState,
+            onScrollPositionChanged = { index, offset ->
+                feedScrollHolder.recordScrollPosition(currentFeedSort, index, offset)
+            },
             onRefresh = {
+                val targetSort = activeSortedBy
                 coroutineScope.launch {
                     discoveryRepository.loadInitialOrRefreshFeed(
-                        sortedBy = selectedCategory.sortedBy,
+                        sortedBy = targetSort,
                         appLanguage = appLanguage,
                         forceRefresh = true,
                     )
+                    feedScrollHolder.scrollToTop(targetSort, isEink)
                 }
             },
             onLoadNextPage = {
+                val targetSort = activeSortedBy
                 coroutineScope.launch {
                     discoveryRepository.loadNextFeedPage(
-                        sortedBy = selectedCategory.sortedBy,
+                        sortedBy = targetSort,
                         appLanguage = appLanguage,
                     )
                 }

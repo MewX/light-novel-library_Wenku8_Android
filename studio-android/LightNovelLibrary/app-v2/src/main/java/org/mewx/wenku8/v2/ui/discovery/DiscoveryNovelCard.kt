@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
@@ -42,9 +43,14 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.Stable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.Saver
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -55,10 +61,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
+import kotlinx.coroutines.flow.distinctUntilChanged
+import org.mewx.wenku8.api.Wenku8API
 import org.mewx.wenku8.v2.R
 import org.mewx.wenku8.v2.data.media.WenkuImageRequests
+import org.mewx.wenku8.v2.data.repository.DiscoveryRepository
 import org.mewx.wenku8.v2.domain.model.DiscoveryFeedErrorKind
 import org.mewx.wenku8.v2.domain.model.DiscoveryNovelCardItem
+import org.mewx.wenku8.v2.domain.model.FeedScrollPosition
 import org.mewx.wenku8.v2.domain.model.PaginatedNovelFeedState
 import org.mewx.wenku8.v2.ui.theme.LocalEinkMode
 import org.mewx.wenku8.v2.ui.theme.Wenku8SharedElementKeys
@@ -73,6 +83,7 @@ object DiscoveryTestTags {
     const val RANKING_METRIC_PREFIX = "ranking_metric_"
     const val RANKING_PERIOD_PREFIX = "ranking_period_"
     const val NOVEL_CARD_PREFIX = "novel_card_"
+    const val FEED_LIST = "discovery_feed_list"
     const val FEED_ERROR_CARD = "discovery_feed_error_card"
     const val FEED_RETRY_BUTTON = "discovery_feed_retry_button"
     const val FEED_DIAGNOSTICS_CHIP = "discovery_feed_diagnostics_chip"
@@ -328,6 +339,102 @@ fun DiscoveryNovelCard(
     }
 }
 
+/**
+ * Maintains an isolated [LazyListState] for each [Wenku8API.NovelSortedBy] feed (`周榜`, `日榜`,
+ * `月榜`, `总榜`, `点击榜`, `推荐榜`, `总收藏`, `字数榜`, and `最新` tabs) so:
+ * 1. Switching between rankings NEVER anchors to an overlapping novel `aid` from the previous list.
+ * 2. Each ranking independently remembers its exact `(firstVisibleItemIndex, firstVisibleItemScrollOffset)`
+ *    across sub-tab switches, `NovelDetailScreen` / `Reader` transitions ([DiscoveryRepository]),
+ *    and Activity/configuration recreation (`rememberSaveable`).
+ * 3. Re-tapping an already-selected ranking button smoothly returns that ranking to top (`0, 0`).
+ */
+@Stable
+class DiscoveryFeedScrollStateHolder internal constructor(
+    private val saveablePositions: MutableMap<String, FeedScrollPosition>,
+    private val discoveryRepository: DiscoveryRepository,
+) {
+    private val listStates = HashMap<Wenku8API.NovelSortedBy, LazyListState>()
+
+    fun listStateFor(sortedBy: Wenku8API.NovelSortedBy): LazyListState {
+        return listStates.getOrPut(sortedBy) {
+            val saved = saveablePositions[sortedBy.name]
+                ?: discoveryRepository.getFeedScrollPosition(sortedBy)
+            LazyListState(
+                firstVisibleItemIndex = saved.firstVisibleItemIndex,
+                firstVisibleItemScrollOffset = saved.firstVisibleItemScrollOffset,
+            )
+        }
+    }
+
+    internal fun recordScrollPosition(
+        sortedBy: Wenku8API.NovelSortedBy,
+        firstVisibleItemIndex: Int,
+        firstVisibleItemScrollOffset: Int,
+    ) {
+        val clampedIndex = firstVisibleItemIndex.coerceAtLeast(0)
+        val clampedOffset = firstVisibleItemScrollOffset.coerceAtLeast(0)
+        saveablePositions[sortedBy.name] = FeedScrollPosition(clampedIndex, clampedOffset)
+        discoveryRepository.updateFeedScrollPosition(sortedBy, clampedIndex, clampedOffset)
+    }
+
+    suspend fun scrollToTop(
+        sortedBy: Wenku8API.NovelSortedBy,
+        isEinkMode: Boolean,
+    ) {
+        val state = listStateFor(sortedBy)
+        recordScrollPosition(sortedBy, 0, 0)
+        if (state.firstVisibleItemIndex == 0 && state.firstVisibleItemScrollOffset == 0) {
+            return
+        }
+        if (isEinkMode) {
+            state.scrollToItem(0, 0)
+        } else {
+            if (state.firstVisibleItemIndex > 10) {
+                state.scrollToItem(10, 0)
+            }
+            state.animateScrollToItem(0, 0)
+        }
+    }
+}
+
+private val SaveableFeedScrollMapSaver: Saver<MutableMap<String, FeedScrollPosition>, ArrayList<String>> =
+    Saver(
+        save = { map ->
+            val encoded = ArrayList<String>(map.size)
+            for ((sortName, pos) in map) {
+                encoded.add("$sortName:${pos.firstVisibleItemIndex}:${pos.firstVisibleItemScrollOffset}")
+            }
+            encoded
+        },
+        restore = { encoded ->
+            val restored = LinkedHashMap<String, FeedScrollPosition>(encoded.size)
+            for (entry in encoded) {
+                val parts = entry.split(':')
+                if (parts.size == 3) {
+                    val idx = parts[1].toIntOrNull() ?: 0
+                    val off = parts[2].toIntOrNull() ?: 0
+                    restored[parts[0]] = FeedScrollPosition(idx, off)
+                }
+            }
+            restored
+        },
+    )
+
+@Composable
+fun rememberDiscoveryFeedScrollStateHolder(
+    discoveryRepository: DiscoveryRepository,
+): DiscoveryFeedScrollStateHolder {
+    val saveablePositions = rememberSaveable(saver = SaveableFeedScrollMapSaver) {
+        LinkedHashMap()
+    }
+    return remember(saveablePositions, discoveryRepository) {
+        DiscoveryFeedScrollStateHolder(
+            saveablePositions = saveablePositions,
+            discoveryRepository = discoveryRepository,
+        )
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun PaginatedNovelFeedContent(
@@ -338,12 +445,26 @@ fun PaginatedNovelFeedContent(
     onNovelClicked: (DiscoveryNovelCardItem) -> Unit,
     onOpenNetworkDiagnostics: () -> Unit,
     modifier: Modifier = Modifier,
+    listState: LazyListState = rememberLazyListState(),
+    onScrollPositionChanged: ((firstVisibleItemIndex: Int, firstVisibleItemScrollOffset: Int) -> Unit)? = null,
     sharedTransitionOrigin: String = Wenku8SharedElementKeys.NOVEL_DEFAULT_ORIGIN,
 ) {
     val isEink = LocalEinkMode.current
-    val listState = rememberLazyListState()
+    val hasLoadedItems = feedState.items.isNotEmpty()
 
-    val shouldTriggerLoadMore by remember(feedState.items.size, feedState.canLoadMorePages) {
+    LaunchedEffect(feedState.sortedBy, listState, hasLoadedItems, onScrollPositionChanged) {
+        val callback = onScrollPositionChanged ?: return@LaunchedEffect
+        if (!hasLoadedItems) return@LaunchedEffect
+        snapshotFlow {
+            listState.firstVisibleItemIndex to listState.firstVisibleItemScrollOffset
+        }
+            .distinctUntilChanged()
+            .collect { (index, offset) ->
+                callback(index, offset)
+            }
+    }
+
+    val shouldTriggerLoadMore by remember(listState, feedState.items.size, feedState.canLoadMorePages) {
         derivedStateOf {
             if (!feedState.canLoadMorePages || feedState.items.isEmpty()) {
                 false
@@ -354,7 +475,7 @@ fun PaginatedNovelFeedContent(
         }
     }
 
-    LaunchedEffect(shouldTriggerLoadMore) {
+    LaunchedEffect(feedState.sortedBy, shouldTriggerLoadMore) {
         if (shouldTriggerLoadMore) {
             onLoadNextPage()
         }
@@ -366,7 +487,9 @@ fun PaginatedNovelFeedContent(
         modifier = modifier.fillMaxSize(),
     ) {
         when {
-            feedState.isInitialLoading && feedState.items.isEmpty() -> {
+            (feedState.isInitialLoading || feedState.loadedPage == 0) &&
+                feedState.errorKind == null &&
+                feedState.items.isEmpty() -> {
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
@@ -405,90 +528,97 @@ fun PaginatedNovelFeedContent(
             }
 
             else -> {
-                LazyColumn(
-                    state = listState,
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
-                ) {
-                    itemsIndexed(
-                        items = feedState.items,
-                        key = { _, item -> item.aid },
-                    ) { index, item ->
-                        DiscoveryNovelCard(
-                            item = item,
-                            rankNumber = if (showRankNumbers) index + 1 else null,
-                            onClick = { onNovelClicked(item) },
-                            sharedTransitionOrigin = sharedTransitionOrigin,
-                        )
-                    }
+                // Keying LazyColumn by `feedState.sortedBy` + scoping item keys with `sortedBy.name`
+                // guarantees Compose never anchors scroll position to an overlapping novel `aid`
+                // when switching between 周榜 / 日榜 / 月榜 / 总榜.
+                key(feedState.sortedBy) {
+                    LazyColumn(
+                        state = listState,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .testTag(DiscoveryTestTags.FEED_LIST),
+                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        itemsIndexed(
+                            items = feedState.items,
+                            key = { _, item -> "${feedState.sortedBy.name}_${item.aid}" },
+                        ) { index, item ->
+                            DiscoveryNovelCard(
+                                item = item,
+                                rankNumber = if (showRankNumbers) index + 1 else null,
+                                onClick = { onNovelClicked(item) },
+                                sharedTransitionOrigin = sharedTransitionOrigin,
+                            )
+                        }
 
-                    if (feedState.isAppendingNextPage) {
-                        item(key = "pagination_loading_footer") {
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 14.dp),
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                            ) {
-                                if (isEink) {
-                                    LinearProgressIndicator(modifier = Modifier.fillMaxWidth(0.5f))
-                                } else {
-                                    LinearWavyProgressIndicator(modifier = Modifier.fillMaxWidth(0.5f))
-                                }
-                                Spacer(modifier = Modifier.height(8.dp))
-                                Text(
-                                    text = stringResource(
-                                        R.string.feed_loading_more,
-                                        feedState.loadedPage + 1,
-                                        feedState.totalPages,
-                                    ),
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            }
-                        }
-                    } else if (feedState.errorKind != null && feedState.items.isNotEmpty()) {
-                        item(key = "pagination_retry_footer") {
-                            Surface(
-                                color = MaterialTheme.colorScheme.errorContainer,
-                                contentColor = MaterialTheme.colorScheme.onErrorContainer,
-                                shape = MaterialTheme.shapes.medium,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clickable { onLoadNextPage() }
-                                    .einkHairlineBorder(MaterialTheme.shapes.medium),
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.Center,
+                        if (feedState.isAppendingNextPage) {
+                            item(key = "${feedState.sortedBy.name}_pagination_loading_footer") {
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 14.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally,
                                 ) {
-                                    Icon(
-                                        imageVector = Icons.Outlined.Refresh,
-                                        contentDescription = null,
-                                    )
-                                    Spacer(modifier = Modifier.width(8.dp))
+                                    if (isEink) {
+                                        LinearProgressIndicator(modifier = Modifier.fillMaxWidth(0.5f))
+                                    } else {
+                                        LinearWavyProgressIndicator(modifier = Modifier.fillMaxWidth(0.5f))
+                                    }
+                                    Spacer(modifier = Modifier.height(8.dp))
                                     Text(
-                                        text = stringResource(R.string.feed_append_failed_retry),
-                                        style = MaterialTheme.typography.labelLarge,
+                                        text = stringResource(
+                                            R.string.feed_loading_more,
+                                            feedState.loadedPage + 1,
+                                            feedState.totalPages,
+                                        ),
+                                        style = MaterialTheme.typography.labelMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     )
                                 }
                             }
-                        }
-                    } else if (feedState.loadedPage >= feedState.totalPages && feedState.items.isNotEmpty()) {
-                        item(key = "pagination_end_footer") {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 12.dp),
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                Text(
-                                    text = stringResource(R.string.feed_end_reached, feedState.items.size),
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
+                        } else if (feedState.errorKind != null && feedState.items.isNotEmpty()) {
+                            item(key = "${feedState.sortedBy.name}_pagination_retry_footer") {
+                                Surface(
+                                    color = MaterialTheme.colorScheme.errorContainer,
+                                    contentColor = MaterialTheme.colorScheme.onErrorContainer,
+                                    shape = MaterialTheme.shapes.medium,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable { onLoadNextPage() }
+                                        .einkHairlineBorder(MaterialTheme.shapes.medium),
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.Center,
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Outlined.Refresh,
+                                            contentDescription = null,
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text(
+                                            text = stringResource(R.string.feed_append_failed_retry),
+                                            style = MaterialTheme.typography.labelLarge,
+                                        )
+                                    }
+                                }
+                            }
+                        } else if (feedState.loadedPage >= feedState.totalPages && feedState.items.isNotEmpty()) {
+                            item(key = "${feedState.sortedBy.name}_pagination_end_footer") {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 12.dp),
+                                    contentAlignment = Alignment.Center,
+                                ) {
+                                    Text(
+                                        text = stringResource(R.string.feed_end_reached, feedState.items.size),
+                                        style = MaterialTheme.typography.labelMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
                             }
                         }
                     }

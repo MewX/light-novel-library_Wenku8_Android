@@ -128,6 +128,16 @@ data class PaginatedNovelFeedState(
 }
 
 /**
+ * Saved scroll anchor for an individual `NovelSortedBy` feed (`周榜`, `日榜`, `月榜`, `总榜`, etc.)
+ * so switching between rankings preserves each list's own scroll progress without cross-anchoring
+ * overlapping novel `aid`s.
+ */
+data class FeedScrollPosition(
+    val firstVisibleItemIndex: Int = 0,
+    val firstVisibleItemScrollOffset: Int = 0,
+)
+
+/**
  * Search mode selected in `UnifiedSearchScreen`.
  */
 enum class UnifiedSearchMode {

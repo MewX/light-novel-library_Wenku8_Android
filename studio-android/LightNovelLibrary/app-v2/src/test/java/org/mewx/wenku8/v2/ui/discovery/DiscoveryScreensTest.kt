@@ -3,6 +3,9 @@ package org.mewx.wenku8.v2.ui.discovery
 import android.content.Context
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsSelected
@@ -10,6 +13,7 @@ import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.unit.dp
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
@@ -31,6 +35,7 @@ import org.mewx.wenku8.v2.data.remote.parser.ParsedNovelFullMeta
 import org.mewx.wenku8.v2.data.remote.parser.ParsedNovelListItem
 import org.mewx.wenku8.v2.data.remote.parser.ParsedNovelListPage
 import org.mewx.wenku8.v2.data.repository.DiscoveryRepository
+import org.mewx.wenku8.v2.domain.model.FeedScrollPosition
 import org.mewx.wenku8.v2.domain.model.LatestFeedCategory
 import org.mewx.wenku8.v2.domain.model.RankingMetric
 import org.mewx.wenku8.v2.domain.model.RankingPeriod
@@ -62,6 +67,7 @@ class DiscoveryScreensTest {
 
     @After
     fun tearDown() {
+        runCatching { composeTestRule.waitForIdle() }
         database.close()
     }
 
@@ -235,6 +241,192 @@ class DiscoveryScreensTest {
         composeTestRule.onNodeWithTag(DiscoveryTestTags.FEED_ERROR_CARD).assertIsDisplayed()
         composeTestRule.onNodeWithTag(DiscoveryTestTags.FEED_DIAGNOSTICS_CHIP).performClick()
         assertTrue(diagnosticsOpened)
+    }
+
+    @Test
+    fun rankingsScreenPreservesIndependentScrollProgressWithoutCrossAnchoringAndRetapScrollsToTop() {
+        fun sampleNovel(aid: Int, title: String) = ParsedNovelListItem(
+            aid = aid,
+            title = title,
+            author = "作者$aid",
+            bookStatus = "连载中",
+            lastUpdate = "2026-11-16",
+            tagsCsv = "校园 奇幻",
+            introShort = "作品简介 $aid",
+        )
+
+        // Week list has 9001..9018 (`9001` at #1, `9009` at #9).
+        // Day list deliberately places `9001` at #14 and `9009` at #15 so any cross-ranking `aid`
+        // anchoring bug would jump `日榜` down to #14/#15 instead of starting at #1 (`9101`).
+        val weekItems = (1..18).map { rank ->
+            val aid = 9000 + rank
+            sampleNovel(aid = aid, title = "小说-$aid")
+        }
+        val dayItems = buildList {
+            for (rank in 1..13) {
+                val aid = 9100 + rank
+                add(sampleNovel(aid = aid, title = "小说-$aid"))
+            }
+            add(sampleNovel(aid = 9001, title = "小说-9001"))
+            add(sampleNovel(aid = 9009, title = "小说-9009"))
+            for (rank in 16..18) {
+                val aid = 9100 + rank
+                add(sampleNovel(aid = aid, title = "小说-$aid"))
+            }
+        }
+        val monthItems = buildList {
+            for (rank in 1..14) {
+                val aid = 9200 + rank
+                add(sampleNovel(aid = aid, title = "小说-$aid"))
+            }
+            add(sampleNovel(aid = 9001, title = "小说-9001"))
+            add(sampleNovel(aid = 9009, title = "小说-9009"))
+        }
+        val allTimeItems = buildList {
+            for (rank in 1..14) {
+                val aid = 9300 + rank
+                add(sampleNovel(aid = aid, title = "小说-$aid"))
+            }
+            add(sampleNovel(aid = 9001, title = "小说-9001"))
+            add(sampleNovel(aid = 9009, title = "小说-9009"))
+        }
+
+        val gateway = FakeDiscoveryGateway().apply {
+            pagesBySort[Wenku8API.NovelSortedBy.weekVisit] =
+                WenkuApiResult.Success(ParsedNovelListPage(totalPages = 3, items = weekItems))
+            pagesBySort[Wenku8API.NovelSortedBy.dayVisit] =
+                WenkuApiResult.Success(ParsedNovelListPage(totalPages = 3, items = dayItems))
+            pagesBySort[Wenku8API.NovelSortedBy.monthVisit] =
+                WenkuApiResult.Success(ParsedNovelListPage(totalPages = 3, items = monthItems))
+            pagesBySort[Wenku8API.NovelSortedBy.allVisit] =
+                WenkuApiResult.Success(ParsedNovelListPage(totalPages = 3, items = allTimeItems))
+        }
+
+        val repository = DiscoveryRepository(database = database, apiClient = gateway)
+        var reselectCounter by mutableIntStateOf(0)
+
+        composeTestRule.setContent {
+            Box(modifier = Modifier.size(width = 412.dp, height = 892.dp)) {
+                Wenku8ExpressiveTheme(themeMode = Wenku8ThemeMode.CLASSIC_BLUE) {
+                    RankingsScreen(
+                        discoveryRepository = repository,
+                        appLanguage = Wenku8API.AppLanguage.SC,
+                        onOpenSearch = {},
+                        onNovelClicked = {},
+                        onOpenNetworkDiagnostics = {},
+                        reselectScrollToTopTrigger = reselectCounter,
+                    )
+                }
+            }
+        }
+
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithText("小说-9001").assertIsDisplayed()
+
+        // 1. Scroll 周榜 (weekVisit) down to index 8 (#9, aid = 9009)
+        composeTestRule.onNodeWithTag(DiscoveryTestTags.FEED_LIST).performScrollToIndex(8)
+        composeTestRule.waitForIdle()
+        val savedWeekScroll = repository.getFeedScrollPosition(Wenku8API.NovelSortedBy.weekVisit)
+        assertTrue(
+            "Expected weekVisit scroll index > 0, got $savedWeekScroll",
+            savedWeekScroll.firstVisibleItemIndex >= 4,
+        )
+        composeTestRule.onNodeWithText("小说-9009").assertIsDisplayed()
+
+        // 2. Switch to 日榜 (dayVisit): must start at #1 (9101), NOT anchored to 9001/9009 at #14/#15!
+        composeTestRule
+            .onNodeWithTag(DiscoveryTestTags.RANKING_PERIOD_PREFIX + RankingPeriod.DAY.name)
+            .performClick()
+        composeTestRule.waitForIdle()
+        assertEquals(
+            FeedScrollPosition(0, 0),
+            repository.getFeedScrollPosition(Wenku8API.NovelSortedBy.dayVisit),
+        )
+        composeTestRule.onNodeWithText("小说-9101").assertIsDisplayed()
+
+        // 3. Scroll 日榜 (dayVisit) independently to index 6 (#7, aid = 9107)
+        composeTestRule.onNodeWithTag(DiscoveryTestTags.FEED_LIST).performScrollToIndex(6)
+        composeTestRule.waitForIdle()
+        val savedDayScroll = repository.getFeedScrollPosition(Wenku8API.NovelSortedBy.dayVisit)
+        assertTrue(
+            "Expected dayVisit scroll index > 0, got $savedDayScroll",
+            savedDayScroll.firstVisibleItemIndex >= 2,
+        )
+
+        // 4. Switch to 总榜 (allVisit) and 月榜 (monthVisit): both unvisited rankings start at #1
+        composeTestRule
+            .onNodeWithTag(DiscoveryTestTags.RANKING_PERIOD_PREFIX + RankingPeriod.ALL_TIME.name)
+            .performClick()
+        composeTestRule.waitForIdle()
+        assertEquals(
+            FeedScrollPosition(0, 0),
+            repository.getFeedScrollPosition(Wenku8API.NovelSortedBy.allVisit),
+        )
+        composeTestRule.onNodeWithText("小说-9301").assertIsDisplayed()
+
+        composeTestRule
+            .onNodeWithTag(DiscoveryTestTags.RANKING_PERIOD_PREFIX + RankingPeriod.MONTH.name)
+            .performClick()
+        composeTestRule.waitForIdle()
+        assertEquals(
+            FeedScrollPosition(0, 0),
+            repository.getFeedScrollPosition(Wenku8API.NovelSortedBy.monthVisit),
+        )
+        composeTestRule.onNodeWithText("小说-9201").assertIsDisplayed()
+
+        // 5. Switch back to 周榜 (weekVisit): restores exact saved scroll progress!
+        composeTestRule
+            .onNodeWithTag(DiscoveryTestTags.RANKING_PERIOD_PREFIX + RankingPeriod.WEEK.name)
+            .performClick()
+        composeTestRule.waitForIdle()
+        assertEquals(
+            savedWeekScroll,
+            repository.getFeedScrollPosition(Wenku8API.NovelSortedBy.weekVisit),
+        )
+        composeTestRule.onNodeWithText("小说-9009").assertIsDisplayed()
+
+        // 6. Re-tap already-selected 周榜 chip -> smoothly scrolls 周榜 back to top (#1)!
+        composeTestRule
+            .onNodeWithTag(DiscoveryTestTags.RANKING_PERIOD_PREFIX + RankingPeriod.WEEK.name)
+            .performClick()
+        composeTestRule.waitForIdle()
+        assertEquals(
+            FeedScrollPosition(0, 0),
+            repository.getFeedScrollPosition(Wenku8API.NovelSortedBy.weekVisit),
+        )
+        composeTestRule.onNodeWithText("小说-9001").assertIsDisplayed()
+
+        // 7. Switch back to 日榜 (dayVisit): still preserved its own scroll position, then
+        //    re-tapping active metric button / bottom-nav reselect returns 日榜 to top (#1)!
+        composeTestRule
+            .onNodeWithTag(DiscoveryTestTags.RANKING_PERIOD_PREFIX + RankingPeriod.DAY.name)
+            .performClick()
+        composeTestRule.waitForIdle()
+        assertEquals(
+            savedDayScroll,
+            repository.getFeedScrollPosition(Wenku8API.NovelSortedBy.dayVisit),
+        )
+
+        composeTestRule
+            .onNodeWithTag(DiscoveryTestTags.RANKING_METRIC_PREFIX + RankingMetric.VISITS.name)
+            .performClick()
+        composeTestRule.waitForIdle()
+        assertEquals(
+            FeedScrollPosition(0, 0),
+            repository.getFeedScrollPosition(Wenku8API.NovelSortedBy.dayVisit),
+        )
+        composeTestRule.onNodeWithText("小说-9101").assertIsDisplayed()
+
+        // Also verify bottom-nav reselect trigger scrolls back to top
+        composeTestRule.onNodeWithTag(DiscoveryTestTags.FEED_LIST).performScrollToIndex(6)
+        composeTestRule.waitForIdle()
+        assertTrue(repository.getFeedScrollPosition(Wenku8API.NovelSortedBy.dayVisit).firstVisibleItemIndex >= 2)
+        reselectCounter++
+        composeTestRule.waitForIdle()
+        assertEquals(
+            FeedScrollPosition(0, 0),
+            repository.getFeedScrollPosition(Wenku8API.NovelSortedBy.dayVisit),
+        )
     }
 
     private class FakeDiscoveryGateway : WenkuCatalogGateway {

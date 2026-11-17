@@ -29,8 +29,12 @@ import org.mewx.wenku8.v2.data.remote.parser.ParsedNovelFullMeta
 import org.mewx.wenku8.v2.data.remote.parser.ParsedNovelListItem
 import org.mewx.wenku8.v2.domain.model.DiscoveryFeedErrorKind
 import org.mewx.wenku8.v2.domain.model.DiscoveryNovelCardItem
+import org.mewx.wenku8.v2.domain.model.FeedScrollPosition
+import org.mewx.wenku8.v2.domain.model.LatestFeedCategory
 import org.mewx.wenku8.v2.domain.model.OnlineSearchExecutionState
 import org.mewx.wenku8.v2.domain.model.PaginatedNovelFeedState
+import org.mewx.wenku8.v2.domain.model.RankingMetric
+import org.mewx.wenku8.v2.domain.model.RankingPeriod
 import org.mewx.wenku8.v2.domain.model.UnifiedSearchMode
 import java.util.concurrent.ConcurrentHashMap
 
@@ -65,6 +69,16 @@ class DiscoveryRepository(
 
     private val feedStates = ConcurrentHashMap<Wenku8API.NovelSortedBy, MutableStateFlow<PaginatedNovelFeedState>>()
     private val feedLoadMutexes = ConcurrentHashMap<Wenku8API.NovelSortedBy, Mutex>()
+    private val feedScrollPositions = ConcurrentHashMap<Wenku8API.NovelSortedBy, FeedScrollPosition>()
+
+    @Volatile
+    var activeLatestCategory: LatestFeedCategory = LatestFeedCategory.RECENT_UPDATES
+
+    @Volatile
+    var activeRankingMetric: RankingMetric = RankingMetric.VISITS
+
+    @Volatile
+    var activeRankingPeriod: RankingPeriod = RankingPeriod.WEEK
 
     /**
      * Process-wide completeness-monotonic novel summary cache.
@@ -83,6 +97,21 @@ class DiscoveryRepository(
 
     fun observeFeedState(sortedBy: Wenku8API.NovelSortedBy): StateFlow<PaginatedNovelFeedState> {
         return getOrCreateFeedFlow(sortedBy).asStateFlow()
+    }
+
+    fun getFeedScrollPosition(sortedBy: Wenku8API.NovelSortedBy): FeedScrollPosition {
+        return feedScrollPositions[sortedBy] ?: FeedScrollPosition()
+    }
+
+    fun updateFeedScrollPosition(
+        sortedBy: Wenku8API.NovelSortedBy,
+        firstVisibleItemIndex: Int,
+        firstVisibleItemScrollOffset: Int,
+    ) {
+        feedScrollPositions[sortedBy] = FeedScrollPosition(
+            firstVisibleItemIndex = firstVisibleItemIndex.coerceAtLeast(0),
+            firstVisibleItemScrollOffset = firstVisibleItemScrollOffset.coerceAtLeast(0),
+        )
     }
 
     /**
@@ -129,6 +158,9 @@ class DiscoveryRepository(
                 is WenkuApiResult.Success -> {
                     val mappedItems = response.data.items.map { parsed ->
                         mergeAndCacheParsedItem(parsed, bookshelfAidSet.contains(parsed.aid))
+                    }
+                    if (forceRefresh) {
+                        feedScrollPositions[sortedBy] = FeedScrollPosition(0, 0)
                     }
                     stateFlow.update { current ->
                         current.copy(
