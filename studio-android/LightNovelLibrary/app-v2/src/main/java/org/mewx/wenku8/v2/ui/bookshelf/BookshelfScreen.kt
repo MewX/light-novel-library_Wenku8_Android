@@ -90,14 +90,17 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -142,6 +145,7 @@ object BookshelfTestTags {
     const val SORT_MODE_ITEM_PREFIX = "bookshelf_sort_mode_"
     const val CONTINUE_READING_CAROUSEL = "bookshelf_continue_reading_carousel"
     const val CONTINUE_READING_ITEM_PREFIX = "bookshelf_continue_item_"
+    const val CONTINUE_READING_COVER_PREFIX = "bookshelf_continue_cover_"
     const val CONTINUE_READING_BUTTON_PREFIX = "bookshelf_continue_btn_"
     const val FILTER_CHIP_ALL = "bookshelf_filter_all"
     const val FILTER_CHIP_NEW_CHAPTERS = "bookshelf_filter_new_chapters"
@@ -1021,6 +1025,10 @@ private fun ContinueReadingCarouselSection(
     onContinueReadingClick: (BookshelfItemModel) -> Unit,
 ) {
     val carouselState = rememberCarouselState { items.size }
+    val layoutDirection = LocalLayoutDirection.current
+    val isEinkMode = LocalEinkMode.current
+    val carouselCardShape = MaterialTheme.shapes.medium
+
     Column(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -1034,34 +1042,58 @@ private fun ContinueReadingCarouselSection(
 
         HorizontalMultiBrowseCarousel(
             state = carouselState,
-            preferredItemWidth = 296.dp,
+            preferredItemWidth = 284.dp,
             itemSpacing = 12.dp,
+            minSmallItemWidth = 56.dp,
+            maxSmallItemWidth = 104.dp,
             modifier = Modifier
                 .fillMaxWidth()
                 .height(146.dp)
                 .testTag(BookshelfTestTags.CONTINUE_READING_CAROUSEL),
         ) { index ->
             val item = items[index]
+            val drawInfo = carouselItemDrawInfo
+            val isMostlyExpanded = drawInfo.maxSize <= 0f || drawInfo.size >= drawInfo.maxSize * 0.85f
+
             Card(
                 onClick = { onCardClick(item) },
                 colors = CardDefaults.cardColors(
                     containerColor = MaterialTheme.colorScheme.surfaceContainer,
                 ),
-                shape = MaterialTheme.shapes.large,
+                shape = carouselCardShape,
                 modifier = Modifier
                     .fillMaxSize()
-                    .maskClip(MaterialTheme.shapes.large)
-                    .einkHairlineBorder(MaterialTheme.shapes.large)
+                    .maskClip(carouselCardShape)
+                    .then(
+                        if (isEinkMode) {
+                            Modifier.maskBorder(
+                                BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                                carouselCardShape,
+                            )
+                        } else {
+                            Modifier
+                        },
+                    )
                     .testTag(BookshelfTestTags.CONTINUE_READING_ITEM_PREFIX + item.aid),
             ) {
                 Row(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(12.dp),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        .graphicsLayer {
+                            // Material3's `HorizontalMultiBrowseCarousel` centers `maskRect` inside
+                            // `[0, itemMainAxisSize]`. Shifting inner content to `maskRect.left`
+                            // makes partially-collapsed cards expand from the left edge so the flush
+                            // book cover is always shown first instead of centered text!
+                            translationX = if (layoutDirection == LayoutDirection.Rtl) {
+                                -(size.width - drawInfo.maskRect.right)
+                            } else {
+                                drawInfo.maskRect.left
+                            }
+                        },
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    val carouselCoverShape = MaterialTheme.shapes.small
+                    // Flush edge-to-edge cover (`贴边显示`): zero top/bottom/left margin so collapsed
+                    // cards frame pure cover art and expanded cards present a clean flush spine.
                     Box(
                         contentAlignment = Alignment.Center,
                         modifier = Modifier
@@ -1070,10 +1102,11 @@ private fun ContinueReadingCarouselSection(
                             .wenku8SharedNovelCover(
                                 origin = Wenku8SharedElementKeys.NOVEL_BOOKSHELF_CAROUSEL_ORIGIN,
                                 aid = item.aid,
-                                clipShape = carouselCoverShape,
+                                clipShape = carouselCardShape,
+                                enabled = isMostlyExpanded,
                             )
-                            .clip(carouselCoverShape)
-                            .background(MaterialTheme.colorScheme.surfaceContainerHighest),
+                            .background(MaterialTheme.colorScheme.surfaceContainerHighest)
+                            .testTag(BookshelfTestTags.CONTINUE_READING_COVER_PREFIX + item.aid),
                     ) {
                         Icon(
                             imageVector = Icons.Outlined.AutoStories,
@@ -1098,7 +1131,8 @@ private fun ContinueReadingCarouselSection(
                     Column(
                         modifier = Modifier
                             .weight(1f)
-                            .fillMaxHeight(),
+                            .fillMaxHeight()
+                            .padding(horizontal = 14.dp, vertical = 12.dp),
                         verticalArrangement = Arrangement.SpaceBetween,
                     ) {
                         Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
@@ -1111,6 +1145,7 @@ private fun ContinueReadingCarouselSection(
                                 modifier = Modifier.wenku8SharedNovelTitle(
                                     origin = Wenku8SharedElementKeys.NOVEL_BOOKSHELF_CAROUSEL_ORIGIN,
                                     aid = item.aid,
+                                    enabled = isMostlyExpanded,
                                 ),
                             )
                             val chapterLabel = item.readingProgress?.chapterTitle?.takeIf { it.isNotBlank() }

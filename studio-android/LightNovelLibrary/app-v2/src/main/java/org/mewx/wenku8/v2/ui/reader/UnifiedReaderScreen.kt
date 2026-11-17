@@ -453,11 +453,11 @@ fun UnifiedReaderScreen(
         val initialWinBrightness = context.findHostActivity()?.window?.attributes?.screenBrightness ?: -1f
         mutableFloatStateOf(if (initialWinBrightness in 0.01f..1f) initialWinBrightness else 0.55f)
     }
-    var lastBrightnessDragMs by remember { mutableLongStateOf(0L) }
+    var brightnessDragTick by remember { mutableLongStateOf(0L) }
     var showBrightnessPill by remember { mutableStateOf(false) }
 
-    LaunchedEffect(lastBrightnessDragMs) {
-        if (lastBrightnessDragMs > 0L) {
+    LaunchedEffect(brightnessDragTick) {
+        if (brightnessDragTick > 0L) {
             showBrightnessPill = true
             delay(1_200L)
             showBrightnessPill = false
@@ -1433,7 +1433,8 @@ fun UnifiedReaderScreen(
             onBrightnessDragDelta = { delta ->
                 val updated = (brightnessFraction + delta).coerceIn(0.04f, 1f)
                 brightnessFraction = updated
-                lastBrightnessDragMs = SystemClock.elapsedRealtime()
+                showBrightnessPill = true
+                brightnessDragTick += 1L
                 context.findHostActivity()?.window?.let { win ->
                     val attrs = win.attributes
                     attrs.screenBrightness = updated

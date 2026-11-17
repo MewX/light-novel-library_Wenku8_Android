@@ -14,8 +14,9 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -51,6 +52,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.staticCompositionLocalOf
@@ -69,6 +71,7 @@ import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -437,6 +440,8 @@ fun ReaderViewportHost(
     val density = LocalDensity.current
     val isRtlBunkobon = effectiveMode == ReaderPageTurnMode.VERTICAL_BUNKOBON
     val clockLabel = rememberSystemClockText()
+    val latestOnTapZoneAction by rememberUpdatedState(onTapZoneAction)
+    val latestOnBrightnessDragDelta by rememberUpdatedState(onBrightnessDragDelta)
 
     Box(
         modifier = modifier
@@ -453,31 +458,74 @@ fun ReaderViewportHost(
                             viewportHeight = size.height.toFloat(),
                             isRtlBook = isRtlBunkobon,
                         )
-                        onTapZoneAction(action)
+                        latestOnTapZoneAction(action)
                     }
                 }
             }
             .pointerInput(leftEdgeBrightnessDragEnabled, density.density) {
                 if (leftEdgeBrightnessDragEnabled) {
-                    var dragActiveInSafeStrip = false
-                    detectVerticalDragGestures(
-                        onDragStart = { startOffset ->
-                            dragActiveInSafeStrip = isWithinPredictiveBackSafeBrightnessStrip(
-                                touchXPx = startOffset.x,
+                    // Intercept vertical drags inside `24..72dp` during `PointerEventPass.Initial`
+                    // (top-down, BEFORE child `LazyColumn` in `CONTINUOUS_SCROLL` consumes vertical
+                    // scroll events on `PointerEventPass.Main`), while letting taps, horizontal page
+                    // swipes, multi-touch pinches, and normal scrolling outside `24..72dp` pass through!
+                    awaitEachGesture {
+                        val down = awaitFirstDown(
+                            requireUnconsumed = false,
+                            pass = PointerEventPass.Initial,
+                        )
+                        if (!isWithinPredictiveBackSafeBrightnessStrip(
+                                touchXPx = down.position.x,
                                 densityScale = density.density,
                             )
-                        },
-                        onDragEnd = { dragActiveInSafeStrip = false },
-                        onDragCancel = { dragActiveInSafeStrip = false },
-                        onVerticalDrag = { change, dragAmount ->
-                            if (dragActiveInSafeStrip && size.height > 0) {
-                                change.consume()
-                                // Dragging upward (`dragAmount < 0`) increases brightness.
-                                val deltaFraction = (-dragAmount / (size.height * 0.65f))
-                                onBrightnessDragDelta(deltaFraction)
+                        ) {
+                            return@awaitEachGesture
+                        }
+
+                        val pointerId = down.id
+                        val touchSlop = viewConfiguration.touchSlop
+                        var lastY = down.position.y
+                        var lockedBrightnessDrag = false
+
+                        while (true) {
+                            val event = awaitPointerEvent(pass = PointerEventPass.Initial)
+                            if (!lockedBrightnessDrag && event.changes.count { it.pressed } > 1) {
+                                break
                             }
-                        },
-                    )
+                            val change = event.changes.firstOrNull { it.id == pointerId } ?: break
+                            if (!change.pressed) {
+                                if (lockedBrightnessDrag) {
+                                    change.consume()
+                                }
+                                break
+                            }
+
+                            if (!lockedBrightnessDrag) {
+                                val totalDx = change.position.x - down.position.x
+                                val totalDy = change.position.y - down.position.y
+                                if (kotlin.math.abs(totalDx) > touchSlop &&
+                                    kotlin.math.abs(totalDx) > kotlin.math.abs(totalDy)
+                                ) {
+                                    break
+                                }
+                                if (kotlin.math.abs(totalDy) > touchSlop) {
+                                    lockedBrightnessDrag = true
+                                    val slopSign = if (totalDy > 0f) 1f else -1f
+                                    lastY = down.position.y + slopSign * touchSlop
+                                }
+                            }
+
+                            if (lockedBrightnessDrag) {
+                                val dragAmountY = change.position.y - lastY
+                                lastY = change.position.y
+                                change.consume()
+                                if (size.height > 0 && dragAmountY != 0f) {
+                                    // Dragging upward (`dragAmountY < 0`) increases brightness.
+                                    val deltaFraction = (-dragAmountY / (size.height * 0.65f))
+                                    latestOnBrightnessDragDelta(deltaFraction)
+                                }
+                            }
+                        }
+                    }
                 }
             },
     ) {

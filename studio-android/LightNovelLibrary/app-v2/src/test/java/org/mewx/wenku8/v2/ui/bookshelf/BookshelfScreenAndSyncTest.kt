@@ -912,6 +912,124 @@ class BookshelfScreenAndSyncTest {
         }
     }
 
+    @Test
+    fun continueReadingCarousel_multipleBooksExpandFromLeftWithFlushCovers() = runBlocking {
+        database.novelDao().upsertNovels(
+            listOf(
+                NovelEntity(
+                    aid = 101,
+                    title = "第一本最近阅读",
+                    author = "作者A",
+                    inBookshelf = true,
+                    shelfSortOrder = 1,
+                ),
+                NovelEntity(
+                    aid = 102,
+                    title = "第二本未完全展开",
+                    author = "作者B",
+                    inBookshelf = true,
+                    shelfSortOrder = 2,
+                ),
+                NovelEntity(
+                    aid = 103,
+                    title = "第三本折叠封面",
+                    author = "作者C",
+                    inBookshelf = true,
+                    shelfSortOrder = 3,
+                ),
+            ),
+        )
+        listOf(
+            Triple(101, 500, 3_000L),
+            Triple(102, 350, 2_000L),
+            Triple(103, 200, 1_000L),
+        ).forEach { (aid, permille, updatedAt) ->
+            database.readingProgressDao().upsertProgress(
+                ReadingProgressEntity(
+                    aid = aid,
+                    vid = aid * 10,
+                    cid = aid * 10 + 1,
+                    volumeTitle = "第一卷",
+                    chapterTitle = "第一话",
+                    progressPermille = permille,
+                    updatedAtMs = updatedAt,
+                ),
+            )
+        }
+
+        val repository = BookshelfRepository(
+            database = database,
+            catalogGateway = FakeBookshelfCatalogGateway(),
+            novelTocSyncRepository = tocSyncRepository,
+            ioDispatcher = kotlinx.coroutines.Dispatchers.Unconfined,
+        )
+
+        composeTestRule.setContent {
+            Wenku8ExpressiveTheme(themeMode = Wenku8ThemeMode.CLASSIC_BLUE) {
+                BookshelfScreen(
+                    bookshelfRepository = repository,
+                    appLanguage = Wenku8API.AppLanguage.SC,
+                    viewMode = BookshelfViewMode.GRID,
+                    onViewModeSelected = {},
+                    sortMode = BookshelfSortMode.RECENT_READ,
+                    onSortModeSelected = {},
+                    onOpenSearch = {},
+                )
+            }
+        }
+        composeTestRule.waitForIdle()
+
+        val card1Bounds = composeTestRule
+            .onNodeWithTag(BookshelfTestTags.CONTINUE_READING_ITEM_PREFIX + 101)
+            .fetchSemanticsNode()
+            .boundsInRoot
+        val cover1Bounds = composeTestRule
+            .onNodeWithTag(
+                BookshelfTestTags.CONTINUE_READING_COVER_PREFIX + 101,
+                useUnmergedTree = true,
+            )
+            .fetchSemanticsNode()
+            .boundsInRoot
+
+        // 1. Focal book #1 cover is flush edge-to-edge (left, top, bottom) with the card (`贴边显示`)!
+        assertTrue(
+            "Expanded card cover must sit flush to card left/top/bottom edges (card=$card1Bounds, cover=$cover1Bounds)",
+            kotlin.math.abs(cover1Bounds.left - card1Bounds.left) <= 1.5f &&
+                kotlin.math.abs(cover1Bounds.top - card1Bounds.top) <= 1.5f &&
+                kotlin.math.abs(cover1Bounds.bottom - card1Bounds.bottom) <= 1.5f,
+        )
+
+        val carouselBounds = composeTestRule
+            .onNodeWithTag(BookshelfTestTags.CONTINUE_READING_CAROUSEL)
+            .fetchSemanticsNode()
+            .boundsInRoot
+
+        // 2. Partially-collapsed book #2 (`102`) sits in the visible slot right after `card1 + 12dp`,
+        // and its clipped cover (`cover2Bounds`) starts right at that slot's left edge and fills the
+        // entire collapsed slot top-to-bottom (proving left-anchored expansion + flush cover, whereas
+        // centered masking previously clipped `cover2Bounds` out completely)!
+        val cover2Bounds = composeTestRule
+            .onNodeWithTag(
+                BookshelfTestTags.CONTINUE_READING_COVER_PREFIX + 102,
+                useUnmergedTree = true,
+            )
+            .fetchSemanticsNode()
+            .boundsInRoot
+
+        val expectedSlotLeft = card1Bounds.right + 12f * composeTestRule.density.density
+        assertTrue(
+            "Collapsed second book slot should be narrower than focal card (${cover2Bounds.width} vs ${card1Bounds.width})",
+            cover2Bounds.width > 40f && cover2Bounds.width < card1Bounds.width - 40f,
+        )
+        assertTrue(
+            "Partially-collapsed book card must expand from the left prioritizing its flush cover (expectedSlotLeft=$expectedSlotLeft, carousel=$carouselBounds, cover2=$cover2Bounds)",
+            kotlin.math.abs(cover2Bounds.left - expectedSlotLeft) <= 2f &&
+                kotlin.math.abs(cover2Bounds.right - carouselBounds.right) <= 2f &&
+                kotlin.math.abs(cover2Bounds.top - card1Bounds.top) <= 1.5f &&
+                kotlin.math.abs(cover2Bounds.bottom - card1Bounds.bottom) <= 1.5f,
+        )
+    }
+
     private class FakeAccountSwitchTransport : WenkuTransport {
         override val isEndpointConfigured: Boolean = true
         var activeServerUsername: String = "alice"

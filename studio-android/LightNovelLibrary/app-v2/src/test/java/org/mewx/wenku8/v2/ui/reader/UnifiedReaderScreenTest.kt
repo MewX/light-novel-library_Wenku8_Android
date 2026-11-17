@@ -22,6 +22,7 @@ import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.unit.dp
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.room.Room
@@ -541,6 +542,105 @@ class UnifiedReaderScreenTest {
         val restoredProgress = runBlocking { database.readingProgressDao().getProgressForNovel(1587) }
         assertNotNull(restoredProgress)
         assertEquals(0, restoredProgress!!.paragraphIndex)
+    }
+
+    @Test
+    fun continuousScrollMode_leftEdgeVerticalDragAdjustsBrightnessWithoutScrollingContent() {
+        seedTwoChapterNovel()
+        var hostActivityRef: Activity? = null
+
+        composeTestRule.setContent {
+            val ctx = LocalContext.current
+            hostActivityRef = generateSequence(ctx) { (it as? ContextWrapper)?.baseContext }
+                .filterIsInstance<Activity>()
+                .firstOrNull()
+            Wenku8ExpressiveTheme(themeMode = Wenku8ThemeMode.CLASSIC_BLUE) {
+                UnifiedReaderScreen(
+                    launchRequest = ReaderLaunchRequest(
+                        aid = 1587,
+                        vid = 501,
+                        cid = 6001,
+                        novelTitle = "无职转生",
+                        volumeTitle = "第一卷",
+                        chapterTitle = "第一章 序章",
+                    ),
+                    database = database,
+                    catalogGateway = fakeGateway,
+                    novelTocSyncRepository = tocSyncRepository,
+                    preferences = Wenku8UserPreferences(
+                        readerPageTurnMode = ReaderPageTurnMode.CONTINUOUS_SCROLL,
+                        readerEdgeBrightnessDragEnabled = true,
+                    ),
+                    onReaderTypographyChanged = { _, _, _, _ -> },
+                    onNavigateBack = {},
+                    lineBreaker = DeterministicCellLineBreaker,
+                    ioDispatcher = Dispatchers.Main.immediate,
+                    computeDispatcher = Dispatchers.Main.immediate,
+                )
+            }
+        }
+
+        composeTestRule.waitUntil(5_000) {
+            composeTestRule
+                .onAllNodesWithTag(ReaderTestTags.CONTINUOUS_SCROLL_LIST)
+                .fetchSemanticsNodes()
+                .isNotEmpty()
+        }
+        composeTestRule.waitForIdle()
+
+        // 1. Drag upward inside the 24..72dp safe left-edge brightness strip (45dp) in CONTINUOUS_SCROLL mode:
+        // must adjust screen brightness and display BRIGHTNESS_PILL WITHOUT scrolling LazyColumn or opening HUD!
+        val stripXPx = with(composeTestRule.density) { 45.dp.toPx() }
+        composeTestRule.onNodeWithTag(ReaderTestTags.VIEWPORT_CONTAINER).performTouchInput {
+            down(Offset(stripXPx, height * 0.75f))
+        }
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag(ReaderTestTags.VIEWPORT_CONTAINER).performTouchInput {
+            moveTo(Offset(stripXPx, height * 0.55f))
+        }
+        composeTestRule.waitForIdle()
+        composeTestRule.mainClock.autoAdvance = false
+        composeTestRule.onNodeWithTag(ReaderTestTags.VIEWPORT_CONTAINER).performTouchInput {
+            moveTo(Offset(stripXPx, height * 0.30f))
+            up()
+        }
+        composeTestRule.mainClock.advanceTimeBy(350L)
+
+        composeTestRule.onNodeWithTag(ReaderTestTags.BRIGHTNESS_PILL).assertIsDisplayed()
+        val updatedBrightness = hostActivityRef?.window?.attributes?.screenBrightness ?: -1f
+        assertTrue(
+            "Expected upward drag in 24..72dp strip during CONTINUOUS_SCROLL to raise brightness above 0.55f, got $updatedBrightness",
+            updatedBrightness > 0.65f,
+        )
+        assertEquals(
+            "Left-edge brightness drag must not scroll CONTINUOUS_SCROLL chapter text",
+            0,
+            runBlocking { database.readingProgressDao().getProgressForNovel(1587)?.paragraphIndex },
+        )
+        assertEquals(
+            "Left-edge brightness drag must not accidentally toggle HUD open on pointer up",
+            0,
+            composeTestRule.onAllNodesWithTag(ReaderTestTags.HUD_SCRUBBER_SLIDER).fetchSemanticsNodes().size,
+        )
+
+        composeTestRule.mainClock.autoAdvance = true
+        composeTestRule.waitForIdle()
+
+        // 2. Dragging vertically in the center (outside 24..72dp) still scrolls CONTINUOUS_SCROLL content normally!
+        composeTestRule.onNodeWithTag(ReaderTestTags.CONTINUOUS_SCROLL_LIST).performTouchInput {
+            val midX = width * 0.55f
+            down(Offset(midX, height * 0.80f))
+            moveTo(Offset(midX, height * 0.50f))
+            moveTo(Offset(midX, height * 0.18f))
+            up()
+        }
+        composeTestRule.waitForIdle()
+
+        val scrolledParagraph = runBlocking { database.readingProgressDao().getProgressForNovel(1587)?.paragraphIndex ?: 0 }
+        assertTrue(
+            "Center vertical drag must continue scrolling CONTINUOUS_SCROLL normally (got paragraphIndex=$scrolledParagraph)",
+            scrolledParagraph > 0,
+        )
     }
 
     @Test
