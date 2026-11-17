@@ -1,38 +1,207 @@
+# 轻小说文库 (Wenku8) Android 客户端
+
 [![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2FMewX%2Flight-novel-library_Wenku8_Android.svg?type=shield)](https://app.fossa.com/projects/git%2Bgithub.com%2FMewX%2Flight-novel-library_Wenku8_Android?ref=badge_shield)
 [![Android CI](https://github.com/MewX/light-novel-library_Wenku8_Android/actions/workflows/android-ci.yml/badge.svg)](https://github.com/MewX/light-novel-library_Wenku8_Android/actions/workflows/android-ci.yml)
 [![Coverage Status](https://coveralls.io/repos/github/MewX/light-novel-library_Wenku8_Android/badge.svg)](https://coveralls.io/github/MewX/light-novel-library_Wenku8_Android)
-:point_left: **HISTORICAL ISSUE AND THAT'S WHAT WE ALL KNOW** :sob:
 
-[<img src="https://raw.githubusercontent.com/MewX/light-novel-library_Wenku8_Android/master/graph-source/google-play-badge.png" width="200px" height="auto" alt="play-store-badge">](https://play.google.com/store/apps/details?id=org.mewx.wenku8)
+项目主页：[https://wenku8.app](https://wenku8.app)
+
+[<img src="graph-source/google-play-badge.png" width="200px" height="auto" alt="Google Play 下载">](https://play.google.com/store/apps/details?id=org.mewx.wenku8)
 
 如果您想打赏我用爱发电的代码，可以点击这个链接帮我充电 ❤️：
 [!["充电按钮"](https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png)](https://www.buymeacoffee.com/mewx)
 
-文档目录
-==========
+---
 
-- [写在前面](#foreword)
-- [Repo目录说明](#dir-info)
-- [App程序结构简明](#app-info)
-  - [1.x 版本](#app-info)
-    - [主要视图](#app-1.x-main-view)
-    - [源代码结构](#app-1.x-source)
+## <a id="toc"></a>目录 (Table of Contents)
+
+- [2.0 版本简介（Vibe Coded 世代重构）](#v2-intro)
+  - [核心特性亮点](#v2-highlights)
+  - [Credits 与 Vibe Coding 致谢声明](#credits)
+  - [2.0 版本主要视图（Pixel 8 实机截图）](#app-2.0-main-view)
+  - [2.0 源代码结构与架构](#app-2.0-source)
+  - [2.0 技术栈与开源依赖](#v2-libs)
+  - [编译构建说明（`:api` 与 `api-stub`）](#build-guide)
+- [仓库目录说明（`v1` / `v2` 归档结构）](#dir-info)
+- [1.x 与 0.5.2.1 历史版本归档](#v1-archive)
+  - [1.x 写在前面（2015 开源手记）](#foreword)
+  - [1.x 版本视图与源代码结构](#app-1.x-info)
+    - [1.x 主要视图](#app-1.x-main-view)
+    - [1.x 源代码结构](#app-1.x-source)
   - [0.5.2.1 典藏版](#app-0520)
-    - [预览图](#app-0520-preview)
-    - [源代码结构](#app-0520-source)
-  - [UMENG统计数据](#umeng)
-- [App存档文件结构](#saves)
-  - [总览](#saves-dir)
-  - [存档流程](#saves-procedure)
-  - [技术细节](#saves-tech)
-- [App二次开发指引](#app-sec-dev)
-  - [如何用其他文库的文档兼容本app](#saves-compat)
-- [用到的开源库](#libs)
-- [开发者的碎碎念](#mewx)
-- [LICENSE](#license)
+    - [0.5.2.1 预览图](#app-0520-preview)
+    - [0.5.2.1 源代码结构](#app-0520-source)
+  - [历史 UMENG 统计数据](#umeng)
+  - [1.x 版本存档文件结构（`.wk8`）](#saves)
+  - [1.x 历史二次开发指引](#app-sec-dev)
+  - [1.x 版本用到的开源库](#v1-libs)
+  - [开发者的碎碎念（2015）](#mewx)
+- [LICENSE 与 Contributors](#license)
 
+---
 
-----
+## <a id="v2-intro"></a>2.0 版本简介（Vibe Coded 世代重构）
+
+**轻小说文库 Android `2.0`（`:app-v2`）** 是在初代 Material Design 1 版本发布十余年后的一次彻底世代重构。新版本完全抛弃了旧版繁杂的 `Activity`/`Fragment`/`AsyncTask` 视图栈，采用 **100% Kotlin + Jetpack Compose（Material 3 Expressive）** 从零重写，同时严格保留了正式版包名 `org.mewx.wenku8`，支持从 Google Play 商店已发布的 `1.x` 版本**直接原位覆盖升级并自动无损迁移全部本地数据**。
+
+> [!IMPORTANT]
+> **Vibe Coding 声明**：本项目的 **`2.0` 版本通过 Vibe Coding 方式打造，从前期旧版功能盘点、Material 3 Expressive 设计规范、Kotlin / Compose 代码实现、阅读引擎、数据迁移与备份系统，到自动化测试套件与文档，均完全由 `Gemini Carbon (High)` 完成！**
+
+### <a id="v2-highlights"></a>核心特性亮点
+
+- **Material 3 Expressive 自适应界面架构**：精简为清晰直观的四栏主导航（`书架` · `最新` · `排行` · `我的`），自动适配手机底部导航栏与平板/折叠屏 `NavigationRail`；支持作品封面共享元素过渡动画、Android 12+ 动态壁纸取色、经典蓝/暖白/碳墨深色/纯黑 OLED 主题以及**全局墨水屏高对比模式**（1dp 实体描边 + 零过渡动画）。
+- **六模式中文排版阅读引擎与插图灯箱**：
+  - 基于原生 `StaticLayout` 深度定制的 CJK 排版分页引擎，内置 **覆盖翻页、仿真卷曲、平滑滑动、上下卷轴、日式竖排（从右至左）、墨水屏极速** 六种阅读模式。
+  - **排版与纸张工作室**：半透明实时预览字号、行距、段距、页边距、繁简转换与自定义字体导入；章节目录面板默认聚焦**当前分卷**，告别数百章长列表翻找困扰。
+  - **Artbook 插图画集灯箱**：一键抽离本卷全部插图，支持双指无级缩放、跨页彩插左右拼合、底部胶片缩略图速览与高清原图保存，并内置全文检索、章节书签与系统 TTS 语音朗读。
+- **本地优先 Room 数据库（WAL）与智能云端同步**：
+  - 采用 Room SQLite（WAL 并发模式）管理书架元数据、分卷目录、阅读进度、阅读时长热力图与离线缓存状态。
+  - 本地书架支持**网格 / 列表 / 书脊**三视图切换、“继续阅读”轮播卡片、进入书架自动云端同步（带防抖 TTL 与任务互斥保护），以及将智能更新与强制刷新收纳合一的折叠式 `云端同步 | ▾` 按钮。
+  - 离线缓存支持 **智能更新、仅下载未缓存章节、分卷选择下载、全本覆盖重下** 四种策略。
+- **`1.x` 无损自动迁移与 `.wk8backup.zip` 便携备份**：首次启动自动检测并迁移 `1.x` 的本地书架、阅读进度、离线小说文本与插图以及登录凭据；同时提供全新的 `.wk8backup.zip` 一键导出与智能合并导入。
+- **默认开启的自动网络中转优化与诊断中心**：内置 Cloudflare 中转连通性自动评估、故障无缝切换与单轴对比实验工具，显著提升不同网络环境下的访问成功率。
+- **链接分享、App Links 与桌面小组件**：作品分享直接生成 `https://share.wenku8.app/book/<aid>` 链接并注册系统级深度链接，点击链接即可在应用内直达对应作品详情页；同时提供主屏幕“继续阅读”桌面小组件。
+
+---
+
+### <a id="credits"></a>Credits 与 Vibe Coding 致谢声明
+
+- **`2.0` 版本全栈架构、UI 设计与代码实现（Vibe Coding）**：
+  - **完全由 `Gemini Carbon (High)` 完成** —— 独立完成了 `v2.0` 的旧版代码考古、产品与视觉设计文档（[`docs/designs/v2/`](docs/designs/v2/README.md)）、`:app-v2` 全部 Kotlin / Jetpack Compose 源代码、Room 数据库与 `1.x` 迁移器、阅读与插图引擎、GitHub Actions CI 适配以及全套单元与 Robolectric UI 测试。
+- **项目原作者、架构指导与基础设施维护**：
+  - [**MewX**](https://www.mewx.org) —— 项目发起人、`0.5.x` 与 `1.x` 版本原作者、中转与分享服务端基础设施搭建，以及 `2.0` Vibe Coding 过程中的产品决策、体验把控与真机验收。
+- **历史版本（`1.x` / `0.5.x`）贡献与特别致谢**：
+  - **Yanix**（[SeraphRoy / Baby Pepper](https://github.com/SeraphRoy)）—— `1.x` 版本代码贡献
+  - **Jack Liu**（[aaassseee](https://github.com/aaassseee)）—— `1.x` 版本代码贡献
+  - **ZERO** —— `1.x` 版本 Material Design 界面设计（设计原稿见 [`docs/designs/v1/`](docs/designs/v1/)）
+  - **妻兔姬** —— 早期版本测试与用户反馈协助
+
+---
+
+### <a id="app-2.0-main-view"></a>2.0 版本主要视图（Pixel 8 实机截图）
+
+> 点击任意缩略图即可查看 `1080 × 2400` 高清原图（源文件位于 [`screenshots/v2/`](screenshots/v2/)）。
+
+- **主导航与全站发现（本地书架 · 最新更新 · 二维排行榜 · 即时+全站搜索）**
+
+[![2.0-bookshelf](screenshots/v2/2.0-bookshelf.thumb.jpg)](screenshots/v2/2.0-bookshelf.jpg)
+[![2.0-latest](screenshots/v2/2.0-latest.thumb.jpg)](screenshots/v2/2.0-latest.jpg)
+[![2.0-rankings](screenshots/v2/2.0-rankings.thumb.jpg)](screenshots/v2/2.0-rankings.jpg)
+[![2.0-search](screenshots/v2/2.0-search.thumb.jpg)](screenshots/v2/2.0-search.jpg)
+
+- **作品详情、分卷目录、四模式离线缓存与书评社区**
+
+[![2.0-novel-detail](screenshots/v2/2.0-novel-detail.thumb.jpg)](screenshots/v2/2.0-novel-detail.jpg)
+[![2.0-novel-toc](screenshots/v2/2.0-novel-toc.thumb.jpg)](screenshots/v2/2.0-novel-toc.jpg)
+[![2.0-novel-download](screenshots/v2/2.0-novel-download.thumb.jpg)](screenshots/v2/2.0-novel-download.jpg)
+[![2.0-reviews](screenshots/v2/2.0-reviews.thumb.jpg)](screenshots/v2/2.0-reviews.jpg)
+
+- **六模式阅读引擎、本卷目录、实时排版工作室与插图画集灯箱**
+
+[![2.0-reader-day](screenshots/v2/2.0-reader-day.thumb.jpg)](screenshots/v2/2.0-reader-day.jpg)
+[![2.0-reader-hud](screenshots/v2/2.0-reader-hud.thumb.jpg)](screenshots/v2/2.0-reader-hud.jpg)
+[![2.0-reader-toc](screenshots/v2/2.0-reader-toc.thumb.jpg)](screenshots/v2/2.0-reader-toc.jpg)
+[![2.0-reader-typography](screenshots/v2/2.0-reader-typography.thumb.jpg)](screenshots/v2/2.0-reader-typography.jpg)
+
+[![2.0-reader-modes](screenshots/v2/2.0-reader-modes.thumb.jpg)](screenshots/v2/2.0-reader-modes.jpg)
+[![2.0-reader-night](screenshots/v2/2.0-reader-night.thumb.jpg)](screenshots/v2/2.0-reader-night.jpg)
+[![2.0-artbook](screenshots/v2/2.0-artbook.thumb.jpg)](screenshots/v2/2.0-artbook.jpg)
+
+- **“我的”中心（文库账号、阅读足迹与网络优化）、经典 Logo 登录面板、全局偏好与网络诊断**
+
+[![2.0-profile](screenshots/v2/2.0-profile.thumb.jpg)](screenshots/v2/2.0-profile.jpg)
+[![2.0-login](screenshots/v2/2.0-login.thumb.jpg)](screenshots/v2/2.0-login.jpg)
+[![2.0-profile-settings](screenshots/v2/2.0-profile-settings.thumb.jpg)](screenshots/v2/2.0-profile-settings.jpg)
+[![2.0-network-diagnostics](screenshots/v2/2.0-network-diagnostics.thumb.jpg)](screenshots/v2/2.0-network-diagnostics.jpg)
+
+---
+
+### <a id="app-2.0-source"></a>2.0 源代码结构与架构
+
+`2.0` 主工程位于 `studio-android/LightNovelLibrary/app-v2/`，采用清晰的 **UI (Compose) -> Domain / Repository -> Local (Room + DataStore) & Remote (OkHttp + Relay + `:api`)** 分层架构：
+
+```text
+studio-android/LightNovelLibrary/app-v2/src/main/java/org/mewx/wenku8
+├── MainActivity.kt                      # 单 Activity 宿主、1.x 升级迁移引导与 App Links 入口
+├── Wenku8Application.kt                 # 应用级依赖容器、Coil 图片管线与通知渠道初始化
+├── data/
+│   ├── local/
+│   │   ├── db/                          # Room SQLite (WAL) 数据库、DAO 与实体定义
+│   │   ├── migration/                   # 1.x 旧版书架、阅读进度、缓存与加密登录态无损迁移器
+│   │   └── preferences/                 # Jetpack DataStore 全局偏好与加密凭据存储
+│   ├── network/                         # OkHttp 客户端、Cloudflare 自动中转优化与网络诊断探针
+│   └── repository/                      # 书架同步、目录缓存、发现排行、书评、公告与 .wk8backup.zip 备份仓库
+├── domain/model/                        # 领域模型（作品、分卷章节、阅读会话、排版配置、网络报告等）
+├── reader/                              # CJK StaticLayout 分页引擎、日式竖排渲染与章节内容解析器
+├── tts/                                 # Android TextToSpeech 章节朗读控制器
+├── ui/
+│   ├── bookshelf/                       # 书架页（网格/列表/书脊、继续阅读轮播、云端同步折叠菜单）
+│   ├── latest/                          # 最新页（最近更新 / 最新入库 / 完结精品）
+│   ├── rankings/                        # 二维排行榜矩阵（点击/推荐/收藏/字数 × 日/周/月/总榜）
+│   ├── search/                          # 即时本地书架匹配 + 全站搜索（标题/作者/AID 直达）
+│   ├── detail/                          # 作品详情、分卷目录、四模式离线缓存面板
+│   ├── review/                          # 书评列表、楼中楼详情、发表书评与回复
+│   ├── reader/                          # 六模式统一阅读器、本卷目录、排版工作室与 Artbook 插图灯箱
+│   ├── profile/                         # “我的”页面、文库公告、经典 Logo 登录面板、热力图历史与网络诊断
+│   ├── migration/                       # 1.x 升级数据迁移进度界面
+│   ├── navigation/                      # Material 3 自适应导航骨架、共享元素过渡与 share.wenku8.app 路由
+│   └── theme/                           # M3 Expressive 色彩系统、字体排版与墨水屏高对比主题
+└── widget/                              # 桌面“继续阅读” AppWidget 小组件
+```
+
+### <a id="v2-libs"></a>2.0 技术栈与开源依赖
+
+- **Kotlin & Coroutines / Flow**（Apache-2.0）：全异步响应式数据流与结构化并发。
+- **AndroidX Jetpack Compose & Material 3 Expressive**（Apache-2.0）：现代声明式 UI、自适应导航套件、`HorizontalFloatingToolbar` 与共享元素过渡。
+- **AndroidX Room & SQLite WAL**（Apache-2.0）：本地优先结构化持久化数据库。
+- **AndroidX DataStore & Security Crypto**（Apache-2.0）：类型安全偏好设置与加密会话存储。
+- **AndroidX WorkManager**（Apache-2.0）：后台多章节离线缓存队列管理。
+- **Square OkHttp**（Apache-2.0）：高性能 HTTP/TLS 网络传输与自动中转探测。
+- **Coil 3 (`coil-compose`)**（Apache-2.0）：协程优先的封面与高清插图三级缓存加载管线。
+- **Kotlinx Serialization**（Apache-2.0）：`.wk8backup.zip` 备份清单与结构化 JSON 序列化。
+- **OpenCC (`android-opencc`)**（Apache-2.0）：离线简繁体中文双向排版转换。
+- **JUnit 4 / Robolectric / MockWebServer / Compose UI Test**（EPL / MIT / Apache-2.0）：覆盖数据库迁移、书架双向同步边界、网络中转与全界面交互的本地 JVM 测试套件。
+
+### <a id="build-guide"></a>编译构建说明（`:api` 与 `api-stub`）
+
+出于接口密钥保护原因，官方签名协议模块 `:api` 为私有 Git 子模块；当外部贡献者在未拉取私有子模块的环境下克隆本仓库时，`settings.gradle` 会**自动无缝回退至开源桩模块 `api-stub/`**，因此无需任何私有密钥即可直接编译和运行测试：
+
+```bash
+cd studio-android/LightNovelLibrary
+
+# 编译 2.0 调试版 APK
+./gradlew :app-v2:assembleAlphaDebug
+
+# 运行 2.0 单元测试与 Robolectric UI 测试
+./gradlew :app-v2:testAlphaDebugUnitTest
+
+# 编译保留归档的 1.x 旧版模块（可选）
+./gradlew :app-v1:assembleAlphaDebug
+```
+
+---
+
+## <a id="dir-info"></a>仓库目录说明（`v1` / `v2` 归档结构）
+
+1. **`studio-android/LightNovelLibrary/`** —— Android Studio 多模块主工程：
+   - **`app-v2/`**：**`2.0` 正式版完整源码**（Kotlin + Jetpack Compose + Material 3 Expressive，包名 `org.mewx.wenku8`）。
+   - **`app-v1/`**：**`1.x` 经典版完整源码归档**（Java + Material Design 1，Java 命名空间已隔离至 `org.mewx.wenku8.v1`，仍可独立编译）。
+   - **`api/` & `api-stub/`**：文库协议加密签名子模块及面向开源构建自动启用的兼容桩模块。
+2. **`docs/designs/`** —— 按世代划分的设计文档与视觉稿：
+   - **`docs/designs/v2/`**：`2.0` 版本架构设计规范、旧版功能考古、数据库与备份协议说明及高分交互原型。
+   - **`docs/designs/v1/`**：`1.x` 版本由设计师提供的 `PxCook` Material Design 1 标注稿（原根目录 `design-source/`）。
+3. **`screenshots/`** —— 按世代划分的应用实机截图：
+   - **`screenshots/v2/`**：`2.0` 版本 Google Pixel 8 实机高清截图与缩略图。
+   - **`screenshots/v1/`**：`1.x` 与 `0.5.2.1` 历史版本截图归档。
+4. **`graph-source/`** —— 品牌图标、轻小说文库高清重绘 Logo、Google Play 徽章及早期 Fireworks 制图源文件。
+5. **`eclipse-android/` & `eclipse-android-old/`** —— 2014 年早期 `0.5.1`（Eclipse ADT）与 `0.5.2.1` 典藏版历史源码归档。
+
+---
+
+# <a id="v1-archive"></a>1.x 与 0.5.2.1 历史版本归档
+
+> [!NOTE]
+> 以下内容完整保留自 `1.x`（2015 Material Design 1 版）与 `0.5.2.1` 典藏版的原始开源文档，图片与设计稿路径已同步更新至 `screenshots/v1/`、`docs/designs/v1/` 与 `app-v1/`，供查阅项目十年演进历程参考。
 
 
 <a id="foreword"></a>写在前面
@@ -56,39 +225,12 @@ Material Design风格的`轻小说文库`App**完全**开源了！想实践Mater
 ----
 
 
-<a id="dir-info"></a>Repo目录说明
-==========
-
-1. design-source/
-
-  设计师提供的app制作效果图，大家可以参考学习~
-
-2. eclipse-android/
-
-  0.5.1.0030版本的源代码（`eclipse`+`ADT`版本），这份源代码阉割了API部分，所以编译后也无法正常获取数据。
-
-3. eclipse-android-old/
-
-  0.5.2.1`典藏版`的源代码（`Android Studio`版本），完整从私有库里拷贝出来的。release版本和正式版发布地址一样。
-
-4. graph-source/
-
-  老版的制图源文件，当时自己弄得，完全就是随性而无章法 =。=
-
-5. **studio-android/**
-
-  1.x正式版的所有源代码存放处，`MD`风格的App完整源码，可编译通过并正常运行！（`Android Studio`版本）
-
-
-----
-
-
-<a id="app-info"></a>App程序结构简明
+<a id="app-info"></a>1.x 与 0.5.2.1 程序结构简明
 ==========
 
 ## <a id="app-1.x-info"></a>1.x 版本
 
-新版的`MD`风格App，设计图纸在`design-source/`，工程文件在`studio-android/`。
+经典的 `Material Design 1` 风格 App，设计图纸已归档至 `docs/designs/v1/`，工程模块位于 `studio-android/LightNovelLibrary/app-v1/`。
 
 三方库的引用全部采用Gradle dependency，在混淆方面会直接忽略，加密强度低，不过开发起来各种方便~
 
@@ -97,22 +239,22 @@ Material Design风格的`轻小说文库`App**完全**开源了！想实践Mater
 
 - App启动界面
 
-[![1.x-cover-sc](https://raw.githubusercontent.com/MewX/light-novel-library_Wenku8_Android/master/screenshots/1.x-cover-sc.thumb.jpg)](https://raw.githubusercontent.com/MewX/light-novel-library_Wenku8_Android/master/screenshots/1.x-cover-sc.jpg)
+[![1.x-cover-sc](screenshots/v1/1.x-cover-sc.thumb.jpg)](screenshots/v1/1.x-cover-sc.jpg)
 
     Model & Controller: activity/WelcomeActivity.java
     View: layout/layout_welcome.xml
 
 - 侧栏菜单栏
 
-[![1.x-custom-menu](https://raw.githubusercontent.com/MewX/light-novel-library_Wenku8_Android/master/screenshots/1.x-custom-menu.thumb.jpg)](https://raw.githubusercontent.com/MewX/light-novel-library_Wenku8_Android/master/screenshots/1.x-custom-menu.jpg)
+[![1.x-custom-menu](screenshots/v1/1.x-custom-menu.thumb.jpg)](screenshots/v1/1.x-custom-menu.jpg)
 
     Model & Controller: fragment/NavigationDrawerFragment.java
     View: layout/layout_main_menu.xml
 
 - 最近更新列表
 
-[![1.x-list-loading](https://raw.githubusercontent.com/MewX/light-novel-library_Wenku8_Android/master/screenshots/1.x-list-loading.thumb.jpg)](https://raw.githubusercontent.com/MewX/light-novel-library_Wenku8_Android/master/screenshots/1.x-list-loading.jpg)
-[![1.x-list](https://raw.githubusercontent.com/MewX/light-novel-library_Wenku8_Android/master/screenshots/1.x-list.thumb.jpg)](https://raw.githubusercontent.com/MewX/light-novel-library_Wenku8_Android/master/screenshots/1.x-list.jpg)
+[![1.x-list-loading](screenshots/v1/1.x-list-loading.thumb.jpg)](screenshots/v1/1.x-list-loading.jpg)
+[![1.x-list](screenshots/v1/1.x-list.thumb.jpg)](screenshots/v1/1.x-list.jpg)
 
     Model & Controller: fragment/FavFragment.java
     Adapter: adapter/NovelItemAdapter.java
@@ -120,9 +262,9 @@ Material Design风格的`轻小说文库`App**完全**开源了！想实践Mater
 
 - 搜索界面
 
-[![1.x-search](https://raw.githubusercontent.com/MewX/light-novel-library_Wenku8_Android/master/screenshots/1.x-search.thumb.jpg)](https://raw.githubusercontent.com/MewX/light-novel-library_Wenku8_Android/master/screenshots/1.x-search.jpg)
-[![1.x-searching](https://raw.githubusercontent.com/MewX/light-novel-library_Wenku8_Android/master/screenshots/1.x-searching.thumb.jpg)](https://raw.githubusercontent.com/MewX/light-novel-library_Wenku8_Android/master/screenshots/1.x-searching.jpg)
-[![1.x-search-result](https://raw.githubusercontent.com/MewX/light-novel-library_Wenku8_Android/master/screenshots/1.x-search-result.thumb.jpg)](https://raw.githubusercontent.com/MewX/light-novel-library_Wenku8_Android/master/screenshots/1.x-search-result.jpg)
+[![1.x-search](screenshots/v1/1.x-search.thumb.jpg)](screenshots/v1/1.x-search.jpg)
+[![1.x-searching](screenshots/v1/1.x-searching.thumb.jpg)](screenshots/v1/1.x-searching.jpg)
+[![1.x-search-result](screenshots/v1/1.x-search-result.thumb.jpg)](screenshots/v1/1.x-search-result.jpg)
 
     搜索界面
       Model & Controller: activity/SearchActivity.java
@@ -135,8 +277,8 @@ Material Design风格的`轻小说文库`App**完全**开源了！想实践Mater
 
 - 排行榜列表
 
-[![1.x-rank-list](https://raw.githubusercontent.com/MewX/light-novel-library_Wenku8_Android/master/screenshots/1.x-rank-list.thumb.jpg)](https://raw.githubusercontent.com/MewX/light-novel-library_Wenku8_Android/master/screenshots/1.x-rank-list.jpg)
-[![1.x-rank-list2](https://raw.githubusercontent.com/MewX/light-novel-library_Wenku8_Android/master/screenshots/1.x-rank-list2.thumb.jpg)](https://raw.githubusercontent.com/MewX/light-novel-library_Wenku8_Android/master/screenshots/1.x-rank-list2.jpg)
+[![1.x-rank-list](screenshots/v1/1.x-rank-list.thumb.jpg)](screenshots/v1/1.x-rank-list.jpg)
+[![1.x-rank-list2](screenshots/v1/1.x-rank-list2.thumb.jpg)](screenshots/v1/1.x-rank-list2.jpg)
 
     Model & Controller: fragment/RKListFragment.java
     Adapter: adapter/NovelItemAdapterUpdate.java
@@ -144,7 +286,7 @@ Material Design风格的`轻小说文库`App**完全**开源了！想实践Mater
 
 - 本地书架（收藏）列表
 
-[![1.x-fav](https://raw.githubusercontent.com/MewX/light-novel-library_Wenku8_Android/master/screenshots/1.x-fav.thumb.jpg)](https://raw.githubusercontent.com/MewX/light-novel-library_Wenku8_Android/master/screenshots/1.x-fav.jpg)
+[![1.x-fav](screenshots/v1/1.x-fav.thumb.jpg)](screenshots/v1/1.x-fav.jpg)
 
     Model & Controller: fragment/FavFragment.java
     Adapter: adapter/NovelItemAdapterUpdate.java
@@ -152,50 +294,50 @@ Material Design风格的`轻小说文库`App**完全**开源了！想实践Mater
 
 - 小说详细信息
 
-[![1.x-info](https://raw.githubusercontent.com/MewX/light-novel-library_Wenku8_Android/master/screenshots/1.x-info.thumb.jpg)](https://raw.githubusercontent.com/MewX/light-novel-library_Wenku8_Android/master/screenshots/1.x-info.jpg)
-[![1.x-info-menu](https://raw.githubusercontent.com/MewX/light-novel-library_Wenku8_Android/master/screenshots/1.x-info-menu.thumb.jpg)](https://raw.githubusercontent.com/MewX/light-novel-library_Wenku8_Android/master/screenshots/1.x-info-menu.jpg)
-[![1.x-info-hotspot](https://raw.githubusercontent.com/MewX/light-novel-library_Wenku8_Android/master/screenshots/1.x-info-hotspot.thumb.jpg)](https://raw.githubusercontent.com/MewX/light-novel-library_Wenku8_Android/master/screenshots/1.x-info-hotspot.jpg)
+[![1.x-info](screenshots/v1/1.x-info.thumb.jpg)](screenshots/v1/1.x-info.jpg)
+[![1.x-info-menu](screenshots/v1/1.x-info-menu.thumb.jpg)](screenshots/v1/1.x-info-menu.jpg)
+[![1.x-info-hotspot](screenshots/v1/1.x-info-hotspot.thumb.jpg)](screenshots/v1/1.x-info-hotspot.jpg)
 
     Model & Controller: activity/NovolInfoActivity.java
     View: layout/layout_novel_info.xml
 
 - 小说章节选择
 
-[![1.x-chapter](https://raw.githubusercontent.com/MewX/light-novel-library_Wenku8_Android/master/screenshots/1.x-chapter.thumb.jpg)](https://raw.githubusercontent.com/MewX/light-novel-library_Wenku8_Android/master/screenshots/1.x-chapter.jpg)
+[![1.x-chapter](screenshots/v1/1.x-chapter.thumb.jpg)](screenshots/v1/1.x-chapter.jpg)
 
     Model & Controller: activity/NovolChapterActivity.java
     View: layout/layout_novel_chapter.xml
 
 - 左右滑动阅读引擎
 
-[![1.x-reader](https://raw.githubusercontent.com/MewX/light-novel-library_Wenku8_Android/master/screenshots/1.x-reader.thumb.jpg)](https://raw.githubusercontent.com/MewX/light-novel-library_Wenku8_Android/master/screenshots/1.x-reader.jpg)
-[![1.x-reader-swipe](https://raw.githubusercontent.com/MewX/light-novel-library_Wenku8_Android/master/screenshots/1.x-reader-swipe.thumb.jpg)](https://raw.githubusercontent.com/MewX/light-novel-library_Wenku8_Android/master/screenshots/1.x-reader-swipe.jpg)
-[![1.x-reader-menu](https://raw.githubusercontent.com/MewX/light-novel-library_Wenku8_Android/master/screenshots/1.x-reader-menu.thumb.jpg)](https://raw.githubusercontent.com/MewX/light-novel-library_Wenku8_Android/master/screenshots/1.x-reader-menu.jpg)
-[![1.x-reader-dark](https://raw.githubusercontent.com/MewX/light-novel-library_Wenku8_Android/master/screenshots/1.x-reader-dark.thumb.jpg)](https://raw.githubusercontent.com/MewX/light-novel-library_Wenku8_Android/master/screenshots/1.x-reader-dark.jpg)
-[![1.x-reader-vertical](https://raw.githubusercontent.com/MewX/light-novel-library_Wenku8_Android/master/screenshots/1.x-reader-vertical.thumb.jpg)](https://raw.githubusercontent.com/MewX/light-novel-library_Wenku8_Android/master/screenshots/1.x-reader-vertical.jpg)
-[![1.x-image-view](https://raw.githubusercontent.com/MewX/light-novel-library_Wenku8_Android/master/screenshots/1.x-image-view.thumb.jpg)](https://raw.githubusercontent.com/MewX/light-novel-library_Wenku8_Android/master/screenshots/1.x-image-view.jpg)
-[![1.x-reader-jump](https://raw.githubusercontent.com/MewX/light-novel-library_Wenku8_Android/master/screenshots/1.x-reader-jump.thumb.jpg)](https://raw.githubusercontent.com/MewX/light-novel-library_Wenku8_Android/master/screenshots/1.x-reader-jump.jpg)
-[![1.x-reader-jump-show](https://raw.githubusercontent.com/MewX/light-novel-library_Wenku8_Android/master/screenshots/1.x-reader-jump-show.thumb.jpg)](https://raw.githubusercontent.com/MewX/light-novel-library_Wenku8_Android/master/screenshots/1.x-reader-jump-show.jpg)
-[![1.x-reader-setting](https://raw.githubusercontent.com/MewX/light-novel-library_Wenku8_Android/master/screenshots/1.x-reader-setting.thumb.jpg)](https://raw.githubusercontent.com/MewX/light-novel-library_Wenku8_Android/master/screenshots/1.x-reader-setting.jpg)
-[![1.x-font-custom](https://raw.githubusercontent.com/MewX/light-novel-library_Wenku8_Android/master/screenshots/1.x-font-custom.thumb.jpg)](https://raw.githubusercontent.com/MewX/light-novel-library_Wenku8_Android/master/screenshots/1.x-font-custom.jpg)
-[![1.x-font-seek](https://raw.githubusercontent.com/MewX/light-novel-library_Wenku8_Android/master/screenshots/1.x-font-seek.thumb.jpg)](https://raw.githubusercontent.com/MewX/light-novel-library_Wenku8_Android/master/screenshots/1.x-font-seek.jpg)
+[![1.x-reader](screenshots/v1/1.x-reader.thumb.jpg)](screenshots/v1/1.x-reader.jpg)
+[![1.x-reader-swipe](screenshots/v1/1.x-reader-swipe.thumb.jpg)](screenshots/v1/1.x-reader-swipe.jpg)
+[![1.x-reader-menu](screenshots/v1/1.x-reader-menu.thumb.jpg)](screenshots/v1/1.x-reader-menu.jpg)
+[![1.x-reader-dark](screenshots/v1/1.x-reader-dark.thumb.jpg)](screenshots/v1/1.x-reader-dark.jpg)
+[![1.x-reader-vertical](screenshots/v1/1.x-reader-vertical.thumb.jpg)](screenshots/v1/1.x-reader-vertical.jpg)
+[![1.x-image-view](screenshots/v1/1.x-image-view.thumb.jpg)](screenshots/v1/1.x-image-view.jpg)
+[![1.x-reader-jump](screenshots/v1/1.x-reader-jump.thumb.jpg)](screenshots/v1/1.x-reader-jump.jpg)
+[![1.x-reader-jump-show](screenshots/v1/1.x-reader-jump-show.thumb.jpg)](screenshots/v1/1.x-reader-jump-show.jpg)
+[![1.x-reader-setting](screenshots/v1/1.x-reader-setting.thumb.jpg)](screenshots/v1/1.x-reader-setting.jpg)
+[![1.x-font-custom](screenshots/v1/1.x-font-custom.thumb.jpg)](screenshots/v1/1.x-font-custom.jpg)
+[![1.x-font-seek](screenshots/v1/1.x-font-seek.thumb.jpg)](screenshots/v1/1.x-font-seek.jpg)
 
     Model & Controller: reader/activity/Wenku8ReaderActivityV1.java
     View: layout/layout_reader_swipe_temp.xml + (layout/layout_reader_swipe_page.xml)s
 
 - 上下滑动阅读引擎
 
-[![1.x-reader-horizental](https://raw.githubusercontent.com/MewX/light-novel-library_Wenku8_Android/master/screenshots/1.x-reader-horizental.thumb.jpg)](https://raw.githubusercontent.com/MewX/light-novel-library_Wenku8_Android/master/screenshots/1.x-reader-horizental.jpg)
+[![1.x-reader-horizental](screenshots/v1/1.x-reader-horizental.thumb.jpg)](screenshots/v1/1.x-reader-horizental.jpg)
 
     Model & Controller: activity/VerticalReaderActivity.java
     View: layout/layout_vertical_reader_temp.xml
 
 - 设置界面
 
-[![1.x-config](https://raw.githubusercontent.com/MewX/light-novel-library_Wenku8_Android/master/screenshots/1.x-config.thumb.jpg)](https://raw.githubusercontent.com/MewX/light-novel-library_Wenku8_Android/master/screenshots/1.x-config.jpg)
-[![1.x-switch-tc](https://raw.githubusercontent.com/MewX/light-novel-library_Wenku8_Android/master/screenshots/1.x-switch-tc.thumb.jpg)](https://raw.githubusercontent.com/MewX/light-novel-library_Wenku8_Android/master/screenshots/1.x-switch-tc.jpg)
-[![1.x-cover-tc](https://raw.githubusercontent.com/MewX/light-novel-library_Wenku8_Android/master/screenshots/1.x-cover-tc.thumb.jpg)](https://raw.githubusercontent.com/MewX/light-novel-library_Wenku8_Android/master/screenshots/1.x-cover-tc.jpg)
-[![1.x-config-tc](https://raw.githubusercontent.com/MewX/light-novel-library_Wenku8_Android/master/screenshots/1.x-config-tc.thumb.jpg)](https://raw.githubusercontent.com/MewX/light-novel-library_Wenku8_Android/master/screenshots/1.x-config-tc.jpg)
+[![1.x-config](screenshots/v1/1.x-config.thumb.jpg)](screenshots/v1/1.x-config.jpg)
+[![1.x-switch-tc](screenshots/v1/1.x-switch-tc.thumb.jpg)](screenshots/v1/1.x-switch-tc.jpg)
+[![1.x-cover-tc](screenshots/v1/1.x-cover-tc.thumb.jpg)](screenshots/v1/1.x-cover-tc.jpg)
+[![1.x-config-tc](screenshots/v1/1.x-config-tc.thumb.jpg)](screenshots/v1/1.x-config-tc.jpg)
 
     Model & Controller: fragment/ConfigFragment.java
     View: layout/fragment_config.xml
@@ -313,11 +455,11 @@ Material Design风格的`轻小说文库`App**完全**开源了！想实践Mater
 
 ### <a id="app-0520-preview"></a>预览图
 
-[![0520-cover](https://raw.githubusercontent.com/MewX/light-novel-library_Wenku8_Android/master/screenshots/0520-cover.thumb.jpg)](https://raw.githubusercontent.com/MewX/light-novel-library_Wenku8_Android/master/screenshots/0520-cover.jpg)
-[![0520-menu](https://raw.githubusercontent.com/MewX/light-novel-library_Wenku8_Android/master/screenshots/0520-menu.thumb.jpg)](https://raw.githubusercontent.com/MewX/light-novel-library_Wenku8_Android/master/screenshots/0520-menu.jpg)
-[![0520-list](https://raw.githubusercontent.com/MewX/light-novel-library_Wenku8_Android/master/screenshots/0520-list.thumb.jpg)](https://raw.githubusercontent.com/MewX/light-novel-library_Wenku8_Android/master/screenshots/0520-list.jpg)
-[![0520-info](https://raw.githubusercontent.com/MewX/light-novel-library_Wenku8_Android/master/screenshots/0520-info.thumb.jpg)](https://raw.githubusercontent.com/MewX/light-novel-library_Wenku8_Android/master/screenshots/0520-info.jpg)
-[![0520-reader](https://raw.githubusercontent.com/MewX/light-novel-library_Wenku8_Android/master/screenshots/0520-reader.thumb.jpg)](https://raw.githubusercontent.com/MewX/light-novel-library_Wenku8_Android/master/screenshots/0520-reader.jpg)
+[![0520-cover](screenshots/v1/0520-cover.thumb.jpg)](screenshots/v1/0520-cover.jpg)
+[![0520-menu](screenshots/v1/0520-menu.thumb.jpg)](screenshots/v1/0520-menu.jpg)
+[![0520-list](screenshots/v1/0520-list.thumb.jpg)](screenshots/v1/0520-list.jpg)
+[![0520-info](screenshots/v1/0520-info.thumb.jpg)](screenshots/v1/0520-info.jpg)
+[![0520-reader](screenshots/v1/0520-reader.thumb.jpg)](screenshots/v1/0520-reader.jpg)
 
 
 ### <a id="app-0520-source"></a>源代码结构
@@ -464,22 +606,22 @@ Material Design风格的`轻小说文库`App**完全**开源了！想实践Mater
 
 ## <a id="umeng"></a>UMENG统计数据（2015/10/01残念）
 
-[![1.x-statistic](https://raw.githubusercontent.com/MewX/light-novel-library_Wenku8_Android/master/screenshots/1.x-statistic-20151001.thumb.jpg)](https://raw.githubusercontent.com/MewX/light-novel-library_Wenku8_Android/master/screenshots/1.x-statistic-20151001.jpg)
-[![0520-statistic](https://raw.githubusercontent.com/MewX/light-novel-library_Wenku8_Android/master/screenshots/0520-statistic-20151001.thumb.jpg)](https://raw.githubusercontent.com/MewX/light-novel-library_Wenku8_Android/master/screenshots/0520-statistic-20151001.jpg)
+[![1.x-statistic](screenshots/v1/1.x-statistic-20151001.thumb.jpg)](screenshots/v1/1.x-statistic-20151001.jpg)
+[![0520-statistic](screenshots/v1/0520-statistic-20151001.thumb.jpg)](screenshots/v1/0520-statistic-20151001.jpg)
 
 新版的app用户量10天增长到了1W用户量，全是托wenku8的福。照现在的增长速度速度估计用户量峰值是3W左右。
 
 还有几个有趣的统计图分享一下：
 
-[![1.x-statistic-entry](https://raw.githubusercontent.com/MewX/light-novel-library_Wenku8_Android/master/screenshots/1.x-statistic-entry.thumb.jpg)](https://raw.githubusercontent.com/MewX/light-novel-library_Wenku8_Android/master/screenshots/1.x-statistic-entry.jpg)
+[![1.x-statistic-entry](screenshots/v1/1.x-statistic-entry.thumb.jpg)](screenshots/v1/1.x-statistic-entry.jpg)
 
-![1.x-statistic-entry](https://raw.githubusercontent.com/MewX/light-novel-library_Wenku8_Android/master/screenshots/1.x-statistic-rank.jpg)
+![1.x-statistic-entry](screenshots/v1/1.x-statistic-rank.jpg)
 
 
 ----
 
 
-<a id="saves"></a>App存档文件结构
+<a id="saves"></a>1.x 版本存档文件结构
 ==========
 
 存档文件示例可以到[`release`](https://github.com/MewX/light-novel-library_Wenku8_Android/releases/tag/save-sample-v1.2)区下载查看~
@@ -666,7 +808,7 @@ Material Design风格的`轻小说文库`App**完全**开源了！想实践Mater
 ----
 
 
-<a id="app-sec-dev"></a>App二次开发指引
+<a id="app-sec-dev"></a>1.x 历史二次开发指引
 ==========
 
 本App目前决定暂停维护了……
@@ -801,7 +943,7 @@ Material Design风格的`轻小说文库`App**完全**开源了！想实践Mater
 ----
 
 
-<a id="libs"></a>用到的开源库
+<a id="v1-libs"></a>1.x 版本用到的开源库
 ==========
 
     - jgilfelt / SystemBarTint (Apache License 2.0)
