@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
@@ -76,7 +77,9 @@ import androidx.compose.material3.carousel.HorizontalMultiBrowseCarousel
 import androidx.compose.material3.carousel.rememberCarouselState
 import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -200,19 +203,50 @@ fun BookshelfScreen(
     onContinueReadingClicked: (BookshelfItemModel) -> Unit = { item ->
         onNovelClicked(item.toDiscoveryCardItem())
     },
+    localQueryOverride: String? = null,
+    onLocalQueryChanged: ((String) -> Unit)? = null,
+    activeFilterKeyOverride: String? = null,
+    onActiveFilterKeyChanged: ((String) -> Unit)? = null,
+    reselectScrollToTopTrigger: Int = 0,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
     val isEinkMode = LocalEinkMode.current
     val coroutineScope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
+    val listState = rememberLazyListState()
 
     val snapshot by bookshelfRepository
         .observeBookshelfSnapshot()
-        .collectAsStateWithLifecycle(initialValue = BookshelfSnapshot())
+        .collectAsStateWithLifecycle(initialValue = bookshelfRepository.latestSnapshot.value)
 
-    var localQuery by rememberSaveable { mutableStateOf("") }
-    var activeFilterKey by rememberSaveable { mutableStateOf("all") }
+    var internalLocalQuery by rememberSaveable { mutableStateOf("") }
+    var internalActiveFilterKey by rememberSaveable { mutableStateOf("all") }
+    val localQuery = localQueryOverride ?: internalLocalQuery
+    val activeFilterKey = activeFilterKeyOverride ?: internalActiveFilterKey
+
+    fun updateLocalQuery(nextQuery: String) {
+        internalLocalQuery = nextQuery
+        onLocalQueryChanged?.invoke(nextQuery)
+    }
+
+    fun updateActiveFilterKey(nextKey: String) {
+        internalActiveFilterKey = nextKey
+        onActiveFilterKeyChanged?.invoke(nextKey)
+    }
+
+    var handledReselectTrigger by remember { mutableIntStateOf(reselectScrollToTopTrigger) }
+    LaunchedEffect(reselectScrollToTopTrigger) {
+        if (reselectScrollToTopTrigger != handledReselectTrigger) {
+            handledReselectTrigger = reselectScrollToTopTrigger
+            if (isEinkMode || listState.firstVisibleItemIndex > 12) {
+                listState.scrollToItem(0)
+            } else {
+                listState.animateScrollToItem(0)
+            }
+        }
+    }
+
     var selectedAidList by rememberSaveable { mutableStateOf<List<Int>>(emptyList()) }
     var isBatchSmartUpdating by rememberSaveable { mutableStateOf(false) }
     var showRemoveConfirmDialog by rememberSaveable { mutableStateOf(false) }
@@ -223,8 +257,12 @@ fun BookshelfScreen(
     val selectedAidSet = remember(selectedAidList) { selectedAidList.toSet() }
     val isMultiSelectActive = selectedAidSet.isNotEmpty()
 
-    BackHandler(enabled = isMultiSelectActive) {
-        selectedAidList = emptyList()
+    BackHandler(enabled = isMultiSelectActive || localQuery.isNotEmpty()) {
+        if (isMultiSelectActive) {
+            selectedAidList = emptyList()
+        } else {
+            updateLocalQuery("")
+        }
     }
 
     val displayedItems = remember(snapshot.allShelfItems, localQuery, activeFilter, sortMode) {
@@ -355,6 +393,7 @@ fun BookshelfScreen(
         }
 
         LazyColumn(
+            state = listState,
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(
                 start = 16.dp,
@@ -373,7 +412,7 @@ fun BookshelfScreen(
             item(key = "local_and_online_search_bar") {
                 BookshelfSearchBarRow(
                     localQuery = localQuery,
-                    onLocalQueryChange = { localQuery = it },
+                    onLocalQueryChange = ::updateLocalQuery,
                     onOpenOnlineSearch = onOpenSearch,
                 )
             }
@@ -430,7 +469,7 @@ fun BookshelfScreen(
                         imprints = snapshot.availableImprints,
                         tags = snapshot.availableTags,
                         onSelectFilter = { filter ->
-                            activeFilterKey = encodeFilterKey(filter)
+                            updateActiveFilterKey(encodeFilterKey(filter))
                         },
                     )
                 }
@@ -447,8 +486,8 @@ fun BookshelfScreen(
                 item(key = "empty_filter_state") {
                     EmptyFilteredBookshelfCard(
                         onClearFilters = {
-                            localQuery = ""
-                            activeFilterKey = encodeFilterKey(BookshelfFilter.All)
+                            updateLocalQuery("")
+                            updateActiveFilterKey(encodeFilterKey(BookshelfFilter.All))
                         },
                     )
                 }

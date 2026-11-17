@@ -258,12 +258,28 @@ class DiscoveryRepository(
         }
     }
 
+    @Volatile
+    private var cachedLocalShelfQuery: String = ""
+
+    @Volatile
+    private var cachedLocalShelfMatches: List<DiscoveryNovelCardItem> = emptyList()
+
+    fun latestLocalShelfMatchesFor(rawQuery: String): List<DiscoveryNovelCardItem> {
+        val trimmed = rawQuery.trim()
+        if (trimmed.isEmpty()) return emptyList()
+        return if (trimmed == cachedLocalShelfQuery) cachedLocalShelfMatches else emptyList()
+    }
+
     /**
      * Instant `< 1ms` local Room bookshelf search (`0ms` network, immune to server cooldown).
      */
     suspend fun filterLocalLibraryInstant(rawQuery: String): List<DiscoveryNovelCardItem> {
         val trimmed = rawQuery.trim()
-        if (trimmed.isEmpty()) return emptyList()
+        if (trimmed.isEmpty()) {
+            cachedLocalShelfQuery = ""
+            cachedLocalShelfMatches = emptyList()
+            return emptyList()
+        }
         val directAidCandidate = parseDirectAidOrNull(trimmed)?.toString() ?: trimmed
         val matches = database.novelDao().observeLocalBookshelfMatches(trimmed).first()
         val aidMatches = if (directAidCandidate != trimmed) {
@@ -271,9 +287,12 @@ class DiscoveryRepository(
         } else {
             emptyList()
         }
-        return (matches + aidMatches)
+        val resolved = (matches + aidMatches)
             .distinctBy { it.aid }
             .map { entity -> entity.toCardItem() }
+        cachedLocalShelfQuery = trimmed
+        cachedLocalShelfMatches = resolved
+        return resolved
     }
 
     fun observeSearchHistory(): Flow<List<String>> {
@@ -441,6 +460,14 @@ class DiscoveryRepository(
                 isSearchingOnline = false,
             )
         }
+    }
+
+    fun resetOnlineSearchSession() {
+        activeSearchJob?.cancel()
+        activeSearchJob = null
+        cachedLocalShelfQuery = ""
+        cachedLocalShelfMatches = emptyList()
+        _onlineSearchState.value = OnlineSearchExecutionState()
     }
 
     private suspend fun executeDirectAidLookup(

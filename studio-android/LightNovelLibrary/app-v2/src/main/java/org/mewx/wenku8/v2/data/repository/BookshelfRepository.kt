@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.Semaphore
@@ -241,6 +242,11 @@ class BookshelfRepository(
     private val _syncingNovelAids = MutableStateFlow<Set<Int>>(emptySet())
     val syncingNovelAids: StateFlow<Set<Int>> = _syncingNovelAids.asStateFlow()
 
+    // Retains the most recent emitted shelf snapshot so returning from NovelDetailScreen (or
+    // switching tabs) has synchronous frame-0 data without an empty-shelf flash or scroll clamp.
+    private val _latestSnapshot = MutableStateFlow(BookshelfSnapshot())
+    val latestSnapshot: StateFlow<BookshelfSnapshot> = _latestSnapshot.asStateFlow()
+
     val isApiConfigured: Boolean
         get() = catalogGateway.isApiConfigured
 
@@ -315,6 +321,8 @@ class BookshelfRepository(
                 isCloudSyncRunning = cloudSyncRunning,
                 syncingNovelAids = activeSyncAids,
             )
+        }.onEach { snapshot ->
+            _latestSnapshot.value = snapshot
         }
     }
 

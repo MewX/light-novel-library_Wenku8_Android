@@ -52,9 +52,11 @@ import androidx.compose.material3.rememberWideNavigationRailState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -138,6 +140,7 @@ private sealed interface ScaffoldSceneState {
     }
 
     data class SearchStudio(
+        val sessionId: Int,
         val initialQuery: String,
         val initialMode: UnifiedSearchMode,
         val searchBarOrigin: String,
@@ -182,6 +185,22 @@ private sealed interface ScaffoldSceneState {
     data object NetworkDiagnostics : ScaffoldSceneState {
         override val depth: Int = 6
     }
+}
+
+private fun ScaffoldSceneState.saveableKey(): String = when (this) {
+    ScaffoldSceneState.HomeShell -> "scene_home"
+    is ScaffoldSceneState.SearchStudio -> {
+        "scene_search_${sessionId}_${initialMode.name}_${searchBarOrigin}_$initialQuery"
+    }
+    is ScaffoldSceneState.ReadingFootprint -> "scene_footprint_${initialTab.name}"
+    is ScaffoldSceneState.CompactNovelDetail -> "scene_detail_${aid}_$sharedOrigin"
+    is ScaffoldSceneState.ReviewList -> "scene_review_list_${aid}_$novelTitle"
+    is ScaffoldSceneState.ReviewThread -> "scene_review_thread_${aid}_${thread.rid}"
+    is ScaffoldSceneState.Reader -> {
+        "scene_reader_${request.aid}_${request.vid}_${request.cid}_${request.startWithTts}_" +
+            "${request.initialParagraphIndex}_${request.initialCharOffset}"
+    }
+    ScaffoldSceneState.NetworkDiagnostics -> "scene_diagnostics"
 }
 
 /**
@@ -285,14 +304,26 @@ fun AdaptiveMainScaffold(
     var showOfflineFallbackBanner by rememberSaveable {
         mutableStateOf(initialResolution.triggeredOfflineFallbackToBookshelf)
     }
+    val sceneSaveableStateHolder = rememberSaveableStateHolder()
+    val homeTabSaveableStateHolder = rememberSaveableStateHolder()
+
     var localBookshelfViewMode by rememberSaveable(effectivePreferences.bookshelfViewMode) {
         mutableStateOf(effectivePreferences.bookshelfViewMode)
     }
     var localBookshelfSortMode by rememberSaveable(effectivePreferences.bookshelfSortMode) {
         mutableStateOf(effectivePreferences.bookshelfSortMode)
     }
+    var bookshelfLocalQuery by rememberSaveable {
+        mutableStateOf("")
+    }
+    var bookshelfActiveFilterKey by rememberSaveable {
+        mutableStateOf("all")
+    }
     var isSearchStudioOpen by rememberSaveable {
         mutableStateOf(false)
+    }
+    var searchSessionId by rememberSaveable {
+        mutableIntStateOf(0)
     }
     var searchInitialQuery by rememberSaveable {
         mutableStateOf("")
@@ -334,7 +365,7 @@ fun AdaptiveMainScaffold(
         mutableStateOf<ReadingFootprintTab?>(null)
     }
     var homeTabReselectCounter by androidx.compose.runtime.remember {
-        androidx.compose.runtime.mutableIntStateOf(0)
+        mutableIntStateOf(0)
     }
 
     val handleOpenReader: (ReaderLaunchRequest) -> Unit = { request ->
@@ -357,6 +388,18 @@ fun AdaptiveMainScaffold(
     val handleOpenSearchWithOrigin: (String) -> Unit = { barOrigin ->
         onOpenSearch()
         if (discoveryRepository != null) {
+            if (isSearchStudioOpen) {
+                sceneSaveableStateHolder.removeState(
+                    ScaffoldSceneState.SearchStudio(
+                        sessionId = searchSessionId,
+                        initialQuery = searchInitialQuery,
+                        initialMode = searchInitialMode,
+                        searchBarOrigin = activeSearchBarOrigin,
+                    ).saveableKey(),
+                )
+            }
+            discoveryRepository.resetOnlineSearchSession()
+            searchSessionId++
             activeSearchBarOrigin = barOrigin
             searchInitialQuery = ""
             searchInitialMode = UnifiedSearchMode.NOVEL_TITLE
@@ -376,6 +419,26 @@ fun AdaptiveMainScaffold(
     val handleOpenSearchWithSeed: (String, UnifiedSearchMode) -> Unit = { query, mode ->
         onOpenSearch()
         if (discoveryRepository != null) {
+            if (activeDetailNovelAid > 0) {
+                sceneSaveableStateHolder.removeState(
+                    ScaffoldSceneState.CompactNovelDetail(
+                        aid = activeDetailNovelAid,
+                        sharedOrigin = activeDetailSharedOrigin,
+                    ).saveableKey(),
+                )
+            }
+            if (isSearchStudioOpen) {
+                sceneSaveableStateHolder.removeState(
+                    ScaffoldSceneState.SearchStudio(
+                        sessionId = searchSessionId,
+                        initialQuery = searchInitialQuery,
+                        initialMode = searchInitialMode,
+                        searchBarOrigin = activeSearchBarOrigin,
+                    ).saveableKey(),
+                )
+            }
+            discoveryRepository.resetOnlineSearchSession()
+            searchSessionId++
             activeDetailNovelAid = 0
             activeDetailSeedItem = null
             activeSearchBarOrigin = if (selectedDestination == TopLevelDestination.BOOKSHELF) {
@@ -498,6 +561,7 @@ fun AdaptiveMainScaffold(
             }
             isSearchStudioOpen && discoveryRepository != null -> {
                 ScaffoldSceneState.SearchStudio(
+                    sessionId = searchSessionId,
                     initialQuery = searchInitialQuery,
                     initialMode = searchInitialMode,
                     searchBarOrigin = activeSearchBarOrigin,
@@ -525,10 +589,11 @@ fun AdaptiveMainScaffold(
                 label = "Wenku8HierarchicalSceneTransition",
                 modifier = Modifier.fillMaxSize(),
             ) { scene ->
-                ProvideWenku8SharedTransition(
-                    sharedTransitionScope = this@SharedTransitionLayout,
-                    animatedVisibilityScope = this@AnimatedContent,
-                ) {
+                sceneSaveableStateHolder.SaveableStateProvider(key = scene.saveableKey()) {
+                    ProvideWenku8SharedTransition(
+                        sharedTransitionScope = this@SharedTransitionLayout,
+                        animatedVisibilityScope = this@AnimatedContent,
+                    ) {
                     when (scene) {
                         ScaffoldSceneState.HomeShell -> {
                             if (isCompactWidth) {
@@ -583,53 +648,61 @@ fun AdaptiveMainScaffold(
                                         label = "Wenku8CompactTabTransition",
                                         modifier = Modifier.fillMaxSize(),
                                     ) { destination ->
-                                        MainDestinationBody(
-                                            selectedDestination = destination,
-                                            reselectScrollToTopTrigger = homeTabReselectCounter,
-                                            showOfflineFallbackBanner = showOfflineFallbackBanner,
-                                            onDismissOfflineBanner = { showOfflineFallbackBanner = false },
-                                            preferences = effectivePreferences,
-                                            onThemeModeSelected = onThemeModeSelected,
-                                            onDefaultHomeSelected = onDefaultHomeSelected,
-                                            onAutoOptimizeConnectionChanged = onAutoOptimizeConnectionChanged,
-                                            onAppLanguageSelected = onAppLanguageSelected,
-                                            onEinkModeChanged = onEinkModeChanged,
-                                            onUseDynamicColorChanged = onUseDynamicColorChanged,
-                                            onMenuBackgroundChanged = onMenuBackgroundChanged,
-                                            onReaderTypographyChanged = onReaderTypographyChanged,
-                                            onReaderCustomFontPathChanged = onReaderCustomFontPathChanged,
-                                            onReaderCustomBackgroundPathChanged = onReaderCustomBackgroundPathChanged,
-                                            onVolumeKeyPagingChanged = onVolumeKeyPagingChanged,
-                                            database = database,
-                                            relayRouteController = relayRouteController,
-                                            discoveryRepository = discoveryRepository,
-                                            userSessionRepository = userSessionRepository,
-                                            serverNoticeAndUpdateRepository = serverNoticeAndUpdateRepository,
-                                            storageAndCacheRepository = storageAndCacheRepository,
-                                            backupArchiveRepository = backupArchiveRepository,
-                                            bookshelfRepository = bookshelfRepository,
-                                            bookshelfViewMode = localBookshelfViewMode,
-                                            onBookshelfViewModeSelected = { mode ->
-                                                localBookshelfViewMode = mode
-                                                onBookshelfViewModeSelected(mode)
-                                            },
-                                            bookshelfSortMode = localBookshelfSortMode,
-                                            onBookshelfSortModeSelected = { sort ->
-                                                localBookshelfSortMode = sort
-                                                onBookshelfSortModeSelected(sort)
-                                            },
-                                            legacyV1StorageMigrator = legacyV1StorageMigrator,
-                                            appLanguage = appLanguage,
-                                            onOpenSearch = handleOpenSearch,
-                                            onOpenSearchWithOrigin = handleOpenSearchWithOrigin,
-                                            onOpenLoginSheet = { isLoginBottomSheetOpen = true },
-                                            onOpenReadingFootprint = { tab -> activeFootprintTab = tab },
-                                            onNovelClicked = handleNovelClicked,
-                                            onNovelClickedWithOrigin = handleNovelClickedWithOrigin,
-                                            onContinueReadingClicked = handleContinueReadingClicked,
-                                            onOpenNetworkDiagnostics = handleOpenNetworkDiagnostics,
-                                            contentPadding = innerPadding,
-                                        )
+                                        homeTabSaveableStateHolder.SaveableStateProvider(
+                                            key = "home_tab_${destination.routeKey}",
+                                        ) {
+                                            MainDestinationBody(
+                                                selectedDestination = destination,
+                                                reselectScrollToTopTrigger = homeTabReselectCounter,
+                                                showOfflineFallbackBanner = showOfflineFallbackBanner,
+                                                onDismissOfflineBanner = { showOfflineFallbackBanner = false },
+                                                preferences = effectivePreferences,
+                                                onThemeModeSelected = onThemeModeSelected,
+                                                onDefaultHomeSelected = onDefaultHomeSelected,
+                                                onAutoOptimizeConnectionChanged = onAutoOptimizeConnectionChanged,
+                                                onAppLanguageSelected = onAppLanguageSelected,
+                                                onEinkModeChanged = onEinkModeChanged,
+                                                onUseDynamicColorChanged = onUseDynamicColorChanged,
+                                                onMenuBackgroundChanged = onMenuBackgroundChanged,
+                                                onReaderTypographyChanged = onReaderTypographyChanged,
+                                                onReaderCustomFontPathChanged = onReaderCustomFontPathChanged,
+                                                onReaderCustomBackgroundPathChanged = onReaderCustomBackgroundPathChanged,
+                                                onVolumeKeyPagingChanged = onVolumeKeyPagingChanged,
+                                                database = database,
+                                                relayRouteController = relayRouteController,
+                                                discoveryRepository = discoveryRepository,
+                                                userSessionRepository = userSessionRepository,
+                                                serverNoticeAndUpdateRepository = serverNoticeAndUpdateRepository,
+                                                storageAndCacheRepository = storageAndCacheRepository,
+                                                backupArchiveRepository = backupArchiveRepository,
+                                                bookshelfRepository = bookshelfRepository,
+                                                bookshelfViewMode = localBookshelfViewMode,
+                                                onBookshelfViewModeSelected = { mode ->
+                                                    localBookshelfViewMode = mode
+                                                    onBookshelfViewModeSelected(mode)
+                                                },
+                                                bookshelfSortMode = localBookshelfSortMode,
+                                                onBookshelfSortModeSelected = { sort ->
+                                                    localBookshelfSortMode = sort
+                                                    onBookshelfSortModeSelected(sort)
+                                                },
+                                                bookshelfLocalQuery = bookshelfLocalQuery,
+                                                onBookshelfLocalQueryChanged = { bookshelfLocalQuery = it },
+                                                bookshelfActiveFilterKey = bookshelfActiveFilterKey,
+                                                onBookshelfActiveFilterKeyChanged = { bookshelfActiveFilterKey = it },
+                                                legacyV1StorageMigrator = legacyV1StorageMigrator,
+                                                appLanguage = appLanguage,
+                                                onOpenSearch = handleOpenSearch,
+                                                onOpenSearchWithOrigin = handleOpenSearchWithOrigin,
+                                                onOpenLoginSheet = { isLoginBottomSheetOpen = true },
+                                                onOpenReadingFootprint = { tab -> activeFootprintTab = tab },
+                                                onNovelClicked = handleNovelClicked,
+                                                onNovelClickedWithOrigin = handleNovelClickedWithOrigin,
+                                                onContinueReadingClicked = handleContinueReadingClicked,
+                                                onOpenNetworkDiagnostics = handleOpenNetworkDiagnostics,
+                                                contentPadding = innerPadding,
+                                            )
+                                        }
                                     }
                                 }
                             } else {
@@ -697,53 +770,61 @@ fun AdaptiveMainScaffold(
                                             label = "Wenku8ExpandedTabTransition",
                                             modifier = Modifier.fillMaxSize(),
                                         ) { destination ->
-                                            MainDestinationBody(
-                                                selectedDestination = destination,
-                                                reselectScrollToTopTrigger = homeTabReselectCounter,
-                                                showOfflineFallbackBanner = showOfflineFallbackBanner,
-                                                onDismissOfflineBanner = { showOfflineFallbackBanner = false },
-                                                preferences = effectivePreferences,
-                                                onThemeModeSelected = onThemeModeSelected,
-                                                onDefaultHomeSelected = onDefaultHomeSelected,
-                                                onAutoOptimizeConnectionChanged = onAutoOptimizeConnectionChanged,
-                                                onAppLanguageSelected = onAppLanguageSelected,
-                                                onEinkModeChanged = onEinkModeChanged,
-                                                onUseDynamicColorChanged = onUseDynamicColorChanged,
-                                                onMenuBackgroundChanged = onMenuBackgroundChanged,
-                                                onReaderTypographyChanged = onReaderTypographyChanged,
-                                                onReaderCustomFontPathChanged = onReaderCustomFontPathChanged,
-                                                onReaderCustomBackgroundPathChanged = onReaderCustomBackgroundPathChanged,
-                                                onVolumeKeyPagingChanged = onVolumeKeyPagingChanged,
-                                                database = database,
-                                                relayRouteController = relayRouteController,
-                                                discoveryRepository = discoveryRepository,
-                                                userSessionRepository = userSessionRepository,
-                                                serverNoticeAndUpdateRepository = serverNoticeAndUpdateRepository,
-                                                storageAndCacheRepository = storageAndCacheRepository,
-                                                backupArchiveRepository = backupArchiveRepository,
-                                                bookshelfRepository = bookshelfRepository,
-                                                bookshelfViewMode = localBookshelfViewMode,
-                                                onBookshelfViewModeSelected = { mode ->
-                                                    localBookshelfViewMode = mode
-                                                    onBookshelfViewModeSelected(mode)
-                                                },
-                                                bookshelfSortMode = localBookshelfSortMode,
-                                                onBookshelfSortModeSelected = { sort ->
-                                                    localBookshelfSortMode = sort
-                                                    onBookshelfSortModeSelected(sort)
-                                                },
-                                                legacyV1StorageMigrator = legacyV1StorageMigrator,
-                                                appLanguage = appLanguage,
-                                                onOpenSearch = handleOpenSearch,
-                                                onOpenSearchWithOrigin = handleOpenSearchWithOrigin,
-                                                onOpenLoginSheet = { isLoginBottomSheetOpen = true },
-                                                onOpenReadingFootprint = { tab -> activeFootprintTab = tab },
-                                                onNovelClicked = handleNovelClicked,
-                                                onNovelClickedWithOrigin = handleNovelClickedWithOrigin,
-                                                onContinueReadingClicked = handleContinueReadingClicked,
-                                                onOpenNetworkDiagnostics = handleOpenNetworkDiagnostics,
-                                                contentPadding = innerPadding,
-                                            )
+                                            homeTabSaveableStateHolder.SaveableStateProvider(
+                                                key = "home_tab_${destination.routeKey}",
+                                            ) {
+                                                MainDestinationBody(
+                                                    selectedDestination = destination,
+                                                    reselectScrollToTopTrigger = homeTabReselectCounter,
+                                                    showOfflineFallbackBanner = showOfflineFallbackBanner,
+                                                    onDismissOfflineBanner = { showOfflineFallbackBanner = false },
+                                                    preferences = effectivePreferences,
+                                                    onThemeModeSelected = onThemeModeSelected,
+                                                    onDefaultHomeSelected = onDefaultHomeSelected,
+                                                    onAutoOptimizeConnectionChanged = onAutoOptimizeConnectionChanged,
+                                                    onAppLanguageSelected = onAppLanguageSelected,
+                                                    onEinkModeChanged = onEinkModeChanged,
+                                                    onUseDynamicColorChanged = onUseDynamicColorChanged,
+                                                    onMenuBackgroundChanged = onMenuBackgroundChanged,
+                                                    onReaderTypographyChanged = onReaderTypographyChanged,
+                                                    onReaderCustomFontPathChanged = onReaderCustomFontPathChanged,
+                                                    onReaderCustomBackgroundPathChanged = onReaderCustomBackgroundPathChanged,
+                                                    onVolumeKeyPagingChanged = onVolumeKeyPagingChanged,
+                                                    database = database,
+                                                    relayRouteController = relayRouteController,
+                                                    discoveryRepository = discoveryRepository,
+                                                    userSessionRepository = userSessionRepository,
+                                                    serverNoticeAndUpdateRepository = serverNoticeAndUpdateRepository,
+                                                    storageAndCacheRepository = storageAndCacheRepository,
+                                                    backupArchiveRepository = backupArchiveRepository,
+                                                    bookshelfRepository = bookshelfRepository,
+                                                    bookshelfViewMode = localBookshelfViewMode,
+                                                    onBookshelfViewModeSelected = { mode ->
+                                                        localBookshelfViewMode = mode
+                                                        onBookshelfViewModeSelected(mode)
+                                                    },
+                                                    bookshelfSortMode = localBookshelfSortMode,
+                                                    onBookshelfSortModeSelected = { sort ->
+                                                        localBookshelfSortMode = sort
+                                                        onBookshelfSortModeSelected(sort)
+                                                    },
+                                                    bookshelfLocalQuery = bookshelfLocalQuery,
+                                                    onBookshelfLocalQueryChanged = { bookshelfLocalQuery = it },
+                                                    bookshelfActiveFilterKey = bookshelfActiveFilterKey,
+                                                    onBookshelfActiveFilterKeyChanged = { bookshelfActiveFilterKey = it },
+                                                    legacyV1StorageMigrator = legacyV1StorageMigrator,
+                                                    appLanguage = appLanguage,
+                                                    onOpenSearch = handleOpenSearch,
+                                                    onOpenSearchWithOrigin = handleOpenSearchWithOrigin,
+                                                    onOpenLoginSheet = { isLoginBottomSheetOpen = true },
+                                                    onOpenReadingFootprint = { tab -> activeFootprintTab = tab },
+                                                    onNovelClicked = handleNovelClicked,
+                                                    onNovelClickedWithOrigin = handleNovelClickedWithOrigin,
+                                                    onContinueReadingClicked = handleContinueReadingClicked,
+                                                    onOpenNetworkDiagnostics = handleOpenNetworkDiagnostics,
+                                                    contentPadding = innerPadding,
+                                                )
+                                            }
                                         }
                                     }
 
@@ -820,6 +901,8 @@ fun AdaptiveMainScaffold(
                                     initialMode = scene.initialMode,
                                     searchBarSharedOrigin = scene.searchBarOrigin,
                                     onNavigateBack = {
+                                        sceneSaveableStateHolder.removeState(scene.saveableKey())
+                                        discoveryRepository.resetOnlineSearchSession()
                                         isSearchStudioOpen = false
                                         searchInitialQuery = ""
                                     },
@@ -835,10 +918,14 @@ fun AdaptiveMainScaffold(
                                 ReadingFootprintScreen(
                                     database = database,
                                     initialTab = scene.initialTab,
-                                    onNavigateBack = { activeFootprintTab = null },
+                                    onNavigateBack = {
+                                        sceneSaveableStateHolder.removeState(scene.saveableKey())
+                                        activeFootprintTab = null
+                                    },
                                     onOpenReader = handleOpenReader,
                                     onOpenNovelDetail = { item ->
                                         if (isExpandedRailWidth) {
+                                            sceneSaveableStateHolder.removeState(scene.saveableKey())
                                             activeFootprintTab = null
                                         }
                                         handleNovelClickedWithOrigin(
@@ -866,6 +953,7 @@ fun AdaptiveMainScaffold(
                                     seedDiscoveryItem = activeDetailSeedItem?.takeIf { it.aid == scene.aid },
                                     sharedTransitionOrigin = scene.sharedOrigin,
                                     onNavigateBack = {
+                                        sceneSaveableStateHolder.removeState(scene.saveableKey())
                                         activeDetailNovelAid = 0
                                         activeDetailSeedItem = null
                                     },
@@ -894,6 +982,7 @@ fun AdaptiveMainScaffold(
                                     appLanguage = appLanguage,
                                     userSessionRepository = userSessionRepository,
                                     onNavigateBack = {
+                                        sceneSaveableStateHolder.removeState(scene.saveableKey())
                                         activeReviewsAid = 0
                                         activeReviewsNovelTitle = ""
                                         activeReviewThread = null
@@ -914,7 +1003,10 @@ fun AdaptiveMainScaffold(
                                     reviewsRepository = reviewsRepository,
                                     appLanguage = appLanguage,
                                     userSessionRepository = userSessionRepository,
-                                    onNavigateBack = { activeReviewThread = null },
+                                    onNavigateBack = {
+                                        sceneSaveableStateHolder.removeState(scene.saveableKey())
+                                        activeReviewThread = null
+                                    },
                                     onOpenLoginSheet = { isLoginBottomSheetOpen = true },
                                     onOpenNetworkDiagnostics = handleOpenNetworkDiagnostics,
                                 )
@@ -942,7 +1034,10 @@ fun AdaptiveMainScaffold(
                                     onReaderEdgeBrightnessDragChanged = onReaderEdgeBrightnessDragChanged,
                                     onVolumeKeyPagingChanged = onVolumeKeyPagingChanged,
                                     onOpenNetworkDiagnostics = handleOpenNetworkDiagnostics,
-                                    onNavigateBack = { activeReaderRequest = null },
+                                    onNavigateBack = {
+                                        sceneSaveableStateHolder.removeState(scene.saveableKey())
+                                        activeReaderRequest = null
+                                    },
                                 )
                             }
                         }
@@ -956,10 +1051,14 @@ fun AdaptiveMainScaffold(
                                     viewModel = diagnosticsViewModel,
                                     autoOptimizeEnabled = effectivePreferences.autoOptimizeConnectionEnabled,
                                     onAutoOptimizeChanged = onAutoOptimizeConnectionChanged,
-                                    onNavigateBack = { isNetworkDiagnosticsOpen = false },
+                                    onNavigateBack = {
+                                        sceneSaveableStateHolder.removeState(scene.saveableKey())
+                                        isNetworkDiagnosticsOpen = false
+                                    },
                                 )
                             }
                         }
+                    }
                     }
                 }
             }
@@ -1013,6 +1112,10 @@ private fun MainDestinationBody(
     onBookshelfViewModeSelected: (BookshelfViewMode) -> Unit,
     bookshelfSortMode: BookshelfSortMode,
     onBookshelfSortModeSelected: (BookshelfSortMode) -> Unit,
+    bookshelfLocalQuery: String,
+    onBookshelfLocalQueryChanged: (String) -> Unit,
+    bookshelfActiveFilterKey: String,
+    onBookshelfActiveFilterKeyChanged: (String) -> Unit,
     legacyV1StorageMigrator: LegacyV1StorageMigrator?,
     appLanguage: Wenku8API.AppLanguage,
     onOpenSearch: () -> Unit,
@@ -1042,6 +1145,11 @@ private fun MainDestinationBody(
             onNovelClicked = onNovelClicked,
             onNovelClickedWithOrigin = onNovelClickedWithOrigin,
             onContinueReadingClicked = onContinueReadingClicked,
+            localQueryOverride = bookshelfLocalQuery,
+            onLocalQueryChanged = onBookshelfLocalQueryChanged,
+            activeFilterKeyOverride = bookshelfActiveFilterKey,
+            onActiveFilterKeyChanged = onBookshelfActiveFilterKeyChanged,
+            reselectScrollToTopTrigger = reselectScrollToTopTrigger,
             modifier = Modifier
                 .fillMaxSize()
                 .padding(contentPadding)

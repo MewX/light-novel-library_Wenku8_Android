@@ -2,6 +2,7 @@ package org.mewx.wenku8.v2.ui.navigation
 
 import android.content.Context
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
@@ -162,9 +163,12 @@ class SharedTransitionNavigationTest {
         composeRule.onNodeWithTag(NovelDetailTestTags.NOVEL_TITLE_TEXT).assertIsDisplayed()
 
         // 3. Navigate back from NovelDetailScreen -> returns smoothly to UnifiedSearchScreen
+        //    with query and online results preserved so user can inspect other search hits
         composeRule.onNodeWithTag(NovelDetailTestTags.BACK_BUTTON).performClick()
         composeRule.waitForIdle()
         composeRule.onNodeWithTag(UnifiedSearchTestTags.SCREEN_ROOT).assertIsDisplayed()
+        composeRule.onNodeWithTag(UnifiedSearchTestTags.QUERY_INPUT).assertTextContains("刀剑")
+        composeRule.onNodeWithTag("${DiscoveryTestTags.NOVEL_CARD_PREFIX}1143").assertIsDisplayed()
 
         // 4. Navigate back from UnifiedSearchScreen -> Searchbox morphs back to LatestScreen pill
         composeRule.onNodeWithTag(UnifiedSearchTestTags.BACK_BUTTON).performClick()
@@ -172,6 +176,7 @@ class SharedTransitionNavigationTest {
         composeRule.onNodeWithTag(DiscoveryTestTags.PERSISTENT_SEARCH_PILL).assertIsDisplayed()
 
         // 5. Switch to Bookshelf tab -> directional tab transition -> tap 搜全站 searchbox morph
+        //    and verify fresh search session starts clean without leftover results
         composeRule.onNodeWithTag("${MainScaffoldTestTags.NAV_ITEM_PREFIX}bookshelf").performClick()
         composeRule.waitForIdle()
         composeRule.onNodeWithTag(BookshelfTestTags.ONLINE_SEARCH_TRIGGER)
@@ -179,6 +184,7 @@ class SharedTransitionNavigationTest {
             .performClick()
         composeRule.waitForIdle()
         composeRule.onNodeWithTag(UnifiedSearchTestTags.SCREEN_ROOT).assertIsDisplayed()
+        composeRule.onNodeWithTag("${DiscoveryTestTags.NOVEL_CARD_PREFIX}1143").assertDoesNotExist()
     }
 
     @Test
@@ -272,6 +278,144 @@ class SharedTransitionNavigationTest {
         composeRule.waitForIdle()
         composeRule.onNodeWithTag(NovelDetailTestTags.SCREEN_ROOT).assertIsDisplayed()
     }
+
+    @Test
+    fun bookshelfLocalSearchAndFilter_preservedAcrossNovelDetailNavigationAndTabSwitches(): Unit = runBlocking {
+        database.novelDao().upsertNovel(
+            NovelEntity(
+                aid = 1143,
+                title = "刀剑神域 Sword Art Online",
+                author = "川原砾",
+                bookStatus = "连载中",
+                lastUpdate = "2026-11-03",
+                inBookshelf = true,
+            ),
+        )
+        database.novelDao().upsertNovel(
+            NovelEntity(
+                aid = 1500,
+                title = "刀剑神域 Progressive",
+                author = "川原砾",
+                bookStatus = "已完结",
+                lastUpdate = "2026-11-02",
+                inBookshelf = true,
+            ),
+        )
+        database.novelDao().upsertNovel(
+            NovelEntity(
+                aid = 2906,
+                title = "败犬女主太多了！",
+                author = "雨森焚火",
+                bookStatus = "连载中",
+                lastUpdate = "2026-11-01",
+                inBookshelf = true,
+            ),
+        )
+
+        val fakeGateway = FakeMotionCatalogGateway()
+        val tocSyncRepository = NovelTocSyncRepository(database)
+        val discoveryRepository = DiscoveryRepository(database = database, apiClient = fakeGateway)
+        val bookshelfRepository = BookshelfRepository(
+            database = database,
+            catalogGateway = fakeGateway,
+            novelTocSyncRepository = tocSyncRepository,
+            userSessionRepository = null,
+            ioDispatcher = Dispatchers.Unconfined,
+        )
+        val novelDetailRepository = NovelDetailRepository(
+            database = database,
+            catalogGateway = fakeGateway,
+            novelTocSyncRepository = tocSyncRepository,
+            ioDispatcher = Dispatchers.Unconfined,
+        )
+        val novelDownloadRepository = NovelDownloadRepository(
+            database = database,
+            catalogGateway = fakeGateway,
+            novelTocSyncRepository = tocSyncRepository,
+            assetRootsProvider = { listOf(tempAssetRoot) },
+            applicationScope = testScope,
+            appContext = null,
+            ioDispatcher = Dispatchers.Unconfined,
+        )
+
+        composeRule.setContent {
+            Wenku8ExpressiveTheme(
+                themeMode = Wenku8ThemeMode.ARCHIVAL_DAY,
+                useDynamicColor = false,
+            ) {
+                AdaptiveMainScaffold(
+                    preferredHomeDestination = DefaultHomeDestination.BOOKSHELF,
+                    isNetworkAvailableOnColdStart = true,
+                    currentThemeMode = Wenku8ThemeMode.ARCHIVAL_DAY,
+                    onThemeModeSelected = {},
+                    onDefaultHomeSelected = {},
+                    database = database,
+                    catalogGateway = fakeGateway,
+                    novelTocSyncRepository = tocSyncRepository,
+                    discoveryRepository = discoveryRepository,
+                    bookshelfRepository = bookshelfRepository,
+                    novelDetailRepository = novelDetailRepository,
+                    novelDownloadRepository = novelDownloadRepository,
+                )
+            }
+        }
+        composeRule.waitForIdle()
+
+        // All 3 shelf novels are initially visible
+        composeRule.onNodeWithTag("${BookshelfTestTags.BOOK_CARD_PREFIX}1143").assertIsDisplayed()
+        composeRule.onNodeWithTag("${BookshelfTestTags.BOOK_CARD_PREFIX}1500").assertIsDisplayed()
+        composeRule.onNodeWithTag("${BookshelfTestTags.BOOK_CARD_PREFIX}2906").assertIsDisplayed()
+
+        // Filter shelf locally by "刀剑" -> 2906 is filtered out, 1143 & 1500 remain
+        composeRule.onNodeWithTag(BookshelfTestTags.LOCAL_SEARCH_INPUT)
+            .assertIsDisplayed()
+            .performTextInput("刀剑")
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithTag("${BookshelfTestTags.BOOK_CARD_PREFIX}1143").assertIsDisplayed()
+        composeRule.onNodeWithTag("${BookshelfTestTags.BOOK_CARD_PREFIX}1500").assertIsDisplayed()
+        composeRule.onNodeWithTag("${BookshelfTestTags.BOOK_CARD_PREFIX}2906").assertDoesNotExist()
+
+        // Tap first matching novel (1143) -> opens NovelDetailScreen
+        composeRule.onNodeWithTag("${BookshelfTestTags.BOOK_CARD_PREFIX}1143").performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag(NovelDetailTestTags.SCREEN_ROOT).assertIsDisplayed()
+        composeRule.onNodeWithTag(NovelDetailTestTags.NOVEL_TITLE_TEXT)
+            .assertTextContains("刀剑神域 Sword Art Online")
+
+        // Navigate back -> local search query "刀剑" MUST remain active so user can tap another match
+        composeRule.onNodeWithTag(NovelDetailTestTags.BACK_BUTTON).performClick()
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithTag(BookshelfTestTags.LOCAL_SEARCH_INPUT).assertTextContains("刀剑")
+        composeRule.onNodeWithTag("${BookshelfTestTags.BOOK_CARD_PREFIX}2906").assertDoesNotExist()
+        composeRule.onNodeWithTag("${BookshelfTestTags.BOOK_CARD_PREFIX}1143").assertIsDisplayed()
+        composeRule.onNodeWithTag("${BookshelfTestTags.BOOK_CARD_PREFIX}1500").assertIsDisplayed()
+
+        // Tap second matching novel (1500) directly from preserved search results
+        composeRule.onNodeWithTag("${BookshelfTestTags.BOOK_CARD_PREFIX}1500").performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag(NovelDetailTestTags.SCREEN_ROOT).assertIsDisplayed()
+        composeRule.onNodeWithTag(NovelDetailTestTags.NOVEL_TITLE_TEXT)
+            .assertTextContains("刀剑神域 Progressive")
+
+        // Navigate back again -> still filtered to "刀剑"
+        composeRule.onNodeWithTag(NovelDetailTestTags.BACK_BUTTON).performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("${BookshelfTestTags.BOOK_CARD_PREFIX}2906").assertDoesNotExist()
+
+        // Switch to Latest tab and back to Bookshelf tab -> local search state still preserved
+        composeRule.onNodeWithTag("${MainScaffoldTestTags.NAV_ITEM_PREFIX}latest").performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag(DiscoveryTestTags.PERSISTENT_SEARCH_PILL).assertIsDisplayed()
+
+        composeRule.onNodeWithTag("${MainScaffoldTestTags.NAV_ITEM_PREFIX}bookshelf").performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag(BookshelfTestTags.LOCAL_SEARCH_INPUT).assertTextContains("刀剑")
+        composeRule.onNodeWithTag("${BookshelfTestTags.BOOK_CARD_PREFIX}2906").assertDoesNotExist()
+        composeRule.onNodeWithTag("${BookshelfTestTags.BOOK_CARD_PREFIX}1143").assertIsDisplayed()
+        composeRule.onNodeWithTag("${BookshelfTestTags.BOOK_CARD_PREFIX}1500").assertIsDisplayed()
+    }
 }
 
 private class FakeMotionCatalogGateway : WenkuCatalogGateway {
@@ -289,6 +433,12 @@ private class FakeMotionCatalogGateway : WenkuCatalogGateway {
         pushCount = 100,
         favCount = 50,
     )
+
+    private fun resolveTitle(aid: Int): String = when (aid) {
+        1500 -> "刀剑神域 Progressive"
+        2906 -> "败犬女主太多了！"
+        else -> sampleItem.title
+    }
 
     override fun resolveCoverUrl(aid: Int): String = ""
 
@@ -314,7 +464,9 @@ private class FakeMotionCatalogGateway : WenkuCatalogGateway {
     override suspend fun fetchNovelShortInfo(
         aid: Int,
         appLanguage: Wenku8API.AppLanguage,
-    ): WenkuApiResult<ParsedNovelListItem> = WenkuApiResult.Success(sampleItem.copy(aid = aid))
+    ): WenkuApiResult<ParsedNovelListItem> = WenkuApiResult.Success(
+        sampleItem.copy(aid = aid, title = resolveTitle(aid)),
+    )
 
     override suspend fun fetchNovelFullMeta(
         aid: Int,
@@ -323,7 +475,7 @@ private class FakeMotionCatalogGateway : WenkuCatalogGateway {
         return WenkuApiResult.Success(
             ParsedNovelFullMeta(
                 aid = aid,
-                title = sampleItem.title,
+                title = resolveTitle(aid),
                 author = sampleItem.author,
                 dayHitsCount = 10,
                 totalHitsCount = 1000,

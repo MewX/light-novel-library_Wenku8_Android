@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -137,11 +138,15 @@ fun UnifiedSearchScreen(
     val focusRequester = remember { FocusRequester() }
     val isEink = LocalEinkMode.current
 
+    val listState = rememberLazyListState()
     var queryText by rememberSaveable(initialQuery) { mutableStateOf(initialQuery) }
     var selectedMode by rememberSaveable(initialMode) { mutableStateOf(initialMode) }
     var hasDispatchedInitialQuery by rememberSaveable(initialQuery, initialMode) { mutableStateOf(false) }
+    var hasRequestedInitialAutoFocus by rememberSaveable(initialQuery, initialMode) { mutableStateOf(false) }
     var showDirectAidValidationError by rememberSaveable { mutableStateOf(false) }
-    var localShelfMatches by remember { mutableStateOf<List<DiscoveryNovelCardItem>>(emptyList()) }
+    var localShelfMatches by remember {
+        mutableStateOf(discoveryRepository.latestLocalShelfMatchesFor(queryText))
+    }
 
     val searchHistory by discoveryRepository
         .observeSearchHistory()
@@ -157,7 +162,8 @@ fun UnifiedSearchScreen(
     }
 
     LaunchedEffect(autoFocusInputOnEntry) {
-        if (autoFocusInputOnEntry) {
+        if (autoFocusInputOnEntry && !hasRequestedInitialAutoFocus && queryText.isEmpty()) {
+            hasRequestedInitialAutoFocus = true
             runCatching { focusRequester.requestFocus() }
         }
     }
@@ -341,6 +347,7 @@ fun UnifiedSearchScreen(
             HorizontalDivider()
 
             LazyColumn(
+                state = listState,
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(horizontal = 16.dp, vertical = 14.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
