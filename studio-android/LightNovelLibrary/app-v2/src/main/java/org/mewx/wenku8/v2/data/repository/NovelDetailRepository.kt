@@ -63,6 +63,7 @@ data class NovelDetailSnapshot(
 
 sealed interface NovelDetailRefreshOutcome {
     data object Success : NovelDetailRefreshOutcome
+    data object SkippedFreshCache : NovelDetailRefreshOutcome
     data object OfflineOrCachedOnly : NovelDetailRefreshOutcome
     data object ApiNotConfigured : NovelDetailRefreshOutcome
     data class Failed(val debugDetail: String? = null) : NovelDetailRefreshOutcome
@@ -75,10 +76,14 @@ sealed interface NovelDetailRefreshOutcome {
  * 1. **Instant Local Rendering**: Combines Room's `novels`, `volumes`, `chapters`, `chapter_contents`,
  *    and `reading_progress` streams immediately so cached/bookshelf novels open in `< 5ms` even in
  *    airplane mode.
- * 2. **Non-Destructive Metadata Merge**: Refreshes `do=meta` + `do=intro` + `do=list` concurrently,
+ * 2. **5-Minute Auto-Refresh TTL**: Automatic screen-entry refreshes (`forceRefresh = false`) skip
+ *    redundant server round-trips when full metadata, synopsis, and TOC for the active language were
+ *    already synchronized within [DEFAULT_AUTO_REFRESH_TTL_MS], while manual refreshes and
+ *    [BookshelfRepository] syncs always execute normally.
+ * 3. **Non-Destructive Metadata Merge**: Refreshes `do=meta` + `do=intro` + `do=list` concurrently,
  *    merging server metadata via `mergeServerMetadataPreservingShelfState` so `in_bookshelf`,
  *    `shelf_category`, `cloud_synced`, and `shelf_sort_order` are never overwritten.
- * 3. **Atomic Monotonic TOC Sync**: Commits `do=list` strictly through [NovelTocSyncRepository]
+ * 4. **Atomic Monotonic TOC Sync**: Commits `do=list` strictly through [NovelTocSyncRepository]
  *    (`@Upsert` + `toc_version` + automatic `reading_progress.vid` healing).
  */
 class NovelDetailRepository(
@@ -87,6 +92,7 @@ class NovelDetailRepository(
     private val novelTocSyncRepository: NovelTocSyncRepository,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
     private val wallClockMs: () -> Long = { System.currentTimeMillis() },
+    private val autoRefreshTtlMs: Long = DEFAULT_AUTO_REFRESH_TTL_MS,
 ) {
     private val novelDao = database.novelDao()
     private val tocDao = database.tocDao()
@@ -219,23 +225,53 @@ class NovelDetailRepository(
      * Refreshes full metadata (`do=meta`), full synopsis (`do=intro`), `#Tags` fallback
      * (`do=bookinfo`), and volume/chapter index (`do=list`) without ever wiping cached offline data
      * when the network is unreachable.
+     *
+     * When [forceRefresh] is `false` (automatic screen entry), skips redundant server round-trips
+     * if full metadata, synopsis, and TOC for [appLanguage] were already synced within
+     * [autoRefreshTtlMs] (`5` minutes by default) and [fallbackSeedItem] does not advertise a
+     * newer `lastUpdate`.
      */
     suspend fun refreshNovelDetail(
         aid: Int,
         appLanguage: Wenku8API.AppLanguage,
         fallbackSeedItem: DiscoveryNovelCardItem? = null,
+        forceRefresh: Boolean = true,
     ): NovelDetailRefreshOutcome = withContext(ioDispatcher) {
         if (aid <= 0) return@withContext NovelDetailRefreshOutcome.Failed("invalid_aid")
         if (fallbackSeedItem != null) {
             seedFromDiscoveryItemIfNeeded(fallbackSeedItem, appLanguage)
         }
 
+        val requestStartedAtMs = wallClockMs()
+        val existingBeforeRefresh = novelDao.getNovelByAid(aid)
+
+        if (!forceRefresh && autoRefreshTtlMs > 0L && existingBeforeRefresh != null) {
+            val ageMs = requestStartedAtMs - existingBeforeRefresh.metaSyncedAtMs
+            val seedIndicatesNewerUpdate = fallbackSeedItem != null &&
+                fallbackSeedItem.lastUpdate.isNotBlank() &&
+                existingBeforeRefresh.lastUpdate.isNotBlank() &&
+                fallbackSeedItem.lastUpdate != existingBeforeRefresh.lastUpdate
+            if (existingBeforeRefresh.metaSyncedAtMs > 0L &&
+                ageMs in 0L until autoRefreshTtlMs &&
+                existingBeforeRefresh.contentLang == appLanguage.name &&
+                existingBeforeRefresh.fullIntro.isNotBlank() &&
+                !seedIndicatesNewerUpdate &&
+                tocDao.getVolumesForNovel(aid).isNotEmpty()
+            ) {
+                val cachedChapters = tocDao.getChaptersForNovel(aid)
+                val tocCoversLatestSection = cachedChapters.isNotEmpty() &&
+                    (existingBeforeRefresh.latestSectionCid <= 0 ||
+                        cachedChapters.any { it.cid == existingBeforeRefresh.latestSectionCid })
+                if (tocCoversLatestSection) {
+                    acknowledgeUnreadUpdateIfPresent(aid)
+                    return@withContext NovelDetailRefreshOutcome.SkippedFreshCache
+                }
+            }
+        }
+
         if (!catalogGateway.isApiConfigured) {
             return@withContext NovelDetailRefreshOutcome.ApiNotConfigured
         }
-
-        val requestStartedAtMs = wallClockMs()
-        val existingBeforeRefresh = novelDao.getNovelByAid(aid)
 
         val (metaRes, introRes, tocRes) = coroutineScope {
             val deferredMeta = async { catalogGateway.fetchNovelFullMeta(aid, appLanguage) }
@@ -332,6 +368,8 @@ class NovelDetailRepository(
     }
 
     companion object {
+        const val DEFAULT_AUTO_REFRESH_TTL_MS: Long = 5L * 60L * 1_000L
+
         private val TAG_SPLITTER_REGEX = Regex("[\\s,，/、]+")
 
         fun parseNormalizedTags(tagsCsv: String): List<String> {

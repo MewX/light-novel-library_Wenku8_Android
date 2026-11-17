@@ -779,6 +779,10 @@ class BookshelfScreenAndSyncTest {
         composeTestRule.waitForIdle()
         assertEquals(BookshelfViewMode.DETAIL_LIST, activeViewMode)
         composeTestRule.onNodeWithTag(BookshelfTestTags.BOOK_CARD_PREFIX + 5).assertIsDisplayed()
+        composeTestRule.onNodeWithTag(
+            org.mewx.wenku8.v2.ui.discovery.DiscoveryTestTags.BOOK_STATUS_BADGE_PREFIX + 5,
+            useUnmergedTree = true,
+        ).assertExists()
 
         composeTestRule.onNodeWithTag(
             BookshelfTestTags.VIEW_MODE_CHIP_PREFIX + BookshelfViewMode.SPINE_3D.name,
@@ -1030,9 +1034,203 @@ class BookshelfScreenAndSyncTest {
         )
     }
 
+    @Test
+    fun cloudBookcaseSync_combinatorialConflictMatrix_handlesDeleteReAddConcurrentAddAndRelogin() = runTest {
+        val tempRoot = File(context.cacheDir, "combinatorial_matrix_${System.nanoTime()}").apply { mkdirs() }
+        try {
+            val authTransport = FakeAccountSwitchTransport().apply { activeServerUsername = "alice" }
+            val authGateway = FakeAccountSwitchAuthGateway(authTransport)
+            val sessionRepo = UserSessionRepository(
+                transport = authTransport,
+                assetRootsProvider = { listOf(tempRoot) },
+                authGateway = authGateway,
+            )
+            assertTrue(sessionRepo.loginWithCredentials("alice", "pw123") is LoginOutcome.Success)
+
+            val gateway = FakeBookshelfCatalogGateway().apply {
+                cloudBookshelfEntries = listOf(
+                    ParsedCloudBookshelfEntry(aid = 8001, lastUpdateDate = "2026-03-01", title = "在线双删后云端重加", latestChapterCid = 11),
+                    ParsedCloudBookshelfEntry(aid = 8002, lastUpdateDate = "2026-03-01", title = "离线本地删_云端亦删_再云端重加", latestChapterCid = 21),
+                    ParsedCloudBookshelfEntry(aid = 8003, lastUpdateDate = "2026-03-01", title = "离线未同步本地删_优先冲刷一次", latestChapterCid = 31),
+                    ParsedCloudBookshelfEntry(aid = 8004, lastUpdateDate = "2026-03-01", title = "云端删除后再云端重加", latestChapterCid = 41),
+                    ParsedCloudBookshelfEntry(aid = 8005, lastUpdateDate = "2026-03-01", title = "离线本地删后又本地加回", latestChapterCid = 51),
+                )
+            }
+            val repository = BookshelfRepository(
+                database = database,
+                catalogGateway = gateway,
+                novelTocSyncRepository = tocSyncRepository,
+                userSessionRepository = sessionRepo,
+            )
+
+            // Baseline sync: 8001..8005 are all pulled & recorded as STATE_SYNCED under "alice".
+            val baseline = repository.syncWithCloudBookcase(Wenku8API.AppLanguage.SC) as CloudBookshelfSyncOutcome.Success
+            assertEquals(5, baseline.pulledFromCloudCount)
+            assertEquals(setOf(8001, 8002, 8003, 8004, 8005), database.novelDao().getBookshelfNovelIds().toSet())
+
+            // Seed reading progress on 8001 & 8004 to verify progress survives delete -> re-add cycles!
+            database.readingProgressDao().upsertProgress(
+                ReadingProgressEntity(
+                    aid = 8001,
+                    vid = 80010,
+                    cid = 80011,
+                    volumeTitle = "第一卷",
+                    chapterTitle = "第一话",
+                    progressPermille = 640,
+                    updatedAtMs = 50_000L,
+                ),
+            )
+            database.readingProgressDao().upsertProgress(
+                ReadingProgressEntity(
+                    aid = 8004,
+                    vid = 80040,
+                    cid = 80041,
+                    volumeTitle = "第一卷",
+                    chapterTitle = "第一话",
+                    progressPermille = 810,
+                    updatedAtMs = 60_000L,
+                ),
+            )
+
+            // -------------------------------------------------------------------------------------
+            // Prepare Pass 1 mutations across all combinations:
+            // - 8001 (Case A1): Online local delete (`do=del` succeeds immediately -> tombstone cleared)
+            //   + Cloud also deleted, then Cloud re-adds BEFORE Pass 1!
+            // - 8002 (Case A2): Offline local delete (`STATE_PENDING_DELETE`) + Cloud ALSO deleted
+            //   (`do=del` returns `7 = SERVER_CODE_NOT_IN_BOOKSHELF` on Pass 1 -> tombstone cleared).
+            // - 8003 (Case B): Offline un-synced local delete (`STATE_PENDING_DELETE`) while Cloud
+            //   deleted & re-added BEFORE Pass 1 (wire-identical to untouched cloud entry -> un-synced
+            //   local delete MUST win on Pass 1 and NEVER resurrect!).
+            // - 8004 (Case C): Cloud deletes 8004 -> Pass 1 removes locally.
+            // - 8005 (Case D): Offline local delete -> Offline local re-add (`STATE_PENDING_ADD`,
+            //   category = "重温收藏") while Cloud still holds 8005 -> zero `do=del`, reconciles to SYNCED!
+            // - 8006 (Case E1): Offline local add (`STATE_PENDING_ADD`, category = "新番原著") AND
+            //   Cloud independently added 8006 -> reconciles to SYNCED without redundant `do=add`!
+            // - 8007 (Case E2): Offline local add (`STATE_PENDING_ADD`), added on Cloud right after
+            //   `action=bookcase` snapshot so `do=add` returns `5 = SERVER_CODE_ALREADY_IN_BOOKSHELF`!
+            // - Session expiry (Case F): `fetchCloudBookshelf` returns `4 = SERVER_CODE_NOT_LOGGED_IN`
+            //   once -> auto re-authenticates from `cert.wk8` transparently!
+            // -------------------------------------------------------------------------------------
+
+            // 8001: online delete succeeds immediately
+            gateway.removeResponsesByAid[8001] = WenkuApiResult.Success(Unit)
+            repository.removeNovelsFromBookshelf(listOf(8001))
+            assertNull(database.cloudBookcaseLedgerDao().getEntry("alice", 8001))
+
+            // 8002 & 8003 & 8005: user goes offline and deletes locally
+            gateway.removeResponsesByAid[8002] = WenkuApiResult.NetworkError("offline")
+            gateway.removeResponsesByAid[8003] = WenkuApiResult.NetworkError("offline")
+            gateway.removeResponsesByAid[8005] = WenkuApiResult.NetworkError("offline")
+            repository.removeNovelsFromBookshelf(listOf(8002, 8003, 8005))
+
+            // 8005: user changes mind offline and re-adds 8005 with custom category
+            gateway.addResponsesByAid[8005] = WenkuApiResult.NetworkError("offline")
+            repository.addNovelToBookshelf(
+                NovelEntity(aid = 8005, title = "离线本地删后又本地加回", shelfCategory = "重温收藏"),
+            )
+            assertEquals(
+                CloudBookcaseLedgerEntity.STATE_PENDING_ADD,
+                database.cloudBookcaseLedgerDao().getEntry("alice", 8005)?.syncState,
+            )
+
+            // 8006 & 8007: user adds brand-new novels while offline
+            gateway.addResponsesByAid[8006] = WenkuApiResult.NetworkError("offline")
+            gateway.addResponsesByAid[8007] = WenkuApiResult.NetworkError("offline")
+            repository.addNovelToBookshelf(
+                NovelEntity(aid = 8006, title = "双端同时新增作品", shelfCategory = "新番原著"),
+            )
+            repository.addNovelToBookshelf(
+                NovelEntity(aid = 8007, title = "并发已存在返回码5作品", shelfCategory = "待看"),
+            )
+
+            // Come back online for Pass 1:
+            gateway.removedAidsFromCloud.clear()
+            gateway.pushedAidsToCloud.clear()
+            // 8002 was already deleted on Cloud too -> server returns code 7 (NOT_IN_BOOKSHELF)
+            gateway.removeResponsesByAid[8002] = WenkuApiResult.ServerErrorCode(
+                numericCode = BookshelfRepository.SERVER_CODE_NOT_IN_BOOKSHELF,
+            )
+            // 8003 un-synced local delete flushes `do=del` -> succeeds
+            gateway.removeResponsesByAid[8003] = WenkuApiResult.Success(Unit)
+            // 8007 returns code 5 (ALREADY_IN_BOOKSHELF) on `do=add`
+            gateway.addResponsesByAid[8007] = WenkuApiResult.ServerErrorCode(
+                numericCode = BookshelfRepository.SERVER_CODE_ALREADY_IN_BOOKSHELF,
+            )
+            // Simulate PHPSESSID expiry once on Pass 1
+            gateway.failNextFetchCloudNotLoggedIn = true
+            // Cloud shelf at Pass 1 has:
+            // - 8001 (re-added on Cloud after synced online local delete!)
+            // - 8003 (still present / re-added before offline local delete ever synced -> must NOT resurrect!)
+            // - 8005 (still on Cloud)
+            // - 8006 (independently added on Cloud too!)
+            // (8002 & 8004 are absent on Cloud)
+            gateway.cloudBookshelfEntries = listOf(
+                ParsedCloudBookshelfEntry(aid = 8001, lastUpdateDate = "2026-03-05", title = "在线双删后云端重加", latestChapterCid = 12),
+                ParsedCloudBookshelfEntry(aid = 8003, lastUpdateDate = "2026-03-05", title = "离线未同步本地删_优先冲刷一次", latestChapterCid = 31),
+                ParsedCloudBookshelfEntry(aid = 8005, lastUpdateDate = "2026-03-01", title = "离线本地删后又本地加回", latestChapterCid = 51),
+                ParsedCloudBookshelfEntry(aid = 8006, lastUpdateDate = "2026-03-05", title = "双端同时新增作品", latestChapterCid = 61),
+            )
+
+            val pass1 = repository.syncWithCloudBookcase(Wenku8API.AppLanguage.SC) as CloudBookshelfSyncOutcome.Success
+            assertTrue("Session expiry should have triggered single re-login", authTransport.loginCallCount >= 2)
+
+            // Verify Pass 1 exact state across all 7 novels:
+            // - 8001: pulled back onto local shelf with reading progress 640 preserved!
+            // - 8002: tombstone cleared via code 7, stays off shelf
+            // - 8003: flushed `do=del` once (`deletedFromCloudCount == 1`), tombstone cleared, NOT resurrected!
+            // - 8004: removed locally due to Cloud deletion (`removedRemotelyDeletedCount == 1`), progress 810 preserved!
+            // - 8005: stayed on shelf with category "重温收藏", `8005 !in removedAidsFromCloud`, reconciled to SYNCED!
+            // - 8006: reconciled directly to SYNCED (`8006 !in pushedAidsToCloud`), category "新番原著" preserved!
+            // - 8007: pushed via `do=add` -> code 5 treated as SYNCED!
+            assertEquals(1, pass1.deletedFromCloudCount)
+            assertEquals(1, pass1.removedRemotelyDeletedCount)
+            assertEquals(1, pass1.pulledFromCloudCount) // 8001
+            assertEquals(1, pass1.pushedToCloudCount) // 8007
+            assertEquals(setOf(8002, 8003), gateway.removedAidsFromCloud.toSet())
+            assertEquals(listOf(8007), gateway.pushedAidsToCloud)
+
+            val shelfAfterPass1 = database.novelDao().getBookshelfNovelsSnapshot().associateBy { it.aid }
+            assertEquals(setOf(8001, 8005, 8006, 8007), shelfAfterPass1.keys)
+            assertEquals(640, database.readingProgressDao().getProgressForNovel(8001)?.progressPermille)
+            assertEquals(810, database.readingProgressDao().getProgressForNovel(8004)?.progressPermille)
+            assertEquals("重温收藏", shelfAfterPass1.getValue(8005).shelfCategory)
+            assertEquals("新番原著", shelfAfterPass1.getValue(8006).shelfCategory)
+            assertTrue(shelfAfterPass1.values.all { it.cloudSynced })
+            assertNull(database.cloudBookcaseLedgerDao().getEntry("alice", 8002))
+            assertNull(database.cloudBookcaseLedgerDao().getEntry("alice", 8003))
+            assertNull(database.cloudBookcaseLedgerDao().getEntry("alice", 8004))
+
+            // -------------------------------------------------------------------------------------
+            // Pass 2: Now that 8002, 8003, and 8004 have all had their deletions confirmed & synced,
+            // user re-adds 8002, 8003, and 8004 on Wenku8 Web (`action=bookcase` lists them again).
+            // All three MUST be pulled back onto the local shelf cleanly (with 8004's progress 810 intact)!
+            // -------------------------------------------------------------------------------------
+            gateway.cloudBookshelfEntries = listOf(
+                ParsedCloudBookshelfEntry(aid = 8001, lastUpdateDate = "2026-03-05", title = "在线双删后云端重加", latestChapterCid = 12),
+                ParsedCloudBookshelfEntry(aid = 8002, lastUpdateDate = "2026-03-06", title = "离线本地删_云端亦删_再云端重加", latestChapterCid = 22),
+                ParsedCloudBookshelfEntry(aid = 8003, lastUpdateDate = "2026-03-06", title = "离线未同步本地删_优先冲刷一次", latestChapterCid = 32),
+                ParsedCloudBookshelfEntry(aid = 8004, lastUpdateDate = "2026-03-06", title = "云端删除后再云端重加", latestChapterCid = 42),
+                ParsedCloudBookshelfEntry(aid = 8005, lastUpdateDate = "2026-03-01", title = "离线本地删后又本地加回", latestChapterCid = 51),
+                ParsedCloudBookshelfEntry(aid = 8006, lastUpdateDate = "2026-03-05", title = "双端同时新增作品", latestChapterCid = 61),
+                ParsedCloudBookshelfEntry(aid = 8007, lastUpdateDate = "2026-03-05", title = "并发已存在返回码5作品", latestChapterCid = 71),
+            )
+
+            val pass2 = repository.syncWithCloudBookcase(Wenku8API.AppLanguage.SC) as CloudBookshelfSyncOutcome.Success
+            assertEquals(3, pass2.pulledFromCloudCount)
+            assertEquals(
+                setOf(8001, 8002, 8003, 8004, 8005, 8006, 8007),
+                database.novelDao().getBookshelfNovelIds().toSet(),
+            )
+            assertEquals(810, database.readingProgressDao().getProgressForNovel(8004)?.progressPermille)
+        } finally {
+            tempRoot.deleteRecursively()
+        }
+    }
+
     private class FakeAccountSwitchTransport : WenkuTransport {
         override val isEndpointConfigured: Boolean = true
         var activeServerUsername: String = "alice"
+        var loginCallCount: Int = 0
 
         override suspend fun postForm(
             endpointUrl: String,
@@ -1040,7 +1238,11 @@ class BookshelfScreenAndSyncTest {
         ): ByteArray {
             val action = formParams.getAsString("action")
             return when (action) {
-                "login", "logout" -> "1".toByteArray(StandardCharsets.UTF_8)
+                "login" -> {
+                    loginCallCount++
+                    "1".toByteArray(StandardCharsets.UTF_8)
+                }
+                "logout" -> "1".toByteArray(StandardCharsets.UTF_8)
                 "userinfo" -> """
                     <?xml version="1.0" encoding="utf-8"?>
                     <metadata>
@@ -1100,6 +1302,7 @@ class BookshelfScreenAndSyncTest {
         override val isApiConfigured: Boolean = true
 
         var cloudBookshelfEntries: List<ParsedCloudBookshelfEntry> = emptyList()
+        var failNextFetchCloudNotLoggedIn: Boolean = false
         val addResponsesByAid = mutableMapOf<Int, WenkuApiResult<Unit>>()
         val removeResponsesByAid = mutableMapOf<Int, WenkuApiResult<Unit>>()
         val pushedAidsToCloud = mutableListOf<Int>()
@@ -1191,7 +1394,13 @@ class BookshelfScreenAndSyncTest {
 
         override suspend fun fetchCloudBookshelf(
             appLanguage: Wenku8API.AppLanguage,
-        ): WenkuApiResult<List<ParsedCloudBookshelfEntry>> = WenkuApiResult.Success(cloudBookshelfEntries)
+        ): WenkuApiResult<List<ParsedCloudBookshelfEntry>> {
+            if (failNextFetchCloudNotLoggedIn) {
+                failNextFetchCloudNotLoggedIn = false
+                return WenkuApiResult.ServerErrorCode(BookshelfRepository.SERVER_CODE_NOT_LOGGED_IN)
+            }
+            return WenkuApiResult.Success(cloudBookshelfEntries)
+        }
 
         override suspend fun addToCloudBookshelf(aid: Int): WenkuApiResult<Unit> {
             pushedAidsToCloud += aid

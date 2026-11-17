@@ -33,11 +33,13 @@ import androidx.compose.material.icons.automirrored.outlined.ViewList
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.outlined.AutoStories
 import androidx.compose.material.icons.outlined.Check
+import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.CleaningServices
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.CloudOff
 import androidx.compose.material.icons.outlined.CloudSync
 import androidx.compose.material.icons.outlined.DeleteOutline
+import androidx.compose.material.icons.outlined.EditNote
 import androidx.compose.material.icons.outlined.ExpandMore
 import androidx.compose.material.icons.outlined.GridView
 import androidx.compose.material.icons.outlined.PlayArrow
@@ -119,6 +121,8 @@ import org.mewx.wenku8.v2.data.repository.CloudBookshelfSyncOutcome
 import org.mewx.wenku8.v2.domain.model.DiscoveryNovelCardItem
 import org.mewx.wenku8.v2.ui.components.ActionTooltipBox
 import org.mewx.wenku8.v2.ui.components.TooltipIconButton
+import org.mewx.wenku8.v2.ui.discovery.BookStatusBadge
+import org.mewx.wenku8.v2.ui.discovery.DiscoveryTestTags
 import org.mewx.wenku8.v2.ui.discovery.formatBookStatusLabel
 import org.mewx.wenku8.v2.ui.navigation.MainScaffoldTestTags
 import org.mewx.wenku8.v2.ui.theme.LocalEinkMode
@@ -1256,6 +1260,13 @@ private fun BookshelfFilterChipRail(
             FilterChip(
                 selected = activeFilter == BookshelfFilter.Serializing,
                 onClick = { onSelectFilter(BookshelfFilter.Serializing) },
+                leadingIcon = {
+                    Icon(
+                        imageVector = Icons.Outlined.EditNote,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp),
+                    )
+                },
                 label = { Text(text = stringResource(R.string.bookshelf_filter_serializing)) },
                 modifier = Modifier.testTag(BookshelfTestTags.FILTER_CHIP_SERIALIZING),
             )
@@ -1264,6 +1275,13 @@ private fun BookshelfFilterChipRail(
             FilterChip(
                 selected = activeFilter == BookshelfFilter.Completed,
                 onClick = { onSelectFilter(BookshelfFilter.Completed) },
+                leadingIcon = {
+                    Icon(
+                        imageVector = Icons.Outlined.CheckCircle,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp),
+                    )
+                },
                 label = { Text(text = stringResource(R.string.bookshelf_filter_completed)) },
                 modifier = Modifier.testTag(BookshelfTestTags.FILTER_CHIP_COMPLETED),
             )
@@ -1540,16 +1558,29 @@ private fun BookshelfDetailListCard(
                 val metaParts = buildList {
                     if (item.novel.author.isNotBlank()) add(item.novel.author)
                     if (item.novel.pressId.isNotBlank()) add(item.novel.pressId)
-                    if (displayBookStatus.isNotBlank()) add(displayBookStatus)
                 }
-                if (metaParts.isNotEmpty()) {
-                    Text(
-                        text = metaParts.joinToString(" · "),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
+                if (metaParts.isNotEmpty() || displayBookStatus.isNotBlank()) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        if (metaParts.isNotEmpty()) {
+                            Text(
+                                text = metaParts.joinToString(" · "),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f, fill = false),
+                            )
+                        }
+                        BookStatusBadge(
+                            rawStatus = item.novel.bookStatus,
+                            modifier = Modifier.testTag(
+                                DiscoveryTestTags.BOOK_STATUS_BADGE_PREFIX + item.aid,
+                            ),
+                        )
+                    }
                 }
 
                 val statusLine = when {

@@ -313,7 +313,8 @@ class NovelDetailAndDownloadTest {
         composeTestRule.waitForIdle()
 
         // Server `do=meta` returns BookStatus="已完成", which must normalize to "已完结"
-        // consistently with the novel list!
+        // consistently with the novel list and render with its leading status icon badge!
+        composeTestRule.onNodeWithTag(NovelDetailTestTags.BOOK_STATUS_BADGE).assertIsDisplayed()
         composeTestRule.onNodeWithText("已完结").assertIsDisplayed()
         composeTestRule.onNodeWithText("已完成").assertDoesNotExist()
         assertEquals(
@@ -408,6 +409,170 @@ class NovelDetailAndDownloadTest {
     }
 
     @Test
+    fun autoRefreshTtl_skipsRedundantFetchWithinFiveMinutes_clearsUnreadBadge_andKeepsBookcaseSyncIntact() = runBlocking {
+        var nowMs = 1_000_000L
+        val ttlDetailRepository = NovelDetailRepository(
+            database = database,
+            catalogGateway = fakeGateway,
+            novelTocSyncRepository = tocSyncRepository,
+            ioDispatcher = Dispatchers.Unconfined,
+            wallClockMs = { nowMs },
+        )
+
+        // 1. Initial automatic screen entry (`forceRefresh = false`) fetches meta + intro + toc.
+        val initialOutcome = ttlDetailRepository.refreshNovelDetail(
+            aid = 5,
+            appLanguage = Wenku8API.AppLanguage.SC,
+            forceRefresh = false,
+        )
+        assertEquals(NovelDetailRefreshOutcome.Success, initialOutcome)
+        assertEquals(1, fakeGateway.metaRequestCount)
+        assertEquals(1, fakeGateway.introRequestCount)
+        assertEquals(1, fakeGateway.tocRequestCount)
+
+        // 2. Re-entering within 5 minutes (`+4m59s`) with `forceRefresh = false` hits fresh cache
+        //    with ZERO network round-trips, while still clearing `hasUnreadUpdate` (`新章节` badge)!
+        database.novelDao().setHasUnreadUpdate(aid = 5, hasUnreadUpdate = true)
+        nowMs += 299_000L
+        val cachedOutcome = ttlDetailRepository.refreshNovelDetail(
+            aid = 5,
+            appLanguage = Wenku8API.AppLanguage.SC,
+            forceRefresh = false,
+        )
+        assertEquals(NovelDetailRefreshOutcome.SkippedFreshCache, cachedOutcome)
+        assertEquals(1, fakeGateway.metaRequestCount)
+        assertEquals(1, fakeGateway.introRequestCount)
+        assertEquals(1, fakeGateway.tocRequestCount)
+        assertFalse(database.novelDao().getNovelByAid(5)!!.hasUnreadUpdate)
+
+        // 3. Explicit manual refresh (`forceRefresh = true`) always bypasses the 5-minute TTL.
+        nowMs += 500L
+        val manualOutcome = ttlDetailRepository.refreshNovelDetail(
+            aid = 5,
+            appLanguage = Wenku8API.AppLanguage.SC,
+            forceRefresh = true,
+        )
+        assertEquals(NovelDetailRefreshOutcome.Success, manualOutcome)
+        assertEquals(2, fakeGateway.metaRequestCount)
+
+        // 4. Language switch (`SC -> TC`) bypasses the TTL on automatic entry, then caches `TC`.
+        nowMs += 1_000L
+        val langSwitchOutcome = ttlDetailRepository.refreshNovelDetail(
+            aid = 5,
+            appLanguage = Wenku8API.AppLanguage.TC,
+            forceRefresh = false,
+        )
+        assertEquals(NovelDetailRefreshOutcome.Success, langSwitchOutcome)
+        assertEquals(3, fakeGateway.metaRequestCount)
+
+        nowMs += 10_000L
+        assertEquals(
+            NovelDetailRefreshOutcome.SkippedFreshCache,
+            ttlDetailRepository.refreshNovelDetail(
+                aid = 5,
+                appLanguage = Wenku8API.AppLanguage.TC,
+                forceRefresh = false,
+            ),
+        )
+        assertEquals(3, fakeGateway.metaRequestCount)
+
+        // 5. Discovery card advertising a newer `lastUpdate` bypasses TTL immediately.
+        nowMs += 5_000L
+        fakeGateway.serverLastUpdate = "2026-03-01"
+        val newerSeedOutcome = ttlDetailRepository.refreshNovelDetail(
+            aid = 5,
+            appLanguage = Wenku8API.AppLanguage.TC,
+            fallbackSeedItem = org.mewx.wenku8.v2.domain.model.DiscoveryNovelCardItem(
+                aid = 5,
+                title = "狼与香辛料",
+                author = "支仓冻砂",
+                bookStatus = "已完结",
+                lastUpdate = "2026-03-01",
+                tags = listOf("奇幻"),
+                introShort = "商人罗伦斯与贤狼赫萝的旅途。",
+                coverUrl = "",
+            ),
+            forceRefresh = false,
+        )
+        assertEquals(NovelDetailRefreshOutcome.Success, newerSeedOutcome)
+        assertEquals(4, fakeGateway.metaRequestCount)
+
+        // 6. After 5 minutes (`+5m01s`), automatic entry refreshes from server again.
+        nowMs += NovelDetailRepository.DEFAULT_AUTO_REFRESH_TTL_MS + 1_000L
+        val expiredTtlOutcome = ttlDetailRepository.refreshNovelDetail(
+            aid = 5,
+            appLanguage = Wenku8API.AppLanguage.TC,
+            forceRefresh = false,
+        )
+        assertEquals(NovelDetailRefreshOutcome.Success, expiredTtlOutcome)
+        assertEquals(5, fakeGateway.metaRequestCount)
+
+        // 7. Bookcase Sync & Smart Update MUST work 100% normally even 10s after a detail refresh!
+        nowMs += 10_000L
+        bookshelfRepository.addNovelToBookshelf(
+            database.novelDao().getNovelByAid(5)!!.copy(inBookshelf = true, cloudSynced = true),
+            syncToCloudIfSignedIn = false,
+        )
+        database.novelDao().upsertNovel(
+            database.novelDao().getNovelByAid(5)!!.copy(inBookshelf = true, cloudSynced = true),
+        )
+        fakeGateway.includeExtraChapter202 = true
+        fakeGateway.serverLastUpdate = "2026-03-02"
+        fakeGateway.cloudBookshelfForTest = listOf(
+            ParsedCloudBookshelfEntry(
+                aid = 5,
+                lastUpdateDate = "2026-03-02",
+                title = "狼与香辛料",
+                latestChapterCid = 202,
+                latestChapterName = "第二话 新航路",
+            ),
+        )
+
+        val syncOutcome = bookshelfRepository.syncWithCloudBookcase(Wenku8API.AppLanguage.TC)
+        assertTrue(syncOutcome is org.mewx.wenku8.v2.data.repository.CloudBookshelfSyncOutcome.Success)
+        val syncSuccess = syncOutcome as org.mewx.wenku8.v2.data.repository.CloudBookshelfSyncOutcome.Success
+        assertEquals(1, syncSuccess.refreshedStaleCount)
+        assertTrue(database.novelDao().getNovelByAid(5)!!.hasUnreadUpdate)
+        assertTrue(database.tocDao().getChaptersForNovel(5).any { it.cid == 202 })
+
+        // Seed 1 cached chapter so `smartUpdateShelfNovels` downloads the remaining missing chapters (including 202)
+        database.chapterContentDao().upsertChapterContent(
+            org.mewx.wenku8.v2.data.local.db.entity.ChapterContentEntity(
+                cid = 101,
+                aid = 5,
+                contentLang = "TC",
+                contentText = "第一话正文",
+                byteLength = 15,
+                imageUrlsJson = "[]",
+                imageCount = 0,
+                sha256Checksum = "sha101",
+                downloadedAtMs = nowMs,
+            ),
+        )
+        fakeGateway.requestedChapterCids.clear()
+        val smartSummary = bookshelfRepository.smartUpdateShelfNovels(
+            aids = listOf(5),
+            appLanguage = Wenku8API.AppLanguage.TC,
+        )
+        assertEquals(1, smartSummary.updatedNovelCount)
+        assertTrue(202 in fakeGateway.requestedChapterCids)
+
+        // Opening NovelDetailScreen right after Bookcase Sync clears `hasUnreadUpdate` and shows cid 202
+        val postSyncDetailOutcome = ttlDetailRepository.refreshNovelDetail(
+            aid = 5,
+            appLanguage = Wenku8API.AppLanguage.TC,
+            forceRefresh = false,
+        )
+        assertTrue(
+            postSyncDetailOutcome == NovelDetailRefreshOutcome.SkippedFreshCache ||
+                postSyncDetailOutcome == NovelDetailRefreshOutcome.Success,
+        )
+        assertFalse(database.novelDao().getNovelByAid(5)!!.hasUnreadUpdate)
+        val finalSnapshot = ttlDetailRepository.observeNovelDetail(5).first()
+        assertEquals(4, finalSnapshot.totalChapters)
+    }
+
+    @Test
     fun serverSupportBannerAd_collapsesCompletelyWhenOffline() {
         composeTestRule.setContent {
             Wenku8ExpressiveTheme(themeMode = Wenku8ThemeMode.ARCHIVAL_DAY) {
@@ -434,6 +599,11 @@ private class FakeDetailAndDownloadGateway : WenkuCatalogGateway {
     var simulateNetworkOffline: Boolean = false
     var includeExtraChapter202: Boolean = false
     var chapterTextPrefix: String = ""
+    var serverLastUpdate: String = "2026-02-18"
+    var cloudBookshelfForTest: List<ParsedCloudBookshelfEntry> = emptyList()
+    var metaRequestCount: Int = 0
+    var introRequestCount: Int = 0
+    var tocRequestCount: Int = 0
     val requestedChapterCids = mutableListOf<Int>()
 
     override fun resolveCoverUrl(aid: Int): String = coverUrlForBinaryTest
@@ -466,7 +636,7 @@ private class FakeDetailAndDownloadGateway : WenkuCatalogGateway {
                 title = "狼与香辛料",
                 author = "支仓冻砂",
                 bookStatus = "已完成",
-                lastUpdate = "2026-02-18",
+                lastUpdate = serverLastUpdate,
                 tagsCsv = "奇幻 旅行 经商",
                 introShort = "商人罗伦斯与贤狼赫萝的旅途。",
                 totalHits = 2_316_000,
@@ -481,6 +651,7 @@ private class FakeDetailAndDownloadGateway : WenkuCatalogGateway {
         appLanguage: Wenku8API.AppLanguage,
     ): WenkuApiResult<ParsedNovelFullMeta> {
         if (simulateNetworkOffline) return WenkuApiResult.NetworkError("offline")
+        metaRequestCount++
         return WenkuApiResult.Success(
             ParsedNovelFullMeta(
                 aid = aid,
@@ -493,9 +664,9 @@ private class FakeDetailAndDownloadGateway : WenkuCatalogGateway {
                 pressId = "电击文库",
                 bookStatus = "已完成",
                 bookLength = 2_004_000,
-                lastUpdate = "2026-02-18",
+                lastUpdate = serverLastUpdate,
                 latestSectionCid = if (includeExtraChapter202) 202 else 201,
-                latestSectionName = "第二卷 第一话",
+                latestSectionName = if (includeExtraChapter202) "第二话 新航路" else "第二卷 第一话",
                 tagsCsv = "奇幻 旅行 经商",
             ),
         )
@@ -506,6 +677,7 @@ private class FakeDetailAndDownloadGateway : WenkuCatalogGateway {
         appLanguage: Wenku8API.AppLanguage,
     ): WenkuApiResult<String> {
         if (simulateNetworkOffline) return WenkuApiResult.NetworkError("offline")
+        introRequestCount++
         return WenkuApiResult.Success(
             "从教会都市出发的商人罗伦斯，在装满麦子的马车上发现了熟睡的贤狼赫萝……",
         )
@@ -516,6 +688,7 @@ private class FakeDetailAndDownloadGateway : WenkuCatalogGateway {
         appLanguage: Wenku8API.AppLanguage,
     ): WenkuApiResult<List<ParsedVolumeToc>> {
         if (simulateNetworkOffline) return WenkuApiResult.NetworkError("offline")
+        tocRequestCount++
         val vol2Chapters = buildList {
             add(ParsedChapterToc(cid = 201, chapterTitle = "第一话 旅途再启"))
             if (includeExtraChapter202) {
@@ -558,5 +731,5 @@ private class FakeDetailAndDownloadGateway : WenkuCatalogGateway {
 
     override suspend fun fetchCloudBookshelf(
         appLanguage: Wenku8API.AppLanguage,
-    ): WenkuApiResult<List<ParsedCloudBookshelfEntry>> = WenkuApiResult.Success(emptyList())
+    ): WenkuApiResult<List<ParsedCloudBookshelfEntry>> = WenkuApiResult.Success(cloudBookshelfForTest)
 }

@@ -23,6 +23,8 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AutoStories
 import androidx.compose.material.icons.outlined.BookmarkAdded
+import androidx.compose.material.icons.outlined.CheckCircle
+import androidx.compose.material.icons.outlined.EditNote
 import androidx.compose.material.icons.outlined.ErrorOutline
 import androidx.compose.material.icons.outlined.NetworkCheck
 import androidx.compose.material.icons.outlined.Refresh
@@ -54,6 +56,7 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -104,8 +107,62 @@ fun formatBookStatusLabel(
     )
 }
 
+/**
+ * Resolves a clear leading icon for serialized vs completed novel status labels (`已完结` / `连载中`).
+ */
+fun bookStatusLeadingIcon(statusText: String): ImageVector? {
+    val trimmed = statusText.trim()
+    if (trimmed.isEmpty()) return null
+    return if (trimmed.contains("完")) {
+        Icons.Outlined.CheckCircle
+    } else {
+        Icons.Outlined.EditNote
+    }
+}
+
+@Composable
+fun BookStatusBadge(
+    rawStatus: String,
+    modifier: Modifier = Modifier,
+    appLanguage: Wenku8API.AppLanguage? = null,
+) {
+    val displayBookStatus = formatBookStatusLabel(
+        rawStatus = rawStatus,
+        appLanguage = appLanguage,
+    )
+    if (displayBookStatus.isBlank()) return
+    val icon = bookStatusLeadingIcon(displayBookStatus)
+    Surface(
+        color = MaterialTheme.colorScheme.secondaryContainer,
+        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+        shape = MaterialTheme.shapes.extraSmall,
+        modifier = modifier.einkHairlineBorder(MaterialTheme.shapes.extraSmall),
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(3.dp),
+        ) {
+            if (icon != null) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    modifier = Modifier.size(12.dp),
+                )
+            }
+            Text(
+                text = displayBookStatus,
+                style = MaterialTheme.typography.labelSmall,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
+
 object DiscoveryTestTags {
     const val PERSISTENT_SEARCH_PILL = "discovery_persistent_search_pill"
+    const val BOOK_STATUS_BADGE_PREFIX = "discovery_book_status_badge_"
     const val LATEST_TAB_PREFIX = "latest_tab_"
     const val RANKING_METRIC_PREFIX = "ranking_metric_"
     const val RANKING_PERIOD_PREFIX = "ranking_period_"
@@ -282,21 +339,10 @@ fun DiscoveryNovelCard(
                             modifier = Modifier.weight(1f, fill = false),
                         )
                     }
-                    val displayBookStatus = formatBookStatusLabel(item.bookStatus)
-                    if (displayBookStatus.isNotBlank()) {
-                        Surface(
-                            color = MaterialTheme.colorScheme.secondaryContainer,
-                            contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-                            shape = MaterialTheme.shapes.extraSmall,
-                            modifier = Modifier.einkHairlineBorder(MaterialTheme.shapes.extraSmall),
-                        ) {
-                            Text(
-                                text = displayBookStatus,
-                                style = MaterialTheme.typography.labelSmall,
-                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                            )
-                        }
-                    }
+                    BookStatusBadge(
+                        rawStatus = item.bookStatus,
+                        modifier = Modifier.testTag(DiscoveryTestTags.BOOK_STATUS_BADGE_PREFIX + item.aid),
+                    )
                     if (item.inLocalBookshelf) {
                         Surface(
                             color = MaterialTheme.colorScheme.tertiaryContainer,

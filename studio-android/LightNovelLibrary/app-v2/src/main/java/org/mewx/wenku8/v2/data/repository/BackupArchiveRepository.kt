@@ -234,9 +234,11 @@ class BackupArchiveRepository(
             // Apply portable settings.json (re-anchoring relative custom/* paths)
             val settingsFile = File(stagingDir, ENTRY_SETTINGS_JSON)
             if (settingsFile.isFile && primaryRoot != null) {
+                val existingPrefs = userPreferencesRepository.preferencesFlow.first()
                 val parsedPrefs = decodePortableSettingsJson(
                     rawJson = settingsFile.readText(StandardCharsets.UTF_8),
                     primaryRoot = primaryRoot,
+                    fallbackPrefs = existingPrefs,
                 )
                 userPreferencesRepository.applyImportedPortablePreferences(parsedPrefs)
             }
@@ -351,6 +353,14 @@ class BackupArchiveRepository(
 
                 val aidsAcceptingBackupToc = HashSet<Int>()
                 val newlyRestoredShelfAids = ArrayList<Int>()
+                val existingShelfSnapshot = novelDao.getBookshelfNovelsSnapshot()
+                val occupiedShelfOrders = existingShelfSnapshot.mapTo(HashSet()) { it.shelfSortOrder }
+                var nextAppendedShelfOrder = (existingShelfSnapshot.maxOfOrNull { it.shelfSortOrder } ?: 0) + 1
+
+                fun isPlaceholderTitle(title: String, aid: Int): Boolean {
+                    val trimmed = title.trim()
+                    return trimmed.isEmpty() || trimmed == "AID $aid" || trimmed == "AID #$aid"
+                }
 
                 // 1. Smart-merge novels (union in_bookshelf = 1, never drop shelf membership)
                 for (incoming in incomingNovels) {
@@ -363,24 +373,76 @@ class BackupArchiveRepository(
                         newlyRestoredShelfAids.add(incoming.aid)
                     }
 
+                    val resolvedShelfSortOrder = when {
+                        local != null && local.inBookshelf -> local.shelfSortOrder
+                        incoming.inBookshelf -> {
+                            if (occupiedShelfOrders.add(incoming.shelfSortOrder)) {
+                                nextAppendedShelfOrder = maxOf(nextAppendedShelfOrder, incoming.shelfSortOrder + 1)
+                                incoming.shelfSortOrder
+                            } else {
+                                val assigned = nextAppendedShelfOrder++
+                                occupiedShelfOrders.add(assigned)
+                                assigned
+                            }
+                        }
+                        else -> local?.shelfSortOrder ?: incoming.shelfSortOrder
+                    }
+
                     if (local == null) {
                         novelDao.upsertNovel(
                             incoming.copy(
                                 inBookshelf = unionShelf,
+                                shelfSortOrder = resolvedShelfSortOrder,
                                 cloudSynced = false,
                             ),
                         )
                         aidsAcceptingBackupToc.add(incoming.aid)
                     } else {
-                        val incomingIsNewer = incoming.metaSyncedAtMs >= local.metaSyncedAtMs
+                        val incomingIsNewer = incoming.metaSyncedAtMs > local.metaSyncedAtMs
                         if (incoming.tocVersion > local.tocVersion) {
                             aidsAcceptingBackupToc.add(incoming.aid)
                         }
-                        val mergedNovel = (if (incomingIsNewer) incoming else local).copy(
+                        val primary = if (incomingIsNewer) incoming else local
+                        val secondary = if (incomingIsNewer) local else incoming
+                        val resolvedTitle = when {
+                            !isPlaceholderTitle(primary.title, incoming.aid) -> primary.title
+                            !isPlaceholderTitle(secondary.title, incoming.aid) -> secondary.title
+                            else -> primary.title.ifBlank { "AID ${incoming.aid}" }
+                        }
+                        val detectedNewerSectionOnLocalShelf = wasAlreadyOnLocalShelf &&
+                            local.latestSectionCid > 0 &&
+                            incoming.latestSectionCid > local.latestSectionCid
+
+                        val mergedNovel = primary.copy(
+                            contentLang = primary.contentLang.ifBlank { secondary.contentLang },
+                            title = resolvedTitle,
+                            author = primary.author.ifBlank { secondary.author },
+                            bookStatus = primary.bookStatus.ifBlank { secondary.bookStatus },
+                            pressId = primary.pressId.ifBlank { secondary.pressId },
+                            bookLength = if (primary.bookLength > 0) primary.bookLength else secondary.bookLength,
+                            lastUpdate = primary.lastUpdate.ifBlank { secondary.lastUpdate },
+                            latestSectionCid = maxOf(local.latestSectionCid, incoming.latestSectionCid),
+                            latestSectionName = if (incoming.latestSectionCid >= local.latestSectionCid &&
+                                incoming.latestSectionName.isNotBlank()
+                            ) {
+                                incoming.latestSectionName
+                            } else {
+                                local.latestSectionName.ifBlank { incoming.latestSectionName }
+                            },
+                            dayHits = if (primary.dayHits > 0) primary.dayHits else secondary.dayHits,
+                            totalHits = if (primary.totalHits > 0) primary.totalHits else secondary.totalHits,
+                            pushCount = if (primary.pushCount > 0) primary.pushCount else secondary.pushCount,
+                            favCount = if (primary.favCount > 0) primary.favCount else secondary.favCount,
+                            tagsCsv = primary.tagsCsv.ifBlank { secondary.tagsCsv },
                             inBookshelf = unionShelf,
-                            shelfCategory = if (local.inBookshelf) local.shelfCategory else incoming.shelfCategory,
-                            shelfSortOrder = if (local.inBookshelf) local.shelfSortOrder else incoming.shelfSortOrder,
+                            shelfCategory = if (wasAlreadyOnLocalShelf) local.shelfCategory else incoming.shelfCategory,
+                            shelfSortOrder = resolvedShelfSortOrder,
                             cloudSynced = if (wasAlreadyOnLocalShelf) local.cloudSynced else false,
+                            hasUnreadUpdate = if (wasAlreadyOnLocalShelf) {
+                                local.hasUnreadUpdate || detectedNewerSectionOnLocalShelf
+                            } else {
+                                incoming.hasUnreadUpdate
+                            },
                             tocVersion = maxOf(local.tocVersion, incoming.tocVersion),
                             tocSha256 = if (incoming.tocVersion >= local.tocVersion && incoming.tocSha256.isNotEmpty()) {
                                 incoming.tocSha256
@@ -388,8 +450,8 @@ class BackupArchiveRepository(
                                 local.tocSha256
                             },
                             metaSyncedAtMs = maxOf(local.metaSyncedAtMs, incoming.metaSyncedAtMs),
-                            fullIntro = incoming.fullIntro.ifEmpty { local.fullIntro },
-                            introShort = incoming.introShort.ifEmpty { local.introShort },
+                            fullIntro = primary.fullIntro.ifEmpty { secondary.fullIntro },
+                            introShort = primary.introShort.ifEmpty { secondary.introShort },
                             lastAccessedMs = maxOf(local.lastAccessedMs, incoming.lastAccessedMs),
                         )
                         novelDao.upsertNovel(mergedNovel)
@@ -623,6 +685,8 @@ class BackupArchiveRepository(
             put("einkModeEnabled", prefs.einkModeEnabled)
             put("useDynamicColor", prefs.useDynamicColor)
             put("defaultHomeDestination", prefs.defaultHomeDestination.name)
+            put("bookshelfViewMode", prefs.bookshelfViewMode.name)
+            put("bookshelfSortMode", prefs.bookshelfSortMode.name)
             put("menuBackgroundPresetId", prefs.menuBackgroundPresetId)
             put("menuBackgroundCustomToken", portableCustomToken(prefs.menuBackgroundCustomPath, CustomAssetSlot.MENU_BACKGROUND))
             put("readerFontSizeSp", prefs.readerFontSizeSp)
@@ -640,7 +704,11 @@ class BackupArchiveRepository(
         }.toString(2)
     }
 
-    private fun decodePortableSettingsJson(rawJson: String, primaryRoot: File): Wenku8UserPreferences {
+    private fun decodePortableSettingsJson(
+        rawJson: String,
+        primaryRoot: File,
+        fallbackPrefs: Wenku8UserPreferences = Wenku8UserPreferences(),
+    ): Wenku8UserPreferences {
         val obj = JSONObject(rawJson)
         fun resolveCustomToken(token: String, slot: CustomAssetSlot): String {
             if (token != "custom/${slot.fileName}") return ""
@@ -649,41 +717,49 @@ class BackupArchiveRepository(
         }
 
         val lang = runCatching {
-            Wenku8API.AppLanguage.valueOf(obj.optString("appLanguage", "SC"))
-        }.getOrDefault(Wenku8API.AppLanguage.SC)
+            Wenku8API.AppLanguage.valueOf(obj.optString("appLanguage", fallbackPrefs.appLanguage.name))
+        }.getOrDefault(fallbackPrefs.appLanguage)
         val theme = runCatching {
-            Wenku8ThemeMode.valueOf(obj.optString("themeMode", Wenku8ThemeMode.CLASSIC_BLUE.name))
-        }.getOrDefault(Wenku8ThemeMode.CLASSIC_BLUE)
+            Wenku8ThemeMode.valueOf(obj.optString("themeMode", fallbackPrefs.themeMode.name))
+        }.getOrDefault(fallbackPrefs.themeMode)
         val home = runCatching {
-            DefaultHomeDestination.valueOf(obj.optString("defaultHomeDestination", DefaultHomeDestination.LATEST.name))
-        }.getOrDefault(DefaultHomeDestination.LATEST)
+            DefaultHomeDestination.valueOf(obj.optString("defaultHomeDestination", fallbackPrefs.defaultHomeDestination.name))
+        }.getOrDefault(fallbackPrefs.defaultHomeDestination)
+        val shelfView = runCatching {
+            BookshelfViewMode.valueOf(obj.optString("bookshelfViewMode", fallbackPrefs.bookshelfViewMode.name))
+        }.getOrDefault(fallbackPrefs.bookshelfViewMode)
+        val shelfSort = runCatching {
+            BookshelfSortMode.valueOf(obj.optString("bookshelfSortMode", fallbackPrefs.bookshelfSortMode.name))
+        }.getOrDefault(fallbackPrefs.bookshelfSortMode)
         val pageTurnMode = runCatching {
-            ReaderPageTurnMode.valueOf(obj.optString("readerPageTurnMode", ReaderPageTurnMode.COVER_SLIDE.name))
-        }.getOrDefault(ReaderPageTurnMode.COVER_SLIDE)
+            ReaderPageTurnMode.valueOf(obj.optString("readerPageTurnMode", fallbackPrefs.readerPageTurnMode.name))
+        }.getOrDefault(fallbackPrefs.readerPageTurnMode)
         val paperPreset = runCatching {
-            ReaderPaperPreset.valueOf(obj.optString("readerPaperPreset", ReaderPaperPreset.PARCHMENT.name))
-        }.getOrDefault(ReaderPaperPreset.PARCHMENT)
+            ReaderPaperPreset.valueOf(obj.optString("readerPaperPreset", fallbackPrefs.readerPaperPreset.name))
+        }.getOrDefault(fallbackPrefs.readerPaperPreset)
 
         return Wenku8UserPreferences(
             appLanguage = lang,
             themeMode = theme,
             einkModeEnabled = obj.optBoolean("einkModeEnabled", theme == Wenku8ThemeMode.E_INK),
-            useDynamicColor = obj.optBoolean("useDynamicColor", false),
+            useDynamicColor = obj.optBoolean("useDynamicColor", fallbackPrefs.useDynamicColor),
             defaultHomeDestination = home,
-            menuBackgroundPresetId = obj.optInt("menuBackgroundPresetId", Wenku8UserPreferences.DEFAULT_MENU_BG_PRESET_ID).coerceIn(0, 5),
+            bookshelfViewMode = shelfView,
+            bookshelfSortMode = shelfSort,
+            menuBackgroundPresetId = obj.optInt("menuBackgroundPresetId", fallbackPrefs.menuBackgroundPresetId).coerceIn(0, 5),
             menuBackgroundCustomPath = resolveCustomToken(obj.optString("menuBackgroundCustomToken", ""), CustomAssetSlot.MENU_BACKGROUND),
-            readerFontSizeSp = obj.optInt("readerFontSizeSp", Wenku8UserPreferences.DEFAULT_READER_FONT_SIZE_SP),
-            readerLineDistanceDp = obj.optInt("readerLineDistanceDp", Wenku8UserPreferences.DEFAULT_READER_LINE_DISTANCE_DP),
-            readerParagraphDistanceDp = obj.optInt("readerParagraphDistanceDp", Wenku8UserPreferences.DEFAULT_READER_PARAGRAPH_DISTANCE_DP),
-            readerPageEdgeDistanceDp = obj.optInt("readerPageEdgeDistanceDp", Wenku8UserPreferences.DEFAULT_READER_PAGE_EDGE_DISTANCE_DP),
+            readerFontSizeSp = obj.optInt("readerFontSizeSp", fallbackPrefs.readerFontSizeSp),
+            readerLineDistanceDp = obj.optInt("readerLineDistanceDp", fallbackPrefs.readerLineDistanceDp),
+            readerParagraphDistanceDp = obj.optInt("readerParagraphDistanceDp", fallbackPrefs.readerParagraphDistanceDp),
+            readerPageEdgeDistanceDp = obj.optInt("readerPageEdgeDistanceDp", fallbackPrefs.readerPageEdgeDistanceDp),
             readerCustomFontPath = resolveCustomToken(obj.optString("readerCustomFontToken", ""), CustomAssetSlot.READER_FONT),
             readerCustomBackgroundPath = resolveCustomToken(obj.optString("readerCustomBgToken", ""), CustomAssetSlot.READER_BACKGROUND),
             readerPageTurnMode = pageTurnMode,
             readerPaperPreset = paperPreset,
-            readerKeepScreenOn = obj.optBoolean("readerKeepScreenOn", false),
-            readerEdgeBrightnessDragEnabled = obj.optBoolean("readerEdgeBrightnessDragEnabled", false),
-            volumeKeyPagingEnabled = obj.optBoolean("volumeKeyPagingEnabled", true),
-            autoOptimizeConnectionEnabled = obj.optBoolean("autoOptimizeConnectionEnabled", true),
+            readerKeepScreenOn = obj.optBoolean("readerKeepScreenOn", fallbackPrefs.readerKeepScreenOn),
+            readerEdgeBrightnessDragEnabled = obj.optBoolean("readerEdgeBrightnessDragEnabled", fallbackPrefs.readerEdgeBrightnessDragEnabled),
+            volumeKeyPagingEnabled = obj.optBoolean("volumeKeyPagingEnabled", fallbackPrefs.volumeKeyPagingEnabled),
+            autoOptimizeConnectionEnabled = obj.optBoolean("autoOptimizeConnectionEnabled", fallbackPrefs.autoOptimizeConnectionEnabled),
         )
     }
 

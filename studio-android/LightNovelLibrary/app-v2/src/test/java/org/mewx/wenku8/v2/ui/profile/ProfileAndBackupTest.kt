@@ -33,22 +33,45 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
 import org.junit.runner.RunWith
+import android.content.ContentValues
 import org.mewx.wenku8.api.Wenku8API
+import org.mewx.wenku8.api.Wenku8Error
 import org.mewx.wenku8.v2.data.local.db.Wenku8Database
 import org.mewx.wenku8.v2.data.local.db.entity.BookmarkNoteEntity
 import org.mewx.wenku8.v2.data.local.db.entity.ChapterContentEntity
 import org.mewx.wenku8.v2.data.local.db.entity.ChapterEntity
+import org.mewx.wenku8.v2.data.local.db.entity.CloudBookcaseLedgerEntity
 import org.mewx.wenku8.v2.data.local.db.entity.NovelEntity
 import org.mewx.wenku8.v2.data.local.db.entity.ReadingProgressEntity
 import org.mewx.wenku8.v2.data.local.db.entity.ReadingSessionEntity
 import org.mewx.wenku8.v2.data.local.db.entity.VolumeEntity
 import org.mewx.wenku8.v2.data.local.preferences.UserPreferencesRepository
 import org.mewx.wenku8.v2.data.local.preferences.Wenku8UserPreferences
+import org.mewx.wenku8.v2.data.remote.api.OnlineSearchField
+import org.mewx.wenku8.v2.data.remote.api.WenkuApiResult
+import org.mewx.wenku8.v2.data.remote.api.WenkuCatalogGateway
+import org.mewx.wenku8.v2.data.remote.parser.ParsedCloudBookshelfEntry
+import org.mewx.wenku8.v2.data.remote.parser.ParsedNovelFullMeta
+import org.mewx.wenku8.v2.data.remote.parser.ParsedNovelListItem
+import org.mewx.wenku8.v2.data.remote.parser.ParsedNovelListPage
 import org.mewx.wenku8.v2.data.remote.parser.WenkuXmlParsers
+import org.mewx.wenku8.v2.data.remote.transport.WenkuTransport
+import org.mewx.wenku8.v2.data.repository.AccountAuthGateway
 import org.mewx.wenku8.v2.data.repository.BackupArchiveMode
 import org.mewx.wenku8.v2.data.repository.BackupArchiveRepository
+import org.mewx.wenku8.v2.data.repository.BookshelfRepository
+import org.mewx.wenku8.v2.data.repository.BookshelfSortMode
+import org.mewx.wenku8.v2.data.repository.BookshelfViewMode
+import org.mewx.wenku8.v2.data.repository.CloudBookshelfSyncOutcome
 import org.mewx.wenku8.v2.data.repository.CustomAssetSlot
+import org.mewx.wenku8.v2.data.repository.LoginOutcome
+import org.mewx.wenku8.v2.data.repository.NovelTocSyncRepository
+import org.mewx.wenku8.v2.data.repository.ParsedChapterToc
+import org.mewx.wenku8.v2.data.repository.ParsedVolumeToc
 import org.mewx.wenku8.v2.data.repository.StorageAndCacheRepository
+import org.mewx.wenku8.v2.data.repository.StoredAccountCredentials
+import org.mewx.wenku8.v2.data.repository.AccountSessionState
+import org.mewx.wenku8.v2.data.repository.UserSessionRepository
 import org.mewx.wenku8.v2.ui.navigation.DefaultHomeDestination
 import org.mewx.wenku8.v2.ui.theme.Wenku8ExpressiveTheme
 import org.mewx.wenku8.v2.ui.theme.Wenku8ThemeMode
@@ -564,8 +587,393 @@ class ProfileAndBackupTest {
         }
     }
 
+    @Test
+    fun backupImportConflictMatrix_preservesCredentialsSessionLocalShelfTombstoneResetAndProgress() =
+        runTest(UnconfinedTestDispatcher()) {
+            val sourceDb = buildFileBackedDb("matrix_source")
+            val destDb = buildFileBackedDb("matrix_dest")
+            try {
+                val sourceFilesDir = tempFolder.newFolder("matrix_src_files")
+                val sourceCacheDir = tempFolder.newFolder("matrix_src_cache")
+                val sourcePrefsFile = File(tempFolder.newFolder("matrix_src_prefs"), "settings.preferences_pb")
+                val sourcePrefsRepo = UserPreferencesRepository(
+                    PreferenceDataStoreFactory.create(scope = backgroundScope) { sourcePrefsFile },
+                )
+
+                val destFilesDir = tempFolder.newFolder("matrix_dest_files")
+                val destCacheDir = tempFolder.newFolder("matrix_dest_cache")
+                val destPrefsFile = File(tempFolder.newFolder("matrix_dest_prefs"), "settings.preferences_pb")
+                val destPrefsRepo = UserPreferencesRepository(
+                    PreferenceDataStoreFactory.create(scope = backgroundScope) { destPrefsFile },
+                )
+
+                // 1. Source device is logged in as "alice" with cert.wk8, account_uname.wk8, avatar.jpg, and ledger
+                val sourceSaves = File(sourceFilesDir, "saves").apply { mkdirs() }
+                File(sourceSaves, "cert.wk8").writeText("alice:alice_secret")
+                File(sourceSaves, "account_uname.wk8").writeText("alice")
+                File(sourceSaves, "avatar.jpg").writeBytes(byteArrayOf(1, 2, 3))
+                sourceDb.cloudBookcaseLedgerDao().upsertEntry(
+                    CloudBookcaseLedgerEntity("alice", 9001, CloudBookcaseLedgerEntity.STATE_SYNCED, 1_000L),
+                )
+
+                sourcePrefsRepo.setBookshelfViewMode(BookshelfViewMode.DETAIL_LIST)
+                sourcePrefsRepo.setBookshelfSortMode(BookshelfSortMode.RECENT_READ)
+
+                // Populate Source DB novels + progress + cover + chapter:
+                // - 9001: shared shelf book (source category "备份分类", older progress 20_000L)
+                // - 9002: on shelf in backup (restores a previously deleted book on destination, newer progress 60_000L)
+                // - 9003: equal-timestamp progress 30_000L
+                // - 9004: transient non-shelf book in backup (inBookshelf = false, backup-only progress 40_000L)
+                // - 9005: unhydrated "AID 9005" stub in backup (metaSyncedAtMs = 0) -> must NOT overwrite real local title!
+                sourceDb.novelDao().upsertNovels(
+                    listOf(
+                        NovelEntity(
+                            aid = 9001,
+                            title = "共享书架作品",
+                            author = "作者甲",
+                            inBookshelf = true,
+                            shelfCategory = "备份分类",
+                            shelfSortOrder = 1,
+                            cloudSynced = true,
+                            metaSyncedAtMs = 5_000L,
+                        ),
+                        NovelEntity(
+                            aid = 9002,
+                            title = "备份恢复书架作品",
+                            author = "作者乙",
+                            inBookshelf = true,
+                            shelfCategory = "备份恢复分类",
+                            shelfSortOrder = 1, // intentionally collides with local 9001 sortOrder=1!
+                            cloudSynced = true,
+                            metaSyncedAtMs = 6_000L,
+                        ),
+                        NovelEntity(
+                            aid = 9003,
+                            title = "本地书架且时间戳相同作品",
+                            author = "作者丙",
+                            inBookshelf = false, // non-shelf in backup, shelf locally -> union keeps shelf=true!
+                            metaSyncedAtMs = 3_000L,
+                        ),
+                        NovelEntity(
+                            aid = 9004,
+                            title = "备份路过非书架作品",
+                            author = "作者丁",
+                            inBookshelf = false,
+                            metaSyncedAtMs = 4_000L,
+                        ),
+                        NovelEntity(
+                            aid = 9005,
+                            title = "AID 9005",
+                            author = "",
+                            inBookshelf = false,
+                            metaSyncedAtMs = 0L,
+                        ),
+                    ),
+                )
+                sourceDb.readingProgressDao().upsertProgress(
+                    ReadingProgressEntity(aid = 9001, vid = 10, cid = 101, progressPermille = 200, updatedAtMs = 20_000L),
+                )
+                sourceDb.readingProgressDao().upsertProgress(
+                    ReadingProgressEntity(aid = 9002, vid = 20, cid = 202, progressPermille = 720, updatedAtMs = 60_000L),
+                )
+                sourceDb.readingProgressDao().upsertProgress(
+                    ReadingProgressEntity(aid = 9003, vid = 30, cid = 301, progressPermille = 111, updatedAtMs = 30_000L),
+                )
+                sourceDb.readingProgressDao().upsertProgress(
+                    ReadingProgressEntity(aid = 9004, vid = 40, cid = 401, progressPermille = 310, updatedAtMs = 40_000L),
+                )
+                File(File(sourceFilesDir, "imgs").apply { mkdirs() }, "9001.jpg")
+                    .writeBytes(byteArrayOf(11, 11, 11))
+                File(File(sourceFilesDir, "imgs"), "9002.jpg")
+                    .writeBytes(byteArrayOf(22, 22, 22))
+
+                val sourceBackupRepo = BackupArchiveRepository(
+                    database = sourceDb,
+                    userPreferencesRepository = sourcePrefsRepo,
+                    cacheRootProvider = { sourceCacheDir },
+                    assetRootsProvider = { listOf(sourceFilesDir) },
+                    ioDispatcher = UnconfinedTestDispatcher(testScheduler),
+                )
+                val cleanFullZip = ByteArrayOutputStream().also { out ->
+                    assertTrue(sourceBackupRepo.exportBackupArchive(BackupArchiveMode.FULL_ARCHIVE, out).isSuccess)
+                }.toByteArray()
+                assertFalse(listZipEntryNames(cleanFullZip).any { it.contains("account_uname.wk8") })
+
+                // Inject malicious/tampered credential files into a copy of the archive to verify import defense-in-depth!
+                val tamperedZipBytes = injectZipEntries(
+                    baseZip = cleanFullZip,
+                    extraEntries = mapOf(
+                        "saves/cert.wk8" to "attacker:stolen_pw".toByteArray(),
+                        "saves/account_uname.wk8" to "attacker".toByteArray(),
+                        "saves/avatar.jpg" to byteArrayOf(99, 99, 99),
+                        "network_routing_local.preferences_pb" to "evil_proxy".toByteArray(),
+                    ),
+                )
+
+                // 2. Destination device is actively signed in as "bob"!
+                val bobTransport = object : WenkuTransport {
+                    override val isEndpointConfigured: Boolean = true
+                    override suspend fun postForm(endpointUrl: String, formParams: ContentValues): ByteArray {
+                        return when (formParams.getAsString("action")) {
+                            "userinfo" -> """
+                                <?xml version="1.0" encoding="utf-8"?>
+                                <metadata>
+                                    <item name="uid">202</item>
+                                    <item name="uname"><![CDATA[bob]]></item>
+                                    <item name="nickname"><![CDATA[Bob读者]]></item>
+                                    <item name="score">88</item>
+                                    <item name="experience">120</item>
+                                    <item name="rank">正式会员</item>
+                                </metadata>
+                            """.trimIndent().toByteArray(StandardCharsets.UTF_8)
+                            else -> "1".toByteArray(StandardCharsets.UTF_8)
+                        }
+                    }
+                    override suspend fun getBytes(url: String): ByteArray? = byteArrayOf(7, 8, 9)
+                    override fun clearSessionCookie() = Unit
+                }
+                val bobAuthGateway = object : AccountAuthGateway {
+                    override val isAuthConfigured: Boolean = true
+                    override val baseUrlOrEmpty: String = "https://relay.example.test/android.php"
+                    override val registerUrlOrEmpty: String = ""
+                    override fun loginParams(identifier: String, password: String): ContentValues =
+                        ContentValues().apply { put("action", "login") }
+                    override fun logoutParams(): ContentValues =
+                        ContentValues().apply { put("action", "logout") }
+                    override fun userInfoParams(): ContentValues =
+                        ContentValues().apply { put("action", "userinfo") }
+                    override fun userSignParams(): ContentValues =
+                        ContentValues().apply { put("action", "sign") }
+                    override fun avatarUrlForUid(uid: Int): String = "https://img.example.test/bob.jpg"
+                    override fun mapServerErrorCode(rawCode: Int): Wenku8Error.ErrorCode =
+                        Wenku8Error.ErrorCode.SYSTEM_1_SUCCEEDED
+                    override fun decodeCertBlob(rawCertContent: String): StoredAccountCredentials? {
+                        val parts = rawCertContent.split(":", limit = 2)
+                        return if (parts.size == 2) StoredAccountCredentials(parts[0], parts[1]) else null
+                    }
+                    override fun encodeCertBlob(identifier: String, password: String): String = "$identifier:$password"
+                    override fun syncInMemoryCredentials(identifier: String, password: String) = Unit
+                    override fun clearInMemorySession() = Unit
+                }
+                val bobSessionRepo = UserSessionRepository(
+                    transport = bobTransport,
+                    assetRootsProvider = { listOf(destFilesDir) },
+                    authGateway = bobAuthGateway,
+                    ioDispatcher = UnconfinedTestDispatcher(testScheduler),
+                )
+                assertTrue(bobSessionRepo.loginWithCredentials("bob", "bob_secret") is LoginOutcome.Success)
+                assertTrue(bobSessionRepo.sessionState.value is AccountSessionState.SignedIn)
+
+                // Pre-existing local cover for 9001 must NOT be overwritten by backup's 9001.jpg
+                val destCover9001 = File(File(destFilesDir, "imgs").apply { mkdirs() }, "9001.jpg").apply {
+                    writeBytes(byteArrayOf(77, 77, 77))
+                }
+
+                // Seed Destination DB:
+                // - 9001: on Bob's shelf (category "本地精选", sortOrder 1, cloudSynced=true, STATE_SYNCED) + newer progress 50_000L
+                // - 9002: previously deleted locally by Bob (inBookshelf=false, STATE_PENDING_DELETE tombstone!) + older progress 10_000L
+                // - 9003: on Bob's shelf (sortOrder 2) while non-shelf in backup + equal-timestamp progress 30_000L (permille 555)
+                // - 9005: local populated metadata ("冰菓" / "米泽穗信", metaSyncedAtMs = 0) + local-only progress 45_000L
+                // - 9006: local-only shelf book completely absent from backup (sortOrder 3)
+                destDb.novelDao().upsertNovels(
+                    listOf(
+                        NovelEntity(
+                            aid = 9001,
+                            title = "共享书架作品",
+                            author = "作者甲",
+                            inBookshelf = true,
+                            shelfCategory = "本地精选",
+                            shelfSortOrder = 1,
+                            cloudSynced = true,
+                            metaSyncedAtMs = 2_000L,
+                        ),
+                        NovelEntity(
+                            aid = 9002,
+                            title = "备份恢复书架作品",
+                            author = "作者乙",
+                            inBookshelf = false,
+                            cloudSynced = false,
+                            metaSyncedAtMs = 1_000L,
+                        ),
+                        NovelEntity(
+                            aid = 9003,
+                            title = "本地书架且时间戳相同作品",
+                            author = "作者丙",
+                            inBookshelf = true,
+                            shelfCategory = "本地分类",
+                            shelfSortOrder = 2,
+                            cloudSynced = true,
+                            metaSyncedAtMs = 3_000L,
+                        ),
+                        NovelEntity(
+                            aid = 9005,
+                            title = "冰菓",
+                            author = "米泽穗信",
+                            inBookshelf = false,
+                            metaSyncedAtMs = 0L,
+                        ),
+                        NovelEntity(
+                            aid = 9006,
+                            title = "备份完全不存在的本地独有藏书",
+                            author = "作者己",
+                            inBookshelf = true,
+                            shelfCategory = "独有分类",
+                            shelfSortOrder = 3,
+                            cloudSynced = true,
+                            metaSyncedAtMs = 3_500L,
+                        ),
+                    ),
+                )
+                destDb.cloudBookcaseLedgerDao().upsertEntries(
+                    listOf(
+                        CloudBookcaseLedgerEntity("bob", 9001, CloudBookcaseLedgerEntity.STATE_SYNCED, 2_000L),
+                        CloudBookcaseLedgerEntity("bob", 9002, CloudBookcaseLedgerEntity.STATE_PENDING_DELETE, 2_500L),
+                        CloudBookcaseLedgerEntity("bob", 9003, CloudBookcaseLedgerEntity.STATE_SYNCED, 3_000L),
+                        CloudBookcaseLedgerEntity("bob", 9006, CloudBookcaseLedgerEntity.STATE_SYNCED, 3_500L),
+                    ),
+                )
+                destDb.readingProgressDao().upsertProgress(
+                    ReadingProgressEntity(aid = 9001, vid = 10, cid = 109, progressPermille = 880, updatedAtMs = 50_000L),
+                )
+                destDb.readingProgressDao().upsertProgress(
+                    ReadingProgressEntity(aid = 9002, vid = 20, cid = 201, progressPermille = 50, updatedAtMs = 10_000L),
+                )
+                destDb.readingProgressDao().upsertProgress(
+                    ReadingProgressEntity(aid = 9003, vid = 30, cid = 301, progressPermille = 555, updatedAtMs = 30_000L),
+                )
+                destDb.readingProgressDao().upsertProgress(
+                    ReadingProgressEntity(aid = 9005, vid = 50, cid = 501, progressPermille = 910, updatedAtMs = 45_000L),
+                )
+
+                val destBackupRepo = BackupArchiveRepository(
+                    database = destDb,
+                    userPreferencesRepository = destPrefsRepo,
+                    cacheRootProvider = { destCacheDir },
+                    assetRootsProvider = { listOf(destFilesDir) },
+                    ioDispatcher = UnconfinedTestDispatcher(testScheduler),
+                )
+
+                // 3. Import tampered archive onto Bob's device!
+                val importRes = destBackupRepo.importBackupArchiveSmartMerge(ByteArrayInputStream(tamperedZipBytes))
+                assertTrue("Import must succeed cleanly: ${importRes.exceptionOrNull()}", importRes.isSuccess)
+
+                // A. Credentials & Active Login State: 100% untouched!
+                val bobStateAfter = bobSessionRepo.sessionState.value
+                assertTrue(bobStateAfter is AccountSessionState.SignedIn)
+                assertEquals("bob", (bobStateAfter as AccountSessionState.SignedIn).profile.username)
+                assertEquals("bob:bob_secret", File(destFilesDir, "saves/cert.wk8").readText())
+                assertEquals("bob", File(destFilesDir, "saves/account_uname.wk8").readText())
+                assertEquals(listOf<Byte>(7, 8, 9), File(destFilesDir, "saves/avatar.jpg").readBytes().toList())
+                assertFalse(File(destFilesDir, "network_routing_local.preferences_pb").exists())
+                assertTrue(destDb.cloudBookcaseLedgerDao().getEntriesForAccount("alice").isEmpty())
+
+                // B. Bookshelf Membership, Categories, Sort Order & Stub Protection:
+                val shelfMap = destDb.novelDao().getBookshelfNovelsSnapshot().associateBy { it.aid }
+                assertEquals(setOf(9001, 9002, 9003, 9006), shelfMap.keys)
+
+                // 9001 kept local category, local sortOrder=1, and cloudSynced=true!
+                assertEquals("本地精选", shelfMap.getValue(9001).shelfCategory)
+                assertEquals(1, shelfMap.getValue(9001).shelfSortOrder)
+                assertTrue(shelfMap.getValue(9001).cloudSynced)
+
+                // 9002 restored onto shelf with backup category, cloudSynced=false, non-colliding sortOrder (>3),
+                // AND its STATE_PENDING_DELETE tombstone under "bob" was cleared so next sync pushes it up!
+                assertEquals("备份恢复分类", shelfMap.getValue(9002).shelfCategory)
+                assertFalse(shelfMap.getValue(9002).cloudSynced)
+                assertTrue(shelfMap.getValue(9002).shelfSortOrder > 3)
+                assertNull(destDb.cloudBookcaseLedgerDao().getEntry("bob", 9002))
+
+                // 9004 remained non-bookshelf; 9005 kept real title "冰菓" & author "米泽穗信"!
+                assertFalse(destDb.novelDao().getNovelByAid(9004)!!.inBookshelf)
+                assertEquals("冰菓", destDb.novelDao().getNovelByAid(9005)?.title)
+                assertEquals("米泽穗信", destDb.novelDao().getNovelByAid(9005)?.author)
+
+                // Verify subsequent Cloud Bookcase Sync pushes restored 9002 up to Bob's cloud shelf!
+                val pushedBySync = mutableListOf<Int>()
+                val syncGateway = object : WenkuCatalogGateway {
+                    override val isApiConfigured: Boolean = true
+                    override fun resolveCoverUrl(aid: Int): String = ""
+                    override suspend fun fetchNovelListPage(sortedBy: Wenku8API.NovelSortedBy, pageNumber: Int, appLanguage: Wenku8API.AppLanguage) =
+                        WenkuApiResult.ApiNotConfigured
+                    override suspend fun searchNovelsByField(query: String, searchField: OnlineSearchField, appLanguage: Wenku8API.AppLanguage) =
+                        WenkuApiResult.ApiNotConfigured
+                    override suspend fun fetchNovelShortInfo(aid: Int, appLanguage: Wenku8API.AppLanguage) =
+                        WenkuApiResult.ApiNotConfigured
+                    override suspend fun fetchNovelFullMeta(aid: Int, appLanguage: Wenku8API.AppLanguage) =
+                        WenkuApiResult.Success(ParsedNovelFullMeta(aid = aid, title = "作品 $aid", lastUpdate = "2026-03-01"))
+                    override suspend fun fetchNovelFullIntro(aid: Int, appLanguage: Wenku8API.AppLanguage) =
+                        WenkuApiResult.Success("简介")
+                    override suspend fun fetchNovelVolumeToc(aid: Int, appLanguage: Wenku8API.AppLanguage) =
+                        WenkuApiResult.Success(listOf(ParsedVolumeToc(vid = 1, volumeTitle = "第一卷", chapters = listOf(ParsedChapterToc(cid = 2, chapterTitle = "第一话")))))
+                    override suspend fun fetchChapterContent(aid: Int, cid: Int, appLanguage: Wenku8API.AppLanguage) =
+                        WenkuApiResult.Success("正文")
+                    override suspend fun fetchCloudBookshelf(appLanguage: Wenku8API.AppLanguage) =
+                        WenkuApiResult.Success(
+                            listOf(
+                                ParsedCloudBookshelfEntry(aid = 9001, lastUpdateDate = "2026-03-01", title = "共享书架作品", latestChapterCid = 109),
+                                ParsedCloudBookshelfEntry(aid = 9003, lastUpdateDate = "2026-03-01", title = "本地书架且时间戳相同作品", latestChapterCid = 301),
+                                ParsedCloudBookshelfEntry(aid = 9006, lastUpdateDate = "2026-03-01", title = "备份完全不存在的本地独有藏书", latestChapterCid = 601),
+                            ),
+                        )
+                    override suspend fun addToCloudBookshelf(aid: Int): WenkuApiResult<Unit> {
+                        pushedBySync += aid
+                        return WenkuApiResult.Success(Unit)
+                    }
+                }
+                val bobShelfRepo = BookshelfRepository(
+                    database = destDb,
+                    catalogGateway = syncGateway,
+                    novelTocSyncRepository = NovelTocSyncRepository(destDb),
+                    userSessionRepository = bobSessionRepo,
+                    ioDispatcher = UnconfinedTestDispatcher(testScheduler),
+                )
+                val syncAfterImport = bobShelfRepo.syncWithCloudBookcase(Wenku8API.AppLanguage.SC) as CloudBookshelfSyncOutcome.Success
+                assertEquals(1, syncAfterImport.pushedToCloudCount)
+                assertEquals(listOf(9002), pushedBySync)
+
+                // C. Reading Progress Conflict Matrix (`MAX(updated_at_ms)`):
+                assertEquals(880, destDb.readingProgressDao().getProgressForNovel(9001)?.progressPermille) // local newer kept
+                assertEquals(720, destDb.readingProgressDao().getProgressForNovel(9002)?.progressPermille) // backup newer won
+                assertEquals(555, destDb.readingProgressDao().getProgressForNovel(9003)?.progressPermille) // equal timestamp kept local
+                assertEquals(310, destDb.readingProgressDao().getProgressForNovel(9004)?.progressPermille) // backup-only inserted
+                assertEquals(910, destDb.readingProgressDao().getProgressForNovel(9005)?.progressPermille) // local-only preserved
+
+                // D. Cover Non-Overwrite & Portable Bookshelf View/Sort Preferences:
+                assertEquals(listOf<Byte>(77, 77, 77), destCover9001.readBytes().toList())
+                assertEquals(listOf<Byte>(22, 22, 22), File(destFilesDir, "imgs/9002.jpg").readBytes().toList())
+
+                val prefsAfter = destPrefsRepo.preferencesFlow.first()
+                assertEquals(BookshelfViewMode.DETAIL_LIST, prefsAfter.bookshelfViewMode)
+                assertEquals(BookshelfSortMode.RECENT_READ, prefsAfter.bookshelfSortMode)
+            } finally {
+                sourceDb.close()
+                destDb.close()
+            }
+        }
+
     private fun Modifier.composeTestTagForLazyList(): Modifier =
         this.testTag(ProfileStudioTestTags.LIST)
+
+    private fun injectZipEntries(baseZip: ByteArray, extraEntries: Map<String, ByteArray>): ByteArray {
+        val out = ByteArrayOutputStream()
+        ZipOutputStream(out).use { zos ->
+            ZipInputStream(ByteArrayInputStream(baseZip)).use { zis ->
+                while (true) {
+                    val entry = zis.nextEntry ?: break
+                    zos.putNextEntry(ZipEntry(entry.name))
+                    zis.copyTo(zos)
+                    zos.closeEntry()
+                    zis.closeEntry()
+                }
+            }
+            for ((name, bytes) in extraEntries) {
+                zos.putNextEntry(ZipEntry(name))
+                zos.write(bytes)
+                zos.closeEntry()
+            }
+        }
+        return out.toByteArray()
+    }
 
     private fun listZipEntryNames(zipBytes: ByteArray): Set<String> {
         val names = LinkedHashSet<String>()

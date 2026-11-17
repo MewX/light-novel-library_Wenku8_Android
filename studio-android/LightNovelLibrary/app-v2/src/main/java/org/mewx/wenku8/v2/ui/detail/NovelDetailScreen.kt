@@ -96,6 +96,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
@@ -130,6 +131,7 @@ import org.mewx.wenku8.v2.data.repository.VolumeAccordionModel
 import org.mewx.wenku8.v2.domain.model.DiscoveryNovelCardItem
 import org.mewx.wenku8.v2.ui.components.ActionTooltipBox
 import org.mewx.wenku8.v2.ui.components.TooltipIconButton
+import org.mewx.wenku8.v2.ui.discovery.bookStatusLeadingIcon
 import org.mewx.wenku8.v2.ui.discovery.formatBookStatusLabel
 import org.mewx.wenku8.v2.ui.theme.CoverThemeEngine
 import org.mewx.wenku8.v2.ui.theme.LocalEinkMode
@@ -146,6 +148,7 @@ object NovelDetailTestTags {
     const val SHARE_BUTTON = "novel_detail_share_button"
     const val REFRESH_BUTTON = "novel_detail_refresh_button"
     const val NOVEL_TITLE_TEXT = "novel_detail_title_text"
+    const val BOOK_STATUS_BADGE = "novel_detail_book_status_badge"
     const val TITLE_DIALOG = "novel_detail_title_dialog"
     const val TITLE_DIALOG_COPY_BUTTON = "novel_detail_title_dialog_copy"
     const val AUTHOR_TRIGGER = "novel_detail_author_trigger"
@@ -343,9 +346,12 @@ fun NovelDetailScreen(
                         aid = aid,
                         appLanguage = appLanguage,
                         fallbackSeedItem = seedDiscoveryItem,
+                        forceRefresh = manual,
                     )
                 ) {
-                    NovelDetailRefreshOutcome.Success -> {
+                    NovelDetailRefreshOutcome.Success,
+                    NovelDetailRefreshOutcome.SkippedFreshCache,
+                    -> {
                         showOfflinePreservedBanner = false
                     }
                     NovelDetailRefreshOutcome.OfflineOrCachedOnly -> {
@@ -1089,6 +1095,8 @@ private fun NovelHeroHeaderCard(
                                 text = displayBookStatus,
                                 containerColor = MaterialTheme.colorScheme.secondaryContainer,
                                 contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                                leadingIcon = bookStatusLeadingIcon(displayBookStatus),
+                                modifier = Modifier.testTag(NovelDetailTestTags.BOOK_STATUS_BADGE),
                             )
                         }
                     }
@@ -2038,20 +2046,34 @@ private fun BadgePill(
     text: String,
     containerColor: Color,
     contentColor: Color,
+    leadingIcon: ImageVector? = null,
+    modifier: Modifier = Modifier,
 ) {
     Surface(
         color = containerColor,
         contentColor = contentColor,
         shape = MaterialTheme.shapes.extraSmall,
-        modifier = Modifier.einkHairlineBorder(MaterialTheme.shapes.extraSmall),
+        modifier = modifier.einkHairlineBorder(MaterialTheme.shapes.extraSmall),
     ) {
-        Text(
-            text = text,
-            style = MaterialTheme.typography.labelSmall,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
+        Row(
             modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-        )
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(3.dp),
+        ) {
+            if (leadingIcon != null) {
+                Icon(
+                    imageVector = leadingIcon,
+                    contentDescription = null,
+                    modifier = Modifier.size(12.dp),
+                )
+            }
+            Text(
+                text = text,
+                style = MaterialTheme.typography.labelSmall,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
     }
 }
 
