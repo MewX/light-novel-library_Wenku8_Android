@@ -5,15 +5,13 @@ apply plugin: 'org.jetbrains.kotlin.plugin.serialization'
 apply plugin: 'com.google.devtools.ksp'
 
 android {
-    namespace 'org.mewx.wenku8.v2'
+    namespace 'org.mewx.wenku8'
     compileSdkVersion rootProject.targetSdkVersion
     buildToolsVersion rootProject.buildToolsVersion
 
     defaultConfig {
-        // Isolated dev package ID during v2.0 parallel development so installing :app-v2 on a
-        // device never overwrites or collides with the production v1.31 app ("org.mewx.wenku8").
-        // Cutover to "org.mewx.wenku8" happens at the final release milestone.
-        applicationId "org.mewx.wenku8.v2dev"
+        // Production package ID matching v1 on Google Play Store for seamless in-place upgrades.
+        applicationId "org.mewx.wenku8"
         // Material 3 Expressive (androidx.compose.material3:1.5.0-beta01 / 1.5.0-rc01+) officially
         // requires minSdk 24 (Android 7.0 Nougat) per AndroidX's 2026 baseline.
         minSdkVersion 24

@@ -15,11 +15,9 @@
         android:theme="@style/Theme.Wenku8V2"
         android:usesCleartextTraffic="true">
 
-        <!-- Official Google test AdMob App ID while developing under org.mewx.wenku8.v2dev.
-             Switch to production App ID (ca-app-pub-7333757578973883~9635263460) at final cutover. -->
         <meta-data
             android:name="com.google.android.gms.ads.APPLICATION_ID"
-            android:value="ca-app-pub-3940256099942544~3347511713" />
+            android:value="ca-app-pub-7333757578973883~9635263460" />
         <meta-data
             android:name="com.google.android.gms.ads.flag.OPTIMIZE_INITIALIZATION"
             android:value="true" />
@@ -30,12 +28,19 @@
         <activity
             android:name=".MainActivity"
             android:exported="true"
-            android:windowSoftInputMode="adjustResize">
+            android:windowSoftInputMode="adjustResize" />
+
+        <!-- Preserves Play Store v1.x pinned launcher shortcuts (org.mewx.wenku8.activity.MainActivity)
+             on in-place upgrade without creating duplicate app-drawer icons. -->
+        <activity-alias
+            android:name="org.mewx.wenku8.activity.MainActivity"
+            android:exported="true"
+            android:targetActivity=".MainActivity">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-        </activity>
+        </activity-alias>
 
         <provider
             android:name="androidx.core.content.FileProvider"
