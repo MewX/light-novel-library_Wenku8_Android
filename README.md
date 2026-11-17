@@ -22,7 +22,7 @@
   - [2.0 源代码结构与架构](#app-2.0-source)
   - [2.0 技术栈与开源依赖](#v2-libs)
   - [编译构建说明（`:api` 与 `api-stub`）](#build-guide)
-- [仓库目录说明（`v1` / `v2` 归档结构）](#dir-info)
+- [仓库目录说明（`v0` / `v1` / `v2` 归档结构）](#dir-info)
 - [1.x 与 0.5.2.1 历史版本归档](#v1-archive)
   - [1.x 写在前面（2015 开源手记）](#foreword)
   - [1.x 版本视图与源代码结构](#app-1.x-info)
@@ -181,7 +181,7 @@ cd studio-android/LightNovelLibrary
 
 ---
 
-## <a id="dir-info"></a>仓库目录说明（`v1` / `v2` 归档结构）
+## <a id="dir-info"></a>仓库目录说明（`v0` / `v1` / `v2` 归档结构）
 
 1. **`studio-android/LightNovelLibrary/`** —— Android Studio 多模块主工程：
    - **`app-v2/`**：**`2.0` 正式版完整源码**（Kotlin + Jetpack Compose + Material 3 Expressive，包名 `org.mewx.wenku8`）。
@@ -192,7 +192,8 @@ cd studio-android/LightNovelLibrary
    - **`docs/designs/v1/`**：`1.x` 版本由设计师提供的 `PxCook` Material Design 1 标注稿（原根目录 `design-source/`）。
 3. **`screenshots/`** —— 按世代划分的应用实机截图：
    - **`screenshots/v2/`**：`2.0` 版本 Google Pixel 8 实机高清截图与缩略图。
-   - **`screenshots/v1/`**：`1.x` 与 `0.5.2.1` 历史版本截图归档。
+   - **`screenshots/v1/`**：`1.x`（Material Design 1）历史版本截图归档。
+   - **`screenshots/v0/`**：`0.5.2.x` 早期典藏版历史截图归档。
 4. **`graph-source/`** —— 品牌图标、轻小说文库高清重绘 Logo、Google Play 徽章及早期 Fireworks 制图源文件。
 5. **`eclipse-android/` & `eclipse-android-old/`** —— 2014 年早期 `0.5.1`（Eclipse ADT）与 `0.5.2.1` 典藏版历史源码归档。
 
@@ -201,7 +202,7 @@ cd studio-android/LightNovelLibrary
 # <a id="v1-archive"></a>1.x 与 0.5.2.1 历史版本归档
 
 > [!NOTE]
-> 以下内容完整保留自 `1.x`（2015 Material Design 1 版）与 `0.5.2.1` 典藏版的原始开源文档，图片与设计稿路径已同步更新至 `screenshots/v1/`、`docs/designs/v1/` 与 `app-v1/`，供查阅项目十年演进历程参考。
+> 以下内容完整保留自 `1.x`（2015 Material Design 1 版）与 `0.5.2.1` 典藏版的原始开源文档，图片与设计稿路径已同步更新至 `screenshots/v1/`、`screenshots/v0/`、`docs/designs/v1/` 与 `app-v1/`，供查阅项目十年演进历程参考。
 
 
 <a id="foreword"></a>写在前面
@@ -455,11 +456,11 @@ Material Design风格的`轻小说文库`App**完全**开源了！想实践Mater
 
 ### <a id="app-0520-preview"></a>预览图
 
-[![0520-cover](screenshots/v1/0520-cover.thumb.jpg)](screenshots/v1/0520-cover.jpg)
-[![0520-menu](screenshots/v1/0520-menu.thumb.jpg)](screenshots/v1/0520-menu.jpg)
-[![0520-list](screenshots/v1/0520-list.thumb.jpg)](screenshots/v1/0520-list.jpg)
-[![0520-info](screenshots/v1/0520-info.thumb.jpg)](screenshots/v1/0520-info.jpg)
-[![0520-reader](screenshots/v1/0520-reader.thumb.jpg)](screenshots/v1/0520-reader.jpg)
+[![0520-cover](screenshots/v0/0520-cover.thumb.jpg)](screenshots/v0/0520-cover.jpg)
+[![0520-menu](screenshots/v0/0520-menu.thumb.jpg)](screenshots/v0/0520-menu.jpg)
+[![0520-list](screenshots/v0/0520-list.thumb.jpg)](screenshots/v0/0520-list.jpg)
+[![0520-info](screenshots/v0/0520-info.thumb.jpg)](screenshots/v0/0520-info.jpg)
+[![0520-reader](screenshots/v0/0520-reader.thumb.jpg)](screenshots/v0/0520-reader.jpg)
 
 
 ### <a id="app-0520-source"></a>源代码结构
@@ -607,7 +608,7 @@ Material Design风格的`轻小说文库`App**完全**开源了！想实践Mater
 ## <a id="umeng"></a>UMENG统计数据（2015/10/01残念）
 
 [![1.x-statistic](screenshots/v1/1.x-statistic-20151001.thumb.jpg)](screenshots/v1/1.x-statistic-20151001.jpg)
-[![0520-statistic](screenshots/v1/0520-statistic-20151001.thumb.jpg)](screenshots/v1/0520-statistic-20151001.jpg)
+[![0520-statistic](screenshots/v0/0520-statistic-20151001.thumb.jpg)](screenshots/v0/0520-statistic-20151001.jpg)
 
 新版的app用户量10天增长到了1W用户量，全是托wenku8的福。照现在的增长速度速度估计用户量峰值是3W左右。
 

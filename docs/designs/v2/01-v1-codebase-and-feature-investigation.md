@@ -35,7 +35,7 @@ flowchart LR
 | `studio-android/LightNovelLibrary/STABILITY_PLAN.md` | 1,877-line engineering diagnosis & refactoring log addressing the 4 systemic root causes of `1.x` crashes and extracting pure-JVM testable seams (`ChapterNavigator`, `ChapterContentLoader`, `WenkuReaderPaginator`, `AccountInfoLoader`, `BookshelfSync`, `NovelDownloader`). |
 | `studio-android/LightNovelLibrary/STORAGE_MIGRATION_PLAN.md` | Proposal to replace hand-rolled `.wk8` delimiter files and direct `LightCache` calls (~104 call sites) with **Preferences DataStore** (settings) and **Room SQLite** (bookshelf, reading positions, search history, volume index, chapter completeness rows) while keeping chapter XML and images on disk. |
 | `studio-android/LightNovelLibrary/api/docs/` | Relay v1/v2 architecture (`relay-versioning-and-reuse.md`), hardware key attestation (`hardware-key-attestation-design.md`), client hardening, and Chinese OEM compatibility plans. |
-| `docs/designs/v1/` & `screenshots/v1/` | 2015 Material Design 1 UI mockups (`PxCook` specs) and historical `0.5.2.0` / `1.x` screenshots. |
+| `docs/designs/v1/` & `screenshots/{v0,v1}/` | 2015 Material Design 1 UI mockups (`PxCook` specs) and historical `0.5.2.0` (`v0`) / `1.x` (`v1`) screenshots. |
 | `eclipse-android/` & `eclipse-android-old/` | Historical `0.5.1` and `0.5.2.1` ("典藏版") sources preserved for reference. |
 | `studio-android/pending-to-do.txt` | Historical developer backlog (in-book text search, TTS reading, EPUB export, download pause/cancel, per-volume cache management, auto-page turn). |
 
