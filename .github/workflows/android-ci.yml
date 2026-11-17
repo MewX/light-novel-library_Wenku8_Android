@@ -23,9 +23,9 @@ jobs:
     steps:
     # Deliberately no `submodules:` -- api/ is private, so CI falls back to api-stub
     # via the check in settings.gradle.
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     - name: Set up JDK 21
-      uses: actions/setup-java@v4
+      uses: actions/setup-java@v5
       with:
         java-version: '21'
         distribution: 'temurin'
@@ -60,7 +60,7 @@ jobs:
 
     - name: Upload unit test reports
       if: always()
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v6
       with:
         name: unit-test-results
         path: |
@@ -80,8 +80,9 @@ jobs:
         flag-name: jvm-v2
         parallel: true
         github-token: ${{ secrets.GITHUB_TOKEN }}
-        repo-token: ${{ secrets.COVERALLS_REPO_TOKEN }}
         fail-on-error: false
+      env:
+        COVERALLS_REPO_TOKEN: ${{ secrets.COVERALLS_REPO_TOKEN }}
 
     - name: Upload app-v1 JVM coverage to Coveralls
       uses: coverallsapp/github-action@v2
@@ -92,8 +93,9 @@ jobs:
         flag-name: jvm
         parallel: true
         github-token: ${{ secrets.GITHUB_TOKEN }}
-        repo-token: ${{ secrets.COVERALLS_REPO_TOKEN }}
         fail-on-error: false
+      env:
+        COVERALLS_REPO_TOKEN: ${{ secrets.COVERALLS_REPO_TOKEN }}
 
   instrumented-test:
     name: Instrumented tests (:app-v1 emulator)
@@ -102,9 +104,9 @@ jobs:
     steps:
     # Deliberately no `submodules:` -- api/ is private, so CI falls back to api-stub
     # via the check in settings.gradle.
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     - name: Set up JDK 21
-      uses: actions/setup-java@v4
+      uses: actions/setup-java@v5
       with:
         java-version: '21'
         distribution: 'temurin'
@@ -152,7 +154,7 @@ jobs:
 
     - name: Upload instrumented test report
       if: always()
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v6
       with:
         name: instrumented-test-results
         path: studio-android/LightNovelLibrary/app-v1/build/reports/androidTests/
@@ -179,8 +181,9 @@ jobs:
         flag-name: instrumented
         parallel: true
         github-token: ${{ secrets.GITHUB_TOKEN }}
-        repo-token: ${{ secrets.COVERALLS_REPO_TOKEN }}
         fail-on-error: false
+      env:
+        COVERALLS_REPO_TOKEN: ${{ secrets.COVERALLS_REPO_TOKEN }}
 
   coverage-finish:
     name: Publish merged coverage
@@ -194,5 +197,6 @@ jobs:
         parallel-finished: true
         carryforward: jvm,jvm-v2,instrumented
         github-token: ${{ secrets.GITHUB_TOKEN }}
-        repo-token: ${{ secrets.COVERALLS_REPO_TOKEN }}
         fail-on-error: false
+      env:
+        COVERALLS_REPO_TOKEN: ${{ secrets.COVERALLS_REPO_TOKEN }}
