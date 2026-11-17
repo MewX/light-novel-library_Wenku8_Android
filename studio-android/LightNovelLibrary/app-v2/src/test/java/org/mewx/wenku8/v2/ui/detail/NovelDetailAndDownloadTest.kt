@@ -362,9 +362,41 @@ class NovelDetailAndDownloadTest {
         composeTestRule.onNodeWithTag(NovelDetailTestTags.SERVER_SUPPORT_AD_SLOT)
             .assertHeightIsAtLeast(50.dp)
 
-        // Volume illustration chip jumps straight to cid 102
+        // Volume headers must NOT show an underneath "插图章节" chip and must keep uniform height
+        // regardless of whether a volume contains an illustration chapter!
         listNode.performScrollToNode(hasTestTag(NovelDetailTestTags.VOLUME_HEADER_PREFIX + "10"))
-        composeTestRule.onNodeWithTag(NovelDetailTestTags.VOLUME_ILLUS_CHIP_PREFIX + "10")
+        assertEquals(
+            0,
+            composeTestRule.onAllNodesWithTag(NovelDetailTestTags.VOLUME_ILLUS_CHIP_PREFIX + "10")
+                .fetchSemanticsNodes().size,
+        )
+        composeTestRule.onNodeWithText("插图章节").assertDoesNotExist()
+        val vol10HeaderHeight = composeTestRule
+            .onNodeWithTag(NovelDetailTestTags.VOLUME_HEADER_PREFIX + "10")
+            .fetchSemanticsNode()
+            .boundsInRoot
+            .height
+        listNode.performScrollToNode(hasTestTag(NovelDetailTestTags.VOLUME_HEADER_PREFIX + "20"))
+        val vol20HeaderHeight = composeTestRule
+            .onNodeWithTag(NovelDetailTestTags.VOLUME_HEADER_PREFIX + "20")
+            .fetchSemanticsNode()
+            .boundsInRoot
+            .height
+        assertTrue(
+            "Volume headers with and without illustrations must have uniform height (got $vol10HeaderHeight vs $vol20HeaderHeight)",
+            kotlin.math.abs(vol10HeaderHeight - vol20HeaderHeight) <= 1f,
+        )
+
+        // Clicking the illustration chapter row inside expanded Volume 10 launches cid 102
+        if (composeTestRule.onAllNodesWithTag(NovelDetailTestTags.CHAPTER_ROW_PREFIX + "102")
+                .fetchSemanticsNodes().isEmpty()
+        ) {
+            listNode.performScrollToNode(hasTestTag(NovelDetailTestTags.VOLUME_HEADER_PREFIX + "10"))
+            composeTestRule.onNodeWithTag(NovelDetailTestTags.VOLUME_HEADER_PREFIX + "10").performClick()
+            composeTestRule.waitForIdle()
+        }
+        listNode.performScrollToNode(hasTestTag(NovelDetailTestTags.CHAPTER_ROW_PREFIX + "102"))
+        composeTestRule.onNodeWithTag(NovelDetailTestTags.CHAPTER_ROW_PREFIX + "102")
             .performClick()
         assertEquals(102, lastReaderLaunch?.cid)
 

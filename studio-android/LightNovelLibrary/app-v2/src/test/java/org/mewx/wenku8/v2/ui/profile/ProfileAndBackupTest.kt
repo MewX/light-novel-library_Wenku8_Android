@@ -11,6 +11,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -533,8 +534,12 @@ class ProfileAndBackupTest {
             composeTestRule.onNodeWithTag(ProfileStudioTestTags.LIST)
                 .performScrollToNode(hasTestTag(ProfileStudioTestTags.FAST_CLEAN_BUTTON))
             composeTestRule.onNodeWithTag(ProfileStudioTestTags.FAST_CLEAN_BUTTON).performClick()
-            composeTestRule.waitUntil(timeoutMillis = 3_000L) {
-                !File(cacheDir, "stale.tmp").exists()
+            composeTestRule.waitUntil(timeoutMillis = 5_000L) {
+                !File(cacheDir, "stale.tmp").exists() &&
+                    composeTestRule
+                        .onAllNodesWithTag(ProfileStudioTestTags.STORAGE_STATUS_BANNER)
+                        .fetchSemanticsNodes()
+                        .isNotEmpty()
             }
             composeTestRule.onNodeWithTag(ProfileStudioTestTags.LIST)
                 .performScrollToNode(hasTestTag(ProfileStudioTestTags.STORAGE_STATUS_BANNER))

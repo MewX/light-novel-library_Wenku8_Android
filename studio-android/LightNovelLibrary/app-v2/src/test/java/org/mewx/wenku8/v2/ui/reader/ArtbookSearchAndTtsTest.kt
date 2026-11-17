@@ -16,6 +16,7 @@ import androidx.compose.ui.test.click
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTouchInput
@@ -26,6 +27,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -880,6 +882,229 @@ class ArtbookSearchAndTtsTest {
             "Swiping backward from illustration chapter 9103 must land strictly on 9102, never 9101",
             9102,
             runBlocking { database.readingProgressDao().getProgressForNovel(5120)?.cid },
+        )
+    }
+
+    @Test
+    fun temporaryVolumeIllustrationPeek_auditsButtonsAndPreservesExactReadingProgress() {
+        val imgFile1 = createTestImageFile("vol_peek_1.jpg", 420, 600, AndroidColor.rgb(52, 110, 175))
+        val imgFile2 = createTestImageFile("vol_peek_2.jpg", 420, 600, AndroidColor.rgb(175, 88, 120))
+        val urlMap = mapOf(
+            "https://pic.wenku8.com/pictures/6144/v1_p1.jpg" to imgFile1,
+            "https://pic.wenku8.com/pictures/6144/v1_p2.jpg" to imgFile2,
+        )
+
+        runBlocking {
+            database.novelDao().upsertNovel(
+                NovelEntity(
+                    aid = 6144,
+                    title = "临时插图浏览测试作",
+                    author = "测试作者",
+                    inBookshelf = true,
+                    metaSyncedAtMs = 1_000L,
+                ),
+            )
+            tocSyncRepository.syncNovelIndexAtomically(
+                aid = 6144,
+                language = Wenku8API.AppLanguage.SC,
+                requestStartedAtMs = 2_000L,
+                parsedVolumes = listOf(
+                    ParsedVolumeToc(
+                        vid = 901,
+                        volumeTitle = "第一卷",
+                        chapters = listOf(
+                            ParsedChapterToc(cid = 9101, chapterTitle = "第一章 漫长旅途"),
+                            ParsedChapterToc(cid = 9103, chapterTitle = "插图"),
+                        ),
+                    ),
+                    ParsedVolumeToc(
+                        vid = 902,
+                        volumeTitle = "第二卷",
+                        chapters = listOf(
+                            ParsedChapterToc(cid = 9201, chapterTitle = "第一章 无图之章"),
+                        ),
+                    ),
+                ),
+            )
+            val multiPageCh1 = buildString {
+                appendLine("第一卷 第一章 漫长旅途")
+                for (i in 1..26) {
+                    appendLine("　　第一卷第一章第${i}段长篇测试正文，用于验证翻到第二页后临时查看插图不会篡改当前阅读进度锚点。")
+                }
+            }
+            val illusCh = buildString {
+                appendLine("第一卷 插图")
+                urlMap.keys.forEach { u ->
+                    appendLine("<!--image-->$u<!--image-->")
+                }
+            }
+            val vol2NoIllusCh = """
+                第二卷 第一章 无图之章
+                　　第二卷没有任何插图章节，顶栏不应出现“本卷插图”按钮。
+            """.trimIndent()
+
+            listOf(
+                9101 to multiPageCh1,
+                9103 to illusCh,
+                9201 to vol2NoIllusCh,
+            ).forEach { (cid, body) ->
+                database.chapterContentDao().upsertChapterContent(
+                    ChapterContentEntity(
+                        cid = cid,
+                        aid = 6144,
+                        contentLang = Wenku8API.AppLanguage.SC.name,
+                        contentText = body,
+                        byteLength = body.toByteArray().size,
+                        sha256Checksum = "sha_$cid",
+                        downloadedAtMs = 1_700_000_000_000L,
+                    ),
+                )
+            }
+        }
+
+        var navigateBackCount = 0
+        var illustrationClickedCallbackCount = 0
+
+        composeTestRule.setContent {
+            Wenku8ExpressiveTheme(themeMode = Wenku8ThemeMode.CLASSIC_BLUE) {
+                UnifiedReaderScreen(
+                    launchRequest = ReaderLaunchRequest(
+                        aid = 6144,
+                        novelTitle = "临时插图浏览测试作",
+                        vid = 901,
+                        volumeTitle = "第一卷",
+                        cid = 9101,
+                        chapterTitle = "第一章 漫长旅途",
+                        initialParagraphIndex = 0,
+                    ),
+                    database = database,
+                    catalogGateway = fakeGateway,
+                    novelTocSyncRepository = tocSyncRepository,
+                    preferences = Wenku8UserPreferences(readerPageTurnMode = ReaderPageTurnMode.COVER_SLIDE),
+                    onReaderTypographyChanged = { _, _, _, _ -> },
+                    onIllustrationClicked = { _, _, _ -> illustrationClickedCallbackCount += 1 },
+                    onNavigateBack = { navigateBackCount += 1 },
+                    lineBreaker = DeterministicCellLineBreaker,
+                    artbookImageFileResolver = { url -> urlMap[url] },
+                    ioDispatcher = Dispatchers.Main.immediate,
+                    computeDispatcher = Dispatchers.Main.immediate,
+                )
+            }
+        }
+        composeTestRule.waitForIdle()
+
+        // 1. Advance to Page 2 of prose chapter 9101 so we have a non-zero paragraph anchor to protect!
+        composeTestRule.onNodeWithTag(ReaderTestTags.PAGED_HORIZONTAL_PAGER).performTouchInput {
+            click(Offset(x = width * 0.85f, y = height * 0.5f))
+        }
+        composeTestRule.waitForIdle()
+
+        val progressBeforePeek = runBlocking { database.readingProgressDao().getProgressForNovel(6144) }
+        assertNotNull(progressBeforePeek)
+        assertEquals(9101, progressBeforePeek!!.cid)
+        assertTrue(
+            "Expected Page 2 anchor paragraphIndex > 0 before peeking volume illustrations",
+            progressBeforePeek.paragraphIndex > 0,
+        )
+
+        // 2. Open HUD in non-illustration chapter 9101 -> "本卷插图" button MUST be displayed!
+        composeTestRule.onNodeWithTag(ReaderTestTags.PAGED_HORIZONTAL_PAGER).performTouchInput {
+            click(Offset(x = width * 0.5f, y = height * 0.5f))
+        }
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag(ReaderTestTags.HUD_PEEK_VOLUME_ILLUSTRATIONS_BUTTON)
+            .assertIsDisplayed()
+
+        // 3. Tap "本卷插图" -> opens temporary ArtbookLightboxOverlay
+        composeTestRule.onNodeWithTag(ReaderTestTags.HUD_PEEK_VOLUME_ILLUSTRATIONS_BUTTON)
+            .performClick()
+        composeTestRule.waitForIdle()
+
+        composeTestRule.onNodeWithTag(ArtbookTestTags.OVERLAY).assertIsDisplayed()
+        composeTestRule.onNodeWithText("第一卷 · 插图（临时浏览）").assertIsDisplayed()
+
+        // Strict Button Audit: appropriate controls ARE shown...
+        composeTestRule.onNodeWithTag(ArtbookTestTags.CLOSE_BUTTON).assertIsDisplayed()
+        composeTestRule.onNodeWithTag(ArtbookTestTags.RETURN_TO_READING_CHIP).assertIsDisplayed()
+        composeTestRule.onNodeWithTag(ArtbookTestTags.SPREAD_TOGGLE_CHIP).assertIsDisplayed()
+        composeTestRule.onNodeWithTag(ArtbookTestTags.ROTATE_BUTTON).assertIsDisplayed()
+        composeTestRule.onNodeWithTag(ArtbookTestTags.SAVE_BUTTON).assertIsDisplayed()
+        composeTestRule.onNodeWithTag(ArtbookTestTags.SHARE_BUTTON).assertIsDisplayed()
+        composeTestRule.onNodeWithTag(ArtbookTestTags.CAROUSEL).assertIsDisplayed()
+
+        // ...while chapter-mutating / mode-overriding chips MUST NOT exist in temporary peek mode!
+        assertEquals(
+            0,
+            composeTestRule.onAllNodesWithTag(ArtbookTestTags.READER_MODE_CHIP).fetchSemanticsNodes().size,
+        )
+        assertEquals(
+            0,
+            composeTestRule.onAllNodesWithTag(ArtbookTestTags.PREV_CHAPTER_CHIP).fetchSemanticsNodes().size,
+        )
+        assertEquals(
+            0,
+            composeTestRule.onAllNodesWithTag(ArtbookTestTags.NEXT_CHAPTER_CHIP).fetchSemanticsNodes().size,
+        )
+
+        // 4. Browse to image #2 (`2 / 2`) inside temporary peek, then tap "返回阅读" chip
+        composeTestRule.onNodeWithTag(ArtbookTestTags.THUMBNAIL_PREFIX + "1").performClick()
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag(ArtbookTestTags.PAGE_INDICATOR).assertTextEquals("2 / 2")
+
+        composeTestRule.onNodeWithTag(ArtbookTestTags.RETURN_TO_READING_CHIP).performClick()
+        composeTestRule.waitForIdle()
+
+        // Overlay dismissed cleanly WITHOUT exiting reader, WITHOUT undo pill, and WITHOUT mutating progress!
+        assertEquals(
+            0,
+            composeTestRule.onAllNodesWithTag(ArtbookTestTags.OVERLAY).fetchSemanticsNodes().size,
+        )
+        assertEquals(0, navigateBackCount)
+        assertEquals(0, illustrationClickedCallbackCount)
+        assertEquals(
+            0,
+            composeTestRule.onAllNodesWithTag(ReaderTestTags.UNDO_JUMP_PILL).fetchSemanticsNodes().size,
+        )
+        val progressAfterFirstPeek = runBlocking { database.readingProgressDao().getProgressForNovel(6144) }
+        assertNotNull(progressAfterFirstPeek)
+        assertEquals(9101, progressAfterFirstPeek!!.cid)
+        assertEquals(progressBeforePeek.paragraphIndex, progressAfterFirstPeek.paragraphIndex)
+        assertEquals(progressBeforePeek.charOffset, progressAfterFirstPeek.charOffset)
+
+        // 5. Re-open "本卷插图" -> remembers image `2 / 2` in the same volume, and top-left `←` also returns to reading!
+        composeTestRule.onNodeWithTag(ReaderTestTags.PAGED_HORIZONTAL_PAGER).performTouchInput {
+            click(Offset(x = width * 0.5f, y = height * 0.5f))
+        }
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag(ReaderTestTags.HUD_PEEK_VOLUME_ILLUSTRATIONS_BUTTON)
+            .performClick()
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag(ArtbookTestTags.PAGE_INDICATOR).assertTextEquals("2 / 2")
+        composeTestRule.onNodeWithTag(ArtbookTestTags.CLOSE_BUTTON).performClick()
+        composeTestRule.waitForIdle()
+        assertEquals(0, navigateBackCount)
+        assertEquals(9101, runBlocking { database.readingProgressDao().getProgressForNovel(6144)?.cid })
+
+        // 6. Jump to Volume 2 (`9201`), which has NO illustration chapter -> "本卷插图" MUST NOT appear!
+        composeTestRule.onNodeWithTag(ReaderTestTags.PAGED_HORIZONTAL_PAGER).performTouchInput {
+            click(Offset(x = width * 0.5f, y = height * 0.5f))
+        }
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag(ReaderTestTags.ACTION_TOC).performClick()
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag(ReaderTestTags.TOC_CHAPTER_ITEM_PREFIX + "9201").performClick()
+        composeTestRule.waitForIdle()
+        assertEquals(9201, runBlocking { database.readingProgressDao().getProgressForNovel(6144)?.cid })
+
+        composeTestRule.onNodeWithTag(ReaderTestTags.PAGED_HORIZONTAL_PAGER).performTouchInput {
+            click(Offset(x = width * 0.5f, y = height * 0.5f))
+        }
+        composeTestRule.waitForIdle()
+        assertEquals(
+            "Volumes without any illustration chapter must not show HUD_PEEK_VOLUME_ILLUSTRATIONS_BUTTON",
+            0,
+            composeTestRule.onAllNodesWithTag(ReaderTestTags.HUD_PEEK_VOLUME_ILLUSTRATIONS_BUTTON)
+                .fetchSemanticsNodes().size,
         )
     }
 

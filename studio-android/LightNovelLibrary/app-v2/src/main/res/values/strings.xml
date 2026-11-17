@@ -456,7 +456,12 @@
     <string name="reader_tts_next_sentence">下一句</string>
     <string name="reader_tts_stop">停止朗读</string>
     <string name="artbook_action_close">关闭画集</string>
+    <string name="artbook_action_return_to_reading">返回阅读</string>
+    <string name="artbook_temporary_peek_title_format">%1$s（临时浏览）</string>
     <string name="artbook_action_rotate_90">旋转 90°</string>
     <string name="artbook_action_save">保存插图</string>
     <string name="artbook_action_share">分享插图</string>
+    <string name="reader_action_peek_volume_illustrations">本卷插图</string>
+    <string name="reader_action_peek_volume_illustrations_tooltip">临时查看本卷插图（不改变阅读进度）</string>
+    <string name="reader_peek_volume_illustrations_loading">正在加载插图…</string>
 </resources>

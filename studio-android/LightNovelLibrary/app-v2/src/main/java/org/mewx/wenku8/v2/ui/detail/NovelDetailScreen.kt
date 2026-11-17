@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
@@ -839,17 +840,6 @@ fun NovelDetailScreen(
                                     } else {
                                         baseIds + volume.vid
                                     }
-                                },
-                                onJumpToIllustrationChapter = { illusChap ->
-                                    invokeReaderTarget(
-                                        volume.vid,
-                                        illusChap.cid,
-                                        volume.volumeTitle,
-                                        illusChap.chapterTitle,
-                                        false,
-                                        0,
-                                        0,
-                                    )
                                 },
                                 onChapterClicked = { chap ->
                                     val prog = snapshot.readingProgress?.takeIf { it.cid == chap.cid }
@@ -1697,14 +1687,12 @@ private fun VolumeDirectoryHeader(
     }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun VolumeAccordionCard(
     volume: VolumeAccordionModel,
     isExpanded: Boolean,
     readingProgressPercent: Int,
     onToggleExpand: () -> Unit,
-    onJumpToIllustrationChapter: (ChapterRowModel) -> Unit,
     onChapterClicked: (ChapterRowModel) -> Unit,
 ) {
     Card(
@@ -1720,76 +1708,40 @@ private fun VolumeAccordionCard(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .heightIn(min = 48.dp)
                     .clickable(onClick = onToggleExpand)
                     .padding(horizontal = 14.dp, vertical = 12.dp)
                     .testTag(NovelDetailTestTags.VOLUME_HEADER_PREFIX + volume.vid),
                 verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                Column(
+                Text(
+                    text = volume.volumeTitle,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(6.dp),
-                ) {
-                    Text(
-                        text = volume.volumeTitle,
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onSurface,
-                    )
+                )
 
-                    FlowRow(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalArrangement = Arrangement.spacedBy(4.dp),
-                    ) {
-                        if (volume.containsReadingProgress) {
-                            BadgePill(
-                                text = stringResource(R.string.detail_volume_last_read_badge),
-                                containerColor = MaterialTheme.colorScheme.primaryContainer,
-                                contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                            )
-                        }
-                        if (volume.cachedChapterCount > 0) {
-                            BadgePill(
-                                text = stringResource(
-                                    R.string.detail_volume_cached_ratio_format,
-                                    volume.cachedChapterCount,
-                                    volume.totalChapterCount,
-                                ),
-                                containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                                contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-                            )
-                        }
-                        val illus = volume.illustrationChapter
-                        if (illus != null) {
-                            AssistChip(
-                                onClick = { onJumpToIllustrationChapter(illus) },
-                                label = {
-                                    Text(
-                                        text = stringResource(R.string.detail_volume_illustration_chip),
-                                        style = MaterialTheme.typography.labelSmall,
-                                    )
-                                },
-                                leadingIcon = {
-                                    Icon(
-                                        imageVector = Icons.Outlined.Image,
-                                        contentDescription = null,
-                                        modifier = Modifier.size(15.dp),
-                                    )
-                                },
-                                colors = AssistChipDefaults.assistChipColors(
-                                    containerColor = MaterialTheme.colorScheme.tertiaryContainer,
-                                    labelColor = MaterialTheme.colorScheme.onTertiaryContainer,
-                                    leadingIconContentColor = MaterialTheme.colorScheme.onTertiaryContainer,
-                                ),
-                                border = AssistChipDefaults.assistChipBorder(
-                                    enabled = true,
-                                    borderColor = MaterialTheme.colorScheme.outlineVariant,
-                                ),
-                                modifier = Modifier
-                                    .height(28.dp)
-                                    .testTag(NovelDetailTestTags.VOLUME_ILLUS_CHIP_PREFIX + volume.vid),
-                            )
-                        }
-                    }
+                if (volume.containsReadingProgress) {
+                    BadgePill(
+                        text = stringResource(R.string.detail_volume_last_read_badge),
+                        containerColor = MaterialTheme.colorScheme.primaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                    )
+                }
+                if (volume.cachedChapterCount > 0) {
+                    BadgePill(
+                        text = stringResource(
+                            R.string.detail_volume_cached_ratio_format,
+                            volume.cachedChapterCount,
+                            volume.totalChapterCount,
+                        ),
+                        containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                    )
                 }
 
                 Icon(

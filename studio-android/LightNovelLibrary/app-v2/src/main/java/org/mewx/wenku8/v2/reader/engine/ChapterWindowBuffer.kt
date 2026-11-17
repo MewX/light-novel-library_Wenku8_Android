@@ -606,6 +606,58 @@ class ChapterWindowBuffer(
     }
 
     /**
+     * Resolves illustration image URLs for [illustrationChapters] (offline SQLite cache first,
+     * falling back to remote fetch) **without** modifying `_snapshotFlow`, active chapter,
+     * coordinate revision, or reading progress!
+     */
+    suspend fun loadVolumeIllustrationUrlsForPeek(
+        illustrationChapters: List<OrderedChapterWithVolume>,
+    ): Result<List<String>> {
+        if (illustrationChapters.isEmpty()) {
+            return Result.success(emptyList())
+        }
+        val collectedUrls = ArrayList<String>()
+        var lastFailure: Throwable? = null
+        for (chapterMeta in illustrationChapters) {
+            val inMemoryAst = stateMutex.withLock { astCache[chapterMeta.cid] }
+            if (inMemoryAst != null) {
+                inMemoryAst.illustrationBlocks.forEach { block ->
+                    if (block.imageUrl.isNotBlank()) {
+                        collectedUrls.add(block.imageUrl)
+                    }
+                }
+                continue
+            }
+            val rawTextResult = fetchChapterTextOfflineFirst(chapterMeta)
+            rawTextResult.onSuccess { rawText ->
+                val parsed = withContext(computeDispatcher) {
+                    WenkuChapterParser.parse(
+                        rawChapterText = rawText,
+                        aid = aid,
+                        vid = chapterMeta.vid,
+                        cid = chapterMeta.cid,
+                        volumeTitle = chapterMeta.volumeTitle,
+                        chapterTitle = chapterMeta.chapterTitle,
+                    )
+                }
+                parsed.illustrationBlocks.forEach { block ->
+                    if (block.imageUrl.isNotBlank()) {
+                        collectedUrls.add(block.imageUrl)
+                    }
+                }
+            }.onFailure { err ->
+                lastFailure = err
+            }
+        }
+        val deduplicated = collectedUrls.distinct()
+        return if (deduplicated.isNotEmpty() || lastFailure == null) {
+            Result.success(deduplicated)
+        } else {
+            Result.failure(lastFailure)
+        }
+    }
+
+    /**
      * Retries loading a failed slot (current or neighbor) after network recovery.
      */
     suspend fun retrySlot(cid: Int): ReaderWindowSnapshot {

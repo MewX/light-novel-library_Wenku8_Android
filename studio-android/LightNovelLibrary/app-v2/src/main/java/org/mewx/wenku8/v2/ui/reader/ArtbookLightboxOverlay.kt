@@ -146,6 +146,7 @@ object ArtbookTestTags {
     const val SAVE_BUTTON = "artbook_save_button"
     const val SHARE_BUTTON = "artbook_share_button"
     const val READER_MODE_CHIP = "artbook_reader_mode_chip"
+    const val RETURN_TO_READING_CHIP = "artbook_return_to_reading_chip"
     const val PREV_CHAPTER_CHIP = "artbook_prev_chapter_chip"
     const val NEXT_CHAPTER_CHIP = "artbook_next_chapter_chip"
     const val SPREAD_TOGGLE_CHIP = "artbook_spread_toggle_chip"
@@ -570,6 +571,8 @@ fun ArtbookLightboxOverlay(
     imageUrls: List<String>,
     initialImageIndex: Int = 0,
     isAutoEnteredIllustrationChapter: Boolean = false,
+    isTemporaryPeek: Boolean = false,
+    onPrimaryImageIndexChanged: ((Int) -> Unit)? = null,
     onSwitchToNovelReadingMode: ((currentImageIndex: Int) -> Unit)? = null,
     onPreviousChapter: (() -> Unit)? = null,
     onNextChapter: (() -> Unit)? = null,
@@ -610,8 +613,8 @@ fun ArtbookLightboxOverlay(
     var isSpreadModeEnabled by rememberSaveable { mutableStateOf(false) }
     var isFirstPageSolo by rememberSaveable { mutableStateOf(false) }
     var isRtlSpread by rememberSaveable { mutableStateOf(true) }
-    var rotationQuarterTurns by rememberSaveable { mutableIntStateOf(0) }
-    var activePrimaryImageIndex by rememberSaveable {
+    var rotationQuarterTurns by rememberSaveable(imageUrls) { mutableIntStateOf(0) }
+    var activePrimaryImageIndex by rememberSaveable(imageUrls, initialImageIndex) {
         mutableIntStateOf(initialImageIndex.coerceIn(0, imageUrls.lastIndex))
     }
 
@@ -644,6 +647,7 @@ fun ArtbookLightboxOverlay(
     LaunchedEffect(pagerState.settledPage, entries) {
         entries.getOrNull(pagerState.settledPage)?.let { settled ->
             activePrimaryImageIndex = settled.primaryImageIndex
+            onPrimaryImageIndexChanged?.invoke(settled.primaryImageIndex)
         }
     }
 
@@ -760,10 +764,10 @@ fun ArtbookLightboxOverlay(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier.fillMaxWidth(),
                     ) {
-                        val closeOrBackLabel = if (isAutoEnteredIllustrationChapter) {
-                            stringResource(R.string.action_back)
-                        } else {
-                            stringResource(R.string.artbook_action_close)
+                        val closeOrBackLabel = when {
+                            isTemporaryPeek -> stringResource(R.string.artbook_action_return_to_reading)
+                            isAutoEnteredIllustrationChapter -> stringResource(R.string.action_back)
+                            else -> stringResource(R.string.artbook_action_close)
                         }
                         TooltipIconButton(
                             tooltipText = closeOrBackLabel,
@@ -771,7 +775,7 @@ fun ArtbookLightboxOverlay(
                             modifier = Modifier.testTag(ArtbookTestTags.CLOSE_BUTTON),
                         ) {
                             Icon(
-                                imageVector = if (isAutoEnteredIllustrationChapter) {
+                                imageVector = if (isTemporaryPeek || isAutoEnteredIllustrationChapter) {
                                     Icons.AutoMirrored.Outlined.ArrowBack
                                 } else {
                                     Icons.Outlined.Close
@@ -866,7 +870,8 @@ fun ArtbookLightboxOverlay(
                         }
                     }
 
-                    val showActionChipRow = onSwitchToNovelReadingMode != null ||
+                    val showActionChipRow = isTemporaryPeek ||
+                        onSwitchToNovelReadingMode != null ||
                         imageUrls.size >= 2 ||
                         onPreviousChapter != null ||
                         onNextChapter != null
@@ -878,7 +883,24 @@ fun ArtbookLightboxOverlay(
                                 .horizontalScroll(rememberScrollState())
                                 .padding(horizontal = 8.dp, vertical = 2.dp),
                         ) {
-                            if (onSwitchToNovelReadingMode != null) {
+                            if (isTemporaryPeek) {
+                                FilterChip(
+                                    selected = false,
+                                    onClick = onDismiss,
+                                    leadingIcon = {
+                                        Icon(
+                                            imageVector = Icons.AutoMirrored.Outlined.ArrowBack,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(16.dp),
+                                        )
+                                    },
+                                    label = { Text(stringResource(R.string.artbook_action_return_to_reading)) },
+                                    colors = artbookChipColors(),
+                                    modifier = Modifier.testTag(ArtbookTestTags.RETURN_TO_READING_CHIP),
+                                )
+                            }
+
+                            if (!isTemporaryPeek && onSwitchToNovelReadingMode != null) {
                                 FilterChip(
                                     selected = false,
                                     onClick = { onSwitchToNovelReadingMode(activePrimaryImageIndex) },
@@ -936,7 +958,7 @@ fun ArtbookLightboxOverlay(
                                 }
                             }
 
-                            if (onPreviousChapter != null) {
+                            if (!isTemporaryPeek && onPreviousChapter != null) {
                                 FilterChip(
                                     selected = false,
                                     onClick = onPreviousChapter,
@@ -953,7 +975,7 @@ fun ArtbookLightboxOverlay(
                                 )
                             }
 
-                            if (onNextChapter != null) {
+                            if (!isTemporaryPeek && onNextChapter != null) {
                                 FilterChip(
                                     selected = false,
                                     onClick = onNextChapter,
@@ -1026,6 +1048,7 @@ fun ArtbookLightboxOverlay(
                                 )
                                 .clickable {
                                     activePrimaryImageIndex = thumbIdx
+                                    onPrimaryImageIndexChanged?.invoke(thumbIdx)
                                     val targetEntry = findEntryIndexContainingImage(entries, thumbIdx)
                                     coroutineScope.launch {
                                         pagerState.animateScrollToPage(targetEntry)

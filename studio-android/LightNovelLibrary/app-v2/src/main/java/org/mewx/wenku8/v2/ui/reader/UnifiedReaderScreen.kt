@@ -35,6 +35,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
@@ -57,12 +58,14 @@ import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.GraphicEq
 import androidx.compose.material.icons.outlined.LightMode
 import androidx.compose.material.icons.outlined.NetworkCheck
+import androidx.compose.material.icons.outlined.PhotoLibrary
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.TextFields
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilterChip
@@ -74,6 +77,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.PlainTooltip
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SnackbarHost
@@ -82,6 +86,10 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TooltipAnchorPosition
+import androidx.compose.material3.TooltipBox
+import androidx.compose.material3.TooltipDefaults
+import androidx.compose.material3.rememberTooltipState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -153,6 +161,7 @@ import org.mewx.wenku8.v2.reader.engine.ReadingAnchor
 import org.mewx.wenku8.v2.reader.engine.StaticLayoutPaginator
 import org.mewx.wenku8.v2.reader.model.ReaderPageTurnMode
 import org.mewx.wenku8.v2.reader.model.ReaderPaperPreset
+import org.mewx.wenku8.v2.ui.components.ActionTooltipBox
 import org.mewx.wenku8.v2.ui.components.TooltipIconButton
 import org.mewx.wenku8.v2.ui.detail.ReaderLaunchRequest
 import org.mewx.wenku8.v2.ui.theme.LocalEinkMode
@@ -175,6 +184,7 @@ object ReaderTestTags {
     const val HUD_BACK_BUTTON = "reader_hud_back_button"
     const val HUD_BOOKMARK_TOGGLE = "reader_hud_bookmark_toggle"
     const val HUD_VIEW_ILLUSTRATIONS_CHIP = "reader_hud_view_illustrations_chip"
+    const val HUD_PEEK_VOLUME_ILLUSTRATIONS_BUTTON = "reader_hud_peek_volume_illustrations_button"
     const val HUD_SCRUBBER_SLIDER = "reader_hud_scrubber_slider"
     const val HUD_PREV_CHAPTER_BUTTON = "reader_hud_prev_chapter_button"
     const val HUD_NEXT_CHAPTER_BUTTON = "reader_hud_next_chapter_button"
@@ -233,12 +243,19 @@ private data class ReaderUndoJumpState(
     val createdAtElapsedMs: Long,
 )
 
+private enum class ReaderArtbookEntryMode {
+    INLINE_CHAPTER_GALLERY,
+    PURE_ILLUSTRATION_CHAPTER,
+    TEMPORARY_VOLUME_PEEK,
+}
+
 private data class ReaderActiveArtbookState(
     val cid: Int,
+    val volumeVid: Int = 0,
     val chapterTitle: String,
     val imageUrls: List<String>,
     val initialIndex: Int,
-    val isAutoEnteredForChapter: Boolean = false,
+    val entryMode: ReaderArtbookEntryMode = ReaderArtbookEntryMode.INLINE_CHAPTER_GALLERY,
 )
 
 private data class ActiveFocalHighlightState(
@@ -395,6 +412,9 @@ fun UnifiedReaderScreen(
     // Chapter IDs where the user tapped "小说阅读" inside an auto-opened pure-illustration chapter.
     var novelModeOverriddenCids by rememberSaveable(launchRequest.aid) { mutableStateOf(intArrayOf()) }
     var lastAutoOpenedGalleryCid by rememberSaveable(launchRequest.aid) { mutableIntStateOf(0) }
+    val cachedVolumePeekUrlsByVid = remember(launchRequest.aid) { mutableMapOf<Int, List<String>>() }
+    val lastVolumePeekIndexByVid = remember(launchRequest.aid) { mutableMapOf<Int, Int>() }
+    var isPeekingVolumeIllustrationsLoading by remember { mutableStateOf(false) }
 
     // Continuous-scroll (`上下卷轴`) live anchor, progress, and imperative jump channel.
     var continuousScrollAnchor by remember(launchRequest.aid) { mutableStateOf(ReadingAnchor()) }
@@ -1106,10 +1126,93 @@ fun UnifiedReaderScreen(
                 chapterTitle = chapterTitle,
                 imageUrls = urls,
                 initialIndex = safeIdx,
-                isAutoEnteredForChapter = isAutoEnteredForChapter,
+                entryMode = if (isAutoEnteredForChapter) {
+                    ReaderArtbookEntryMode.PURE_ILLUSTRATION_CHAPTER
+                } else {
+                    ReaderArtbookEntryMode.INLINE_CHAPTER_GALLERY
+                },
             )
             if (!isAutoEnteredForChapter) {
                 onIllustrationClicked(chapterTitle, urls, safeIdx)
+            }
+        }
+
+        val sameVolumeIllustrationChapters = remember(
+            snapshot.activeChapter?.vid,
+            snapshot.activeChapter?.cid,
+            snapshot.activeChapter?.isIllustrationChapter,
+            activeChapterAst?.isPureIllustrationContent,
+            snapshot.orderedToc,
+        ) {
+            val activeMeta = snapshot.activeChapter
+            if (activeMeta == null ||
+                activeMeta.isIllustrationChapter ||
+                activeChapterAst?.isPureIllustrationContent == true
+            ) {
+                emptyList()
+            } else {
+                snapshot.orderedToc.filter { entry ->
+                    entry.vid == activeMeta.vid &&
+                        entry.cid != activeMeta.cid &&
+                        entry.isIllustrationChapter
+                }
+            }
+        }
+
+        fun openSameVolumeIllustrationsPeek() {
+            if (isPeekingVolumeIllustrationsLoading || sameVolumeIllustrationChapters.isEmpty()) {
+                return
+            }
+            val targetChapters = sameVolumeIllustrationChapters
+            val firstIllus = targetChapters.first()
+            val targetVid = firstIllus.vid
+            val baseLabel = "${firstIllus.volumeTitle} · ${firstIllus.chapterTitle}"
+                .trim(' ', '·')
+                .ifBlank { firstIllus.chapterTitle }
+            val peekTitle = context.getString(R.string.artbook_temporary_peek_title_format, baseLabel)
+
+            val cachedUrls = cachedVolumePeekUrlsByVid[targetVid]
+            if (!cachedUrls.isNullOrEmpty()) {
+                val rememberedIdx = (lastVolumePeekIndexByVid[targetVid] ?: 0)
+                    .coerceIn(0, cachedUrls.lastIndex)
+                isHudVisible = false
+                activeArtbookState = ReaderActiveArtbookState(
+                    cid = firstIllus.cid,
+                    volumeVid = targetVid,
+                    chapterTitle = peekTitle,
+                    imageUrls = cachedUrls,
+                    initialIndex = rememberedIdx,
+                    entryMode = ReaderArtbookEntryMode.TEMPORARY_VOLUME_PEEK,
+                )
+                return
+            }
+
+            coroutineScope.launch {
+                isPeekingVolumeIllustrationsLoading = true
+                try {
+                    val result = windowBuffer.loadVolumeIllustrationUrlsForPeek(targetChapters)
+                    val urls = result.getOrNull().orEmpty()
+                    if (urls.isNotEmpty()) {
+                        cachedVolumePeekUrlsByVid[targetVid] = urls
+                        val rememberedIdx = (lastVolumePeekIndexByVid[targetVid] ?: 0)
+                            .coerceIn(0, urls.lastIndex)
+                        isHudVisible = false
+                        activeArtbookState = ReaderActiveArtbookState(
+                            cid = firstIllus.cid,
+                            volumeVid = targetVid,
+                            chapterTitle = peekTitle,
+                            imageUrls = urls,
+                            initialIndex = rememberedIdx,
+                            entryMode = ReaderArtbookEntryMode.TEMPORARY_VOLUME_PEEK,
+                        )
+                    } else {
+                        val errMsg = result.exceptionOrNull()?.localizedMessage?.takeIf { it.isNotBlank() }
+                            ?: "未能在该插图章节中解析到图片"
+                        snackbarHostState.showSnackbar(errMsg)
+                    }
+                } finally {
+                    isPeekingVolumeIllustrationsLoading = false
+                }
             }
         }
 
@@ -1488,6 +1591,65 @@ fun UnifiedReaderScreen(
                                 .padding(end = 2.dp)
                                 .testTag(ReaderTestTags.HUD_VIEW_ILLUSTRATIONS_CHIP),
                         )
+                    }
+
+                    if (sameVolumeIllustrationChapters.isNotEmpty()) {
+                        val peekLabel = stringResource(R.string.reader_action_peek_volume_illustrations)
+                        val peekTooltip = stringResource(R.string.reader_action_peek_volume_illustrations_tooltip)
+                        val peekLoadingLabel = stringResource(R.string.reader_peek_volume_illustrations_loading)
+                        if (currentIllustrations.isEmpty()) {
+                            ActionTooltipBox(tooltipText = peekTooltip) {
+                                AssistChip(
+                                    onClick = { openSameVolumeIllustrationsPeek() },
+                                    enabled = !isPeekingVolumeIllustrationsLoading,
+                                    leadingIcon = {
+                                        if (isPeekingVolumeIllustrationsLoading) {
+                                            CircularProgressIndicator(
+                                                strokeWidth = 2.dp,
+                                                modifier = Modifier.size(16.dp),
+                                            )
+                                        } else {
+                                            Icon(
+                                                imageVector = Icons.Outlined.PhotoLibrary,
+                                                contentDescription = null,
+                                                modifier = Modifier.size(18.dp),
+                                            )
+                                        }
+                                    },
+                                    label = {
+                                        Text(
+                                            text = if (isPeekingVolumeIllustrationsLoading) {
+                                                peekLoadingLabel
+                                            } else {
+                                                peekLabel
+                                            },
+                                        )
+                                    },
+                                    modifier = Modifier
+                                        .padding(end = 2.dp)
+                                        .testTag(ReaderTestTags.HUD_PEEK_VOLUME_ILLUSTRATIONS_BUTTON),
+                                )
+                            }
+                        } else {
+                            TooltipIconButton(
+                                tooltipText = peekTooltip,
+                                enabled = !isPeekingVolumeIllustrationsLoading,
+                                onClick = { openSameVolumeIllustrationsPeek() },
+                                modifier = Modifier.testTag(ReaderTestTags.HUD_PEEK_VOLUME_ILLUSTRATIONS_BUTTON),
+                            ) {
+                                if (isPeekingVolumeIllustrationsLoading) {
+                                    CircularProgressIndicator(
+                                        strokeWidth = 2.dp,
+                                        modifier = Modifier.size(18.dp),
+                                    )
+                                } else {
+                                    Icon(
+                                        imageVector = Icons.Outlined.PhotoLibrary,
+                                        contentDescription = peekLabel,
+                                    )
+                                }
+                            }
+                        }
                     }
 
                     val searchInBookLabel = stringResource(R.string.reader_action_search_in_book)
@@ -2348,8 +2510,13 @@ fun UnifiedReaderScreen(
                     ?.resolveLocalAssetRoots()
                     ?: listOf(context.filesDir)
             }
-            val isPureIllustrationChapter = activeChapterAst?.cid == openArtbook.cid &&
+            val isTempPeek = openArtbook.entryMode == ReaderArtbookEntryMode.TEMPORARY_VOLUME_PEEK
+            val isAutoEntered =
+                openArtbook.entryMode == ReaderArtbookEntryMode.PURE_ILLUSTRATION_CHAPTER
+            val isPureIllustrationChapter = !isTempPeek &&
+                activeChapterAst?.cid == openArtbook.cid &&
                 activeChapterAst.isPureIllustrationContent
+            val canShowChapterControls = !isTempPeek && (isAutoEntered || isPureIllustrationChapter)
             val prevChapterCid = snapshot.prevSlot?.chapter?.cid
             val nextChapterCid = snapshot.nextSlot?.chapter?.cid
             ArtbookLightboxOverlay(
@@ -2357,8 +2524,14 @@ fun UnifiedReaderScreen(
                 chapterTitle = openArtbook.chapterTitle,
                 imageUrls = openArtbook.imageUrls,
                 initialImageIndex = openArtbook.initialIndex,
-                isAutoEnteredIllustrationChapter = openArtbook.isAutoEnteredForChapter,
-                onSwitchToNovelReadingMode = if (openArtbook.isAutoEnteredForChapter || isPureIllustrationChapter) {
+                isAutoEnteredIllustrationChapter = isAutoEntered,
+                isTemporaryPeek = isTempPeek,
+                onPrimaryImageIndexChanged = if (isTempPeek) {
+                    { idx -> lastVolumePeekIndexByVid[openArtbook.volumeVid] = idx }
+                } else {
+                    null
+                },
+                onSwitchToNovelReadingMode = if (canShowChapterControls) {
                     { currentImgIdx ->
                         if (openArtbook.cid > 0) {
                             novelModeOverriddenCids =
@@ -2396,7 +2569,7 @@ fun UnifiedReaderScreen(
                 } else {
                     null
                 },
-                onPreviousChapter = if ((openArtbook.isAutoEnteredForChapter || isPureIllustrationChapter) && prevChapterCid != null) {
+                onPreviousChapter = if (canShowChapterControls && prevChapterCid != null) {
                     {
                         activeArtbookState = null
                         jumpToChapterWithUndo(prevChapterCid)
@@ -2404,7 +2577,7 @@ fun UnifiedReaderScreen(
                 } else {
                     null
                 },
-                onNextChapter = if ((openArtbook.isAutoEnteredForChapter || isPureIllustrationChapter) && nextChapterCid != null) {
+                onNextChapter = if (canShowChapterControls && nextChapterCid != null) {
                     {
                         activeArtbookState = null
                         jumpToChapterWithUndo(nextChapterCid)
@@ -2416,9 +2589,8 @@ fun UnifiedReaderScreen(
                 imageFileResolver = artbookImageFileResolver,
                 ioDispatcher = ioDispatcher,
                 onDismiss = {
-                    val wasAutoEntered = openArtbook.isAutoEnteredForChapter
                     activeArtbookState = null
-                    if (wasAutoEntered) {
+                    if (isAutoEntered) {
                         ttsController.stopAndDismiss()
                         onNavigateBack()
                     }
