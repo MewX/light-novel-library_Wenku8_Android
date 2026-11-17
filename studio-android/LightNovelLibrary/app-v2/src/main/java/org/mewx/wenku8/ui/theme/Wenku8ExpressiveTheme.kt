@@ -41,17 +41,18 @@ object EinkZeroMotionScheme : MotionScheme {
 /**
  * Root Material 3 Expressive (`M3e`) theme wrapper for Wenku8 `:app-v2`.
  *
- * @param themeMode Selected theme preset (defaults to [Wenku8ThemeMode.CLASSIC_BLUE] matching `v1.31`).
+ * - [Wenku8ThemeMode.CLASSIC_BLUE] always uses Wenku8's signature Classic Blue palette (`v1.31` default).
+ * - [Wenku8ThemeMode.SYSTEM] (`跟随系统`) follows BOTH system Day/Night dark mode AND Android 12+ (`API 31+`)
+ *   Material You dynamic wallpaper color extraction (falling back to Carbon Night / Classic Blue on API < 31).
+ *
+ * @param themeMode Selected theme preset (defaults to [Wenku8ThemeMode.CLASSIC_BLUE]).
  * @param einkModeOverride Explicit legacy `eink_mode` setting toggle; forces E-Ink monochrome & zero-motion
  *   even when [themeMode] is set to another preset.
- * @param useDynamicColor Optional Android 12+ (`API 31+`) Material You wallpaper color extraction
- *   (disabled by default so Wenku8 launches with its signature Classic Blue identity).
  */
 @Composable
 fun Wenku8ExpressiveTheme(
     themeMode: Wenku8ThemeMode = Wenku8ThemeMode.CLASSIC_BLUE,
     einkModeOverride: Boolean = false,
-    useDynamicColor: Boolean = false,
     content: @Composable () -> Unit,
 ) {
     val isEinkActive = einkModeOverride || themeMode == Wenku8ThemeMode.E_INK
@@ -62,13 +63,13 @@ fun Wenku8ExpressiveTheme(
 
     val resolvedColorScheme: ColorScheme = when {
         isEinkActive -> Wenku8ColorSchemes.EinkMonochromeColorScheme
+        themeMode == Wenku8ThemeMode.CLASSIC_BLUE -> Wenku8ColorSchemes.ClassicBlueColorScheme
         themeMode == Wenku8ThemeMode.ARCHIVAL_DAY -> Wenku8ColorSchemes.ArchivalDayColorScheme
         themeMode == Wenku8ThemeMode.CARBON_NIGHT -> Wenku8ColorSchemes.CarbonNightColorScheme
         themeMode == Wenku8ThemeMode.PURE_AMOLED -> Wenku8ColorSchemes.PureAmoledColorScheme
-        useDynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
-            if (isDarkEffective) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
+        Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
+            if (systemDarkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
         }
-        themeMode == Wenku8ThemeMode.CLASSIC_BLUE -> Wenku8ColorSchemes.ClassicBlueColorScheme
         systemDarkTheme -> Wenku8ColorSchemes.CarbonNightColorScheme
         else -> Wenku8ColorSchemes.ClassicBlueColorScheme
     }

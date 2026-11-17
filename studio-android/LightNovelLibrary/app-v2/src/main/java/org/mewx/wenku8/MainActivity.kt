@@ -107,7 +107,6 @@ class MainActivity : AppCompatActivity(), HardwareVolumeKeyHost {
             Wenku8ExpressiveTheme(
                 themeMode = activePreferences.themeMode,
                 einkModeOverride = activePreferences.einkModeEnabled,
-                useDynamicColor = activePreferences.useDynamicColor,
             ) {
                 // Wait for the initial DataStore snapshot (~1-3ms off disk) before locking in the
                 // cold-start destination so a user who chose "本地书架" never flashes "最新" first.
@@ -182,16 +181,6 @@ class MainActivity : AppCompatActivity(), HardwareVolumeKeyHost {
                         onEinkModeChanged = { enabled ->
                             coroutineScope.launch {
                                 preferencesRepository.setEinkModeEnabled(enabled)
-                            }
-                        },
-                        onUseDynamicColorChanged = { enabled ->
-                            coroutineScope.launch {
-                                preferencesRepository.setUseDynamicColor(enabled)
-                            }
-                        },
-                        onMenuBackgroundChanged = { presetId, customPath ->
-                            coroutineScope.launch {
-                                preferencesRepository.setMenuBackground(presetId, customPath)
                             }
                         },
                         onReaderTypographyChanged = { fontSizeSp, lineDistDp, paraDistDp, edgeDistDp ->

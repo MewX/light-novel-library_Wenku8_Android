@@ -14,7 +14,6 @@ import java.io.File
 import java.io.IOException
 
 enum class CustomAssetSlot(val fileName: String) {
-    MENU_BACKGROUND("menu_bg"),
     READER_FONT("reader_font"),
     READER_BACKGROUND("reader_background"),
 }
@@ -34,7 +33,7 @@ data class DeepCleanProgress(
 
 /**
  * Implements `v1.31`-parity Two-Mode Cache Cleanup (`快速清理` & cancellable `深度清理`) plus safe
- * SAF custom asset import (`filesDir/custom/{menu_bg, reader_font, reader_background}`).
+ * SAF custom asset import (`filesDir/custom/{reader_font, reader_background}`).
  */
 class StorageAndCacheRepository(
     private val database: Wenku8Database,

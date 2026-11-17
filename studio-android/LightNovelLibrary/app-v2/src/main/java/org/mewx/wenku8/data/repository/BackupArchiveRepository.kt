@@ -683,12 +683,9 @@ class BackupArchiveRepository(
             put("appLanguage", prefs.appLanguage.name)
             put("themeMode", prefs.themeMode.name)
             put("einkModeEnabled", prefs.einkModeEnabled)
-            put("useDynamicColor", prefs.useDynamicColor)
             put("defaultHomeDestination", prefs.defaultHomeDestination.name)
             put("bookshelfViewMode", prefs.bookshelfViewMode.name)
             put("bookshelfSortMode", prefs.bookshelfSortMode.name)
-            put("menuBackgroundPresetId", prefs.menuBackgroundPresetId)
-            put("menuBackgroundCustomToken", portableCustomToken(prefs.menuBackgroundCustomPath, CustomAssetSlot.MENU_BACKGROUND))
             put("readerFontSizeSp", prefs.readerFontSizeSp)
             put("readerLineDistanceDp", prefs.readerLineDistanceDp)
             put("readerParagraphDistanceDp", prefs.readerParagraphDistanceDp)
@@ -742,12 +739,9 @@ class BackupArchiveRepository(
             appLanguage = lang,
             themeMode = theme,
             einkModeEnabled = obj.optBoolean("einkModeEnabled", theme == Wenku8ThemeMode.E_INK),
-            useDynamicColor = obj.optBoolean("useDynamicColor", fallbackPrefs.useDynamicColor),
             defaultHomeDestination = home,
             bookshelfViewMode = shelfView,
             bookshelfSortMode = shelfSort,
-            menuBackgroundPresetId = obj.optInt("menuBackgroundPresetId", fallbackPrefs.menuBackgroundPresetId).coerceIn(0, 5),
-            menuBackgroundCustomPath = resolveCustomToken(obj.optString("menuBackgroundCustomToken", ""), CustomAssetSlot.MENU_BACKGROUND),
             readerFontSizeSp = obj.optInt("readerFontSizeSp", fallbackPrefs.readerFontSizeSp),
             readerLineDistanceDp = obj.optInt("readerLineDistanceDp", fallbackPrefs.readerLineDistanceDp),
             readerParagraphDistanceDp = obj.optInt("readerParagraphDistanceDp", fallbackPrefs.readerParagraphDistanceDp),

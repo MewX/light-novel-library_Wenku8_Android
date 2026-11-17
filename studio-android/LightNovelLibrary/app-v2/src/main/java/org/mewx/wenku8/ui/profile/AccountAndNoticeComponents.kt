@@ -3,6 +3,7 @@ package org.mewx.wenku8.ui.profile
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -13,21 +14,24 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.Logout
 import androidx.compose.material.icons.automirrored.outlined.OpenInNew
 import androidx.compose.material.icons.outlined.AccountCircle
 import androidx.compose.material.icons.outlined.Campaign
 import androidx.compose.material.icons.outlined.CheckCircle
-import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.CloudOff
 import androidx.compose.material.icons.outlined.EventAvailable
 import androidx.compose.material.icons.outlined.Refresh
@@ -67,6 +71,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -83,7 +88,6 @@ import org.mewx.wenku8.data.repository.AccountSessionState
 import org.mewx.wenku8.data.repository.AppVersionCheckResult
 import org.mewx.wenku8.data.repository.DailySignOutcome
 import org.mewx.wenku8.data.repository.LoginOutcome
-import org.mewx.wenku8.ui.components.TooltipIconButton
 import org.mewx.wenku8.data.repository.ParsedServerNotice
 import org.mewx.wenku8.data.repository.UserSessionRepository
 import org.mewx.wenku8.ui.theme.LocalEinkMode
@@ -93,7 +97,6 @@ import java.io.File
 /** Semantic test tags for `P3.1` Account, `NoticeString`, and App Version Check UI. */
 object ProfileAccountTestTags {
     const val SERVER_NOTICE_BANNER = "profile_server_notice_banner"
-    const val SERVER_NOTICE_DISMISS_BUTTON = "profile_server_notice_dismiss"
     const val ACCOUNT_PROFILE_CARD = "profile_account_card"
     const val OPEN_LOGIN_SHEET_BUTTON = "profile_open_login_sheet"
     const val OPEN_REGISTER_DIALOG_BUTTON = "profile_open_register_dialog"
@@ -104,9 +107,11 @@ object ProfileAccountTestTags {
     const val LOGOUT_CONFIRM_BUTTON = "profile_logout_confirm_button"
 
     const val LOGIN_BOTTOM_SHEET = "profile_login_bottom_sheet"
+    const val LOGIN_LOGO_IMAGE = "profile_login_logo_image"
     const val LOGIN_IDENTIFIER_INPUT = "profile_login_identifier_input"
     const val LOGIN_PASSWORD_INPUT = "profile_login_password_input"
     const val LOGIN_SUBMIT_BUTTON = "profile_login_submit_button"
+    const val LOGIN_FORGOT_PASSWORD_BUTTON = "profile_login_forgot_password_button"
     const val LOGIN_ERROR_TEXT = "profile_login_error_text"
 
     const val CHECK_UPDATE_BUTTON = "profile_check_update_button"
@@ -114,14 +119,13 @@ object ProfileAccountTestTags {
 }
 
 /**
- * Dismissible M3e tonal announcement card rendering `Wenku8API.NoticeString` (`notice_sc` /
+ * Persistent M3e tonal announcement card rendering `Wenku8API.NoticeString` (`notice_sc` /
  * `notice_tc` + `saves/notice.wk8`), including safe clickable `<a href>` action chips.
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun ServerNoticeBannerCard(
     notice: ParsedServerNotice,
-    onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
     onExternalUrlClicked: ((String) -> Unit)? = null,
 ) {
@@ -154,19 +158,6 @@ fun ServerNoticeBannerCard(
                     fontWeight = FontWeight.SemiBold,
                     modifier = Modifier.weight(1f),
                 )
-                val dismissNoticeLabel = stringResource(R.string.notice_action_dismiss)
-                TooltipIconButton(
-                    tooltipText = dismissNoticeLabel,
-                    onClick = onDismiss,
-                    modifier = Modifier
-                        .size(36.dp)
-                        .testTag(ProfileAccountTestTags.SERVER_NOTICE_DISMISS_BUTTON),
-                ) {
-                    Icon(
-                        imageVector = Icons.Outlined.Close,
-                        contentDescription = dismissNoticeLabel,
-                    )
-                }
             }
 
             if (notice.plainDisplayText.isNotEmpty()) {
@@ -699,7 +690,8 @@ private fun ProfileMetricPill(
 
 /**
  * M3e `ModalBottomSheet` for username/email + password login (`<= 30` chars validation, inline
- * server status mapping, show/hide password toggle, and web registration shortcut).
+ * server status mapping, show/hide password toggle, classic Wenku8 logo banner, web registration,
+ * and forgot-password shortcut).
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -708,6 +700,7 @@ fun AccountLoginBottomSheet(
     onSubmitLogin: suspend (identifier: String, password: String) -> LoginOutcome,
     onDismiss: () -> Unit,
     onLoginSuccess: () -> Unit,
+    forgotPasswordUrl: String = UserSessionRepository.FORGOT_PASSWORD_URL,
     onOpenExternalUrl: ((String) -> Unit)? = null,
 ) {
     val context = LocalContext.current
@@ -753,14 +746,29 @@ fun AccountLoginBottomSheet(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
                 .padding(horizontal = 24.dp)
                 .navigationBarsPadding()
                 .imePadding()
                 .padding(bottom = 24.dp),
         ) {
+            Image(
+                painter = painterResource(R.drawable.ic_wenku8_logo_transparent),
+                contentDescription = stringResource(R.string.app_name),
+                contentScale = ContentScale.Fit,
+                modifier = Modifier
+                    .align(Alignment.CenterHorizontally)
+                    .widthIn(max = 256.dp)
+                    .heightIn(max = 96.dp)
+                    .fillMaxWidth(0.75f)
+                    .testTag(ProfileAccountTestTags.LOGIN_LOGO_IMAGE),
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+
             Text(
                 text = stringResource(R.string.auth_sheet_title),
                 style = MaterialTheme.typography.headlineSmall,
+                modifier = Modifier.align(Alignment.CenterHorizontally),
             )
             Spacer(modifier = Modifier.height(16.dp))
 
@@ -854,20 +862,42 @@ fun AccountLoginBottomSheet(
                 )
             }
 
-            if (registerPageUrl.isNotEmpty()) {
+            if (registerPageUrl.isNotEmpty() || forgotPasswordUrl.isNotEmpty()) {
                 Spacer(modifier = Modifier.height(8.dp))
-                TextButton(
-                    enabled = !isSubmitting,
-                    onClick = {
-                        if (onOpenExternalUrl != null) {
-                            onOpenExternalUrl(registerPageUrl)
-                        } else {
-                            openSafeBrowserUrl(context, registerPageUrl)
-                        }
-                    },
-                    modifier = Modifier.align(Alignment.CenterHorizontally),
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally),
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth(),
                 ) {
-                    Text(text = stringResource(R.string.auth_action_register_web))
+                    if (registerPageUrl.isNotEmpty()) {
+                        TextButton(
+                            enabled = !isSubmitting,
+                            onClick = {
+                                if (onOpenExternalUrl != null) {
+                                    onOpenExternalUrl(registerPageUrl)
+                                } else {
+                                    openSafeBrowserUrl(context, registerPageUrl)
+                                }
+                            },
+                        ) {
+                            Text(text = stringResource(R.string.auth_action_register_web))
+                        }
+                    }
+                    if (forgotPasswordUrl.isNotEmpty()) {
+                        TextButton(
+                            enabled = !isSubmitting,
+                            onClick = {
+                                if (onOpenExternalUrl != null) {
+                                    onOpenExternalUrl(forgotPasswordUrl)
+                                } else {
+                                    openSafeBrowserUrl(context, forgotPasswordUrl)
+                                }
+                            },
+                            modifier = Modifier.testTag(ProfileAccountTestTags.LOGIN_FORGOT_PASSWORD_BUTTON),
+                        ) {
+                            Text(text = stringResource(R.string.auth_action_forgot_password))
+                        }
+                    }
                 }
             }
         }
@@ -1000,7 +1030,7 @@ fun AppUpdateCheckCard(
     }
 }
 
-private fun openSafeBrowserUrl(context: Context, rawUrl: String) {
+internal fun openSafeBrowserUrl(context: Context, rawUrl: String) {
     val trimmed = rawUrl.trim()
     if (!trimmed.startsWith("https://", ignoreCase = true) &&
         !trimmed.startsWith("http://", ignoreCase = true)

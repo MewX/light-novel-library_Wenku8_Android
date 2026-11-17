@@ -76,8 +76,6 @@ class UserPreferencesRepositoryTest {
         assertEquals(Wenku8API.AppLanguage.TC, migrated.appLanguage)
         assertTrue(migrated.einkModeEnabled)
         assertEquals(Wenku8ThemeMode.E_INK, migrated.themeMode)
-        assertEquals(0, migrated.menuBackgroundPresetId)
-        assertEquals("/data/user/0/org.mewx.wenku8/files/custom/banner.png", migrated.menuBackgroundCustomPath)
         assertEquals(26, migrated.readerFontSizeSp)
         assertEquals(22, migrated.readerLineDistanceDp)
         assertEquals(34, migrated.readerParagraphDistanceDp)

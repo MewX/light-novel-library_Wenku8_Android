@@ -19,6 +19,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -474,14 +475,24 @@ fun UnifiedReaderScreen(
         }
     }
 
+    val systemDarkTheme = isSystemInDarkTheme()
+    val effectivePaperPreset = when {
+        preferences.themeMode != Wenku8ThemeMode.SYSTEM -> preferences.readerPaperPreset
+        systemDarkTheme && !preferences.readerPaperPreset.isDark -> ReaderPaperPreset.CARBON_NIGHT
+        !systemDarkTheme && preferences.readerPaperPreset.isDark -> {
+            preferences.lastDayPaperPreset.takeIf { !it.isDark } ?: ReaderPaperPreset.PARCHMENT
+        }
+        else -> preferences.readerPaperPreset
+    }
+
     val palette = remember(
-        preferences.readerPaperPreset,
+        effectivePaperPreset,
         isEinkMode,
         preferences.readerCustomBackgroundPath,
         preferences.readerCustomFontPath,
     ) {
         resolveReaderVisualPalette(
-            paperPreset = preferences.readerPaperPreset,
+            paperPreset = effectivePaperPreset,
             isEinkMode = isEinkMode,
             customBackgroundPath = preferences.readerCustomBackgroundPath,
             customFontPath = preferences.readerCustomFontPath,
@@ -1905,7 +1916,7 @@ fun UnifiedReaderScreen(
                     paragraphDistanceDp = liveParagraphDistanceDp,
                     pageEdgeDistanceDp = livePageEdgeDistanceDp,
                     activeDraggingSlider = activeDraggingSlider,
-                    selectedPaperPreset = preferences.readerPaperPreset,
+                    selectedPaperPreset = effectivePaperPreset,
                     hasCustomFont = preferences.readerCustomFontPath.isNotBlank(),
                     hasCustomDayBackground = preferences.readerCustomBackgroundPath.isNotBlank(),
                     volumeKeyPagingEnabled = preferences.volumeKeyPagingEnabled,
@@ -2190,7 +2201,7 @@ fun UnifiedReaderScreen(
                             }
                         },
                     )
-                    val isCurrentlyNight = preferences.readerPaperPreset.isDark
+                    val isCurrentlyNight = effectivePaperPreset.isDark
                     ReaderToolbarActionButton(
                         icon = if (isCurrentlyNight) Icons.Outlined.LightMode else Icons.Outlined.DarkMode,
                         label = if (isCurrentlyNight) "日间" else "夜间",

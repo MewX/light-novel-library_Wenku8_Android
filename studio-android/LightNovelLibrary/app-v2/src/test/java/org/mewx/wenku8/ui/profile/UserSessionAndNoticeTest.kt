@@ -2,10 +2,13 @@ package org.mewx.wenku8.ui.profile
 
 import android.content.ContentValues
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
@@ -13,6 +16,7 @@ import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextReplacement
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.test.runTest
@@ -83,8 +87,13 @@ class UserSessionAndNoticeTest {
     }
 
     @Test
-    fun `ServerNoticeAndUpdateRepository parses links persists notice dismissal and checks updates`() = runTest {
+    fun `ServerNoticeAndUpdateRepository parses links keeps notice persistently visible and checks updates`() = runTest {
         val rootDir = tempFolder.newFolder("notice_root")
+        // Seed a legacy dismissed-hash file to verify it is cleaned up and never hides notices
+        val legacySavesDir = File(rootDir, "saves").apply { mkdirs() }
+        val legacyDismissedFile = File(legacySavesDir, "notice_dismissed.sha256").apply {
+            writeText("stale_hash_from_older_build")
+        }
         var remoteNoticeHtml = """欢迎使用新版客户端！<br/><a href="https://wenku8.mewx.org/faq">查看常见问题</a>"""
         var remoteVersionBody = "999"
 
@@ -107,21 +116,26 @@ class UserSessionAndNoticeTest {
 
         val firstNotice = repo.loadAndRefreshNotice(Wenku8API.AppLanguage.SC)
         assertNotNull(firstNotice)
+        assertFalse(legacyDismissedFile.exists())
         assertEquals("欢迎使用新版客户端！\n查看常见问题", firstNotice?.plainDisplayText)
         assertEquals(1, firstNotice?.links?.size)
         assertEquals("https://wenku8.mewx.org/faq", firstNotice?.links?.first()?.url)
         assertTrue(File(rootDir, "saves/notice.wk8").isFile)
 
-        // Dismissing hides the notice even on subsequent reloads of the same content
-        repo.dismissCurrentNotice()
-        assertNull(repo.activeNotice.value)
-        assertNull(repo.loadAndRefreshNotice(Wenku8API.AppLanguage.SC))
+        // Subsequent reloads keep the notice persistently visible (like v1)
+        val reloadedSameNotice = repo.loadAndRefreshNotice(Wenku8API.AppLanguage.SC)
+        assertNotNull(reloadedSameNotice)
+        assertEquals(firstNotice?.plainDisplayText, reloadedSameNotice?.plainDisplayText)
 
-        // Publishing a new server notice automatically re-surfaces it
+        // Publishing a new server notice updates activeNotice
         remoteNoticeHtml = "服务器维护已完成，感谢耐心等待！"
         val updatedNotice = repo.loadAndRefreshNotice(Wenku8API.AppLanguage.SC)
         assertNotNull(updatedNotice)
         assertEquals("服务器维护已完成，感谢耐心等待！", updatedNotice?.plainDisplayText)
+
+        // Empty server notice clears activeNotice
+        remoteNoticeHtml = "   "
+        assertNull(repo.loadAndRefreshNotice(Wenku8API.AppLanguage.SC))
 
         // Version check
         val available = repo.checkForAppUpdate(currentVersionCode = 55)
@@ -319,17 +333,17 @@ class UserSessionAndNoticeTest {
         composeRule.setContent {
             Wenku8ExpressiveTheme(themeMode = Wenku8ThemeMode.ARCHIVAL_DAY) {
                 val sessionState by userRepo.sessionState.collectAsStateWithLifecycle()
-                var showNotice by remember { mutableStateOf(true) }
                 var showSheet by remember { mutableStateOf(false) }
 
-                Column {
-                    if (showNotice) {
-                        ServerNoticeBannerCard(
-                            notice = parsedNotice,
-                            onDismiss = { showNotice = false },
-                            onExternalUrlClicked = { openedUrls.add(it) },
-                        )
-                    }
+                Column(
+                    modifier = androidx.compose.ui.Modifier.verticalScroll(
+                        androidx.compose.foundation.rememberScrollState(),
+                    ),
+                ) {
+                    ServerNoticeBannerCard(
+                        notice = parsedNotice,
+                        onExternalUrlClicked = { openedUrls.add(it) },
+                    )
                     AccountProfileCard(
                         sessionState = sessionState,
                         registerPageUrl = userRepo.registerPageUrl,
@@ -352,16 +366,25 @@ class UserSessionAndNoticeTest {
             }
         }
 
-        // Verify Notice banner link + dismiss
+        // Verify persistent Notice banner + extracted link chip
         composeRule.onNodeWithTag(ProfileAccountTestTags.SERVER_NOTICE_BANNER).assertIsDisplayed()
         composeRule.onNodeWithText("阅读详情").performClick()
         assertEquals(listOf("https://wenku8.mewx.org/blog"), openedUrls)
-        composeRule.onNodeWithTag(ProfileAccountTestTags.SERVER_NOTICE_DISMISS_BUTTON).performClick()
-        composeRule.onNodeWithTag(ProfileAccountTestTags.SERVER_NOTICE_BANNER).assertDoesNotExist()
+        composeRule.onNodeWithTag(ProfileAccountTestTags.SERVER_NOTICE_BANNER).assertIsDisplayed()
 
-        // Open login sheet, test wrong password error, then succeed
-        composeRule.onNodeWithTag(ProfileAccountTestTags.OPEN_LOGIN_SHEET_BUTTON).performClick()
+        // Open login sheet, verify classic Wenku8 logo + forgot password link, test wrong password error, then succeed
+        composeRule.onNodeWithTag(ProfileAccountTestTags.OPEN_LOGIN_SHEET_BUTTON)
+            .performScrollTo()
+            .performClick()
         composeRule.onNodeWithTag(ProfileAccountTestTags.LOGIN_BOTTOM_SHEET).assertIsDisplayed()
+        composeRule.onNodeWithTag(ProfileAccountTestTags.LOGIN_LOGO_IMAGE).assertIsDisplayed()
+        composeRule.onNodeWithTag(ProfileAccountTestTags.LOGIN_FORGOT_PASSWORD_BUTTON)
+            .assertIsDisplayed()
+            .performClick()
+        assertEquals(
+            listOf("https://wenku8.mewx.org/blog", UserSessionRepository.FORGOT_PASSWORD_URL),
+            openedUrls,
+        )
         composeRule.onNodeWithTag(ProfileAccountTestTags.LOGIN_IDENTIFIER_INPUT)
             .performTextReplacement("kino_reader")
         composeRule.onNodeWithTag(ProfileAccountTestTags.LOGIN_PASSWORD_INPUT)
@@ -381,20 +404,26 @@ class UserSessionAndNoticeTest {
         }
 
         // Signed-in profile rendered with nickname, rank, and initial score 80
-        composeRule.onNodeWithText("奇诺之旅").assertIsDisplayed()
-        composeRule.onNodeWithText("资深读者").assertIsDisplayed()
-        composeRule.onNodeWithText("80").assertIsDisplayed()
+        composeRule.onNodeWithText("奇诺之旅").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("资深读者").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("80").performScrollTo().assertIsDisplayed()
 
         // Perform daily sign-in -> score refreshes to 82 & feedback banner shown
-        composeRule.onNodeWithTag(ProfileAccountTestTags.DAILY_SIGN_BUTTON).performClick()
+        composeRule.onNodeWithTag(ProfileAccountTestTags.DAILY_SIGN_BUTTON)
+            .performScrollTo()
+            .performClick()
         composeRule.waitUntil(timeoutMillis = 5_000) {
             composeRule.onAllNodesWithText("82").fetchSemanticsNodes().isNotEmpty()
         }
-        composeRule.onNodeWithText("82").assertIsDisplayed()
-        composeRule.onNodeWithTag(ProfileAccountTestTags.DAILY_SIGN_FEEDBACK_TEXT).assertIsDisplayed()
+        composeRule.onNodeWithText("82").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithTag(ProfileAccountTestTags.DAILY_SIGN_FEEDBACK_TEXT)
+            .performScrollTo()
+            .assertIsDisplayed()
 
         // Logout with confirmation dialog -> returns to SignedOut
-        composeRule.onNodeWithTag(ProfileAccountTestTags.LOGOUT_BUTTON).performClick()
+        composeRule.onNodeWithTag(ProfileAccountTestTags.LOGOUT_BUTTON)
+            .performScrollTo()
+            .performClick()
         composeRule.onNodeWithTag(ProfileAccountTestTags.LOGOUT_CONFIRM_BUTTON).performClick()
         composeRule.waitUntil(timeoutMillis = 5_000) {
             composeRule.onAllNodesWithTag(ProfileAccountTestTags.OPEN_LOGIN_SHEET_BUTTON)

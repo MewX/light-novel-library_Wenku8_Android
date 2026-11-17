@@ -15,6 +15,7 @@ import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.unit.dp
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
@@ -530,6 +531,11 @@ class ProfileAndBackupTest {
                 }
             }
 
+            // 0. Removed header card & standalone dynamic-color / header-wallpaper options stay absent
+            composeTestRule.onNodeWithText("我的与工作室").assertDoesNotExist()
+            composeTestRule.onNodeWithText("个人主页头图壁纸").assertDoesNotExist()
+            composeTestRule.onNodeWithText("系统壁纸动态取色 (Material You)").assertDoesNotExist()
+
             // 1. Reading footprint summary visible
             composeTestRule.onNodeWithText("120 分钟").assertIsDisplayed()
             composeTestRule.onNodeWithText("2.5w").assertIsDisplayed()
@@ -540,11 +546,32 @@ class ProfileAndBackupTest {
             composeTestRule.onNodeWithTag(ProfileStudioTestTags.OPEN_DIAGNOSTICS_BUTTON).performClick()
             assertEquals(1, diagnosticsOpened)
 
-            // 3. Language switch & Typography reset
+            // 3. Language switch, multi-paragraph spacing live preview, & Typography reset
             composeTestRule.onNodeWithTag(ProfileStudioTestTags.LIST)
                 .performScrollToNode(hasTestTag(ProfileStudioTestTags.LANG_CHIP_TC))
             composeTestRule.onNodeWithTag(ProfileStudioTestTags.LANG_CHIP_TC).performClick()
             assertEquals(Wenku8API.AppLanguage.TC, prefsState.appLanguage)
+
+            composeTestRule.onNodeWithTag(ProfileStudioTestTags.LIST)
+                .performScrollToNode(hasTestTag(ProfileStudioTestTags.TYPOGRAPHY_PREVIEW_BOX))
+            prefsState = prefsState.copy(readerParagraphDistanceDp = 0)
+            composeTestRule.waitForIdle()
+            val zeroParaHeight = composeTestRule
+                .onNodeWithTag(ProfileStudioTestTags.TYPOGRAPHY_PREVIEW_BOX)
+                .fetchSemanticsNode()
+                .boundsInRoot
+                .height
+            prefsState = prefsState.copy(readerParagraphDistanceDp = 40)
+            composeTestRule.waitForIdle()
+            val wideParaHeight = composeTestRule
+                .onNodeWithTag(ProfileStudioTestTags.TYPOGRAPHY_PREVIEW_BOX)
+                .fetchSemanticsNode()
+                .boundsInRoot
+                .height
+            assertTrue(
+                "Multi-paragraph preview height must grow when paragraph spacing increases ($wideParaHeight > $zeroParaHeight)",
+                wideParaHeight > zeroParaHeight,
+            )
 
             composeTestRule.onNodeWithTag(ProfileStudioTestTags.LIST)
                 .performScrollToNode(hasTestTag(ProfileStudioTestTags.RESET_TYPOGRAPHY_BUTTON))
@@ -568,20 +595,43 @@ class ProfileAndBackupTest {
                 .performScrollToNode(hasTestTag(ProfileStudioTestTags.STORAGE_STATUS_BANNER))
             composeTestRule.onNodeWithTag(ProfileStudioTestTags.STORAGE_STATUS_BANNER).assertIsDisplayed()
 
-            // 5. Open-Source License dialog displays R.raw.license content
+            // 5. Open-Source License dialog displays regenerated R.raw.license content + git.io link
             composeTestRule.onNodeWithTag(ProfileStudioTestTags.LIST)
                 .performScrollToNode(hasTestTag(ProfileStudioTestTags.OPEN_LICENSE_BUTTON))
             composeTestRule.onNodeWithTag(ProfileStudioTestTags.OPEN_LICENSE_BUTTON).performClick()
             composeTestRule.onNodeWithText("开源许可与版权声明").assertIsDisplayed()
+            composeTestRule.onNodeWithText("https://git.io/v8Ck3", substring = true).assertIsDisplayed()
+            composeTestRule.onNodeWithText("Jetpack Compose", substring = true).assertIsDisplayed()
             composeTestRule.onNodeWithText("关闭").performClick()
 
-            // 6. About dialog 5-tap version Easter egg
+            // 6. About dialog matches v1 info & credits + 5-tap version Easter egg
             composeTestRule.onNodeWithTag(ProfileStudioTestTags.OPEN_ABOUT_BUTTON).performClick()
+            composeTestRule.onNodeWithText("版本：2.0.0 (100)").assertIsDisplayed()
+            composeTestRule.onNodeWithTag(ProfileStudioTestTags.ABOUT_HOMEPAGE_LINK).assertIsDisplayed()
+            composeTestRule.onNodeWithText("QQ交流群: 2166068158")
+                .performScrollTo()
+                .assertIsDisplayed()
             composeTestRule.onNodeWithTag(ProfileStudioTestTags.ABOUT_EASTER_EGG_TEXT).assertDoesNotExist()
+            composeTestRule.onNodeWithTag(ProfileStudioTestTags.ABOUT_VERSION_TAP_TARGET).performScrollTo()
             repeat(5) {
                 composeTestRule.onNodeWithTag(ProfileStudioTestTags.ABOUT_VERSION_TAP_TARGET).performClick()
             }
             composeTestRule.onNodeWithTag(ProfileStudioTestTags.ABOUT_EASTER_EGG_TEXT).assertIsDisplayed()
+            composeTestRule.onNodeWithText("MewX <https://mewx.org>")
+                .performScrollTo()
+                .assertIsDisplayed()
+            composeTestRule.onNodeWithText("Yanix <https://github.com/SeraphRoy>")
+                .performScrollTo()
+                .assertIsDisplayed()
+            composeTestRule.onNodeWithText("Jack Liu <https://github.com/aaassseee>")
+                .performScrollTo()
+                .assertIsDisplayed()
+            composeTestRule.onNodeWithText("ZERO (原界面设计) <78283358@qq.com>")
+                .performScrollTo()
+                .assertIsDisplayed()
+            composeTestRule.onNodeWithText("妻兔姬 (原反馈协助) <1270263248@qq.com>")
+                .performScrollTo()
+                .assertIsDisplayed()
         } finally {
             db.close()
         }

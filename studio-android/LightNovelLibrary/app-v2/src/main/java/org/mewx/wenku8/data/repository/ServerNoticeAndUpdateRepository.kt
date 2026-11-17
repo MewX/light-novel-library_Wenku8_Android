@@ -145,16 +145,16 @@ class ServerNoticeAndUpdateRepository(
 
     /**
      * Loads any cached `saves/notice.wk8` immediately, then fetches the latest language-matched
-     * notice (`notice_sc` vs `notice_tc`) over [transport]. Dismissed notices stay hidden until
-     * the server notice content changes.
+     * notice (`notice_sc` vs `notice_tc`) over [transport]. Like `v1`, the notice remains visible
+     * whenever the server announcement is non-empty.
      */
     suspend fun loadAndRefreshNotice(appLanguage: Wenku8API.AppLanguage): ParsedServerNotice? =
         withContext(ioDispatcher) {
-            val dismissedHash = readDismissedNoticeHash()
+            cleanupLegacyDismissedHashFile()
             val cachedRaw = readCachedNoticeText()
             parseNoticeHtmlOrNull(cachedRaw)?.let { cachedParsed ->
                 syncLegacyNoticeStatic(cachedParsed.rawHtml)
-                _activeNotice.value = cachedParsed.takeUnless { it.contentHash == dismissedHash }
+                _activeNotice.value = cachedParsed
             }
 
             val targetUrl = if (appLanguage == Wenku8API.AppLanguage.SC) {
@@ -164,26 +164,19 @@ class ServerNoticeAndUpdateRepository(
             }
             val downloadedBytes = transport.getBytes(targetUrl) ?: return@withContext _activeNotice.value
             val downloadedText = String(downloadedBytes, StandardCharsets.UTF_8).trim()
+            if (downloadedText.isEmpty() || downloadedText.equals(Wenku8API.UNKNOWN, ignoreCase = true)) {
+                clearCachedNoticeText()
+                syncLegacyNoticeStatic("")
+                _activeNotice.value = null
+                return@withContext null
+            }
             val freshParsed = parseNoticeHtmlOrNull(downloadedText) ?: return@withContext _activeNotice.value
 
             writeCachedNoticeText(freshParsed.rawHtml)
             syncLegacyNoticeStatic(freshParsed.rawHtml)
-            val currentDismissedHash = readDismissedNoticeHash()
-            val visibleNotice = freshParsed.takeUnless { it.contentHash == currentDismissedHash }
-            _activeNotice.value = visibleNotice
-            visibleNotice
+            _activeNotice.value = freshParsed
+            freshParsed
         }
-
-    suspend fun dismissCurrentNotice() = withContext(ioDispatcher) {
-        val current = _activeNotice.value ?: return@withContext
-        val primaryRoot = assetRootsProvider().firstOrNull() ?: return@withContext
-        val savesDir = File(primaryRoot, SAVES_DIR_NAME).apply { mkdirs() }
-        runCatching {
-            File(savesDir, DISMISSED_NOTICE_HASH_FILE)
-                .writeText(current.contentHash, StandardCharsets.UTF_8)
-        }
-        _activeNotice.value = null
-    }
 
     /**
      * Checks `https://wenku8.mewx.org/version` against [currentVersionCode].
@@ -236,11 +229,22 @@ class ServerNoticeAndUpdateRepository(
         }
     }
 
-    private fun readDismissedNoticeHash(): String? {
-        val primaryRoot = assetRootsProvider().firstOrNull() ?: return null
-        val file = File(File(primaryRoot, SAVES_DIR_NAME), DISMISSED_NOTICE_HASH_FILE)
-        if (!file.isFile) return null
-        return runCatching { file.readText(StandardCharsets.UTF_8).trim() }.getOrNull()
+    private fun clearCachedNoticeText() {
+        for (root in assetRootsProvider()) {
+            val file = File(File(root, SAVES_DIR_NAME), NOTICE_FILE_NAME)
+            if (file.isFile) {
+                runCatching { file.delete() }
+            }
+        }
+    }
+
+    private fun cleanupLegacyDismissedHashFile() {
+        for (root in assetRootsProvider()) {
+            val legacyFile = File(File(root, SAVES_DIR_NAME), DISMISSED_NOTICE_HASH_FILE)
+            if (legacyFile.isFile) {
+                runCatching { legacyFile.delete() }
+            }
+        }
     }
 
     private fun syncLegacyNoticeStatic(rawNotice: String) {

@@ -28,33 +28,28 @@ import java.io.IOException
 /**
  * Immutable snapshot of all user-configurable Wenku8 `v2.0` settings (`settings.preferences_pb`).
  *
- * Guarantees **100% parity ("More, Never Less")** with all 11 legacy `v1.31`
- * `GlobalConfig.SettingItems` (`settings.wk8`) plus `v2.0` additions:
+ * Covers legacy `v1.31` `GlobalConfig.SettingItems` (`settings.wk8`) plus `v2.0` additions:
  * - `language` (`SC` / `TC`) -> [appLanguage]
  * - `eink_mode` (`0` / `1`) -> [einkModeEnabled]
- * - `menu_bg_id` (`1..5` system preset or `0` custom) -> [menuBackgroundPresetId]
- * - `menu_bg_path` -> [menuBackgroundCustomPath]
  * - `reader_font_size` (`8..36` sp, covering `v1.31`'s `8..32` sp) -> [readerFontSizeSp]
  * - `reader_line_distance` (`0..32` dp) -> [readerLineDistanceDp]
  * - `reader_paragraph_distance` (`0..48` dp) -> [readerParagraphDistanceDp]
  * - `reader_paragraph_edge_distance` (`0..32` dp) -> [readerPageEdgeDistanceDp]
  * - `reader_font_path` (`""` = system default) -> [readerCustomFontPath]
  * - `reader_background_path` (`""` = system default) -> [readerCustomBackgroundPath]
- * - Plus `v2.0`: [themeMode], [useDynamicColor], [defaultHomeDestination] (`LATEST` default /
- *   `BOOKSHELF`), [bookshelfViewMode], [bookshelfSortMode], [readerPageTurnMode],
- *   [readerPaperPreset], [readerKeepScreenOn], [readerEdgeBrightnessDragEnabled],
- *   [volumeKeyPagingEnabled], [autoOptimizeConnectionEnabled], and [legacyV1InternalMigrationVersion].
+ * - Plus `v2.0`: [themeMode] (where [Wenku8ThemeMode.SYSTEM] unifies system Day/Night + Material You
+ *   dynamic color), [defaultHomeDestination] (`LATEST` default / `BOOKSHELF`), [bookshelfViewMode],
+ *   [bookshelfSortMode], [readerPageTurnMode], [readerPaperPreset], [readerKeepScreenOn],
+ *   [readerEdgeBrightnessDragEnabled], [volumeKeyPagingEnabled], [autoOptimizeConnectionEnabled],
+ *   and [legacyV1InternalMigrationVersion].
  */
 data class Wenku8UserPreferences(
     val appLanguage: Wenku8API.AppLanguage = Wenku8API.AppLanguage.SC,
     val themeMode: Wenku8ThemeMode = Wenku8ThemeMode.CLASSIC_BLUE,
     val einkModeEnabled: Boolean = false,
-    val useDynamicColor: Boolean = false,
     val defaultHomeDestination: DefaultHomeDestination = DefaultHomeDestination.LATEST,
     val bookshelfViewMode: BookshelfViewMode = BookshelfViewMode.GRID,
     val bookshelfSortMode: BookshelfSortMode = BookshelfSortMode.MANUAL_ORDER,
-    val menuBackgroundPresetId: Int = DEFAULT_MENU_BG_PRESET_ID,
-    val menuBackgroundCustomPath: String = "",
     val readerFontSizeSp: Int = DEFAULT_READER_FONT_SIZE_SP,
     val readerLineDistanceDp: Int = DEFAULT_READER_LINE_DISTANCE_DP,
     val readerParagraphDistanceDp: Int = DEFAULT_READER_PARAGRAPH_DISTANCE_DP,
@@ -73,7 +68,6 @@ data class Wenku8UserPreferences(
     val legacyV1InternalMigrationVersion: Int = 0,
 ) {
     companion object {
-        const val DEFAULT_MENU_BG_PRESET_ID = 1
         const val MIN_READER_FONT_SIZE_SP = 8
         const val MAX_READER_FONT_SIZE_SP = 36
         const val DEFAULT_READER_FONT_SIZE_SP = 18
@@ -205,10 +199,6 @@ class UserPreferencesRepository(
         }
     }
 
-    suspend fun setUseDynamicColor(enabled: Boolean) {
-        dataStore.edit { it[Keys.USE_DYNAMIC_COLOR] = enabled }
-    }
-
     suspend fun setDefaultHomeDestination(destination: DefaultHomeDestination) {
         dataStore.edit { it[Keys.DEFAULT_HOME_DESTINATION] = destination.name }
     }
@@ -219,14 +209,6 @@ class UserPreferencesRepository(
 
     suspend fun setBookshelfSortMode(sortMode: BookshelfSortMode) {
         dataStore.edit { it[Keys.BOOKSHELF_SORT_MODE] = sortMode.name }
-    }
-
-    suspend fun setMenuBackground(presetId: Int, customPath: String = "") {
-        val clampedPresetId = presetId.coerceIn(0, 5)
-        dataStore.edit { prefs ->
-            prefs[Keys.MENU_BG_PRESET_ID] = clampedPresetId
-            prefs[Keys.MENU_BG_CUSTOM_PATH] = if (clampedPresetId == 0) customPath else ""
-        }
     }
 
     suspend fun setReaderTypography(
@@ -359,13 +341,6 @@ class UserPreferencesRepository(
                 }
             }
 
-            migratedSettings["menu_bg_id"]?.toIntOrNull()?.let { rawBgId ->
-                prefs[Keys.MENU_BG_PRESET_ID] = rawBgId.coerceIn(0, 5)
-            }
-            migratedSettings["menu_bg_path"]?.let { rawBgPath ->
-                prefs[Keys.MENU_BG_CUSTOM_PATH] = if (rawBgPath == "0") "" else rawBgPath
-            }
-
             migratedSettings["reader_font_size"]?.toIntOrNull()?.let { rawSize ->
                 prefs[Keys.READER_FONT_SIZE_SP] = rawSize.coerceIn(
                     Wenku8UserPreferences.MIN_READER_FONT_SIZE_SP,
@@ -417,12 +392,9 @@ class UserPreferencesRepository(
             prefs[Keys.APP_LANGUAGE] = imported.appLanguage.name
             prefs[Keys.THEME_MODE] = imported.themeMode.name
             prefs[Keys.EINK_MODE_ENABLED] = imported.einkModeEnabled
-            prefs[Keys.USE_DYNAMIC_COLOR] = imported.useDynamicColor
             prefs[Keys.DEFAULT_HOME_DESTINATION] = imported.defaultHomeDestination.name
             prefs[Keys.BOOKSHELF_VIEW_MODE] = imported.bookshelfViewMode.name
             prefs[Keys.BOOKSHELF_SORT_MODE] = imported.bookshelfSortMode.name
-            prefs[Keys.MENU_BG_PRESET_ID] = imported.menuBackgroundPresetId.coerceIn(0, 5)
-            prefs[Keys.MENU_BG_CUSTOM_PATH] = imported.menuBackgroundCustomPath
             prefs[Keys.READER_FONT_SIZE_SP] = imported.readerFontSizeSp.coerceIn(
                 Wenku8UserPreferences.MIN_READER_FONT_SIZE_SP,
                 Wenku8UserPreferences.MAX_READER_FONT_SIZE_SP,
@@ -495,13 +467,9 @@ class UserPreferencesRepository(
             appLanguage = language,
             themeMode = themeMode,
             einkModeEnabled = einkEnabled,
-            useDynamicColor = prefs[Keys.USE_DYNAMIC_COLOR] ?: false,
             defaultHomeDestination = defaultHome,
             bookshelfViewMode = bookshelfView,
             bookshelfSortMode = bookshelfSort,
-            menuBackgroundPresetId = (prefs[Keys.MENU_BG_PRESET_ID]
-                ?: Wenku8UserPreferences.DEFAULT_MENU_BG_PRESET_ID).coerceIn(0, 5),
-            menuBackgroundCustomPath = prefs[Keys.MENU_BG_CUSTOM_PATH] ?: "",
             readerFontSizeSp = (prefs[Keys.READER_FONT_SIZE_SP]
                 ?: Wenku8UserPreferences.DEFAULT_READER_FONT_SIZE_SP).coerceIn(
                 Wenku8UserPreferences.MIN_READER_FONT_SIZE_SP,
@@ -546,12 +514,9 @@ class UserPreferencesRepository(
         val APP_LANGUAGE = stringPreferencesKey("app_language")
         val THEME_MODE = stringPreferencesKey("theme_mode")
         val EINK_MODE_ENABLED = booleanPreferencesKey("eink_mode_enabled")
-        val USE_DYNAMIC_COLOR = booleanPreferencesKey("use_dynamic_color")
         val DEFAULT_HOME_DESTINATION = stringPreferencesKey("default_home_destination")
         val BOOKSHELF_VIEW_MODE = stringPreferencesKey("bookshelf_view_mode")
         val BOOKSHELF_SORT_MODE = stringPreferencesKey("bookshelf_sort_mode")
-        val MENU_BG_PRESET_ID = intPreferencesKey("menu_bg_preset_id")
-        val MENU_BG_CUSTOM_PATH = stringPreferencesKey("menu_bg_custom_path")
         val READER_FONT_SIZE_SP = intPreferencesKey("reader_font_size_sp")
         val READER_LINE_DISTANCE_DP = intPreferencesKey("reader_line_distance_dp")
         val READER_PARAGRAPH_DISTANCE_DP = intPreferencesKey("reader_paragraph_distance_dp")

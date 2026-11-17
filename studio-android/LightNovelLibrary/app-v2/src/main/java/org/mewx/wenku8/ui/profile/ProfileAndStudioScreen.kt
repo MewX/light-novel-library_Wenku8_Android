@@ -3,8 +3,6 @@ package org.mewx.wenku8.ui.profile
 import android.graphics.Typeface
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -44,7 +42,6 @@ import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -54,6 +51,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -64,17 +62,16 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.documentfile.provider.DocumentFile
@@ -111,7 +108,6 @@ import kotlin.math.roundToInt
 /** Semantic UI test tags for Robolectric & instrumented `ProfileAndStudioScreen` tests. */
 object ProfileStudioTestTags {
     const val LIST = "profile_studio_list"
-    const val TOP_ABOUT_BUTTON = "profile_top_about_button"
     const val FOOTPRINT_CARD = "profile_footprint_card"
     const val OPEN_FOOTPRINT_STATS_BUTTON = "profile_open_footprint_stats_button"
     const val OPEN_FOOTPRINT_BOOKMARKS_BUTTON = "profile_open_footprint_bookmarks_button"
@@ -121,7 +117,7 @@ object ProfileStudioTestTags {
     const val LANG_CHIP_SC = "profile_lang_chip_sc"
     const val LANG_CHIP_TC = "profile_lang_chip_tc"
     const val EINK_SWITCH = "profile_eink_switch"
-    const val DYNAMIC_COLOR_SWITCH = "profile_dynamic_color_switch"
+    const val TYPOGRAPHY_PREVIEW_BOX = "profile_typography_preview_box"
     const val FONT_SIZE_SLIDER = "profile_font_size_slider"
     const val LINE_DIST_SLIDER = "profile_line_dist_slider"
     const val PARA_DIST_SLIDER = "profile_para_dist_slider"
@@ -137,25 +133,24 @@ object ProfileStudioTestTags {
     const val OPEN_LICENSE_BUTTON = "profile_open_license_button"
     const val OPEN_ABOUT_BUTTON = "profile_open_about_button"
     const val ABOUT_VERSION_TAP_TARGET = "profile_about_version_tap_target"
+    const val ABOUT_HOMEPAGE_LINK = "profile_about_homepage_link"
     const val ABOUT_EASTER_EGG_TEXT = "profile_about_easter_egg_text"
 }
 
 /**
- * Full Material 3 Expressive (`M3e`) `Tab 4 · 我的` Profile, Settings Studio & Archive Hub
- * (`docs/designs/v2/08-account-reviews-and-profile-design.md` §4).
+ * Full Material 3 Expressive (`M3e`) `Tab 4 · 我的` Profile, Settings Studio & Archive Hub.
  *
- * Guarantees **100% `v1.31` Settings Parity ("More, Never Less")** plus `v2.0` upgrades:
- * - Header wallpaper (`menu_bg_id` `1..5`, custom SAF wallpaper, or M3e Pure Card)
- * - `NoticeString` banner + `AccountProfileCard` (`cert.wk8` / daily sign-in / avatar)
+ * - Persistent `NoticeString` announcement banner + `AccountProfileCard` (`cert.wk8` / daily sign-in / avatar)
  * - Reading Footprint summary (`累计阅读` / `累计字数` / `书签笔记`) + 1-tap Heatmap / History / Bookmarks Hub
  * - Network & Auto-Routing quick controls (`自动优化连接` toggle + status + `网络检测` + `恢复默认连接`)
- * - Language (`SC` / `TC`), Startup Home (`最新` / `书架`), Theme (`6` modes), E-Ink high-contrast, Dynamic Color
+ * - Language (`SC` / `TC`), Startup Home (`最新` / `书架`), Theme (`6` modes, where `跟随系统` unifies
+ *   system Day/Night + Android 12+ Material You wallpaper colors), and E-Ink high-contrast
  * - Reader default typography (`8..36 sp`, line `0..32 dp`, paragraph `0..48 dp`, edge `0..32 dp`,
- *   live preview quote, custom `.ttf`/`.otf` font, custom day paper image, volume-key paging)
+ *   multi-paragraph live preview, custom `.ttf`/`.otf` font, custom day paper image, volume-key paging)
  * - Fast & cancellable Deep Orphan Cache Cleanup, `.wk8backup.zip` Light/Full Export & Smart-Merge
  *   Import, and external `v1.x` SAF folder import
- * - App Update Check (`CheckAppNewVersion`), Open-Source License (`R.raw.license`), and About dialog
- *   with 5-tap version Easter egg.
+ * - App Update Check (`CheckAppNewVersion`), Open-Source License (`R.raw.license`), and legacy-aligned
+ *   About dialog with 5-tap version Easter egg.
  */
 @Composable
 fun ProfileAndStudioScreen(
@@ -175,8 +170,6 @@ fun ProfileAndStudioScreen(
     onOpenNetworkDiagnostics: () -> Unit = {},
     onAppLanguageSelected: (Wenku8API.AppLanguage) -> Unit = {},
     onEinkModeChanged: (Boolean) -> Unit = {},
-    onUseDynamicColorChanged: (Boolean) -> Unit = {},
-    onMenuBackgroundChanged: (presetId: Int, customPath: String) -> Unit = { _, _ -> },
     onReaderTypographyChanged: (
         fontSizeSp: Int,
         lineDistanceDp: Int,
@@ -195,6 +188,10 @@ fun ProfileAndStudioScreen(
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
+
+    LaunchedEffect(serverNoticeAndUpdateRepository, preferences.appLanguage) {
+        serverNoticeAndUpdateRepository?.loadAndRefreshNotice(preferences.appLanguage)
+    }
 
     val activeNotice = if (serverNoticeAndUpdateRepository != null) {
         val state by serverNoticeAndUpdateRepository.activeNotice.collectAsStateWithLifecycle()
@@ -223,21 +220,6 @@ fun ProfileAndStudioScreen(
     val backupFailedMessage = stringResource(R.string.profile_backup_failed)
 
     // SAF Launchers for Custom Assets, .wk8backup.zip Export/Import & Legacy v1.x Tree Import
-    val customMenuBgLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.OpenDocument(),
-    ) { uri ->
-        if (uri != null && storageAndCacheRepository != null) {
-            coroutineScope.launch {
-                storageAndCacheRepository.importCustomAsset(
-                    contentResolver = context.contentResolver,
-                    sourceUri = uri,
-                    slot = CustomAssetSlot.MENU_BACKGROUND,
-                ).onSuccess { savedFile ->
-                    onMenuBackgroundChanged(0, savedFile.absolutePath)
-                }
-            }
-        }
-    }
 
     val customReaderFontLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument(),
@@ -408,30 +390,16 @@ fun ProfileAndStudioScreen(
             }
         }
 
-        // 1. Editorial Header Card with Optional Legacy / Custom Wallpaper (`menu_bg_id` 1..5 / 0)
-        item(key = "profile_header_banner") {
-            ProfileHeaderWallpaperCard(
-                presetId = preferences.menuBackgroundPresetId,
-                customImagePath = preferences.menuBackgroundCustomPath,
-                onOpenAbout = { showAboutDialog = true },
-            )
-        }
-
-        // 2. Server Announcement Banner (`NoticeString` SC / TC)
+        // 1. Server Announcement Banner (`NoticeString` SC / TC)
         if (activeNotice != null && serverNoticeAndUpdateRepository != null) {
             item(key = "profile_server_notice_banner") {
                 ServerNoticeBannerCard(
                     notice = activeNotice,
-                    onDismiss = {
-                        coroutineScope.launch {
-                            serverNoticeAndUpdateRepository.dismissCurrentNotice()
-                        }
-                    },
                 )
             }
         }
 
-        // 3. Wenku8 Account Card (`cert.wk8` / Avatar / Daily Sign-In)
+        // 2. Wenku8 Account Card (`cert.wk8` / Avatar / Daily Sign-In)
         if (userSessionRepository != null && sessionState != null) {
             item(key = "profile_account_card") {
                 AccountProfileCard(
@@ -451,7 +419,7 @@ fun ProfileAndStudioScreen(
             }
         }
 
-        // 4. Reading Footprint & Bookmarks Summary
+        // 3. Reading Footprint & Bookmarks Summary
         item(key = "profile_reading_footprint_card") {
             ReadingFootprintCard(
                 totalReadingSeconds = totalReadingSeconds,
@@ -461,7 +429,7 @@ fun ProfileAndStudioScreen(
             )
         }
 
-        // 5. Network & Auto-Optimize Connection Studio Card
+        // 4. Network & Auto-Optimize Connection Studio Card
         item(key = "profile_network_routing_card") {
             NetworkRoutingStudioCard(
                 autoOptimizeEnabled = preferences.autoOptimizeConnectionEnabled,
@@ -472,7 +440,7 @@ fun ProfileAndStudioScreen(
             )
         }
 
-        // 6. Appearance, Language, Startup Home & Header Wallpaper Card
+        // 5. Appearance, Language & Startup Home Card
         item(key = "profile_appearance_and_startup_card") {
             AppearanceAndStartupStudioCard(
                 preferences = preferences,
@@ -480,13 +448,6 @@ fun ProfileAndStudioScreen(
                 onAppLanguageSelected = onAppLanguageSelected,
                 onThemeModeSelected = onThemeModeSelected,
                 onEinkModeChanged = onEinkModeChanged,
-                onUseDynamicColorChanged = onUseDynamicColorChanged,
-                onMenuBackgroundPresetSelected = { presetId ->
-                    onMenuBackgroundChanged(presetId, "")
-                },
-                onPickCustomMenuBackground = {
-                    customMenuBgLauncher.launch(arrayOf("image/*"))
-                },
             )
         }
 
@@ -648,110 +609,6 @@ fun ProfileAndStudioScreen(
     // About Wenku8 v2 Dialog (with 5-tap Easter egg)
     if (showAboutDialog) {
         AboutWenkuDialog(onDismiss = { showAboutDialog = false })
-    }
-}
-
-@Composable
-private fun ProfileHeaderWallpaperCard(
-    presetId: Int,
-    customImagePath: String,
-    onOpenAbout: () -> Unit,
-) {
-    val presetDrawableRes = when (presetId) {
-        1 -> R.drawable.bg_avatar_01
-        2 -> R.drawable.bg_avatar_02
-        3 -> R.drawable.bg_avatar_03
-        4 -> R.drawable.bg_avatar_04
-        5 -> R.drawable.bg_avatar_05
-        else -> null
-    }
-    val customFile = remember(presetId, customImagePath) {
-        if (presetId == 0 && customImagePath.isNotBlank()) {
-            File(customImagePath).takeIf { it.isFile }
-        } else {
-            null
-        }
-    }
-    val hasImageBackdrop = presetDrawableRes != null || customFile != null
-
-    Card(
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
-        ),
-        shape = MaterialTheme.shapes.large,
-        modifier = Modifier
-            .fillMaxWidth()
-            .einkHairlineBorder(MaterialTheme.shapes.large),
-    ) {
-        Box(modifier = Modifier.fillMaxWidth()) {
-            if (presetDrawableRes != null) {
-                Image(
-                    painter = painterResource(presetDrawableRes),
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.matchParentSize(),
-                )
-            } else if (customFile != null) {
-                AsyncImage(
-                    model = customFile,
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.matchParentSize(),
-                )
-            }
-
-            if (hasImageBackdrop) {
-                Box(
-                    modifier = Modifier
-                        .matchParentSize()
-                        .background(
-                            Brush.verticalGradient(
-                                colors = listOf(
-                                    Color.Black.copy(alpha = 0.40f),
-                                    Color.Black.copy(alpha = 0.72f),
-                                ),
-                            ),
-                        ),
-                )
-            }
-
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 20.dp, vertical = 22.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = stringResource(R.string.profile_headline),
-                        style = MaterialTheme.typography.headlineMedium,
-                        color = if (hasImageBackdrop) Color.White else MaterialTheme.colorScheme.onSurface,
-                    )
-                    Spacer(modifier = Modifier.height(6.dp))
-                    Text(
-                        text = stringResource(R.string.profile_subtitle),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = if (hasImageBackdrop) {
-                            Color.White.copy(alpha = 0.90f)
-                        } else {
-                            MaterialTheme.colorScheme.onSurfaceVariant
-                        },
-                    )
-                }
-                val aboutLabel = stringResource(R.string.profile_about_action)
-                TooltipIconButton(
-                    tooltipText = aboutLabel,
-                    onClick = onOpenAbout,
-                    modifier = Modifier.testTag(ProfileStudioTestTags.TOP_ABOUT_BUTTON),
-                ) {
-                    Icon(
-                        imageVector = Icons.Outlined.Info,
-                        contentDescription = aboutLabel,
-                        tint = if (hasImageBackdrop) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
-        }
     }
 }
 
@@ -980,15 +837,7 @@ private fun AppearanceAndStartupStudioCard(
     onAppLanguageSelected: (Wenku8API.AppLanguage) -> Unit,
     onThemeModeSelected: (Wenku8ThemeMode) -> Unit,
     onEinkModeChanged: (Boolean) -> Unit,
-    onUseDynamicColorChanged: (Boolean) -> Unit,
-    onMenuBackgroundPresetSelected: (Int) -> Unit,
-    onPickCustomMenuBackground: () -> Unit,
 ) {
-    val isPureCardSelected = preferences.menuBackgroundPresetId == 0 &&
-        preferences.menuBackgroundCustomPath.isBlank()
-    val isCustomMenuBgActive = preferences.menuBackgroundPresetId == 0 &&
-        preferences.menuBackgroundCustomPath.isNotBlank()
-
     Card(
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceContainer,
@@ -1054,7 +903,7 @@ private fun AppearanceAndStartupStudioCard(
                 }
             }
 
-            // Reading & App Theme Mode (6 M3e modes)
+            // Reading & App Theme Mode (6 M3e modes; SYSTEM unifies Day/Night + Material You dynamic color)
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(
                     text = stringResource(R.string.theme_section_title),
@@ -1100,74 +949,6 @@ private fun AppearanceAndStartupStudioCard(
                     modifier = Modifier.testTag(ProfileStudioTestTags.EINK_SWITCH),
                 )
             }
-
-            // Dynamic Wallpaper Color (`Material You`)
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    text = stringResource(R.string.profile_dynamic_color_switch),
-                    style = MaterialTheme.typography.bodyLarge,
-                    modifier = Modifier.weight(1f),
-                )
-                Spacer(modifier = Modifier.width(12.dp))
-                Switch(
-                    checked = preferences.useDynamicColor,
-                    onCheckedChange = onUseDynamicColorChanged,
-                    modifier = Modifier.testTag(ProfileStudioTestTags.DYNAMIC_COLOR_SWITCH),
-                )
-            }
-
-            HorizontalDivider()
-
-            // Profile Header Wallpaper (`menu_bg_id` 1..5 / 0 Pure / 0 Custom)
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(
-                    text = stringResource(R.string.profile_header_bg_title),
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    FilterChip(
-                        selected = isPureCardSelected,
-                        onClick = { onMenuBackgroundPresetSelected(0) },
-                        label = { Text(stringResource(R.string.profile_header_bg_pure)) },
-                    )
-                    for (presetIndex in 1..5) {
-                        FilterChip(
-                            selected = preferences.menuBackgroundPresetId == presetIndex,
-                            onClick = { onMenuBackgroundPresetSelected(presetIndex) },
-                            label = {
-                                Text(
-                                    stringResource(
-                                        R.string.profile_header_bg_preset_format,
-                                        presetIndex,
-                                    ),
-                                )
-                            },
-                        )
-                    }
-                    FilterChip(
-                        selected = isCustomMenuBgActive,
-                        onClick = onPickCustomMenuBackground,
-                        label = {
-                            Text(
-                                stringResource(
-                                    if (isCustomMenuBgActive) {
-                                        R.string.profile_header_bg_custom_active
-                                    } else {
-                                        R.string.profile_header_bg_custom
-                                    },
-                                ),
-                            )
-                        },
-                    )
-                }
-            }
         }
     }
 }
@@ -1211,6 +992,10 @@ private fun ReaderDefaultTypographyCard(
             ?.let(::File)
             ?.takeIf { it.isFile }
     }
+    val previewSampleText = stringResource(R.string.profile_reader_preview_sample)
+    val previewParagraphs = remember(previewSampleText) {
+        previewSampleText.lines().filter { it.isNotBlank() }
+    }
 
     Card(
         colors = CardDefaults.cardColors(
@@ -1242,7 +1027,7 @@ private fun ReaderDefaultTypographyCard(
                 }
             }
 
-            // Live Typography Preview Box
+            // Multi-Paragraph Live Typography Preview Box (previews font size, line height, paragraph spacing, and page margin)
             Surface(
                 color = MaterialTheme.colorScheme.surfaceContainerLowest,
                 shape = MaterialTheme.shapes.medium,
@@ -1261,17 +1046,26 @@ private fun ReaderDefaultTypographyCard(
                             modifier = Modifier.matchParentSize(),
                         )
                     }
-                    Text(
-                        text = stringResource(R.string.profile_reader_preview_sample),
-                        fontFamily = previewFontFamily,
-                        fontSize = preferences.readerFontSizeSp.sp,
-                        lineHeight = (preferences.readerFontSizeSp + preferences.readerLineDistanceDp).sp,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.padding(
-                            horizontal = preferences.readerPageEdgeDistanceDp.coerceAtLeast(10).dp,
-                            vertical = 14.dp,
-                        ),
-                    )
+                    Column(
+                        verticalArrangement = Arrangement.spacedBy(preferences.readerParagraphDistanceDp.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(
+                                horizontal = preferences.readerPageEdgeDistanceDp.coerceAtLeast(10).dp,
+                                vertical = 14.dp,
+                            )
+                            .testTag(ProfileStudioTestTags.TYPOGRAPHY_PREVIEW_BOX),
+                    ) {
+                        previewParagraphs.forEach { paragraph ->
+                            Text(
+                                text = paragraph,
+                                fontFamily = previewFontFamily,
+                                fontSize = preferences.readerFontSizeSp.sp,
+                                lineHeight = (preferences.readerFontSizeSp + preferences.readerLineDistanceDp).sp,
+                                color = MaterialTheme.colorScheme.onSurface,
+                            )
+                        }
+                    }
                 }
             }
 
@@ -1782,42 +1576,140 @@ private fun OpenSourceLicenseDialog(onDismiss: () -> Unit) {
 
 @Composable
 private fun AboutWenkuDialog(onDismiss: () -> Unit) {
+    val context = LocalContext.current
     var versionTapCount by rememberSaveable { mutableIntStateOf(0) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(text = stringResource(R.string.profile_about_dialog_title)) },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Surface(
-                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                    shape = MaterialTheme.shapes.medium,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(MaterialTheme.shapes.medium)
-                        .clickable { versionTapCount++ }
-                        .testTag(ProfileStudioTestTags.ABOUT_VERSION_TAP_TARGET)
-                        .einkHairlineBorder(MaterialTheme.shapes.medium),
-                ) {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 440.dp)
+                    .verticalScroll(rememberScrollState()),
+            ) {
+                // Card 1: 轻小说文库 (Wenku8.com) — Version, Project Homepage, Disclaimer, QQ Group
+                AboutSectionCard(title = stringResource(R.string.about_wenku8_title)) {
                     Text(
                         text = stringResource(
-                            R.string.profile_about_body_format,
+                            R.string.about_version_format,
                             BuildConfig.VERSION_NAME,
                             BuildConfig.VERSION_CODE,
-                            BuildConfig.API_PROTOCOL_VERSION,
                         ),
                         style = MaterialTheme.typography.bodyMedium,
-                        modifier = Modifier.padding(14.dp),
+                        fontWeight = FontWeight.Medium,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(MaterialTheme.shapes.small)
+                            .clickable { versionTapCount++ }
+                            .padding(vertical = 6.dp)
+                            .testTag(ProfileStudioTestTags.ABOUT_VERSION_TAP_TARGET),
+                    )
+
+                    if (versionTapCount >= 5) {
+                        Text(
+                            text = stringResource(R.string.profile_about_easter_egg),
+                            style = MaterialTheme.typography.bodySmall,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.primary,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp)
+                                .testTag(ProfileStudioTestTags.ABOUT_EASTER_EGG_TEXT),
+                        )
+                    }
+
+                    Text(
+                        text = stringResource(R.string.about_project_homepage),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.primary,
+                        textDecoration = TextDecoration.Underline,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(MaterialTheme.shapes.small)
+                            .clickable { openSafeBrowserUrl(context, "https://wenku8.app") }
+                            .padding(vertical = 6.dp)
+                            .testTag(ProfileStudioTestTags.ABOUT_HOMEPAGE_LINK),
+                    )
+
+                    Text(
+                        text = stringResource(R.string.about_no_duty),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 6.dp),
+                    )
+
+                    Text(
+                        text = stringResource(R.string.about_qq_group),
+                        style = MaterialTheme.typography.bodyMedium,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 4.dp, bottom = 2.dp),
                     )
                 }
 
-                if (versionTapCount >= 5) {
+                // Card 2: 软件架构 — MewX
+                AboutSectionCard(title = stringResource(R.string.about_software_arch)) {
                     Text(
-                        text = stringResource(R.string.profile_about_easter_egg),
-                        style = MaterialTheme.typography.bodySmall,
-                        fontWeight = FontWeight.Medium,
+                        text = stringResource(R.string.about_mewx),
+                        style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.testTag(ProfileStudioTestTags.ABOUT_EASTER_EGG_TEXT),
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(MaterialTheme.shapes.small)
+                            .clickable { openSafeBrowserUrl(context, "https://mewx.org") }
+                            .padding(vertical = 6.dp),
+                    )
+                }
+
+                // Card 3: 致谢 — Yanix, Jack Liu, ZERO, 妻兔姬
+                AboutSectionCard(title = stringResource(R.string.about_acknowledgement)) {
+                    Text(
+                        text = stringResource(R.string.about_ack_seraphroy),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.primary,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(MaterialTheme.shapes.small)
+                            .clickable { openSafeBrowserUrl(context, "https://github.com/SeraphRoy") }
+                            .padding(vertical = 4.dp),
+                    )
+                    Text(
+                        text = stringResource(R.string.about_ack_aaassseee),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.primary,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(MaterialTheme.shapes.small)
+                            .clickable { openSafeBrowserUrl(context, "https://github.com/aaassseee") }
+                            .padding(vertical = 4.dp),
+                    )
+                    Text(
+                        text = stringResource(R.string.about_ack_zero),
+                        style = MaterialTheme.typography.bodyMedium,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp),
+                    )
+                    Text(
+                        text = stringResource(R.string.about_ack_qituji),
+                        style = MaterialTheme.typography.bodyMedium,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp),
                     )
                 }
             }
@@ -1828,6 +1720,37 @@ private fun AboutWenkuDialog(onDismiss: () -> Unit) {
             }
         },
     )
+}
+
+@Composable
+private fun AboutSectionCard(
+    title: String,
+    content: @Composable () -> Unit,
+) {
+    Surface(
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        shape = MaterialTheme.shapes.medium,
+        modifier = Modifier
+            .fillMaxWidth()
+            .einkHairlineBorder(MaterialTheme.shapes.medium),
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 14.dp, vertical = 12.dp),
+        ) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(bottom = 8.dp),
+            )
+            HorizontalDivider(modifier = Modifier.padding(bottom = 6.dp))
+            content()
+        }
+    }
 }
 
 internal fun formatByteSize(bytes: Long): String {

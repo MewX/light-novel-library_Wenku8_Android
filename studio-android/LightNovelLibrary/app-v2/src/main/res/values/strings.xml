@@ -26,8 +26,6 @@
     <string name="latest_subtitle">最近更新 · 最新入库 · 完结精品</string>
     <string name="rankings_headline">排行榜</string>
     <string name="rankings_subtitle">多维热度矩阵 · 周榜 / 日榜 / 月榜 / 总榜</string>
-    <string name="profile_headline">我的与工作室</string>
-    <string name="profile_subtitle">账号签到 · 阅读排版 · 自动优化连接 · 备份与存储管理</string>
 
     <!-- Latest Tabs -->
     <string name="latest_tab_recent_updates">最近更新</string>
@@ -142,13 +140,13 @@
 
     <!-- Account Session, NoticeString & App Version Check (P3.1) -->
     <string name="notice_card_title">文库公告</string>
-    <string name="notice_action_dismiss">关闭此条公告</string>
 
     <string name="auth_card_title_signed_out">文库账号</string>
     <string name="auth_card_subtitle_signed_out">登录后可同步云端书架、发表书评并领取每日签到积分</string>
     <string name="auth_card_unavailable_stub">当前版本未配置账号接口 (api-stub 模式)</string>
     <string name="auth_action_open_login">登录账号</string>
     <string name="auth_action_register_web">网页注册</string>
+    <string name="auth_action_forgot_password">忘记密码</string>
     <string name="auth_restoring_format">正在恢复已保存账号：%1$s…</string>
     <string name="auth_offline_saved_title_format">已保存账号：%1$s（当前离线）</string>
     <string name="auth_offline_saved_subtitle">网络恢复后可点击刷新验证会话，本地凭证与头像已妥善保留</string>
@@ -204,15 +202,9 @@
     <string name="profile_lang_tc">繁體中文</string>
     <string name="profile_eink_switch">墨水屏高对比模式</string>
     <string name="profile_eink_subtitle">启用 1dp 实体边框并关闭过渡动画，适配电子纸刷新</string>
-    <string name="profile_dynamic_color_switch">系统壁纸动态取色 (Material You)</string>
-    <string name="profile_header_bg_title">个人主页头图壁纸</string>
-    <string name="profile_header_bg_pure">M3e 纯净卡片</string>
-    <string name="profile_header_bg_preset_format">经典预设 %1$d</string>
-    <string name="profile_header_bg_custom">自定义头图…</string>
-    <string name="profile_header_bg_custom_active">自定义头图 (已启用)</string>
 
     <string name="profile_reader_studio_title">阅读器默认排版与交互</string>
-    <string name="profile_reader_preview_sample">「奇诺，人类真是一种不可思议的生物呢。」艾尔梅斯静静地说道。</string>
+    <string name="profile_reader_preview_sample">\u3000\u3000「奇诺，人类真是一种不可思议的生物呢。」艾尔梅斯静静地说道。\n\u3000\u3000「怎么突然这么说？」奇诺一边检查着摩托车的仪表，一边随口应道。\n\u3000\u3000微风拂过旷野，远方的城墙在晨光里渐渐显出轮廓。</string>
     <string name="profile_reader_font_size_format">字号大小：%1$d sp</string>
     <string name="profile_reader_line_dist_format">行间距：%1$d dp</string>
     <string name="profile_reader_para_dist_format">段间距：%1$d dp</string>
@@ -254,8 +246,19 @@
     <string name="profile_license_action">开源许可声明</string>
     <string name="profile_license_dialog_title">开源许可与版权声明</string>
     <string name="profile_about_action">关于轻小说文库</string>
-    <string name="profile_about_dialog_title">关于轻小说文库 v2</string>
-    <string name="profile_about_body_format">版本：%1$s (Build %2$d · 协议兼容 %3$s)\n架构：Kotlin + Jetpack Compose M3 Expressive + Room WAL\n致敬每一位热爱轻小说与纸页阅读的旅人。</string>
+    <string name="profile_about_dialog_title">关于轻小说文库</string>
+    <string name="about_wenku8_title">轻小说文库 (Wenku8.com)</string>
+    <string name="about_version_format">版本：%1$s (%2$d)</string>
+    <string name="about_project_homepage">项目主页: https://wenku8.app</string>
+    <string name="about_no_duty">所有数据来自于互联网，开发者、设计师、客服均与网站无任何关系，而且本项目完全免费，完整源代码均开放，纯凭兴趣做的app，仅供大家学习安卓应用程序制作之法，如有侵犯您的权益，请务必邮件联系，保证12小时内回复，app内会做屏蔽。</string>
+    <string name="about_qq_group">QQ交流群: 2166068158</string>
+    <string name="about_software_arch">软件架构</string>
+    <string name="about_mewx">MewX &lt;https://mewx.org&gt;</string>
+    <string name="about_acknowledgement">致谢</string>
+    <string name="about_ack_seraphroy">Yanix &lt;https://github.com/SeraphRoy&gt;</string>
+    <string name="about_ack_aaassseee">Jack Liu &lt;https://github.com/aaassseee&gt;</string>
+    <string name="about_ack_zero">ZERO (原界面设计) &lt;78283358@qq.com&gt;</string>
+    <string name="about_ack_qituji">妻兔姬 (原反馈协助) &lt;1270263248@qq.com&gt;</string>
     <string name="profile_about_easter_egg">✨ 旅途愉快！愿每一本轻小说都为你留下一段奇诺般的风景 (5/5)</string>
 
     <string name="review_list_title">书评讨论</string>

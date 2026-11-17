@@ -247,8 +247,6 @@ fun AdaptiveMainScaffold(
     onBookshelfSortModeSelected: (BookshelfSortMode) -> Unit = {},
     onAppLanguageSelected: (Wenku8API.AppLanguage) -> Unit = {},
     onEinkModeChanged: (Boolean) -> Unit = {},
-    onUseDynamicColorChanged: (Boolean) -> Unit = {},
-    onMenuBackgroundChanged: (presetId: Int, customPath: String) -> Unit = { _, _ -> },
     onReaderTypographyChanged: (
         fontSizeSp: Int,
         lineDistanceDp: Int,
@@ -662,8 +660,6 @@ fun AdaptiveMainScaffold(
                                                 onAutoOptimizeConnectionChanged = onAutoOptimizeConnectionChanged,
                                                 onAppLanguageSelected = onAppLanguageSelected,
                                                 onEinkModeChanged = onEinkModeChanged,
-                                                onUseDynamicColorChanged = onUseDynamicColorChanged,
-                                                onMenuBackgroundChanged = onMenuBackgroundChanged,
                                                 onReaderTypographyChanged = onReaderTypographyChanged,
                                                 onReaderCustomFontPathChanged = onReaderCustomFontPathChanged,
                                                 onReaderCustomBackgroundPathChanged = onReaderCustomBackgroundPathChanged,
@@ -784,8 +780,6 @@ fun AdaptiveMainScaffold(
                                                     onAutoOptimizeConnectionChanged = onAutoOptimizeConnectionChanged,
                                                     onAppLanguageSelected = onAppLanguageSelected,
                                                     onEinkModeChanged = onEinkModeChanged,
-                                                    onUseDynamicColorChanged = onUseDynamicColorChanged,
-                                                    onMenuBackgroundChanged = onMenuBackgroundChanged,
                                                     onReaderTypographyChanged = onReaderTypographyChanged,
                                                     onReaderCustomFontPathChanged = onReaderCustomFontPathChanged,
                                                     onReaderCustomBackgroundPathChanged = onReaderCustomBackgroundPathChanged,
@@ -862,7 +856,7 @@ fun AdaptiveMainScaffold(
                                                 novelDownloadRepository = novelDownloadRepository,
                                                 appLanguage = appLanguage,
                                                 themeMode = effectivePreferences.themeMode,
-                                                useCoverTheme = effectivePreferences.useDynamicColor,
+                                                useCoverTheme = effectivePreferences.themeMode == Wenku8ThemeMode.SYSTEM,
                                                 seedDiscoveryItem = activeDetailSeedItem?.takeIf {
                                                     it.aid == activeDetailNovelAid
                                                 },
@@ -949,7 +943,7 @@ fun AdaptiveMainScaffold(
                                     novelDownloadRepository = novelDownloadRepository,
                                     appLanguage = appLanguage,
                                     themeMode = effectivePreferences.themeMode,
-                                    useCoverTheme = effectivePreferences.useDynamicColor,
+                                    useCoverTheme = effectivePreferences.themeMode == Wenku8ThemeMode.SYSTEM,
                                     seedDiscoveryItem = activeDetailSeedItem?.takeIf { it.aid == scene.aid },
                                     sharedTransitionOrigin = scene.sharedOrigin,
                                     onNavigateBack = {
@@ -1090,8 +1084,6 @@ private fun MainDestinationBody(
     onAutoOptimizeConnectionChanged: (Boolean) -> Unit,
     onAppLanguageSelected: (Wenku8API.AppLanguage) -> Unit,
     onEinkModeChanged: (Boolean) -> Unit,
-    onUseDynamicColorChanged: (Boolean) -> Unit,
-    onMenuBackgroundChanged: (presetId: Int, customPath: String) -> Unit,
     onReaderTypographyChanged: (
         fontSizeSp: Int,
         lineDistanceDp: Int,
@@ -1251,8 +1243,6 @@ private fun MainDestinationBody(
             onOpenNetworkDiagnostics = onOpenNetworkDiagnostics,
             onAppLanguageSelected = onAppLanguageSelected,
             onEinkModeChanged = onEinkModeChanged,
-            onUseDynamicColorChanged = onUseDynamicColorChanged,
-            onMenuBackgroundChanged = onMenuBackgroundChanged,
             onReaderTypographyChanged = onReaderTypographyChanged,
             onReaderCustomFontPathChanged = onReaderCustomFontPathChanged,
             onReaderCustomBackgroundPathChanged = onReaderCustomBackgroundPathChanged,
@@ -1275,13 +1265,13 @@ private fun MainDestinationBody(
         TopLevelDestination.BOOKSHELF -> stringResource(R.string.bookshelf_headline)
         TopLevelDestination.LATEST -> stringResource(R.string.latest_headline)
         TopLevelDestination.RANKINGS -> stringResource(R.string.rankings_headline)
-        TopLevelDestination.PROFILE -> stringResource(R.string.profile_headline)
+        TopLevelDestination.PROFILE -> stringResource(R.string.nav_profile)
     }
     val subtitleText = when (selectedDestination) {
         TopLevelDestination.BOOKSHELF -> stringResource(R.string.bookshelf_subtitle)
         TopLevelDestination.LATEST -> stringResource(R.string.latest_subtitle)
         TopLevelDestination.RANKINGS -> stringResource(R.string.rankings_subtitle)
-        TopLevelDestination.PROFILE -> stringResource(R.string.profile_subtitle)
+        TopLevelDestination.PROFILE -> ""
     }
 
     LazyColumn(
