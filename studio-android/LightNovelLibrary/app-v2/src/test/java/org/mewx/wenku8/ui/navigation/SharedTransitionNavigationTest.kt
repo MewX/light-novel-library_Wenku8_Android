@@ -1,6 +1,12 @@
 package org.mewx.wenku8.ui.navigation
 
 import android.content.Context
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.net.Uri
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -15,10 +21,14 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.runBlocking
 import org.junit.After
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.mewx.wenku8.MainActivity
 import org.mewx.wenku8.api.Wenku8API
 import org.mewx.wenku8.data.download.NovelDownloadRepository
 import org.mewx.wenku8.data.local.db.Wenku8Database
@@ -120,7 +130,6 @@ class SharedTransitionNavigationTest {
         composeRule.setContent {
             Wenku8ExpressiveTheme(
                 themeMode = Wenku8ThemeMode.ARCHIVAL_DAY,
-                useDynamicColor = false,
             ) {
                 AdaptiveMainScaffold(
                     preferredHomeDestination = DefaultHomeDestination.LATEST,
@@ -241,7 +250,6 @@ class SharedTransitionNavigationTest {
         composeRule.setContent {
             Wenku8ExpressiveTheme(
                 themeMode = Wenku8ThemeMode.ARCHIVAL_DAY,
-                useDynamicColor = false,
             ) {
                 AdaptiveMainScaffold(
                     preferredHomeDestination = DefaultHomeDestination.BOOKSHELF,
@@ -341,7 +349,6 @@ class SharedTransitionNavigationTest {
         composeRule.setContent {
             Wenku8ExpressiveTheme(
                 themeMode = Wenku8ThemeMode.ARCHIVAL_DAY,
-                useDynamicColor = false,
             ) {
                 AdaptiveMainScaffold(
                     preferredHomeDestination = DefaultHomeDestination.BOOKSHELF,
@@ -415,6 +422,140 @@ class SharedTransitionNavigationTest {
         composeRule.onNodeWithTag("${BookshelfTestTags.BOOK_CARD_PREFIX}2906").assertDoesNotExist()
         composeRule.onNodeWithTag("${BookshelfTestTags.BOOK_CARD_PREFIX}1143").assertIsDisplayed()
         composeRule.onNodeWithTag("${BookshelfTestTags.BOOK_CARD_PREFIX}1500").assertIsDisplayed()
+    }
+
+    @Test
+    fun shareBookDeepLink_resolvesInManifest_parsesUrlVariants_andOpensNovelDetailScreen() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+
+        // 1. Verify AndroidManifest.xml registers https & http share.wenku8.app/book/<aid> for MainActivity
+        for (url in listOf(
+            "https://share.wenku8.app/book/2906",
+            "http://share.wenku8.app/book/1500",
+        )) {
+            val viewIntent = Intent(Intent.ACTION_VIEW, Uri.parse(url)).apply {
+                addCategory(Intent.CATEGORY_BROWSABLE)
+                setPackage(context.packageName)
+            }
+            val resolved = context.packageManager.queryIntentActivities(
+                viewIntent,
+                PackageManager.MATCH_DEFAULT_ONLY,
+            )
+            assertTrue(
+                "Expected MainActivity to resolve $url, got $resolved",
+                resolved.any { it.activityInfo.name == MainActivity::class.java.name },
+            )
+        }
+
+        // 2. Verify Wenku8DeepLinks & DiscoveryRepository.parseDirectAidOrNull parsing
+        assertEquals(
+            2906,
+            Wenku8DeepLinks.parseShareBookIntentAid(
+                Intent(Intent.ACTION_VIEW, Uri.parse("https://share.wenku8.app/book/2906")),
+            ),
+        )
+        assertEquals(
+            1306,
+            Wenku8DeepLinks.parseShareBookIntentAid(
+                Intent(Intent.ACTION_VIEW, Uri.parse("http://share.wenku8.app/book/1306/?from=share#top")),
+            ),
+        )
+        assertEquals(
+            5,
+            Wenku8DeepLinks.parseShareBookUriAid(Uri.parse("https://share.wenku8.app/book/5.htm")),
+        )
+        assertEquals(
+            5,
+            DiscoveryRepository.parseDirectAidOrNull(
+                "《狼与香辛料》（作者：支仓冻砂） https://share.wenku8.app/book/5",
+            ),
+        )
+        assertNull(
+            Wenku8DeepLinks.parseShareBookIntentAid(
+                Intent(Intent.ACTION_MAIN, Uri.parse("https://share.wenku8.app/book/2906")),
+            ),
+        )
+        assertNull(Wenku8DeepLinks.parseShareBookUriAid(Uri.parse("https://share.wenku8.app/")))
+        assertNull(Wenku8DeepLinks.parseShareBookUriAid(Uri.parse("https://share.wenku8.app/book/0")))
+        assertNull(Wenku8DeepLinks.parseShareBookUriAid(Uri.parse("https://share.wenku8.app/book/abc")))
+        assertNull(Wenku8DeepLinks.parseShareBookUriAid(Uri.parse("https://www.wenku8.net/book/5.htm")))
+
+        // 3. Verify AdaptiveMainScaffold opens NovelDetailScreen on cold-start & onNewIntent deep links
+        val fakeGateway = FakeMotionCatalogGateway()
+        val tocSyncRepository = NovelTocSyncRepository(database)
+        val discoveryRepository = DiscoveryRepository(database = database, apiClient = fakeGateway)
+        val bookshelfRepository = BookshelfRepository(
+            database = database,
+            catalogGateway = fakeGateway,
+            novelTocSyncRepository = tocSyncRepository,
+            userSessionRepository = null,
+            ioDispatcher = Dispatchers.Unconfined,
+        )
+        val novelDetailRepository = NovelDetailRepository(
+            database = database,
+            catalogGateway = fakeGateway,
+            novelTocSyncRepository = tocSyncRepository,
+            ioDispatcher = Dispatchers.Unconfined,
+        )
+        val novelDownloadRepository = NovelDownloadRepository(
+            database = database,
+            catalogGateway = fakeGateway,
+            novelTocSyncRepository = tocSyncRepository,
+            assetRootsProvider = { listOf(tempAssetRoot) },
+            applicationScope = testScope,
+            appContext = null,
+            ioDispatcher = Dispatchers.Unconfined,
+        )
+
+        var pendingExternalAid by mutableIntStateOf(2906)
+
+        composeRule.setContent {
+            Wenku8ExpressiveTheme(themeMode = Wenku8ThemeMode.ARCHIVAL_DAY) {
+                AdaptiveMainScaffold(
+                    preferredHomeDestination = DefaultHomeDestination.LATEST,
+                    isNetworkAvailableOnColdStart = true,
+                    currentThemeMode = Wenku8ThemeMode.ARCHIVAL_DAY,
+                    onThemeModeSelected = {},
+                    onDefaultHomeSelected = {},
+                    database = database,
+                    catalogGateway = fakeGateway,
+                    novelTocSyncRepository = tocSyncRepository,
+                    discoveryRepository = discoveryRepository,
+                    bookshelfRepository = bookshelfRepository,
+                    novelDetailRepository = novelDetailRepository,
+                    novelDownloadRepository = novelDownloadRepository,
+                    externalOpenNovelAid = pendingExternalAid,
+                    onExternalLaunchConsumed = { pendingExternalAid = 0 },
+                )
+            }
+        }
+        composeRule.waitForIdle()
+
+        // Cold-start deep link opened aid = 2906 and consumed pendingExternalAid
+        assertEquals(0, pendingExternalAid)
+        composeRule.onNodeWithTag(NovelDetailTestTags.SCREEN_ROOT).assertIsDisplayed()
+        composeRule.onNodeWithTag(NovelDetailTestTags.NOVEL_TITLE_TEXT)
+            .assertTextContains("败犬女主太多了！")
+
+        // Navigate back to Home -> open UnifiedSearchScreen -> simulate onNewIntent deep link for aid = 1500
+        composeRule.onNodeWithTag(NovelDetailTestTags.BACK_BUTTON).performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag(DiscoveryTestTags.PERSISTENT_SEARCH_PILL).performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag(UnifiedSearchTestTags.SCREEN_ROOT).assertIsDisplayed()
+
+        pendingExternalAid = 1500
+        composeRule.waitForIdle()
+
+        assertEquals(0, pendingExternalAid)
+        composeRule.onNodeWithTag(NovelDetailTestTags.SCREEN_ROOT).assertIsDisplayed()
+        composeRule.onNodeWithTag(NovelDetailTestTags.NOVEL_TITLE_TEXT)
+            .assertTextContains("刀剑神域 Progressive")
+
+        // Back from deep-linked detail returns directly to Home (Search overlay was cleanly dismissed)
+        composeRule.onNodeWithTag(NovelDetailTestTags.BACK_BUTTON).performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag(DiscoveryTestTags.PERSISTENT_SEARCH_PILL).assertIsDisplayed()
     }
 }
 

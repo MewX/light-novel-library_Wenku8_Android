@@ -27,7 +27,20 @@
         <activity
             android:name=".MainActivity"
             android:exported="true"
-            android:windowSoftInputMode="adjustResize" />
+            android:launchMode="singleTop"
+            android:windowSoftInputMode="adjustResize">
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+
+                <data android:scheme="https" />
+                <data android:scheme="http" />
+                <data android:host="share.wenku8.app" />
+                <data android:pathPrefix="/book/" />
+            </intent-filter>
+        </activity>
 
         <!-- Preserves Play Store v1.x pinned launcher shortcuts (org.mewx.wenku8.activity.MainActivity)
              on in-place upgrade without creating duplicate app-drawer icons. -->

@@ -394,7 +394,7 @@
     <string name="detail_title_dialog_aid_format">作品编号：#%1$d</string>
     <string name="detail_title_dialog_copy">复制标题与编号</string>
     <string name="detail_title_copied_snackbar">已复制作品标题与编号</string>
-    <string name="detail_share_text_format">《%1$s》（作者：%2$s） https://www.wenku8.net/book/%3$d.htm</string>
+    <string name="detail_share_text_format">《%1$s》（作者：%2$s） https://share.wenku8.app/book/%3$d</string>
     <string name="detail_reader_launch_snackbar_format">已定位章节：%1$s</string>
 
     <string name="download_sheet_title">离线缓存下载</string>

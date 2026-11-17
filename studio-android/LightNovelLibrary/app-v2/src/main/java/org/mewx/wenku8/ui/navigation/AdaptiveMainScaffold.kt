@@ -264,6 +264,7 @@ fun AdaptiveMainScaffold(
     initialOpenReviewsTitle: String = "",
     externalReaderLaunchRequest: ReaderLaunchRequest? = null,
     externalOpenBookshelf: Boolean = false,
+    externalOpenNovelAid: Int = 0,
     onExternalLaunchConsumed: () -> Unit = {},
     onOpenSearch: () -> Unit = {},
     onNovelClicked: (DiscoveryNovelCardItem) -> Unit = {},
@@ -373,8 +374,51 @@ fun AdaptiveMainScaffold(
         }
     }
 
-    LaunchedEffect(externalReaderLaunchRequest, externalOpenBookshelf) {
-        if (externalReaderLaunchRequest != null) {
+    LaunchedEffect(externalReaderLaunchRequest, externalOpenBookshelf, externalOpenNovelAid) {
+        if (externalOpenNovelAid > 0) {
+            if (activeDetailNovelAid > 0 && activeDetailNovelAid != externalOpenNovelAid) {
+                sceneSaveableStateHolder.removeState(
+                    ScaffoldSceneState.CompactNovelDetail(
+                        aid = activeDetailNovelAid,
+                        sharedOrigin = activeDetailSharedOrigin,
+                    ).saveableKey(),
+                )
+            }
+            if (isSearchStudioOpen) {
+                sceneSaveableStateHolder.removeState(
+                    ScaffoldSceneState.SearchStudio(
+                        sessionId = searchSessionId,
+                        initialQuery = searchInitialQuery,
+                        initialMode = searchInitialMode,
+                        searchBarOrigin = activeSearchBarOrigin,
+                    ).saveableKey(),
+                )
+                discoveryRepository?.resetOnlineSearchSession()
+                isSearchStudioOpen = false
+                searchInitialQuery = ""
+            }
+            activeFootprintTab?.let { tab ->
+                sceneSaveableStateHolder.removeState(
+                    ScaffoldSceneState.ReadingFootprint(tab).saveableKey(),
+                )
+            }
+            activeFootprintTab = null
+            isNetworkDiagnosticsOpen = false
+            activeReaderRequest = null
+            activeReviewsAid = 0
+            activeReviewThread = null
+            isLoginBottomSheetOpen = false
+
+            if (novelDetailRepository != null &&
+                bookshelfRepository != null &&
+                novelDownloadRepository != null
+            ) {
+                activeDetailSeedItem = null
+                activeDetailSharedOrigin = Wenku8SharedElementKeys.NOVEL_DEFAULT_ORIGIN
+                activeDetailNovelAid = externalOpenNovelAid
+            }
+            onExternalLaunchConsumed()
+        } else if (externalReaderLaunchRequest != null) {
             handleOpenReader(externalReaderLaunchRequest)
             onExternalLaunchConsumed()
         } else if (externalOpenBookshelf) {

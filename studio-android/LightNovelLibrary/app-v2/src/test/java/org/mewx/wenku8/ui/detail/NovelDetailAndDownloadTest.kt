@@ -1,5 +1,8 @@
 package org.mewx.wenku8.ui.detail
 
+import android.app.Application
+import android.content.Intent
+import android.content.res.Configuration
 import android.graphics.Bitmap
 import android.graphics.Color as AndroidColor
 import androidx.compose.ui.test.assertHeightIsAtLeast
@@ -31,6 +34,7 @@ import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.mewx.wenku8.R
 import org.mewx.wenku8.api.Wenku8API
 import org.mewx.wenku8.data.download.NovelDownloadMode
 import org.mewx.wenku8.data.download.NovelDownloadRepository
@@ -57,9 +61,11 @@ import org.mewx.wenku8.ui.theme.Wenku8ColorSchemes
 import org.mewx.wenku8.ui.theme.Wenku8ExpressiveTheme
 import org.mewx.wenku8.ui.theme.Wenku8ThemeMode
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.Shadows
 import org.robolectric.annotation.Config
 import java.io.File
 import java.nio.file.Files
+import java.util.Locale
 import java.util.concurrent.Executor
 
 @RunWith(RobolectricTestRunner::class)
@@ -589,6 +595,61 @@ class NovelDetailAndDownloadTest {
             composeTestRule.onAllNodesWithTag(NovelDetailTestTags.SERVER_SUPPORT_AD_CARD)
                 .fetchSemanticsNodes().size,
         )
+    }
+
+    @Test
+    fun shareButton_sharesShareWenku8AppBookUrlAcrossLocales() {
+        val app = ApplicationProvider.getApplicationContext<Application>()
+        Shadows.shadowOf(app).clearNextStartedActivities()
+
+        composeTestRule.setContent {
+            Wenku8ExpressiveTheme(themeMode = Wenku8ThemeMode.ARCHIVAL_DAY) {
+                NovelDetailScreen(
+                    aid = 5,
+                    novelDetailRepository = detailRepository,
+                    bookshelfRepository = bookshelfRepository,
+                    novelDownloadRepository = downloadRepository,
+                    appLanguage = Wenku8API.AppLanguage.SC,
+                    themeMode = Wenku8ThemeMode.ARCHIVAL_DAY,
+                    useCoverTheme = false,
+                    onNavigateBack = {},
+                    onOpenReader = {},
+                )
+            }
+        }
+        composeTestRule.waitForIdle()
+
+        composeTestRule.onNodeWithTag(NovelDetailTestTags.SHARE_BUTTON).performClick()
+        composeTestRule.waitForIdle()
+
+        val chooserIntent = Shadows.shadowOf(app).nextStartedActivity
+        assertNotNull(chooserIntent)
+        assertEquals(Intent.ACTION_CHOOSER, chooserIntent.action)
+        @Suppress("DEPRECATION")
+        val sendIntent = chooserIntent.getParcelableExtra<Intent>(Intent.EXTRA_INTENT)
+        assertNotNull(sendIntent)
+        assertEquals(Intent.ACTION_SEND, sendIntent!!.action)
+        assertEquals(
+            "《狼与香辛料》（作者：支仓冻砂） https://share.wenku8.app/book/5",
+            sendIntent.getStringExtra(Intent.EXTRA_TEXT),
+        )
+
+        for (locale in listOf(Locale.SIMPLIFIED_CHINESE, Locale.TAIWAN, Locale("zh", "HK"))) {
+            val localizedConfig = Configuration(app.resources.configuration).apply {
+                setLocale(locale)
+            }
+            val localizedContext = app.createConfigurationContext(localizedConfig)
+            val formatted = localizedContext.getString(
+                R.string.detail_share_text_format,
+                "狼与香辛料",
+                "支仓冻砂",
+                5,
+            )
+            assertEquals(
+                "《狼与香辛料》（作者：支仓冻砂） https://share.wenku8.app/book/5",
+                formatted,
+            )
+        }
     }
 }
 

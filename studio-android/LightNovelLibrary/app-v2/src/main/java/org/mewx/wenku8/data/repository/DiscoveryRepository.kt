@@ -36,6 +36,7 @@ import org.mewx.wenku8.domain.model.PaginatedNovelFeedState
 import org.mewx.wenku8.domain.model.RankingMetric
 import org.mewx.wenku8.domain.model.RankingPeriod
 import org.mewx.wenku8.domain.model.UnifiedSearchMode
+import org.mewx.wenku8.ui.navigation.Wenku8DeepLinks
 import java.util.concurrent.ConcurrentHashMap
 
 /**
@@ -64,6 +65,7 @@ class DiscoveryRepository(
                 .removePrefix("AID")
                 .trim()
             return normalized.toIntOrNull()?.takeIf { it > 0 }
+                ?: Wenku8DeepLinks.parseShareBookTextAid(rawQuery)
         }
     }
 

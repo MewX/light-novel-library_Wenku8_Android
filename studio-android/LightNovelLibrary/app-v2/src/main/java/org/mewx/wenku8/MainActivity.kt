@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -27,6 +28,7 @@ import org.mewx.wenku8.api.Wenku8API
 import org.mewx.wenku8.data.local.preferences.Wenku8UserPreferences
 import org.mewx.wenku8.ui.detail.ReaderLaunchRequest
 import org.mewx.wenku8.ui.navigation.AdaptiveMainScaffold
+import org.mewx.wenku8.ui.navigation.Wenku8DeepLinks
 import org.mewx.wenku8.ui.reader.HardwareVolumeKeyHost
 import org.mewx.wenku8.ui.theme.Wenku8ExpressiveTheme
 import org.mewx.wenku8.widget.ContinueReadingAppWidgetProvider
@@ -45,6 +47,7 @@ class MainActivity : AppCompatActivity(), HardwareVolumeKeyHost {
 
     private var pendingWidgetReaderRequest by mutableStateOf<ReaderLaunchRequest?>(null)
     private var pendingWidgetOpenBookshelf by mutableStateOf(false)
+    private var pendingExternalNovelAid by mutableIntStateOf(0)
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
         if (event.keyCode == KeyEvent.KEYCODE_VOLUME_UP ||
@@ -60,14 +63,22 @@ class MainActivity : AppCompatActivity(), HardwareVolumeKeyHost {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        consumeWidgetDeepLinkIfPresent(intent)
+        consumeExternalDeepLinkIfPresent(intent)
     }
 
-    private fun consumeWidgetDeepLinkIfPresent(incomingIntent: Intent?) {
+    private fun consumeExternalDeepLinkIfPresent(incomingIntent: Intent?) {
+        val sharedBookAid = Wenku8DeepLinks.parseShareBookIntentAid(incomingIntent)
+        if (sharedBookAid != null) {
+            pendingExternalNovelAid = sharedBookAid
+            pendingWidgetReaderRequest = null
+            pendingWidgetOpenBookshelf = false
+            return
+        }
         val readerRequest = parseWidgetReaderLaunchRequest(incomingIntent)
         if (readerRequest != null) {
             pendingWidgetReaderRequest = readerRequest
             pendingWidgetOpenBookshelf = false
+            pendingExternalNovelAid = 0
             return
         }
         if (incomingIntent?.getBooleanExtra(
@@ -76,6 +87,7 @@ class MainActivity : AppCompatActivity(), HardwareVolumeKeyHost {
             ) == true
         ) {
             pendingWidgetOpenBookshelf = true
+            pendingExternalNovelAid = 0
         }
     }
 
@@ -90,7 +102,7 @@ class MainActivity : AppCompatActivity(), HardwareVolumeKeyHost {
         super.onCreate(savedInstanceState)
 
         if (savedInstanceState == null) {
-            consumeWidgetDeepLinkIfPresent(intent)
+            consumeExternalDeepLinkIfPresent(intent)
         }
 
         val appContainer = (application as Wenku8V2Application).appContainer
@@ -138,9 +150,11 @@ class MainActivity : AppCompatActivity(), HardwareVolumeKeyHost {
                         novelTocSyncRepository = appContainer.novelTocSyncRepository,
                         externalReaderLaunchRequest = pendingWidgetReaderRequest,
                         externalOpenBookshelf = pendingWidgetOpenBookshelf,
+                        externalOpenNovelAid = pendingExternalNovelAid,
                         onExternalLaunchConsumed = {
                             pendingWidgetReaderRequest = null
                             pendingWidgetOpenBookshelf = false
+                            pendingExternalNovelAid = 0
                         },
                         relayRouteController = appContainer.relayRouteController,
                         discoveryRepository = discoveryRepository,
