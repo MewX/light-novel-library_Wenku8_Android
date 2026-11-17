@@ -1,4 +1,4 @@
-include ':app', ':app-v2'
+include ':app-v1', ':app-v2'
 
 // Include the API module.
 include ':api'

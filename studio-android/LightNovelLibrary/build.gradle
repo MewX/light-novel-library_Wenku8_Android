@@ -32,6 +32,6 @@ allprojects {
 ext {
     targetSdkVersion = 37
     buildToolsVersion = "37.0.0"
-    minSdkVersion = 21  // Minimum requirement for Play Store (:app); :app-v2 uses minSdk 23.
+    minSdkVersion = 21  // Minimum requirement for Play Store (:app-v1); :app-v2 uses minSdk 24.
 }
 
