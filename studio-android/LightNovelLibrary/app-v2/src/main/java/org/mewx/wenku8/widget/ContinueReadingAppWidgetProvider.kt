@@ -218,7 +218,7 @@ fun buildContinueReadingRemoteViews(
             if (coverBitmap != null) {
                 views.setImageViewBitmap(R.id.widget_cover_image, coverBitmap)
             } else {
-                views.setImageViewResource(R.id.widget_cover_image, R.mipmap.ic_launcher)
+                views.setImageViewResource(R.id.widget_cover_image, R.drawable.ic_launcher)
             }
         }
 
@@ -236,7 +236,7 @@ fun buildContinueReadingRemoteViews(
                 R.id.widget_cta_button,
                 context.getString(R.string.widget_continue_action_open_shelf),
             )
-            views.setImageViewResource(R.id.widget_cover_image, R.mipmap.ic_launcher)
+            views.setImageViewResource(R.id.widget_cover_image, R.drawable.ic_launcher)
         }
     }
     return views
