@@ -34,6 +34,10 @@ class CoverThemeEngineTest {
                 foreground = scheme.onPrimaryContainer,
                 background = scheme.primaryContainer,
             )
+            val tertiaryChipContrast = CoverThemeEngine.calculateContrastRatio(
+                foreground = scheme.onTertiaryContainer,
+                background = scheme.tertiaryContainer,
+            )
 
             assertTrue(
                 "Expected >= 4.5 primary button contrast for $coverLabel in light mode, got $primaryButtonContrast",
@@ -42,6 +46,10 @@ class CoverThemeEngineTest {
             assertTrue(
                 "Expected >= 4.5 container chip contrast for $coverLabel in light mode, got $containerChipContrast",
                 containerChipContrast >= 4.5f,
+            )
+            assertTrue(
+                "Expected >= 4.5 tertiary chip contrast for $coverLabel in light mode, got $tertiaryChipContrast",
+                tertiaryChipContrast >= 4.5f,
             )
         }
     }
@@ -64,6 +72,10 @@ class CoverThemeEngineTest {
                 foreground = scheme.onPrimaryContainer,
                 background = scheme.primaryContainer,
             )
+            val tertiaryChipContrast = CoverThemeEngine.calculateContrastRatio(
+                foreground = scheme.onTertiaryContainer,
+                background = scheme.tertiaryContainer,
+            )
 
             assertTrue(
                 "Expected >= 4.5 primary button contrast for $coverLabel in dark mode, got $primaryButtonContrast",
@@ -72,6 +84,10 @@ class CoverThemeEngineTest {
             assertTrue(
                 "Expected >= 4.5 container chip contrast for $coverLabel in dark mode, got $containerChipContrast",
                 containerChipContrast >= 4.5f,
+            )
+            assertTrue(
+                "Expected >= 4.5 tertiary chip contrast for $coverLabel in dark mode, got $tertiaryChipContrast",
+                tertiaryChipContrast >= 4.5f,
             )
         }
     }
@@ -90,12 +106,23 @@ class CoverThemeEngineTest {
     }
 
     @Test
-    fun classicBlueColorSchemeMatchesLegacyV1PaletteAndPreservesOtherSchemes() {
+    fun classicBlueColorSchemeMatchesLegacyV1PaletteUsesCalmNonRedTertiaryAndPreservesOtherSchemes() {
         val classicBlue = Wenku8ColorSchemes.ClassicBlueColorScheme
         assertEquals(Color(0xFF4284F5), classicBlue.primary)
         assertEquals(Color(0xFF3870D0), classicBlue.secondary)
         assertEquals(Color(0xFFF5F5F5), classicBlue.background)
         assertEquals(Color(0xFFFFFFFF), classicBlue.surface)
+
+        // Tertiary & tertiaryContainer (used for illustration chapters and bookshelf badges)
+        // must be calm cool blue/cyan rather than warning-red, with WCAG AA contrast.
+        assertTrue(classicBlue.tertiary.blue > classicBlue.tertiary.red)
+        assertTrue(classicBlue.tertiaryContainer.blue > classicBlue.tertiaryContainer.red)
+        assertTrue(
+            CoverThemeEngine.calculateContrastRatio(
+                classicBlue.onTertiaryContainer,
+                classicBlue.tertiaryContainer,
+            ) >= 4.5f,
+        )
 
         // Ensure existing schemes remain untouched.
         assertEquals(Color(0xFF7A4F2B), Wenku8ColorSchemes.ArchivalDayColorScheme.primary)

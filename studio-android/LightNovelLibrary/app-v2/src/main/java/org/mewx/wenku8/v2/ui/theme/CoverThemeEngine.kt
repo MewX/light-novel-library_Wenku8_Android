@@ -140,7 +140,14 @@ object CoverThemeEngine {
         // Achromatic covers (pure white/grey/black sketches) fall back gracefully to warm bronze hue.
         val effectiveHueDegrees = if (rawSaturation < 0.08f) 28f else rawHueDegrees
         val clampedSaturation = rawSaturation.coerceIn(0.24f, 0.56f)
-        val companionHueDegrees = (effectiveHueDegrees + 38f) % 360f
+        val rawCompanionHue = (effectiveHueDegrees + 38f) % 360f
+        // Keep tertiary accents (used on illustration chapter chips & informational badges) out of
+        // the alarm-red warning band (`345°..360°` and `0°..24°`).
+        val companionHueDegrees = if (rawCompanionHue >= 345f || rawCompanionHue <= 24f) {
+            204f
+        } else {
+            rawCompanionHue
+        }
 
         return if (!isDarkTheme) {
             val primaryColor = hslToColor(effectiveHueDegrees, clampedSaturation, lightness = 0.30f)
@@ -149,6 +156,8 @@ object CoverThemeEngine {
             val secondaryContainerColor = hslToColor(effectiveHueDegrees, clampedSaturation * 0.55f, lightness = 0.88f)
             val onSecondaryContainerColor = hslToColor(effectiveHueDegrees, clampedSaturation * 0.75f, lightness = 0.16f)
             val tertiaryColor = hslToColor(companionHueDegrees, clampedSaturation * 0.80f, lightness = 0.30f)
+            val tertiaryContainerColor = hslToColor(companionHueDegrees, clampedSaturation * 0.65f, lightness = 0.90f)
+            val onTertiaryContainerColor = hslToColor(companionHueDegrees, clampedSaturation * 0.85f, lightness = 0.15f)
 
             baseColorScheme.copy(
                 primary = primaryColor,
@@ -159,6 +168,8 @@ object CoverThemeEngine {
                 onSecondaryContainer = onSecondaryContainerColor,
                 tertiary = tertiaryColor,
                 onTertiary = Color.White,
+                tertiaryContainer = tertiaryContainerColor,
+                onTertiaryContainer = onTertiaryContainerColor,
             )
         } else {
             val primaryColor = hslToColor(effectiveHueDegrees, clampedSaturation * 0.85f, lightness = 0.76f)
@@ -169,6 +180,8 @@ object CoverThemeEngine {
             val onSecondaryContainerColor = hslToColor(effectiveHueDegrees, clampedSaturation * 0.70f, lightness = 0.89f)
             val tertiaryColor = hslToColor(companionHueDegrees, clampedSaturation * 0.75f, lightness = 0.76f)
             val onTertiaryColor = hslToColor(companionHueDegrees, clampedSaturation, lightness = 0.15f)
+            val tertiaryContainerColor = hslToColor(companionHueDegrees, clampedSaturation * 0.65f, lightness = 0.25f)
+            val onTertiaryContainerColor = hslToColor(companionHueDegrees, clampedSaturation * 0.80f, lightness = 0.90f)
 
             baseColorScheme.copy(
                 primary = primaryColor,
@@ -179,6 +192,8 @@ object CoverThemeEngine {
                 onSecondaryContainer = onSecondaryContainerColor,
                 tertiary = tertiaryColor,
                 onTertiary = onTertiaryColor,
+                tertiaryContainer = tertiaryContainerColor,
+                onTertiaryContainer = onTertiaryContainerColor,
             )
         }
     }

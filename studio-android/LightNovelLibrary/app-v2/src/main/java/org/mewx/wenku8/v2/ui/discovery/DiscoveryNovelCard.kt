@@ -70,12 +70,39 @@ import org.mewx.wenku8.v2.domain.model.DiscoveryFeedErrorKind
 import org.mewx.wenku8.v2.domain.model.DiscoveryNovelCardItem
 import org.mewx.wenku8.v2.domain.model.FeedScrollPosition
 import org.mewx.wenku8.v2.domain.model.PaginatedNovelFeedState
+import org.mewx.wenku8.v2.domain.model.normalizeBookStatusText
 import org.mewx.wenku8.v2.ui.theme.LocalEinkMode
 import org.mewx.wenku8.v2.ui.theme.Wenku8SharedElementKeys
 import org.mewx.wenku8.v2.ui.theme.einkHairlineBorder
 import org.mewx.wenku8.v2.ui.theme.wenku8SharedNovelCover
 import org.mewx.wenku8.v2.ui.theme.wenku8SharedNovelTitle
 import org.mewx.wenku8.v2.ui.theme.wenku8SharedSearchBarBounds
+
+/**
+ * Formats Wenku8's raw `BookStatus` (`"已完成"` from `do=meta` vs `"已完结"` / `"已完結"` from
+ * `novellist`) into a consistent localized status label (`"已完结"` in SC, `"已完結"` in TC).
+ */
+@Composable
+fun formatBookStatusLabel(
+    rawStatus: String,
+    appLanguage: Wenku8API.AppLanguage? = null,
+): String {
+    val trimmed = rawStatus.trim()
+    if (trimmed.isEmpty()) return ""
+    val localizedCompleted = stringResource(R.string.bookshelf_filter_completed)
+    val preferTraditional = when (appLanguage) {
+        Wenku8API.AppLanguage.TC -> true
+        Wenku8API.AppLanguage.SC -> false
+        null -> localizedCompleted == "已完結" ||
+            trimmed == "已完結" ||
+            trimmed == "完結" ||
+            trimmed == "連載中"
+    }
+    return normalizeBookStatusText(
+        rawStatus = trimmed,
+        preferTraditionalChinese = preferTraditional,
+    )
+}
 
 object DiscoveryTestTags {
     const val PERSISTENT_SEARCH_PILL = "discovery_persistent_search_pill"
@@ -255,7 +282,8 @@ fun DiscoveryNovelCard(
                             modifier = Modifier.weight(1f, fill = false),
                         )
                     }
-                    if (item.bookStatus.isNotBlank()) {
+                    val displayBookStatus = formatBookStatusLabel(item.bookStatus)
+                    if (displayBookStatus.isNotBlank()) {
                         Surface(
                             color = MaterialTheme.colorScheme.secondaryContainer,
                             contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
@@ -263,7 +291,7 @@ fun DiscoveryNovelCard(
                             modifier = Modifier.einkHairlineBorder(MaterialTheme.shapes.extraSmall),
                         ) {
                             Text(
-                                text = item.bookStatus,
+                                text = displayBookStatus,
                                 style = MaterialTheme.typography.labelSmall,
                                 modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
                             )

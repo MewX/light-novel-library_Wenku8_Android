@@ -123,6 +123,7 @@ import org.mewx.wenku8.v2.data.repository.NovelDetailRepository
 import org.mewx.wenku8.v2.data.repository.NovelDetailSnapshot
 import org.mewx.wenku8.v2.data.repository.VolumeAccordionModel
 import org.mewx.wenku8.v2.domain.model.DiscoveryNovelCardItem
+import org.mewx.wenku8.v2.ui.discovery.formatBookStatusLabel
 import org.mewx.wenku8.v2.ui.theme.CoverThemeEngine
 import org.mewx.wenku8.v2.ui.theme.LocalEinkMode
 import org.mewx.wenku8.v2.ui.theme.Wenku8SharedElementKeys
@@ -555,6 +556,7 @@ fun NovelDetailScreen(
                         title = displayTitle,
                         author = displayAuthor,
                         novel = snapshot.novel,
+                        appLanguage = appLanguage,
                         coverUrl = snapshot.coverUrl.ifBlank { initialCoverUrl },
                         tags = snapshot.tags,
                         isEinkMode = isEinkMode,
@@ -911,6 +913,7 @@ private fun NovelHeroHeaderCard(
     title: String,
     author: String,
     novel: NovelEntity?,
+    appLanguage: Wenku8API.AppLanguage,
     coverUrl: String,
     tags: List<String>,
     isEinkMode: Boolean,
@@ -1006,8 +1009,11 @@ private fun NovelHeroHeaderCard(
                 verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {
                 val pressId = novel?.pressId.orEmpty()
-                val bookStatus = novel?.bookStatus.orEmpty()
-                if (pressId.isNotBlank() || bookStatus.isNotBlank()) {
+                val displayBookStatus = formatBookStatusLabel(
+                    rawStatus = novel?.bookStatus.orEmpty(),
+                    appLanguage = appLanguage,
+                )
+                if (pressId.isNotBlank() || displayBookStatus.isNotBlank()) {
                     FlowRow(
                         horizontalArrangement = Arrangement.spacedBy(6.dp),
                         verticalArrangement = Arrangement.spacedBy(4.dp),
@@ -1015,15 +1021,15 @@ private fun NovelHeroHeaderCard(
                         if (pressId.isNotBlank()) {
                             BadgePill(
                                 text = pressId,
-                                containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                                contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                                containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                                contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
-                        if (bookStatus.isNotBlank()) {
+                        if (displayBookStatus.isNotBlank()) {
                             BadgePill(
-                                text = bookStatus,
-                                containerColor = MaterialTheme.colorScheme.tertiaryContainer,
-                                contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
+                                text = displayBookStatus,
+                                containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                                contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
                             )
                         }
                     }
@@ -1697,6 +1703,10 @@ private fun VolumeAccordionCard(
                                     containerColor = MaterialTheme.colorScheme.tertiaryContainer,
                                     labelColor = MaterialTheme.colorScheme.onTertiaryContainer,
                                     leadingIconContentColor = MaterialTheme.colorScheme.onTertiaryContainer,
+                                ),
+                                border = AssistChipDefaults.assistChipBorder(
+                                    enabled = true,
+                                    borderColor = MaterialTheme.colorScheme.outlineVariant,
                                 ),
                                 modifier = Modifier
                                     .height(28.dp)

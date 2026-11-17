@@ -20,9 +20,10 @@ object Wenku8ColorSchemes {
 
     /**
      * Default light theme ("经典蓝色"): Faithful to legacy Wenku8 `v1.31`
-     * (`myPrimaryColor = #4284F5`, `myPrimaryDarkColor = #3870D0`, `myAccentColor = #FE5151`,
-     * `myWindowBackground = #F5F5F5`, `default_white = #FFFFFF`, `default_divider = #DADADA`),
-     * paired with Material 3 Expressive blue tonal containers for navigation & filter chips.
+     * (`myPrimaryColor = #4284F5`, `myPrimaryDarkColor = #3870D0`, `myWindowBackground = #F5F5F5`,
+     * `default_white = #FFFFFF`, `default_divider = #DADADA`), paired with Material 3 Expressive
+     * blue and calm cerulean tonal containers so informational badges (such as illustration
+     * chapters or bookshelf pills) never resemble red warning alerts.
      */
     val ClassicBlueColorScheme: ColorScheme = lightColorScheme(
         primary = Color(0xFF4284F5),
@@ -33,10 +34,10 @@ object Wenku8ColorSchemes {
         onSecondary = Color(0xFFFFFFFF),
         secondaryContainer = Color(0xFFDCE8FC),
         onSecondaryContainer = Color(0xFF102C57),
-        tertiary = Color(0xFFE04848),
+        tertiary = Color(0xFF1E6F8E),
         onTertiary = Color(0xFFFFFFFF),
-        tertiaryContainer = Color(0xFFFFDAD8),
-        onTertiaryContainer = Color(0xFF410005),
+        tertiaryContainer = Color(0xFFD2ECF9),
+        onTertiaryContainer = Color(0xFF072B3A),
         background = Color(0xFFF5F5F5),
         onBackground = Color(0xFF22252A),
         surface = Color(0xFFFFFFFF),

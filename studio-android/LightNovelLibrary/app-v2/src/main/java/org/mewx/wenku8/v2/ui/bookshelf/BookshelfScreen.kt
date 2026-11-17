@@ -110,6 +110,7 @@ import org.mewx.wenku8.v2.data.repository.BookshelfSortMode
 import org.mewx.wenku8.v2.data.repository.BookshelfViewMode
 import org.mewx.wenku8.v2.data.repository.CloudBookshelfSyncOutcome
 import org.mewx.wenku8.v2.domain.model.DiscoveryNovelCardItem
+import org.mewx.wenku8.v2.ui.discovery.formatBookStatusLabel
 import org.mewx.wenku8.v2.ui.navigation.MainScaffoldTestTags
 import org.mewx.wenku8.v2.ui.theme.LocalEinkMode
 import org.mewx.wenku8.v2.ui.theme.Wenku8SharedElementKeys
@@ -1449,10 +1450,11 @@ private fun BookshelfDetailListCard(
                     }
                 }
 
+                val displayBookStatus = formatBookStatusLabel(item.novel.bookStatus)
                 val metaParts = buildList {
                     if (item.novel.author.isNotBlank()) add(item.novel.author)
                     if (item.novel.pressId.isNotBlank()) add(item.novel.pressId)
-                    if (item.novel.bookStatus.isNotBlank()) add(item.novel.bookStatus)
+                    if (displayBookStatus.isNotBlank()) add(displayBookStatus)
                 }
                 if (metaParts.isNotEmpty()) {
                     Text(

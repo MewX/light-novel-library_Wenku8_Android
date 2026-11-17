@@ -310,6 +310,18 @@ class NovelDetailAndDownloadTest {
         }
         composeTestRule.waitForIdle()
 
+        // Server `do=meta` returns BookStatus="已完成", which must normalize to "已完结"
+        // consistently with the novel list!
+        composeTestRule.onNodeWithText("已完结").assertIsDisplayed()
+        composeTestRule.onNodeWithText("已完成").assertDoesNotExist()
+        assertEquals(
+            "已完結",
+            org.mewx.wenku8.v2.domain.model.normalizeBookStatusText(
+                rawStatus = "已完成",
+                preferTraditionalChinese = true,
+            ),
+        )
+
         // Title dialog & copy
         composeTestRule.onNodeWithTag(NovelDetailTestTags.NOVEL_TITLE_TEXT).performClick()
         composeTestRule.onNodeWithTag(NovelDetailTestTags.TITLE_DIALOG).assertIsDisplayed()

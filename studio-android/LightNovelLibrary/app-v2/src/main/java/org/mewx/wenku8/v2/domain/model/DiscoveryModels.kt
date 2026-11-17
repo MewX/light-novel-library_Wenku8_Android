@@ -99,6 +99,29 @@ data class DiscoveryNovelCardItem(
     }
 }
 
+/**
+ * Unifies Wenku8's inconsistent server-side `BookStatus` labels across endpoints:
+ * `action=novellist` returns `"已完结"` / `"已完結"`, whereas `do=meta` and `do=bookinfo` return
+ * `"已完成"`. Normalizing to `"已完结"` (SC) / `"已完結"` (TC) keeps novel lists, search cards,
+ * bookshelf filters, and `NovelDetailScreen` completely consistent.
+ */
+fun normalizeBookStatusText(
+    rawStatus: String,
+    preferTraditionalChinese: Boolean = false,
+): String {
+    val trimmed = rawStatus.trim()
+    if (trimmed.isEmpty()) return ""
+    return when (trimmed) {
+        "已完成", "已完结", "完结", "已完結", "完結" -> {
+            if (preferTraditionalChinese) "已完結" else "已完结"
+        }
+        "连载中", "連載中" -> {
+            if (preferTraditionalChinese) "連載中" else "连载中"
+        }
+        else -> trimmed
+    }
+}
+
 enum class DiscoveryFeedErrorKind {
     API_NOT_CONFIGURED,
     NETWORK_UNREACHABLE,
