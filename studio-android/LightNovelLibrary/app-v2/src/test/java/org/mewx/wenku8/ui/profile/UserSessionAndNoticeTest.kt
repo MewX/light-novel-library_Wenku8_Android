@@ -8,6 +8,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -308,6 +310,7 @@ class UserSessionAndNoticeTest {
             transport = transport,
             assetRootsProvider = { listOf(rootDir) },
             authGateway = FakeAccountAuthGateway(),
+            ioDispatcher = kotlinx.coroutines.Dispatchers.Unconfined,
         )
         val parsedNotice = ServerNoticeAndUpdateRepository.parseNoticeHtmlOrNull(
             """春季书架同步升级通知 <a href="https://wenku8.mewx.org/blog">阅读详情</a>""",
@@ -364,13 +367,18 @@ class UserSessionAndNoticeTest {
         composeRule.onNodeWithTag(ProfileAccountTestTags.LOGIN_PASSWORD_INPUT)
             .performTextReplacement("wrong")
         composeRule.onNodeWithTag(ProfileAccountTestTags.LOGIN_SUBMIT_BUTTON).performClick()
-        composeRule.waitForIdle()
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodesWithTag(ProfileAccountTestTags.LOGIN_ERROR_TEXT)
+                .fetchSemanticsNodes().isNotEmpty()
+        }
         composeRule.onNodeWithTag(ProfileAccountTestTags.LOGIN_ERROR_TEXT).assertIsDisplayed()
 
         composeRule.onNodeWithTag(ProfileAccountTestTags.LOGIN_PASSWORD_INPUT)
             .performTextReplacement("secret")
         composeRule.onNodeWithTag(ProfileAccountTestTags.LOGIN_SUBMIT_BUTTON).performClick()
-        composeRule.waitForIdle()
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodesWithText("80").fetchSemanticsNodes().isNotEmpty()
+        }
 
         // Signed-in profile rendered with nickname, rank, and initial score 80
         composeRule.onNodeWithText("奇诺之旅").assertIsDisplayed()
@@ -379,14 +387,19 @@ class UserSessionAndNoticeTest {
 
         // Perform daily sign-in -> score refreshes to 82 & feedback banner shown
         composeRule.onNodeWithTag(ProfileAccountTestTags.DAILY_SIGN_BUTTON).performClick()
-        composeRule.waitForIdle()
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodesWithText("82").fetchSemanticsNodes().isNotEmpty()
+        }
         composeRule.onNodeWithText("82").assertIsDisplayed()
         composeRule.onNodeWithTag(ProfileAccountTestTags.DAILY_SIGN_FEEDBACK_TEXT).assertIsDisplayed()
 
         // Logout with confirmation dialog -> returns to SignedOut
         composeRule.onNodeWithTag(ProfileAccountTestTags.LOGOUT_BUTTON).performClick()
         composeRule.onNodeWithTag(ProfileAccountTestTags.LOGOUT_CONFIRM_BUTTON).performClick()
-        composeRule.waitForIdle()
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodesWithTag(ProfileAccountTestTags.OPEN_LOGIN_SHEET_BUTTON)
+                .fetchSemanticsNodes().isNotEmpty()
+        }
         composeRule.onNodeWithTag(ProfileAccountTestTags.OPEN_LOGIN_SHEET_BUTTON).assertIsDisplayed()
     }
 
