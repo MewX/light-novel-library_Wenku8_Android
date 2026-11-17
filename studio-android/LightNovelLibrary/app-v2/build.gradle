@@ -156,7 +156,8 @@ dependencies {
     implementation "androidx.room:room-runtime:${roomVersion}"
     implementation "androidx.room:room-ktx:${roomVersion}"
     ksp "androidx.room:room-compiler:${roomVersion}"
-    implementation 'androidx.datastore:datastore-preferences:1.2.0'
+    // 1.2.1+ fixes 16 KB page-size PT_GNU_RELRO segment alignment in libdatastore_shared_counter.so.
+    implementation 'androidx.datastore:datastore-preferences:1.2.1'
 
     // OkHttp 5.x & Coil 3 (wired in P0.3 / Phase 2)
     implementation 'com.squareup.okhttp3:okhttp:5.5.1'
