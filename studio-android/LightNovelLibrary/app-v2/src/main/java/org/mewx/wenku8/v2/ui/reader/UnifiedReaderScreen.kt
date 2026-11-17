@@ -3,8 +3,10 @@ package org.mewx.wenku8.v2.ui.reader
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
+import android.os.Build
 import android.os.SystemClock
 import android.view.KeyEvent as AndroidKeyEvent
+import android.view.ViewTreeObserver
 import android.view.WindowManager
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -25,6 +27,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -37,6 +40,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -108,6 +112,11 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
@@ -127,10 +136,12 @@ import org.mewx.wenku8.v2.data.local.db.entity.ReadingProgressEntity
 import org.mewx.wenku8.v2.data.local.db.entity.ReadingSessionEntity
 import org.mewx.wenku8.v2.widget.ContinueReadingWidgetUpdater
 import org.mewx.wenku8.v2.data.local.preferences.Wenku8UserPreferences
+import org.mewx.wenku8.v2.data.local.preferences.resolveSyncedThemeForPaperPreset
 import org.mewx.wenku8.v2.data.remote.api.WenkuCatalogGateway
 import org.mewx.wenku8.v2.data.repository.CustomAssetSlot
 import org.mewx.wenku8.v2.data.repository.NovelTocSyncRepository
 import org.mewx.wenku8.v2.data.repository.StorageAndCacheRepository
+import org.mewx.wenku8.v2.reader.engine.ChapterBlock
 import org.mewx.wenku8.v2.reader.engine.ChapterWindowBuffer
 import org.mewx.wenku8.v2.reader.engine.ChapterWindowSlot
 import org.mewx.wenku8.v2.reader.engine.ParagraphLineBreaker
@@ -145,6 +156,7 @@ import org.mewx.wenku8.v2.reader.model.ReaderPaperPreset
 import org.mewx.wenku8.v2.ui.components.TooltipIconButton
 import org.mewx.wenku8.v2.ui.detail.ReaderLaunchRequest
 import org.mewx.wenku8.v2.ui.theme.LocalEinkMode
+import org.mewx.wenku8.v2.ui.theme.Wenku8ThemeMode
 import org.mewx.wenku8.v2.ui.theme.einkHairlineBorder
 import java.io.File
 import kotlin.math.roundToInt
@@ -201,6 +213,10 @@ object ReaderTestTags {
     const val TTS_PLAY_PAUSE_BUTTON = "reader_tts_play_pause_button"
     const val TTS_NEXT_BUTTON = "reader_tts_next_button"
     const val TTS_STOP_BUTTON = "reader_tts_stop_button"
+    const val READER_CLOCK_LABEL = "reader_clock_label"
+    const val TTS_HIGHLIGHTED_BLOCK_PREFIX = "reader_tts_highlight_block_"
+    const val FOCAL_HIGHLIGHTED_BLOCK_PREFIX = "reader_focal_highlight_block_"
+    const val BOOKMARK_ITEM_PREFIX = "reader_bookmark_item_"
 }
 
 enum class ReaderTypographySliderField(val label: String) {
@@ -223,6 +239,13 @@ private data class ReaderActiveArtbookState(
     val imageUrls: List<String>,
     val initialIndex: Int,
     val isAutoEnteredForChapter: Boolean = false,
+)
+
+private data class ActiveFocalHighlightState(
+    val cid: Int,
+    val blockIndex: Int,
+    val startChar: Int = -1,
+    val endCharExclusive: Int = -1,
 )
 
 /**
@@ -304,6 +327,7 @@ fun UnifiedReaderScreen(
     onReaderCustomBackgroundPathChanged: (String) -> Unit = {},
     onReaderPageTurnModeChanged: (ReaderPageTurnMode) -> Unit = {},
     onReaderPaperPresetChanged: (ReaderPaperPreset) -> Unit = {},
+    onThemeModeSelected: (Wenku8ThemeMode) -> Unit = {},
     onReaderKeepScreenOnChanged: (Boolean) -> Unit = {},
     onReaderEdgeBrightnessDragChanged: (Boolean) -> Unit = {},
     onVolumeKeyPagingChanged: (Boolean) -> Unit = {},
@@ -371,6 +395,38 @@ fun UnifiedReaderScreen(
     // Chapter IDs where the user tapped "小说阅读" inside an auto-opened pure-illustration chapter.
     var novelModeOverriddenCids by rememberSaveable(launchRequest.aid) { mutableStateOf(intArrayOf()) }
     var lastAutoOpenedGalleryCid by rememberSaveable(launchRequest.aid) { mutableIntStateOf(0) }
+
+    // Continuous-scroll (`上下卷轴`) live anchor, progress, and imperative jump channel.
+    var continuousScrollAnchor by remember(launchRequest.aid) { mutableStateOf(ReadingAnchor()) }
+    var continuousScrollProgress by remember(launchRequest.aid) { mutableFloatStateOf(0f) }
+    var scrollJumpRevision by remember { mutableLongStateOf(0L) }
+    var continuousScrollJumpCommand by remember { mutableStateOf<ContinuousScrollJumpCommand?>(null) }
+    fun dispatchContinuousScrollJump(cid: Int, paragraphIndex: Int, animated: Boolean = false) {
+        scrollJumpRevision += 1L
+        continuousScrollJumpCommand = ContinuousScrollJumpCommand(
+            revision = scrollJumpRevision,
+            cid = cid,
+            paragraphIndex = paragraphIndex.coerceAtLeast(0),
+            animated = animated,
+        )
+    }
+
+    // Search / Bookmark jump highlight state shared across all 6 page-turn modes.
+    var activeFocalHighlight by remember(launchRequest.aid) {
+        mutableStateOf<ActiveFocalHighlightState?>(null)
+    }
+
+    val applyPaperPresetAndSyncGlobalTheme: (ReaderPaperPreset) -> Unit = { nextPreset ->
+        val syncedTheme = resolveSyncedThemeForPaperPreset(
+            preset = nextPreset,
+            currentThemeMode = preferences.themeMode,
+            lastDayThemeMode = preferences.lastDayThemeMode,
+        )
+        onReaderPaperPresetChanged(nextPreset)
+        if (syncedTheme != preferences.themeMode) {
+            onThemeModeSelected(syncedTheme)
+        }
+    }
 
     // Brightness HUD pill state.
     var brightnessFraction by remember {
@@ -520,6 +576,7 @@ fun UnifiedReaderScreen(
         snapshot.activeChapter?.cid,
         snapshot.activePageIndexInCurrentChapter,
         (snapshot.currentSlot as? ChapterWindowSlot.Loaded)?.layout,
+        preferences.readerPageTurnMode,
     ) {
         val activeChapter = snapshot.activeChapter ?: return@LaunchedEffect
         if (activeChapter.cid != sessionCid) {
@@ -532,10 +589,12 @@ fun UnifiedReaderScreen(
         if (visitedPagesForSession.add(pageVisitKey)) {
             accumulatedSessionChars += activePage.characterCountOnPage
         }
-        persistReadingProgress(
-            chapter = activeChapter,
-            anchor = activePage.toBookmarkOrProgressAnchor(),
-        )
+        if (preferences.readerPageTurnMode != ReaderPageTurnMode.CONTINUOUS_SCROLL) {
+            persistReadingProgress(
+                chapter = activeChapter,
+                anchor = activePage.toBookmarkOrProgressAnchor(),
+            )
+        }
     }
 
     // SAF custom `.ttf/.otf` font & custom day wallpaper pickers inside Typography Studio.
@@ -621,6 +680,8 @@ fun UnifiedReaderScreen(
         isAnyModalOpen || isTypographyPanelOpen || ttsUiState.isSpeaking,
     )
     val latestSnapshotForKey by rememberUpdatedState(snapshot)
+    val latestPageTurnMode by rememberUpdatedState(preferences.readerPageTurnMode)
+    val latestIsEinkMode by rememberUpdatedState(isEinkMode)
 
     val handleAndroidVolumeKeyEvent: (AndroidKeyEvent) -> Boolean = remember(windowBuffer, coroutineScope) {
         { nativeEvent ->
@@ -639,8 +700,18 @@ fun UnifiedReaderScreen(
                     ReaderTapZoneAction.TOGGLE_HUD -> snap.activeVirtualPageIndex
                 }
                 if (targetVirtual in 0 until snap.totalVirtualPages) {
+                    val resolvedTarget = snap.resolveVirtualPage(targetVirtual)
                     coroutineScope.launch {
                         windowBuffer.onVirtualPageSettled(targetVirtual)
+                        if (latestPageTurnMode == ReaderPageTurnMode.CONTINUOUS_SCROLL &&
+                            resolvedTarget?.page != null
+                        ) {
+                            dispatchContinuousScrollJump(
+                                cid = resolvedTarget.slot.chapter.cid,
+                                paragraphIndex = resolvedTarget.page.startAnchor.paragraphIndex,
+                                animated = !latestIsEinkMode,
+                            )
+                        }
                     }
                 }
                 true
@@ -665,6 +736,7 @@ fun UnifiedReaderScreen(
     }
 
     val view = LocalView.current
+    val lifecycleOwner = LocalLifecycleOwner.current
     val surfaceBgLuminance = (
         0.299f * MaterialTheme.colorScheme.surfaceContainer.red +
             0.587f * MaterialTheme.colorScheme.surfaceContainer.green +
@@ -675,34 +747,88 @@ fun UnifiedReaderScreen(
         isHudVisible && activeDraggingSlider == null -> surfaceBgLuminance > 0.5f
         else -> !palette.isDarkPalette
     }
-    DisposableEffect(context, view) {
+    val shouldShowStatusBar = isHudVisible || activeArtbookState != null
+    val latestShouldUseLightBars by rememberUpdatedState(shouldUseLightBarAppearance)
+    val latestShouldShowStatusBar by rememberUpdatedState(shouldShowStatusBar)
+
+    val applyReaderSystemBarsState = remember(context, view) {
+        {
+            val window = context.findHostActivity()?.window
+            if (window != null) {
+                val controller = WindowCompat.getInsetsController(window, view)
+                controller.systemBarsBehavior =
+                    WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+                controller.isAppearanceLightStatusBars = latestShouldUseLightBars
+                controller.isAppearanceLightNavigationBars = latestShouldUseLightBars
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    window.isNavigationBarContrastEnforced = false
+                }
+                // Always hide the bottom system navigation bar in reading mode so night mode is
+                // never ruined by a bright/contrasting gesture bar; swipe up reveals transiently.
+                controller.hide(WindowInsetsCompat.Type.navigationBars())
+                if (latestShouldShowStatusBar) {
+                    controller.show(WindowInsetsCompat.Type.statusBars())
+                } else {
+                    controller.hide(WindowInsetsCompat.Type.statusBars())
+                }
+            }
+        }
+    }
+
+    DisposableEffect(context, view, lifecycleOwner) {
         val window = context.findHostActivity()?.window
         val controller = if (window != null) WindowCompat.getInsetsController(window, view) else null
         val prevLightStatus = controller?.isAppearanceLightStatusBars
         val prevLightNav = controller?.isAppearanceLightNavigationBars
+        val prevBehavior = controller?.systemBarsBehavior
+        val prevNavContrastEnforced = if (window != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            window.isNavigationBarContrastEnforced
+        } else {
+            null
+        }
+
+        applyReaderSystemBarsState()
+
+        val focusListener = ViewTreeObserver.OnWindowFocusChangeListener { hasFocus ->
+            if (hasFocus) applyReaderSystemBarsState()
+        }
+        view.viewTreeObserver.addOnWindowFocusChangeListener(focusListener)
+
+        val lifecycleObserver = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                applyReaderSystemBarsState()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(lifecycleObserver)
+
         onDispose {
+            runCatching { view.viewTreeObserver.removeOnWindowFocusChangeListener(focusListener) }
+            lifecycleOwner.lifecycle.removeObserver(lifecycleObserver)
+            if (window != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && prevNavContrastEnforced != null) {
+                window.isNavigationBarContrastEnforced = prevNavContrastEnforced
+            }
             if (controller != null) {
+                if (prevBehavior != null) controller.systemBarsBehavior = prevBehavior
                 if (prevLightStatus != null) controller.isAppearanceLightStatusBars = prevLightStatus
                 if (prevLightNav != null) controller.isAppearanceLightNavigationBars = prevLightNav
+                controller.show(WindowInsetsCompat.Type.systemBars())
             }
         }
     }
-    LaunchedEffect(context, view, shouldUseLightBarAppearance) {
-        val window = context.findHostActivity()?.window ?: return@LaunchedEffect
-        val controller = WindowCompat.getInsetsController(window, view)
-        controller.isAppearanceLightStatusBars = shouldUseLightBarAppearance
-        controller.isAppearanceLightNavigationBars = shouldUseLightBarAppearance
+
+    LaunchedEffect(shouldUseLightBarAppearance, shouldShowStatusBar) {
+        applyReaderSystemBarsState()
     }
 
     LaunchedEffect(Unit) {
         runCatching { focusRequester.requestFocus() }
     }
 
-    val safeInsets = WindowInsets.safeDrawing
-    val safeLeftPx = safeInsets.getLeft(density, androidx.compose.ui.unit.LayoutDirection.Ltr)
-    val safeRightPx = safeInsets.getRight(density, androidx.compose.ui.unit.LayoutDirection.Ltr)
-    val safeTopPx = safeInsets.getTop(density)
-    val safeBottomPx = safeInsets.getBottom(density)
+    val cutoutInsets = WindowInsets.displayCutout
+    val safeLeftPx = cutoutInsets.getLeft(density, androidx.compose.ui.unit.LayoutDirection.Ltr)
+    val safeRightPx = cutoutInsets.getRight(density, androidx.compose.ui.unit.LayoutDirection.Ltr)
+    val safeTopPx = cutoutInsets.getTop(density)
+    val safeBottomPx = cutoutInsets.getBottom(density)
 
     BoxWithConstraints(
         modifier = modifier
@@ -767,6 +893,14 @@ fun UnifiedReaderScreen(
                     } else {
                         ReadingAnchor()
                     }
+                }
+                continuousScrollAnchor = resolvedInitialAnchor
+                if (resolvedInitialAnchor.paragraphIndex > 0) {
+                    dispatchContinuousScrollJump(
+                        cid = launchRequest.cid,
+                        paragraphIndex = resolvedInitialAnchor.paragraphIndex,
+                        animated = false,
+                    )
                 }
                 windowBuffer.openChapter(
                     cid = launchRequest.cid,
@@ -835,25 +969,56 @@ fun UnifiedReaderScreen(
             }
         }
 
-        fun jumpToChapterWithUndo(targetCid: Int, targetAnchor: ReadingAnchor = ReadingAnchor()) {
+        fun jumpToChapterWithUndo(
+            targetCid: Int,
+            targetAnchor: ReadingAnchor = ReadingAnchor(),
+            clearFocalHighlight: Boolean = true,
+        ) {
+            if (clearFocalHighlight) {
+                activeFocalHighlight = null
+            }
             val prevChapter = snapshot.activeChapter
             val prevPage = snapshot.activeReaderPage
             if (prevChapter != null && prevPage != null) {
+                val savedOriginAnchor =
+                    if (preferences.readerPageTurnMode == ReaderPageTurnMode.CONTINUOUS_SCROLL) {
+                        continuousScrollAnchor
+                    } else {
+                        prevPage.toBookmarkOrProgressAnchor()
+                    }
                 undoJumpState = ReaderUndoJumpState(
                     cid = prevChapter.cid,
                     pageIndexOneBased = prevPage.pageIndexInChapter + 1,
-                    anchor = prevPage.toBookmarkOrProgressAnchor(),
+                    anchor = savedOriginAnchor,
                     createdAtElapsedMs = SystemClock.elapsedRealtime(),
                 )
             }
             coroutineScope.launch {
                 val loadedCur = snapshot.currentSlot as? ChapterWindowSlot.Loaded
                 if (prevChapter?.cid == targetCid && loadedCur != null) {
-                    val resolvedLocal = loadedCur.layout.resolvePageIndexForAnchor(targetAnchor)
-                    val targetVirtual = snapshot.prevPageCount + resolvedLocal
-                    pagerState.scrollToPage(targetVirtual)
-                    windowBuffer.onVirtualPageSettled(targetVirtual)
+                    if (preferences.readerPageTurnMode == ReaderPageTurnMode.CONTINUOUS_SCROLL) {
+                        continuousScrollAnchor = targetAnchor
+                        dispatchContinuousScrollJump(
+                            cid = targetCid,
+                            paragraphIndex = targetAnchor.paragraphIndex,
+                            animated = false,
+                        )
+                        windowBuffer.syncActiveAnchorInCurrentChapter(targetAnchor)
+                        persistReadingProgress(prevChapter, targetAnchor)
+                    } else {
+                        val resolvedLocal = loadedCur.layout.resolvePageIndexForAnchor(targetAnchor)
+                        val targetVirtual = snapshot.prevPageCount + resolvedLocal
+                        pagerState.scrollToPage(targetVirtual)
+                        windowBuffer.onVirtualPageSettled(targetVirtual)
+                    }
                 } else {
+                    continuousScrollAnchor = targetAnchor
+                    continuousScrollProgress = 0f
+                    dispatchContinuousScrollJump(
+                        cid = targetCid,
+                        paragraphIndex = targetAnchor.paragraphIndex,
+                        animated = false,
+                    )
                     val meta = snapshot.orderedToc.firstOrNull { it.cid == targetCid }
                     windowBuffer.openChapter(
                         cid = targetCid,
@@ -944,7 +1109,12 @@ fun UnifiedReaderScreen(
             val ast = activeChapterAst ?: return@LaunchedEffect
             if (launchRequest.startWithTts && !didAutoStartInitialTts && ast.cid == launchRequest.cid) {
                 didAutoStartInitialTts = true
-                val startBlock = snapshot.activeReaderPage?.startAnchor?.paragraphIndex ?: 0
+                val startBlock =
+                    if (preferences.readerPageTurnMode == ReaderPageTurnMode.CONTINUOUS_SCROLL) {
+                        continuousScrollAnchor.paragraphIndex
+                    } else {
+                        snapshot.activeReaderPage?.startAnchor?.paragraphIndex ?: 0
+                    }
                 ttsController.startChapter(
                     ast = ast,
                     startFromBlockIndex = startBlock,
@@ -973,6 +1143,9 @@ fun UnifiedReaderScreen(
                 }
             if (nextCid != null) {
                 pendingTtsStartOnCid = nextCid
+                continuousScrollAnchor = ReadingAnchor()
+                continuousScrollProgress = 0f
+                dispatchContinuousScrollJump(cid = nextCid, paragraphIndex = 0, animated = false)
                 val meta = snapshot.orderedToc.firstOrNull { it.cid == nextCid }
                 windowBuffer.openChapter(
                     cid = nextCid,
@@ -988,39 +1161,81 @@ fun UnifiedReaderScreen(
             }
         }
 
-        // Automatically flip pages to follow the currently spoken paragraph during active TTS!
-        LaunchedEffect(ttsUiState.isSpeaking, ttsUiState.activeCid, ttsUiState.activeBlockIndex) {
-            if (!ttsUiState.isSpeaking) return@LaunchedEffect
+        // Automatically flip pages or scroll to follow the currently active TTS paragraph across ALL 6 modes!
+        LaunchedEffect(
+            ttsUiState.isSessionOpen,
+            ttsUiState.activeCid,
+            ttsUiState.activeBlockIndex,
+            preferences.readerPageTurnMode,
+            (snapshot.currentSlot as? ChapterWindowSlot.Loaded)?.chapter?.cid,
+        ) {
+            if (!ttsUiState.isSessionOpen || ttsUiState.totalUtterances <= 0 || ttsUiState.activeBlockIndex < 0) {
+                return@LaunchedEffect
+            }
             val loadedCur = snapshot.currentSlot as? ChapterWindowSlot.Loaded ?: return@LaunchedEffect
             if (loadedCur.chapter.cid != ttsUiState.activeCid) return@LaunchedEffect
             val spokenAnchor = ReadingAnchor(paragraphIndex = ttsUiState.activeBlockIndex, charOffset = 0)
-            val targetLocalPage = loadedCur.layout.resolvePageIndexForAnchor(spokenAnchor)
-            if (targetLocalPage != snapshot.activePageIndexInCurrentChapter) {
+            if (preferences.readerPageTurnMode == ReaderPageTurnMode.CONTINUOUS_SCROLL) {
+                dispatchContinuousScrollJump(
+                    cid = ttsUiState.activeCid,
+                    paragraphIndex = ttsUiState.activeBlockIndex,
+                    animated = !isEinkMode,
+                )
+                windowBuffer.syncActiveAnchorInCurrentChapter(spokenAnchor)
+            } else {
+                val targetLocalPage = loadedCur.layout.resolvePageIndexForAnchor(spokenAnchor)
                 val targetVirtual = snapshot.prevPageCount + targetLocalPage
-                if (targetVirtual in 0 until snapshot.totalVirtualPages) {
+                if (targetVirtual in 0 until snapshot.totalVirtualPages &&
+                    (targetLocalPage != snapshot.activePageIndexInCurrentChapter ||
+                        pagerState.currentPage != targetVirtual)
+                ) {
                     val instantFlip = isEinkMode ||
                         preferences.readerPageTurnMode == ReaderPageTurnMode.EINK_INSTANT
                     if (instantFlip) {
                         pagerState.scrollToPage(targetVirtual)
                     } else {
                         runCatching { pagerState.animateScrollToPage(targetVirtual) }
+                            .onFailure { pagerState.scrollToPage(targetVirtual) }
                     }
                     windowBuffer.onVirtualPageSettled(targetVirtual)
                 }
             }
         }
 
+        val contentHighlight = remember(ttsUiState, activeFocalHighlight) {
+            val showTts = ttsUiState.isSessionOpen &&
+                ttsUiState.totalUtterances > 0 &&
+                ttsUiState.activeBlockIndex >= 0
+            ReaderContentHighlight(
+                ttsCid = if (showTts) ttsUiState.activeCid else 0,
+                ttsBlockIndex = if (showTts) ttsUiState.activeBlockIndex else -1,
+                focalCid = activeFocalHighlight?.cid ?: 0,
+                focalBlockIndex = activeFocalHighlight?.blockIndex ?: -1,
+                focalStartChar = activeFocalHighlight?.startChar ?: -1,
+                focalEndCharExclusive = activeFocalHighlight?.endCharExclusive ?: -1,
+            )
+        }
+
         val currentChapterBookmark = remember(
             novelBookmarks,
             snapshot.activeChapter?.cid,
             snapshot.activeReaderPage?.startAnchor,
+            snapshot.activeReaderPage?.endAnchor,
+            preferences.readerPageTurnMode,
+            continuousScrollAnchor,
         ) {
             val curCid = snapshot.activeChapter?.cid ?: return@remember null
-            val curPage = snapshot.activeReaderPage ?: return@remember null
-            novelBookmarks.firstOrNull { note ->
-                note.cid == curCid &&
-                    ReadingAnchor(note.startParagraph, note.startChar) >= curPage.startAnchor &&
-                    ReadingAnchor(note.startParagraph, note.startChar) <= curPage.endAnchor
+            if (preferences.readerPageTurnMode == ReaderPageTurnMode.CONTINUOUS_SCROLL) {
+                novelBookmarks.firstOrNull { note ->
+                    note.cid == curCid && note.startParagraph == continuousScrollAnchor.paragraphIndex
+                }
+            } else {
+                val curPage = snapshot.activeReaderPage ?: return@remember null
+                novelBookmarks.firstOrNull { note ->
+                    note.cid == curCid &&
+                        ReadingAnchor(note.startParagraph, note.startChar) >= curPage.startAnchor &&
+                        ReadingAnchor(note.startParagraph, note.startChar) <= curPage.endAnchor
+                }
             }
         }
 
@@ -1034,6 +1249,8 @@ fun UnifiedReaderScreen(
             paragraphDistanceDp = liveParagraphDistanceDp,
             pageEdgeDistanceDp = livePageEdgeDistanceDp,
             leftEdgeBrightnessDragEnabled = preferences.readerEdgeBrightnessDragEnabled,
+            contentHighlight = contentHighlight,
+            continuousScrollJumpCommand = continuousScrollJumpCommand,
             onTapZoneAction = { action ->
                 if (isTypographyPanelOpen) {
                     activeDraggingSlider = null
@@ -1072,10 +1289,13 @@ fun UnifiedReaderScreen(
                     clickedIdx = clickedIdx,
                 )
             },
-            onContinuousScrollAnchorChanged = { scrollAnchor, _ ->
+            onContinuousScrollAnchorChanged = { scrollAnchor, progressFraction ->
+                continuousScrollAnchor = scrollAnchor
+                continuousScrollProgress = progressFraction
                 val activeChapter = snapshot.activeChapter
                 if (activeChapter != null) {
                     coroutineScope.launch {
+                        windowBuffer.syncActiveAnchorInCurrentChapter(scrollAnchor)
                         persistReadingProgress(activeChapter, scrollAnchor)
                     }
                 }
@@ -1094,7 +1314,7 @@ fun UnifiedReaderScreen(
                 coroutineScope.launch { windowBuffer.retrySlot(failedCid) }
             },
             onOpenNetworkDiagnostics = onOpenNetworkDiagnostics,
-            modifier = Modifier.windowInsetsPadding(WindowInsets.safeDrawing),
+            modifier = Modifier.windowInsetsPadding(WindowInsets.displayCutout),
         )
 
         // Floating brightness indicator pill (`24..72dp` left-edge drag feedback).
@@ -1230,23 +1450,65 @@ fun UnifiedReaderScreen(
                         tooltipText = bookmarkToggleLabel,
                         onClick = {
                             val curChapter = snapshot.activeChapter ?: return@TooltipIconButton
-                            val curPage = snapshot.activeReaderPage ?: return@TooltipIconButton
+                            val curPage = snapshot.activeReaderPage
+                            val isScrollMode =
+                                preferences.readerPageTurnMode == ReaderPageTurnMode.CONTINUOUS_SCROLL
+                            if (!isScrollMode && curPage == null) return@TooltipIconButton
                             coroutineScope.launch {
                                 if (currentChapterBookmark != null) {
+                                    val removedNote = currentChapterBookmark
+                                    if (activeFocalHighlight?.cid == removedNote.cid &&
+                                        activeFocalHighlight?.blockIndex == removedNote.startParagraph
+                                    ) {
+                                        activeFocalHighlight = null
+                                    }
                                     withContext(ioDispatcher) {
                                         database.bookmarkNoteDao()
-                                            .deleteBookmarkNoteById(currentChapterBookmark.id)
+                                            .deleteBookmarkNoteById(removedNote.id)
                                     }
                                     snackbarHostState.showSnackbar("已移除当前页书签")
                                 } else {
-                                    val snippet = curPage.elements.firstNotNullOfOrNull { el ->
-                                        when (el) {
-                                            is org.mewx.wenku8.v2.reader.engine.ReaderPageElement.TextLine -> el.text.trim('\u3000')
-                                            is org.mewx.wenku8.v2.reader.engine.ReaderPageElement.VerticalColumn -> el.verticalText.trim('\u3000')
-                                            is org.mewx.wenku8.v2.reader.engine.ReaderPageElement.TitleLine -> el.text
-                                            else -> null
-                                        }?.takeIf { it.isNotBlank() }
-                                    }?.take(72) ?: curChapter.chapterTitle
+                                    val startParagraph: Int
+                                    val startChar: Int
+                                    val endParagraph: Int
+                                    val endChar: Int
+                                    val snippet: String
+                                    if (isScrollMode) {
+                                        startParagraph = continuousScrollAnchor.paragraphIndex
+                                        startChar = continuousScrollAnchor.charOffset
+                                        endParagraph = startParagraph
+                                        endChar = startChar
+                                        val blockText = activeChapterAst?.blocks
+                                            ?.firstOrNull { it.blockIndex >= startParagraph }
+                                            ?.let { blk ->
+                                                when (blk) {
+                                                    is ChapterBlock.TitleBlock -> blk.title
+                                                    is ChapterBlock.ParagraphBlock -> blk.formattedText.trim('\u3000')
+                                                    is ChapterBlock.IllustrationBlock -> null
+                                                }
+                                            }
+                                            ?.takeIf { it.isNotBlank() }
+                                        snippet = blockText?.take(72) ?: curChapter.chapterTitle
+                                    } else {
+                                        val page = curPage ?: return@launch
+                                        startParagraph = page.startAnchor.paragraphIndex
+                                        startChar = page.startAnchor.charOffset
+                                        endParagraph = page.endAnchor.paragraphIndex
+                                        endChar = page.endAnchor.charOffset
+                                        snippet = page.elements.firstNotNullOfOrNull { el ->
+                                            when (el) {
+                                                is ReaderPageElement.TextLine -> el.text.trim('\u3000')
+                                                is ReaderPageElement.VerticalColumn -> el.verticalText.trim('\u3000')
+                                                is ReaderPageElement.TitleLine -> el.text
+                                                else -> null
+                                            }?.takeIf { it.isNotBlank() }
+                                        }?.take(72) ?: curChapter.chapterTitle
+                                    }
+
+                                    activeFocalHighlight = ActiveFocalHighlightState(
+                                        cid = curChapter.cid,
+                                        blockIndex = startParagraph,
+                                    )
 
                                     withContext(ioDispatcher) {
                                         if (database.novelDao().getSyncHeader(launchRequest.aid) == null) {
@@ -1265,10 +1527,10 @@ fun UnifiedReaderScreen(
                                                 vid = curChapter.vid,
                                                 cid = curChapter.cid,
                                                 chapterTitle = "${curChapter.volumeTitle} · ${curChapter.chapterTitle}".trim(' ', '·'),
-                                                startParagraph = curPage.startAnchor.paragraphIndex,
-                                                startChar = curPage.startAnchor.charOffset,
-                                                endParagraph = curPage.endAnchor.paragraphIndex,
-                                                endChar = curPage.endAnchor.charOffset,
+                                                startParagraph = startParagraph,
+                                                startChar = startChar,
+                                                endParagraph = endParagraph,
+                                                endChar = endChar,
                                                 snippetText = snippet,
                                                 styleType = BookmarkNoteEntity.STYLE_BOOKMARK,
                                                 createdAtMs = System.currentTimeMillis(),
@@ -1350,16 +1612,36 @@ fun UnifiedReaderScreen(
                         .clickable {
                             val targetUndo = activeUndo
                             undoJumpState = null
+                            activeFocalHighlight = null
                             coroutineScope.launch {
                                 if (snapshot.activeChapter?.cid == targetUndo.cid) {
-                                    val resolvedIdx = (snapshot.currentSlot as? ChapterWindowSlot.Loaded)
-                                        ?.layout
-                                        ?.resolvePageIndexForAnchor(targetUndo.anchor)
-                                        ?: (targetUndo.pageIndexOneBased - 1).coerceAtLeast(0)
-                                    val targetVirtual = snapshot.prevPageCount + resolvedIdx
-                                    pagerState.scrollToPage(targetVirtual)
-                                    windowBuffer.onVirtualPageSettled(targetVirtual)
+                                    if (preferences.readerPageTurnMode == ReaderPageTurnMode.CONTINUOUS_SCROLL) {
+                                        continuousScrollAnchor = targetUndo.anchor
+                                        dispatchContinuousScrollJump(
+                                            cid = targetUndo.cid,
+                                            paragraphIndex = targetUndo.anchor.paragraphIndex,
+                                            animated = false,
+                                        )
+                                        windowBuffer.syncActiveAnchorInCurrentChapter(targetUndo.anchor)
+                                        snapshot.activeChapter?.let { ch ->
+                                            persistReadingProgress(ch, targetUndo.anchor)
+                                        }
+                                    } else {
+                                        val resolvedIdx = (snapshot.currentSlot as? ChapterWindowSlot.Loaded)
+                                            ?.layout
+                                            ?.resolvePageIndexForAnchor(targetUndo.anchor)
+                                            ?: (targetUndo.pageIndexOneBased - 1).coerceAtLeast(0)
+                                        val targetVirtual = snapshot.prevPageCount + resolvedIdx
+                                        pagerState.scrollToPage(targetVirtual)
+                                        windowBuffer.onVirtualPageSettled(targetVirtual)
+                                    }
                                 } else {
+                                    continuousScrollAnchor = targetUndo.anchor
+                                    dispatchContinuousScrollJump(
+                                        cid = targetUndo.cid,
+                                        paragraphIndex = targetUndo.anchor.paragraphIndex,
+                                        animated = false,
+                                    )
                                     val meta = snapshot.orderedToc.firstOrNull { it.cid == targetUndo.cid }
                                     windowBuffer.openChapter(
                                         cid = targetUndo.cid,
@@ -1400,7 +1682,12 @@ fun UnifiedReaderScreen(
                     onSliderDragValueChanged = { field, newValue ->
                         if (activeDraggingSlider != field) {
                             activeDraggingSlider = field
-                            dragLockedAnchor = snapshot.activeReaderPage?.startAnchor ?: ReadingAnchor()
+                            dragLockedAnchor =
+                                if (preferences.readerPageTurnMode == ReaderPageTurnMode.CONTINUOUS_SCROLL) {
+                                    continuousScrollAnchor
+                                } else {
+                                    snapshot.activeReaderPage?.startAnchor ?: ReadingAnchor()
+                                }
                         }
                         when (field) {
                             ReaderTypographySliderField.FONT_SIZE -> liveFontSizeSp = newValue
@@ -1419,7 +1706,7 @@ fun UnifiedReaderScreen(
                             livePageEdgeDistanceDp,
                         )
                     },
-                    onSelectPaperPreset = onReaderPaperPresetChanged,
+                    onSelectPaperPreset = applyPaperPresetAndSyncGlobalTheme,
                     onPickCustomFont = {
                         customFontPicker.launch(arrayOf("font/*", "application/octet-stream", "*/*"))
                     },
@@ -1462,51 +1749,133 @@ fun UnifiedReaderScreen(
                             Text("上一章")
                         }
 
-                        val totalPagesInCur = snapshot.currentPageCount.coerceAtLeast(1)
-                        val curPageZeroBased = snapshot.activePageIndexInCurrentChapter
-                        var scrubPreviewIndex by remember(curPageZeroBased, totalPagesInCur) {
-                            mutableFloatStateOf(curPageZeroBased.toFloat())
-                        }
+                        if (preferences.readerPageTurnMode == ReaderPageTurnMode.CONTINUOUS_SCROLL) {
+                            val scrollBlocks = activeChapterAst?.blocks.orEmpty()
+                            val totalBlocks = scrollBlocks.size.coerceAtLeast(1)
+                            val curBlockPos = scrollBlocks
+                                .indexOfFirst { it.blockIndex >= continuousScrollAnchor.paragraphIndex }
+                                .let { if (it >= 0) it else 0 }
+                            var scrubBlockPreviewPos by remember(curBlockPos, totalBlocks) {
+                                mutableFloatStateOf(curBlockPos.toFloat())
+                            }
+                            val previewPosInt = scrubBlockPreviewPos.roundToInt().coerceIn(0, totalBlocks - 1)
+                            val previewPct = if (totalBlocks <= 1) {
+                                100
+                            } else {
+                                ((previewPosInt.toFloat() / (totalBlocks - 1).toFloat()) * 100f)
+                                    .roundToInt()
+                                    .coerceIn(0, 100)
+                            }
 
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            modifier = Modifier.weight(1f),
-                        ) {
-                            Text(
-                                text = "第 ${scrubPreviewIndex.roundToInt() + 1} / $totalPagesInCur 页",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                            Slider(
-                                value = scrubPreviewIndex,
-                                enabled = totalPagesInCur > 1,
-                                valueRange = 0f..(totalPagesInCur - 1).coerceAtLeast(1).toFloat(),
-                                onValueChange = { raw ->
-                                    scrubPreviewIndex = raw
-                                },
-                                onValueChangeFinished = {
-                                    val targetLocalPage = scrubPreviewIndex.roundToInt()
-                                        .coerceIn(0, totalPagesInCur - 1)
-                                    if (targetLocalPage != curPageZeroBased) {
-                                        val prevChapter = snapshot.activeChapter
-                                        val prevPage = snapshot.activeReaderPage
-                                        if (prevChapter != null && prevPage != null) {
-                                            undoJumpState = ReaderUndoJumpState(
-                                                cid = prevChapter.cid,
-                                                pageIndexOneBased = curPageZeroBased + 1,
-                                                anchor = prevPage.toBookmarkOrProgressAnchor(),
-                                                createdAtElapsedMs = SystemClock.elapsedRealtime(),
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                modifier = Modifier.weight(1f),
+                            ) {
+                                Text(
+                                    text = "阅读进度 $previewPct% (${previewPosInt + 1} / $totalBlocks 段)",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                                Slider(
+                                    value = scrubBlockPreviewPos,
+                                    enabled = totalBlocks > 1,
+                                    valueRange = 0f..(totalBlocks - 1).coerceAtLeast(1).toFloat(),
+                                    onValueChange = { raw ->
+                                        scrubBlockPreviewPos = raw
+                                    },
+                                    onValueChangeFinished = {
+                                        val targetPos = scrubBlockPreviewPos.roundToInt()
+                                            .coerceIn(0, totalBlocks - 1)
+                                        val targetBlock = scrollBlocks.getOrNull(targetPos)
+                                        if (targetBlock != null && targetPos != curBlockPos) {
+                                            activeFocalHighlight = null
+                                            val prevChapter = snapshot.activeChapter
+                                            if (prevChapter != null) {
+                                                undoJumpState = ReaderUndoJumpState(
+                                                    cid = prevChapter.cid,
+                                                    pageIndexOneBased = snapshot.activePageIndexInCurrentChapter + 1,
+                                                    anchor = continuousScrollAnchor,
+                                                    createdAtElapsedMs = SystemClock.elapsedRealtime(),
+                                                )
+                                            }
+                                            val permille = if (totalBlocks <= 1) {
+                                                1000
+                                            } else {
+                                                ((targetPos.toFloat() / (totalBlocks - 1).toFloat()) * 1000f)
+                                                    .roundToInt()
+                                                    .coerceIn(0, 1000)
+                                            }
+                                            val targetAnchor = ReadingAnchor(
+                                                paragraphIndex = targetBlock.blockIndex,
+                                                charOffset = 0,
+                                                progressPermille = permille,
                                             )
+                                            continuousScrollAnchor = targetAnchor
+                                            continuousScrollProgress = permille / 1000f
+                                            dispatchContinuousScrollJump(
+                                                cid = activeChapterAst?.cid ?: launchRequest.cid,
+                                                paragraphIndex = targetBlock.blockIndex,
+                                                animated = false,
+                                            )
+                                            coroutineScope.launch {
+                                                windowBuffer.syncActiveAnchorInCurrentChapter(targetAnchor)
+                                                snapshot.activeChapter?.let { ch ->
+                                                    persistReadingProgress(ch, targetAnchor)
+                                                }
+                                            }
                                         }
-                                        val targetVirtual = snapshot.prevPageCount + targetLocalPage
-                                        coroutineScope.launch {
-                                            pagerState.scrollToPage(targetVirtual)
-                                            windowBuffer.onVirtualPageSettled(targetVirtual)
+                                    },
+                                    modifier = Modifier.testTag(ReaderTestTags.HUD_SCRUBBER_SLIDER),
+                                )
+                            }
+                        } else {
+                            val totalPagesInCur = snapshot.currentPageCount.coerceAtLeast(1)
+                            val curPageZeroBased = snapshot.activePageIndexInCurrentChapter
+                            var scrubPreviewIndex by remember(curPageZeroBased, totalPagesInCur) {
+                                mutableFloatStateOf(curPageZeroBased.toFloat())
+                            }
+
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                modifier = Modifier.weight(1f),
+                            ) {
+                                Text(
+                                    text = "第 ${scrubPreviewIndex.roundToInt() + 1} / $totalPagesInCur 页",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                                Slider(
+                                    value = scrubPreviewIndex,
+                                    enabled = totalPagesInCur > 1,
+                                    valueRange = 0f..(totalPagesInCur - 1).coerceAtLeast(1).toFloat(),
+                                    onValueChange = { raw ->
+                                        scrubPreviewIndex = raw
+                                    },
+                                    onValueChangeFinished = {
+                                        val targetLocalPage = scrubPreviewIndex.roundToInt()
+                                            .coerceIn(0, totalPagesInCur - 1)
+                                        if (targetLocalPage != curPageZeroBased) {
+                                            activeFocalHighlight = null
+                                            val prevChapter = snapshot.activeChapter
+                                            val prevPage = snapshot.activeReaderPage
+                                            if (prevChapter != null && prevPage != null) {
+                                                undoJumpState = ReaderUndoJumpState(
+                                                    cid = prevChapter.cid,
+                                                    pageIndexOneBased = curPageZeroBased + 1,
+                                                    anchor = prevPage.toBookmarkOrProgressAnchor(),
+                                                    createdAtElapsedMs = SystemClock.elapsedRealtime(),
+                                                )
+                                            }
+                                            val targetVirtual = snapshot.prevPageCount + targetLocalPage
+                                            coroutineScope.launch {
+                                                pagerState.scrollToPage(targetVirtual)
+                                                windowBuffer.onVirtualPageSettled(targetVirtual)
+                                            }
                                         }
-                                    }
-                                },
-                                modifier = Modifier.testTag(ReaderTestTags.HUD_SCRUBBER_SLIDER),
-                            )
+                                    },
+                                    modifier = Modifier.testTag(ReaderTestTags.HUD_SCRUBBER_SLIDER),
+                                )
+                            }
                         }
 
                         TextButton(
@@ -1563,7 +1932,12 @@ fun UnifiedReaderScreen(
                             } else {
                                 val ast = activeChapterAst
                                 if (ast != null) {
-                                    val startBlock = snapshot.activeReaderPage?.startAnchor?.paragraphIndex ?: 0
+                                    val startBlock =
+                                        if (preferences.readerPageTurnMode == ReaderPageTurnMode.CONTINUOUS_SCROLL) {
+                                            continuousScrollAnchor.paragraphIndex
+                                        } else {
+                                            snapshot.activeReaderPage?.startAnchor?.paragraphIndex ?: 0
+                                        }
                                     isHudVisible = false
                                     ttsController.startChapter(
                                         ast = ast,
@@ -1581,11 +1955,12 @@ fun UnifiedReaderScreen(
                         tag = ReaderTestTags.ACTION_DAY_NIGHT,
                         onClick = {
                             val nextPreset = if (isCurrentlyNight) {
-                                ReaderPaperPreset.PARCHMENT
+                                preferences.lastDayPaperPreset.takeIf { !it.isDark }
+                                    ?: ReaderPaperPreset.PARCHMENT
                             } else {
                                 ReaderPaperPreset.CARBON_NIGHT
                             }
-                            onReaderPaperPresetChanged(nextPreset)
+                            applyPaperPresetAndSyncGlobalTheme(nextPreset)
                         },
                     )
                 }
@@ -1708,6 +2083,19 @@ fun UnifiedReaderScreen(
                                 .fillMaxWidth()
                                 .einkHairlineBorder(MaterialTheme.shapes.medium)
                                 .clickable {
+                                    if (mode == ReaderPageTurnMode.CONTINUOUS_SCROLL &&
+                                        preferences.readerPageTurnMode != ReaderPageTurnMode.CONTINUOUS_SCROLL
+                                    ) {
+                                        val curAnchor = snapshot.activeReaderPage?.startAnchor ?: ReadingAnchor()
+                                        continuousScrollAnchor = curAnchor
+                                        snapshot.activeChapter?.cid?.let { curCid ->
+                                            dispatchContinuousScrollJump(
+                                                cid = curCid,
+                                                paragraphIndex = curAnchor.paragraphIndex,
+                                                animated = false,
+                                            )
+                                        }
+                                    }
                                     onReaderPageTurnModeChanged(mode)
                                     isPageModeSheetOpen = false
                                 }
@@ -1768,7 +2156,10 @@ fun UnifiedReaderScreen(
                         )
                     } else {
                         LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            items(items = novelBookmarks, key = { it.id }) { note ->
+                            itemsIndexed(
+                                items = novelBookmarks,
+                                key = { _, note -> note.id },
+                            ) { index, note ->
                                 Card(
                                     modifier = Modifier
                                         .fillMaxWidth()
@@ -1776,14 +2167,20 @@ fun UnifiedReaderScreen(
                                         .clickable {
                                             isBookmarksSheetOpen = false
                                             isHudVisible = false
+                                            activeFocalHighlight = ActiveFocalHighlightState(
+                                                cid = note.cid,
+                                                blockIndex = note.startParagraph,
+                                            )
                                             jumpToChapterWithUndo(
                                                 targetCid = note.cid,
                                                 targetAnchor = ReadingAnchor(
                                                     paragraphIndex = note.startParagraph,
                                                     charOffset = note.startChar,
                                                 ),
+                                                clearFocalHighlight = false,
                                             )
-                                        },
+                                        }
+                                        .testTag("${ReaderTestTags.BOOKMARK_ITEM_PREFIX}$index"),
                                 ) {
                                     Row(
                                         verticalAlignment = Alignment.CenterVertically,
@@ -1809,6 +2206,11 @@ fun UnifiedReaderScreen(
                                         TooltipIconButton(
                                             tooltipText = deleteBookmarkLabel,
                                             onClick = {
+                                                if (activeFocalHighlight?.cid == note.cid &&
+                                                    activeFocalHighlight?.blockIndex == note.startParagraph
+                                                ) {
+                                                    activeFocalHighlight = null
+                                                }
                                                 coroutineScope.launch(ioDispatcher) {
                                                     database.bookmarkNoteDao().deleteBookmarkNoteById(note.id)
                                                 }
@@ -1839,12 +2241,19 @@ fun UnifiedReaderScreen(
                 onJumpToResult = { hit ->
                     isSearchSheetOpen = false
                     isHudVisible = false
+                    activeFocalHighlight = ActiveFocalHighlightState(
+                        cid = hit.cid,
+                        blockIndex = hit.match.blockIndex,
+                        startChar = hit.match.startCharOffset,
+                        endCharExclusive = hit.match.endCharOffsetExclusive,
+                    )
                     jumpToChapterWithUndo(
                         targetCid = hit.cid,
                         targetAnchor = ReadingAnchor(
                             paragraphIndex = hit.match.blockIndex,
                             charOffset = hit.match.startCharOffset,
                         ),
+                        clearFocalHighlight = false,
                     )
                 },
                 onDismiss = { isSearchSheetOpen = false },

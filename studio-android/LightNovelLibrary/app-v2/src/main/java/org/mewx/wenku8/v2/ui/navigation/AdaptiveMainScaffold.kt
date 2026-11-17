@@ -1030,6 +1030,7 @@ fun AdaptiveMainScaffold(
                                     onReaderCustomBackgroundPathChanged = onReaderCustomBackgroundPathChanged,
                                     onReaderPageTurnModeChanged = onReaderPageTurnModeChanged,
                                     onReaderPaperPresetChanged = onReaderPaperPresetChanged,
+                                    onThemeModeSelected = onThemeModeSelected,
                                     onReaderKeepScreenOnChanged = onReaderKeepScreenOnChanged,
                                     onReaderEdgeBrightnessDragChanged = onReaderEdgeBrightnessDragChanged,
                                     onVolumeKeyPagingChanged = onVolumeKeyPagingChanged,

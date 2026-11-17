@@ -5,6 +5,10 @@ import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.Color as AndroidColor
 import android.graphics.Rect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertTextEquals
@@ -44,6 +48,7 @@ import org.mewx.wenku8.v2.data.repository.NovelTocSyncRepository
 import org.mewx.wenku8.v2.data.repository.ParsedChapterToc
 import org.mewx.wenku8.v2.data.repository.ParsedVolumeToc
 import org.mewx.wenku8.v2.reader.engine.DeterministicCellLineBreaker
+import org.mewx.wenku8.v2.reader.model.ReaderPageTurnMode
 import org.mewx.wenku8.v2.ui.detail.ReaderLaunchRequest
 import org.mewx.wenku8.v2.ui.theme.Wenku8ExpressiveTheme
 import org.mewx.wenku8.v2.ui.theme.Wenku8ThemeMode
@@ -454,6 +459,336 @@ class ArtbookSearchAndTtsTest {
                 .onAllNodesWithTag(ReaderTestTags.TTS_CONTROLLER_BAR)
                 .fetchSemanticsNodes()
                 .size,
+        )
+    }
+
+    @Test
+    fun ttsReadAloud_highlightsActiveParagraph_andAutoFollowsAcrossPagesInAllSixModes() {
+        seedMultiPageTwoChapterNovel()
+        var activeMode by mutableStateOf(ReaderPageTurnMode.COVER_SLIDE)
+        var modeIteration by mutableStateOf(0)
+        var activeSpeechEngine by mutableStateOf(FakeSpeechEngineAdapter())
+
+        composeTestRule.setContent {
+            Wenku8ExpressiveTheme(themeMode = Wenku8ThemeMode.CLASSIC_BLUE) {
+                key(activeMode, modeIteration) {
+                    if (modeIteration > 0) {
+                        UnifiedReaderScreen(
+                            launchRequest = ReaderLaunchRequest(
+                                aid = 3096,
+                                novelTitle = "银翼编年史",
+                                vid = 801,
+                                volumeTitle = "第一卷",
+                                cid = 8101,
+                                chapterTitle = "第一章 星图",
+                                initialParagraphIndex = 0,
+                                startWithTts = true,
+                            ),
+                            database = database,
+                            catalogGateway = fakeGateway,
+                            novelTocSyncRepository = tocSyncRepository,
+                            preferences = Wenku8UserPreferences(readerPageTurnMode = activeMode),
+                            onReaderTypographyChanged = { _, _, _, _ -> },
+                            onNavigateBack = {},
+                            lineBreaker = DeterministicCellLineBreaker,
+                            speechEngineAdapter = activeSpeechEngine,
+                            ioDispatcher = Dispatchers.Main.immediate,
+                            computeDispatcher = Dispatchers.Main.immediate,
+                        )
+                    }
+                }
+            }
+        }
+
+        for (mode in ReaderPageTurnMode.entries) {
+            val engineForMode = FakeSpeechEngineAdapter()
+            activeSpeechEngine = engineForMode
+            activeMode = mode
+            modeIteration += 1
+            composeTestRule.waitForIdle()
+
+            composeTestRule.waitUntil(timeoutMillis = 5_000L) {
+                composeTestRule
+                    .onAllNodesWithTag(ReaderTestTags.TTS_CONTROLLER_BAR)
+                    .fetchSemanticsNodes()
+                    .isNotEmpty()
+            }
+
+            // Block 0 (chapter title) is spoken first and highlighted on the active viewport!
+            composeTestRule.waitUntil(timeoutMillis = 5_000L) {
+                composeTestRule
+                    .onAllNodesWithTag(
+                        "${ReaderTestTags.TTS_HIGHLIGHTED_BLOCK_PREFIX}0",
+                        useUnmergedTree = true,
+                    )
+                    .fetchSemanticsNodes()
+                    .isNotEmpty()
+            }
+
+            // Advance 22 utterances to reach deep blockIndex = 22 (off initial page/scroll viewport)
+            repeat(22) {
+                engineForMode.completeActiveUtterance()
+                composeTestRule.waitForIdle()
+            }
+
+            // Verify the reader automatically flipped/scrolled so block 22 is now visible & highlighted!
+            composeTestRule.waitUntil(timeoutMillis = 5_000L) {
+                composeTestRule
+                    .onAllNodesWithTag(
+                        "${ReaderTestTags.TTS_HIGHLIGHTED_BLOCK_PREFIX}22",
+                        useUnmergedTree = true,
+                    )
+                    .fetchSemanticsNodes()
+                    .isNotEmpty()
+            }
+            assertEquals(
+                "Block 0 should no longer be highlighted once TTS reaches block 22 in mode=$mode",
+                0,
+                composeTestRule
+                    .onAllNodesWithTag(
+                        "${ReaderTestTags.TTS_HIGHLIGHTED_BLOCK_PREFIX}0",
+                        useUnmergedTree = true,
+                    )
+                    .fetchSemanticsNodes()
+                    .size,
+            )
+
+            composeTestRule.onNodeWithTag(ReaderTestTags.TTS_STOP_BUTTON).performClick()
+            composeTestRule.waitForIdle()
+        }
+    }
+
+    @Test
+    fun inBookSearch_jumpsToTargetParagraph_andHighlightsMatchInAllSixModes() {
+        seedMultiPageTwoChapterNovel()
+        var activeMode by mutableStateOf(ReaderPageTurnMode.COVER_SLIDE)
+        var modeIteration by mutableStateOf(0)
+
+        composeTestRule.setContent {
+            Wenku8ExpressiveTheme(themeMode = Wenku8ThemeMode.CLASSIC_BLUE) {
+                key(activeMode, modeIteration) {
+                    UnifiedReaderScreen(
+                        launchRequest = ReaderLaunchRequest(
+                            aid = 3096,
+                            novelTitle = "银翼编年史",
+                            vid = 801,
+                            volumeTitle = "第一卷",
+                            cid = 8101,
+                            chapterTitle = "第一章 星图",
+                            initialParagraphIndex = 0,
+                        ),
+                        database = database,
+                        catalogGateway = fakeGateway,
+                        novelTocSyncRepository = tocSyncRepository,
+                        preferences = Wenku8UserPreferences(readerPageTurnMode = activeMode),
+                        onReaderTypographyChanged = { _, _, _, _ -> },
+                        onNavigateBack = {},
+                        lineBreaker = DeterministicCellLineBreaker,
+                        ioDispatcher = Dispatchers.Main.immediate,
+                        computeDispatcher = Dispatchers.Main.immediate,
+                    )
+                }
+            }
+        }
+
+        for (mode in ReaderPageTurnMode.entries) {
+            activeMode = mode
+            modeIteration += 1
+            composeTestRule.waitForIdle()
+
+            val viewportTag = if (mode == ReaderPageTurnMode.CONTINUOUS_SCROLL) {
+                ReaderTestTags.CONTINUOUS_SCROLL_LIST
+            } else {
+                ReaderTestTags.PAGED_HORIZONTAL_PAGER
+            }
+            composeTestRule.waitUntil(timeoutMillis = 5_000L) {
+                composeTestRule.onAllNodesWithTag(viewportTag).fetchSemanticsNodes().isNotEmpty()
+            }
+
+            // Open HUD -> open In-Book Search -> search for "星界秘银罗盘" (at deep blockIndex = 22)
+            composeTestRule.onNodeWithTag(viewportTag).performTouchInput {
+                click(center)
+            }
+            composeTestRule.onNodeWithTag(ReaderTestTags.HUD_SEARCH_BUTTON).performClick()
+            composeTestRule.onNodeWithTag(ReaderTestTags.SEARCH_INPUT).performTextInput("星界秘银罗盘")
+            composeTestRule.waitUntil(timeoutMillis = 5_000L) {
+                composeTestRule
+                    .onAllNodesWithTag("${ReaderTestTags.SEARCH_RESULT_PREFIX}0")
+                    .fetchSemanticsNodes()
+                    .isNotEmpty()
+            }
+
+            // Tap result -> reader jumps to block 22 and renders focal highlight in ALL 6 modes!
+            composeTestRule.onNodeWithTag("${ReaderTestTags.SEARCH_RESULT_PREFIX}0").performClick()
+            composeTestRule.waitForIdle()
+
+            composeTestRule.waitUntil(timeoutMillis = 5_000L) {
+                composeTestRule
+                    .onAllNodesWithTag(
+                        "${ReaderTestTags.FOCAL_HIGHLIGHTED_BLOCK_PREFIX}22",
+                        useUnmergedTree = true,
+                    )
+                    .fetchSemanticsNodes()
+                    .isNotEmpty()
+            }
+        }
+    }
+
+    @Test
+    fun bookmarks_addNavigateAwayAndJumpBack_highlightsBookmarkedParagraphInAllSixModes() {
+        seedMultiPageTwoChapterNovel()
+        var activeMode by mutableStateOf(ReaderPageTurnMode.COVER_SLIDE)
+        var modeIteration by mutableStateOf(0)
+
+        composeTestRule.setContent {
+            Wenku8ExpressiveTheme(themeMode = Wenku8ThemeMode.CLASSIC_BLUE) {
+                key(activeMode, modeIteration) {
+                    UnifiedReaderScreen(
+                        launchRequest = ReaderLaunchRequest(
+                            aid = 3096,
+                            novelTitle = "银翼编年史",
+                            vid = 801,
+                            volumeTitle = "第一卷",
+                            cid = 8101,
+                            chapterTitle = "第一章 星图",
+                            initialParagraphIndex = 22,
+                        ),
+                        database = database,
+                        catalogGateway = fakeGateway,
+                        novelTocSyncRepository = tocSyncRepository,
+                        preferences = Wenku8UserPreferences(readerPageTurnMode = activeMode),
+                        onReaderTypographyChanged = { _, _, _, _ -> },
+                        onNavigateBack = {},
+                        lineBreaker = DeterministicCellLineBreaker,
+                        ioDispatcher = Dispatchers.Main.immediate,
+                        computeDispatcher = Dispatchers.Main.immediate,
+                    )
+                }
+            }
+        }
+
+        for (mode in ReaderPageTurnMode.entries) {
+            runBlocking {
+                database.bookmarkNoteDao().getAllBookmarkNotes().forEach { note ->
+                    database.bookmarkNoteDao().deleteBookmarkNoteById(note.id)
+                }
+            }
+            activeMode = mode
+            modeIteration += 1
+            composeTestRule.waitForIdle()
+
+            val viewportTag = if (mode == ReaderPageTurnMode.CONTINUOUS_SCROLL) {
+                ReaderTestTags.CONTINUOUS_SCROLL_LIST
+            } else {
+                ReaderTestTags.PAGED_HORIZONTAL_PAGER
+            }
+            composeTestRule.waitUntil(timeoutMillis = 5_000L) {
+                composeTestRule.onAllNodesWithTag(viewportTag).fetchSemanticsNodes().isNotEmpty()
+            }
+            composeTestRule.waitForIdle()
+
+            // 1. Open HUD at deep paragraph 22 and add bookmark
+            composeTestRule.onNodeWithTag(viewportTag).performTouchInput {
+                click(center)
+            }
+            composeTestRule.onNodeWithTag(ReaderTestTags.HUD_BOOKMARK_TOGGLE).performClick()
+            composeTestRule.waitForIdle()
+
+            val createdNotes = runBlocking {
+                database.bookmarkNoteDao().getAllBookmarkNotes().filter { it.aid == 3096 }
+            }
+            assertEquals("Expected 1 bookmark in mode=$mode", 1, createdNotes.size)
+            val expectedHighlightedBlock = createdNotes.single().startParagraph
+            assertTrue(
+                "Expected deep bookmarked block (>= 15) in mode=$mode, got $expectedHighlightedBlock",
+                expectedHighlightedBlock >= 15,
+            )
+
+            // 2. Navigate away to Chapter 2 (cid = 8102)
+            composeTestRule.onNodeWithTag(ReaderTestTags.HUD_NEXT_CHAPTER_BUTTON).performClick()
+            composeTestRule.waitForIdle()
+            assertEquals(8102, runBlocking { database.readingProgressDao().getProgressForNovel(3096)?.cid })
+
+            // 3. Open Bookmarks Sheet from Chapter 2 and jump back to the saved bookmark!
+            composeTestRule.onNodeWithTag(ReaderTestTags.ACTION_BOOKMARKS).performClick()
+            composeTestRule.onNodeWithTag("${ReaderTestTags.BOOKMARK_ITEM_PREFIX}0").performClick()
+            composeTestRule.waitForIdle()
+
+            assertEquals(8101, runBlocking { database.readingProgressDao().getProgressForNovel(3096)?.cid })
+            composeTestRule.waitUntil(timeoutMillis = 5_000L) {
+                composeTestRule
+                    .onAllNodesWithTag(
+                        "${ReaderTestTags.FOCAL_HIGHLIGHTED_BLOCK_PREFIX}$expectedHighlightedBlock",
+                        useUnmergedTree = true,
+                    )
+                    .fetchSemanticsNodes()
+                    .isNotEmpty()
+            }
+        }
+    }
+
+    private fun seedMultiPageTwoChapterNovel() = runBlocking {
+        database.novelDao().upsertNovel(
+            NovelEntity(
+                aid = 3096,
+                title = "银翼编年史",
+                author = "测试作者",
+                inBookshelf = true,
+                metaSyncedAtMs = 1_000L,
+            ),
+        )
+        tocSyncRepository.syncNovelIndexAtomically(
+            aid = 3096,
+            language = Wenku8API.AppLanguage.SC,
+            requestStartedAtMs = 2_000L,
+            parsedVolumes = listOf(
+                ParsedVolumeToc(
+                    vid = 801,
+                    volumeTitle = "第一卷",
+                    chapters = listOf(
+                        ParsedChapterToc(cid = 8101, chapterTitle = "第一章 星图"),
+                        ParsedChapterToc(cid = 8102, chapterTitle = "第二章 远航"),
+                    ),
+                ),
+            ),
+        )
+        val multiPageCh1 = buildString {
+            appendLine("第一卷 第一章 星图")
+            for (idx in 1..28) {
+                if (idx == 22) {
+                    appendLine("　　第22段关键剧情：在苍穹观测台的穹顶之下，少女举起了古老的星界秘银罗盘，指针骤然指向北方群星。")
+                } else {
+                    appendLine("　　第${idx}段长篇测试正文，用于在横排翻页、仿真卷曲、弹簧滑动、上下卷轴、日式竖排与墨水屏直切六种翻页模式下构建充足的多页阅读高度。")
+                }
+            }
+        }
+        val ch2 = buildString {
+            appendLine("第一卷 第二章 远航")
+            for (idx in 1..10) {
+                appendLine("　　第二章第${idx}段测试正文，用于验证跨章跳转后再通过书签返回并高亮。")
+            }
+        }
+        database.chapterContentDao().upsertChapterContent(
+            ChapterContentEntity(
+                cid = 8101,
+                aid = 3096,
+                contentLang = Wenku8API.AppLanguage.SC.name,
+                contentText = multiPageCh1,
+                byteLength = multiPageCh1.toByteArray().size,
+                sha256Checksum = "sha_8101",
+                downloadedAtMs = 1_700_000_000_000L,
+            ),
+        )
+        database.chapterContentDao().upsertChapterContent(
+            ChapterContentEntity(
+                cid = 8102,
+                aid = 3096,
+                contentLang = Wenku8API.AppLanguage.SC.name,
+                contentText = ch2,
+                byteLength = ch2.toByteArray().size,
+                sha256Checksum = "sha_8102",
+                downloadedAtMs = 1_700_000_000_000L,
+            ),
         )
     }
 

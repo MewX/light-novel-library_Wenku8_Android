@@ -1,18 +1,29 @@
 package org.mewx.wenku8.v2.ui.reader
 
+import android.app.Activity
+import android.content.ContextWrapper
+import android.content.Intent
 import android.view.KeyEvent as AndroidKeyEvent
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import kotlinx.coroutines.Dispatchers
@@ -355,6 +366,310 @@ class UnifiedReaderScreenTest {
             composeTestRule.waitForIdle()
             composeTestRule.onNodeWithTag(ReaderTestTags.PAGED_HORIZONTAL_PAGER).assertIsDisplayed()
         }
+    }
+
+    @Test
+    fun coverSlideShadow_movesRightToLeftFollowingUpperPageEdge() {
+        // At rest (0f) and completed (-1f), no shadow should be cast.
+        assertNull(computeCoverSlideShadowSpec(pageOffset = 0f, viewportWidthPx = 1000f, shadowWidthPx = 24f))
+        assertNull(computeCoverSlideShadowSpec(pageOffset = -1f, viewportWidthPx = 1000f, shadowWidthPx = 24f))
+
+        // Swiping left to advance page:
+        // - 10% swipe -> incoming page has pageOffset = -0.90f -> upper page right edge is at x = 900f
+        // - 50% swipe -> incoming page has pageOffset = -0.50f -> upper page right edge is at x = 500f
+        // - 90% swipe -> incoming page has pageOffset = -0.10f -> upper page right edge is at x = 100f
+        val spec10 = computeCoverSlideShadowSpec(pageOffset = -0.90f, viewportWidthPx = 1000f, shadowWidthPx = 24f)
+        val spec50 = computeCoverSlideShadowSpec(pageOffset = -0.50f, viewportWidthPx = 1000f, shadowWidthPx = 24f)
+        val spec90 = computeCoverSlideShadowSpec(pageOffset = -0.10f, viewportWidthPx = 1000f, shadowWidthPx = 24f)
+
+        assertNotNull(spec10)
+        assertNotNull(spec50)
+        assertNotNull(spec90)
+
+        assertEquals(900f, spec10!!.startX, 0.01f)
+        assertEquals(500f, spec50!!.startX, 0.01f)
+        assertEquals(100f, spec90!!.startX, 0.01f)
+        assertTrue(spec10.startX > spec50.startX && spec50.startX > spec90.startX)
+        assertEquals(24f, spec50.widthPx, 0.01f)
+    }
+
+    @Test
+    fun liveSystemClock_updatesOnTimeChangedAndTimeTickInPagedAndContinuousModes() {
+        seedTwoChapterNovel()
+        val cal = java.util.Calendar.getInstance().apply {
+            set(java.util.Calendar.HOUR_OF_DAY, 9)
+            set(java.util.Calendar.MINUTE, 15)
+            set(java.util.Calendar.SECOND, 0)
+            set(java.util.Calendar.MILLISECOND, 0)
+        }
+        val fakeMillis = java.util.concurrent.atomic.AtomicLong(cal.timeInMillis)
+        var currentPrefs by mutableStateOf(Wenku8UserPreferences())
+
+        composeTestRule.setContent {
+            CompositionLocalProvider(LocalReaderClockMillisProvider provides { fakeMillis.get() }) {
+                Wenku8ExpressiveTheme(themeMode = currentPrefs.themeMode) {
+                    UnifiedReaderScreen(
+                        launchRequest = ReaderLaunchRequest(
+                            aid = 1587,
+                            vid = 501,
+                            cid = 6001,
+                            novelTitle = "无职转生",
+                            volumeTitle = "第一卷",
+                            chapterTitle = "第一章 序章",
+                        ),
+                        database = database,
+                        catalogGateway = fakeGateway,
+                        novelTocSyncRepository = tocSyncRepository,
+                        preferences = currentPrefs,
+                        onReaderTypographyChanged = { _, _, _, _ -> },
+                        onReaderPageTurnModeChanged = { mode ->
+                            currentPrefs = currentPrefs.copy(readerPageTurnMode = mode)
+                        },
+                        onNavigateBack = {},
+                        lineBreaker = DeterministicCellLineBreaker,
+                        ioDispatcher = Dispatchers.Main.immediate,
+                        computeDispatcher = Dispatchers.Main.immediate,
+                    )
+                }
+            }
+        }
+
+        composeTestRule.waitUntil(5_000) {
+            composeTestRule
+                .onAllNodesWithTag(ReaderTestTags.READER_CLOCK_LABEL)
+                .fetchSemanticsNodes()
+                .isNotEmpty()
+        }
+        composeTestRule.onNodeWithTag(ReaderTestTags.READER_CLOCK_LABEL).assertTextEquals("09:15")
+
+        // Advance system clock to 14:42 and broadcast ACTION_TIME_CHANGED -> updates in paged mode without page flip!
+        cal.set(java.util.Calendar.HOUR_OF_DAY, 14)
+        cal.set(java.util.Calendar.MINUTE, 42)
+        fakeMillis.set(cal.timeInMillis)
+        ApplicationProvider.getApplicationContext<android.content.Context>()
+            .sendBroadcast(Intent(Intent.ACTION_TIME_CHANGED))
+        composeTestRule.waitForIdle()
+        org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idle()
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag(ReaderTestTags.READER_CLOCK_LABEL).assertTextEquals("14:42")
+
+        // Switch to CONTINUOUS_SCROLL and broadcast ACTION_TIME_TICK at 23:08 -> updates live in scroll mode too!
+        currentPrefs = currentPrefs.copy(readerPageTurnMode = ReaderPageTurnMode.CONTINUOUS_SCROLL)
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag(ReaderTestTags.READER_CLOCK_LABEL).assertTextEquals("14:42")
+
+        cal.set(java.util.Calendar.HOUR_OF_DAY, 23)
+        cal.set(java.util.Calendar.MINUTE, 8)
+        fakeMillis.set(cal.timeInMillis)
+        ApplicationProvider.getApplicationContext<android.content.Context>()
+            .sendBroadcast(Intent(Intent.ACTION_TIME_TICK))
+        composeTestRule.waitForIdle()
+        org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idle()
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag(ReaderTestTags.READER_CLOCK_LABEL).assertTextEquals("23:08")
+    }
+
+    @Test
+    fun continuousScrollMode_scrubberSliderJumpsToTargetParagraph_andUndoRestores() {
+        seedTwoChapterNovel()
+        var currentPrefs by mutableStateOf(
+            Wenku8UserPreferences(readerPageTurnMode = ReaderPageTurnMode.CONTINUOUS_SCROLL),
+        )
+
+        composeTestRule.setContent {
+            Wenku8ExpressiveTheme(themeMode = currentPrefs.themeMode) {
+                UnifiedReaderScreen(
+                    launchRequest = ReaderLaunchRequest(
+                        aid = 1587,
+                        vid = 501,
+                        cid = 6001,
+                        novelTitle = "无职转生",
+                        volumeTitle = "第一卷",
+                        chapterTitle = "第一章 序章",
+                    ),
+                    database = database,
+                    catalogGateway = fakeGateway,
+                    novelTocSyncRepository = tocSyncRepository,
+                    preferences = currentPrefs,
+                    onReaderTypographyChanged = { _, _, _, _ -> },
+                    onNavigateBack = {},
+                    lineBreaker = DeterministicCellLineBreaker,
+                    ioDispatcher = Dispatchers.Main.immediate,
+                    computeDispatcher = Dispatchers.Main.immediate,
+                )
+            }
+        }
+
+        composeTestRule.waitUntil(5_000) {
+            composeTestRule
+                .onAllNodesWithTag(ReaderTestTags.CONTINUOUS_SCROLL_LIST)
+                .fetchSemanticsNodes()
+                .isNotEmpty()
+        }
+        composeTestRule.waitForIdle()
+
+        val initialProgress = runBlocking { database.readingProgressDao().getProgressForNovel(1587) }
+        assertNotNull(initialProgress)
+        assertEquals(0, initialProgress!!.paragraphIndex)
+
+        // Tap continuous scroll viewport to open HUD
+        composeTestRule.onNodeWithTag(ReaderTestTags.CONTINUOUS_SCROLL_LIST).performClick()
+        composeTestRule.onNodeWithTag(ReaderTestTags.HUD_SCRUBBER_SLIDER).assertIsDisplayed()
+
+        // Pause auto-advance so the 5s Undo Jump Pill stays visible, then scrub to ~85% of the chapter!
+        composeTestRule.mainClock.autoAdvance = false
+        composeTestRule.onNodeWithTag(ReaderTestTags.HUD_SCRUBBER_SLIDER).performTouchInput {
+            down(Offset(width * 0.08f, centerY))
+            moveTo(Offset(width * 0.85f, centerY))
+            up()
+        }
+        composeTestRule.mainClock.advanceTimeBy(300L)
+
+        val scrubbedProgress = runBlocking { database.readingProgressDao().getProgressForNovel(1587) }
+        assertNotNull(scrubbedProgress)
+        assertTrue(
+            "Expected continuous scroll scrubber to jump past paragraph 18, got ${scrubbedProgress!!.paragraphIndex}",
+            scrubbedProgress.paragraphIndex >= 18,
+        )
+        composeTestRule.onNodeWithTag(ReaderTestTags.UNDO_JUMP_PILL).assertIsDisplayed()
+
+        // Tap Undo Jump Pill -> restores scroll position back to paragraph 0!
+        composeTestRule.onNodeWithTag(ReaderTestTags.UNDO_JUMP_PILL).performClick()
+        composeTestRule.mainClock.autoAdvance = true
+        composeTestRule.waitForIdle()
+
+        val restoredProgress = runBlocking { database.readingProgressDao().getProgressForNovel(1587) }
+        assertNotNull(restoredProgress)
+        assertEquals(0, restoredProgress!!.paragraphIndex)
+    }
+
+    @Test
+    fun readerDayNightToggle_synchronizesGlobalThemeAndHidesSystemNavigationBar() {
+        seedTwoChapterNovel()
+        var currentPrefs by mutableStateOf(
+            Wenku8UserPreferences(
+                themeMode = Wenku8ThemeMode.CLASSIC_BLUE,
+                lastDayThemeMode = Wenku8ThemeMode.CLASSIC_BLUE,
+                readerPaperPreset = ReaderPaperPreset.EYE_CARE_GREEN,
+                lastDayPaperPreset = ReaderPaperPreset.EYE_CARE_GREEN,
+            ),
+        )
+        var isInReader by mutableStateOf(true)
+        var observedSurfaceColor by mutableStateOf(Color.White)
+        var hostActivityRef: Activity? = null
+
+        composeTestRule.setContent {
+            val ctx = LocalContext.current
+            val view = LocalView.current
+            hostActivityRef = generateSequence(ctx) { (it as? ContextWrapper)?.baseContext }
+                .filterIsInstance<Activity>()
+                .firstOrNull()
+            Wenku8ExpressiveTheme(themeMode = currentPrefs.themeMode) {
+                observedSurfaceColor = MaterialTheme.colorScheme.surfaceContainerHigh
+                if (isInReader) {
+                    UnifiedReaderScreen(
+                        launchRequest = ReaderLaunchRequest(
+                            aid = 1587,
+                            vid = 501,
+                            cid = 6001,
+                            novelTitle = "无职转生",
+                            volumeTitle = "第一卷",
+                            chapterTitle = "第一章 序章",
+                        ),
+                        database = database,
+                        catalogGateway = fakeGateway,
+                        novelTocSyncRepository = tocSyncRepository,
+                        preferences = currentPrefs,
+                        onReaderTypographyChanged = { _, _, _, _ -> },
+                        onReaderPaperPresetChanged = { preset ->
+                            currentPrefs = currentPrefs.copy(
+                                readerPaperPreset = preset,
+                                lastDayPaperPreset = if (!preset.isDark) preset else currentPrefs.lastDayPaperPreset,
+                            )
+                        },
+                        onThemeModeSelected = { nextTheme ->
+                            currentPrefs = currentPrefs.copy(
+                                themeMode = nextTheme,
+                                lastDayThemeMode = if (nextTheme == Wenku8ThemeMode.CLASSIC_BLUE ||
+                                    nextTheme == Wenku8ThemeMode.ARCHIVAL_DAY
+                                ) {
+                                    nextTheme
+                                } else {
+                                    currentPrefs.lastDayThemeMode
+                                },
+                            )
+                        },
+                        onNavigateBack = { isInReader = false },
+                        lineBreaker = DeterministicCellLineBreaker,
+                        ioDispatcher = Dispatchers.Main.immediate,
+                        computeDispatcher = Dispatchers.Main.immediate,
+                    )
+                } else {
+                    val _unused = view
+                }
+            }
+        }
+
+        composeTestRule.waitUntil(5_000) {
+            composeTestRule
+                .onAllNodesWithTag(ReaderTestTags.PAGED_HORIZONTAL_PAGER)
+                .fetchSemanticsNodes()
+                .isNotEmpty()
+        }
+        composeTestRule.waitForIdle()
+
+        // Verify Android Q+ navigation bar contrast enforcement is disabled and navigationBars() hidden in reader
+        val window = hostActivityRef?.window
+        assertNotNull(window)
+        assertFalse(window!!.isNavigationBarContrastEnforced)
+        val rootInsetsInReader = ViewCompat.getRootWindowInsets(window.decorView)
+        if (rootInsetsInReader != null) {
+            assertFalse(rootInsetsInReader.isVisible(WindowInsetsCompat.Type.navigationBars()))
+        }
+
+        // Initial HUD surface in Classic Blue is bright (day)
+        val initialLuminance =
+            0.299f * observedSurfaceColor.red +
+                0.587f * observedSurfaceColor.green +
+                0.114f * observedSurfaceColor.blue
+        assertTrue("Expected bright day surface initially, luminance=$initialLuminance", initialLuminance > 0.7f)
+
+        // Open HUD and tap Night Mode -> BOTH readerPaperPreset AND global themeMode switch to CARBON_NIGHT!
+        composeTestRule.onNodeWithTag(ReaderTestTags.PAGED_HORIZONTAL_PAGER).performTouchInput {
+            click(center)
+        }
+        composeTestRule.onNodeWithTag(ReaderTestTags.ACTION_DAY_NIGHT).performClick()
+        composeTestRule.waitForIdle()
+
+        assertEquals(ReaderPaperPreset.CARBON_NIGHT, currentPrefs.readerPaperPreset)
+        assertEquals(Wenku8ThemeMode.CARBON_NIGHT, currentPrefs.themeMode)
+        val nightLuminance =
+            0.299f * observedSurfaceColor.red +
+                0.587f * observedSurfaceColor.green +
+                0.114f * observedSurfaceColor.blue
+        assertTrue("Expected dark HUD surface in night mode, luminance=$nightLuminance", nightLuminance < 0.25f)
+
+        // Switch paper preset chip to PURE_AMOLED inside Typography Studio -> global theme updates to PURE_AMOLED!
+        composeTestRule.onNodeWithTag(ReaderTestTags.ACTION_TYPOGRAPHY).performClick()
+        composeTestRule
+            .onNodeWithTag("${ReaderTestTags.PAPER_PRESET_CHIP_PREFIX}${ReaderPaperPreset.PURE_AMOLED.name}")
+            .performClick()
+        composeTestRule.waitForIdle()
+        assertEquals(Wenku8ThemeMode.PURE_AMOLED, currentPrefs.themeMode)
+
+        // Close Typography Studio (tap upper viewport above panel; HUD remains open!) and tap Day/Night button again -> restores EYE_CARE_GREEN + CLASSIC_BLUE!
+        composeTestRule.onNodeWithTag(ReaderTestTags.PAGED_HORIZONTAL_PAGER).performTouchInput {
+            click(Offset(centerX, height * 0.22f))
+        }
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag(ReaderTestTags.ACTION_DAY_NIGHT).performClick()
+        composeTestRule.waitForIdle()
+        assertEquals(ReaderPaperPreset.EYE_CARE_GREEN, currentPrefs.readerPaperPreset)
+        assertEquals(Wenku8ThemeMode.CLASSIC_BLUE, currentPrefs.themeMode)
+
+        // Exit reader -> system bars are restored on dispose
+        isInReader = false
+        composeTestRule.waitForIdle()
     }
 
     private fun seedTwoChapterNovel() = runBlocking {

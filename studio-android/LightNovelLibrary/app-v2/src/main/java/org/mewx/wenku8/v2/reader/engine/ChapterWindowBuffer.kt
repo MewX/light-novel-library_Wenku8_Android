@@ -437,6 +437,40 @@ class ChapterWindowBuffer(
     }
 
     /**
+     * Synchronizes [ReaderWindowSnapshot.activeVirtualPageIndex] to [anchor] within `currentSlot`
+     * while scrolling in `CONTINUOUS_SCROLL` (`上下卷轴`) mode, keeping chapter progress, bookmark
+     * detection, 70% `nextSlot` pre-fetching, and mode-switch anchors aligned in real time.
+     */
+    suspend fun syncActiveAnchorInCurrentChapter(anchor: ReadingAnchor): ReaderWindowSnapshot {
+        var neighborToSchedule: Pair<OrderedChapterWithVolume, ReaderLayoutConfig>? = null
+        stateMutex.withLock {
+            val snap = _snapshotFlow.value
+            val config = snap.layoutConfig ?: return snap
+            val loadedCur = snap.currentSlot as? ChapterWindowSlot.Loaded ?: return snap
+            val resolvedLocalPage = loadedCur.layout.resolvePageIndexForAnchor(anchor)
+            val targetVirtual = snap.prevPageCount + resolvedLocalPage
+            val updated = if (targetVirtual != snap.activeVirtualPageIndex) {
+                snap.copy(activeVirtualPageIndex = targetVirtual).also { _snapshotFlow.value = it }
+            } else {
+                snap
+            }
+            val nextSlot = updated.nextSlot
+            if (nextSlot is ChapterWindowSlot.Unloaded &&
+                updated.currentChapterProgressRatio >= PREFETCH_THRESHOLD_RATIO
+            ) {
+                _snapshotFlow.value = updated.copy(
+                    nextSlot = ChapterWindowSlot.Loading(nextSlot.chapter),
+                )
+                neighborToSchedule = nextSlot.chapter to config
+            }
+        }
+        neighborToSchedule?.let { (neighborMeta, config) ->
+            scheduleNeighborSlotLoad(neighborMeta, config)
+        }
+        return _snapshotFlow.value
+    }
+
+    /**
      * Re-paginates all loaded slots in memory under [newConfig] while preserving the exact
      * paragraph & character reading anchor (`lockedAnchorOverride` or the current active page's
      * start anchor).

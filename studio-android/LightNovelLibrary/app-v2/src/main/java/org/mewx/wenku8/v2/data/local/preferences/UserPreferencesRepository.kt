@@ -63,6 +63,8 @@ data class Wenku8UserPreferences(
     val readerCustomBackgroundPath: String = "",
     val readerPageTurnMode: ReaderPageTurnMode = ReaderPageTurnMode.COVER_SLIDE,
     val readerPaperPreset: ReaderPaperPreset = ReaderPaperPreset.PARCHMENT,
+    val lastDayThemeMode: Wenku8ThemeMode = Wenku8ThemeMode.CLASSIC_BLUE,
+    val lastDayPaperPreset: ReaderPaperPreset = ReaderPaperPreset.PARCHMENT,
     val readerKeepScreenOn: Boolean = false,
     val readerEdgeBrightnessDragEnabled: Boolean = false,
     val volumeKeyPagingEnabled: Boolean = true,
@@ -87,6 +89,35 @@ data class Wenku8UserPreferences(
         const val MIN_READER_PAGE_EDGE_DISTANCE_DP = 0
         const val MAX_READER_PAGE_EDGE_DISTANCE_DP = 32
         const val DEFAULT_READER_PAGE_EDGE_DISTANCE_DP = 8
+    }
+}
+
+/**
+ * Computes the synchronized global [Wenku8ThemeMode] when the user selects [preset] inside the
+ * reader so switching Day/Night inside the reader updates global UI surfaces (HUD, bottom sheets,
+ * snackbars, and outer app screens) without any bright white flash.
+ */
+fun resolveSyncedThemeForPaperPreset(
+    preset: ReaderPaperPreset,
+    currentThemeMode: Wenku8ThemeMode,
+    lastDayThemeMode: Wenku8ThemeMode = Wenku8ThemeMode.CLASSIC_BLUE,
+): Wenku8ThemeMode = when (preset) {
+    ReaderPaperPreset.CARBON_NIGHT -> Wenku8ThemeMode.CARBON_NIGHT
+    ReaderPaperPreset.PURE_AMOLED -> Wenku8ThemeMode.PURE_AMOLED
+    ReaderPaperPreset.PARCHMENT,
+    ReaderPaperPreset.PURE_WHITE,
+    ReaderPaperPreset.EYE_CARE_GREEN,
+    -> when (currentThemeMode) {
+        Wenku8ThemeMode.CLASSIC_BLUE,
+        Wenku8ThemeMode.ARCHIVAL_DAY,
+        Wenku8ThemeMode.E_INK,
+        -> currentThemeMode
+        Wenku8ThemeMode.CARBON_NIGHT,
+        Wenku8ThemeMode.PURE_AMOLED,
+        Wenku8ThemeMode.SYSTEM,
+        -> lastDayThemeMode.takeIf {
+            it == Wenku8ThemeMode.CLASSIC_BLUE || it == Wenku8ThemeMode.ARCHIVAL_DAY
+        } ?: Wenku8ThemeMode.CLASSIC_BLUE
     }
 }
 
@@ -119,7 +150,42 @@ class UserPreferencesRepository(
 
     suspend fun setThemeMode(themeMode: Wenku8ThemeMode) {
         dataStore.edit { prefs ->
+            val curPaperPreset = enumValueOrDefault(
+                raw = prefs[Keys.READER_PAPER_PRESET],
+                default = ReaderPaperPreset.PARCHMENT,
+            )
+            val savedDayPaper = enumValueOrDefault(
+                raw = prefs[Keys.LAST_DAY_PAPER_PRESET],
+                default = ReaderPaperPreset.PARCHMENT,
+            ).takeIf { !it.isDark } ?: ReaderPaperPreset.PARCHMENT
+
             prefs[Keys.THEME_MODE] = themeMode.name
+            when (themeMode) {
+                Wenku8ThemeMode.CLASSIC_BLUE,
+                Wenku8ThemeMode.ARCHIVAL_DAY,
+                -> {
+                    prefs[Keys.LAST_DAY_THEME_MODE] = themeMode.name
+                    if (curPaperPreset.isDark) {
+                        prefs[Keys.READER_PAPER_PRESET] = savedDayPaper.name
+                    }
+                }
+                Wenku8ThemeMode.CARBON_NIGHT -> {
+                    if (!curPaperPreset.isDark) {
+                        prefs[Keys.LAST_DAY_PAPER_PRESET] = curPaperPreset.name
+                    }
+                    prefs[Keys.READER_PAPER_PRESET] = ReaderPaperPreset.CARBON_NIGHT.name
+                }
+                Wenku8ThemeMode.PURE_AMOLED -> {
+                    if (!curPaperPreset.isDark) {
+                        prefs[Keys.LAST_DAY_PAPER_PRESET] = curPaperPreset.name
+                    }
+                    prefs[Keys.READER_PAPER_PRESET] = ReaderPaperPreset.PURE_AMOLED.name
+                }
+                Wenku8ThemeMode.SYSTEM,
+                Wenku8ThemeMode.E_INK,
+                -> Unit
+            }
+
             // Selecting E_INK directly in the theme switcher also syncs the legacy eink_mode flag
             // so Reader and Profile toggles stay 100% consistent.
             if (themeMode == Wenku8ThemeMode.E_INK) {
@@ -204,7 +270,41 @@ class UserPreferencesRepository(
     }
 
     suspend fun setReaderPaperPreset(preset: ReaderPaperPreset) {
-        dataStore.edit { it[Keys.READER_PAPER_PRESET] = preset.name }
+        dataStore.edit { prefs ->
+            val curPaperPreset = enumValueOrDefault(
+                raw = prefs[Keys.READER_PAPER_PRESET],
+                default = ReaderPaperPreset.PARCHMENT,
+            )
+            val curTheme = enumValueOrDefault(
+                raw = prefs[Keys.THEME_MODE],
+                default = Wenku8ThemeMode.CLASSIC_BLUE,
+            )
+            val savedLastDayTheme = enumValueOrDefault(
+                raw = prefs[Keys.LAST_DAY_THEME_MODE],
+                default = Wenku8ThemeMode.CLASSIC_BLUE,
+            )
+
+            if (!curPaperPreset.isDark) {
+                prefs[Keys.LAST_DAY_PAPER_PRESET] = curPaperPreset.name
+            }
+            if (!preset.isDark) {
+                prefs[Keys.LAST_DAY_PAPER_PRESET] = preset.name
+            }
+            if (curTheme == Wenku8ThemeMode.CLASSIC_BLUE || curTheme == Wenku8ThemeMode.ARCHIVAL_DAY) {
+                prefs[Keys.LAST_DAY_THEME_MODE] = curTheme.name
+            }
+
+            prefs[Keys.READER_PAPER_PRESET] = preset.name
+            val syncedTheme = resolveSyncedThemeForPaperPreset(
+                preset = preset,
+                currentThemeMode = curTheme,
+                lastDayThemeMode = savedLastDayTheme,
+            )
+            prefs[Keys.THEME_MODE] = syncedTheme.name
+            if (preset.isDark && prefs[Keys.EINK_MODE_ENABLED] == true) {
+                prefs[Keys.EINK_MODE_ENABLED] = false
+            }
+        }
     }
 
     suspend fun setReaderKeepScreenOn(enabled: Boolean) {
@@ -379,6 +479,16 @@ class UserPreferencesRepository(
             raw = prefs[Keys.READER_PAPER_PRESET],
             default = ReaderPaperPreset.PARCHMENT,
         )
+        val lastDayTheme = enumValueOrDefault(
+            raw = prefs[Keys.LAST_DAY_THEME_MODE],
+            default = Wenku8ThemeMode.CLASSIC_BLUE,
+        ).takeIf {
+            it == Wenku8ThemeMode.CLASSIC_BLUE || it == Wenku8ThemeMode.ARCHIVAL_DAY
+        } ?: Wenku8ThemeMode.CLASSIC_BLUE
+        val lastDayPaper = enumValueOrDefault(
+            raw = prefs[Keys.LAST_DAY_PAPER_PRESET],
+            default = ReaderPaperPreset.PARCHMENT,
+        ).takeIf { !it.isDark } ?: ReaderPaperPreset.PARCHMENT
         val einkEnabled = prefs[Keys.EINK_MODE_ENABLED] ?: (themeMode == Wenku8ThemeMode.E_INK)
 
         return Wenku8UserPreferences(
@@ -416,6 +526,8 @@ class UserPreferencesRepository(
             readerCustomBackgroundPath = prefs[Keys.READER_CUSTOM_BG_PATH] ?: "",
             readerPageTurnMode = pageTurnMode,
             readerPaperPreset = paperPreset,
+            lastDayThemeMode = lastDayTheme,
+            lastDayPaperPreset = lastDayPaper,
             readerKeepScreenOn = prefs[Keys.READER_KEEP_SCREEN_ON] ?: false,
             readerEdgeBrightnessDragEnabled = prefs[Keys.READER_EDGE_BRIGHTNESS_DRAG] ?: false,
             volumeKeyPagingEnabled = prefs[Keys.VOLUME_KEY_PAGING_ENABLED] ?: true,
@@ -448,6 +560,8 @@ class UserPreferencesRepository(
         val READER_CUSTOM_BG_PATH = stringPreferencesKey("reader_custom_bg_path")
         val READER_PAGE_TURN_MODE = stringPreferencesKey("reader_page_turn_mode")
         val READER_PAPER_PRESET = stringPreferencesKey("reader_paper_preset")
+        val LAST_DAY_THEME_MODE = stringPreferencesKey("last_day_theme_mode")
+        val LAST_DAY_PAPER_PRESET = stringPreferencesKey("last_day_paper_preset")
         val READER_KEEP_SCREEN_ON = booleanPreferencesKey("reader_keep_screen_on")
         val READER_EDGE_BRIGHTNESS_DRAG = booleanPreferencesKey("reader_edge_brightness_drag")
         val VOLUME_KEY_PAGING_ENABLED = booleanPreferencesKey("volume_key_paging_enabled")

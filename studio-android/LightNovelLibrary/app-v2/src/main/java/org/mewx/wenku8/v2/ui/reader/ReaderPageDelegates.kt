@@ -1,5 +1,9 @@
 package org.mewx.wenku8.v2.ui.reader
 
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.graphics.Paint as AndroidPaint
 import android.graphics.RuntimeShader
 import android.graphics.Shader
@@ -40,15 +44,22 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
@@ -60,17 +71,26 @@ import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
+import androidx.core.content.ContextCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import coil3.compose.AsyncImage
 import kotlinx.coroutines.flow.distinctUntilChanged
 import org.mewx.wenku8.v2.data.media.WenkuImageRequests
@@ -93,6 +113,136 @@ import kotlin.math.abs
 import kotlin.math.roundToInt
 
 /**
+ * Injectable wall-clock provider for deterministic unit testing of [rememberSystemClockText].
+ */
+val LocalReaderClockMillisProvider = staticCompositionLocalOf<() -> Long> {
+    { System.currentTimeMillis() }
+}
+
+internal fun formatReaderClockMillis(epochMillis: Long): String =
+    SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(epochMillis))
+
+/**
+ * Live-updating system clock text (`HH:mm`) that automatically refreshes on
+ * [Intent.ACTION_TIME_TICK], [Intent.ACTION_TIME_CHANGED], [Intent.ACTION_TIMEZONE_CHANGED],
+ * and [Lifecycle.Event.ON_RESUME] even while the user remains on the same page.
+ */
+@Composable
+fun rememberSystemClockText(): String {
+    val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
+    val clockProvider = LocalReaderClockMillisProvider.current
+    var clockText by remember(clockProvider) {
+        mutableStateOf(formatReaderClockMillis(clockProvider()))
+    }
+
+    DisposableEffect(context, lifecycleOwner, clockProvider) {
+        val refreshClock = {
+            clockText = formatReaderClockMillis(clockProvider())
+        }
+        refreshClock()
+
+        val receiver = object : BroadcastReceiver() {
+            override fun onReceive(ctx: Context?, intent: Intent?) {
+                refreshClock()
+            }
+        }
+        val filter = IntentFilter().apply {
+            addAction(Intent.ACTION_TIME_TICK)
+            addAction(Intent.ACTION_TIME_CHANGED)
+            addAction(Intent.ACTION_TIMEZONE_CHANGED)
+        }
+        ContextCompat.registerReceiver(
+            context,
+            receiver,
+            filter,
+            ContextCompat.RECEIVER_NOT_EXPORTED,
+        )
+
+        val lifecycleObserver = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                refreshClock()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(lifecycleObserver)
+
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(lifecycleObserver)
+            runCatching { context.unregisterReceiver(receiver) }
+        }
+    }
+
+    return clockText
+}
+
+/**
+ * Unified paragraph & character-span highlight state shared across all 6 page-turn modes:
+ * - [ttsCid] / [ttsBlockIndex]: active paragraph currently spoken (or paused) in TTS read-aloud.
+ * - [focalCid] / [focalBlockIndex] / [focalStartChar] / [focalEndCharExclusive]: matched keyword or
+ *   bookmarked anchor highlighted upon jumping from In-Book Search or Bookmarks.
+ */
+data class ReaderContentHighlight(
+    val ttsCid: Int = 0,
+    val ttsBlockIndex: Int = -1,
+    val focalCid: Int = 0,
+    val focalBlockIndex: Int = -1,
+    val focalStartChar: Int = -1,
+    val focalEndCharExclusive: Int = -1,
+)
+
+/**
+ * Imperative scroll jump command for `CONTINUOUS_SCROLL` (`上下卷轴`) mode so scrubber drags,
+ * in-chapter search jumps, bookmark jumps, undo restores, volume keys, and TTS auto-follow scroll
+ * the `LazyColumn` deterministically within the same chapter.
+ */
+data class ContinuousScrollJumpCommand(
+    val revision: Long,
+    val cid: Int,
+    val paragraphIndex: Int,
+    val animated: Boolean = false,
+)
+
+/**
+ * Pure geometry specification for the drop shadow cast by the sliding upper page onto the revealed
+ * lower page in [ReaderPageTurnMode.COVER_SLIDE] (`覆盖翻页`).
+ */
+data class CoverSlideShadowSpec(
+    val startX: Float,
+    val widthPx: Float,
+    val startAlpha: Float,
+)
+
+/**
+ * Computes the horizontal drop-shadow placement on the pinned underlying page (`pageOffset` in
+ * `(-1f, 0f)`) during a `COVER_SLIDE` transition.
+ *
+ * When turning forward from Page `k` to Page `k + 1` with left-swipe progress `p` in `(0f, 1f)`:
+ * - Page `k` slides left so its right edge sits at `(1f - p) * viewportWidthPx` (moving **right to left**).
+ * - Page `k + 1` has `pageOffset = p - 1f` and is pinned at `x = 0f`.
+ * - Therefore Page `k`'s right edge in Page `k + 1`'s coordinates is `-pageOffset * viewportWidthPx`,
+ *   NOT `(1f + pageOffset) * viewportWidthPx`!
+ */
+internal fun computeCoverSlideShadowSpec(
+    pageOffset: Float,
+    viewportWidthPx: Float,
+    shadowWidthPx: Float,
+): CoverSlideShadowSpec? {
+    if (viewportWidthPx <= 0f || shadowWidthPx <= 0f) return null
+    if (pageOffset >= -0.001f || pageOffset <= -0.999f) return null
+    val upperPageRightEdgeX = (-pageOffset * viewportWidthPx).coerceIn(0f, viewportWidthPx)
+    val clampedWidth = shadowWidthPx.coerceAtMost(viewportWidthPx - upperPageRightEdgeX)
+    if (clampedWidth <= 0.5f) return null
+    val remainingFraction = (-pageOffset).coerceIn(0f, 1f)
+    val fadeNearExit = (remainingFraction * 4f).coerceIn(0f, 1f)
+    val alpha = (0.28f * fadeNearExit).coerceIn(0f, 0.28f)
+    return CoverSlideShadowSpec(
+        startX = upperPageRightEdgeX,
+        widthPx = clampedWidth,
+        startAlpha = alpha,
+    )
+}
+
+/**
  * Tap actions emitted by the 3x3 reader tap-zone matrix (`10-next-gen-reader-engine-architecture.md` §6).
  */
 enum class ReaderTapZoneAction {
@@ -112,7 +262,42 @@ data class ReaderVisualPalette(
     val isEinkMonochrome: Boolean,
     val customDayBackgroundFile: File?,
     val customTypeface: Typeface?,
-)
+) {
+    val ttsParagraphBgColor: Color
+        get() = when {
+            isEinkMonochrome -> Color(0xFFEAEAEA)
+            isDarkPalette -> Color(0xFF4F8BFF).copy(alpha = 0.22f)
+            else -> Color(0xFF1E64B4).copy(alpha = 0.13f)
+        }
+
+    val ttsAccentBarColor: Color
+        get() = when {
+            isEinkMonochrome -> Color(0xFF111111)
+            isDarkPalette -> Color(0xFF82B1FF)
+            else -> Color(0xFF1E64B4)
+        }
+
+    val focalParagraphBgColor: Color
+        get() = when {
+            isEinkMonochrome -> Color(0xFFF2F2F2)
+            isDarkPalette -> Color(0xFFFFB74D).copy(alpha = 0.14f)
+            else -> Color(0xFFFFB300).copy(alpha = 0.14f)
+        }
+
+    val focalKeywordBgColor: Color
+        get() = when {
+            isEinkMonochrome -> Color(0xFFD6D6D6)
+            isDarkPalette -> Color(0xFFFFB300).copy(alpha = 0.44f)
+            else -> Color(0xFFFFD54F).copy(alpha = 0.72f)
+        }
+
+    val focalAccentBarColor: Color
+        get() = when {
+            isEinkMonochrome -> Color(0xFF111111)
+            isDarkPalette -> Color(0xFFFFCA28)
+            else -> Color(0xFFE65100)
+        }
+}
 
 /**
  * Pure, unit-testable 9-zone tap resolver (`10-next-gen-reader-engine-architecture.md` §6):
@@ -228,6 +413,8 @@ fun ReaderViewportHost(
     paragraphDistanceDp: Int,
     pageEdgeDistanceDp: Int,
     leftEdgeBrightnessDragEnabled: Boolean,
+    contentHighlight: ReaderContentHighlight = ReaderContentHighlight(),
+    continuousScrollJumpCommand: ContinuousScrollJumpCommand? = null,
     onTapZoneAction: (ReaderTapZoneAction) -> Unit,
     onBrightnessDragDelta: (Float) -> Unit,
     onIllustrationClicked: (imageUrl: String, imageIndexInChapter: Int) -> Unit,
@@ -249,6 +436,7 @@ fun ReaderViewportHost(
 
     val density = LocalDensity.current
     val isRtlBunkobon = effectiveMode == ReaderPageTurnMode.VERTICAL_BUNKOBON
+    val clockLabel = rememberSystemClockText()
 
     Box(
         modifier = modifier
@@ -314,6 +502,9 @@ fun ReaderViewportHost(
                 ContinuousScrollReaderDelegate(
                     snapshot = snapshot,
                     palette = palette,
+                    clockLabel = clockLabel,
+                    contentHighlight = contentHighlight,
+                    jumpCommand = continuousScrollJumpCommand,
                     fontSizeSp = fontSizeSp,
                     lineDistanceDp = lineDistanceDp,
                     paragraphDistanceDp = paragraphDistanceDp,
@@ -358,6 +549,7 @@ fun ReaderViewportHost(
                     val resolution = snapshot.resolveVirtualPage(virtualPageIndex)
                     val pageOffset = (pagerState.currentPage - virtualPageIndex) +
                         pagerState.currentPageOffsetFraction
+                    val isActiveViewportPage = virtualPageIndex == pagerState.currentPage
 
                     Box(
                         modifier = Modifier
@@ -374,6 +566,9 @@ fun ReaderViewportHost(
                             ReaderResolvedPageSurface(
                                 resolution = resolution,
                                 palette = palette,
+                                clockLabel = clockLabel,
+                                contentHighlight = contentHighlight,
+                                isActiveViewportPage = isActiveViewportPage,
                                 onIllustrationClicked = onIllustrationClicked,
                                 onRetryFailedSlot = onRetryFailedSlot,
                                 onOpenNetworkDiagnostics = onOpenNetworkDiagnostics,
@@ -422,22 +617,26 @@ private fun Modifier.applyPageTurnTransition(
                         drawRect(color = paperBackground)
                     }
                     drawContent()
-                    // Ambient spine shadow cast onto the underlying incoming page.
-                    if (pageOffset < -0.001f && pageOffset > -0.999f) {
-                        val shadowPx = spineShadowWidthDp.toPx()
-                        val revealEdgeX = (1f + pageOffset) * size.width
-                        val shadowAlpha = (abs(pageOffset) * 0.28f).coerceIn(0f, 0.28f)
+                    // Ambient drop shadow cast by the sliding upper page's right edge onto the
+                    // pinned underlying page, moving right-to-left (`size.width -> 0f`) in lockstep
+                    // with the upper page's edge!
+                    val shadowSpec = computeCoverSlideShadowSpec(
+                        pageOffset = pageOffset,
+                        viewportWidthPx = size.width,
+                        shadowWidthPx = spineShadowWidthDp.toPx(),
+                    )
+                    if (shadowSpec != null) {
                         drawRect(
                             brush = Brush.horizontalGradient(
                                 colors = listOf(
-                                    Color.Black.copy(alpha = shadowAlpha),
+                                    Color.Black.copy(alpha = shadowSpec.startAlpha),
                                     Color.Transparent,
                                 ),
-                                startX = revealEdgeX,
-                                endX = (revealEdgeX + shadowPx).coerceAtMost(size.width),
+                                startX = shadowSpec.startX,
+                                endX = shadowSpec.startX + shadowSpec.widthPx,
                             ),
-                            topLeft = Offset(revealEdgeX, 0f),
-                            size = Size(shadowPx.coerceAtMost(size.width - revealEdgeX), size.height),
+                            topLeft = Offset(shadowSpec.startX, 0f),
+                            size = Size(shadowSpec.widthPx, size.height),
                         )
                     }
                 }
@@ -595,6 +794,9 @@ half4 main(float2 fragCoord) {
 private fun ReaderResolvedPageSurface(
     resolution: VirtualPageResolution,
     palette: ReaderVisualPalette,
+    clockLabel: String,
+    contentHighlight: ReaderContentHighlight,
+    isActiveViewportPage: Boolean,
     onIllustrationClicked: (imageUrl: String, imageIndexInChapter: Int) -> Unit,
     onRetryFailedSlot: (cid: Int) -> Unit,
     onOpenNetworkDiagnostics: () -> Unit,
@@ -607,6 +809,9 @@ private fun ReaderResolvedPageSurface(
                     chapterTitle = "${slot.chapter.volumeTitle} · ${slot.chapter.chapterTitle}".trim(' ', '·'),
                     page = page,
                     palette = palette,
+                    clockLabel = clockLabel,
+                    contentHighlight = contentHighlight,
+                    isActiveViewportPage = isActiveViewportPage,
                     tagSuffix = "${resolution.role.name}_${resolution.pageIndexInSlot}",
                     onIllustrationClicked = onIllustrationClicked,
                 )
@@ -685,19 +890,35 @@ private fun ReaderCanvasPage(
     chapterTitle: String,
     page: ReaderPage,
     palette: ReaderVisualPalette,
+    clockLabel: String,
+    contentHighlight: ReaderContentHighlight,
+    isActiveViewportPage: Boolean,
     tagSuffix: String,
     onIllustrationClicked: (imageUrl: String, imageIndexInChapter: Int) -> Unit,
 ) {
     val density = LocalDensity.current
-    val clockLabel = remember(page.cid, page.pageIndexInChapter) {
-        SimpleDateFormat("HH:mm", Locale.US).format(Date())
-    }
     val progressPercent = remember(page.pageIndexInChapter, page.totalPagesInChapter) {
         if (page.totalPagesInChapter <= 1) {
             100
         } else {
             (((page.pageIndexInChapter + 1) * 100f) / page.totalPagesInChapter.toFloat()).roundToInt()
         }
+    }
+
+    val hasTtsHighlightOnPage = remember(page, contentHighlight.ttsCid, contentHighlight.ttsBlockIndex) {
+        page.cid == contentHighlight.ttsCid &&
+            contentHighlight.ttsBlockIndex >= 0 &&
+            page.elements.any { el ->
+                el !is ReaderPageElement.ImageSlot && el.blockIndex == contentHighlight.ttsBlockIndex
+            }
+    }
+
+    val hasFocalHighlightOnPage = remember(page, contentHighlight.focalCid, contentHighlight.focalBlockIndex) {
+        page.cid == contentHighlight.focalCid &&
+            contentHighlight.focalBlockIndex >= 0 &&
+            page.elements.any { el ->
+                el !is ReaderPageElement.ImageSlot && el.blockIndex == contentHighlight.focalBlockIndex
+            }
     }
 
     val accessibilitySummary = remember(chapterTitle, page) {
@@ -741,6 +962,21 @@ private fun ReaderCanvasPage(
             .testTag(ReaderTestTags.PAGE_CANVAS_PREFIX + tagSuffix)
             .semantics { contentDescription = accessibilitySummary },
     ) {
+        if (isActiveViewportPage && hasTtsHighlightOnPage) {
+            Box(
+                modifier = Modifier
+                    .size(1.dp)
+                    .testTag("${ReaderTestTags.TTS_HIGHLIGHTED_BLOCK_PREFIX}${contentHighlight.ttsBlockIndex}"),
+            )
+        }
+        if (isActiveViewportPage && hasFocalHighlightOnPage) {
+            Box(
+                modifier = Modifier
+                    .size(1.dp)
+                    .testTag("${ReaderTestTags.FOCAL_HIGHLIGHTED_BLOCK_PREFIX}${contentHighlight.focalBlockIndex}"),
+            )
+        }
+
         // Running header & footer captions (suppressed on full-bleed dedicated Artbook plates).
         if (!page.isFullBleedArtbookPage) {
             Text(
@@ -769,17 +1005,42 @@ private fun ReaderCanvasPage(
                     text = clockLabel,
                     color = palette.secondaryInkColor,
                     fontSize = 11.sp,
+                    modifier = if (isActiveViewportPage) {
+                        Modifier.testTag(ReaderTestTags.READER_CLOCK_LABEL)
+                    } else {
+                        Modifier
+                    },
                 )
             }
         }
 
         Canvas(modifier = Modifier.fillMaxSize()) {
             val nativeCanvas = drawContext.canvas.nativeCanvas
+            val accentBarWidthPx = 3.dp.toPx()
+            val highlightCorner = CornerRadius(4.dp.toPx(), 4.dp.toPx())
+            val keywordCorner = CornerRadius(3.dp.toPx(), 3.dp.toPx())
+
             for (element in page.elements) {
                 when (element) {
                     is ReaderPageElement.TitleLine -> {
                         titlePaint.textSize = element.fontSizePx
                         titlePaint.letterSpacing = 0f
+                        drawHorizontalLineHighlights(
+                            pageCid = page.cid,
+                            blockIndex = element.blockIndex,
+                            rawStartChar = element.rawStartChar,
+                            lineText = element.text,
+                            leadingIndentChars = 0,
+                            xPx = element.xPx,
+                            topYPx = element.topYPx,
+                            heightPx = element.heightPx,
+                            paint = titlePaint,
+                            palette = palette,
+                            highlight = contentHighlight,
+                            accentBarWidthPx = accentBarWidthPx,
+                            lineCorner = highlightCorner,
+                            keywordCorner = keywordCorner,
+                        )
                         nativeCanvas.drawText(
                             element.text,
                             element.xPx,
@@ -796,6 +1057,27 @@ private fun ReaderCanvasPage(
                         } else {
                             0f
                         }
+                        val leadingIndent = if (element.isParagraphFirstLine) {
+                            element.text.takeWhile { it == '\u3000' }.length
+                        } else {
+                            0
+                        }
+                        drawHorizontalLineHighlights(
+                            pageCid = page.cid,
+                            blockIndex = element.blockIndex,
+                            rawStartChar = element.rawStartChar,
+                            lineText = element.text,
+                            leadingIndentChars = leadingIndent,
+                            xPx = element.xPx,
+                            topYPx = element.topYPx,
+                            heightPx = element.heightPx,
+                            paint = bodyPaint,
+                            palette = palette,
+                            highlight = contentHighlight,
+                            accentBarWidthPx = accentBarWidthPx,
+                            lineCorner = highlightCorner,
+                            keywordCorner = keywordCorner,
+                        )
                         nativeCanvas.drawText(
                             element.text,
                             element.xPx,
@@ -808,6 +1090,68 @@ private fun ReaderCanvasPage(
                         val paint = if (element.isTitleColumn) titlePaint else bodyPaint
                         paint.textSize = element.fontSizePx
                         paint.letterSpacing = 0f
+
+                        val colHalfW = element.fontSizePx * 0.72f
+                        val colTop = element.startYPx - element.fontSizePx * 0.90f
+                        val colHeight = (element.verticalText.length * element.cellAdvanceYPx +
+                            element.fontSizePx * 0.16f).coerceAtLeast(element.fontSizePx)
+
+                        if (page.cid == contentHighlight.ttsCid &&
+                            element.blockIndex == contentHighlight.ttsBlockIndex
+                        ) {
+                            drawRoundRect(
+                                color = palette.ttsParagraphBgColor,
+                                topLeft = Offset(element.centerXPx - colHalfW, colTop),
+                                size = Size(colHalfW * 2f, colHeight),
+                                cornerRadius = highlightCorner,
+                            )
+                            drawRect(
+                                color = palette.ttsAccentBarColor,
+                                topLeft = Offset(element.centerXPx - colHalfW, colTop - accentBarWidthPx),
+                                size = Size(colHalfW * 2f, accentBarWidthPx),
+                            )
+                        }
+
+                        if (page.cid == contentHighlight.focalCid &&
+                            element.blockIndex == contentHighlight.focalBlockIndex
+                        ) {
+                            drawRoundRect(
+                                color = palette.focalParagraphBgColor,
+                                topLeft = Offset(element.centerXPx - colHalfW, colTop),
+                                size = Size(colHalfW * 2f, colHeight),
+                                cornerRadius = highlightCorner,
+                            )
+                            if (contentHighlight.focalStartChar >= 0 &&
+                                contentHighlight.focalEndCharExclusive > contentHighlight.focalStartChar
+                            ) {
+                                val leadingIndent = if (!element.isTitleColumn && element.rawStartChar == 0) {
+                                    element.verticalText.takeWhile { it == '\u3000' }.length
+                                } else {
+                                    0
+                                }
+                                val rawLenInCol = (element.verticalText.length - leadingIndent).coerceAtLeast(0)
+                                val colRawStart = element.rawStartChar
+                                val colRawEndExclusive = colRawStart + rawLenInCol
+                                val ovStart = maxOf(contentHighlight.focalStartChar, colRawStart)
+                                val ovEnd = minOf(contentHighlight.focalEndCharExclusive, colRawEndExclusive)
+                                if (ovEnd > ovStart) {
+                                    val c0 = (leadingIndent + (ovStart - colRawStart))
+                                        .coerceIn(0, element.verticalText.length)
+                                    val c1 = (leadingIndent + (ovEnd - colRawStart))
+                                        .coerceIn(c0, element.verticalText.length)
+                                    val y0 = element.startYPx + c0 * element.cellAdvanceYPx - element.fontSizePx * 0.88f
+                                    val yH = ((c1 - c0) * element.cellAdvanceYPx + element.fontSizePx * 0.12f)
+                                        .coerceAtLeast(element.fontSizePx)
+                                    drawRoundRect(
+                                        color = palette.focalKeywordBgColor,
+                                        topLeft = Offset(element.centerXPx - colHalfW * 0.94f, y0),
+                                        size = Size(colHalfW * 1.88f, yH),
+                                        cornerRadius = keywordCorner,
+                                    )
+                                }
+                            }
+                        }
+
                         var cellY = element.startYPx
                         for (index in element.verticalText.indices) {
                             val glyph = element.verticalText.substring(index, index + 1)
@@ -867,14 +1211,94 @@ private fun ReaderCanvasPage(
     }
 }
 
+private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawHorizontalLineHighlights(
+    pageCid: Int,
+    blockIndex: Int,
+    rawStartChar: Int,
+    lineText: String,
+    leadingIndentChars: Int,
+    xPx: Float,
+    topYPx: Float,
+    heightPx: Float,
+    paint: AndroidPaint,
+    palette: ReaderVisualPalette,
+    highlight: ReaderContentHighlight,
+    accentBarWidthPx: Float,
+    lineCorner: CornerRadius,
+    keywordCorner: CornerRadius,
+) {
+    val isTtsBlock = pageCid == highlight.ttsCid && blockIndex == highlight.ttsBlockIndex
+    val isFocalBlock = pageCid == highlight.focalCid && blockIndex == highlight.focalBlockIndex
+    if (!isTtsBlock && !isFocalBlock) return
+
+    val lineWidthPx = paint.measureText(lineText).coerceAtLeast(paint.textSize)
+
+    if (isTtsBlock) {
+        drawRoundRect(
+            color = palette.ttsParagraphBgColor,
+            topLeft = Offset((xPx - 4f).coerceAtLeast(0f), topYPx - 2f),
+            size = Size(lineWidthPx + 8f, heightPx + 4f),
+            cornerRadius = lineCorner,
+        )
+        drawRect(
+            color = palette.ttsAccentBarColor,
+            topLeft = Offset((xPx - 8f).coerceAtLeast(0f), topYPx),
+            size = Size(accentBarWidthPx, heightPx),
+        )
+    }
+
+    if (isFocalBlock) {
+        drawRoundRect(
+            color = palette.focalParagraphBgColor,
+            topLeft = Offset((xPx - 4f).coerceAtLeast(0f), topYPx - 2f),
+            size = Size(lineWidthPx + 8f, heightPx + 4f),
+            cornerRadius = lineCorner,
+        )
+        drawRect(
+            color = palette.focalAccentBarColor,
+            topLeft = Offset((xPx - 8f).coerceAtLeast(0f), topYPx),
+            size = Size(accentBarWidthPx, heightPx),
+        )
+
+        if (highlight.focalStartChar >= 0 && highlight.focalEndCharExclusive > highlight.focalStartChar) {
+            val rawLenInLine = (lineText.length - leadingIndentChars).coerceAtLeast(0)
+            val lineRawEndExclusive = rawStartChar + rawLenInLine
+            val ovStart = maxOf(highlight.focalStartChar, rawStartChar)
+            val ovEnd = minOf(highlight.focalEndCharExclusive, lineRawEndExclusive)
+            if (ovEnd > ovStart) {
+                val subStart = (leadingIndentChars + (ovStart - rawStartChar)).coerceIn(0, lineText.length)
+                val subEnd = (leadingIndentChars + (ovEnd - rawStartChar)).coerceIn(subStart, lineText.length)
+                val startOffsetX = if (subStart > 0) paint.measureText(lineText, 0, subStart) else 0f
+                val endOffsetX = paint.measureText(lineText, 0, subEnd)
+                val spanWidth = (endOffsetX - startOffsetX).coerceAtLeast(paint.textSize * 0.45f)
+                drawRoundRect(
+                    color = palette.focalKeywordBgColor,
+                    topLeft = Offset(xPx + startOffsetX - 2f, topYPx - 1f),
+                    size = Size(spanWidth + 4f, heightPx + 2f),
+                    cornerRadius = keywordCorner,
+                )
+                drawRect(
+                    color = palette.focalAccentBarColor,
+                    topLeft = Offset(xPx + startOffsetX, topYPx + heightPx - 2f),
+                    size = Size(spanWidth, 2f),
+                )
+            }
+        }
+    }
+}
+
 /**
  * Mode 4 (`上下卷轴`): Continuous vertical scrolling delegate rendering structured `ChapterBlock`s
- * with sticky chapter title headers and full-width clickable illustrations.
+ * with live clock/progress status, imperative scrubber/search/bookmark/TTS jumps, and inline
+ * paragraph + keyword highlighting.
  */
 @Composable
 private fun ContinuousScrollReaderDelegate(
     snapshot: ReaderWindowSnapshot,
     palette: ReaderVisualPalette,
+    clockLabel: String,
+    contentHighlight: ReaderContentHighlight,
+    jumpCommand: ContinuousScrollJumpCommand?,
     fontSizeSp: Int,
     lineDistanceDp: Int,
     paragraphDistanceDp: Int,
@@ -894,6 +1318,9 @@ private fun ContinuousScrollReaderDelegate(
             ReaderResolvedPageSurface(
                 resolution = fallbackRes,
                 palette = palette,
+                clockLabel = clockLabel,
+                contentHighlight = contentHighlight,
+                isActiveViewportPage = true,
                 onIllustrationClicked = onIllustrationClicked,
                 onRetryFailedSlot = onRetryFailedSlot,
                 onOpenNetworkDiagnostics = onOpenNetworkDiagnostics,
@@ -903,137 +1330,320 @@ private fun ContinuousScrollReaderDelegate(
     }
 
     val ast = currentSlot.layout.ast
+    val blockItemOffset = if (snapshot.prevSlot != null) 1 else 0
     val initialItemIndex = remember(ast.cid) {
-        val anchorBlock = snapshot.activeReaderPage?.startAnchor?.paragraphIndex ?: 0
-        anchorBlock.coerceIn(0, (ast.blocks.size - 1).coerceAtLeast(0))
+        val commandTarget = jumpCommand?.takeIf { it.cid == ast.cid }?.paragraphIndex
+        val anchorBlock = commandTarget ?: snapshot.activeReaderPage?.startAnchor?.paragraphIndex ?: 0
+        val blockPos = ast.blocks.indexOfFirst { it.blockIndex >= anchorBlock }
+            .let { if (it >= 0) it else 0 }
+        (blockItemOffset + blockPos).coerceAtLeast(0)
     }
-    val listState = rememberLazyListState(initialFirstVisibleItemIndex = initialItemIndex)
+    val listState = key(ast.cid) {
+        rememberLazyListState(initialFirstVisibleItemIndex = initialItemIndex)
+    }
     val customFontFamily = remember(palette.customTypeface) {
         palette.customTypeface?.let { FontFamily(it) }
     }
 
-    val scrollProgress by remember(ast.blocks.size) {
+    // Execute programmatic jumps from HUD scrubber, In-Book Search, Bookmarks, Undo Pill, Volume Keys, and TTS!
+    LaunchedEffect(jumpCommand?.revision, ast.cid, blockItemOffset) {
+        val cmd = jumpCommand ?: return@LaunchedEffect
+        if (cmd.cid != ast.cid || ast.blocks.isEmpty()) return@LaunchedEffect
+        val blockPos = ast.blocks.indexOfFirst { it.blockIndex >= cmd.paragraphIndex }
+            .let { if (it >= 0) it else ast.blocks.lastIndex }
+        val targetItemIndex = (blockItemOffset + blockPos).coerceAtLeast(0)
+        if (cmd.animated) {
+            runCatching { listState.animateScrollToItem(targetItemIndex) }
+                .onFailure { listState.scrollToItem(targetItemIndex) }
+        } else {
+            listState.scrollToItem(targetItemIndex)
+        }
+    }
+
+    val currentBlockPosAndProgress by remember(ast, listState, blockItemOffset) {
         derivedStateOf {
             if (ast.blocks.isEmpty()) {
-                1f
+                0 to 1f
             } else {
-                ((listState.firstVisibleItemIndex + 1).toFloat() / ast.blocks.size.toFloat())
-                    .coerceIn(0f, 1f)
+                val reachedBottom = !listState.canScrollForward && listState.canScrollBackward
+                val blockPos = if (reachedBottom) {
+                    ast.blocks.lastIndex
+                } else {
+                    (listState.firstVisibleItemIndex - blockItemOffset).coerceIn(0, ast.blocks.lastIndex)
+                }
+                val progress = if (ast.blocks.size <= 1) {
+                    1f
+                } else {
+                    (blockPos.toFloat() / (ast.blocks.size - 1).toFloat()).coerceIn(0f, 1f)
+                }
+                blockPos to progress
             }
         }
     }
 
-    LaunchedEffect(ast.cid, listState) {
-        snapshotFlow { listState.firstVisibleItemIndex }
+    LaunchedEffect(ast.cid, listState, blockItemOffset) {
+        snapshotFlow { currentBlockPosAndProgress }
             .distinctUntilChanged()
-            .collect { itemIdx ->
-                val block = ast.blocks.getOrNull(itemIdx)
+            .collect { (blockPos, progress) ->
+                val block = ast.blocks.getOrNull(blockPos)
                 if (block != null) {
-                    val permille = (scrollProgress * 1000f).roundToInt().coerceIn(0, 1000)
+                    val permille = (progress * 1000f).roundToInt().coerceIn(0, 1000)
                     onAnchorChanged(
                         ReadingAnchor(
                             paragraphIndex = block.blockIndex,
                             charOffset = 0,
                             progressPermille = permille,
                         ),
-                        scrollProgress,
+                        progress,
                     )
                 }
             }
     }
 
-    LazyColumn(
-        state = listState,
-        contentPadding = PaddingValues(
-            horizontal = pageEdgeDistanceDp.coerceAtLeast(12).dp,
-            vertical = 28.dp,
-        ),
-        verticalArrangement = Arrangement.spacedBy(paragraphDistanceDp.coerceAtLeast(6).dp),
-        modifier = Modifier
-            .fillMaxSize()
-            .clickable(
-                interactionSource = null,
-                indication = null,
-                onClick = onToggleHud,
-            )
-            .testTag(ReaderTestTags.CONTINUOUS_SCROLL_LIST),
-    ) {
-        if (snapshot.prevSlot != null) {
-            item(key = "prev_chapter_btn_${ast.cid}") {
-                OutlinedButton(
-                    onClick = onRequestPrevChapter,
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text("▲ 上一章：${snapshot.prevSlot.chapter.chapterTitle}")
+    val chapterHeaderTitle = remember(currentSlot.chapter) {
+        "${currentSlot.chapter.volumeTitle} · ${currentSlot.chapter.chapterTitle}".trim(' ', '·')
+    }
+    val progressPercent = ((currentBlockPosAndProgress.second * 100f).roundToInt()).coerceIn(0, 100)
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        LazyColumn(
+            state = listState,
+            contentPadding = PaddingValues(
+                start = pageEdgeDistanceDp.coerceAtLeast(12).dp,
+                end = pageEdgeDistanceDp.coerceAtLeast(12).dp,
+                top = 30.dp,
+                bottom = 34.dp,
+            ),
+            verticalArrangement = Arrangement.spacedBy(paragraphDistanceDp.coerceAtLeast(6).dp),
+            modifier = Modifier
+                .fillMaxSize()
+                .pointerInput(onToggleHud) {
+                    detectTapGestures { onToggleHud() }
+                }
+                .testTag(ReaderTestTags.CONTINUOUS_SCROLL_LIST),
+        ) {
+            if (snapshot.prevSlot != null) {
+                item(key = "prev_chapter_btn_${ast.cid}") {
+                    OutlinedButton(
+                        onClick = onRequestPrevChapter,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text("▲ 上一章：${snapshot.prevSlot.chapter.chapterTitle}")
+                    }
                 }
             }
-        }
 
-        items(
-            items = ast.blocks,
-            key = { block -> "${ast.cid}_${block.blockIndex}" },
-        ) { block ->
-            when (block) {
-                is ChapterBlock.TitleBlock -> {
-                    Text(
-                        text = block.title,
-                        color = palette.primaryInkColor,
-                        fontSize = (fontSizeSp + 4).sp,
-                        fontWeight = FontWeight.Bold,
-                        fontFamily = customFontFamily,
-                        modifier = Modifier.padding(top = 8.dp, bottom = 8.dp),
-                    )
-                }
+            items(
+                items = ast.blocks,
+                key = { block -> "${ast.cid}_${block.blockIndex}" },
+            ) { block ->
+                val isTtsHighlighted = ast.cid == contentHighlight.ttsCid &&
+                    block.blockIndex == contentHighlight.ttsBlockIndex
+                val isFocalHighlighted = ast.cid == contentHighlight.focalCid &&
+                    block.blockIndex == contentHighlight.focalBlockIndex
 
-                is ChapterBlock.ParagraphBlock -> {
-                    Text(
-                        text = block.formattedText,
-                        color = palette.primaryInkColor,
-                        fontSize = fontSizeSp.sp,
-                        lineHeight = (fontSizeSp + lineDistanceDp).sp,
-                        fontFamily = customFontFamily,
-                    )
-                }
+                val blockHighlightModifier = Modifier
+                    .let { base ->
+                        if (isTtsHighlighted || isFocalHighlighted) {
+                            val bg = if (isTtsHighlighted) {
+                                palette.ttsParagraphBgColor
+                            } else {
+                                palette.focalParagraphBgColor
+                            }
+                            val barColor = if (isTtsHighlighted) {
+                                palette.ttsAccentBarColor
+                            } else {
+                                palette.focalAccentBarColor
+                            }
+                            base
+                                .clip(MaterialTheme.shapes.extraSmall)
+                                .background(bg)
+                                .drawBehind {
+                                    drawRect(
+                                        color = barColor,
+                                        topLeft = Offset.Zero,
+                                        size = Size(3.dp.toPx(), size.height),
+                                    )
+                                }
+                                .padding(horizontal = 8.dp, vertical = 4.dp)
+                        } else {
+                            base
+                        }
+                    }
+                    .let { mod ->
+                        if (isTtsHighlighted) {
+                            mod.testTag("${ReaderTestTags.TTS_HIGHLIGHTED_BLOCK_PREFIX}${block.blockIndex}")
+                        } else {
+                            mod
+                        }
+                    }
+                    .let { mod ->
+                        if (isFocalHighlighted && !isTtsHighlighted) {
+                            mod.testTag("${ReaderTestTags.FOCAL_HIGHLIGHTED_BLOCK_PREFIX}${block.blockIndex}")
+                        } else {
+                            mod
+                        }
+                    }
 
-                is ChapterBlock.IllustrationBlock -> {
-                    val ratio = (block.cachedAspectRatio ?: 0.71f).coerceIn(0.3f, 2.5f)
-                    Surface(
-                        onClick = {
-                            onIllustrationClicked(block.imageUrl, block.imageIndexInChapter)
-                        },
-                        color = palette.backgroundColor.copy(alpha = 0.5f),
-                        shape = MaterialTheme.shapes.medium,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .aspectRatio(ratio)
-                            .einkHairlineBorder(MaterialTheme.shapes.medium)
-                            .clip(MaterialTheme.shapes.medium)
-                            .testTag("${ReaderTestTags.INLINE_IMAGE_PREFIX}${block.imageIndexInChapter}"),
-                    ) {
-                        if (block.imageUrl.isNotBlank()) {
-                            AsyncImage(
-                                model = WenkuImageRequests.rememberIllustrationImageRequest(block.imageUrl),
-                                contentDescription = "插图 ${block.imageIndexInChapter + 1}",
-                                contentScale = ContentScale.Fit,
-                                modifier = Modifier.fillMaxSize(),
+                Box(modifier = Modifier.fillMaxWidth()) {
+                    if (isTtsHighlighted && isFocalHighlighted) {
+                        // Emit secondary marker when both TTS and Search/Bookmark target the exact same block.
+                        Box(
+                            modifier = Modifier
+                                .size(1.dp)
+                                .testTag("${ReaderTestTags.FOCAL_HIGHLIGHTED_BLOCK_PREFIX}${block.blockIndex}"),
+                        )
+                    }
+                    when (block) {
+                        is ChapterBlock.TitleBlock -> {
+                            val annotatedTitle = buildHighlightedScrollText(
+                                displayText = block.title,
+                                indentLength = 0,
+                                isFocalBlock = isFocalHighlighted,
+                                focalStartChar = contentHighlight.focalStartChar,
+                                focalEndCharExclusive = contentHighlight.focalEndCharExclusive,
+                                palette = palette,
+                            )
+                            Text(
+                                text = annotatedTitle,
+                                color = palette.primaryInkColor,
+                                fontSize = (fontSizeSp + 4).sp,
+                                fontWeight = FontWeight.Bold,
+                                fontFamily = customFontFamily,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(top = 8.dp, bottom = 8.dp)
+                                    .then(blockHighlightModifier),
                             )
                         }
+
+                        is ChapterBlock.ParagraphBlock -> {
+                            val annotatedBody = buildHighlightedScrollText(
+                                displayText = block.formattedText,
+                                indentLength = block.indentLength,
+                                isFocalBlock = isFocalHighlighted,
+                                focalStartChar = contentHighlight.focalStartChar,
+                                focalEndCharExclusive = contentHighlight.focalEndCharExclusive,
+                                palette = palette,
+                            )
+                            Text(
+                                text = annotatedBody,
+                                color = palette.primaryInkColor,
+                                fontSize = fontSizeSp.sp,
+                                lineHeight = (fontSizeSp + lineDistanceDp).sp,
+                                fontFamily = customFontFamily,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .then(blockHighlightModifier),
+                            )
+                        }
+
+                        is ChapterBlock.IllustrationBlock -> {
+                            val ratio = (block.cachedAspectRatio ?: 0.71f).coerceIn(0.3f, 2.5f)
+                            Surface(
+                                onClick = {
+                                    onIllustrationClicked(block.imageUrl, block.imageIndexInChapter)
+                                },
+                                color = palette.backgroundColor.copy(alpha = 0.5f),
+                                shape = MaterialTheme.shapes.medium,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .aspectRatio(ratio)
+                                    .einkHairlineBorder(MaterialTheme.shapes.medium)
+                                    .clip(MaterialTheme.shapes.medium)
+                                    .testTag("${ReaderTestTags.INLINE_IMAGE_PREFIX}${block.imageIndexInChapter}"),
+                            ) {
+                                if (block.imageUrl.isNotBlank()) {
+                                    AsyncImage(
+                                        model = WenkuImageRequests.rememberIllustrationImageRequest(block.imageUrl),
+                                        contentDescription = "插图 ${block.imageIndexInChapter + 1}",
+                                        contentScale = ContentScale.Fit,
+                                        modifier = Modifier.fillMaxSize(),
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (snapshot.nextSlot != null) {
+                item(key = "next_chapter_btn_${ast.cid}") {
+                    Button(
+                        onClick = onRequestNextChapter,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 12.dp),
+                    ) {
+                        Text("下一章：${snapshot.nextSlot.chapter.chapterTitle} ▼")
                     }
                 }
             }
         }
 
-        if (snapshot.nextSlot != null) {
-            item(key = "next_chapter_btn_${ast.cid}") {
-                Button(
-                    onClick = onRequestNextChapter,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 12.dp),
-                ) {
-                    Text("下一章：${snapshot.nextSlot.chapter.chapterTitle} ▼")
-                }
-            }
+        // Running header & footer captions matching paged Bunkobon modes.
+        Text(
+            text = chapterHeaderTitle,
+            color = palette.secondaryInkColor,
+            fontSize = 11.sp,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier
+                .align(Alignment.TopStart)
+                .background(palette.backgroundColor.copy(alpha = 0.86f))
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 4.dp),
+        )
+        Row(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .background(palette.backgroundColor.copy(alpha = 0.86f))
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 4.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Text(
+                text = "阅读进度 $progressPercent%",
+                color = palette.secondaryInkColor,
+                fontSize = 11.sp,
+            )
+            Text(
+                text = clockLabel,
+                color = palette.secondaryInkColor,
+                fontSize = 11.sp,
+                modifier = Modifier.testTag(ReaderTestTags.READER_CLOCK_LABEL),
+            )
         }
+    }
+}
+
+private fun buildHighlightedScrollText(
+    displayText: String,
+    indentLength: Int,
+    isFocalBlock: Boolean,
+    focalStartChar: Int,
+    focalEndCharExclusive: Int,
+    palette: ReaderVisualPalette,
+): AnnotatedString {
+    if (!isFocalBlock || focalStartChar < 0 || focalEndCharExclusive <= focalStartChar) {
+        return AnnotatedString(displayText)
+    }
+    val spanStart = (indentLength + focalStartChar).coerceIn(0, displayText.length)
+    val spanEnd = (indentLength + focalEndCharExclusive).coerceIn(spanStart, displayText.length)
+    if (spanEnd <= spanStart) {
+        return AnnotatedString(displayText)
+    }
+    return buildAnnotatedString {
+        append(displayText)
+        addStyle(
+            style = SpanStyle(
+                background = palette.focalKeywordBgColor,
+                color = palette.primaryInkColor,
+                fontWeight = FontWeight.Bold,
+                textDecoration = TextDecoration.Underline,
+            ),
+            start = spanStart,
+            end = spanEnd,
+        )
     }
 }

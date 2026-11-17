@@ -101,4 +101,52 @@ class UserPreferencesRepositoryTest {
         assertEquals(48, clamped.readerParagraphDistanceDp)
         assertEquals(32, clamped.readerPageEdgeDistanceDp)
     }
+
+    @Test
+    fun readerPaperPresetAndGlobalThemeModeStaySynchronizedBidirectionally() = runTest(UnconfinedTestDispatcher()) {
+        val repository = createRepository(this)
+
+        // Default starts on Classic Blue + Parchment
+        val initial = repository.preferencesFlow.first()
+        assertEquals(Wenku8ThemeMode.CLASSIC_BLUE, initial.themeMode)
+        assertEquals(org.mewx.wenku8.v2.reader.model.ReaderPaperPreset.PARCHMENT, initial.readerPaperPreset)
+
+        // Pick Eye-Care Green day paper + Archival Day global theme
+        repository.setReaderPaperPreset(org.mewx.wenku8.v2.reader.model.ReaderPaperPreset.EYE_CARE_GREEN)
+        repository.setThemeMode(Wenku8ThemeMode.ARCHIVAL_DAY)
+        val dayCustom = repository.preferencesFlow.first()
+        assertEquals(Wenku8ThemeMode.ARCHIVAL_DAY, dayCustom.themeMode)
+        assertEquals(org.mewx.wenku8.v2.reader.model.ReaderPaperPreset.EYE_CARE_GREEN, dayCustom.readerPaperPreset)
+        assertEquals(org.mewx.wenku8.v2.reader.model.ReaderPaperPreset.EYE_CARE_GREEN, dayCustom.lastDayPaperPreset)
+        assertEquals(Wenku8ThemeMode.ARCHIVAL_DAY, dayCustom.lastDayThemeMode)
+
+        // Switching to Carbon Night inside Reader updates global themeMode atomically
+        repository.setReaderPaperPreset(org.mewx.wenku8.v2.reader.model.ReaderPaperPreset.CARBON_NIGHT)
+        val carbonNight = repository.preferencesFlow.first()
+        assertEquals(Wenku8ThemeMode.CARBON_NIGHT, carbonNight.themeMode)
+        assertEquals(org.mewx.wenku8.v2.reader.model.ReaderPaperPreset.CARBON_NIGHT, carbonNight.readerPaperPreset)
+
+        // Switching to Pure AMOLED inside Reader updates global themeMode to PURE_AMOLED
+        repository.setReaderPaperPreset(org.mewx.wenku8.v2.reader.model.ReaderPaperPreset.PURE_AMOLED)
+        val pureAmoled = repository.preferencesFlow.first()
+        assertEquals(Wenku8ThemeMode.PURE_AMOLED, pureAmoled.themeMode)
+        assertEquals(org.mewx.wenku8.v2.reader.model.ReaderPaperPreset.PURE_AMOLED, pureAmoled.readerPaperPreset)
+
+        // Switching back to day paper restores remembered day global theme (ARCHIVAL_DAY)
+        repository.setReaderPaperPreset(pureAmoled.lastDayPaperPreset)
+        val restoredDay = repository.preferencesFlow.first()
+        assertEquals(org.mewx.wenku8.v2.reader.model.ReaderPaperPreset.EYE_CARE_GREEN, restoredDay.readerPaperPreset)
+        assertEquals(Wenku8ThemeMode.ARCHIVAL_DAY, restoredDay.themeMode)
+
+        // Switching global theme to CARBON_NIGHT and back to CLASSIC_BLUE also syncs reader paper preset
+        repository.setThemeMode(Wenku8ThemeMode.CARBON_NIGHT)
+        assertEquals(
+            org.mewx.wenku8.v2.reader.model.ReaderPaperPreset.CARBON_NIGHT,
+            repository.preferencesFlow.first().readerPaperPreset,
+        )
+        repository.setThemeMode(Wenku8ThemeMode.CLASSIC_BLUE)
+        val backToBlue = repository.preferencesFlow.first()
+        assertEquals(Wenku8ThemeMode.CLASSIC_BLUE, backToBlue.themeMode)
+        assertEquals(org.mewx.wenku8.v2.reader.model.ReaderPaperPreset.EYE_CARE_GREEN, backToBlue.readerPaperPreset)
+    }
 }
