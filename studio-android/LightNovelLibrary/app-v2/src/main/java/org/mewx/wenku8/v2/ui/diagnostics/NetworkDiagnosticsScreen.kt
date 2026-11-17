@@ -87,6 +87,7 @@ import org.mewx.wenku8.v2.data.remote.diagnostics.DiagnosticsStopReason
 import org.mewx.wenku8.v2.data.remote.diagnostics.NetworkSnapshot
 import org.mewx.wenku8.v2.data.remote.diagnostics.ProbeSampleResult
 import org.mewx.wenku8.v2.data.remote.diagnostics.UnderlyingTransportKind
+import org.mewx.wenku8.v2.ui.components.TooltipIconButton
 import org.mewx.wenku8.v2.ui.theme.LocalEinkMode
 import org.mewx.wenku8.v2.ui.theme.einkHairlineBorder
 import java.util.Locale
@@ -358,13 +359,15 @@ private fun DiagnosticsTopBar(
                 .padding(horizontal = 8.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            IconButton(
+            val backLabel = stringResource(R.string.action_back)
+            TooltipIconButton(
+                tooltipText = backLabel,
                 onClick = onNavigateBack,
                 modifier = Modifier.testTag(NetworkDiagnosticsTestTags.BACK_BUTTON),
             ) {
                 Icon(
                     imageVector = Icons.AutoMirrored.Outlined.ArrowBack,
-                    contentDescription = stringResource(R.string.action_back),
+                    contentDescription = backLabel,
                 )
             }
             Spacer(modifier = Modifier.width(4.dp))
@@ -374,22 +377,26 @@ private fun DiagnosticsTopBar(
                 modifier = Modifier.weight(1f),
             )
             if (finishedReport != null) {
-                IconButton(
+                val copySummaryLabel = stringResource(R.string.diag_action_copy_summary)
+                TooltipIconButton(
+                    tooltipText = copySummaryLabel,
                     onClick = onCopySummary,
                     modifier = Modifier.testTag(NetworkDiagnosticsTestTags.HEADER_COPY_BUTTON),
                 ) {
                     Icon(
                         imageVector = Icons.Outlined.ContentCopy,
-                        contentDescription = stringResource(R.string.diag_action_copy_summary),
+                        contentDescription = copySummaryLabel,
                     )
                 }
-                IconButton(
+                val shareReportLabel = stringResource(R.string.diag_action_share_report)
+                TooltipIconButton(
+                    tooltipText = shareReportLabel,
                     onClick = onOpenShareSheet,
                     modifier = Modifier.testTag(NetworkDiagnosticsTestTags.HEADER_SHARE_BUTTON),
                 ) {
                     Icon(
                         imageVector = Icons.Outlined.Share,
-                        contentDescription = stringResource(R.string.diag_action_share_report),
+                        contentDescription = shareReportLabel,
                     )
                 }
             }

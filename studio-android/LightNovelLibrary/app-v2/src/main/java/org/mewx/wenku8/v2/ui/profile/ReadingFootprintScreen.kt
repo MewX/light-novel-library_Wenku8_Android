@@ -90,6 +90,7 @@ import org.mewx.wenku8.v2.data.local.db.dao.ReadingHistoryWithNovel
 import org.mewx.wenku8.v2.data.local.db.entity.ReadingSessionEntity
 import org.mewx.wenku8.v2.data.media.WenkuImageRequests
 import org.mewx.wenku8.v2.domain.model.DiscoveryNovelCardItem
+import org.mewx.wenku8.v2.ui.components.TooltipIconButton
 import org.mewx.wenku8.v2.ui.detail.ReaderLaunchRequest
 import org.mewx.wenku8.v2.ui.theme.LocalEinkMode
 import org.mewx.wenku8.v2.ui.theme.Wenku8SharedElementKeys
@@ -517,15 +518,21 @@ fun ReadingFootprintScreen(
                         )
                     },
                     navigationIcon = {
-                        IconButton(onClick = onNavigateBack) {
+                        val backLabel = stringResource(R.string.action_back)
+                        TooltipIconButton(
+                            tooltipText = backLabel,
+                            onClick = onNavigateBack,
+                        ) {
                             Icon(
                                 imageVector = Icons.AutoMirrored.Outlined.ArrowBack,
-                                contentDescription = stringResource(R.string.action_back),
+                                contentDescription = backLabel,
                             )
                         }
                     },
                     actions = {
-                        IconButton(
+                        val sharePosterLabel = stringResource(R.string.footprint_action_share_poster)
+                        TooltipIconButton(
+                            tooltipText = sharePosterLabel,
                             onClick = {
                                 coroutineScope.launch {
                                     runCatching {
@@ -541,7 +548,7 @@ fun ReadingFootprintScreen(
                         ) {
                             Icon(
                                 imageVector = Icons.Outlined.Share,
-                                contentDescription = stringResource(R.string.footprint_action_share_poster),
+                                contentDescription = sharePosterLabel,
                             )
                         }
                     },
@@ -1242,8 +1249,12 @@ private fun CrossBookBookmarksHubTabContent(
             },
             trailingIcon = {
                 if (searchQuery.isNotEmpty()) {
-                    IconButton(onClick = { searchQuery = "" }) {
-                        Icon(imageVector = Icons.Outlined.Close, contentDescription = null)
+                    val clearLabel = stringResource(R.string.action_clear)
+                    TooltipIconButton(
+                        tooltipText = clearLabel,
+                        onClick = { searchQuery = "" },
+                    ) {
+                        Icon(imageVector = Icons.Outlined.Close, contentDescription = clearLabel)
                     }
                 }
             },
@@ -1367,7 +1378,9 @@ private fun CrossBookBookmarksHubTabContent(
                                     overflow = TextOverflow.Ellipsis,
                                 )
                             }
-                            IconButton(
+                            val deleteLabel = stringResource(R.string.footprint_bookmarks_delete_desc)
+                            TooltipIconButton(
+                                tooltipText = deleteLabel,
                                 onClick = { onDeleteBookmark(item.id) },
                                 modifier = Modifier.testTag(
                                     "${ReadingFootprintTestTags.BOOKMARK_DELETE_PREFIX}${item.id}",
@@ -1375,7 +1388,7 @@ private fun CrossBookBookmarksHubTabContent(
                             ) {
                                 Icon(
                                     imageVector = Icons.Outlined.DeleteOutline,
-                                    contentDescription = stringResource(R.string.footprint_bookmarks_delete_desc),
+                                    contentDescription = deleteLabel,
                                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
                             }

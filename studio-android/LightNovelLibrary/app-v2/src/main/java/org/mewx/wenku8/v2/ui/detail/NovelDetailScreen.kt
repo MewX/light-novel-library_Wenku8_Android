@@ -123,6 +123,8 @@ import org.mewx.wenku8.v2.data.repository.NovelDetailRepository
 import org.mewx.wenku8.v2.data.repository.NovelDetailSnapshot
 import org.mewx.wenku8.v2.data.repository.VolumeAccordionModel
 import org.mewx.wenku8.v2.domain.model.DiscoveryNovelCardItem
+import org.mewx.wenku8.v2.ui.components.ActionTooltipBox
+import org.mewx.wenku8.v2.ui.components.TooltipIconButton
 import org.mewx.wenku8.v2.ui.discovery.formatBookStatusLabel
 import org.mewx.wenku8.v2.ui.theme.CoverThemeEngine
 import org.mewx.wenku8.v2.ui.theme.LocalEinkMode
@@ -457,13 +459,15 @@ fun NovelDetailScreen(
                     },
                     navigationIcon = {
                         if (showBackButton) {
-                            IconButton(
+                            val backLabel = stringResource(R.string.action_back)
+                            TooltipIconButton(
+                                tooltipText = backLabel,
                                 onClick = onNavigateBack,
                                 modifier = Modifier.testTag(NovelDetailTestTags.BACK_BUTTON),
                             ) {
                                 Icon(
                                     imageVector = Icons.AutoMirrored.Outlined.ArrowBack,
-                                    contentDescription = null,
+                                    contentDescription = backLabel,
                                 )
                             }
                         }
@@ -475,23 +479,27 @@ fun NovelDetailScreen(
                             displayAuthor.ifBlank { "-" },
                             aid,
                         )
-                        IconButton(
+                        val shareLabel = stringResource(R.string.detail_action_share)
+                        TooltipIconButton(
+                            tooltipText = shareLabel,
                             onClick = { shareNovelExternally(context, shareMessage) },
                             modifier = Modifier.testTag(NovelDetailTestTags.SHARE_BUTTON),
                         ) {
                             Icon(
                                 imageVector = Icons.Outlined.Share,
-                                contentDescription = stringResource(R.string.detail_action_share),
+                                contentDescription = shareLabel,
                             )
                         }
-                        IconButton(
+                        val refreshLabel = stringResource(R.string.detail_action_refresh)
+                        TooltipIconButton(
+                            tooltipText = refreshLabel,
                             onClick = triggerRefresh,
                             enabled = !isRefreshing,
                             modifier = Modifier.testTag(NovelDetailTestTags.REFRESH_BUTTON),
                         ) {
                             Icon(
                                 imageVector = Icons.Outlined.Refresh,
-                                contentDescription = stringResource(R.string.detail_action_refresh),
+                                contentDescription = refreshLabel,
                             )
                         }
                     },
@@ -541,8 +549,12 @@ fun NovelDetailScreen(
                                     style = MaterialTheme.typography.bodySmall,
                                     modifier = Modifier.weight(1f),
                                 )
-                                IconButton(onClick = { showOfflinePreservedBanner = false }) {
-                                    Icon(imageVector = Icons.Outlined.Close, contentDescription = null)
+                                val dismissLabel = stringResource(R.string.action_dismiss_banner)
+                                TooltipIconButton(
+                                    tooltipText = dismissLabel,
+                                    onClick = { showOfflinePreservedBanner = false },
+                                ) {
+                                    Icon(imageVector = Icons.Outlined.Close, contentDescription = dismissLabel)
                                 }
                             }
                         }
@@ -1259,17 +1271,20 @@ private fun NovelActionDeck(
                     }
                 },
                 trailingButton = {
-                    SplitButtonDefaults.TrailingButton(
-                        checked = showReadDropdownMenu,
-                        onCheckedChange = onShowReadDropdownMenuChange,
-                        enabled = hasReadableToc,
-                        modifier = Modifier.testTag(NovelDetailTestTags.READ_TRAILING_BUTTON),
-                    ) {
-                        Icon(
-                            imageVector = Icons.Outlined.ExpandMore,
-                            contentDescription = stringResource(R.string.detail_read_menu_description),
-                            modifier = Modifier.size(SplitButtonDefaults.TrailingIconSize),
-                        )
+                    val readMenuLabel = stringResource(R.string.detail_read_menu_description)
+                    ActionTooltipBox(tooltipText = readMenuLabel) {
+                        SplitButtonDefaults.TrailingButton(
+                            checked = showReadDropdownMenu,
+                            onCheckedChange = onShowReadDropdownMenuChange,
+                            enabled = hasReadableToc,
+                            modifier = Modifier.testTag(NovelDetailTestTags.READ_TRAILING_BUTTON),
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.ExpandMore,
+                                contentDescription = readMenuLabel,
+                                modifier = Modifier.size(SplitButtonDefaults.TrailingIconSize),
+                            )
+                        }
                     }
                 },
             )
@@ -1608,8 +1623,12 @@ private fun VolumeDirectoryHeader(
                 leadingIcon = { Icon(Icons.Outlined.Search, contentDescription = null) },
                 trailingIcon = {
                     if (searchQuery.isNotEmpty()) {
-                        IconButton(onClick = { onSearchQueryChange("") }) {
-                            Icon(Icons.Outlined.Close, contentDescription = null)
+                        val clearLabel = stringResource(R.string.action_clear)
+                        TooltipIconButton(
+                            tooltipText = clearLabel,
+                            onClick = { onSearchQueryChange("") },
+                        ) {
+                            Icon(Icons.Outlined.Close, contentDescription = clearLabel)
                         }
                     }
                 },

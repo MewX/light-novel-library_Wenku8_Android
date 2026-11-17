@@ -71,6 +71,7 @@ import androidx.compose.material3.SplitButtonLayout
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TooltipAnchorPosition
 import androidx.compose.material3.carousel.HorizontalMultiBrowseCarousel
 import androidx.compose.material3.carousel.rememberCarouselState
 import androidx.compose.material3.minimumInteractiveComponentSize
@@ -110,6 +111,8 @@ import org.mewx.wenku8.v2.data.repository.BookshelfSortMode
 import org.mewx.wenku8.v2.data.repository.BookshelfViewMode
 import org.mewx.wenku8.v2.data.repository.CloudBookshelfSyncOutcome
 import org.mewx.wenku8.v2.domain.model.DiscoveryNovelCardItem
+import org.mewx.wenku8.v2.ui.components.ActionTooltipBox
+import org.mewx.wenku8.v2.ui.components.TooltipIconButton
 import org.mewx.wenku8.v2.ui.discovery.formatBookStatusLabel
 import org.mewx.wenku8.v2.ui.navigation.MainScaffoldTestTags
 import org.mewx.wenku8.v2.ui.theme.LocalEinkMode
@@ -663,13 +666,15 @@ private fun OfflineFallbackShelfBanner(
                 style = MaterialTheme.typography.bodyMedium,
                 modifier = Modifier.weight(1f),
             )
-            IconButton(
+            val dismissBannerLabel = stringResource(R.string.action_dismiss_banner)
+            TooltipIconButton(
+                tooltipText = dismissBannerLabel,
                 onClick = onDismiss,
                 modifier = Modifier.testTag(MainScaffoldTestTags.DISMISS_OFFLINE_BANNER_BUTTON),
             ) {
                 Icon(
                     imageVector = Icons.Outlined.Close,
-                    contentDescription = null,
+                    contentDescription = dismissBannerLabel,
                 )
             }
         }
@@ -735,13 +740,15 @@ private fun BookshelfSearchBarRow(
                 )
             }
             if (localQuery.isNotEmpty()) {
-                IconButton(
+                val clearLabel = stringResource(R.string.action_clear)
+                TooltipIconButton(
+                    tooltipText = clearLabel,
                     onClick = { onLocalQueryChange("") },
                     modifier = Modifier.testTag(BookshelfTestTags.CLEAR_LOCAL_SEARCH_BUTTON),
                 ) {
                     Icon(
                         imageVector = Icons.Outlined.Close,
-                        contentDescription = null,
+                        contentDescription = clearLabel,
                     )
                 }
             }
@@ -796,8 +803,10 @@ private fun BookshelfHeaderSection(
                 modifier = Modifier.weight(1f),
             )
 
-            // Cloud Sync button separated cleanly with full 48x48dp touch target
-            IconButton(
+            // Cloud Sync button separated cleanly with full 48x48dp touch target + long-press tooltip
+            val cloudSyncLabel = stringResource(R.string.bookshelf_cloud_sync_action)
+            TooltipIconButton(
+                tooltipText = cloudSyncLabel,
                 onClick = onCloudSyncClick,
                 enabled = !isCloudSyncRunning,
                 modifier = Modifier
@@ -806,13 +815,14 @@ private fun BookshelfHeaderSection(
             ) {
                 Icon(
                     imageVector = Icons.Outlined.CloudSync,
-                    contentDescription = stringResource(R.string.bookshelf_cloud_sync_action),
+                    contentDescription = cloudSyncLabel,
                 )
             }
 
             Spacer(modifier = Modifier.width(4.dp))
 
             Box {
+                val forceSyncMenuLabel = stringResource(R.string.bookshelf_force_sync_menu)
                 SplitButtonLayout(
                     leadingButton = {
                         SplitButtonDefaults.TonalLeadingButton(
@@ -833,16 +843,18 @@ private fun BookshelfHeaderSection(
                         }
                     },
                     trailingButton = {
-                        SplitButtonDefaults.TonalTrailingButton(
-                            checked = showSmartUpdateMenu,
-                            onCheckedChange = onShowSmartUpdateMenuChange,
-                            modifier = Modifier.testTag(BookshelfTestTags.SMART_UPDATE_TRAILING_BUTTON),
-                        ) {
-                            Icon(
-                                imageVector = Icons.Outlined.ExpandMore,
-                                contentDescription = stringResource(R.string.bookshelf_force_sync_menu),
-                                modifier = Modifier.size(SplitButtonDefaults.TrailingIconSize),
-                            )
+                        ActionTooltipBox(tooltipText = forceSyncMenuLabel) {
+                            SplitButtonDefaults.TonalTrailingButton(
+                                checked = showSmartUpdateMenu,
+                                onCheckedChange = onShowSmartUpdateMenuChange,
+                                modifier = Modifier.testTag(BookshelfTestTags.SMART_UPDATE_TRAILING_BUTTON),
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Outlined.ExpandMore,
+                                    contentDescription = forceSyncMenuLabel,
+                                    modifier = Modifier.size(SplitButtonDefaults.TrailingIconSize),
+                                )
+                            }
                         }
                     },
                 )
@@ -1743,58 +1755,76 @@ private fun BookshelfMultiSelectFloatingToolbar(
                 .einkHairlineBorder(FloatingToolbarDefaults.ContainerShape)
                 .testTag(BookshelfTestTags.MULTI_SELECT_TOOLBAR),
         ) {
-            IconButton(
+            val selectAllLabel = stringResource(R.string.bookshelf_batch_select_all)
+            TooltipIconButton(
+                tooltipText = selectAllLabel,
                 onClick = onSelectAll,
+                anchorPosition = TooltipAnchorPosition.Above,
                 modifier = Modifier.testTag(BookshelfTestTags.BATCH_SELECT_ALL),
             ) {
                 Icon(
                     imageVector = Icons.Outlined.SelectAll,
-                    contentDescription = stringResource(R.string.bookshelf_batch_select_all),
+                    contentDescription = selectAllLabel,
                 )
             }
-            IconButton(
+            val smartUpdateLabel = stringResource(R.string.bookshelf_smart_update_action)
+            TooltipIconButton(
+                tooltipText = smartUpdateLabel,
                 onClick = onSmartUpdateSelected,
+                anchorPosition = TooltipAnchorPosition.Above,
                 modifier = Modifier.testTag(BookshelfTestTags.BATCH_SMART_UPDATE),
             ) {
                 Icon(
                     imageVector = Icons.Outlined.SystemUpdateAlt,
-                    contentDescription = stringResource(R.string.bookshelf_smart_update_action),
+                    contentDescription = smartUpdateLabel,
                 )
             }
-            IconButton(
+            val pinTopLabel = stringResource(R.string.bookshelf_batch_pin_top)
+            TooltipIconButton(
+                tooltipText = pinTopLabel,
                 onClick = onPinToTopSelected,
+                anchorPosition = TooltipAnchorPosition.Above,
                 modifier = Modifier.testTag(BookshelfTestTags.BATCH_PIN_TOP),
             ) {
                 Icon(
                     imageVector = Icons.Outlined.VerticalAlignTop,
-                    contentDescription = stringResource(R.string.bookshelf_batch_pin_top),
+                    contentDescription = pinTopLabel,
                 )
             }
-            IconButton(
+            val clearCacheLabel = stringResource(R.string.bookshelf_batch_clear_cache)
+            TooltipIconButton(
+                tooltipText = clearCacheLabel,
                 onClick = onClearCacheSelected,
+                anchorPosition = TooltipAnchorPosition.Above,
                 modifier = Modifier.testTag(BookshelfTestTags.BATCH_CLEAR_CACHE),
             ) {
                 Icon(
                     imageVector = Icons.Outlined.CleaningServices,
-                    contentDescription = stringResource(R.string.bookshelf_batch_clear_cache),
+                    contentDescription = clearCacheLabel,
                 )
             }
-            IconButton(
+            val removeLabel = stringResource(R.string.bookshelf_batch_remove)
+            TooltipIconButton(
+                tooltipText = removeLabel,
                 onClick = onRemoveSelected,
+                anchorPosition = TooltipAnchorPosition.Above,
                 modifier = Modifier.testTag(BookshelfTestTags.BATCH_REMOVE),
             ) {
                 Icon(
                     imageVector = Icons.Outlined.DeleteOutline,
-                    contentDescription = stringResource(R.string.bookshelf_batch_remove),
+                    contentDescription = removeLabel,
                 )
             }
-            IconButton(
+            val doneLabel = stringResource(R.string.bookshelf_batch_done)
+            TooltipIconButton(
+                tooltipText = doneLabel,
                 onClick = onDone,
+                anchorPosition = TooltipAnchorPosition.Above,
                 modifier = Modifier.testTag(BookshelfTestTags.BATCH_DONE),
             ) {
                 Icon(
                     imageVector = Icons.Outlined.Check,
-                    contentDescription = stringResource(R.string.bookshelf_batch_done),
+                    contentDescription = doneLabel,
                 )
             }
         }

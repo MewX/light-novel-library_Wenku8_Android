@@ -99,6 +99,7 @@ import org.mewx.wenku8.v2.data.repository.DeepCleanProgress
 import org.mewx.wenku8.v2.data.repository.ServerNoticeAndUpdateRepository
 import org.mewx.wenku8.v2.data.repository.StorageAndCacheRepository
 import org.mewx.wenku8.v2.data.repository.UserSessionRepository
+import org.mewx.wenku8.v2.ui.components.TooltipIconButton
 import org.mewx.wenku8.v2.ui.navigation.DefaultHomeDestination
 import org.mewx.wenku8.v2.ui.navigation.MainScaffoldTestTags
 import org.mewx.wenku8.v2.ui.theme.Wenku8ThemeMode
@@ -394,11 +395,13 @@ fun ProfileAndStudioScreen(
                             style = MaterialTheme.typography.bodyMedium,
                             modifier = Modifier.weight(1f),
                         )
-                        IconButton(
+                        val dismissLabel = stringResource(R.string.action_dismiss_banner)
+                        TooltipIconButton(
+                            tooltipText = dismissLabel,
                             onClick = onDismissOfflineBanner,
                             modifier = Modifier.testTag(MainScaffoldTestTags.DISMISS_OFFLINE_BANNER_BUTTON),
                         ) {
-                            Icon(imageVector = Icons.Outlined.Close, contentDescription = null)
+                            Icon(imageVector = Icons.Outlined.Close, contentDescription = dismissLabel)
                         }
                     }
                 }
@@ -735,13 +738,15 @@ private fun ProfileHeaderWallpaperCard(
                         },
                     )
                 }
-                IconButton(
+                val aboutLabel = stringResource(R.string.profile_about_action)
+                TooltipIconButton(
+                    tooltipText = aboutLabel,
                     onClick = onOpenAbout,
                     modifier = Modifier.testTag(ProfileStudioTestTags.TOP_ABOUT_BUTTON),
                 ) {
                     Icon(
                         imageVector = Icons.Outlined.Info,
-                        contentDescription = stringResource(R.string.profile_about_action),
+                        contentDescription = aboutLabel,
                         tint = if (hasImageBackdrop) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }

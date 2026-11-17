@@ -83,6 +83,7 @@ import org.mewx.wenku8.v2.data.repository.AccountSessionState
 import org.mewx.wenku8.v2.data.repository.AppVersionCheckResult
 import org.mewx.wenku8.v2.data.repository.DailySignOutcome
 import org.mewx.wenku8.v2.data.repository.LoginOutcome
+import org.mewx.wenku8.v2.ui.components.TooltipIconButton
 import org.mewx.wenku8.v2.data.repository.ParsedServerNotice
 import org.mewx.wenku8.v2.data.repository.UserSessionRepository
 import org.mewx.wenku8.v2.ui.theme.LocalEinkMode
@@ -153,7 +154,9 @@ fun ServerNoticeBannerCard(
                     fontWeight = FontWeight.SemiBold,
                     modifier = Modifier.weight(1f),
                 )
-                IconButton(
+                val dismissNoticeLabel = stringResource(R.string.notice_action_dismiss)
+                TooltipIconButton(
+                    tooltipText = dismissNoticeLabel,
                     onClick = onDismiss,
                     modifier = Modifier
                         .size(36.dp)
@@ -161,7 +164,7 @@ fun ServerNoticeBannerCard(
                 ) {
                     Icon(
                         imageVector = Icons.Outlined.Close,
-                        contentDescription = stringResource(R.string.notice_action_dismiss),
+                        contentDescription = dismissNoticeLabel,
                     )
                 }
             }

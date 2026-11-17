@@ -754,6 +754,12 @@ class BookshelfScreenAndSyncTest {
         composeTestRule.onNodeWithTag(BookshelfTestTags.FLAT_READING_PROGRESS_PREFIX + 5).assertExists()
         composeTestRule.onNodeWithTag(BookshelfTestTags.ACTIVE_WAVY_PROGRESS_PREFIX + 5).assertDoesNotExist()
 
+        // 1b. Long-pressing top-right Cloud Sync button shows its tooltip hint
+        composeTestRule.onNodeWithTag(BookshelfTestTags.CLOUD_SYNC_BUTTON)
+            .performTouchInput { longClick() }
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithText("云端同步").assertIsDisplayed()
+
         // 2. Online search button triggers UnifiedSearchScreen callback
         composeTestRule.onNodeWithTag(BookshelfTestTags.ONLINE_SEARCH_TRIGGER).performClick()
         assertEquals(1, openedOnlineSearchCount)
@@ -781,11 +787,35 @@ class BookshelfScreenAndSyncTest {
         assertEquals(BookshelfViewMode.SPINE_3D, activeViewMode)
         composeTestRule.onNodeWithTag(BookshelfTestTags.BOOK_CARD_PREFIX + 5).assertIsDisplayed()
 
-        // 5. Long-press multi-select summons HorizontalFloatingToolbar; clear cache & remove work
+        // 5. Long-press multi-select summons HorizontalFloatingToolbar; long-pressing each small
+        // icon button displays a descriptive tooltip without accidentally firing onClick!
         composeTestRule.onNodeWithTag(BookshelfTestTags.BOOK_CARD_PREFIX + 5)
             .performTouchInput { longClick() }
         composeTestRule.waitForIdle()
         composeTestRule.onNodeWithTag(BookshelfTestTags.MULTI_SELECT_TOOLBAR).assertIsDisplayed()
+
+        listOf(
+            BookshelfTestTags.BATCH_SELECT_ALL to "全选",
+            BookshelfTestTags.BATCH_PIN_TOP to "置顶",
+            BookshelfTestTags.BATCH_CLEAR_CACHE to "清理缓存",
+            BookshelfTestTags.BATCH_REMOVE to "移出书架",
+            BookshelfTestTags.BATCH_DONE to "完成",
+        ).forEach { (tag, expectedTooltip) ->
+            composeTestRule.onNodeWithTag(tag).performTouchInput { longClick() }
+            composeTestRule.waitForIdle()
+            composeTestRule.onNodeWithText(expectedTooltip).assertIsDisplayed()
+        }
+        composeTestRule.onNodeWithTag(BookshelfTestTags.BATCH_SMART_UPDATE)
+            .performTouchInput { longClick() }
+        composeTestRule.waitForIdle()
+        assertTrue(
+            composeTestRule.onAllNodes(androidx.compose.ui.test.hasText("智能更新"))
+                .fetchSemanticsNodes().size >= 2,
+        )
+        // Multi-select toolbar remains open & remove confirmation dialog did NOT trigger on long-press
+        composeTestRule.onNodeWithTag(BookshelfTestTags.MULTI_SELECT_TOOLBAR).assertIsDisplayed()
+        composeTestRule.onNodeWithTag(BookshelfTestTags.CONFIRM_REMOVE_BUTTON).assertDoesNotExist()
+        assertFalse(database.chapterContentDao().getCachedChapterIdsForNovel(5).isEmpty())
 
         composeTestRule.onNodeWithTag(BookshelfTestTags.BATCH_CLEAR_CACHE).performClick()
         composeTestRule.waitForIdle()

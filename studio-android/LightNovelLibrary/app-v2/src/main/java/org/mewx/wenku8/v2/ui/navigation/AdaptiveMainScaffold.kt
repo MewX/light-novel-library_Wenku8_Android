@@ -92,6 +92,7 @@ import org.mewx.wenku8.v2.domain.model.UnifiedSearchMode
 import org.mewx.wenku8.v2.reader.model.ReaderPageTurnMode
 import org.mewx.wenku8.v2.reader.model.ReaderPaperPreset
 import org.mewx.wenku8.v2.ui.bookshelf.BookshelfScreen
+import org.mewx.wenku8.v2.ui.components.TooltipIconButton
 import org.mewx.wenku8.v2.ui.detail.NovelDetailScreen
 import org.mewx.wenku8.v2.ui.detail.ReaderLaunchRequest
 import org.mewx.wenku8.v2.ui.diagnostics.NetworkDiagnosticsScreen
@@ -1207,7 +1208,9 @@ private fun MainDestinationBody(
                             style = MaterialTheme.typography.bodyMedium,
                             modifier = Modifier.weight(1f),
                         )
-                        IconButton(
+                        val dismissLabel = stringResource(R.string.action_dismiss_banner)
+                        TooltipIconButton(
+                            tooltipText = dismissLabel,
                             onClick = onDismissOfflineBanner,
                             modifier = Modifier.testTag(
                                 MainScaffoldTestTags.DISMISS_OFFLINE_BANNER_BUTTON,
@@ -1215,7 +1218,7 @@ private fun MainDestinationBody(
                         ) {
                             Icon(
                                 imageVector = Icons.Outlined.Close,
-                                contentDescription = null,
+                                contentDescription = dismissLabel,
                             )
                         }
                     }

@@ -43,6 +43,7 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TooltipAnchorPosition
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -53,6 +54,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -72,12 +74,14 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.mewx.wenku8.api.Wenku8API
+import org.mewx.wenku8.v2.R
 import org.mewx.wenku8.v2.data.local.db.dao.ChapterContentDao
 import org.mewx.wenku8.v2.data.local.db.dao.OrderedChapterWithVolume
 import org.mewx.wenku8.v2.reader.engine.ChapterAst
 import org.mewx.wenku8.v2.reader.engine.ChapterBlock
 import org.mewx.wenku8.v2.reader.engine.ChapterTextMatch
 import org.mewx.wenku8.v2.reader.engine.WenkuChapterParser
+import org.mewx.wenku8.v2.ui.components.TooltipIconButton
 import org.mewx.wenku8.v2.ui.theme.LocalEinkMode
 import org.mewx.wenku8.v2.ui.theme.einkHairlineBorder
 import java.util.Locale
@@ -305,10 +309,14 @@ fun ReaderInBookSearchSheet(
                 },
                 trailingIcon = {
                     if (query.isNotEmpty()) {
-                        IconButton(onClick = { query = "" }) {
+                        val clearLabel = stringResource(R.string.action_clear)
+                        TooltipIconButton(
+                            tooltipText = clearLabel,
+                            onClick = { query = "" },
+                        ) {
                             Icon(
                                 imageVector = Icons.Outlined.Clear,
-                                contentDescription = "清空搜索词",
+                                contentDescription = clearLabel,
                             )
                         }
                     }
@@ -973,19 +981,29 @@ fun ReaderTtsFloatingBar(
                 )
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(
+                    val prevLabel = stringResource(R.string.reader_tts_prev_sentence)
+                    TooltipIconButton(
+                        tooltipText = prevLabel,
                         enabled = state.totalUtterances > 0 && state.activeUtteranceIndex > 0,
                         onClick = onSkipPrevious,
+                        anchorPosition = TooltipAnchorPosition.Above,
                         modifier = Modifier.testTag(ReaderTestTags.TTS_PREV_BUTTON),
                     ) {
                         Icon(
                             imageVector = Icons.Outlined.SkipPrevious,
-                            contentDescription = "上一句",
+                            contentDescription = prevLabel,
                         )
                     }
-                    IconButton(
+                    val playPauseLabel = if (state.isSpeaking) {
+                        stringResource(R.string.reader_tts_pause)
+                    } else {
+                        stringResource(R.string.reader_tts_resume)
+                    }
+                    TooltipIconButton(
+                        tooltipText = playPauseLabel,
                         enabled = state.totalUtterances > 0,
                         onClick = onTogglePlayPause,
+                        anchorPosition = TooltipAnchorPosition.Above,
                         modifier = Modifier.testTag(ReaderTestTags.TTS_PLAY_PAUSE_BUTTON),
                     ) {
                         Icon(
@@ -994,29 +1012,35 @@ fun ReaderTtsFloatingBar(
                             } else {
                                 Icons.Outlined.PlayArrow
                             },
-                            contentDescription = if (state.isSpeaking) "暂停朗读" else "继续朗读",
+                            contentDescription = playPauseLabel,
                         )
                     }
-                    IconButton(
+                    val nextLabel = stringResource(R.string.reader_tts_next_sentence)
+                    TooltipIconButton(
+                        tooltipText = nextLabel,
                         enabled = state.totalUtterances > 0 &&
                             state.activeUtteranceIndex < state.totalUtterances - 1,
                         onClick = onSkipNext,
+                        anchorPosition = TooltipAnchorPosition.Above,
                         modifier = Modifier.testTag(ReaderTestTags.TTS_NEXT_BUTTON),
                     ) {
                         Icon(
                             imageVector = Icons.Outlined.SkipNext,
-                            contentDescription = "下一句",
+                            contentDescription = nextLabel,
                         )
                     }
                 }
 
-                IconButton(
+                val stopLabel = stringResource(R.string.reader_tts_stop)
+                TooltipIconButton(
+                    tooltipText = stopLabel,
                     onClick = onStopAndDismiss,
+                    anchorPosition = TooltipAnchorPosition.Above,
                     modifier = Modifier.testTag(ReaderTestTags.TTS_STOP_BUTTON),
                 ) {
                     Icon(
                         imageVector = Icons.Outlined.Close,
-                        contentDescription = "停止朗读",
+                        contentDescription = stopLabel,
                     )
                 }
             }

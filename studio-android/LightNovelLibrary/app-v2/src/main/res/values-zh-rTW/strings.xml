@@ -442,4 +442,21 @@
     <string name="widget_continue_empty_subtitle">點此開啟本地書架或探索最新輕小說</string>
     <string name="widget_continue_action_resume">繼續閱讀</string>
     <string name="widget_continue_action_open_shelf">開啟書架</string>
+
+    <!-- Action Bar & Toolbar Long-Press Tooltips -->
+    <string name="action_dismiss_banner">關閉提示</string>
+    <string name="review_refresh_action">重新整理書評</string>
+    <string name="reader_action_search_in_book">書內搜尋</string>
+    <string name="reader_action_add_bookmark">新增書籤</string>
+    <string name="reader_action_remove_bookmark">移除書籤</string>
+    <string name="reader_action_network_diagnostics">網路檢測</string>
+    <string name="reader_tts_prev_sentence">上一句</string>
+    <string name="reader_tts_pause">暫停朗讀</string>
+    <string name="reader_tts_resume">繼續朗讀</string>
+    <string name="reader_tts_next_sentence">下一句</string>
+    <string name="reader_tts_stop">停止朗讀</string>
+    <string name="artbook_action_close">關閉畫集</string>
+    <string name="artbook_action_rotate_90">旋轉 90°</string>
+    <string name="artbook_action_save">儲存插圖</string>
+    <string name="artbook_action_share">分享插圖</string>
 </resources>

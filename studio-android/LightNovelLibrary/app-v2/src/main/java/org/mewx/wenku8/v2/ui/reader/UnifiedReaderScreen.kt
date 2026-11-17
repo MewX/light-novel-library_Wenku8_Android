@@ -102,6 +102,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -116,6 +117,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.mewx.wenku8.api.Wenku8API
+import org.mewx.wenku8.v2.R
 import org.mewx.wenku8.v2.Wenku8V2Application
 import org.mewx.wenku8.v2.data.local.db.Wenku8Database
 import org.mewx.wenku8.v2.data.local.db.dao.OrderedChapterWithVolume
@@ -140,6 +142,7 @@ import org.mewx.wenku8.v2.reader.engine.ReadingAnchor
 import org.mewx.wenku8.v2.reader.engine.StaticLayoutPaginator
 import org.mewx.wenku8.v2.reader.model.ReaderPageTurnMode
 import org.mewx.wenku8.v2.reader.model.ReaderPaperPreset
+import org.mewx.wenku8.v2.ui.components.TooltipIconButton
 import org.mewx.wenku8.v2.ui.detail.ReaderLaunchRequest
 import org.mewx.wenku8.v2.ui.theme.LocalEinkMode
 import org.mewx.wenku8.v2.ui.theme.einkHairlineBorder
@@ -1143,13 +1146,15 @@ fun UnifiedReaderScreen(
                         .fillMaxWidth()
                         .padding(horizontal = 8.dp, vertical = 6.dp),
                 ) {
-                    IconButton(
+                    val backLabel = stringResource(R.string.action_back)
+                    TooltipIconButton(
+                        tooltipText = backLabel,
                         onClick = onNavigateBack,
                         modifier = Modifier.testTag(ReaderTestTags.HUD_BACK_BUTTON),
                     ) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Outlined.ArrowBack,
-                            contentDescription = "返回",
+                            contentDescription = backLabel,
                         )
                     }
 
@@ -1204,20 +1209,28 @@ fun UnifiedReaderScreen(
                         )
                     }
 
-                    IconButton(
+                    val searchInBookLabel = stringResource(R.string.reader_action_search_in_book)
+                    TooltipIconButton(
+                        tooltipText = searchInBookLabel,
                         onClick = { isSearchSheetOpen = true },
                         modifier = Modifier.testTag(ReaderTestTags.HUD_SEARCH_BUTTON),
                     ) {
                         Icon(
                             imageVector = Icons.Outlined.Search,
-                            contentDescription = "书内搜索",
+                            contentDescription = searchInBookLabel,
                         )
                     }
 
-                    IconButton(
+                    val bookmarkToggleLabel = if (currentChapterBookmark != null) {
+                        stringResource(R.string.reader_action_remove_bookmark)
+                    } else {
+                        stringResource(R.string.reader_action_add_bookmark)
+                    }
+                    TooltipIconButton(
+                        tooltipText = bookmarkToggleLabel,
                         onClick = {
-                            val curChapter = snapshot.activeChapter ?: return@IconButton
-                            val curPage = snapshot.activeReaderPage ?: return@IconButton
+                            val curChapter = snapshot.activeChapter ?: return@TooltipIconButton
+                            val curPage = snapshot.activeReaderPage ?: return@TooltipIconButton
                             coroutineScope.launch {
                                 if (currentChapterBookmark != null) {
                                     withContext(ioDispatcher) {
@@ -1274,7 +1287,7 @@ fun UnifiedReaderScreen(
                             } else {
                                 Icons.Outlined.BookmarkBorder
                             },
-                            contentDescription = if (currentChapterBookmark != null) "移除书签" else "添加书签",
+                            contentDescription = bookmarkToggleLabel,
                             tint = if (currentChapterBookmark != null) {
                                 MaterialTheme.colorScheme.primary
                             } else {
@@ -1283,10 +1296,14 @@ fun UnifiedReaderScreen(
                         )
                     }
 
-                    IconButton(onClick = onOpenNetworkDiagnostics) {
+                    val networkDiagLabel = stringResource(R.string.reader_action_network_diagnostics)
+                    TooltipIconButton(
+                        tooltipText = networkDiagLabel,
+                        onClick = onOpenNetworkDiagnostics,
+                    ) {
                         Icon(
                             imageVector = Icons.Outlined.NetworkCheck,
-                            contentDescription = "网络检测",
+                            contentDescription = networkDiagLabel,
                         )
                     }
                 }
@@ -1788,7 +1805,9 @@ fun UnifiedReaderScreen(
                                                 overflow = TextOverflow.Ellipsis,
                                             )
                                         }
-                                        IconButton(
+                                        val deleteBookmarkLabel = stringResource(R.string.footprint_bookmarks_delete_desc)
+                                        TooltipIconButton(
+                                            tooltipText = deleteBookmarkLabel,
                                             onClick = {
                                                 coroutineScope.launch(ioDispatcher) {
                                                     database.bookmarkNoteDao().deleteBookmarkNoteById(note.id)
@@ -1797,7 +1816,7 @@ fun UnifiedReaderScreen(
                                         ) {
                                             Icon(
                                                 imageVector = Icons.Outlined.Delete,
-                                                contentDescription = "删除书签",
+                                                contentDescription = deleteBookmarkLabel,
                                             )
                                         }
                                     }

@@ -6,11 +6,13 @@ import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
+import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.unit.dp
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
@@ -321,6 +323,17 @@ class NovelDetailAndDownloadTest {
                 preferTraditionalChinese = true,
             ),
         )
+
+        // Long-pressing top-right action bar buttons shows their descriptive tooltips
+        composeTestRule.onNodeWithTag(NovelDetailTestTags.SHARE_BUTTON)
+            .performTouchInput { longClick() }
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithText("分享作品").assertIsDisplayed()
+
+        composeTestRule.onNodeWithTag(NovelDetailTestTags.REFRESH_BUTTON)
+            .performTouchInput { longClick() }
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithText("刷新详情与目录").assertIsDisplayed()
 
         // Title dialog & copy
         composeTestRule.onNodeWithTag(NovelDetailTestTags.NOVEL_TITLE_TEXT).performClick()

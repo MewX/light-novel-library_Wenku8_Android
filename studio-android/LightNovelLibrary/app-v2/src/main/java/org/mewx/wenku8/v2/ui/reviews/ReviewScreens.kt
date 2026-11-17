@@ -99,6 +99,7 @@ import org.mewx.wenku8.v2.data.repository.ReviewSubmitOutcome
 import org.mewx.wenku8.v2.data.repository.ReviewThreadCardItem
 import org.mewx.wenku8.v2.data.repository.ReviewsRepository
 import org.mewx.wenku8.v2.data.repository.UserSessionRepository
+import org.mewx.wenku8.v2.ui.components.TooltipIconButton
 import org.mewx.wenku8.v2.ui.theme.LocalEinkMode
 import org.mewx.wenku8.v2.ui.theme.einkHairlineBorder
 
@@ -273,18 +274,22 @@ fun ReviewListScreen(
                     }
                 },
                 navigationIcon = {
-                    IconButton(
+                    val backLabel = stringResource(R.string.action_back)
+                    TooltipIconButton(
+                        tooltipText = backLabel,
                         onClick = onNavigateBack,
                         modifier = Modifier.testTag(ReviewScreensTestTags.REVIEW_LIST_BACK_BUTTON),
                     ) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Outlined.ArrowBack,
-                            contentDescription = null,
+                            contentDescription = backLabel,
                         )
                     }
                 },
                 actions = {
-                    IconButton(
+                    val refreshLabel = stringResource(R.string.review_refresh_action)
+                    TooltipIconButton(
+                        tooltipText = refreshLabel,
                         onClick = {
                             if (!isInitialOrRefreshLoading) {
                                 coroutineScope.launch {
@@ -295,7 +300,7 @@ fun ReviewListScreen(
                     ) {
                         Icon(
                             imageVector = Icons.Outlined.Refresh,
-                            contentDescription = stringResource(R.string.review_retry_action),
+                            contentDescription = refreshLabel,
                         )
                     }
                 },
@@ -579,18 +584,22 @@ fun ReviewThreadScreen(
                     }
                 },
                 navigationIcon = {
-                    IconButton(
+                    val backLabel = stringResource(R.string.action_back)
+                    TooltipIconButton(
+                        tooltipText = backLabel,
                         onClick = onNavigateBack,
                         modifier = Modifier.testTag(ReviewScreensTestTags.REVIEW_THREAD_BACK_BUTTON),
                     ) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Outlined.ArrowBack,
-                            contentDescription = null,
+                            contentDescription = backLabel,
                         )
                     }
                 },
                 actions = {
-                    IconButton(
+                    val refreshLabel = stringResource(R.string.review_refresh_action)
+                    TooltipIconButton(
+                        tooltipText = refreshLabel,
                         onClick = {
                             if (!isInitialOrRefreshLoading) {
                                 coroutineScope.launch {
@@ -601,7 +610,7 @@ fun ReviewThreadScreen(
                     ) {
                         Icon(
                             imageVector = Icons.Outlined.Refresh,
-                            contentDescription = stringResource(R.string.review_retry_action),
+                            contentDescription = refreshLabel,
                         )
                     }
                 },

@@ -102,6 +102,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
@@ -117,10 +118,12 @@ import kotlinx.coroutines.withContext
 import okhttp3.Dns
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import org.mewx.wenku8.v2.R
 import org.mewx.wenku8.v2.Wenku8V2Application
 import org.mewx.wenku8.v2.data.media.OfflineFirstWenkuImageFetcher
 import org.mewx.wenku8.v2.data.media.WenkuImageRequests
 import org.mewx.wenku8.v2.data.remote.parser.WenkuXmlParsers
+import org.mewx.wenku8.v2.ui.components.TooltipIconButton
 import org.mewx.wenku8.v2.ui.theme.LocalEinkMode
 import java.io.File
 import java.io.FileInputStream
@@ -757,7 +760,13 @@ fun ArtbookLightboxOverlay(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier.fillMaxWidth(),
                     ) {
-                        IconButton(
+                        val closeOrBackLabel = if (isAutoEnteredIllustrationChapter) {
+                            stringResource(R.string.action_back)
+                        } else {
+                            stringResource(R.string.artbook_action_close)
+                        }
+                        TooltipIconButton(
+                            tooltipText = closeOrBackLabel,
                             onClick = onDismiss,
                             modifier = Modifier.testTag(ArtbookTestTags.CLOSE_BUTTON),
                         ) {
@@ -767,11 +776,7 @@ fun ArtbookLightboxOverlay(
                                 } else {
                                     Icons.Outlined.Close
                                 },
-                                contentDescription = if (isAutoEnteredIllustrationChapter) {
-                                    "返回"
-                                } else {
-                                    "关闭画集"
-                                },
+                                contentDescription = closeOrBackLabel,
                             )
                         }
 
@@ -796,17 +801,21 @@ fun ArtbookLightboxOverlay(
                             )
                         }
 
-                        IconButton(
+                        val rotateLabel = stringResource(R.string.artbook_action_rotate_90)
+                        TooltipIconButton(
+                            tooltipText = rotateLabel,
                             onClick = { rotationQuarterTurns = (rotationQuarterTurns + 1) % 4 },
                             modifier = Modifier.testTag(ArtbookTestTags.ROTATE_BUTTON),
                         ) {
                             Icon(
                                 imageVector = Icons.Outlined.Rotate90DegreesCw,
-                                contentDescription = "旋转 90°",
+                                contentDescription = rotateLabel,
                             )
                         }
 
-                        IconButton(
+                        val saveLabel = stringResource(R.string.artbook_action_save)
+                        TooltipIconButton(
+                            tooltipText = saveLabel,
                             onClick = {
                                 coroutineScope.launch {
                                     val savedOk = saveArtbookEntryToMediaStore(
@@ -826,11 +835,13 @@ fun ArtbookLightboxOverlay(
                         ) {
                             Icon(
                                 imageVector = Icons.Outlined.Download,
-                                contentDescription = "保存插图",
+                                contentDescription = saveLabel,
                             )
                         }
 
-                        IconButton(
+                        val shareLabel = stringResource(R.string.artbook_action_share)
+                        TooltipIconButton(
+                            tooltipText = shareLabel,
                             onClick = {
                                 coroutineScope.launch {
                                     val sharedOk = shareArtbookEntryViaFileProvider(
@@ -850,7 +861,7 @@ fun ArtbookLightboxOverlay(
                         ) {
                             Icon(
                                 imageVector = Icons.Outlined.Share,
-                                contentDescription = "分享插图",
+                                contentDescription = shareLabel,
                             )
                         }
                     }

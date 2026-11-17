@@ -75,6 +75,7 @@ import org.mewx.wenku8.v2.data.repository.DiscoveryRepository
 import org.mewx.wenku8.v2.domain.model.DiscoveryNovelCardItem
 import org.mewx.wenku8.v2.domain.model.OnlineSearchExecutionState
 import org.mewx.wenku8.v2.domain.model.UnifiedSearchMode
+import org.mewx.wenku8.v2.ui.components.TooltipIconButton
 import org.mewx.wenku8.v2.ui.discovery.DiscoveryFeedErrorCard
 import org.mewx.wenku8.v2.ui.discovery.DiscoveryNovelCard
 import org.mewx.wenku8.v2.ui.theme.LocalEinkMode
@@ -210,13 +211,15 @@ fun UnifiedSearchScreen(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    IconButton(
+                    val backLabel = stringResource(R.string.action_back)
+                    TooltipIconButton(
+                        tooltipText = backLabel,
                         onClick = onNavigateBack,
                         modifier = Modifier.testTag(UnifiedSearchTestTags.BACK_BUTTON),
                     ) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Outlined.ArrowBack,
-                            contentDescription = stringResource(R.string.action_back),
+                            contentDescription = backLabel,
                         )
                     }
 
@@ -239,7 +242,9 @@ fun UnifiedSearchScreen(
                         },
                         trailingIcon = {
                             if (queryText.isNotEmpty()) {
-                                IconButton(
+                                val clearLabel = stringResource(R.string.action_clear)
+                                TooltipIconButton(
+                                    tooltipText = clearLabel,
                                     onClick = {
                                         queryText = ""
                                         showDirectAidValidationError = false
@@ -248,7 +253,7 @@ fun UnifiedSearchScreen(
                                 ) {
                                     Icon(
                                         imageVector = Icons.Outlined.Close,
-                                        contentDescription = stringResource(R.string.action_clear),
+                                        contentDescription = clearLabel,
                                     )
                                 }
                             }
