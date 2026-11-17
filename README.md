@@ -19,6 +19,7 @@
   - [核心特性亮点](#v2-highlights)
   - [Credits 与 Vibe Coding 致谢声明](#credits)
   - [2.0 版本主要视图（Pixel 8 实机截图）](#app-2.0-main-view)
+  - [墨水屏高对比模式（E-Ink 专属适配）](#v2-eink)
   - [2.0 源代码结构与架构](#app-2.0-source)
   - [2.0 技术栈与开源依赖](#v2-libs)
   - [编译构建说明（`:api` 与 `api-stub`）](#build-guide)
@@ -113,6 +114,21 @@
 [![2.0-login](screenshots/v2/2.0-login.thumb.jpg)](screenshots/v2/2.0-login.jpg)
 [![2.0-profile-settings](screenshots/v2/2.0-profile-settings.thumb.jpg)](screenshots/v2/2.0-profile-settings.jpg)
 [![2.0-network-diagnostics](screenshots/v2/2.0-network-diagnostics.thumb.jpg)](screenshots/v2/2.0-network-diagnostics.jpg)
+
+---
+
+### <a id="v2-eink"></a>墨水屏高对比模式（E-Ink 专属适配）
+
+针对文石（BOOX）、汉王、掌阅、墨案等开放式 Android 电子纸阅读器，`2.0` 内置了全局级的 **墨水屏高对比模式（E-Ink Mode）**，并非简单的黑白滤镜，而是从主题令牌、组件描边到动画曲线的深度定制：
+
+- **纯白底色与纯黑油墨对比**：全局移除 Material 3 默认的灰阶阴影与半透明表面叠色，统一采用 `#FFFFFF` 纯白背景与 `#000000` 高对比文字/主按钮，彻底杜绝电子纸灰阶抖动发虚。
+- **全局 `1dp` 实体描边**：所有卡片、搜索框、筛选标签、分卷面板、浮动工具栏与底部导航栏自动切换为锐利的 `1dp` 实体黑框，层级边界一目了然。
+- **零残影无动画交互 + 墨水屏极速翻页**：全局关闭页面切换与弹窗过渡动画，配合阅读器内置的 **“墨水屏极速”** 无动画瞬切翻页模式与物理音量键翻页，最大限度减少电子墨水屏刷新残影与闪烁。
+
+[![2.0-eink-bookshelf](screenshots/v2/2.0-eink-bookshelf.thumb.jpg)](screenshots/v2/2.0-eink-bookshelf.jpg)
+[![2.0-eink-novel-detail](screenshots/v2/2.0-eink-novel-detail.thumb.jpg)](screenshots/v2/2.0-eink-novel-detail.jpg)
+[![2.0-eink-reader](screenshots/v2/2.0-eink-reader.thumb.jpg)](screenshots/v2/2.0-eink-reader.jpg)
+[![2.0-eink-profile](screenshots/v2/2.0-eink-profile.thumb.jpg)](screenshots/v2/2.0-eink-profile.jpg)
 
 ---
 
