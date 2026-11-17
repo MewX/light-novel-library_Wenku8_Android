@@ -1085,14 +1085,29 @@ class ArtbookSearchAndTtsTest {
         assertEquals(0, navigateBackCount)
         assertEquals(9101, runBlocking { database.readingProgressDao().getProgressForNovel(6144)?.cid })
 
-        // 6. Jump to Volume 2 (`9201`), which has NO illustration chapter -> "本卷插图" MUST NOT appear!
+        // 6. Open TOC in Volume 1 -> MUST only list Volume 1 chapters (`9101`, `9103`), excluding Volume 2 (`9201`),
+        //    then advance via `9103` -> Next Chapter into Volume 2 (`9201`) and verify both no "本卷插图" button
+        //    and Volume 2 TOC only lists `9201`!
         composeTestRule.onNodeWithTag(ReaderTestTags.PAGED_HORIZONTAL_PAGER).performTouchInput {
             click(Offset(x = width * 0.5f, y = height * 0.5f))
         }
         composeTestRule.waitForIdle()
         composeTestRule.onNodeWithTag(ReaderTestTags.ACTION_TOC).performClick()
         composeTestRule.waitForIdle()
-        composeTestRule.onNodeWithTag(ReaderTestTags.TOC_CHAPTER_ITEM_PREFIX + "9201").performClick()
+        composeTestRule.onNodeWithTag(ReaderTestTags.TOC_HEADER_TITLE).assertTextEquals("本卷目录 (2)")
+        composeTestRule.onNodeWithTag(ReaderTestTags.TOC_VOLUME_SUBTITLE).assertTextEquals("第一卷")
+        composeTestRule.onNodeWithTag(ReaderTestTags.TOC_CHAPTER_ITEM_PREFIX + "9101").assertIsDisplayed()
+        composeTestRule.onNodeWithTag(ReaderTestTags.TOC_CHAPTER_ITEM_PREFIX + "9103").assertIsDisplayed()
+        assertEquals(
+            "Reader TOC sheet must only show chapters from the current volume",
+            0,
+            composeTestRule.onAllNodesWithTag(ReaderTestTags.TOC_CHAPTER_ITEM_PREFIX + "9201")
+                .fetchSemanticsNodes().size,
+        )
+
+        composeTestRule.onNodeWithTag(ReaderTestTags.TOC_CHAPTER_ITEM_PREFIX + "9103").performClick()
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag(ArtbookTestTags.NEXT_CHAPTER_CHIP).performClick()
         composeTestRule.waitForIdle()
         assertEquals(9201, runBlocking { database.readingProgressDao().getProgressForNovel(6144)?.cid })
 
@@ -1104,6 +1119,17 @@ class ArtbookSearchAndTtsTest {
             "Volumes without any illustration chapter must not show HUD_PEEK_VOLUME_ILLUSTRATIONS_BUTTON",
             0,
             composeTestRule.onAllNodesWithTag(ReaderTestTags.HUD_PEEK_VOLUME_ILLUSTRATIONS_BUTTON)
+                .fetchSemanticsNodes().size,
+        )
+
+        composeTestRule.onNodeWithTag(ReaderTestTags.ACTION_TOC).performClick()
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag(ReaderTestTags.TOC_HEADER_TITLE).assertTextEquals("本卷目录 (1)")
+        composeTestRule.onNodeWithTag(ReaderTestTags.TOC_VOLUME_SUBTITLE).assertTextEquals("第二卷")
+        composeTestRule.onNodeWithTag(ReaderTestTags.TOC_CHAPTER_ITEM_PREFIX + "9201").assertIsDisplayed()
+        assertEquals(
+            0,
+            composeTestRule.onAllNodesWithTag(ReaderTestTags.TOC_CHAPTER_ITEM_PREFIX + "9101")
                 .fetchSemanticsNodes().size,
         )
     }

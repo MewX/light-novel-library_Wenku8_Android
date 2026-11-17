@@ -43,6 +43,7 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -205,6 +206,8 @@ object ReaderTestTags {
     const val PAGE_MODE_ITEM_PREFIX = "reader_page_mode_item_"
     const val PAPER_PRESET_CHIP_PREFIX = "reader_paper_preset_"
     const val TOC_SHEET = "reader_toc_sheet"
+    const val TOC_HEADER_TITLE = "reader_toc_header_title"
+    const val TOC_VOLUME_SUBTITLE = "reader_toc_volume_subtitle"
     const val TOC_CHAPTER_ITEM_PREFIX = "reader_toc_chapter_"
     const val BOOKMARKS_SHEET = "reader_bookmarks_sheet"
     const val BRIGHTNESS_PILL = "reader_brightness_pill"
@@ -2220,8 +2223,29 @@ fun UnifiedReaderScreen(
             }
         }
 
-        // Volume & Chapter TOC ModalBottomSheet
+        // Current-Volume Chapter TOC ModalBottomSheet
         if (isTocSheetOpen) {
+            val activeChapter = snapshot.activeChapter
+            val activeVid = activeChapter?.vid ?: launchRequest.vid
+            val activeVolumeTitle = activeChapter?.volumeTitle
+                ?.ifBlank { launchRequest.volumeTitle }
+                ?: launchRequest.volumeTitle
+            val currentVolumeToc = remember(snapshot.orderedToc, activeVid, activeVolumeTitle) {
+                val filtered = when {
+                    activeVid > 0 -> snapshot.orderedToc.filter { it.vid == activeVid }
+                    activeVolumeTitle.isNotBlank() -> {
+                        snapshot.orderedToc.filter { it.volumeTitle == activeVolumeTitle }
+                    }
+                    else -> emptyList()
+                }
+                filtered.ifEmpty { snapshot.orderedToc }
+            }
+            val activeIndexInVolume = remember(currentVolumeToc, activeChapter?.cid) {
+                currentVolumeToc.indexOfFirst { it.cid == activeChapter?.cid }.coerceAtLeast(0)
+            }
+            val tocListState = rememberLazyListState(
+                initialFirstVisibleItemIndex = (activeIndexInVolume - 2).coerceAtLeast(0),
+            )
             ModalBottomSheet(
                 onDismissRequest = { isTocSheetOpen = false },
                 modifier = Modifier.testTag(ReaderTestTags.TOC_SHEET),
@@ -2233,19 +2257,37 @@ fun UnifiedReaderScreen(
                         .padding(horizontal = 16.dp, vertical = 8.dp),
                 ) {
                     Text(
-                        text = "章节目录 (${snapshot.orderedToc.size})",
+                        text = stringResource(
+                            R.string.reader_toc_current_volume_header_format,
+                            currentVolumeToc.size,
+                        ),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(bottom = 12.dp),
+                        modifier = Modifier.testTag(ReaderTestTags.TOC_HEADER_TITLE),
                     )
+                    if (activeVolumeTitle.isNotBlank()) {
+                        Text(
+                            text = activeVolumeTitle,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier
+                                .padding(top = 2.dp, bottom = 12.dp)
+                                .testTag(ReaderTestTags.TOC_VOLUME_SUBTITLE),
+                        )
+                    } else {
+                        Spacer(modifier = Modifier.height(12.dp))
+                    }
                     LazyColumn(
+                        state = tocListState,
                         verticalArrangement = Arrangement.spacedBy(4.dp),
                     ) {
                         items(
-                            items = snapshot.orderedToc,
+                            items = currentVolumeToc,
                             key = { it.cid },
                         ) { entry ->
-                            val isCurrent = entry.cid == snapshot.activeChapter?.cid
+                            val isCurrent = entry.cid == activeChapter?.cid
                             val isCached = entry.cid in cachedChapterIds
                             Surface(
                                 color = if (isCurrent) {
@@ -2271,31 +2313,26 @@ fun UnifiedReaderScreen(
                                         .fillMaxWidth()
                                         .padding(horizontal = 12.dp, vertical = 10.dp),
                                 ) {
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        Text(
-                                            text = entry.volumeTitle,
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        )
-                                        Text(
-                                            text = entry.chapterTitle,
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Normal,
-                                        )
-                                    }
+                                    Text(
+                                        text = entry.chapterTitle,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Normal,
+                                        modifier = Modifier.weight(1f),
+                                    )
                                     if (entry.isIllustrationChapter) {
                                         Text(
-                                            text = "🖼 插图",
+                                            text = stringResource(R.string.reader_toc_illustration_badge),
                                             style = MaterialTheme.typography.labelSmall,
                                             color = MaterialTheme.colorScheme.tertiary,
-                                            modifier = Modifier.padding(end = 8.dp),
+                                            modifier = Modifier.padding(start = 8.dp),
                                         )
                                     }
                                     if (isCached) {
                                         Text(
-                                            text = "已缓存",
+                                            text = stringResource(R.string.reader_toc_cached_badge),
                                             style = MaterialTheme.typography.labelSmall,
                                             color = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.padding(start = 8.dp),
                                         )
                                     }
                                 }
