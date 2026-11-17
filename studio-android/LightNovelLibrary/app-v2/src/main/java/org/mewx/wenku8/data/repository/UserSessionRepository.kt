@@ -240,6 +240,7 @@ class UserSessionRepository(
 ) {
     companion object {
         const val MAX_CREDENTIAL_LENGTH: Int = 30
+        const val FORGOT_PASSWORD_URL: String = "https://www.wenku8.com/getpass.php"
         const val SAVES_FOLDER_NAME: String = "saves"
         const val CERT_FILE_NAME: String = "cert.wk8"
         const val CANONICAL_UNAME_FILE_NAME: String = "account_uname.wk8"
@@ -353,6 +354,9 @@ class UserSessionRepository(
         authMutex.withLock {
             if (!isAuthSupported) {
                 _sessionState.value = AccountSessionState.UnavailableStub
+                return@withLock
+            }
+            if (_sessionState.value is AccountSessionState.SignedIn) {
                 return@withLock
             }
 
@@ -585,6 +589,19 @@ class UserSessionRepository(
     }
 
     /**
+     * Ensures saved `saves/cert.wk8` credentials have been restored into an active session before
+     * cold-start Cloud Bookcase sync runs. Shares [authMutex] with [initializeSessionOnStartup] so
+     * that if startup restoration already completed while waiting on the lock, the active session
+     * is reused without issuing a duplicate login request.
+     */
+    suspend fun ensureSessionRestoredForStartupSync(): Boolean = withContext(ioDispatcher) {
+        authMutex.withLock {
+            if (_sessionState.value is AccountSessionState.SignedIn) return@withLock true
+            restoreFromSavedCredentialsLocked()
+        }
+    }
+
+    /**
      * Performs a bounded single re-login using stored `saves/cert.wk8` credentials when another
      * authenticated endpoint (e.g., review posting or cloud bookcase sync) receives
      * `SYSTEM_4_NOT_LOGGED_IN` (`4`) due to an expired `PHPSESSID` cookie.
@@ -594,45 +611,49 @@ class UserSessionRepository(
      */
     suspend fun reauthenticateFromSavedCredentialsIfPossible(): Boolean = withContext(ioDispatcher) {
         authMutex.withLock {
-            if (!isAuthSupported) return@withLock false
-            val creds = cachedCredentials ?: loadCredentialsFromDisk() ?: return@withLock false
-            cachedCredentials = creds
-            authGateway.syncInMemoryCredentials(creds.identifier, creds.password)
+            restoreFromSavedCredentialsLocked()
+        }
+    }
 
-            when (executeLoginCallLocked(creds.identifier, creds.password)) {
-                Wenku8Error.ErrorCode.SYSTEM_1_SUCCEEDED -> {
-                    val (freshInfo, freshAvatar) = fetchUserInfoAndAvatarLocked(allowSingleRelogin = false)
-                    val currentSignedIn = _sessionState.value as? AccountSessionState.SignedIn
-                    val resolvedUname = freshInfo?.username?.takeIf { it.isNotBlank() }
-                        ?: cachedCanonicalUsername
-                        ?: currentSignedIn?.profile?.username?.takeIf { it.isNotBlank() && !it.contains('@') }
-                        ?: creds.identifier.takeIf { !it.contains('@') }
-                    if (!resolvedUname.isNullOrBlank()) {
-                        persistCanonicalUsernameLocked(resolvedUname)
-                    }
-                    val profile = freshInfo ?: currentSignedIn?.profile ?: ParsedUserInfo(
-                        username = resolvedUname ?: creds.identifier,
-                        nickname = resolvedUname ?: creds.identifier,
-                    )
-                    _sessionState.value = AccountSessionState.SignedIn(
-                        profile = profile,
-                        cachedAvatarFile = freshAvatar ?: currentSignedIn?.cachedAvatarFile ?: findExistingAvatarFile(),
-                        avatarCacheBusterMs = System.currentTimeMillis(),
-                        dailySignStatus = currentSignedIn?.dailySignStatus ?: DailySignStatus.IDLE,
-                    )
-                    true
+    private suspend fun restoreFromSavedCredentialsLocked(): Boolean {
+        if (!isAuthSupported) return false
+        val creds = cachedCredentials ?: loadCredentialsFromDisk() ?: return false
+        cachedCredentials = creds
+        authGateway.syncInMemoryCredentials(creds.identifier, creds.password)
+
+        return when (executeLoginCallLocked(creds.identifier, creds.password)) {
+            Wenku8Error.ErrorCode.SYSTEM_1_SUCCEEDED -> {
+                val (freshInfo, freshAvatar) = fetchUserInfoAndAvatarLocked(allowSingleRelogin = false)
+                val currentSignedIn = _sessionState.value as? AccountSessionState.SignedIn
+                val resolvedUname = freshInfo?.username?.takeIf { it.isNotBlank() }
+                    ?: cachedCanonicalUsername
+                    ?: currentSignedIn?.profile?.username?.takeIf { it.isNotBlank() && !it.contains('@') }
+                    ?: creds.identifier.takeIf { !it.contains('@') }
+                if (!resolvedUname.isNullOrBlank()) {
+                    persistCanonicalUsernameLocked(resolvedUname)
                 }
-
-                Wenku8Error.ErrorCode.SYSTEM_2_ERROR_USERNAME,
-                Wenku8Error.ErrorCode.SYSTEM_3_ERROR_PASSWORD,
-                -> {
-                    wipeStoredAccountFilesAndMemoryLocked()
-                    _sessionState.value = AccountSessionState.SignedOut
-                    false
-                }
-
-                else -> false
+                val profile = freshInfo ?: currentSignedIn?.profile ?: ParsedUserInfo(
+                    username = resolvedUname ?: creds.identifier,
+                    nickname = resolvedUname ?: creds.identifier,
+                )
+                _sessionState.value = AccountSessionState.SignedIn(
+                    profile = profile,
+                    cachedAvatarFile = freshAvatar ?: currentSignedIn?.cachedAvatarFile ?: findExistingAvatarFile(),
+                    avatarCacheBusterMs = System.currentTimeMillis(),
+                    dailySignStatus = currentSignedIn?.dailySignStatus ?: DailySignStatus.IDLE,
+                )
+                true
             }
+
+            Wenku8Error.ErrorCode.SYSTEM_2_ERROR_USERNAME,
+            Wenku8Error.ErrorCode.SYSTEM_3_ERROR_PASSWORD,
+            -> {
+                wipeStoredAccountFilesAndMemoryLocked()
+                _sessionState.value = AccountSessionState.SignedOut
+                false
+            }
+
+            else -> false
         }
     }
 

@@ -301,8 +301,13 @@
     <string name="bookshelf_local_search_placeholder">在本地書架搜尋書名、作者、標籤或編號…</string>
     <string name="bookshelf_online_search_button">搜全站</string>
     <string name="bookshelf_cloud_sync_action">雲端同步</string>
+    <string name="bookshelf_more_sync_options">更多更新選項</string>
     <string name="bookshelf_smart_update_action">智慧更新</string>
+    <string name="bookshelf_smart_update_menu_desc">逐本檢查目錄並補齊已快取新章節</string>
     <string name="bookshelf_force_sync_menu">強制重新整理全部雲端書目</string>
+    <string name="bookshelf_force_sync_confirm_title">強制重新整理全部雲端書目</string>
+    <string name="bookshelf_force_sync_confirm_body">將無視本地快取重新拉取全部藏書的詳情與目錄（僅用於修復異常快取，耗時較長），確定繼續嗎？</string>
+    <string name="bookshelf_force_sync_confirm_action">確定重新整理</string>
     <string name="bookshelf_view_grid">網格</string>
     <string name="bookshelf_view_list">清單</string>
     <string name="bookshelf_view_spine">書脊</string>

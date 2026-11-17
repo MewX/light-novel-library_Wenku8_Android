@@ -15,7 +15,6 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.Semaphore
-import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
@@ -33,6 +32,7 @@ import org.mewx.wenku8.util.DigestUtils
 import java.nio.charset.StandardCharsets
 import java.text.Collator
 import java.util.Locale
+import java.util.concurrent.atomic.AtomicBoolean
 
 enum class BookshelfViewMode {
     GRID,
@@ -90,8 +90,12 @@ data class BookshelfSnapshot(
     val availableImprints: List<String> = emptyList(),
     val availableTags: List<String> = emptyList(),
     val isCloudSyncRunning: Boolean = false,
+    val isSmartUpdateRunning: Boolean = false,
     val syncingNovelAids: Set<Int> = emptySet(),
-)
+) {
+    val isShelfTaskRunning: Boolean
+        get() = isCloudSyncRunning || isSmartUpdateRunning
+}
 
 sealed interface CloudBookshelfSyncOutcome {
     data class Success(
@@ -104,6 +108,7 @@ sealed interface CloudBookshelfSyncOutcome {
         val failedHydrationCount: Int = 0,
     ) : CloudBookshelfSyncOutcome
 
+    data object AlreadyRunning : CloudBookshelfSyncOutcome
     data object ApiNotConfigured : CloudBookshelfSyncOutcome
     data object NotLoggedIn : CloudBookshelfSyncOutcome
     data class NetworkOrServerError(
@@ -116,6 +121,7 @@ data class SmartBatchUpdateSummary(
     val updatedNovelCount: Int,
     val newlyDownloadedChapterCount: Int,
     val failedNovelCount: Int,
+    val skippedBecauseBusy: Boolean = false,
 )
 
 /**
@@ -236,8 +242,16 @@ class BookshelfRepository(
     }
 
     private val syncMutex = Mutex()
+    private val coldStartFirstEntryConsumed = AtomicBoolean(false)
+
     private val _isCloudSyncRunning = MutableStateFlow(false)
     val isCloudSyncRunning: StateFlow<Boolean> = _isCloudSyncRunning.asStateFlow()
+
+    private val _isSmartUpdateRunning = MutableStateFlow(false)
+    val isSmartUpdateRunning: StateFlow<Boolean> = _isSmartUpdateRunning.asStateFlow()
+
+    val isShelfTaskRunning: Boolean
+        get() = _isCloudSyncRunning.value || _isSmartUpdateRunning.value
 
     private val _syncingNovelAids = MutableStateFlow<Set<Int>>(emptySet())
     val syncingNovelAids: StateFlow<Set<Int>> = _syncingNovelAids.asStateFlow()
@@ -249,6 +263,21 @@ class BookshelfRepository(
 
     val isApiConfigured: Boolean
         get() = catalogGateway.isApiConfigured
+
+    /**
+     * Evaluates cold-start first-entry auto-sync eligibility (`v1` `FavFragment` `timecount == 0` parity).
+     *
+     * Consumed atomically at most once per process launch on the first entry into `本地书架`, and
+     * returns `true` only when a Wenku8 account is signed in (or persisted in `saves/cert.wk8`),
+     * leaving signed-out users undisturbed and never re-triggering on tab switches or back navigation.
+     */
+    fun consumeColdStartAutoSyncEligibility(): Boolean {
+        if (!coldStartFirstEntryConsumed.compareAndSet(false, true)) {
+            return false
+        }
+        val sessionRepo = userSessionRepository ?: return false
+        return catalogGateway.isApiConfigured && sessionRepo.activeAccountKeyOrNull() != null
+    }
 
     fun observeBookshelfSnapshot(): Flow<BookshelfSnapshot> {
         val dbSnapshotFlow = combine(
@@ -268,8 +297,9 @@ class BookshelfRepository(
         return combine(
             dbSnapshotFlow,
             _isCloudSyncRunning,
+            _isSmartUpdateRunning,
             _syncingNovelAids,
-        ) { bundle, cloudSyncRunning, activeSyncAids ->
+        ) { bundle, cloudSyncRunning, smartUpdateRunning, activeSyncAids ->
             val items = bundle.shelfNovels.map { novel ->
                 BookshelfItemModel(
                     novel = novel,
@@ -319,6 +349,7 @@ class BookshelfRepository(
                 availableImprints = imprints,
                 availableTags = topTags,
                 isCloudSyncRunning = cloudSyncRunning,
+                isSmartUpdateRunning = smartUpdateRunning,
                 syncingNovelAids = activeSyncAids,
             )
         }.onEach { snapshot ->
@@ -350,19 +381,22 @@ class BookshelfRepository(
     suspend fun syncWithCloudBookcase(
         appLanguage: Wenku8API.AppLanguage,
         forceRefreshAll: Boolean = false,
-    ): CloudBookshelfSyncOutcome = withContext(ioDispatcher) {
-        syncMutex.withLock {
-            if (!catalogGateway.isApiConfigured) {
-                return@withLock CloudBookshelfSyncOutcome.ApiNotConfigured
-            }
-            if (!ensureAuthenticatedForCloudSync()) {
-                return@withLock CloudBookshelfSyncOutcome.NotLoggedIn
-            }
-            val accountKey = resolveActiveLedgerAccountKey()
-                ?: return@withLock CloudBookshelfSyncOutcome.NotLoggedIn
+    ): CloudBookshelfSyncOutcome {
+        if (!syncMutex.tryLock()) {
+            return CloudBookshelfSyncOutcome.AlreadyRunning
+        }
+        _isCloudSyncRunning.value = true
+        return try {
+            withContext(ioDispatcher) {
+                if (!catalogGateway.isApiConfigured) {
+                    return@withContext CloudBookshelfSyncOutcome.ApiNotConfigured
+                }
+                if (!ensureAuthenticatedForCloudSync()) {
+                    return@withContext CloudBookshelfSyncOutcome.NotLoggedIn
+                }
+                val accountKey = resolveActiveLedgerAccountKey()
+                    ?: return@withContext CloudBookshelfSyncOutcome.NotLoggedIn
 
-            _isCloudSyncRunning.value = true
-            try {
                 val ledgerDao = database.cloudBookcaseLedgerDao()
 
                 // Migrate any offline ledger entries recorded under an email login hint into the
@@ -434,19 +468,19 @@ class BookshelfRepository(
 
                 var rawCloudEntries = when (cloudResult) {
                     is WenkuApiResult.Success -> cloudResult.data
-                    WenkuApiResult.ApiNotConfigured -> return@withLock CloudBookshelfSyncOutcome.ApiNotConfigured
+                    WenkuApiResult.ApiNotConfigured -> return@withContext CloudBookshelfSyncOutcome.ApiNotConfigured
                     is WenkuApiResult.ServerErrorCode -> {
-                        return@withLock if (cloudResult.numericCode == SERVER_CODE_NOT_LOGGED_IN) {
+                        return@withContext if (cloudResult.numericCode == SERVER_CODE_NOT_LOGGED_IN) {
                             CloudBookshelfSyncOutcome.NotLoggedIn
                         } else {
                             CloudBookshelfSyncOutcome.NetworkOrServerError(numericCode = cloudResult.numericCode)
                         }
                     }
                     is WenkuApiResult.NetworkError -> {
-                        return@withLock CloudBookshelfSyncOutcome.NetworkOrServerError(debugDetail = cloudResult.debugDetail)
+                        return@withContext CloudBookshelfSyncOutcome.NetworkOrServerError(debugDetail = cloudResult.debugDetail)
                     }
                     is WenkuApiResult.ParseError -> {
-                        return@withLock CloudBookshelfSyncOutcome.NetworkOrServerError(debugDetail = cloudResult.rawPreview)
+                        return@withContext CloudBookshelfSyncOutcome.NetworkOrServerError(debugDetail = cloudResult.rawPreview)
                     }
                 }
 
@@ -469,7 +503,7 @@ class BookshelfRepository(
                         }
 
                         is WenkuApiResult.ServerErrorCode -> {
-                            return@withLock if (verifyAidList.numericCode == SERVER_CODE_NOT_LOGGED_IN) {
+                            return@withContext if (verifyAidList.numericCode == SERVER_CODE_NOT_LOGGED_IN) {
                                 CloudBookshelfSyncOutcome.NotLoggedIn
                             } else {
                                 CloudBookshelfSyncOutcome.NetworkOrServerError(numericCode = verifyAidList.numericCode)
@@ -477,11 +511,11 @@ class BookshelfRepository(
                         }
 
                         is WenkuApiResult.NetworkError -> {
-                            return@withLock CloudBookshelfSyncOutcome.NetworkOrServerError(debugDetail = verifyAidList.debugDetail)
+                            return@withContext CloudBookshelfSyncOutcome.NetworkOrServerError(debugDetail = verifyAidList.debugDetail)
                         }
 
                         is WenkuApiResult.ParseError -> {
-                            return@withLock CloudBookshelfSyncOutcome.NetworkOrServerError(debugDetail = verifyAidList.rawPreview)
+                            return@withContext CloudBookshelfSyncOutcome.NetworkOrServerError(debugDetail = verifyAidList.rawPreview)
                         }
                     }
                 }
@@ -646,131 +680,150 @@ class BookshelfRepository(
                     removedRemotelyDeletedCount = removedRemotelyDeletedCount,
                     failedHydrationCount = failedHydrationCount,
                 )
-            } finally {
-                _isCloudSyncRunning.value = false
             }
+        } finally {
+            _isCloudSyncRunning.value = false
+            syncMutex.unlock()
         }
     }
 
     /**
      * Smart-updates metadata, atomic TOC, and any missing chapters for novels that already have
      * offline chapter caches (powering the shelf header & multi-select `智能更新` action).
+     *
+     * Mutually excluded against [syncWithCloudBookcase] and other smart-update invocations via
+     * [syncMutex] so overlapping shelf tasks cannot race or queue up duplicate network passes.
      */
     suspend fun smartUpdateShelfNovels(
         aids: List<Int>,
         appLanguage: Wenku8API.AppLanguage,
-    ): SmartBatchUpdateSummary = withContext(ioDispatcher) {
+    ): SmartBatchUpdateSummary {
         val targetAids = aids.distinct().filter { it > 0 }
         if (targetAids.isEmpty() || !catalogGateway.isApiConfigured) {
-            return@withContext SmartBatchUpdateSummary(0, 0, 0)
+            return SmartBatchUpdateSummary(0, 0, 0)
         }
+        if (!syncMutex.tryLock()) {
+            return SmartBatchUpdateSummary(
+                updatedNovelCount = 0,
+                newlyDownloadedChapterCount = 0,
+                failedNovelCount = 0,
+                skippedBecauseBusy = true,
+            )
+        }
+        _isSmartUpdateRunning.value = true
+        return try {
+            withContext(ioDispatcher) {
+                var updatedNovels = 0
+                var downloadedChapters = 0
+                var failedNovels = 0
 
-        var updatedNovels = 0
-        var downloadedChapters = 0
-        var failedNovels = 0
+                for (aid in targetAids) {
+                    markNovelSyncing(aid, active = true)
+                    try {
+                        val startedAt = wallClockMs()
+                        val existing = database.novelDao().getNovelByAid(aid)
+                        if (existing == null || !existing.inBookshelf) {
+                            continue
+                        }
+                        val metaRes = catalogGateway.fetchNovelFullMeta(aid, appLanguage)
+                        val tocRes = catalogGateway.fetchNovelVolumeToc(aid, appLanguage)
 
-        for (aid in targetAids) {
-            markNovelSyncing(aid, active = true)
-            try {
-                val startedAt = wallClockMs()
-                val existing = database.novelDao().getNovelByAid(aid)
-                if (existing == null || !existing.inBookshelf) {
-                    continue
-                }
-                val metaRes = catalogGateway.fetchNovelFullMeta(aid, appLanguage)
-                val tocRes = catalogGateway.fetchNovelVolumeToc(aid, appLanguage)
+                        if (metaRes !is WenkuApiResult.Success && tocRes !is WenkuApiResult.Success) {
+                            failedNovels++
+                            continue
+                        }
 
-                if (metaRes !is WenkuApiResult.Success && tocRes !is WenkuApiResult.Success) {
-                    failedNovels++
-                    continue
-                }
+                        if (tocRes is WenkuApiResult.Success) {
+                            val freshBeforeToc = database.novelDao().getNovelByAid(aid)
+                            if (freshBeforeToc == null || !freshBeforeToc.inBookshelf) {
+                                continue
+                            }
+                            novelTocSyncRepository.syncNovelIndexAtomically(
+                                aid = aid,
+                                language = appLanguage,
+                                requestStartedAtMs = startedAt,
+                                parsedVolumes = tocRes.data,
+                                fallbackNovelTitle = freshBeforeToc.title.ifBlank { "AID $aid" },
+                            )
+                        }
 
-                if (tocRes is WenkuApiResult.Success) {
-                    val freshBeforeToc = database.novelDao().getNovelByAid(aid)
-                    if (freshBeforeToc == null || !freshBeforeToc.inBookshelf) {
-                        continue
-                    }
-                    novelTocSyncRepository.syncNovelIndexAtomically(
-                        aid = aid,
-                        language = appLanguage,
-                        requestStartedAtMs = startedAt,
-                        parsedVolumes = tocRes.data,
-                        fallbackNovelTitle = freshBeforeToc.title.ifBlank { "AID $aid" },
-                    )
-                }
-
-                if (metaRes is WenkuApiResult.Success) {
-                    val freshForMeta = database.novelDao().getNovelByAid(aid)
-                    if (freshForMeta != null && freshForMeta.inBookshelf) {
-                        val m = metaRes.data
-                        val incoming = freshForMeta.copy(
-                            contentLang = appLanguage.name,
-                            metaSyncedAtMs = startedAt,
-                            title = m.title.ifBlank { freshForMeta.title },
-                            author = m.author.ifBlank { freshForMeta.author },
-                            bookStatus = m.bookStatus.ifBlank { freshForMeta.bookStatus },
-                            pressId = m.pressId.ifBlank { freshForMeta.pressId },
-                            bookLength = if (m.bookLength > 0) m.bookLength else freshForMeta.bookLength,
-                            lastUpdate = m.lastUpdate.ifBlank { freshForMeta.lastUpdate },
-                            latestSectionCid = if (m.latestSectionCid > 0) m.latestSectionCid else freshForMeta.latestSectionCid,
-                            latestSectionName = m.latestSectionName.ifBlank { freshForMeta.latestSectionName },
-                            dayHits = m.dayHitsCount,
-                            totalHits = m.totalHitsCount,
-                            pushCount = m.pushCount,
-                            favCount = m.favCount,
-                        )
-                        database.novelDao().mergeServerMetadataPreservingShelfState(incoming)
-                    }
-                }
-
-                if (tocRes is WenkuApiResult.Success) {
-                    // If this novel already has offline cached chapters, smart-download any new
-                    // uncached chapters so offline readers stay current!
-                    val cachedCids = database.chapterContentDao().getCachedChapterIdsForNovel(aid).toHashSet()
-                    if (cachedCids.isNotEmpty()) {
-                        val allCids = tocRes.data.asSequence()
-                            .flatMap { it.chapters.asSequence() }
-                            .map { it.cid }
-                            .filter { it > 0 && it !in cachedCids }
-                            .toList()
-                        for (cid in allCids) {
-                            val stillOnShelf = database.novelDao().getNovelByAid(aid)?.inBookshelf == true
-                            if (!stillOnShelf) break
-                            val contentRes = catalogGateway.fetchChapterContent(aid, cid, appLanguage)
-                            if (contentRes is WenkuApiResult.Success) {
-                                val text = contentRes.data
-                                val imageUrls = WenkuXmlParsers.extractChapterImageUrls(text)
-                                val jsonUrls = JSONArray(imageUrls).toString()
-                                val utf8Bytes = text.toByteArray(StandardCharsets.UTF_8)
-                                database.chapterContentDao().upsertChapterContent(
-                                    ChapterContentEntity(
-                                        cid = cid,
-                                        aid = aid,
-                                        contentLang = appLanguage.name,
-                                        contentText = text,
-                                        byteLength = utf8Bytes.size,
-                                        imageUrlsJson = jsonUrls,
-                                        imageCount = imageUrls.size,
-                                        sha256Checksum = DigestUtils.sha256Hex(text),
-                                        downloadedAtMs = wallClockMs(),
-                                    ),
+                        if (metaRes is WenkuApiResult.Success) {
+                            val freshForMeta = database.novelDao().getNovelByAid(aid)
+                            if (freshForMeta != null && freshForMeta.inBookshelf) {
+                                val m = metaRes.data
+                                val incoming = freshForMeta.copy(
+                                    contentLang = appLanguage.name,
+                                    metaSyncedAtMs = startedAt,
+                                    title = m.title.ifBlank { freshForMeta.title },
+                                    author = m.author.ifBlank { freshForMeta.author },
+                                    bookStatus = m.bookStatus.ifBlank { freshForMeta.bookStatus },
+                                    pressId = m.pressId.ifBlank { freshForMeta.pressId },
+                                    bookLength = if (m.bookLength > 0) m.bookLength else freshForMeta.bookLength,
+                                    lastUpdate = m.lastUpdate.ifBlank { freshForMeta.lastUpdate },
+                                    latestSectionCid = if (m.latestSectionCid > 0) m.latestSectionCid else freshForMeta.latestSectionCid,
+                                    latestSectionName = m.latestSectionName.ifBlank { freshForMeta.latestSectionName },
+                                    dayHits = m.dayHitsCount,
+                                    totalHits = m.totalHitsCount,
+                                    pushCount = m.pushCount,
+                                    favCount = m.favCount,
                                 )
-                                downloadedChapters++
+                                database.novelDao().mergeServerMetadataPreservingShelfState(incoming)
                             }
                         }
+
+                        if (tocRes is WenkuApiResult.Success) {
+                            // If this novel already has offline cached chapters, smart-download any new
+                            // uncached chapters so offline readers stay current!
+                            val cachedCids = database.chapterContentDao().getCachedChapterIdsForNovel(aid).toHashSet()
+                            if (cachedCids.isNotEmpty()) {
+                                val allCids = tocRes.data.asSequence()
+                                    .flatMap { it.chapters.asSequence() }
+                                    .map { it.cid }
+                                    .filter { it > 0 && it !in cachedCids }
+                                    .toList()
+                                for (cid in allCids) {
+                                    val stillOnShelf = database.novelDao().getNovelByAid(aid)?.inBookshelf == true
+                                    if (!stillOnShelf) break
+                                    val contentRes = catalogGateway.fetchChapterContent(aid, cid, appLanguage)
+                                    if (contentRes is WenkuApiResult.Success) {
+                                        val text = contentRes.data
+                                        val imageUrls = WenkuXmlParsers.extractChapterImageUrls(text)
+                                        val jsonUrls = JSONArray(imageUrls).toString()
+                                        val utf8Bytes = text.toByteArray(StandardCharsets.UTF_8)
+                                        database.chapterContentDao().upsertChapterContent(
+                                            ChapterContentEntity(
+                                                cid = cid,
+                                                aid = aid,
+                                                contentLang = appLanguage.name,
+                                                contentText = text,
+                                                byteLength = utf8Bytes.size,
+                                                imageUrlsJson = jsonUrls,
+                                                imageCount = imageUrls.size,
+                                                sha256Checksum = DigestUtils.sha256Hex(text),
+                                                downloadedAtMs = wallClockMs(),
+                                            ),
+                                        )
+                                        downloadedChapters++
+                                    }
+                                }
+                            }
+                        }
+                        updatedNovels++
+                    } finally {
+                        markNovelSyncing(aid, active = false)
                     }
                 }
-                updatedNovels++
-            } finally {
-                markNovelSyncing(aid, active = false)
-            }
-        }
 
-        SmartBatchUpdateSummary(
-            updatedNovelCount = updatedNovels,
-            newlyDownloadedChapterCount = downloadedChapters,
-            failedNovelCount = failedNovels,
-        )
+                SmartBatchUpdateSummary(
+                    updatedNovelCount = updatedNovels,
+                    newlyDownloadedChapterCount = downloadedChapters,
+                    failedNovelCount = failedNovels,
+                )
+            }
+        } finally {
+            _isSmartUpdateRunning.value = false
+            syncMutex.unlock()
+        }
     }
 
     /**
@@ -1350,10 +1403,15 @@ class BookshelfRepository(
             is AccountSessionState.SignedIn -> true
             is AccountSessionState.OfflineWithSavedAccount,
             is AccountSessionState.RestoringSession,
-            -> repo.reauthenticateFromSavedCredentialsIfPossible()
-            AccountSessionState.SignedOut,
-            AccountSessionState.UnavailableStub,
-            -> false
+            -> repo.ensureSessionRestoredForStartupSync()
+            AccountSessionState.SignedOut -> {
+                if (repo.activeAccountKeyOrNull() != null) {
+                    repo.ensureSessionRestoredForStartupSync()
+                } else {
+                    false
+                }
+            }
+            AccountSessionState.UnavailableStub -> false
         }
     }
 

@@ -78,6 +78,8 @@ import androidx.compose.material3.TooltipAnchorPosition
 import androidx.compose.material3.carousel.HorizontalMultiBrowseCarousel
 import androidx.compose.material3.carousel.rememberCarouselState
 import androidx.compose.material3.minimumInteractiveComponentSize
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -136,14 +138,16 @@ import kotlin.math.max
 /** Semantic UI test tags for Robolectric and device tests on `BookshelfScreen` (`P4.1`). */
 object BookshelfTestTags {
     const val SCREEN = "bookshelf_screen"
+    const val PULL_TO_REFRESH_BOX = "bookshelf_pull_to_refresh_box"
     const val LOCAL_SEARCH_INPUT = "bookshelf_local_search_input"
     const val CLEAR_LOCAL_SEARCH_BUTTON = "bookshelf_clear_local_search"
     const val ONLINE_SEARCH_TRIGGER = "bookshelf_online_search_trigger"
     const val CLOUD_SYNC_BUTTON = "bookshelf_cloud_sync_button"
     const val HEADER_ACTIVE_SYNC_PROGRESS = "bookshelf_header_active_sync_progress"
-    const val SMART_UPDATE_LEADING_BUTTON = "bookshelf_smart_update_leading"
     const val SMART_UPDATE_TRAILING_BUTTON = "bookshelf_smart_update_trailing"
+    const val SMART_UPDATE_MENU_ITEM = "bookshelf_smart_update_menu_item"
     const val FORCE_CLOUD_SYNC_MENU_ITEM = "bookshelf_force_cloud_sync_menu_item"
+    const val CONFIRM_FORCE_SYNC_BUTTON = "bookshelf_confirm_force_sync_button"
     const val VIEW_MODE_CHIP_PREFIX = "bookshelf_view_mode_"
     const val SORT_MODE_BUTTON = "bookshelf_sort_mode_button"
     const val SORT_MODE_ITEM_PREFIX = "bookshelf_sort_mode_"
@@ -181,7 +185,9 @@ object BookshelfTestTags {
  * Implements:
  * - Instant `< 1ms` local search across title, author, imprint, tags, and `aid`, paired with a
  *   1-tap `[ 搜全站 ]` pill expanding into `UnifiedSearchScreen`.
- * - Non-destructive 2-way Cloud Bookcase sync (`☁️`) + M3e `SplitButtonLayout` (`智能更新 | ▾`).
+ * - Folded M3e `SplitButtonLayout` (`云端同步 | ▾`) housing `智能更新` and `强制刷新全部云端书目`,
+ *   paired with `PullToRefreshBox`, cold-start first-entry auto-sync (`v1` `FavFragment` parity),
+ *   and global mutual exclusion while any shelf sync/update task is active.
  * - `"继续阅读"` M3e `HorizontalMultiBrowseCarousel` with flat `LinearProgressIndicator` (`68%`).
  * - Local filter rail (`全部`, `有新章节`, `已缓存`, `连载中`, `已完结`, custom categories, imprints, `#标签`)
  *   and 4 sort modes (`按最近阅读`, `按更新时间`, `手动置顶排序`, `书名拼音`).
@@ -257,9 +263,20 @@ fun BookshelfScreen(
 
     var selectedAidList by rememberSaveable { mutableStateOf<List<Int>>(emptyList()) }
     var isBatchSmartUpdating by rememberSaveable { mutableStateOf(false) }
+    var isPullRefreshing by remember { mutableStateOf(false) }
     var showRemoveConfirmDialog by rememberSaveable { mutableStateOf(false) }
+    var showForceSyncConfirmDialog by rememberSaveable { mutableStateOf(false) }
     var showSmartUpdateMenu by remember { mutableStateOf(false) }
     var showSortMenu by remember { mutableStateOf(false) }
+    val pullToRefreshState = rememberPullToRefreshState()
+
+    val isShelfTaskRunning = snapshot.isShelfTaskRunning || isBatchSmartUpdating
+
+    LaunchedEffect(isShelfTaskRunning) {
+        if (isShelfTaskRunning) {
+            showSmartUpdateMenu = false
+        }
+    }
 
     val activeFilter = remember(activeFilterKey) { decodeFilterKey(activeFilterKey) }
     val selectedAidSet = remember(selectedAidList) { selectedAidList.toSet() }
@@ -294,75 +311,105 @@ fun BookshelfScreen(
         }
     }
 
-    fun launchCloudSync(forceRefreshAll: Boolean) {
+    fun launchCloudSync(
+        forceRefreshAll: Boolean,
+        isSilentAutoSync: Boolean = false,
+        onFinished: (() -> Unit)? = null,
+    ) {
+        if (isShelfTaskRunning || bookshelfRepository.isShelfTaskRunning) {
+            onFinished?.invoke()
+            return
+        }
         coroutineScope.launch {
-            when (
-                val outcome = bookshelfRepository.syncWithCloudBookcase(
+            val outcome = try {
+                bookshelfRepository.syncWithCloudBookcase(
                     appLanguage = appLanguage,
                     forceRefreshAll = forceRefreshAll,
                 )
-            ) {
+            } finally {
+                onFinished?.invoke()
+            }
+            when (outcome) {
+                CloudBookshelfSyncOutcome.AlreadyRunning -> Unit
+
                 is CloudBookshelfSyncOutcome.Success -> {
-                    val message = when {
-                        outcome.cloudShelfFullReached -> context.getString(
-                            R.string.bookshelf_sync_full_warning_format,
-                            outcome.pulledFromCloudCount,
-                            outcome.pushedToCloudCount,
-                        )
+                    val hasChangesOrWarnings = outcome.pulledFromCloudCount > 0 ||
+                        outcome.pushedToCloudCount > 0 ||
+                        outcome.refreshedStaleCount > 0 ||
+                        outcome.deletedFromCloudCount > 0 ||
+                        outcome.removedRemotelyDeletedCount > 0 ||
+                        outcome.cloudShelfFullReached ||
+                        outcome.failedHydrationCount > 0
+                    if (!isSilentAutoSync || hasChangesOrWarnings) {
+                        val message = when {
+                            outcome.cloudShelfFullReached -> context.getString(
+                                R.string.bookshelf_sync_full_warning_format,
+                                outcome.pulledFromCloudCount,
+                                outcome.pushedToCloudCount,
+                            )
 
-                        outcome.failedHydrationCount > 0 -> context.getString(
-                            R.string.bookshelf_sync_partial_warning_format,
-                            outcome.pulledFromCloudCount,
-                            outcome.pushedToCloudCount,
-                            outcome.failedHydrationCount,
-                        )
+                            outcome.failedHydrationCount > 0 -> context.getString(
+                                R.string.bookshelf_sync_partial_warning_format,
+                                outcome.pulledFromCloudCount,
+                                outcome.pushedToCloudCount,
+                                outcome.failedHydrationCount,
+                            )
 
-                        outcome.removedRemotelyDeletedCount > 0 || outcome.deletedFromCloudCount > 0 -> context.getString(
-                            R.string.bookshelf_sync_success_with_removals_format,
-                            outcome.pulledFromCloudCount,
-                            outcome.pushedToCloudCount,
-                            outcome.deletedFromCloudCount + outcome.removedRemotelyDeletedCount,
-                        )
+                            outcome.removedRemotelyDeletedCount > 0 || outcome.deletedFromCloudCount > 0 -> context.getString(
+                                R.string.bookshelf_sync_success_with_removals_format,
+                                outcome.pulledFromCloudCount,
+                                outcome.pushedToCloudCount,
+                                outcome.deletedFromCloudCount + outcome.removedRemotelyDeletedCount,
+                            )
 
-                        else -> context.getString(
-                            R.string.bookshelf_sync_success_format,
-                            outcome.pulledFromCloudCount,
-                            outcome.pushedToCloudCount,
-                            outcome.refreshedStaleCount,
-                        )
+                            else -> context.getString(
+                                R.string.bookshelf_sync_success_format,
+                                outcome.pulledFromCloudCount,
+                                outcome.pushedToCloudCount,
+                                outcome.refreshedStaleCount,
+                            )
+                        }
+                        snackbarHostState.showSnackbar(message)
                     }
-                    snackbarHostState.showSnackbar(message)
                 }
 
                 CloudBookshelfSyncOutcome.NotLoggedIn -> {
-                    val result = snackbarHostState.showSnackbar(
-                        message = context.getString(R.string.bookshelf_sync_login_required),
-                        actionLabel = context.getString(R.string.review_login_action),
-                        duration = SnackbarDuration.Short,
-                    )
-                    if (result == SnackbarResult.ActionPerformed) {
-                        onOpenLoginSheet()
+                    if (!isSilentAutoSync) {
+                        val result = snackbarHostState.showSnackbar(
+                            message = context.getString(R.string.bookshelf_sync_login_required),
+                            actionLabel = context.getString(R.string.review_login_action),
+                            duration = SnackbarDuration.Short,
+                        )
+                        if (result == SnackbarResult.ActionPerformed) {
+                            onOpenLoginSheet()
+                        }
                     }
                 }
 
                 CloudBookshelfSyncOutcome.ApiNotConfigured,
                 is CloudBookshelfSyncOutcome.NetworkOrServerError,
                 -> {
-                    snackbarHostState.showSnackbar(context.getString(R.string.bookshelf_sync_failed))
+                    if (!isSilentAutoSync) {
+                        snackbarHostState.showSnackbar(context.getString(R.string.bookshelf_sync_failed))
+                    }
                 }
             }
         }
     }
 
     fun launchSmartUpdate(targetAids: List<Int>) {
-        if (targetAids.isEmpty() || isBatchSmartUpdating) return
+        if (targetAids.isEmpty() || isShelfTaskRunning || bookshelfRepository.isShelfTaskRunning) return
         coroutineScope.launch {
             isBatchSmartUpdating = true
-            try {
-                val summary = bookshelfRepository.smartUpdateShelfNovels(
+            val summary = try {
+                bookshelfRepository.smartUpdateShelfNovels(
                     aids = targetAids,
                     appLanguage = appLanguage,
                 )
+            } finally {
+                isBatchSmartUpdating = false
+            }
+            if (!summary.skippedBecauseBusy) {
                 snackbarHostState.showSnackbar(
                     context.getString(
                         R.string.bookshelf_smart_update_done_format,
@@ -370,9 +417,16 @@ fun BookshelfScreen(
                         summary.newlyDownloadedChapterCount,
                     ),
                 )
-            } finally {
-                isBatchSmartUpdating = false
             }
+        }
+    }
+
+    // `v1` `FavFragment` (`timecount == 0`) parity: automatically trigger lightweight Cloud Sync
+    // once per cold start on the first entry into Bookshelf when signed in.
+    LaunchedEffect(bookshelfRepository) {
+        val eligible = bookshelfRepository.consumeColdStartAutoSyncEligibility()
+        if (eligible && !showOfflineFallbackBanner) {
+            launchCloudSync(forceRefreshAll = false, isSilentAutoSync = true)
         }
     }
 
@@ -400,6 +454,29 @@ fun BookshelfScreen(
             }
         }
 
+        PullToRefreshBox(
+            isRefreshing = isPullRefreshing,
+            onRefresh = {
+                if (isShelfTaskRunning || bookshelfRepository.isShelfTaskRunning) {
+                    isPullRefreshing = false
+                    coroutineScope.launch { pullToRefreshState.animateToHidden() }
+                } else {
+                    isPullRefreshing = true
+                    launchCloudSync(
+                        forceRefreshAll = false,
+                        isSilentAutoSync = false,
+                        onFinished = {
+                            isPullRefreshing = false
+                            coroutineScope.launch { pullToRefreshState.animateToHidden() }
+                        },
+                    )
+                }
+            },
+            state = pullToRefreshState,
+            modifier = Modifier
+                .fillMaxSize()
+                .testTag(BookshelfTestTags.PULL_TO_REFRESH_BOX),
+        ) {
         LazyColumn(
             state = listState,
             modifier = Modifier.fillMaxSize(),
@@ -428,8 +505,7 @@ fun BookshelfScreen(
             item(key = "shelf_header_controls") {
                 BookshelfHeaderSection(
                     totalShelfCount = snapshot.allShelfItems.size,
-                    isCloudSyncRunning = snapshot.isCloudSyncRunning,
-                    isBatchSmartUpdating = isBatchSmartUpdating,
+                    isShelfTaskRunning = isShelfTaskRunning,
                     isEinkMode = isEinkMode,
                     viewMode = viewMode,
                     onViewModeSelected = onViewModeSelected,
@@ -445,7 +521,7 @@ fun BookshelfScreen(
                     },
                     onForceRefreshCloudClick = {
                         showSmartUpdateMenu = false
-                        launchCloudSync(forceRefreshAll = true)
+                        showForceSyncConfirmDialog = true
                     },
                 )
             }
@@ -486,6 +562,7 @@ fun BookshelfScreen(
             if (snapshot.allShelfItems.isEmpty()) {
                 item(key = "empty_shelf_state") {
                     EmptyBookshelfCard(
+                        isSyncOrUpdateRunning = isShelfTaskRunning,
                         onCloudSyncClick = { launchCloudSync(forceRefreshAll = false) },
                         onOpenOnlineSearch = onOpenSearch,
                     )
@@ -596,10 +673,12 @@ fun BookshelfScreen(
                 }
             }
         }
+        }
 
         if (isMultiSelectActive) {
             BookshelfMultiSelectFloatingToolbar(
                 selectedCount = selectedAidSet.size,
+                isSyncOrUpdateRunning = isShelfTaskRunning,
                 onSelectAll = {
                     val visibleAids = displayedItems.map { it.aid }
                     selectedAidList = if (visibleAids.all { it in selectedAidSet }) {
@@ -643,6 +722,31 @@ fun BookshelfScreen(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .padding(bottom = if (isMultiSelectActive) 116.dp else 12.dp),
+        )
+    }
+
+    if (showForceSyncConfirmDialog) {
+        AlertDialog(
+            onDismissRequest = { showForceSyncConfirmDialog = false },
+            title = { Text(text = stringResource(R.string.bookshelf_force_sync_confirm_title)) },
+            text = { Text(text = stringResource(R.string.bookshelf_force_sync_confirm_body)) },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showForceSyncConfirmDialog = false
+                        launchCloudSync(forceRefreshAll = true)
+                    },
+                    enabled = !isShelfTaskRunning,
+                    modifier = Modifier.testTag(BookshelfTestTags.CONFIRM_FORCE_SYNC_BUTTON),
+                ) {
+                    Text(text = stringResource(R.string.bookshelf_force_sync_confirm_action))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showForceSyncConfirmDialog = false }) {
+                    Text(text = stringResource(android.R.string.cancel))
+                }
+            },
         )
     }
 
@@ -819,8 +923,7 @@ private fun BookshelfSearchBarRow(
 @Composable
 private fun BookshelfHeaderSection(
     totalShelfCount: Int,
-    isCloudSyncRunning: Boolean,
-    isBatchSmartUpdating: Boolean,
+    isShelfTaskRunning: Boolean,
     isEinkMode: Boolean,
     viewMode: BookshelfViewMode,
     onViewModeSelected: (BookshelfViewMode) -> Unit,
@@ -850,55 +953,43 @@ private fun BookshelfHeaderSection(
                 modifier = Modifier.weight(1f),
             )
 
-            // Cloud Sync button separated cleanly with full 48x48dp touch target + long-press tooltip
-            val cloudSyncLabel = stringResource(R.string.bookshelf_cloud_sync_action)
-            TooltipIconButton(
-                tooltipText = cloudSyncLabel,
-                onClick = onCloudSyncClick,
-                enabled = !isCloudSyncRunning,
-                modifier = Modifier
-                    .minimumInteractiveComponentSize()
-                    .testTag(BookshelfTestTags.CLOUD_SYNC_BUTTON),
-            ) {
-                Icon(
-                    imageVector = Icons.Outlined.CloudSync,
-                    contentDescription = cloudSyncLabel,
-                )
-            }
-
-            Spacer(modifier = Modifier.width(4.dp))
-
             Box {
-                val forceSyncMenuLabel = stringResource(R.string.bookshelf_force_sync_menu)
+                val cloudSyncLabel = stringResource(R.string.bookshelf_cloud_sync_action)
+                val moreSyncOptionsLabel = stringResource(R.string.bookshelf_more_sync_options)
                 SplitButtonLayout(
                     leadingButton = {
                         SplitButtonDefaults.TonalLeadingButton(
-                            onClick = onSmartUpdateAllClick,
-                            enabled = totalShelfCount > 0 && !isBatchSmartUpdating,
-                            modifier = Modifier.testTag(BookshelfTestTags.SMART_UPDATE_LEADING_BUTTON),
+                            onClick = onCloudSyncClick,
+                            enabled = !isShelfTaskRunning,
+                            modifier = Modifier.testTag(BookshelfTestTags.CLOUD_SYNC_BUTTON),
                         ) {
                             Icon(
-                                imageVector = Icons.Outlined.SystemUpdateAlt,
+                                imageVector = Icons.Outlined.CloudSync,
                                 contentDescription = null,
                                 modifier = Modifier.size(SplitButtonDefaults.LeadingIconSize),
                             )
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(
-                                text = stringResource(R.string.bookshelf_smart_update_action),
+                                text = cloudSyncLabel,
                                 maxLines = 1,
                             )
                         }
                     },
                     trailingButton = {
-                        ActionTooltipBox(tooltipText = forceSyncMenuLabel) {
+                        ActionTooltipBox(tooltipText = moreSyncOptionsLabel) {
                             SplitButtonDefaults.TonalTrailingButton(
                                 checked = showSmartUpdateMenu,
-                                onCheckedChange = onShowSmartUpdateMenuChange,
+                                onCheckedChange = { nextExpanded ->
+                                    if (!isShelfTaskRunning) {
+                                        onShowSmartUpdateMenuChange(nextExpanded)
+                                    }
+                                },
+                                enabled = !isShelfTaskRunning,
                                 modifier = Modifier.testTag(BookshelfTestTags.SMART_UPDATE_TRAILING_BUTTON),
                             ) {
                                 Icon(
                                     imageVector = Icons.Outlined.ExpandMore,
-                                    contentDescription = forceSyncMenuLabel,
+                                    contentDescription = moreSyncOptionsLabel,
                                     modifier = Modifier.size(SplitButtonDefaults.TrailingIconSize),
                                 )
                             }
@@ -907,22 +998,50 @@ private fun BookshelfHeaderSection(
                 )
 
                 DropdownMenu(
-                    expanded = showSmartUpdateMenu,
+                    expanded = showSmartUpdateMenu && !isShelfTaskRunning,
                     onDismissRequest = { onShowSmartUpdateMenuChange(false) },
                 ) {
+                    DropdownMenuItem(
+                        text = {
+                            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                Text(
+                                    text = stringResource(R.string.bookshelf_smart_update_action),
+                                    style = MaterialTheme.typography.bodyLarge,
+                                )
+                                Text(
+                                    text = stringResource(R.string.bookshelf_smart_update_menu_desc),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        },
+                        leadingIcon = {
+                            Icon(imageVector = Icons.Outlined.SystemUpdateAlt, contentDescription = null)
+                        },
+                        enabled = totalShelfCount > 0 && !isShelfTaskRunning,
+                        onClick = {
+                            onShowSmartUpdateMenuChange(false)
+                            onSmartUpdateAllClick()
+                        },
+                        modifier = Modifier.testTag(BookshelfTestTags.SMART_UPDATE_MENU_ITEM),
+                    )
                     DropdownMenuItem(
                         text = { Text(text = stringResource(R.string.bookshelf_force_sync_menu)) },
                         leadingIcon = {
                             Icon(imageVector = Icons.Outlined.CloudSync, contentDescription = null)
                         },
-                        onClick = onForceRefreshCloudClick,
+                        enabled = !isShelfTaskRunning,
+                        onClick = {
+                            onShowSmartUpdateMenuChange(false)
+                            onForceRefreshCloudClick()
+                        },
                         modifier = Modifier.testTag(BookshelfTestTags.FORCE_CLOUD_SYNC_MENU_ITEM),
                     )
                 }
             }
         }
 
-        if (isCloudSyncRunning || isBatchSmartUpdating) {
+        if (isShelfTaskRunning) {
             if (isEinkMode) {
                 LinearProgressIndicator(
                     modifier = Modifier
@@ -1823,6 +1942,7 @@ private fun NewChapterPillBadge(
 @Composable
 private fun BookshelfMultiSelectFloatingToolbar(
     selectedCount: Int,
+    isSyncOrUpdateRunning: Boolean,
     onSelectAll: () -> Unit,
     onSmartUpdateSelected: () -> Unit,
     onPinToTopSelected: () -> Unit,
@@ -1876,6 +1996,7 @@ private fun BookshelfMultiSelectFloatingToolbar(
             TooltipIconButton(
                 tooltipText = smartUpdateLabel,
                 onClick = onSmartUpdateSelected,
+                enabled = !isSyncOrUpdateRunning,
                 anchorPosition = TooltipAnchorPosition.Above,
                 modifier = Modifier.testTag(BookshelfTestTags.BATCH_SMART_UPDATE),
             ) {
@@ -1938,6 +2059,7 @@ private fun BookshelfMultiSelectFloatingToolbar(
 
 @Composable
 private fun EmptyBookshelfCard(
+    isSyncOrUpdateRunning: Boolean,
     onCloudSyncClick: () -> Unit,
     onOpenOnlineSearch: () -> Unit,
 ) {
@@ -1977,7 +2099,10 @@ private fun EmptyBookshelfCard(
                 textAlign = TextAlign.Center,
             )
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                FilledTonalButton(onClick = onCloudSyncClick) {
+                FilledTonalButton(
+                    onClick = onCloudSyncClick,
+                    enabled = !isSyncOrUpdateRunning,
+                ) {
                     Icon(
                         imageVector = Icons.Outlined.CloudSync,
                         contentDescription = null,

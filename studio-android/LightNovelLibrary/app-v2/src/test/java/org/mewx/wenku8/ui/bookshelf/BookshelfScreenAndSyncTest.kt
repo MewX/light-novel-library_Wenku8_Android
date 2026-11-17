@@ -8,6 +8,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.onNodeWithTag
@@ -18,6 +20,8 @@ import androidx.compose.ui.test.performTouchInput
 import androidx.room.Room
 import androidx.sqlite.db.framework.FrameworkSQLiteOpenHelperFactory
 import androidx.test.core.app.ApplicationProvider
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
@@ -754,11 +758,15 @@ class BookshelfScreenAndSyncTest {
         composeTestRule.onNodeWithTag(BookshelfTestTags.FLAT_READING_PROGRESS_PREFIX + 5).assertExists()
         composeTestRule.onNodeWithTag(BookshelfTestTags.ACTIVE_WAVY_PROGRESS_PREFIX + 5).assertDoesNotExist()
 
-        // 1b. Long-pressing top-right Cloud Sync button shows its tooltip hint
-        composeTestRule.onNodeWithTag(BookshelfTestTags.CLOUD_SYNC_BUTTON)
-            .performTouchInput { longClick() }
-        composeTestRule.waitForIdle()
+        // 1b. Folded top-right `云端同步 | ▾` split button displays Cloud Sync label + folded menu options
+        composeTestRule.onNodeWithTag(BookshelfTestTags.CLOUD_SYNC_BUTTON).assertIsDisplayed()
         composeTestRule.onNodeWithText("云端同步").assertIsDisplayed()
+        composeTestRule.onNodeWithTag(BookshelfTestTags.SMART_UPDATE_TRAILING_BUTTON).performClick()
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag(BookshelfTestTags.SMART_UPDATE_MENU_ITEM).assertIsDisplayed()
+        composeTestRule.onNodeWithTag(BookshelfTestTags.FORCE_CLOUD_SYNC_MENU_ITEM).assertIsDisplayed()
+        composeTestRule.onNodeWithTag(BookshelfTestTags.SMART_UPDATE_TRAILING_BUTTON).performClick()
+        composeTestRule.waitForIdle()
 
         // 2. Online search button triggers UnifiedSearchScreen callback
         composeTestRule.onNodeWithTag(BookshelfTestTags.ONLINE_SEARCH_TRIGGER).performClick()
@@ -800,6 +808,7 @@ class BookshelfScreenAndSyncTest {
 
         listOf(
             BookshelfTestTags.BATCH_SELECT_ALL to "全选",
+            BookshelfTestTags.BATCH_SMART_UPDATE to "智能更新",
             BookshelfTestTags.BATCH_PIN_TOP to "置顶",
             BookshelfTestTags.BATCH_CLEAR_CACHE to "清理缓存",
             BookshelfTestTags.BATCH_REMOVE to "移出书架",
@@ -809,13 +818,6 @@ class BookshelfScreenAndSyncTest {
             composeTestRule.waitForIdle()
             composeTestRule.onNodeWithText(expectedTooltip).assertIsDisplayed()
         }
-        composeTestRule.onNodeWithTag(BookshelfTestTags.BATCH_SMART_UPDATE)
-            .performTouchInput { longClick() }
-        composeTestRule.waitForIdle()
-        assertTrue(
-            composeTestRule.onAllNodes(androidx.compose.ui.test.hasText("智能更新"))
-                .fetchSemanticsNodes().size >= 2,
-        )
         // Multi-select toolbar remains open & remove confirmation dialog did NOT trigger on long-press
         composeTestRule.onNodeWithTag(BookshelfTestTags.MULTI_SELECT_TOOLBAR).assertIsDisplayed()
         composeTestRule.onNodeWithTag(BookshelfTestTags.CONFIRM_REMOVE_BUTTON).assertDoesNotExist()
@@ -1227,6 +1229,260 @@ class BookshelfScreenAndSyncTest {
         }
     }
 
+    @Test
+    fun coldStartFirstEntryAutoSync_runsOnceForSignedInUser_skipsSignedOut_andDoesNotRetriggerOnReentry(): Unit = runBlocking {
+        val signedOutRoot = Files.createTempDirectory("bookshelf_auto_sync_signed_out").toFile()
+        val signedInRoot = Files.createTempDirectory("bookshelf_auto_sync_signed_in").toFile()
+        try {
+            val authTransport = FakeAccountSwitchTransport().apply { activeServerUsername = "alice" }
+            val authGateway = FakeAccountSwitchAuthGateway(authTransport)
+
+            // 1. Signed-out cold start: entering BookshelfScreen must NOT auto-sync or show login prompt.
+            val signedOutSession = UserSessionRepository(
+                transport = authTransport,
+                assetRootsProvider = { listOf(signedOutRoot) },
+                authGateway = authGateway,
+                ioDispatcher = kotlinx.coroutines.Dispatchers.Unconfined,
+            )
+            val signedOutGateway = FakeBookshelfCatalogGateway().apply {
+                cloudBookshelfEntries = listOf(
+                    ParsedCloudBookshelfEntry(aid = 3100, title = "自动同步作品", latestChapterCid = 31001),
+                )
+            }
+            val signedOutRepo = BookshelfRepository(
+                database = database,
+                catalogGateway = signedOutGateway,
+                novelTocSyncRepository = tocSyncRepository,
+                userSessionRepository = signedOutSession,
+                ioDispatcher = kotlinx.coroutines.Dispatchers.Unconfined,
+            )
+
+            // Persist `saves/cert.wk8` for the signed-in cold-start simulation BEFORE `initializeSessionOnStartup()`.
+            val seedSession = UserSessionRepository(
+                transport = authTransport,
+                assetRootsProvider = { listOf(signedInRoot) },
+                authGateway = authGateway,
+                ioDispatcher = kotlinx.coroutines.Dispatchers.Unconfined,
+            )
+            assertTrue(seedSession.loginWithCredentials("alice", "pw123") is LoginOutcome.Success)
+            val loginCountAfterSeed = authTransport.loginCallCount
+
+            val coldStartSignedInSession = UserSessionRepository(
+                transport = authTransport,
+                assetRootsProvider = { listOf(signedInRoot) },
+                authGateway = authGateway,
+                ioDispatcher = kotlinx.coroutines.Dispatchers.Unconfined,
+            )
+            val signedInGateway = FakeBookshelfCatalogGateway().apply {
+                cloudBookshelfEntries = listOf(
+                    ParsedCloudBookshelfEntry(
+                        aid = 3100,
+                        title = "冷启动自动同步作品",
+                        lastUpdateDate = "2026-03-01",
+                        latestChapterCid = 31001,
+                        latestChapterName = "第一卷 序章",
+                    ),
+                )
+            }
+            val signedInRepo = BookshelfRepository(
+                database = database,
+                catalogGateway = signedInGateway,
+                novelTocSyncRepository = tocSyncRepository,
+                userSessionRepository = coldStartSignedInSession,
+                ioDispatcher = kotlinx.coroutines.Dispatchers.Unconfined,
+            )
+
+            var activeRepo by mutableStateOf(signedOutRepo)
+            var showBookshelf by mutableStateOf(true)
+
+            composeTestRule.setContent {
+                Wenku8ExpressiveTheme(themeMode = Wenku8ThemeMode.ARCHIVAL_DAY) {
+                    if (showBookshelf) {
+                        BookshelfScreen(
+                            bookshelfRepository = activeRepo,
+                            appLanguage = Wenku8API.AppLanguage.SC,
+                            viewMode = BookshelfViewMode.GRID,
+                            onViewModeSelected = {},
+                            sortMode = BookshelfSortMode.MANUAL_ORDER,
+                            onSortModeSelected = {},
+                        )
+                    }
+                }
+            }
+            composeTestRule.waitForIdle()
+
+            assertEquals(0, signedOutGateway.fetchCloudBookshelfCallCount)
+            composeTestRule.onNodeWithText("请先登录轻小说文库账号再同步云端书架").assertDoesNotExist()
+
+            // 2. Switch to cold-start signed-in repository (before `initializeSessionOnStartup()` ran):
+            //    first entry restores session once and triggers lightweight cloud sync automatically!
+            activeRepo = signedInRepo
+            composeTestRule.waitForIdle()
+
+            assertEquals(1, signedInGateway.fetchCloudBookshelfCallCount)
+            assertEquals(loginCountAfterSeed + 1, authTransport.loginCallCount)
+            assertEquals("冷启动自动同步作品", database.novelDao().getNovelByAid(3100)?.title)
+
+            // If background `initializeSessionOnStartup()` runs right afterward, it reuses the
+            // already-restored SignedIn session with zero duplicate login calls.
+            coldStartSignedInSession.initializeSessionOnStartup()
+            assertEquals(loginCountAfterSeed + 1, authTransport.loginCallCount)
+
+            // 3. Leaving BookshelfScreen (e.g. opening NovelDetail/Reader or switching tabs) and
+            //    re-entering with the same repository must NOT re-trigger auto-sync!
+            showBookshelf = false
+            composeTestRule.waitForIdle()
+            showBookshelf = true
+            composeTestRule.waitForIdle()
+
+            assertEquals(1, signedInGateway.fetchCloudBookshelfCallCount)
+        } finally {
+            signedOutRoot.deleteRecursively()
+            signedInRoot.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun foldedSyncSplitButton_runsSmartUpdate_confirmsForceRefresh_andEnforcesGlobalMutualExclusion(): Unit = runBlocking {
+        database.novelDao().upsertNovel(
+            NovelEntity(
+                aid = 4100,
+                title = "本地已同步藏书",
+                author = "作者甲",
+                pressId = "电击文库",
+                bookStatus = "连载中",
+                lastUpdate = "2026-02-20",
+                latestSectionCid = 41001,
+                latestSectionName = "第一话",
+                tocVersion = 1L,
+                inBookshelf = true,
+                shelfSortOrder = 1,
+                cloudSynced = true,
+            ),
+        )
+        database.chapterContentDao().upsertChapterContent(
+            ChapterContentEntity(
+                cid = 41001,
+                aid = 4100,
+                contentLang = "SC",
+                contentText = "已缓存第一话",
+                byteLength = 18,
+                imageUrlsJson = "[]",
+                imageCount = 0,
+                sha256Checksum = "sha_41001",
+                downloadedAtMs = 1_700_000_000_000L,
+            ),
+        )
+
+        val gateway = FakeBookshelfCatalogGateway().apply {
+            cloudBookshelfEntries = listOf(
+                ParsedCloudBookshelfEntry(
+                    aid = 4100,
+                    title = "本地已同步藏书",
+                    lastUpdateDate = "2026-02-20",
+                    latestChapterCid = 41001,
+                    latestChapterName = "第一话",
+                ),
+            )
+            tocByAid[4100] = listOf(
+                ParsedVolumeToc(
+                    vid = 41000,
+                    volumeTitle = "第一卷",
+                    chapters = listOf(
+                        ParsedChapterToc(cid = 41001, chapterTitle = "第一话"),
+                        ParsedChapterToc(cid = 41002, chapterTitle = "第二话"),
+                    ),
+                ),
+            )
+        }
+        val repository = BookshelfRepository(
+            database = database,
+            catalogGateway = gateway,
+            novelTocSyncRepository = tocSyncRepository,
+            ioDispatcher = kotlinx.coroutines.Dispatchers.Unconfined,
+        )
+
+        composeTestRule.setContent {
+            Wenku8ExpressiveTheme(themeMode = Wenku8ThemeMode.ARCHIVAL_DAY) {
+                BookshelfScreen(
+                    bookshelfRepository = repository,
+                    appLanguage = Wenku8API.AppLanguage.SC,
+                    viewMode = BookshelfViewMode.GRID,
+                    onViewModeSelected = {},
+                    sortMode = BookshelfSortMode.MANUAL_ORDER,
+                    onSortModeSelected = {},
+                )
+            }
+        }
+        composeTestRule.waitForIdle()
+
+        // 1. Expand `▾` menu and trigger `智能更新` -> downloads missing chapter 41002 for cached book 4100.
+        composeTestRule.onNodeWithTag(BookshelfTestTags.SMART_UPDATE_TRAILING_BUTTON).performClick()
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag(BookshelfTestTags.SMART_UPDATE_MENU_ITEM).assertIsDisplayed()
+        composeTestRule.onNodeWithTag(BookshelfTestTags.FORCE_CLOUD_SYNC_MENU_ITEM).assertIsDisplayed()
+
+        composeTestRule.onNodeWithTag(BookshelfTestTags.SMART_UPDATE_MENU_ITEM).performClick()
+        composeTestRule.waitForIdle()
+        assertTrue(41002 in database.chapterContentDao().getCachedChapterIdsForNovel(4100))
+
+        // 2. Expand `▾` menu and select `强制刷新全部云端书目`: must require confirmation before running!
+        val metaCallsBeforeForceMenu = gateway.fetchedFullMetaCount
+        composeTestRule.onNodeWithTag(BookshelfTestTags.SMART_UPDATE_TRAILING_BUTTON).performClick()
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag(BookshelfTestTags.FORCE_CLOUD_SYNC_MENU_ITEM).performClick()
+        composeTestRule.waitForIdle()
+
+        composeTestRule.onNodeWithTag(BookshelfTestTags.CONFIRM_FORCE_SYNC_BUTTON).assertIsDisplayed()
+        assertEquals(metaCallsBeforeForceMenu, gateway.fetchedFullMetaCount)
+
+        composeTestRule.onNodeWithTag(BookshelfTestTags.CONFIRM_FORCE_SYNC_BUTTON).performClick()
+        composeTestRule.waitForIdle()
+        // Even though aid=4100 had matching latestSectionCid & lastUpdateDate, forceRefreshAll refreshed its metadata!
+        assertEquals(metaCallsBeforeForceMenu + 1, gateway.fetchedFullMetaCount)
+
+        // 3. Global mutual exclusion: enter multi-select first, then hold Cloud Sync in flight via gate.
+        composeTestRule.onNodeWithTag(BookshelfTestTags.BOOK_CARD_PREFIX + 4100)
+            .performTouchInput { longClick() }
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag(BookshelfTestTags.BATCH_SMART_UPDATE).assertIsEnabled()
+
+        val syncGate = CompletableDeferred<Unit>()
+        gateway.suspendFetchCloudGate = syncGate
+        composeTestRule.mainClock.autoAdvance = false
+        try {
+            composeTestRule.onNodeWithTag(BookshelfTestTags.CLOUD_SYNC_BUTTON).performClick()
+            composeTestRule.mainClock.advanceTimeBy(100)
+
+            assertTrue(repository.isShelfTaskRunning)
+            composeTestRule.onNodeWithTag(BookshelfTestTags.HEADER_ACTIVE_SYNC_PROGRESS).assertExists()
+            composeTestRule.onNodeWithTag(BookshelfTestTags.CLOUD_SYNC_BUTTON).assertIsNotEnabled()
+            composeTestRule.onNodeWithTag(BookshelfTestTags.SMART_UPDATE_TRAILING_BUTTON).assertIsNotEnabled()
+            composeTestRule.onNodeWithTag(BookshelfTestTags.BATCH_SMART_UPDATE).assertIsNotEnabled()
+
+            // Direct repository calls also enforce non-queuing mutual exclusion!
+            val concurrentSync = repository.syncWithCloudBookcase(Wenku8API.AppLanguage.SC)
+            assertEquals(CloudBookshelfSyncOutcome.AlreadyRunning, concurrentSync)
+
+            val concurrentSmartUpdate = repository.smartUpdateShelfNovels(
+                aids = listOf(4100),
+                appLanguage = Wenku8API.AppLanguage.SC,
+            )
+            assertTrue(concurrentSmartUpdate.skippedBecauseBusy)
+            assertEquals(0, concurrentSmartUpdate.updatedNovelCount)
+        } finally {
+            gateway.suspendFetchCloudGate = null
+            syncGate.complete(Unit)
+            composeTestRule.mainClock.autoAdvance = true
+        }
+        composeTestRule.waitForIdle()
+
+        assertFalse(repository.isShelfTaskRunning)
+        composeTestRule.onNodeWithTag(BookshelfTestTags.CLOUD_SYNC_BUTTON).assertIsEnabled()
+        composeTestRule.onNodeWithTag(BookshelfTestTags.SMART_UPDATE_TRAILING_BUTTON).assertIsEnabled()
+        composeTestRule.onNodeWithTag(BookshelfTestTags.BATCH_SMART_UPDATE).assertIsEnabled()
+    }
+
     private class FakeAccountSwitchTransport : WenkuTransport {
         override val isEndpointConfigured: Boolean = true
         var activeServerUsername: String = "alice"
@@ -1303,6 +1559,9 @@ class BookshelfScreenAndSyncTest {
 
         var cloudBookshelfEntries: List<ParsedCloudBookshelfEntry> = emptyList()
         var failNextFetchCloudNotLoggedIn: Boolean = false
+        var fetchCloudBookshelfCallCount: Int = 0
+        var fetchedFullMetaCount: Int = 0
+        var suspendFetchCloudGate: CompletableDeferred<Unit>? = null
         val addResponsesByAid = mutableMapOf<Int, WenkuApiResult<Unit>>()
         val removeResponsesByAid = mutableMapOf<Int, WenkuApiResult<Unit>>()
         val pushedAidsToCloud = mutableListOf<Int>()
@@ -1321,12 +1580,6 @@ class BookshelfScreenAndSyncTest {
             appLanguage: Wenku8API.AppLanguage,
         ): WenkuApiResult<ParsedNovelListPage> = WenkuApiResult.ApiNotConfigured
 
-        override suspend fun searchNovelsByField(
-            query: String,
-            searchField: OnlineSearchField,
-            appLanguage: Wenku8API.AppLanguage,
-        ): WenkuApiResult<List<Int>> = WenkuApiResult.ApiNotConfigured
-
         override suspend fun fetchNovelShortInfo(
             aid: Int,
             appLanguage: Wenku8API.AppLanguage,
@@ -1341,10 +1594,17 @@ class BookshelfScreenAndSyncTest {
             )
         }
 
+        override suspend fun searchNovelsByField(
+            query: String,
+            searchField: OnlineSearchField,
+            appLanguage: Wenku8API.AppLanguage,
+        ): WenkuApiResult<List<Int>> = WenkuApiResult.ApiNotConfigured
+
         override suspend fun fetchNovelFullMeta(
             aid: Int,
             appLanguage: Wenku8API.AppLanguage,
         ): WenkuApiResult<ParsedNovelFullMeta> {
+            fetchedFullMetaCount++
             val cloudEntry = cloudBookshelfEntries.firstOrNull { it.aid == aid }
             return WenkuApiResult.Success(
                 ParsedNovelFullMeta(
@@ -1395,6 +1655,8 @@ class BookshelfScreenAndSyncTest {
         override suspend fun fetchCloudBookshelf(
             appLanguage: Wenku8API.AppLanguage,
         ): WenkuApiResult<List<ParsedCloudBookshelfEntry>> {
+            fetchCloudBookshelfCallCount++
+            suspendFetchCloudGate?.await()
             if (failNextFetchCloudNotLoggedIn) {
                 failNextFetchCloudNotLoggedIn = false
                 return WenkuApiResult.ServerErrorCode(BookshelfRepository.SERVER_CODE_NOT_LOGGED_IN)
