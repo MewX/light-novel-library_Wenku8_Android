@@ -41,10 +41,17 @@ jobs:
     # :app-v1 first (before R8 release minification) with bounded daemon heaps so Gradle + Kotlin
     # daemon + forked Robolectric worker stay comfortably within ubuntu-latest's 7 GB RAM.
     - name: Run JVM unit tests and generate JaCoCo reports
-      run: ./gradlew -Dorg.gradle.jvmargs="-Xmx2560M -Dkotlin.daemon.jvm.options=-Xmx1536M" :app-v2:jacocoAlphaDebugUnitTestReport :app-v1:jacocoAlphaDebugUnitTestReport
+      run: |
+        ./gradlew -Dorg.gradle.jvmargs="-Xmx2560M -Dkotlin.daemon.jvm.options=-Xmx1536M" --max-workers=2 --stacktrace :app-v2:jacocoAlphaDebugUnitTestReport :app-v1:jacocoAlphaDebugUnitTestReport
+        ./gradlew --stop
 
+    # Stop the test-phase Gradle daemon above before switching heap size; otherwise Gradle leaves
+    # the 2.5 GB daemon resident in RAM and spawns a second 3+ GB daemon alongside it, exhausting
+    # ubuntu-latest's 7 GB RAM during :app-v2:packageAlphaDebug / R8 minification.
     - name: Assemble alpha debug and release APKs (:app-v2 & :app-v1)
-      run: ./gradlew -Dorg.gradle.jvmargs="-Xmx3072M -Dkotlin.daemon.jvm.options=-Xmx1536M" assembleAlpha
+      run: |
+        ./gradlew -Dorg.gradle.jvmargs="-Xmx3072M -Dkotlin.daemon.jvm.options=-Xmx1536M" --max-workers=2 --stacktrace assembleAlpha
+        ./gradlew --stop
 
     - name: Verify JVM coverage reports exist
       run: |
@@ -150,7 +157,7 @@ jobs:
           echo "--- device state before tests ---"
           adb shell dumpsys power | grep -E "mWakefulness=" || true
           adb shell dumpsys window | grep -iE "isKeyguardShowing" || true
-          ./gradlew -Dorg.gradle.jvmargs="-Xmx2048M" :app-v1:connectedAlphaDebugAndroidTest :app-v1:jacocoAlphaDebugAndroidTestReport
+          ./gradlew -Dorg.gradle.jvmargs="-Xmx2048M" --stacktrace :app-v1:connectedAlphaDebugAndroidTest :app-v1:jacocoAlphaDebugAndroidTestReport
 
     - name: Upload instrumented test report
       if: always()
