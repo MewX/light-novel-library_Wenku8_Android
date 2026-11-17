@@ -103,9 +103,13 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.snap
+import androidx.compose.animation.core.tween
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.BitmapImage
 import coil3.compose.AsyncImage
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.mewx.wenku8.api.Wenku8API
 import org.mewx.wenku8.v2.R
@@ -234,11 +238,8 @@ fun NovelDetailScreen(
         seedDiscoveryItem?.coverUrl?.takeIf { it.isNotBlank() }
             ?: novelDetailRepository.resolveCoverUrl(aid)
     }
-    val detailFlow = remember(aid, novelDetailRepository) {
-        novelDetailRepository.observeNovelDetail(aid)
-    }
-    val snapshot by detailFlow.collectAsStateWithLifecycle(
-        initialValue = NovelDetailSnapshot(
+    val initialSnapshot = remember(aid, seedDiscoveryItem, initialCoverUrl, novelDetailRepository) {
+        novelDetailRepository.peekCachedSnapshot(aid) ?: NovelDetailSnapshot(
             aid = aid,
             novel = seedDiscoveryItem?.let {
                 NovelEntity(
@@ -257,13 +258,21 @@ fun NovelDetailScreen(
             totalCachedChapters = 0,
             totalChapters = 0,
             tags = seedDiscoveryItem?.tags.orEmpty(),
-        ),
+        )
+    }
+    val detailFlow = remember(aid, novelDetailRepository) {
+        novelDetailRepository.observeNovelDetail(aid)
+    }
+    val snapshot by detailFlow.collectAsStateWithLifecycle(
+        initialValue = initialSnapshot,
     )
 
     val activeDownloadsMap by novelDownloadRepository.activeDownloadsFlow.collectAsStateWithLifecycle()
     val currentDownloadProgress = activeDownloadsMap[aid]
 
     var isRefreshing by rememberSaveable(aid) { mutableStateOf(false) }
+    var isManualRefreshInFlight by rememberSaveable(aid) { mutableStateOf(false) }
+    var showDebouncedAutoRefreshBar by remember(aid) { mutableStateOf(false) }
     var showOfflinePreservedBanner by rememberSaveable(aid) { mutableStateOf(false) }
     var showFullTitleDialog by rememberSaveable(aid) { mutableStateOf(false) }
     var showReadDropdownMenu by remember { mutableStateOf(false) }
@@ -273,27 +282,60 @@ fun NovelDetailScreen(
     var isReverseVolumeOrder by rememberSaveable(aid) { mutableStateOf(false) }
     var isDownloaderSheetOpen by rememberSaveable(aid) { mutableStateOf(false) }
 
-    // Auto-expand either the volume containing reading progress or the first volume on initial load.
+    // Auto-expand either the volume containing reading progress or the first volume on the very
+    // first frame `volumes` arrives so there is never a 1-frame collapsed-then-pop-open flash.
     var expandedVolumeIds by rememberSaveable(aid) { mutableStateOf<List<Int>>(emptyList()) }
     var initializedDefaultAccordion by rememberSaveable(aid) { mutableStateOf(false) }
 
-    LaunchedEffect(aid, snapshot.volumes.size, snapshot.readingProgress?.vid) {
-        if (!initializedDefaultAccordion && snapshot.volumes.isNotEmpty()) {
-            val targetVid = snapshot.readingProgress?.vid
-                ?.takeIf { progressVid -> snapshot.volumes.any { it.vid == progressVid } }
-                ?: snapshot.volumes.first().vid
-            expandedVolumeIds = listOf(targetVid)
+    val defaultInitialExpandedVid = if (!initializedDefaultAccordion && snapshot.volumes.isNotEmpty()) {
+        snapshot.readingProgress?.vid
+            ?.takeIf { progressVid -> snapshot.volumes.any { it.vid == progressVid } }
+            ?: snapshot.volumes.first().vid
+    } else {
+        null
+    }
+    val effectiveExpandedVolumeIds = if (defaultInitialExpandedVid != null) {
+        listOf(defaultInitialExpandedVid)
+    } else {
+        expandedVolumeIds
+    }
+
+    LaunchedEffect(aid, defaultInitialExpandedVid) {
+        if (defaultInitialExpandedVid != null && !initializedDefaultAccordion) {
+            expandedVolumeIds = listOf(defaultInitialExpandedVid)
             initializedDefaultAccordion = true
         }
     }
 
-    var coverSeedColor by remember(aid) {
-        mutableStateOf(CoverThemeEngine.deterministicSeedColorForAid(aid))
+    LaunchedEffect(isRefreshing, isManualRefreshInFlight, snapshot.volumes.isEmpty()) {
+        if (!isRefreshing) {
+            showDebouncedAutoRefreshBar = false
+        } else if (isManualRefreshInFlight) {
+            showDebouncedAutoRefreshBar = true
+        } else if (snapshot.volumes.isEmpty()) {
+            delay(220L)
+            if (isRefreshing && snapshot.volumes.isEmpty()) {
+                showDebouncedAutoRefreshBar = true
+            }
+        } else {
+            showDebouncedAutoRefreshBar = false
+        }
     }
+    val showRefreshProgressBar = isRefreshing && (isManualRefreshInFlight || showDebouncedAutoRefreshBar)
 
-    val triggerRefresh: () -> Unit = {
+    var coverSeedColor by remember(aid) {
+        mutableStateOf(CoverThemeEngine.initialSeedColorForAid(aid))
+    }
+    val animatedCoverSeedColor by animateColorAsState(
+        targetValue = coverSeedColor,
+        animationSpec = if (isEinkMode) snap() else tween(durationMillis = 220),
+        label = "detailCoverSeedColor",
+    )
+
+    val runRefresh: (manual: Boolean) -> Unit = { manual ->
         coroutineScope.launch {
             isRefreshing = true
+            if (manual) isManualRefreshInFlight = true
             try {
                 when (
                     novelDetailRepository.refreshNovelDetail(
@@ -306,21 +348,26 @@ fun NovelDetailScreen(
                         showOfflinePreservedBanner = false
                     }
                     NovelDetailRefreshOutcome.OfflineOrCachedOnly -> {
+                        novelDetailRepository.acknowledgeUnreadUpdateIfPresent(aid)
                         showOfflinePreservedBanner = true
                     }
                     NovelDetailRefreshOutcome.ApiNotConfigured,
                     is NovelDetailRefreshOutcome.Failed,
-                    -> Unit
+                    -> {
+                        novelDetailRepository.acknowledgeUnreadUpdateIfPresent(aid)
+                    }
                 }
             } finally {
                 isRefreshing = false
+                isManualRefreshInFlight = false
             }
         }
     }
 
+    val triggerRefresh: () -> Unit = { runRefresh(true) }
+
     LaunchedEffect(aid, appLanguage) {
-        novelDetailRepository.acknowledgeUnreadUpdateIfPresent(aid)
-        triggerRefresh()
+        runRefresh(false)
     }
 
     val doneFormat = stringResource(R.string.download_done_snackbar_format)
@@ -359,11 +406,11 @@ fun NovelDetailScreen(
     }
 
     val baseScheme = MaterialTheme.colorScheme
-    val effectiveScheme = remember(baseScheme, coverSeedColor, isDarkEffective, isEinkMode, useCoverTheme) {
+    val effectiveScheme = remember(baseScheme, animatedCoverSeedColor, isDarkEffective, isEinkMode, useCoverTheme) {
         if (useCoverTheme && !isEinkMode) {
             CoverThemeEngine.createScopedCoverColorScheme(
                 baseColorScheme = baseScheme,
-                coverSeedColor = coverSeedColor,
+                coverSeedColor = animatedCoverSeedColor,
                 isDarkTheme = isDarkEffective,
                 isEinkMode = false,
             )
@@ -379,7 +426,6 @@ fun NovelDetailScreen(
         ?: seedDiscoveryItem?.author.orEmpty()
     val inBookshelf = snapshot.novel?.inBookshelf == true
 
-    val launchReaderSnackbarTemplate = stringResource(R.string.detail_reader_launch_snackbar_format)
     val invokeReaderTarget: (
         vid: Int,
         cid: Int,
@@ -387,7 +433,8 @@ fun NovelDetailScreen(
         chapterTitle: String,
         tts: Boolean,
         initialParagraphIndex: Int,
-    ) -> Unit = { vid, cid, volTitle, chapTitle, tts, initialParaIdx ->
+        initialCharOffset: Int,
+    ) -> Unit = { vid, cid, volTitle, chapTitle, tts, initialParaIdx, initialCharOff ->
         val req = ReaderLaunchRequest(
             aid = aid,
             vid = vid,
@@ -397,17 +444,9 @@ fun NovelDetailScreen(
             chapterTitle = chapTitle,
             startWithTts = tts,
             initialParagraphIndex = initialParaIdx,
+            initialCharOffset = initialCharOff,
         )
         onOpenReader(req)
-        coroutineScope.launch {
-            snackbarHostState.showSnackbar(
-                String.format(
-                    Locale.getDefault(),
-                    launchReaderSnackbarTemplate,
-                    "$volTitle · $chapTitle".trim(' ', '·'),
-                ),
-            )
-        }
     }
 
     val filteredAndOrderedVolumes = remember(
@@ -506,109 +545,121 @@ fun NovelDetailScreen(
                 )
             },
         ) { innerPadding ->
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(innerPadding)
-                    .testTag(NovelDetailTestTags.SCREEN_ROOT + "_list"),
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
-                verticalArrangement = Arrangement.spacedBy(14.dp),
-            ) {
-                if (isRefreshing) {
-                    item(key = "detail_refresh_progress") {
-                        if (isEinkMode) {
-                            LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
-                        } else {
-                            LinearWavyProgressIndicator(modifier = Modifier.fillMaxWidth())
-                        }
-                    }
-                }
-
-                if (showOfflinePreservedBanner) {
-                    item(key = "detail_offline_banner") {
-                        Surface(
-                            color = MaterialTheme.colorScheme.secondaryContainer,
-                            contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-                            shape = MaterialTheme.shapes.medium,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .testTag(NovelDetailTestTags.OFFLINE_PRESERVED_BANNER)
-                                .einkHairlineBorder(MaterialTheme.shapes.medium),
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
-                                verticalAlignment = Alignment.CenterVertically,
+            Box(modifier = Modifier.fillMaxSize()) {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(innerPadding)
+                        .testTag(NovelDetailTestTags.SCREEN_ROOT + "_list"),
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(14.dp),
+                ) {
+                    if (showOfflinePreservedBanner) {
+                        item(key = "detail_offline_banner") {
+                            Surface(
+                                color = MaterialTheme.colorScheme.secondaryContainer,
+                                contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                                shape = MaterialTheme.shapes.medium,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .testTag(NovelDetailTestTags.OFFLINE_PRESERVED_BANNER)
+                                    .einkHairlineBorder(MaterialTheme.shapes.medium),
                             ) {
-                                Icon(
-                                    imageVector = Icons.Outlined.CloudOff,
-                                    contentDescription = null,
-                                )
-                                Spacer(modifier = Modifier.width(10.dp))
-                                Text(
-                                    text = stringResource(R.string.detail_offline_preserved_banner),
-                                    style = MaterialTheme.typography.bodySmall,
-                                    modifier = Modifier.weight(1f),
-                                )
-                                val dismissLabel = stringResource(R.string.action_dismiss_banner)
-                                TooltipIconButton(
-                                    tooltipText = dismissLabel,
-                                    onClick = { showOfflinePreservedBanner = false },
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
                                 ) {
-                                    Icon(imageVector = Icons.Outlined.Close, contentDescription = dismissLabel)
+                                    Icon(
+                                        imageVector = Icons.Outlined.CloudOff,
+                                        contentDescription = null,
+                                    )
+                                    Spacer(modifier = Modifier.width(10.dp))
+                                    Text(
+                                        text = stringResource(R.string.detail_offline_preserved_banner),
+                                        style = MaterialTheme.typography.bodySmall,
+                                        modifier = Modifier.weight(1f),
+                                    )
+                                    val dismissLabel = stringResource(R.string.action_dismiss_banner)
+                                    TooltipIconButton(
+                                        tooltipText = dismissLabel,
+                                        onClick = { showOfflinePreservedBanner = false },
+                                    ) {
+                                        Icon(imageVector = Icons.Outlined.Close, contentDescription = dismissLabel)
+                                    }
                                 }
                             }
                         }
                     }
-                }
 
-                // 1. Editorial Hero Header with CoverThemeEngine ambient glow & shared-element morph
-                item(key = "detail_hero_header") {
-                    NovelHeroHeaderCard(
-                        aid = aid,
-                        title = displayTitle,
-                        author = displayAuthor,
-                        novel = snapshot.novel,
-                        appLanguage = appLanguage,
-                        coverUrl = snapshot.coverUrl.ifBlank { initialCoverUrl },
-                        tags = snapshot.tags,
-                        isEinkMode = isEinkMode,
-                        sharedTransitionOrigin = sharedTransitionOrigin,
-                        onCoverSeedExtracted = { extracted -> coverSeedColor = extracted },
-                        onTitleClicked = { showFullTitleDialog = true },
-                        onAuthorClicked = {
-                            if (displayAuthor.isNotBlank()) onAuthorClicked(displayAuthor)
-                        },
-                        onTagClicked = onTagClicked,
-                    )
-                }
+                    // 1. Editorial Hero Header with CoverThemeEngine ambient glow & shared-element morph
+                    item(key = "detail_hero_header") {
+                        NovelHeroHeaderCard(
+                            aid = aid,
+                            title = displayTitle,
+                            author = displayAuthor,
+                            novel = snapshot.novel,
+                            appLanguage = appLanguage,
+                            coverUrl = snapshot.coverUrl.ifBlank { initialCoverUrl },
+                            tags = snapshot.tags,
+                            isEinkMode = isEinkMode,
+                            sharedTransitionOrigin = sharedTransitionOrigin,
+                            onCoverSeedExtracted = { extracted ->
+                                CoverThemeEngine.recordExtractedSeedColor(aid, extracted)
+                                coverSeedColor = extracted
+                            },
+                            onTitleClicked = { showFullTitleDialog = true },
+                            onAuthorClicked = {
+                                if (displayAuthor.isNotBlank()) onAuthorClicked(displayAuthor)
+                            },
+                            onTagClicked = onTagClicked,
+                        )
+                    }
 
-                // 2. 4-Column Stat Strip
-                item(key = "detail_stats_strip") {
-                    NovelStatsStrip(novel = snapshot.novel)
-                }
+                    // 2. 4-Column Stat Strip
+                    item(key = "detail_stats_strip") {
+                        NovelStatsStrip(novel = snapshot.novel)
+                    }
 
-                // 3. Primary Reading-Only SplitButtonLayout + Secondary 3-Action Row
-                item(key = "detail_action_deck") {
-                    NovelActionDeck(
-                        snapshot = snapshot,
-                        inBookshelf = inBookshelf,
-                        activeDownload = currentDownloadProgress?.takeIf {
-                            it.state == NovelDownloadRunState.RUNNING
-                        },
-                        showReadDropdownMenu = showReadDropdownMenu,
-                        onShowReadDropdownMenuChange = { showReadDropdownMenu = it },
-                        onResumeOrStartReading = {
-                            val prog = snapshot.readingProgress
-                            if (prog != null && prog.cid > 0) {
-                                invokeReaderTarget(
-                                    prog.vid,
-                                    prog.cid,
-                                    prog.volumeTitle,
-                                    prog.chapterTitle,
-                                    false,
-                                    -1,
-                                )
-                            } else {
+                    // 3. Primary Reading-Only SplitButtonLayout + Secondary 3-Action Row
+                    item(key = "detail_action_deck") {
+                        NovelActionDeck(
+                            snapshot = snapshot,
+                            inBookshelf = inBookshelf,
+                            activeDownload = currentDownloadProgress?.takeIf {
+                                it.state == NovelDownloadRunState.RUNNING
+                            },
+                            showReadDropdownMenu = showReadDropdownMenu,
+                            onShowReadDropdownMenuChange = { showReadDropdownMenu = it },
+                            onResumeOrStartReading = {
+                                val prog = snapshot.readingProgress
+                                if (prog != null && prog.cid > 0) {
+                                    invokeReaderTarget(
+                                        prog.vid,
+                                        prog.cid,
+                                        prog.volumeTitle,
+                                        prog.chapterTitle,
+                                        false,
+                                        prog.paragraphIndex.coerceAtLeast(0),
+                                        prog.charOffset.coerceAtLeast(0),
+                                    )
+                                } else {
+                                    val firstVol = snapshot.volumes.firstOrNull { it.chapters.isNotEmpty() }
+                                    val firstChap = firstVol?.chapters?.firstOrNull()
+                                    if (firstVol != null && firstChap != null) {
+                                        invokeReaderTarget(
+                                            firstVol.vid,
+                                            firstChap.cid,
+                                            firstVol.volumeTitle,
+                                            firstChap.chapterTitle,
+                                            false,
+                                            0,
+                                            0,
+                                        )
+                                    }
+                                }
+                            },
+                            onStartFromBeginning = {
+                                showReadDropdownMenu = false
                                 val firstVol = snapshot.volumes.firstOrNull { it.chapters.isNotEmpty() }
                                 val firstChap = firstVol?.chapters?.firstOrNull()
                                 if (firstVol != null && firstChap != null) {
@@ -619,207 +670,213 @@ fun NovelDetailScreen(
                                         firstChap.chapterTitle,
                                         false,
                                         0,
+                                        0,
                                     )
                                 }
-                            }
-                        },
-                        onStartFromBeginning = {
-                            showReadDropdownMenu = false
-                            val firstVol = snapshot.volumes.firstOrNull { it.chapters.isNotEmpty() }
-                            val firstChap = firstVol?.chapters?.firstOrNull()
-                            if (firstVol != null && firstChap != null) {
-                                invokeReaderTarget(
-                                    firstVol.vid,
-                                    firstChap.cid,
-                                    firstVol.volumeTitle,
-                                    firstChap.chapterTitle,
-                                    false,
-                                    0,
-                                )
-                            }
-                        },
-                        onJumpToLatestChapter = {
-                            showReadDropdownMenu = false
-                            val lastVol = snapshot.volumes.lastOrNull { it.chapters.isNotEmpty() }
-                            val lastChap = lastVol?.chapters?.lastOrNull()
-                            if (lastVol != null && lastChap != null) {
-                                invokeReaderTarget(
-                                    lastVol.vid,
-                                    lastChap.cid,
-                                    lastVol.volumeTitle,
-                                    lastChap.chapterTitle,
-                                    false,
-                                    0,
-                                )
-                            }
-                        },
-                        onReadAloudTts = {
-                            showReadDropdownMenu = false
-                            val prog = snapshot.readingProgress
-                            val firstVol = snapshot.volumes.firstOrNull { it.chapters.isNotEmpty() }
-                            val firstChap = firstVol?.chapters?.firstOrNull()
-                            if (prog != null && prog.cid > 0) {
-                                invokeReaderTarget(
-                                    prog.vid,
-                                    prog.cid,
-                                    prog.volumeTitle,
-                                    prog.chapterTitle,
-                                    true,
-                                    -1,
-                                )
-                            } else if (firstVol != null && firstChap != null) {
-                                invokeReaderTarget(
-                                    firstVol.vid,
-                                    firstChap.cid,
-                                    firstVol.volumeTitle,
-                                    firstChap.chapterTitle,
-                                    true,
-                                    0,
-                                )
-                            }
-                        },
-                        onToggleBookshelf = {
-                            val addedSnack = context.getString(R.string.detail_shelf_added_snackbar)
-                            val removedSnack = context.getString(R.string.detail_shelf_removed_snackbar)
-                            coroutineScope.launch {
-                                if (inBookshelf) {
-                                    bookshelfRepository.removeNovelsFromBookshelf(
-                                        aids = listOf(aid),
-                                        removeFromCloudIfSignedIn = true,
-                                        deleteOfflineCache = false,
+                            },
+                            onJumpToLatestChapter = {
+                                showReadDropdownMenu = false
+                                val lastVol = snapshot.volumes.lastOrNull { it.chapters.isNotEmpty() }
+                                val lastChap = lastVol?.chapters?.lastOrNull()
+                                if (lastVol != null && lastChap != null) {
+                                    invokeReaderTarget(
+                                        lastVol.vid,
+                                        lastChap.cid,
+                                        lastVol.volumeTitle,
+                                        lastChap.chapterTitle,
+                                        false,
+                                        0,
+                                        0,
                                     )
-                                    snackbarHostState.showSnackbar(removedSnack)
-                                } else {
-                                    val baseEntity = snapshot.novel ?: NovelEntity(
-                                        aid = aid,
-                                        title = displayTitle,
-                                        author = displayAuthor,
-                                    )
-                                    bookshelfRepository.addNovelToBookshelf(
-                                        novel = baseEntity,
-                                        syncToCloudIfSignedIn = true,
-                                    )
-                                    snackbarHostState.showSnackbar(addedSnack)
                                 }
-                            }
-                        },
-                        onOpenDownloader = { isDownloaderSheetOpen = true },
-                        onOpenReviews = { onOpenReviews(aid, displayTitle) },
-                    )
-                }
-
-                // 4. Active Download Progress Banner (when downloading this novel)
-                if (currentDownloadProgress != null &&
-                    currentDownloadProgress.state == NovelDownloadRunState.RUNNING
-                ) {
-                    item(key = "detail_active_download_banner") {
-                        ActiveNovelDownloadCard(
-                            progress = currentDownloadProgress,
-                            isEinkMode = isEinkMode,
-                            onCancel = { novelDownloadRepository.cancelDownload(aid) },
+                            },
+                            onReadAloudTts = {
+                                showReadDropdownMenu = false
+                                val prog = snapshot.readingProgress
+                                val firstVol = snapshot.volumes.firstOrNull { it.chapters.isNotEmpty() }
+                                val firstChap = firstVol?.chapters?.firstOrNull()
+                                if (prog != null && prog.cid > 0) {
+                                    invokeReaderTarget(
+                                        prog.vid,
+                                        prog.cid,
+                                        prog.volumeTitle,
+                                        prog.chapterTitle,
+                                        true,
+                                        prog.paragraphIndex.coerceAtLeast(0),
+                                        prog.charOffset.coerceAtLeast(0),
+                                    )
+                                } else if (firstVol != null && firstChap != null) {
+                                    invokeReaderTarget(
+                                        firstVol.vid,
+                                        firstChap.cid,
+                                        firstVol.volumeTitle,
+                                        firstChap.chapterTitle,
+                                        true,
+                                        0,
+                                        0,
+                                    )
+                                }
+                            },
+                            onToggleBookshelf = {
+                                val addedSnack = context.getString(R.string.detail_shelf_added_snackbar)
+                                val removedSnack = context.getString(R.string.detail_shelf_removed_snackbar)
+                                coroutineScope.launch {
+                                    if (inBookshelf) {
+                                        bookshelfRepository.removeNovelsFromBookshelf(
+                                            aids = listOf(aid),
+                                            removeFromCloudIfSignedIn = true,
+                                            deleteOfflineCache = false,
+                                        )
+                                        snackbarHostState.showSnackbar(removedSnack)
+                                    } else {
+                                        val baseEntity = snapshot.novel ?: NovelEntity(
+                                            aid = aid,
+                                            title = displayTitle,
+                                            author = displayAuthor,
+                                        )
+                                        bookshelfRepository.addNovelToBookshelf(
+                                            novel = baseEntity,
+                                            syncToCloudIfSignedIn = true,
+                                        )
+                                        snackbarHostState.showSnackbar(addedSnack)
+                                    }
+                                }
+                            },
+                            onOpenDownloader = { isDownloaderSheetOpen = true },
+                            onOpenReviews = { onOpenReviews(aid, displayTitle) },
                         )
                     }
-                }
 
-                // 5. Expandable Synopsis
-                item(key = "detail_synopsis_card") {
-                    val synopsisText = snapshot.novel?.fullIntro?.ifBlank { null }
-                        ?: snapshot.novel?.introShort?.ifBlank { null }
-                        ?: seedDiscoveryItem?.introShort.orEmpty()
-                    NovelSynopsisCard(
-                        synopsis = synopsisText,
-                        expanded = isSynopsisExpanded,
-                        onToggleExpanded = { isSynopsisExpanded = !isSynopsisExpanded },
-                    )
-                }
-
-                // 6. Single Zero-CLS Server-Support Inline Banner (between Synopsis and Volume Directory)
-                item(key = "detail_server_support_ad") {
-                    ServerSupportBannerAd(
-                        isNetworkAvailableOverride = isNetworkAvailableForAdOverride,
-                        isGmsAvailableOverride = isGmsAvailableForAdOverride,
-                        enableLiveAdViewInflation = enableLiveAdViewInflation,
-                    )
-                }
-
-                // 7. Volume Directory Header + Filter + Order Controls
-                item(key = "detail_toc_header") {
-                    VolumeDirectoryHeader(
-                        volumeCount = snapshot.volumes.size,
-                        isSearchVisible = isChapterFilterVisible,
-                        searchQuery = chapterFilterQuery,
-                        isReverseOrder = isReverseVolumeOrder,
-                        onToggleSearch = {
-                            isChapterFilterVisible = !isChapterFilterVisible
-                            if (!isChapterFilterVisible) chapterFilterQuery = ""
-                        },
-                        onSearchQueryChange = { chapterFilterQuery = it },
-                        onToggleReverseOrder = { isReverseVolumeOrder = !isReverseVolumeOrder },
-                    )
-                }
-
-                if (filteredAndOrderedVolumes.isEmpty()) {
-                    item(key = "detail_toc_empty") {
-                        Card(
-                            colors = CardDefaults.cardColors(
-                                containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
-                            ),
-                            shape = MaterialTheme.shapes.medium,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .einkHairlineBorder(MaterialTheme.shapes.medium),
-                        ) {
-                            Text(
-                                text = if (isRefreshing) {
-                                    stringResource(R.string.detail_toc_empty_loading)
-                                } else {
-                                    stringResource(R.string.detail_toc_empty_offline)
-                                },
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(18.dp),
+                    // 4. Active Download Progress Banner (when downloading this novel)
+                    if (currentDownloadProgress != null &&
+                        currentDownloadProgress.state == NovelDownloadRunState.RUNNING
+                    ) {
+                        item(key = "detail_active_download_banner") {
+                            ActiveNovelDownloadCard(
+                                progress = currentDownloadProgress,
+                                isEinkMode = isEinkMode,
+                                onCancel = { novelDownloadRepository.cancelDownload(aid) },
                             )
                         }
                     }
-                } else {
-                    items(
-                        items = filteredAndOrderedVolumes,
-                        key = { volume -> "volume_${volume.vid}" },
-                    ) { volume ->
-                        val isExpanded = chapterFilterQuery.isNotBlank() ||
-                            volume.vid in expandedVolumeIds
-                        VolumeAccordionCard(
-                            volume = volume,
-                            isExpanded = isExpanded,
-                            readingProgressPercent = snapshot.readingProgressPercent,
-                            onToggleExpand = {
-                                expandedVolumeIds = if (volume.vid in expandedVolumeIds) {
-                                    expandedVolumeIds - volume.vid
-                                } else {
-                                    expandedVolumeIds + volume.vid
-                                }
-                            },
-                            onJumpToIllustrationChapter = { illusChap ->
-                                invokeReaderTarget(
-                                    volume.vid,
-                                    illusChap.cid,
-                                    volume.volumeTitle,
-                                    illusChap.chapterTitle,
-                                    false,
-                                    0,
-                                )
-                            },
-                            onChapterClicked = { chap ->
-                                invokeReaderTarget(
-                                    volume.vid,
-                                    chap.cid,
-                                    volume.volumeTitle,
-                                    chap.chapterTitle,
-                                    false,
-                                    -1,
-                                )
-                            },
+
+                    // 5. Expandable Synopsis
+                    item(key = "detail_synopsis_card") {
+                        val synopsisText = snapshot.novel?.fullIntro?.ifBlank { null }
+                            ?: snapshot.novel?.introShort?.ifBlank { null }
+                            ?: seedDiscoveryItem?.introShort.orEmpty()
+                        NovelSynopsisCard(
+                            synopsis = synopsisText,
+                            expanded = isSynopsisExpanded,
+                            onToggleExpanded = { isSynopsisExpanded = !isSynopsisExpanded },
                         )
+                    }
+
+                    // 6. Single Zero-CLS Server-Support Inline Banner (between Synopsis and Volume Directory)
+                    item(key = "detail_server_support_ad") {
+                        ServerSupportBannerAd(
+                            isNetworkAvailableOverride = isNetworkAvailableForAdOverride,
+                            isGmsAvailableOverride = isGmsAvailableForAdOverride,
+                            enableLiveAdViewInflation = enableLiveAdViewInflation,
+                        )
+                    }
+
+                    // 7. Volume Directory Header + Filter + Order Controls
+                    item(key = "detail_toc_header") {
+                        VolumeDirectoryHeader(
+                            volumeCount = snapshot.volumes.size,
+                            isSearchVisible = isChapterFilterVisible,
+                            searchQuery = chapterFilterQuery,
+                            isReverseOrder = isReverseVolumeOrder,
+                            onToggleSearch = {
+                                isChapterFilterVisible = !isChapterFilterVisible
+                                if (!isChapterFilterVisible) chapterFilterQuery = ""
+                            },
+                            onSearchQueryChange = { chapterFilterQuery = it },
+                            onToggleReverseOrder = { isReverseVolumeOrder = !isReverseVolumeOrder },
+                        )
+                    }
+
+                    if (filteredAndOrderedVolumes.isEmpty()) {
+                        item(key = "detail_toc_empty") {
+                            Card(
+                                colors = CardDefaults.cardColors(
+                                    containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+                                ),
+                                shape = MaterialTheme.shapes.medium,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .einkHairlineBorder(MaterialTheme.shapes.medium),
+                            ) {
+                                Text(
+                                    text = if (isRefreshing) {
+                                        stringResource(R.string.detail_toc_empty_loading)
+                                    } else {
+                                        stringResource(R.string.detail_toc_empty_offline)
+                                    },
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(18.dp),
+                                )
+                            }
+                        }
+                    } else {
+                        items(
+                            items = filteredAndOrderedVolumes,
+                            key = { volume -> "volume_${volume.vid}" },
+                        ) { volume ->
+                            val isExpanded = chapterFilterQuery.isNotBlank() ||
+                                volume.vid in effectiveExpandedVolumeIds
+                            VolumeAccordionCard(
+                                volume = volume,
+                                isExpanded = isExpanded,
+                                readingProgressPercent = snapshot.readingProgressPercent,
+                                onToggleExpand = {
+                                    val baseIds = effectiveExpandedVolumeIds
+                                    initializedDefaultAccordion = true
+                                    expandedVolumeIds = if (volume.vid in baseIds) {
+                                        baseIds - volume.vid
+                                    } else {
+                                        baseIds + volume.vid
+                                    }
+                                },
+                                onJumpToIllustrationChapter = { illusChap ->
+                                    invokeReaderTarget(
+                                        volume.vid,
+                                        illusChap.cid,
+                                        volume.volumeTitle,
+                                        illusChap.chapterTitle,
+                                        false,
+                                        0,
+                                        0,
+                                    )
+                                },
+                                onChapterClicked = { chap ->
+                                    val prog = snapshot.readingProgress?.takeIf { it.cid == chap.cid }
+                                    invokeReaderTarget(
+                                        volume.vid,
+                                        chap.cid,
+                                        volume.volumeTitle,
+                                        chap.chapterTitle,
+                                        false,
+                                        prog?.paragraphIndex ?: -1,
+                                        prog?.charOffset ?: 0,
+                                    )
+                                },
+                            )
+                        }
+                    }
+                }
+
+                if (showRefreshProgressBar) {
+                    val overlayMod = Modifier
+                        .align(Alignment.TopCenter)
+                        .padding(top = innerPadding.calculateTopPadding())
+                        .fillMaxWidth()
+                    if (isEinkMode) {
+                        LinearProgressIndicator(modifier = overlayMod)
+                    } else {
+                        LinearWavyProgressIndicator(modifier = overlayMod)
                     }
                 }
             }

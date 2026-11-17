@@ -20,6 +20,31 @@ import kotlin.math.min
  */
 object CoverThemeEngine {
 
+    private val extractedSeedCacheLock = Any()
+    private val extractedSeedCache = object : LinkedHashMap<Int, Color>(64, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<Int, Color>?): Boolean {
+            return size > 256
+        }
+    }
+
+    /**
+     * Returns a previously extracted cover bitmap seed color for [aid] if available in session
+     * memory, falling back to [deterministicSeedColorForAid].
+     */
+    fun initialSeedColorForAid(aid: Int): Color {
+        synchronized(extractedSeedCacheLock) {
+            extractedSeedCache[aid]?.let { return it }
+        }
+        return deterministicSeedColorForAid(aid)
+    }
+
+    fun recordExtractedSeedColor(aid: Int, seedColor: Color) {
+        if (aid <= 0) return
+        synchronized(extractedSeedCacheLock) {
+            extractedSeedCache[aid] = seedColor
+        }
+    }
+
     /**
      * Deterministic editorial fallback seed color keyed by [aid] before cover artwork finishes
      * decoding (or when offline without a cached cover JPEG).

@@ -541,6 +541,107 @@ class ReaderEngineV2Test {
         buffer.close()
     }
 
+    @Test
+    fun cachedChapterOpen_emitsSingleLoadedSnapshot_andIgnoresStaleCoordinateRevisionSettle() = runBlocking {
+        val aid = 4100
+        database.novelDao().upsertNovel(
+            NovelEntity(
+                aid = aid,
+                title = "防闪烁与防双跳测试作品",
+                metaSyncedAtMs = 1_000L,
+            ),
+        )
+        tocSyncRepository.syncNovelIndexAtomically(
+            aid = aid,
+            language = Wenku8API.AppLanguage.SC,
+            requestStartedAtMs = 2_000L,
+            parsedVolumes = listOf(
+                ParsedVolumeToc(
+                    vid = 10,
+                    volumeTitle = "第一卷",
+                    chapters = listOf(
+                        ParsedChapterToc(cid = 1001, chapterTitle = "第一章 长篇正文"),
+                        ParsedChapterToc(cid = 1002, chapterTitle = "第二章 后记"),
+                        ParsedChapterToc(cid = 1003, chapterTitle = "插图"),
+                    ),
+                ),
+            ),
+        )
+
+        val ch1Long = buildMultiPageChapter("第一卷", "第一章 长篇正文", paragraphCount = 22)
+        val ch2Short = "第一卷 第二章 后记\r\n\r\n　　简短的一页后记正文。\r\n"
+        val ch3Illus = "第一卷 插图\r\n\r\n<!--image-->http://pic.wenku8.cn/pictures/4/4100/1003/1.jpg<!--image-->"
+
+        listOf(1001 to ch1Long, 1002 to ch2Short, 1003 to ch3Illus).forEach { (cid, body) ->
+            database.chapterContentDao().upsertChapterContent(
+                ChapterContentEntity(
+                    cid = cid,
+                    aid = aid,
+                    contentLang = Wenku8API.AppLanguage.SC.name,
+                    contentText = body,
+                    byteLength = body.toByteArray().size,
+                    sha256Checksum = DigestUtils.sha256Hex(body),
+                    downloadedAtMs = 3_000L,
+                ),
+            )
+        }
+
+        val buffer = ChapterWindowBuffer(
+            aid = aid,
+            appLanguageProvider = { Wenku8API.AppLanguage.SC },
+            tocDao = database.tocDao(),
+            chapterContentDao = database.chapterContentDao(),
+            catalogGateway = fakeGateway,
+            novelTocSyncRepository = tocSyncRepository,
+            paginator = StaticLayoutPaginator(lineBreaker = DeterministicCellLineBreaker),
+            scope = testScope,
+            ioDispatcher = Dispatchers.Unconfined,
+            computeDispatcher = Dispatchers.Unconfined,
+        )
+
+        val config = ReaderLayoutConfig(
+            viewportWidthPx = 380,
+            viewportHeightPx = 640,
+            fontSizePx = 22f,
+            lineDistancePx = 10f,
+            paragraphDistancePx = 16f,
+            pageEdgeDistancePx = 20f,
+        )
+
+        // Opening cached chapter 1002 with cached prev chapter 1001 must go straight to Loaded
+        // in 1 revision bump (`0 -> 1`) without intermediate Loading skeleton or second prevSlot shift!
+        val openedCh2 = buffer.openChapter(cid = 1002, layoutConfig = config)
+        assertEquals(1L, openedCh2.coordinateRevision)
+        assertTrue(openedCh2.currentSlot is ChapterWindowSlot.Loaded)
+        assertTrue(openedCh2.prevSlot is ChapterWindowSlot.Loaded)
+        assertTrue(openedCh2.prevPageCount >= 4)
+        assertEquals(1002, openedCh2.activeChapter?.cid)
+
+        // Open illustration chapter 1003 (prevSlot = 1-page 1002 -> activeVirtualPageIndex = 1).
+        val openedIllus = buffer.openChapter(cid = 1003, layoutConfig = config)
+        val illusRev = openedIllus.coordinateRevision
+        assertEquals(1003, openedIllus.activeChapter?.cid)
+        assertEquals(1, openedIllus.prevPageCount)
+        assertEquals(1, openedIllus.activeVirtualPageIndex)
+
+        // Step 1 page backward (`virtualPageIndex = 0`) into 1002.
+        val shiftedToCh2 = buffer.onVirtualPageSettled(
+            virtualPageIndex = 0,
+            expectedCoordinateRevision = illusRev,
+        )
+        assertEquals(1002, shiftedToCh2.activeChapter?.cid)
+
+        // A duplicate/stale settle callback carrying `virtualPageIndex = 0` from `illusRev`
+        // MUST be ignored instead of shifting a second time into 1001!
+        val afterDuplicateSettle = buffer.onVirtualPageSettled(
+            virtualPageIndex = 0,
+            expectedCoordinateRevision = illusRev,
+        )
+        assertEquals(1002, afterDuplicateSettle.activeChapter?.cid)
+
+        buffer.close()
+    }
+
     private fun buildMultiPageChapter(
         volumeTitle: String,
         chapterTitle: String,

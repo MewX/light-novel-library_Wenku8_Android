@@ -19,6 +19,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipeRight
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import kotlinx.coroutines.Dispatchers
@@ -725,6 +726,161 @@ class ArtbookSearchAndTtsTest {
                     .isNotEmpty()
             }
         }
+    }
+
+    @Test
+    fun returningFromIllustrationChapter_viaChipOrBackwardPageTurn_landsStrictlyOnPreviousChapterWithoutDoubleStep() {
+        val imgFile1 = createTestImageFile("illus_back_1.jpg", 400, 560, AndroidColor.rgb(66, 120, 190))
+        val imgFile2 = createTestImageFile("illus_back_2.jpg", 400, 560, AndroidColor.rgb(180, 90, 110))
+        val urlMap = mapOf(
+            "https://pic.wenku8.com/pictures/5120/p1.jpg" to imgFile1,
+            "https://pic.wenku8.com/pictures/5120/p2.jpg" to imgFile2,
+        )
+
+        runBlocking {
+            database.novelDao().upsertNovel(
+                NovelEntity(
+                    aid = 5120,
+                    title = "插画返章测试卷",
+                    author = "测试作者",
+                    inBookshelf = true,
+                    metaSyncedAtMs = 1_000L,
+                ),
+            )
+            tocSyncRepository.syncNovelIndexAtomically(
+                aid = 5120,
+                language = Wenku8API.AppLanguage.SC,
+                requestStartedAtMs = 2_000L,
+                parsedVolumes = listOf(
+                    ParsedVolumeToc(
+                        vid = 901,
+                        volumeTitle = "第一卷",
+                        chapters = listOf(
+                            ParsedChapterToc(cid = 9101, chapterTitle = "第一章 长篇序幕"),
+                            ParsedChapterToc(cid = 9102, chapterTitle = "第二章 后记"),
+                            ParsedChapterToc(cid = 9103, chapterTitle = "插图"),
+                        ),
+                    ),
+                ),
+            )
+            val longCh1 = buildString {
+                appendLine("第一卷 第一章 长篇序幕")
+                for (i in 1..24) {
+                    appendLine("　　第一章第${i}段长篇正文，生成远多于后记页数的多页前置窗口以覆盖坐标偏移边界。")
+                }
+            }
+            val shortCh2 = """
+                第一卷 第二章 后记
+                　　这是紧邻插图之前的单页后记正文。
+            """.trimIndent()
+            val illusCh3 = buildString {
+                appendLine("第一卷 插图")
+                urlMap.keys.forEach { u ->
+                    appendLine("<!--image-->$u<!--image-->")
+                }
+            }
+
+            listOf(9101 to longCh1, 9102 to shortCh2, 9103 to illusCh3).forEach { (cid, body) ->
+                database.chapterContentDao().upsertChapterContent(
+                    ChapterContentEntity(
+                        cid = cid,
+                        aid = 5120,
+                        contentLang = Wenku8API.AppLanguage.SC.name,
+                        contentText = body,
+                        byteLength = body.toByteArray().size,
+                        sha256Checksum = "sha_$cid",
+                        downloadedAtMs = 1_700_000_000_000L,
+                    ),
+                )
+            }
+        }
+
+        composeTestRule.setContent {
+            Wenku8ExpressiveTheme(themeMode = Wenku8ThemeMode.CLASSIC_BLUE) {
+                UnifiedReaderScreen(
+                    launchRequest = ReaderLaunchRequest(
+                        aid = 5120,
+                        novelTitle = "插画返章测试卷",
+                        vid = 901,
+                        volumeTitle = "第一卷",
+                        cid = 9103,
+                        chapterTitle = "插图",
+                        initialParagraphIndex = 0,
+                    ),
+                    database = database,
+                    catalogGateway = fakeGateway,
+                    novelTocSyncRepository = tocSyncRepository,
+                    preferences = Wenku8UserPreferences(readerPageTurnMode = ReaderPageTurnMode.COVER_SLIDE),
+                    onReaderTypographyChanged = { _, _, _, _ -> },
+                    onNavigateBack = {},
+                    lineBreaker = DeterministicCellLineBreaker,
+                    artbookImageFileResolver = { url -> urlMap[url] },
+                    ioDispatcher = Dispatchers.Main.immediate,
+                    computeDispatcher = Dispatchers.Main.immediate,
+                )
+            }
+        }
+        composeTestRule.waitForIdle()
+
+        // 1. Pure illustration chapter 9103 auto-opens ArtbookLightboxOverlay.
+        composeTestRule.onNodeWithTag(ArtbookTestTags.OVERLAY).assertIsDisplayed()
+
+        // Tap `"上一章"` chip inside ArtbookLightboxOverlay -> must land strictly on 9102 (NOT 9101!).
+        composeTestRule.onNodeWithTag(ArtbookTestTags.PREV_CHAPTER_CHIP).performClick()
+        composeTestRule.waitForIdle()
+
+        assertEquals(
+            0,
+            composeTestRule.onAllNodesWithTag(ArtbookTestTags.OVERLAY).fetchSemanticsNodes().size,
+        )
+        assertEquals(
+            "Clicking 上一章 from illustration chapter 9103 must stop at 9102 instead of double-stepping to 9101",
+            9102,
+            runBlocking { database.readingProgressDao().getProgressForNovel(5120)?.cid },
+        )
+
+        // 2. Flip forward 1 page from 1-page 9102 back into 9103 (`插图`), which auto-opens Artbook again!
+        composeTestRule.onNodeWithTag(ReaderTestTags.PAGED_HORIZONTAL_PAGER).performTouchInput {
+            click(Offset(x = width * 0.85f, y = height * 0.5f))
+        }
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag(ArtbookTestTags.OVERLAY).assertIsDisplayed()
+        assertEquals(9103, runBlocking { database.readingProgressDao().getProgressForNovel(5120)?.cid })
+
+        // Switch 9103 to `"小说阅读"` mode and tap top-left zone (`PREV_PAGE`, above the clickable
+        // inline illustration card) to return to 9102 -> must land strictly on 9102, never 9101!
+        composeTestRule.onNodeWithTag(ArtbookTestTags.READER_MODE_CHIP).performClick()
+        composeTestRule.waitForIdle()
+
+        composeTestRule.onNodeWithTag(ReaderTestTags.PAGED_HORIZONTAL_PAGER).performTouchInput {
+            click(Offset(x = width * 0.12f, y = height * 0.03f))
+        }
+        composeTestRule.waitForIdle()
+
+        assertEquals(
+            "Stepping backward via tap from illustration chapter 9103 in novel mode must land on 9102, never 9101",
+            9102,
+            runBlocking { database.readingProgressDao().getProgressForNovel(5120)?.cid },
+        )
+
+        // 3. Flip forward into 9103 again (stays in overridden novel mode) and drag-swipe backward
+        // (`swipeRight()`) -> must also land strictly on 9102 without double-stepping to 9101!
+        composeTestRule.onNodeWithTag(ReaderTestTags.PAGED_HORIZONTAL_PAGER).performTouchInput {
+            click(Offset(x = width * 0.85f, y = height * 0.03f))
+        }
+        composeTestRule.waitForIdle()
+        assertEquals(9103, runBlocking { database.readingProgressDao().getProgressForNovel(5120)?.cid })
+
+        composeTestRule.onNodeWithTag(ReaderTestTags.PAGED_HORIZONTAL_PAGER).performTouchInput {
+            swipeRight()
+        }
+        composeTestRule.waitForIdle()
+
+        assertEquals(
+            "Swiping backward from illustration chapter 9103 must land strictly on 9102, never 9101",
+            9102,
+            runBlocking { database.readingProgressDao().getProgressForNovel(5120)?.cid },
+        )
     }
 
     private fun seedMultiPageTwoChapterNovel() = runBlocking {

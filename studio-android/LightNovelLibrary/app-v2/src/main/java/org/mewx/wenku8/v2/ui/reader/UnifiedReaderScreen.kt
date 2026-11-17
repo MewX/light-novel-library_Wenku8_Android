@@ -700,9 +700,13 @@ fun UnifiedReaderScreen(
                     ReaderTapZoneAction.TOGGLE_HUD -> snap.activeVirtualPageIndex
                 }
                 if (targetVirtual in 0 until snap.totalVirtualPages) {
+                    val originRevision = snap.coordinateRevision
                     val resolvedTarget = snap.resolveVirtualPage(targetVirtual)
                     coroutineScope.launch {
-                        windowBuffer.onVirtualPageSettled(targetVirtual)
+                        windowBuffer.onVirtualPageSettled(
+                            virtualPageIndex = targetVirtual,
+                            expectedCoordinateRevision = originRevision,
+                        )
                         if (latestPageTurnMode == ReaderPageTurnMode.CONTINUOUS_SCROLL &&
                             resolvedTarget?.page != null
                         ) {
@@ -918,18 +922,34 @@ fun UnifiedReaderScreen(
             }
         }
 
+        val boundedInitialVirtualPage = if (snapshot.totalVirtualPages > 0) {
+            snapshot.activeVirtualPageIndex.coerceIn(0, snapshot.totalVirtualPages - 1)
+        } else {
+            0
+        }
         val pagerState = rememberPagerState(
-            initialPage = snapshot.activeVirtualPageIndex,
+            initialPage = boundedInitialVirtualPage,
         ) {
             snapshot.totalVirtualPages.coerceAtLeast(1)
         }
 
         var isProgrammaticPagerSnap by remember { mutableStateOf(false) }
+        val latestWindowSnapshot by rememberUpdatedState(snapshot)
+        val syncedRevisionHolder = remember { longArrayOf(snapshot.coordinateRevision) }
+        if (syncedRevisionHolder[0] != snapshot.coordinateRevision) {
+            syncedRevisionHolder[0] = snapshot.coordinateRevision
+            if (snapshot.totalVirtualPages > 0) {
+                val target = snapshot.activeVirtualPageIndex.coerceIn(0, snapshot.totalVirtualPages - 1)
+                if (pagerState.currentPage != target || pagerState.currentPageOffsetFraction != 0f) {
+                    pagerState.requestScrollToPage(page = target, pageOffsetFraction = 0f)
+                }
+            }
+        }
 
         LaunchedEffect(snapshot.coordinateRevision, snapshot.activeVirtualPageIndex, snapshot.totalVirtualPages) {
             if (snapshot.totalVirtualPages > 0) {
                 val target = snapshot.activeVirtualPageIndex.coerceIn(0, snapshot.totalVirtualPages - 1)
-                if (pagerState.currentPage != target) {
+                if (pagerState.currentPage != target || pagerState.currentPageOffsetFraction != 0f) {
                     isProgrammaticPagerSnap = true
                     try {
                         pagerState.scrollToPage(target)
@@ -941,31 +961,54 @@ fun UnifiedReaderScreen(
         }
 
         LaunchedEffect(pagerState) {
-            snapshotFlow { pagerState.settledPage to pagerState.isScrollInProgress }
+            snapshotFlow {
+                Triple(
+                    pagerState.settledPage,
+                    pagerState.isScrollInProgress,
+                    latestWindowSnapshot.coordinateRevision,
+                )
+            }
                 .distinctUntilChanged()
-                .collect { (settledPage, scrolling) ->
+                .collect { (settledPage, scrolling, rev) ->
+                    val curSnap = latestWindowSnapshot
                     if (!scrolling &&
                         !isProgrammaticPagerSnap &&
-                        snapshot.currentSlot != null &&
-                        settledPage != snapshot.activeVirtualPageIndex
+                        curSnap.currentSlot != null &&
+                        curSnap.coordinateRevision == rev &&
+                        syncedRevisionHolder[0] == rev &&
+                        pagerState.currentPage == settledPage &&
+                        settledPage != curSnap.activeVirtualPageIndex
                     ) {
-                        windowBuffer.onVirtualPageSettled(settledPage)
+                        windowBuffer.onVirtualPageSettled(
+                            virtualPageIndex = settledPage,
+                            expectedCoordinateRevision = rev,
+                        )
                     }
                 }
         }
 
         fun stepPageBy(delta: Int) {
+            val originRevision = snapshot.coordinateRevision
             val targetVirtual = snapshot.activeVirtualPageIndex + delta
             if (targetVirtual !in 0 until snapshot.totalVirtualPages) return
             coroutineScope.launch {
                 val instantFlip = isEinkMode ||
                     preferences.readerPageTurnMode == ReaderPageTurnMode.EINK_INSTANT
-                if (instantFlip) {
-                    pagerState.scrollToPage(targetVirtual)
-                } else {
-                    runCatching { pagerState.animateScrollToPage(targetVirtual) }
+                isProgrammaticPagerSnap = true
+                try {
+                    if (instantFlip) {
+                        pagerState.scrollToPage(targetVirtual)
+                    } else {
+                        runCatching { pagerState.animateScrollToPage(targetVirtual) }
+                            .onFailure { pagerState.scrollToPage(targetVirtual) }
+                    }
+                } finally {
+                    isProgrammaticPagerSnap = false
                 }
-                windowBuffer.onVirtualPageSettled(targetVirtual)
+                windowBuffer.onVirtualPageSettled(
+                    virtualPageIndex = targetVirtual,
+                    expectedCoordinateRevision = originRevision,
+                )
             }
         }
 
@@ -1006,10 +1049,19 @@ fun UnifiedReaderScreen(
                         windowBuffer.syncActiveAnchorInCurrentChapter(targetAnchor)
                         persistReadingProgress(prevChapter, targetAnchor)
                     } else {
+                        val originRevision = snapshot.coordinateRevision
                         val resolvedLocal = loadedCur.layout.resolvePageIndexForAnchor(targetAnchor)
                         val targetVirtual = snapshot.prevPageCount + resolvedLocal
-                        pagerState.scrollToPage(targetVirtual)
-                        windowBuffer.onVirtualPageSettled(targetVirtual)
+                        isProgrammaticPagerSnap = true
+                        try {
+                            pagerState.scrollToPage(targetVirtual)
+                        } finally {
+                            isProgrammaticPagerSnap = false
+                        }
+                        windowBuffer.onVirtualPageSettled(
+                            virtualPageIndex = targetVirtual,
+                            expectedCoordinateRevision = originRevision,
+                        )
                     }
                 } else {
                     continuousScrollAnchor = targetAnchor
@@ -1183,6 +1235,7 @@ fun UnifiedReaderScreen(
                 )
                 windowBuffer.syncActiveAnchorInCurrentChapter(spokenAnchor)
             } else {
+                val originRevision = snapshot.coordinateRevision
                 val targetLocalPage = loadedCur.layout.resolvePageIndexForAnchor(spokenAnchor)
                 val targetVirtual = snapshot.prevPageCount + targetLocalPage
                 if (targetVirtual in 0 until snapshot.totalVirtualPages &&
@@ -1191,13 +1244,21 @@ fun UnifiedReaderScreen(
                 ) {
                     val instantFlip = isEinkMode ||
                         preferences.readerPageTurnMode == ReaderPageTurnMode.EINK_INSTANT
-                    if (instantFlip) {
-                        pagerState.scrollToPage(targetVirtual)
-                    } else {
-                        runCatching { pagerState.animateScrollToPage(targetVirtual) }
-                            .onFailure { pagerState.scrollToPage(targetVirtual) }
+                    isProgrammaticPagerSnap = true
+                    try {
+                        if (instantFlip) {
+                            pagerState.scrollToPage(targetVirtual)
+                        } else {
+                            runCatching { pagerState.animateScrollToPage(targetVirtual) }
+                                .onFailure { pagerState.scrollToPage(targetVirtual) }
+                        }
+                    } finally {
+                        isProgrammaticPagerSnap = false
                     }
-                    windowBuffer.onVirtualPageSettled(targetVirtual)
+                    windowBuffer.onVirtualPageSettled(
+                        virtualPageIndex = targetVirtual,
+                        expectedCoordinateRevision = originRevision,
+                    )
                 }
             }
         }
@@ -1627,13 +1688,22 @@ fun UnifiedReaderScreen(
                                             persistReadingProgress(ch, targetUndo.anchor)
                                         }
                                     } else {
+                                        val originRevision = snapshot.coordinateRevision
                                         val resolvedIdx = (snapshot.currentSlot as? ChapterWindowSlot.Loaded)
                                             ?.layout
                                             ?.resolvePageIndexForAnchor(targetUndo.anchor)
                                             ?: (targetUndo.pageIndexOneBased - 1).coerceAtLeast(0)
                                         val targetVirtual = snapshot.prevPageCount + resolvedIdx
-                                        pagerState.scrollToPage(targetVirtual)
-                                        windowBuffer.onVirtualPageSettled(targetVirtual)
+                                        isProgrammaticPagerSnap = true
+                                        try {
+                                            pagerState.scrollToPage(targetVirtual)
+                                        } finally {
+                                            isProgrammaticPagerSnap = false
+                                        }
+                                        windowBuffer.onVirtualPageSettled(
+                                            virtualPageIndex = targetVirtual,
+                                            expectedCoordinateRevision = originRevision,
+                                        )
                                     }
                                 } else {
                                     continuousScrollAnchor = targetUndo.anchor
@@ -1866,10 +1936,19 @@ fun UnifiedReaderScreen(
                                                     createdAtElapsedMs = SystemClock.elapsedRealtime(),
                                                 )
                                             }
+                                            val originRevision = snapshot.coordinateRevision
                                             val targetVirtual = snapshot.prevPageCount + targetLocalPage
                                             coroutineScope.launch {
-                                                pagerState.scrollToPage(targetVirtual)
-                                                windowBuffer.onVirtualPageSettled(targetVirtual)
+                                                isProgrammaticPagerSnap = true
+                                                try {
+                                                    pagerState.scrollToPage(targetVirtual)
+                                                } finally {
+                                                    isProgrammaticPagerSnap = false
+                                                }
+                                                windowBuffer.onVirtualPageSettled(
+                                                    virtualPageIndex = targetVirtual,
+                                                    expectedCoordinateRevision = originRevision,
+                                                )
                                             }
                                         }
                                     },
@@ -2295,11 +2374,20 @@ fun UnifiedReaderScreen(
                                 }
                             }
                             if (targetLocalPage >= 0 && targetLocalPage != snapshot.activePageIndexInCurrentChapter) {
+                                val originRevision = snapshot.coordinateRevision
                                 val targetVirtual = snapshot.prevPageCount + targetLocalPage
                                 if (targetVirtual in 0 until snapshot.totalVirtualPages) {
                                     coroutineScope.launch {
-                                        pagerState.scrollToPage(targetVirtual)
-                                        windowBuffer.onVirtualPageSettled(targetVirtual)
+                                        isProgrammaticPagerSnap = true
+                                        try {
+                                            pagerState.scrollToPage(targetVirtual)
+                                        } finally {
+                                            isProgrammaticPagerSnap = false
+                                        }
+                                        windowBuffer.onVirtualPageSettled(
+                                            virtualPageIndex = targetVirtual,
+                                            expectedCoordinateRevision = originRevision,
+                                        )
                                     }
                                 }
                             }
@@ -2308,7 +2396,7 @@ fun UnifiedReaderScreen(
                 } else {
                     null
                 },
-                onPreviousChapter = if (openArtbook.isAutoEnteredForChapter && prevChapterCid != null) {
+                onPreviousChapter = if ((openArtbook.isAutoEnteredForChapter || isPureIllustrationChapter) && prevChapterCid != null) {
                     {
                         activeArtbookState = null
                         jumpToChapterWithUndo(prevChapterCid)
@@ -2316,7 +2404,7 @@ fun UnifiedReaderScreen(
                 } else {
                     null
                 },
-                onNextChapter = if (openArtbook.isAutoEnteredForChapter && nextChapterCid != null) {
+                onNextChapter = if ((openArtbook.isAutoEnteredForChapter || isPureIllustrationChapter) && nextChapterCid != null) {
                     {
                         activeArtbookState = null
                         jumpToChapterWithUndo(nextChapterCid)

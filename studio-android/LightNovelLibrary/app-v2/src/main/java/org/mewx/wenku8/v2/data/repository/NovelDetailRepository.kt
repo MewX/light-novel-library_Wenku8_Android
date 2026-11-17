@@ -1,12 +1,16 @@
 package org.mewx.wenku8.v2.data.repository
 
+import androidx.room.withTransaction
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.withContext
+import java.util.concurrent.ConcurrentHashMap
 import org.mewx.wenku8.api.Wenku8API
 import org.mewx.wenku8.v2.data.local.db.Wenku8Database
 import org.mewx.wenku8.v2.data.local.db.entity.ChapterEntity
@@ -88,8 +92,11 @@ class NovelDetailRepository(
     private val tocDao = database.tocDao()
     private val chapterContentDao = database.chapterContentDao()
     private val readingProgressDao = database.readingProgressDao()
+    private val latestSnapshotsByAid = ConcurrentHashMap<Int, NovelDetailSnapshot>()
 
     fun resolveCoverUrl(aid: Int): String = catalogGateway.resolveCoverUrl(aid)
+
+    fun peekCachedSnapshot(aid: Int): NovelDetailSnapshot? = latestSnapshotsByAid[aid]
 
     fun observeNovelDetail(aid: Int): Flow<NovelDetailSnapshot> {
         val coverUrl = resolveCoverUrl(aid)
@@ -155,6 +162,8 @@ class NovelDetailRepository(
                 tags = parseNormalizedTags(novel?.tagsCsv.orEmpty()),
             )
         }
+            .distinctUntilChanged()
+            .onEach { snapshot -> latestSnapshotsByAid[aid] = snapshot }
     }
 
     /**
@@ -167,8 +176,17 @@ class NovelDetailRepository(
         appLanguage: Wenku8API.AppLanguage,
     ) = withContext(ioDispatcher) {
         if (item.aid <= 0) return@withContext
-        val nowMs = wallClockMs()
         val existing = novelDao.getNovelByAid(item.aid)
+        // Skip redundant pre-refresh Room invalidations when the local row already carries metadata.
+        if (existing != null &&
+            existing.title.isNotBlank() &&
+            existing.author.isNotBlank() &&
+            (existing.tagsCsv.isNotBlank() || item.tags.isEmpty()) &&
+            (existing.introShort.isNotBlank() || item.introShort.isBlank())
+        ) {
+            return@withContext
+        }
+        val nowMs = wallClockMs()
         val seedEntity = NovelEntity(
             aid = item.aid,
             contentLang = existing?.contentLang?.ifBlank { appLanguage.name } ?: appLanguage.name,
@@ -293,19 +311,21 @@ class NovelDetailRepository(
             fullIntro = fullIntroText.ifBlank { currentStored?.fullIntro.orEmpty() },
             lastAccessedMs = requestStartedAtMs,
         )
-        novelDao.mergeServerMetadataPreservingShelfState(incomingNovel)
-        if (currentStored?.hasUnreadUpdate == true) {
-            novelDao.setHasUnreadUpdate(aid = aid, hasUnreadUpdate = false)
-        }
+        database.withTransaction {
+            novelDao.mergeServerMetadataPreservingShelfState(incomingNovel)
+            if (currentStored?.hasUnreadUpdate == true) {
+                novelDao.setHasUnreadUpdate(aid = aid, hasUnreadUpdate = false)
+            }
 
-        if (tocRes is WenkuApiResult.Success && tocRes.data.isNotEmpty()) {
-            novelTocSyncRepository.syncNovelIndexAtomically(
-                aid = aid,
-                language = appLanguage,
-                requestStartedAtMs = requestStartedAtMs,
-                parsedVolumes = tocRes.data,
-                fallbackNovelTitle = mergedTitle,
-            )
+            if (tocRes is WenkuApiResult.Success && tocRes.data.isNotEmpty()) {
+                novelTocSyncRepository.syncNovelIndexAtomically(
+                    aid = aid,
+                    language = appLanguage,
+                    requestStartedAtMs = requestStartedAtMs,
+                    parsedVolumes = tocRes.data,
+                    fallbackNovelTitle = mergedTitle,
+                )
+            }
         }
 
         NovelDetailRefreshOutcome.Success

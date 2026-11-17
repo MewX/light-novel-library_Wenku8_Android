@@ -234,32 +234,71 @@ class ChapterWindowBuffer(
         val prevMeta = orderedToc.getOrNull(targetIndex - 1)
         val nextMeta = orderedToc.getOrNull(targetIndex + 1)
 
-        // Emit immediate loading skeleton if not cached in memory yet.
-        stateMutex.withLock {
-            val prevSlotInitial = prevMeta?.let { ChapterWindowSlot.Unloaded(it) }
-            val nextSlotInitial = nextMeta?.let { ChapterWindowSlot.Unloaded(it) }
-            val prevCount = prevSlotInitial?.virtualPageCount ?: 0
-            _snapshotFlow.value = ReaderWindowSnapshot(
-                aid = aid,
-                orderedToc = orderedToc,
-                currentTocIndex = targetIndex,
-                prevSlot = prevSlotInitial,
-                currentSlot = ChapterWindowSlot.Loading(currentMeta),
-                nextSlot = nextSlotInitial,
-                layoutConfig = layoutConfig,
-                activeVirtualPageIndex = prevCount,
-                coordinateRevision = _snapshotFlow.value.coordinateRevision + 1L,
-            )
+        // Check local memory / SQLite availability first so locally cached chapters render in a
+        // single atomic emission without flashing an intermediate Loading skeleton.
+        val cachedCurrentAst = stateMutex.withLock { astCache[currentMeta.cid] }
+        val preloadedCurrentText = if (cachedCurrentAst == null) {
+            withContext(ioDispatcher) { chapterContentDao.loadChapterTextSafely(currentMeta.cid) }
+                ?.takeIf { it.isNotBlank() }
+        } else {
+            null
+        }
+        val needsRemoteFetchForCurrent = cachedCurrentAst == null && preloadedCurrentText == null
+
+        if (needsRemoteFetchForCurrent) {
+            stateMutex.withLock {
+                val prevSlotInitial = prevMeta?.let { ChapterWindowSlot.Unloaded(it) }
+                val nextSlotInitial = nextMeta?.let { ChapterWindowSlot.Unloaded(it) }
+                val prevCount = prevSlotInitial?.virtualPageCount ?: 0
+                _snapshotFlow.value = ReaderWindowSnapshot(
+                    aid = aid,
+                    orderedToc = orderedToc,
+                    currentTocIndex = targetIndex,
+                    prevSlot = prevSlotInitial,
+                    currentSlot = ChapterWindowSlot.Loading(currentMeta),
+                    nextSlot = nextSlotInitial,
+                    layoutConfig = layoutConfig,
+                    activeVirtualPageIndex = prevCount,
+                    coordinateRevision = _snapshotFlow.value.coordinateRevision + 1L,
+                )
+            }
         }
 
-        val loadedCurrentSlot = loadAndPaginateSlot(currentMeta, layoutConfig)
+        val loadedCurrentSlot = loadAndPaginateSlot(
+            chapterMeta = currentMeta,
+            config = layoutConfig,
+            preloadedLocalText = preloadedCurrentText,
+        )
         val initialPageInCurrent = (loadedCurrentSlot as? ChapterWindowSlot.Loaded)
             ?.layout
             ?.resolvePageIndexForAnchor(initialAnchor)
             ?: 0
 
+        // If `prevMeta` is already in memory or cached in local SQLite, paginate it right away
+        // (zero network wait!) so `prevSlot` starts `Loaded` without a second coordinate shift.
+        val preloadedPrevSlot: ChapterWindowSlot? = if (prevMeta != null) {
+            val cachedPrevAst = stateMutex.withLock { astCache[prevMeta.cid] }
+            val localPrevText = if (cachedPrevAst == null) {
+                withContext(ioDispatcher) { chapterContentDao.loadChapterTextSafely(prevMeta.cid) }
+                    ?.takeIf { it.isNotBlank() }
+            } else {
+                null
+            }
+            if (cachedPrevAst != null || localPrevText != null) {
+                loadAndPaginateSlot(
+                    chapterMeta = prevMeta,
+                    config = layoutConfig,
+                    preloadedLocalText = localPrevText,
+                )
+            } else {
+                null
+            }
+        } else {
+            null
+        }
+
         val postLoadSnapshot = stateMutex.withLock {
-            val prevSlot = prevMeta?.let { ChapterWindowSlot.Loading(it) }
+            val prevSlot = preloadedPrevSlot ?: prevMeta?.let { ChapterWindowSlot.Loading(it) }
             val nextSlot = nextMeta?.let { ChapterWindowSlot.Unloaded(it) }
             val prevCount = prevSlot?.virtualPageCount ?: 0
             val nextRevision = _snapshotFlow.value.coordinateRevision + 1L
@@ -279,7 +318,7 @@ class ChapterWindowBuffer(
             updated
         }
 
-        if (prevMeta != null) {
+        if (prevMeta != null && preloadedPrevSlot == null) {
             scheduleNeighborSlotLoad(prevMeta, layoutConfig)
         }
         if (nextMeta != null && postLoadSnapshot.currentChapterProgressRatio >= PREFETCH_THRESHOLD_RATIO) {
@@ -296,13 +335,23 @@ class ChapterWindowBuffer(
      * - Within `NEXT`: shifts the 3-chapter window forward (`prev = oldCur`, `cur = oldNext`).
      * - Within `PREV`: shifts the 3-chapter window backward (`next = oldCur`, `cur = oldPrev`),
      *   preserving final-page landing when swiping backward across a chapter boundary!
+     * - When [expectedCoordinateRevision] is supplied, ignores stale settle callbacks emitted from
+     *   an older coordinate space (preventing double chapter-shifts across `prevSlot` updates).
      */
-    suspend fun onVirtualPageSettled(virtualPageIndex: Int): ReaderWindowSnapshot {
+    suspend fun onVirtualPageSettled(
+        virtualPageIndex: Int,
+        expectedCoordinateRevision: Long? = null,
+    ): ReaderWindowSnapshot {
         var neighborToSchedule: Pair<OrderedChapterWithVolume, ReaderLayoutConfig>? = null
         var synchronousCurrentLoadNeeded: Triple<OrderedChapterWithVolume, ReaderLayoutConfig, Boolean>? = null
 
         stateMutex.withLock {
             val snap = _snapshotFlow.value
+            if (expectedCoordinateRevision != null &&
+                snap.coordinateRevision != expectedCoordinateRevision
+            ) {
+                return snap
+            }
             val config = snap.layoutConfig ?: return snap
             val resolution = snap.resolveVirtualPage(virtualPageIndex) ?: return snap
 
@@ -659,18 +708,22 @@ class ChapterWindowBuffer(
     private suspend fun loadAndPaginateSlot(
         chapterMeta: OrderedChapterWithVolume,
         config: ReaderLayoutConfig,
+        preloadedLocalText: String? = null,
     ): ChapterWindowSlot {
         return try {
             val cachedAst = stateMutex.withLock { astCache[chapterMeta.cid] }
             val ast = if (cachedAst != null) {
                 cachedAst
             } else {
-                val rawTextResult = fetchChapterTextOfflineFirst(chapterMeta)
-                val rawText = rawTextResult.getOrElse { error ->
-                    return ChapterWindowSlot.Error(
-                        chapter = chapterMeta,
-                        message = error.message ?: "章节加载失败",
-                    )
+                val rawText = if (!preloadedLocalText.isNullOrBlank()) {
+                    preloadedLocalText
+                } else {
+                    fetchChapterTextOfflineFirst(chapterMeta).getOrElse { error ->
+                        return ChapterWindowSlot.Error(
+                            chapter = chapterMeta,
+                            message = error.message ?: "章节加载失败",
+                        )
+                    }
                 }
                 val parsed = withContext(computeDispatcher) {
                     WenkuChapterParser.parse(
