@@ -226,11 +226,7 @@ fun NovelDetailScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val isEinkMode = LocalEinkMode.current
     val systemDark = isSystemInDarkTheme()
-    val isDarkEffective = when (themeMode) {
-        Wenku8ThemeMode.SYSTEM -> systemDark
-        Wenku8ThemeMode.ARCHIVAL_DAY, Wenku8ThemeMode.E_INK -> false
-        Wenku8ThemeMode.CARBON_NIGHT, Wenku8ThemeMode.PURE_AMOLED -> true
-    }
+    val isDarkEffective = themeMode.isDarkEffective(systemDark)
 
     val detailFlow = remember(aid, novelDetailRepository) {
         novelDetailRepository.observeNovelDetail(aid)

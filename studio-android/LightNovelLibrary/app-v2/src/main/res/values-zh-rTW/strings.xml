@@ -71,6 +71,7 @@
 
     <!-- Theme & Home Preview Controls -->
     <string name="theme_section_title">閱讀主題與電子紙預覽 (M3 Expressive)</string>
+    <string name="theme_mode_classic_blue">經典藍色</string>
     <string name="theme_mode_system">跟隨系統</string>
     <string name="theme_mode_archival_day">典藏暖白</string>
     <string name="theme_mode_carbon_night">碳墨深色</string>

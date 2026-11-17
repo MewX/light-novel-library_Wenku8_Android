@@ -1,5 +1,6 @@
 package org.mewx.wenku8.v2.ui.theme
 
+import android.app.Activity
 import android.os.Build
 import androidx.compose.animation.core.FiniteAnimationSpec
 import androidx.compose.animation.core.snap
@@ -13,10 +14,13 @@ import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.dp
+import androidx.core.view.WindowCompat
 
 /**
  * Zero-duration [MotionScheme] injected into [MaterialExpressiveTheme] whenever E-Ink mode is active.
@@ -37,22 +41,24 @@ object EinkZeroMotionScheme : MotionScheme {
 /**
  * Root Material 3 Expressive (`M3e`) theme wrapper for Wenku8 `:app-v2`.
  *
- * @param themeMode Selected theme preset ([Wenku8ThemeMode.SYSTEM] defaults to Archival Day / Carbon Night).
+ * @param themeMode Selected theme preset (defaults to [Wenku8ThemeMode.CLASSIC_BLUE] matching `v1.31`).
  * @param einkModeOverride Explicit legacy `eink_mode` setting toggle; forces E-Ink monochrome & zero-motion
  *   even when [themeMode] is set to another preset.
  * @param useDynamicColor Optional Android 12+ (`API 31+`) Material You wallpaper color extraction
- *   (disabled by default so Wenku8 launches with its signature warm paper identity).
+ *   (disabled by default so Wenku8 launches with its signature Classic Blue identity).
  */
 @Composable
 fun Wenku8ExpressiveTheme(
-    themeMode: Wenku8ThemeMode = Wenku8ThemeMode.SYSTEM,
+    themeMode: Wenku8ThemeMode = Wenku8ThemeMode.CLASSIC_BLUE,
     einkModeOverride: Boolean = false,
     useDynamicColor: Boolean = false,
     content: @Composable () -> Unit,
 ) {
     val isEinkActive = einkModeOverride || themeMode == Wenku8ThemeMode.E_INK
     val systemDarkTheme = isSystemInDarkTheme()
+    val isDarkEffective = !isEinkActive && themeMode.isDarkEffective(systemDarkTheme)
     val context = LocalContext.current
+    val view = LocalView.current
 
     val resolvedColorScheme: ColorScheme = when {
         isEinkActive -> Wenku8ColorSchemes.EinkMonochromeColorScheme
@@ -60,10 +66,20 @@ fun Wenku8ExpressiveTheme(
         themeMode == Wenku8ThemeMode.CARBON_NIGHT -> Wenku8ColorSchemes.CarbonNightColorScheme
         themeMode == Wenku8ThemeMode.PURE_AMOLED -> Wenku8ColorSchemes.PureAmoledColorScheme
         useDynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
-            if (systemDarkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
+            if (isDarkEffective) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
         }
+        themeMode == Wenku8ThemeMode.CLASSIC_BLUE -> Wenku8ColorSchemes.ClassicBlueColorScheme
         systemDarkTheme -> Wenku8ColorSchemes.CarbonNightColorScheme
-        else -> Wenku8ColorSchemes.ArchivalDayColorScheme
+        else -> Wenku8ColorSchemes.ClassicBlueColorScheme
+    }
+
+    if (!view.isInEditMode) {
+        SideEffect {
+            val window = (context as? Activity)?.window ?: return@SideEffect
+            val insetsController = WindowCompat.getInsetsController(window, view)
+            insetsController.isAppearanceLightStatusBars = !isDarkEffective
+            insetsController.isAppearanceLightNavigationBars = !isDarkEffective
+        }
     }
 
     val resolvedShapes = if (isEinkActive) {

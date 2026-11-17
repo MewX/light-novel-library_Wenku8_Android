@@ -47,7 +47,7 @@ import java.io.IOException
  */
 data class Wenku8UserPreferences(
     val appLanguage: Wenku8API.AppLanguage = Wenku8API.AppLanguage.SC,
-    val themeMode: Wenku8ThemeMode = Wenku8ThemeMode.SYSTEM,
+    val themeMode: Wenku8ThemeMode = Wenku8ThemeMode.CLASSIC_BLUE,
     val einkModeEnabled: Boolean = false,
     val useDynamicColor: Boolean = false,
     val defaultHomeDestination: DefaultHomeDestination = DefaultHomeDestination.LATEST,
@@ -134,7 +134,7 @@ class UserPreferencesRepository(
         dataStore.edit { prefs ->
             prefs[Keys.EINK_MODE_ENABLED] = enabled
             if (!enabled && prefs[Keys.THEME_MODE] == Wenku8ThemeMode.E_INK.name) {
-                prefs[Keys.THEME_MODE] = Wenku8ThemeMode.SYSTEM.name
+                prefs[Keys.THEME_MODE] = Wenku8ThemeMode.CLASSIC_BLUE.name
             }
         }
     }
@@ -357,7 +357,7 @@ class UserPreferencesRepository(
         )
         val themeMode = enumValueOrDefault(
             raw = prefs[Keys.THEME_MODE],
-            default = Wenku8ThemeMode.SYSTEM,
+            default = Wenku8ThemeMode.CLASSIC_BLUE,
         )
         val defaultHome = enumValueOrDefault(
             raw = prefs[Keys.DEFAULT_HOME_DESTINATION],

@@ -88,4 +88,22 @@ class CoverThemeEngineTest {
         assertEquals(Color.White, scheme.background)
         assertEquals(Color.Black, scheme.primary)
     }
+
+    @Test
+    fun classicBlueColorSchemeMatchesLegacyV1PaletteAndPreservesOtherSchemes() {
+        val classicBlue = Wenku8ColorSchemes.ClassicBlueColorScheme
+        assertEquals(Color(0xFF4284F5), classicBlue.primary)
+        assertEquals(Color(0xFF3870D0), classicBlue.secondary)
+        assertEquals(Color(0xFFF5F5F5), classicBlue.background)
+        assertEquals(Color(0xFFFFFFFF), classicBlue.surface)
+
+        // Ensure existing schemes remain untouched.
+        assertEquals(Color(0xFF7A4F2B), Wenku8ColorSchemes.ArchivalDayColorScheme.primary)
+        assertEquals(Color(0xFFF6F5EF), Wenku8ColorSchemes.ArchivalDayColorScheme.background)
+        assertEquals(Color(0xFF111312), Wenku8ColorSchemes.CarbonNightColorScheme.background)
+        assertEquals(Color(0xFF000000), Wenku8ColorSchemes.PureAmoledColorScheme.background)
+        assertEquals(Color(0xFFFFFFFF), Wenku8ColorSchemes.EinkMonochromeColorScheme.background)
+
+        assertEquals(Wenku8ThemeMode.CLASSIC_BLUE, Wenku8ThemeMode.entries.first())
+    }
 }

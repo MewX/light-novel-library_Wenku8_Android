@@ -18,7 +18,45 @@ import androidx.compose.ui.graphics.Color
  */
 object Wenku8ColorSchemes {
 
-    /** Default light theme: Warm Archival Paper (`#F6F5EF`) + Bunkobon Bronze (`#7A4F2B`). */
+    /**
+     * Default light theme ("经典蓝色"): Faithful to legacy Wenku8 `v1.31`
+     * (`myPrimaryColor = #4284F5`, `myPrimaryDarkColor = #3870D0`, `myAccentColor = #FE5151`,
+     * `myWindowBackground = #F5F5F5`, `default_white = #FFFFFF`, `default_divider = #DADADA`),
+     * paired with Material 3 Expressive blue tonal containers for navigation & filter chips.
+     */
+    val ClassicBlueColorScheme: ColorScheme = lightColorScheme(
+        primary = Color(0xFF4284F5),
+        onPrimary = Color(0xFFFFFFFF),
+        primaryContainer = Color(0xFFD8E6FF),
+        onPrimaryContainer = Color(0xFF0B2960),
+        secondary = Color(0xFF3870D0),
+        onSecondary = Color(0xFFFFFFFF),
+        secondaryContainer = Color(0xFFDCE8FC),
+        onSecondaryContainer = Color(0xFF102C57),
+        tertiary = Color(0xFFE04848),
+        onTertiary = Color(0xFFFFFFFF),
+        tertiaryContainer = Color(0xFFFFDAD8),
+        onTertiaryContainer = Color(0xFF410005),
+        background = Color(0xFFF5F5F5),
+        onBackground = Color(0xFF22252A),
+        surface = Color(0xFFFFFFFF),
+        onSurface = Color(0xFF22252A),
+        surfaceVariant = Color(0xFFE4E9F2),
+        onSurfaceVariant = Color(0xFF44484F),
+        surfaceContainerLowest = Color(0xFFFFFFFF),
+        surfaceContainerLow = Color(0xFFF8FAFD),
+        surfaceContainer = Color(0xFFF0F4FA),
+        surfaceContainerHigh = Color(0xFFE8EEF7),
+        surfaceContainerHighest = Color(0xFFDFE7F2),
+        outline = Color(0xFF747982),
+        outlineVariant = Color(0xFFDADDE3),
+        error = Color(0xFFBA1A1A),
+        onError = Color(0xFFFFFFFF),
+        errorContainer = Color(0xFFFFDAD6),
+        onErrorContainer = Color(0xFF410002),
+    )
+
+    /** Warm Archival Paper (`#F6F5EF`) + Bunkobon Bronze (`#7A4F2B`). */
     val ArchivalDayColorScheme: ColorScheme = lightColorScheme(
         primary = Color(0xFF7A4F2B),
         onPrimary = Color(0xFFFFFFFF),

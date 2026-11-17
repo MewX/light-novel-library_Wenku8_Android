@@ -652,8 +652,8 @@ class BackupArchiveRepository(
             Wenku8API.AppLanguage.valueOf(obj.optString("appLanguage", "SC"))
         }.getOrDefault(Wenku8API.AppLanguage.SC)
         val theme = runCatching {
-            Wenku8ThemeMode.valueOf(obj.optString("themeMode", Wenku8ThemeMode.SYSTEM.name))
-        }.getOrDefault(Wenku8ThemeMode.SYSTEM)
+            Wenku8ThemeMode.valueOf(obj.optString("themeMode", Wenku8ThemeMode.CLASSIC_BLUE.name))
+        }.getOrDefault(Wenku8ThemeMode.CLASSIC_BLUE)
         val home = runCatching {
             DefaultHomeDestination.valueOf(obj.optString("defaultHomeDestination", DefaultHomeDestination.LATEST.name))
         }.getOrDefault(DefaultHomeDestination.LATEST)

@@ -12,11 +12,19 @@ import org.mewx.wenku8.v2.R
  * spring animations, translucent blurs, and drop shadows across the entire Compose tree.
  */
 enum class Wenku8ThemeMode(@param:StringRes val displayNameResId: Int) {
+    CLASSIC_BLUE(R.string.theme_mode_classic_blue),
     SYSTEM(R.string.theme_mode_system),
     ARCHIVAL_DAY(R.string.theme_mode_archival_day),
     CARBON_NIGHT(R.string.theme_mode_carbon_night),
     PURE_AMOLED(R.string.theme_mode_pure_amoled),
     E_INK(R.string.theme_mode_eink),
+    ;
+
+    fun isDarkEffective(systemDarkTheme: Boolean): Boolean = when (this) {
+        SYSTEM -> systemDarkTheme
+        CLASSIC_BLUE, ARCHIVAL_DAY, E_INK -> false
+        CARBON_NIGHT, PURE_AMOLED -> true
+    }
 }
 
 /**

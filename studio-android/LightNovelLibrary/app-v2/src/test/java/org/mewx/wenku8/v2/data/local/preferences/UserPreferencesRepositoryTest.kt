@@ -38,7 +38,7 @@ class UserPreferencesRepositoryTest {
 
         assertEquals(Wenku8API.AppLanguage.SC, defaults.appLanguage)
         assertEquals(DefaultHomeDestination.LATEST, defaults.defaultHomeDestination)
-        assertEquals(Wenku8ThemeMode.SYSTEM, defaults.themeMode)
+        assertEquals(Wenku8ThemeMode.CLASSIC_BLUE, defaults.themeMode)
         assertFalse(defaults.einkModeEnabled)
         assertEquals(18, defaults.readerFontSizeSp)
         assertEquals(16, defaults.readerLineDistanceDp)
