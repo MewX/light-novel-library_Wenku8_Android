@@ -3,6 +3,7 @@ apply plugin: 'org.jetbrains.kotlin.android'
 apply plugin: 'org.jetbrains.kotlin.plugin.compose'
 apply plugin: 'org.jetbrains.kotlin.plugin.serialization'
 apply plugin: 'com.google.devtools.ksp'
+apply plugin: 'jacoco'
 
 android {
     namespace 'org.mewx.wenku8'
@@ -38,6 +39,7 @@ android {
         debug {
             debuggable true
             minifyEnabled false
+            enableUnitTestCoverage true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
         release {
@@ -104,6 +106,10 @@ android {
             all {
                 systemProperty 'robolectric.graphicsMode', 'NATIVE'
                 maxHeapSize = '2048m'
+                jacoco {
+                    includeNoLocationClasses = true
+                    excludes = ['jdk.internal.*']
+                }
             }
         }
     }
@@ -185,4 +191,31 @@ dependencies {
     // Instrumented Android Tests
     androidTestImplementation 'androidx.test.ext:junit:1.3.0'
     androidTestImplementation 'androidx.compose.ui:ui-test-junit4'
+}
+
+jacoco {
+    toolVersion = "0.8.12"
+}
+
+def v2GeneratedExcludes = [
+        '**/R.class', '**/R$*.class', '**/BuildConfig.*', '**/Manifest*.*',
+        '**/*_Impl*.*', '**/*$$serializer*.*', '**/ComposableSingletons$*.*',
+        '**/*$Lambda$*.*', '**/*$inlined$*.*',
+]
+
+tasks.register('jacocoAlphaDebugUnitTestReport', JacocoReport) {
+    dependsOn 'testAlphaDebugUnitTest'
+    group = 'verification'
+    description = 'Generates JaCoCo XML/HTML coverage for the app-v2 alphaDebug JVM & Compose unit tests.'
+    reports {
+        xml.required = true
+        html.required = true
+    }
+    classDirectories.setFrom(files([
+            fileTree(dir: layout.buildDirectory.dir('tmp/kotlin-classes/alphaDebug').get(),
+                    excludes: v2GeneratedExcludes),
+    ]))
+    sourceDirectories.setFrom(files(['src/main/java']))
+    executionData.setFrom(fileTree(dir: layout.buildDirectory.get().asFile,
+            includes: ['outputs/unit_test_code_coverage/**/*.exec']))
 }
