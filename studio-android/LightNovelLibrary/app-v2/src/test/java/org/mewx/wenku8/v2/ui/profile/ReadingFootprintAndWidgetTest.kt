@@ -62,13 +62,17 @@ class ReadingFootprintAndWidgetTest {
     @Before
     fun setUp() {
         context = ApplicationProvider.getApplicationContext()
+        val directExecutor = java.util.concurrent.Executor { runnable -> runnable.run() }
         database = Room.inMemoryDatabaseBuilder(context, Wenku8Database::class.java)
             .allowMainThreadQueries()
+            .setQueryExecutor(directExecutor)
+            .setTransactionExecutor(directExecutor)
             .build()
     }
 
     @After
     fun tearDown() {
+        runCatching { composeTestRule.waitForIdle() }
         database.close()
     }
 

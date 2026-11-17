@@ -3,6 +3,9 @@ package org.mewx.wenku8.v2.di
 import android.content.Context
 import android.os.Environment
 import coil3.ImageLoader
+import coil3.disk.DiskCache
+import coil3.memory.MemoryCache
+import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -13,14 +16,20 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
+import okhttp3.Dns
 import okhttp3.OkHttpClient
+import okio.Path.Companion.toOkioPath
 import org.mewx.wenku8.v2.data.local.db.Wenku8Database
 import org.mewx.wenku8.v2.data.local.preferences.UserPreferencesRepository
 import org.mewx.wenku8.v2.data.media.OfflineFirstWenkuImageFetcher
+import org.mewx.wenku8.v2.data.media.WenkuCanonicalUriKeyer
+import org.mewx.wenku8.v2.data.media.WenkuImageRequests
+import org.mewx.wenku8.v2.data.media.WenkuImmutableImageCacheInterceptor
 import org.mewx.wenku8.v2.data.migration.InternalFileSaveSource
 import org.mewx.wenku8.v2.data.migration.LegacyMigrationProgress
 import org.mewx.wenku8.v2.data.migration.LegacyV1StorageMigrator
 import org.mewx.wenku8.api.Wenku8API
+import java.util.concurrent.TimeUnit
 import org.mewx.wenku8.v2.data.remote.api.WenkuApiClient
 import org.mewx.wenku8.v2.data.remote.api.WenkuApiResult
 import org.mewx.wenku8.v2.data.remote.diagnostics.DiagnosticsEndpointConfig
@@ -62,6 +71,22 @@ class AppContainer(context: Context) {
 
     val sharedBaseOkHttpClient: OkHttpClient by lazy {
         OkHttpProbeTransport.defaultSharedBaseOkHttpClient()
+    }
+
+    /**
+     * Shared OkHttpClient for Coil 3 & Artbook image loading: reuses [sharedBaseOkHttpClient]'s
+     * TCP/TLS connection pool and dispatcher while stamping immutable cache headers onto Wenku8
+     * static covers and illustrations so DiskCache never re-requests cached assets.
+     */
+    val sharedImageOkHttpClient: OkHttpClient by lazy {
+        sharedBaseOkHttpClient.newBuilder()
+            .dns(Dns.SYSTEM)
+            .connectTimeout(12L, TimeUnit.SECONDS)
+            .readTimeout(25L, TimeUnit.SECONDS)
+            .followRedirects(true)
+            .followSslRedirects(true)
+            .addNetworkInterceptor(WenkuImmutableImageCacheInterceptor)
+            .build()
     }
 
     val stalledDnsGuard: StalledDnsGuard by lazy {
@@ -266,8 +291,35 @@ class AppContainer(context: Context) {
 
     fun buildOfflineFirstImageLoader(): ImageLoader {
         return ImageLoader.Builder(appContext)
+            .memoryCache {
+                MemoryCache.Builder()
+                    .maxSizePercent(appContext, 0.25)
+                    .build()
+            }
+            .diskCache {
+                DiskCache.Builder()
+                    .directory(
+                        File(
+                            appContext.cacheDir,
+                            WenkuImageRequests.COIL_DISK_CACHE_DIR_NAME,
+                        ).toOkioPath(),
+                    )
+                    .maxSizeBytes(WenkuImageRequests.COIL_DISK_CACHE_MAX_BYTES)
+                    .build()
+            }
             .components {
-                add(OfflineFirstWenkuImageFetcher.Factory(::resolveLocalAssetRoots))
+                add(WenkuCanonicalUriKeyer)
+                add(
+                    OfflineFirstWenkuImageFetcher.Factory(
+                        assetSearchRootsProvider = ::resolveLocalAssetRoots,
+                        cacheRootProvider = { appContext.cacheDir },
+                    ),
+                )
+                add(
+                    OkHttpNetworkFetcherFactory(
+                        callFactory = { sharedImageOkHttpClient },
+                    ),
+                )
             }
             .build()
     }

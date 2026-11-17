@@ -88,6 +88,7 @@ import org.mewx.wenku8.v2.data.local.db.Wenku8Database
 import org.mewx.wenku8.v2.data.local.db.dao.BookmarkNoteWithNovel
 import org.mewx.wenku8.v2.data.local.db.dao.ReadingHistoryWithNovel
 import org.mewx.wenku8.v2.data.local.db.entity.ReadingSessionEntity
+import org.mewx.wenku8.v2.data.media.WenkuImageRequests
 import org.mewx.wenku8.v2.domain.model.DiscoveryNovelCardItem
 import org.mewx.wenku8.v2.ui.detail.ReaderLaunchRequest
 import org.mewx.wenku8.v2.ui.theme.LocalEinkMode
@@ -1094,7 +1095,11 @@ private fun ReadingHistoryTabContent(
                 ) {
                     val historyCoverShape = MaterialTheme.shapes.small
                     AsyncImage(
-                        model = coverUrl,
+                        model = WenkuImageRequests.rememberCoverImageRequest(
+                            aid = item.aid,
+                            coverUrl = coverUrl,
+                            enableCrossfade = false,
+                        ),
                         contentDescription = item.novelTitle,
                         contentScale = ContentScale.Crop,
                         modifier = Modifier

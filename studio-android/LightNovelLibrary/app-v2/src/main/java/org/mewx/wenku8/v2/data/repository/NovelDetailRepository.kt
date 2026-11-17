@@ -89,8 +89,10 @@ class NovelDetailRepository(
     private val chapterContentDao = database.chapterContentDao()
     private val readingProgressDao = database.readingProgressDao()
 
+    fun resolveCoverUrl(aid: Int): String = catalogGateway.resolveCoverUrl(aid)
+
     fun observeNovelDetail(aid: Int): Flow<NovelDetailSnapshot> {
-        val coverUrl = catalogGateway.resolveCoverUrl(aid)
+        val coverUrl = resolveCoverUrl(aid)
         return combine(
             novelDao.observeNovelByAid(aid),
             tocDao.observeVolumesForNovel(aid),
@@ -322,14 +324,7 @@ class NovelDetailRepository(
         }
 
         fun isIllustrationChapterTitle(rawTitle: String): Boolean {
-            val trimmed = rawTitle.trim()
-            if (trimmed.isEmpty()) return false
-            return trimmed == ChapterEntity.ILLUSTRATION_CHAPTER_TITLE_SC ||
-                trimmed == ChapterEntity.ILLUSTRATION_CHAPTER_TITLE_TC ||
-                trimmed.endsWith("插图") ||
-                trimmed.endsWith("插圖") ||
-                trimmed == "彩页" ||
-                trimmed == "彩頁"
+            return ChapterEntity.isIllustrationChapterTitle(rawTitle)
         }
     }
 }

@@ -134,6 +134,7 @@ import org.mewx.wenku8.v2.reader.engine.ChapterWindowSlot
 import org.mewx.wenku8.v2.reader.engine.ParagraphLineBreaker
 import org.mewx.wenku8.v2.reader.engine.AndroidStaticLayoutLineBreaker
 import org.mewx.wenku8.v2.reader.engine.ReaderLayoutConfig
+import org.mewx.wenku8.v2.reader.engine.ReaderPageElement
 import org.mewx.wenku8.v2.reader.engine.ReaderWindowSnapshot
 import org.mewx.wenku8.v2.reader.engine.ReadingAnchor
 import org.mewx.wenku8.v2.reader.engine.StaticLayoutPaginator
@@ -214,9 +215,11 @@ private data class ReaderUndoJumpState(
 )
 
 private data class ReaderActiveArtbookState(
+    val cid: Int,
     val chapterTitle: String,
     val imageUrls: List<String>,
     val initialIndex: Int,
+    val isAutoEnteredForChapter: Boolean = false,
 )
 
 /**
@@ -362,6 +365,9 @@ fun UnifiedReaderScreen(
     var isBookmarksSheetOpen by rememberSaveable { mutableStateOf(false) }
     var isSearchSheetOpen by rememberSaveable { mutableStateOf(false) }
     var activeArtbookState by remember { mutableStateOf<ReaderActiveArtbookState?>(null) }
+    // Chapter IDs where the user tapped "小说阅读" inside an auto-opened pure-illustration chapter.
+    var novelModeOverriddenCids by rememberSaveable(launchRequest.aid) { mutableStateOf(intArrayOf()) }
+    var lastAutoOpenedGalleryCid by rememberSaveable(launchRequest.aid) { mutableIntStateOf(0) }
 
     // Brightness HUD pill state.
     var brightnessFraction by remember {
@@ -866,15 +872,62 @@ fun UnifiedReaderScreen(
             activeChapterAst?.illustrationBlocks?.map { it.imageUrl }.orEmpty()
         }
 
-        fun openArtbookGallery(chapterTitle: String, urls: List<String>, clickedIdx: Int) {
+        fun openArtbookGallery(
+            cid: Int,
+            chapterTitle: String,
+            urls: List<String>,
+            clickedIdx: Int,
+            isAutoEnteredForChapter: Boolean = false,
+        ) {
             if (urls.isEmpty()) return
             val safeIdx = clickedIdx.coerceIn(0, urls.lastIndex)
             activeArtbookState = ReaderActiveArtbookState(
+                cid = cid,
                 chapterTitle = chapterTitle,
                 imageUrls = urls,
                 initialIndex = safeIdx,
+                isAutoEnteredForChapter = isAutoEnteredForChapter,
             )
-            onIllustrationClicked(chapterTitle, urls, safeIdx)
+            if (!isAutoEnteredForChapter) {
+                onIllustrationClicked(chapterTitle, urls, safeIdx)
+            }
+        }
+
+        // Automatically open the full-screen illustration gallery (`ArtbookLightboxOverlay`) when
+        // the active chapter body consists purely of illustrations (no prose paragraphs), while
+        // remembering per-chapter `"小说阅读"` overrides so the user can toggle back in 1 tap.
+        LaunchedEffect(
+            activeChapterAst?.cid,
+            activeChapterAst?.isPureIllustrationContent,
+            launchRequest.startWithTts,
+        ) {
+            val ast = activeChapterAst ?: return@LaunchedEffect
+            if (lastAutoOpenedGalleryCid != 0 && ast.cid != lastAutoOpenedGalleryCid) {
+                lastAutoOpenedGalleryCid = 0
+            }
+            if (ast.isPureIllustrationContent &&
+                !launchRequest.startWithTts &&
+                ast.cid !in novelModeOverriddenCids &&
+                lastAutoOpenedGalleryCid != ast.cid
+            ) {
+                val urls = ast.illustrationBlocks.map { it.imageUrl }
+                if (urls.isNotEmpty()) {
+                    lastAutoOpenedGalleryCid = ast.cid
+                    val resumedImgIdx = snapshot.activeReaderPage?.elements?.firstNotNullOfOrNull { el ->
+                        (el as? ReaderPageElement.ImageSlot)?.imageIndexInChapter
+                    } ?: 0
+                    val resolvedTitle = snapshot.activeChapter?.chapterTitle
+                        ?.takeIf { it.isNotBlank() }
+                        ?: ast.chapterTitle.ifBlank { launchRequest.chapterTitle }
+                    openArtbookGallery(
+                        cid = ast.cid,
+                        chapterTitle = resolvedTitle,
+                        urls = urls,
+                        clickedIdx = resumedImgIdx,
+                        isAutoEnteredForChapter = true,
+                    )
+                }
+            }
         }
 
         // Honor `ReaderLaunchRequest.startWithTts` from NovelDetailScreen's `"朗读本章 (TTS)"` action,
@@ -1010,6 +1063,7 @@ fun UnifiedReaderScreen(
                     listOf(clickedUrl)
                 }
                 openArtbookGallery(
+                    cid = snapshot.activeChapter?.cid ?: launchRequest.cid,
                     chapterTitle = snapshot.activeChapter?.chapterTitle ?: launchRequest.chapterTitle,
                     urls = urls,
                     clickedIdx = clickedIdx,
@@ -1126,10 +1180,15 @@ fun UnifiedReaderScreen(
                     if (currentIllustrations.isNotEmpty()) {
                         AssistChip(
                             onClick = {
+                                val curImgIdx = snapshot.activeReaderPage?.elements?.firstNotNullOfOrNull { el ->
+                                    (el as? ReaderPageElement.ImageSlot)?.imageIndexInChapter
+                                } ?: 0
+                                isHudVisible = false
                                 openArtbookGallery(
+                                    cid = snapshot.activeChapter?.cid ?: launchRequest.cid,
                                     chapterTitle = snapshot.activeChapter?.chapterTitle ?: launchRequest.chapterTitle,
                                     urls = currentIllustrations,
-                                    clickedIdx = 0,
+                                    clickedIdx = curImgIdx,
                                 )
                             },
                             leadingIcon = {
@@ -1782,15 +1841,72 @@ fun UnifiedReaderScreen(
                     ?.resolveLocalAssetRoots()
                     ?: listOf(context.filesDir)
             }
+            val isPureIllustrationChapter = activeChapterAst?.cid == openArtbook.cid &&
+                activeChapterAst.isPureIllustrationContent
+            val prevChapterCid = snapshot.prevSlot?.chapter?.cid
+            val nextChapterCid = snapshot.nextSlot?.chapter?.cid
             ArtbookLightboxOverlay(
                 novelTitle = launchRequest.novelTitle,
                 chapterTitle = openArtbook.chapterTitle,
                 imageUrls = openArtbook.imageUrls,
                 initialImageIndex = openArtbook.initialIndex,
+                isAutoEnteredIllustrationChapter = openArtbook.isAutoEnteredForChapter,
+                onSwitchToNovelReadingMode = if (openArtbook.isAutoEnteredForChapter || isPureIllustrationChapter) {
+                    { currentImgIdx ->
+                        if (openArtbook.cid > 0) {
+                            novelModeOverriddenCids =
+                                (novelModeOverriddenCids + openArtbook.cid).distinct().toIntArray()
+                        }
+                        activeArtbookState = null
+                        val loadedCur = snapshot.currentSlot as? ChapterWindowSlot.Loaded
+                        if (loadedCur != null && loadedCur.chapter.cid == openArtbook.cid) {
+                            val targetLocalPage = loadedCur.layout.pages.indexOfFirst { page ->
+                                page.elements.any { el ->
+                                    el is ReaderPageElement.ImageSlot &&
+                                        el.imageIndexInChapter == currentImgIdx
+                                }
+                            }
+                            if (targetLocalPage >= 0 && targetLocalPage != snapshot.activePageIndexInCurrentChapter) {
+                                val targetVirtual = snapshot.prevPageCount + targetLocalPage
+                                if (targetVirtual in 0 until snapshot.totalVirtualPages) {
+                                    coroutineScope.launch {
+                                        pagerState.scrollToPage(targetVirtual)
+                                        windowBuffer.onVirtualPageSettled(targetVirtual)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    null
+                },
+                onPreviousChapter = if (openArtbook.isAutoEnteredForChapter && prevChapterCid != null) {
+                    {
+                        activeArtbookState = null
+                        jumpToChapterWithUndo(prevChapterCid)
+                    }
+                } else {
+                    null
+                },
+                onNextChapter = if (openArtbook.isAutoEnteredForChapter && nextChapterCid != null) {
+                    {
+                        activeArtbookState = null
+                        jumpToChapterWithUndo(nextChapterCid)
+                    }
+                } else {
+                    null
+                },
                 assetSearchRoots = appAssetRoots,
                 imageFileResolver = artbookImageFileResolver,
                 ioDispatcher = ioDispatcher,
-                onDismiss = { activeArtbookState = null },
+                onDismiss = {
+                    val wasAutoEntered = openArtbook.isAutoEnteredForChapter
+                    activeArtbookState = null
+                    if (wasAutoEntered) {
+                        ttsController.stopAndDismiss()
+                        onNavigateBack()
+                    }
+                },
             )
         }
     }

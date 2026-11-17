@@ -106,8 +106,6 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.BitmapImage
 import coil3.compose.AsyncImage
-import coil3.request.ImageRequest
-import coil3.request.allowHardware
 import kotlinx.coroutines.launch
 import org.mewx.wenku8.api.Wenku8API
 import org.mewx.wenku8.v2.R
@@ -117,6 +115,7 @@ import org.mewx.wenku8.v2.data.download.NovelDownloadRepository
 import org.mewx.wenku8.v2.data.download.NovelDownloadRequest
 import org.mewx.wenku8.v2.data.download.NovelDownloadRunState
 import org.mewx.wenku8.v2.data.local.db.entity.NovelEntity
+import org.mewx.wenku8.v2.data.media.WenkuImageRequests
 import org.mewx.wenku8.v2.data.repository.BookshelfRepository
 import org.mewx.wenku8.v2.data.repository.ChapterRowModel
 import org.mewx.wenku8.v2.data.repository.NovelDetailRefreshOutcome
@@ -228,6 +227,10 @@ fun NovelDetailScreen(
     val systemDark = isSystemInDarkTheme()
     val isDarkEffective = themeMode.isDarkEffective(systemDark)
 
+    val initialCoverUrl = remember(aid, seedDiscoveryItem, novelDetailRepository) {
+        seedDiscoveryItem?.coverUrl?.takeIf { it.isNotBlank() }
+            ?: novelDetailRepository.resolveCoverUrl(aid)
+    }
     val detailFlow = remember(aid, novelDetailRepository) {
         novelDetailRepository.observeNovelDetail(aid)
     }
@@ -245,7 +248,7 @@ fun NovelDetailScreen(
                     introShort = it.introShort,
                 )
             },
-            coverUrl = "",
+            coverUrl = initialCoverUrl,
             volumes = emptyList(),
             readingProgress = null,
             totalCachedChapters = 0,
@@ -552,9 +555,7 @@ fun NovelDetailScreen(
                         title = displayTitle,
                         author = displayAuthor,
                         novel = snapshot.novel,
-                        coverUrl = snapshot.coverUrl.ifBlank {
-                            seedDiscoveryItem?.coverUrl.orEmpty()
-                        },
+                        coverUrl = snapshot.coverUrl.ifBlank { initialCoverUrl },
                         tags = snapshot.tags,
                         isEinkMode = isEinkMode,
                         sharedTransitionOrigin = sharedTransitionOrigin,
@@ -919,7 +920,6 @@ private fun NovelHeroHeaderCard(
     onAuthorClicked: () -> Unit,
     onTagClicked: (String) -> Unit,
 ) {
-    val context = LocalContext.current
     val gradientColors = if (isEinkMode) {
         listOf(MaterialTheme.colorScheme.surface, MaterialTheme.colorScheme.surface)
     } else {
@@ -961,12 +961,11 @@ private fun NovelHeroHeaderCard(
                     .einkHairlineBorder(heroCoverShape),
             ) {
                 if (coverUrl.isNotBlank()) {
-                    val coverRequest = remember(context, coverUrl) {
-                        ImageRequest.Builder(context)
-                            .data(coverUrl)
-                            .allowHardware(false)
-                            .build()
-                    }
+                    val coverRequest = WenkuImageRequests.rememberCoverImageRequest(
+                        aid = aid,
+                        coverUrl = coverUrl,
+                        enableCrossfade = false,
+                    )
                     AsyncImage(
                         model = coverRequest,
                         contentDescription = title,

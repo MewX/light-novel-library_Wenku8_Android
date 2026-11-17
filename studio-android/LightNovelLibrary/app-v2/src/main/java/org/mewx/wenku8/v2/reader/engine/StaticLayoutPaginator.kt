@@ -506,36 +506,72 @@ class StaticLayoutPaginator(
                     val aspectRatio = resolveAspectRatio(block, config)
                     val naturalWidth = contentWidth.toFloat()
                     val naturalHeight = (naturalWidth / aspectRatio).coerceAtLeast(bodyFontSize * 3f)
+                    val hasOnlyTitleOnCurrentPage = currentElements.isNotEmpty() &&
+                        currentElements.all { it is ReaderPageElement.TitleLine }
 
                     if (ast.isDedicatedIllustrationChapter) {
-                        // Dedicated `<chapter>插图</chapter>` gallery: every plate gets its own
-                        // crisp full-bleed Artbook Page.
-                        flushCurrentPage()
-                        val fitted = fitBoxInside(
-                            aspectRatio = aspectRatio,
-                            maxWidth = config.viewportWidthPx.toFloat(),
-                            maxHeight = config.viewportHeightPx.toFloat(),
-                        )
-                        val left = (config.viewportWidthPx - fitted.first) * 0.5f
-                        val top = (config.viewportHeightPx - fitted.second) * 0.5f
-                        currentElements.add(
-                            ReaderPageElement.ImageSlot(
-                                blockIndex = block.blockIndex,
-                                imageIndexInChapter = block.imageIndexInChapter,
-                                imageUrl = block.imageUrl,
-                                leftPx = left,
-                                topPx = top,
-                                widthPx = fitted.first,
-                                heightPx = fitted.second,
+                        // Dedicated `<chapter>插图</chapter>` gallery: never flush a Page 0 that
+                        // contains only the chapter heading ("插图" / "第一卷 插图")! Keep the
+                        // heading on Page 0 and fit the first plate cleanly below it, while giving
+                        // every subsequent plate its own full-bleed Artbook Page.
+                        if (hasOnlyTitleOnCurrentPage) {
+                            val bottomLimit = (config.viewportHeightPx.toFloat() -
+                                config.footerReservePx.coerceAtLeast(0f)).coerceAtLeast(cursorY + bodyFontSize * 3f)
+                            val availableHeightBelowTitle = (bottomLimit - cursorY)
+                                .coerceAtLeast(bodyFontSize * 3f)
+                            val fitted = fitBoxInside(
                                 aspectRatio = aspectRatio,
-                                isFullBleedArtbookSlot = true,
-                            ),
-                        )
-                        flushCurrentPage(isFullBleedArtbook = true)
+                                maxWidth = config.viewportWidthPx.toFloat(),
+                                maxHeight = availableHeightBelowTitle,
+                            )
+                            val left = (config.viewportWidthPx - fitted.first) * 0.5f
+                            val top = cursorY + (availableHeightBelowTitle - fitted.second) * 0.5f
+                            currentElements.add(
+                                ReaderPageElement.ImageSlot(
+                                    blockIndex = block.blockIndex,
+                                    imageIndexInChapter = block.imageIndexInChapter,
+                                    imageUrl = block.imageUrl,
+                                    leftPx = left,
+                                    topPx = top,
+                                    widthPx = fitted.first,
+                                    heightPx = fitted.second,
+                                    aspectRatio = aspectRatio,
+                                    isFullBleedArtbookSlot = true,
+                                ),
+                            )
+                            flushCurrentPage(isFullBleedArtbook = true)
+                        } else {
+                            flushCurrentPage()
+                            val fitted = fitBoxInside(
+                                aspectRatio = aspectRatio,
+                                maxWidth = config.viewportWidthPx.toFloat(),
+                                maxHeight = config.viewportHeightPx.toFloat(),
+                            )
+                            val left = (config.viewportWidthPx - fitted.first) * 0.5f
+                            val top = (config.viewportHeightPx - fitted.second) * 0.5f
+                            currentElements.add(
+                                ReaderPageElement.ImageSlot(
+                                    blockIndex = block.blockIndex,
+                                    imageIndexInChapter = block.imageIndexInChapter,
+                                    imageUrl = block.imageUrl,
+                                    leftPx = left,
+                                    topPx = top,
+                                    widthPx = fitted.first,
+                                    heightPx = fitted.second,
+                                    aspectRatio = aspectRatio,
+                                    isFullBleedArtbookSlot = true,
+                                ),
+                            )
+                            flushCurrentPage(isFullBleedArtbook = true)
+                        }
                     } else {
                         val remainingHeight = contentBottomLimit - cursorY
-                        if (currentElements.isNotEmpty() && remainingHeight >= minInlineImageHeight) {
-                            // Fits comfortably inline below the preceding paragraph!
+                        val canPlaceBelowExisting = currentElements.isNotEmpty() && (
+                            remainingHeight >= minInlineImageHeight ||
+                                (hasOnlyTitleOnCurrentPage && remainingHeight >= bodyFontSize * 3f)
+                            )
+                        if (canPlaceBelowExisting) {
+                            // Fits comfortably inline below the preceding paragraph or chapter title!
                             val maxInlineHeight = min(remainingHeight, naturalHeight)
                             val fitted = fitBoxInside(
                                 aspectRatio = aspectRatio,
@@ -707,27 +743,56 @@ class StaticLayoutPaginator(
                 }
 
                 is ChapterBlock.IllustrationBlock -> {
-                    flushVerticalPage()
                     val aspectRatio = resolveAspectRatio(block, config)
-                    val fitted = fitBoxInside(
-                        aspectRatio = aspectRatio,
-                        maxWidth = contentWidth,
-                        maxHeight = contentHeight,
-                    )
-                    currentColumns.add(
-                        ReaderPageElement.ImageSlot(
-                            blockIndex = block.blockIndex,
-                            imageIndexInChapter = block.imageIndexInChapter,
-                            imageUrl = block.imageUrl,
-                            leftPx = contentLeft + (contentWidth - fitted.first) * 0.5f,
-                            topPx = contentTop + (contentHeight - fitted.second) * 0.5f,
-                            widthPx = fitted.first,
-                            heightPx = fitted.second,
+                    val hasOnlyTitleColumns = currentColumns.isNotEmpty() &&
+                        currentColumns.all {
+                            it is ReaderPageElement.VerticalColumn && it.isTitleColumn
+                        }
+                    val remainingWidthLeftOfTitle =
+                        (rightStartEdge - columnIndexInPage * columnStepX) - contentLeft
+
+                    if (hasOnlyTitleColumns && remainingWidthLeftOfTitle >= contentWidth * 0.45f) {
+                        val fitted = fitBoxInside(
                             aspectRatio = aspectRatio,
-                            isFullBleedArtbookSlot = true,
-                        ),
-                    )
-                    flushVerticalPage(isFullBleedArtbook = true)
+                            maxWidth = remainingWidthLeftOfTitle,
+                            maxHeight = contentHeight,
+                        )
+                        currentColumns.add(
+                            ReaderPageElement.ImageSlot(
+                                blockIndex = block.blockIndex,
+                                imageIndexInChapter = block.imageIndexInChapter,
+                                imageUrl = block.imageUrl,
+                                leftPx = contentLeft + (remainingWidthLeftOfTitle - fitted.first) * 0.5f,
+                                topPx = contentTop + (contentHeight - fitted.second) * 0.5f,
+                                widthPx = fitted.first,
+                                heightPx = fitted.second,
+                                aspectRatio = aspectRatio,
+                                isFullBleedArtbookSlot = true,
+                            ),
+                        )
+                        flushVerticalPage(isFullBleedArtbook = ast.isDedicatedIllustrationChapter)
+                    } else {
+                        flushVerticalPage()
+                        val fitted = fitBoxInside(
+                            aspectRatio = aspectRatio,
+                            maxWidth = contentWidth,
+                            maxHeight = contentHeight,
+                        )
+                        currentColumns.add(
+                            ReaderPageElement.ImageSlot(
+                                blockIndex = block.blockIndex,
+                                imageIndexInChapter = block.imageIndexInChapter,
+                                imageUrl = block.imageUrl,
+                                leftPx = contentLeft + (contentWidth - fitted.first) * 0.5f,
+                                topPx = contentTop + (contentHeight - fitted.second) * 0.5f,
+                                widthPx = fitted.first,
+                                heightPx = fitted.second,
+                                aspectRatio = aspectRatio,
+                                isFullBleedArtbookSlot = true,
+                            ),
+                        )
+                        flushVerticalPage(isFullBleedArtbook = true)
+                    }
                 }
             }
         }

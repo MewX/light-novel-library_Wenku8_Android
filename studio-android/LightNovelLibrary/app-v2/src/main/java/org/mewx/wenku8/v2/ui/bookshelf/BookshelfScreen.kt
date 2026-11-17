@@ -101,6 +101,7 @@ import coil3.compose.AsyncImage
 import kotlinx.coroutines.launch
 import org.mewx.wenku8.api.Wenku8API
 import org.mewx.wenku8.v2.R
+import org.mewx.wenku8.v2.data.media.WenkuImageRequests
 import org.mewx.wenku8.v2.data.repository.BookshelfFilter
 import org.mewx.wenku8.v2.data.repository.BookshelfItemModel
 import org.mewx.wenku8.v2.data.repository.BookshelfRepository
@@ -1030,7 +1031,11 @@ private fun ContinueReadingCarouselSection(
                         )
                         if (item.coverUrl.isNotBlank()) {
                             AsyncImage(
-                                model = item.coverUrl,
+                                model = WenkuImageRequests.rememberCoverImageRequest(
+                                    aid = item.aid,
+                                    coverUrl = item.coverUrl,
+                                    enableCrossfade = false,
+                                ),
                                 contentDescription = item.novel.title,
                                 contentScale = ContentScale.Crop,
                                 modifier = Modifier.fillMaxSize(),
@@ -1274,7 +1279,11 @@ private fun BookshelfGridItemCard(
                 )
                 if (item.coverUrl.isNotBlank()) {
                     AsyncImage(
-                        model = item.coverUrl,
+                        model = WenkuImageRequests.rememberCoverImageRequest(
+                            aid = item.aid,
+                            coverUrl = item.coverUrl,
+                            enableCrossfade = false,
+                        ),
                         contentDescription = item.novel.title,
                         contentScale = ContentScale.Crop,
                         modifier = Modifier.fillMaxSize(),
@@ -1390,7 +1399,11 @@ private fun BookshelfDetailListCard(
                 )
                 if (item.coverUrl.isNotBlank()) {
                     AsyncImage(
-                        model = item.coverUrl,
+                        model = WenkuImageRequests.rememberCoverImageRequest(
+                            aid = item.aid,
+                            coverUrl = item.coverUrl,
+                            enableCrossfade = false,
+                        ),
                         contentDescription = item.novel.title,
                         contentScale = ContentScale.Crop,
                         modifier = Modifier.fillMaxSize(),

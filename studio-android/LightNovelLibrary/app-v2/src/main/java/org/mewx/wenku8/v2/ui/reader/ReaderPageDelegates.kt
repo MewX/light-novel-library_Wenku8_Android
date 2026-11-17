@@ -73,6 +73,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import coil3.compose.AsyncImage
 import kotlinx.coroutines.flow.distinctUntilChanged
+import org.mewx.wenku8.v2.data.media.WenkuImageRequests
 import org.mewx.wenku8.v2.reader.engine.ChapterBlock
 import org.mewx.wenku8.v2.reader.engine.ChapterWindowSlot
 import org.mewx.wenku8.v2.reader.engine.ReaderPage
@@ -854,7 +855,7 @@ private fun ReaderCanvasPage(
                 ) {
                     if (element.imageUrl.isNotBlank()) {
                         AsyncImage(
-                            model = element.imageUrl,
+                            model = WenkuImageRequests.rememberIllustrationImageRequest(element.imageUrl),
                             contentDescription = "插图 ${element.imageIndexInChapter + 1}",
                             contentScale = ContentScale.Fit,
                             modifier = Modifier.fillMaxSize(),
@@ -1011,7 +1012,7 @@ private fun ContinuousScrollReaderDelegate(
                     ) {
                         if (block.imageUrl.isNotBlank()) {
                             AsyncImage(
-                                model = block.imageUrl,
+                                model = WenkuImageRequests.rememberIllustrationImageRequest(block.imageUrl),
                                 contentDescription = "插图 ${block.imageIndexInChapter + 1}",
                                 contentScale = ContentScale.Fit,
                                 modifier = Modifier.fillMaxSize(),

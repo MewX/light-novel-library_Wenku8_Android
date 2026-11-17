@@ -52,7 +52,11 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.MenuBook
+import androidx.compose.material.icons.automirrored.outlined.NavigateBefore
+import androidx.compose.material.icons.automirrored.outlined.NavigateNext
+import androidx.compose.material.icons.outlined.AutoStories
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material.icons.outlined.Rotate90DegreesCw
@@ -104,6 +108,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
+import coil3.SingletonImageLoader
 import coil3.compose.AsyncImage
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
@@ -112,7 +117,9 @@ import kotlinx.coroutines.withContext
 import okhttp3.Dns
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import org.mewx.wenku8.v2.Wenku8V2Application
 import org.mewx.wenku8.v2.data.media.OfflineFirstWenkuImageFetcher
+import org.mewx.wenku8.v2.data.media.WenkuImageRequests
 import org.mewx.wenku8.v2.data.remote.parser.WenkuXmlParsers
 import org.mewx.wenku8.v2.ui.theme.LocalEinkMode
 import java.io.File
@@ -135,6 +142,9 @@ object ArtbookTestTags {
     const val ROTATE_BUTTON = "artbook_rotate_button"
     const val SAVE_BUTTON = "artbook_save_button"
     const val SHARE_BUTTON = "artbook_share_button"
+    const val READER_MODE_CHIP = "artbook_reader_mode_chip"
+    const val PREV_CHAPTER_CHIP = "artbook_prev_chapter_chip"
+    const val NEXT_CHAPTER_CHIP = "artbook_next_chapter_chip"
     const val SPREAD_TOGGLE_CHIP = "artbook_spread_toggle_chip"
     const val SPREAD_OFFSET_CHIP = "artbook_spread_offset_chip"
     const val DIRECTION_TOGGLE_CHIP = "artbook_direction_toggle_chip"
@@ -433,14 +443,16 @@ object ArtbookImageFileResolver {
             if (local.isFile && local.length() > 0L) return@withContext local
         }
 
-        // 1. Permanent offline storage (`saves/imgs/` & `imgs/`).
+        // 1. Permanent offline storage (`saves/imgs/` & `imgs/`) + `artbook_images` cache.
         OfflineFirstWenkuImageFetcher.findExistingOfflineImageFile(
             imageUrl = trimmed,
             storageRoots = assetRoots,
+            cacheRoot = context.cacheDir,
         )?.let { return@withContext it }
 
-        // 2. Cached artbook download directory.
-        val cacheDir = File(context.cacheDir, "artbook_images").apply { mkdirs() }
+        val cacheDir = File(context.cacheDir, WenkuImageRequests.ARTBOOK_CACHE_DIR_NAME).apply {
+            mkdirs()
+        }
         val safeName = WenkuXmlParsers.generateLegacyImageFileName(trimmed).ifBlank {
             sha256Hex(trimmed) + ".jpg"
         }
@@ -449,14 +461,53 @@ object ArtbookImageFileResolver {
             return@withContext cachedFile
         }
 
-        // 3. Download from Wenku8 picture CDN (`pic.wenku8.com` etc.) using system DNS.
+        // 2. Reuse Coil 3's persistent `DiskCache` if already fetched inline in Reader!
+        val diskCache = runCatching { SingletonImageLoader.get(context).diskCache }.getOrNull()
+        if (diskCache != null) {
+            val candidateKeys = listOfNotNull(
+                WenkuImageRequests.canonicalIllustrationCacheKey(trimmed),
+                WenkuImageRequests.canonicalCacheKeyForUrl(trimmed),
+                trimmed,
+            ).distinct()
+            for (key in candidateKeys) {
+                val snapshot = runCatching { diskCache.openSnapshot(key) }.getOrNull() ?: continue
+                val promoted = snapshot.use { snap ->
+                    val dataFile = snap.data.toFile()
+                    if (dataFile.isFile && dataFile.length() > 0L) {
+                        val tmpCopy = File(cacheDir, "$safeName.coil.tmp")
+                        runCatching {
+                            dataFile.copyTo(tmpCopy, overwrite = true)
+                            if (!tmpCopy.renameTo(cachedFile)) {
+                                tmpCopy.copyTo(cachedFile, overwrite = true)
+                                tmpCopy.delete()
+                            }
+                            cachedFile.takeIf { it.isFile && it.length() > 0L }
+                        }.onFailure {
+                            tmpCopy.delete()
+                        }.getOrNull()
+                    } else {
+                        null
+                    }
+                }
+                if (promoted != null) {
+                    return@withContext promoted
+                }
+            }
+        }
+
+        // 3. Download from Wenku8 picture CDN using the app's pooled `sharedImageOkHttpClient`.
         if (!trimmed.startsWith("http://") && !trimmed.startsWith("https://")) {
             return@withContext null
         }
+        val httpClient = (context.applicationContext as? Wenku8V2Application)
+            ?.appContainer
+            ?.sharedImageOkHttpClient
+            ?: cdnHttpClient
+
         val tempFile = File(cacheDir, "$safeName.tmp")
         runCatching {
             val request = Request.Builder().url(trimmed).get().build()
-            cdnHttpClient.newCall(request).execute().use { response ->
+            httpClient.newCall(request).execute().use { response ->
                 if (!response.isSuccessful) return@runCatching null
                 val body = response.body
                 FileOutputStream(tempFile).use { out ->
@@ -498,6 +549,8 @@ object ArtbookImageFileResolver {
  * - **`跨页拼合` (`口绘` double-page spread stitching)** with zero center gutter seam, `首张单页`
  *   frontispiece offset toggle, and `右起日漫 (RTL)` / `左起 (LTR)` reading order toggle.
  * - **`90°` spring rotation** (`MotionScheme.expressive().defaultSpatialSpec()`, instant snap in E-Ink).
+ * - **1-tap `小说阅读` toggle** when auto-entered on a pure-illustration chapter so the reader can
+ *   switch seamlessly between gallery browsing and Bunkobon paged/scroll novel reading.
  * - **M3e `HorizontalMultiBrowseCarousel` thumbnail filmstrip** for rapid browsing across gallery chapters.
  * - **One-tap save to `MediaStore` (`Pictures/Wenku8`)** and **read-only `FileProvider` share**
  *   (automatically stitching 2-page spreads or applying rotation when needed!).
@@ -513,6 +566,10 @@ fun ArtbookLightboxOverlay(
     chapterTitle: String,
     imageUrls: List<String>,
     initialImageIndex: Int = 0,
+    isAutoEnteredIllustrationChapter: Boolean = false,
+    onSwitchToNovelReadingMode: ((currentImageIndex: Int) -> Unit)? = null,
+    onPreviousChapter: (() -> Unit)? = null,
+    onNextChapter: (() -> Unit)? = null,
     assetSearchRoots: List<File>? = null,
     imageFileResolver: (suspend (String) -> File?)? = null,
     ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
@@ -705,8 +762,16 @@ fun ArtbookLightboxOverlay(
                             modifier = Modifier.testTag(ArtbookTestTags.CLOSE_BUTTON),
                         ) {
                             Icon(
-                                imageVector = Icons.Outlined.Close,
-                                contentDescription = "关闭画集",
+                                imageVector = if (isAutoEnteredIllustrationChapter) {
+                                    Icons.AutoMirrored.Outlined.ArrowBack
+                                } else {
+                                    Icons.Outlined.Close
+                                },
+                                contentDescription = if (isAutoEnteredIllustrationChapter) {
+                                    "返回"
+                                } else {
+                                    "关闭画集"
+                                },
                             )
                         }
 
@@ -790,7 +855,11 @@ fun ArtbookLightboxOverlay(
                         }
                     }
 
-                    if (imageUrls.size >= 2) {
+                    val showActionChipRow = onSwitchToNovelReadingMode != null ||
+                        imageUrls.size >= 2 ||
+                        onPreviousChapter != null ||
+                        onNextChapter != null
+                    if (showActionChipRow) {
                         Row(
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                             modifier = Modifier
@@ -798,42 +867,95 @@ fun ArtbookLightboxOverlay(
                                 .horizontalScroll(rememberScrollState())
                                 .padding(horizontal = 8.dp, vertical = 2.dp),
                         ) {
-                            FilterChip(
-                                selected = isSpreadModeEnabled,
-                                onClick = { isSpreadModeEnabled = !isSpreadModeEnabled },
-                                leadingIcon = {
-                                    Icon(
-                                        imageVector = Icons.AutoMirrored.Outlined.MenuBook,
-                                        contentDescription = null,
-                                        modifier = Modifier.size(16.dp),
-                                    )
-                                },
-                                label = { Text("跨页拼合") },
-                                colors = artbookChipColors(),
-                                modifier = Modifier.testTag(ArtbookTestTags.SPREAD_TOGGLE_CHIP),
-                            )
-
-                            if (isSpreadModeEnabled) {
+                            if (onSwitchToNovelReadingMode != null) {
                                 FilterChip(
-                                    selected = isFirstPageSolo,
-                                    onClick = { isFirstPageSolo = !isFirstPageSolo },
-                                    label = { Text("首张单页") },
-                                    colors = artbookChipColors(),
-                                    modifier = Modifier.testTag(ArtbookTestTags.SPREAD_OFFSET_CHIP),
-                                )
-                                FilterChip(
-                                    selected = isRtlSpread,
-                                    onClick = { isRtlSpread = !isRtlSpread },
+                                    selected = false,
+                                    onClick = { onSwitchToNovelReadingMode(activePrimaryImageIndex) },
                                     leadingIcon = {
                                         Icon(
-                                            imageVector = Icons.Outlined.SwapHoriz,
+                                            imageVector = Icons.Outlined.AutoStories,
                                             contentDescription = null,
                                             modifier = Modifier.size(16.dp),
                                         )
                                     },
-                                    label = { Text(if (isRtlSpread) "右起日漫 (RTL)" else "左起 (LTR)") },
+                                    label = { Text("小说阅读") },
                                     colors = artbookChipColors(),
-                                    modifier = Modifier.testTag(ArtbookTestTags.DIRECTION_TOGGLE_CHIP),
+                                    modifier = Modifier.testTag(ArtbookTestTags.READER_MODE_CHIP),
+                                )
+                            }
+
+                            if (imageUrls.size >= 2) {
+                                FilterChip(
+                                    selected = isSpreadModeEnabled,
+                                    onClick = { isSpreadModeEnabled = !isSpreadModeEnabled },
+                                    leadingIcon = {
+                                        Icon(
+                                            imageVector = Icons.AutoMirrored.Outlined.MenuBook,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(16.dp),
+                                        )
+                                    },
+                                    label = { Text("跨页拼合") },
+                                    colors = artbookChipColors(),
+                                    modifier = Modifier.testTag(ArtbookTestTags.SPREAD_TOGGLE_CHIP),
+                                )
+
+                                if (isSpreadModeEnabled) {
+                                    FilterChip(
+                                        selected = isFirstPageSolo,
+                                        onClick = { isFirstPageSolo = !isFirstPageSolo },
+                                        label = { Text("首张单页") },
+                                        colors = artbookChipColors(),
+                                        modifier = Modifier.testTag(ArtbookTestTags.SPREAD_OFFSET_CHIP),
+                                    )
+                                    FilterChip(
+                                        selected = isRtlSpread,
+                                        onClick = { isRtlSpread = !isRtlSpread },
+                                        leadingIcon = {
+                                            Icon(
+                                                imageVector = Icons.Outlined.SwapHoriz,
+                                                contentDescription = null,
+                                                modifier = Modifier.size(16.dp),
+                                            )
+                                        },
+                                        label = { Text(if (isRtlSpread) "右起日漫 (RTL)" else "左起 (LTR)") },
+                                        colors = artbookChipColors(),
+                                        modifier = Modifier.testTag(ArtbookTestTags.DIRECTION_TOGGLE_CHIP),
+                                    )
+                                }
+                            }
+
+                            if (onPreviousChapter != null) {
+                                FilterChip(
+                                    selected = false,
+                                    onClick = onPreviousChapter,
+                                    leadingIcon = {
+                                        Icon(
+                                            imageVector = Icons.AutoMirrored.Outlined.NavigateBefore,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(16.dp),
+                                        )
+                                    },
+                                    label = { Text("上一章") },
+                                    colors = artbookChipColors(),
+                                    modifier = Modifier.testTag(ArtbookTestTags.PREV_CHAPTER_CHIP),
+                                )
+                            }
+
+                            if (onNextChapter != null) {
+                                FilterChip(
+                                    selected = false,
+                                    onClick = onNextChapter,
+                                    leadingIcon = {
+                                        Icon(
+                                            imageVector = Icons.AutoMirrored.Outlined.NavigateNext,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(16.dp),
+                                        )
+                                    },
+                                    label = { Text("下一章") },
+                                    colors = artbookChipColors(),
+                                    modifier = Modifier.testTag(ArtbookTestTags.NEXT_CHAPTER_CHIP),
                                 )
                             }
                         }
@@ -901,7 +1023,7 @@ fun ArtbookLightboxOverlay(
                                 .testTag("${ArtbookTestTags.THUMBNAIL_PREFIX}$thumbIdx"),
                         ) {
                             AsyncImage(
-                                model = imageUrls[thumbIdx],
+                                model = WenkuImageRequests.rememberIllustrationImageRequest(imageUrls[thumbIdx]),
                                 contentDescription = "插图 ${thumbIdx + 1}",
                                 contentScale = ContentScale.Crop,
                                 modifier = Modifier.fillMaxSize(),

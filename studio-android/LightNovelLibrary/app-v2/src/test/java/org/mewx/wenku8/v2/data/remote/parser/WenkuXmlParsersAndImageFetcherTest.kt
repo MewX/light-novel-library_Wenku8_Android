@@ -17,6 +17,7 @@ import org.junit.Test
 import org.junit.rules.TemporaryFolder
 import org.junit.runner.RunWith
 import org.mewx.wenku8.v2.data.media.OfflineFirstWenkuImageFetcher
+import org.mewx.wenku8.v2.data.media.WenkuImageRequests
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import java.io.File
@@ -183,5 +184,71 @@ class WenkuXmlParsersAndImageFetcherTest {
             imageLoader = imageLoader,
         )
         assertNull(missingFetcher)
+
+        // Artbook local cache (`cacheDir/artbook_images/`) is also shared directly with Coil
+        // so viewing a gallery illustration in Reader or thumbnail strip never re-downloads!
+        val fakeCacheDir = tempFolder.newFolder("cache")
+        val artbookDir = File(fakeCacheDir, "artbook_images").apply { mkdirs() }
+        val artbookIllustrationUrl = "http://pic.wenku8.cn/pictures/4/4526/9101/119999.jpg"
+        val artbookFile = File(
+            artbookDir,
+            WenkuXmlParsers.generateLegacyImageFileName(artbookIllustrationUrl),
+        ).apply {
+            writeBytes(byteArrayOf(0xFF.toByte(), 0xD8.toByte(), 0xFF.toByte(), 0xD9.toByte()))
+        }
+        val crossCacheFactory = OfflineFirstWenkuImageFetcher.Factory(
+            assetSearchRootsProvider = { listOf(fakeFilesDir) },
+            cacheRootProvider = { fakeCacheDir },
+        )
+        val crossCacheFetcher = crossCacheFactory.create(
+            data = "https://pic.wenku8.com/pictures/4/4526/9101/119999.jpg".toUri(),
+            options = Options(context),
+            imageLoader = imageLoader,
+        )
+        assertNotNull(crossCacheFetcher)
+        val crossCacheResult = crossCacheFetcher!!.fetch() as SourceFetchResult
+        assertEquals(DataSource.DISK, crossCacheResult.dataSource)
+        assertTrue(artbookFile.exists())
+    }
+
+    @Test
+    fun wenkuImageRequestsNormalizeCacheKeysAcrossSchemesAndMirrorsAndPreventCoverFlash() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+
+        // HTTP vs HTTPS and .com vs .cn mirrors map to the exact same canonical cache keys!
+        assertEquals(
+            "wenku8_cover_1306",
+            WenkuImageRequests.canonicalCacheKeyForUrl("http://img.wenku8.com/image/1/1306/1306s.jpg"),
+        )
+        assertEquals(
+            "wenku8_cover_1306",
+            WenkuImageRequests.canonicalCacheKeyForUrl("https://img.wenku8.cn/image/1/1306/1306s.jpg"),
+        )
+        assertEquals(
+            WenkuImageRequests.canonicalCacheKeyForUrl("http://pic.wenku8.cn/pictures/1/1305/41759/50471.jpg"),
+            WenkuImageRequests.canonicalCacheKeyForUrl("https://pic.wenku8.com/pictures/1/1305/41759/50471.jpg"),
+        )
+
+        // Cover requests lock Size.ORIGINAL + placeholderMemoryCacheKey so SharedElement transitions
+        // between list cards and NovelDetailScreen hit MemoryCache synchronously on Frame 1!
+        val listCoverReq = WenkuImageRequests.buildCoverImageRequest(
+            context = context,
+            aid = 1306,
+            coverUrl = "https://img.wenku8.com/image/1/1306/1306s.jpg",
+            enableCrossfade = false,
+        )
+        val detailCoverReq = WenkuImageRequests.buildCoverImageRequest(
+            context = context,
+            aid = 1306,
+            coverUrl = "http://img.wenku8.com/image/1/1306/1306s.jpg",
+            enableCrossfade = false,
+        )
+        assertNotNull(listCoverReq)
+        assertNotNull(detailCoverReq)
+        assertEquals("wenku8_cover_1306", listCoverReq!!.memoryCacheKey)
+        assertEquals(listCoverReq.memoryCacheKey, detailCoverReq!!.memoryCacheKey)
+        assertEquals("wenku8_cover_1306", detailCoverReq.placeholderMemoryCacheKey?.key)
+        assertEquals("wenku8_cover_1306", detailCoverReq.diskCacheKey)
+        assertNotNull(detailCoverReq.defined.sizeResolver)
     }
 }

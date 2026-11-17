@@ -768,8 +768,7 @@ class ChapterWindowBuffer(
                 cid = targetCid,
                 chapterOrder = 0,
                 chapterTitle = cleanChapterTitle,
-                isIllustrationChapter = cleanChapterTitle.trim() == ChapterEntity.ILLUSTRATION_CHAPTER_TITLE_SC ||
-                    cleanChapterTitle.trim() == ChapterEntity.ILLUSTRATION_CHAPTER_TITLE_TC,
+                isIllustrationChapter = ChapterEntity.isIllustrationChapterTitle(cleanChapterTitle),
             ),
         )
     }

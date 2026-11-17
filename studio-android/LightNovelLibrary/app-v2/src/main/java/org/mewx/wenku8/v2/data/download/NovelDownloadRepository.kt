@@ -24,10 +24,13 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import coil3.SingletonImageLoader
 import org.mewx.wenku8.api.Wenku8API
 import org.mewx.wenku8.v2.data.local.db.Wenku8Database
 import org.mewx.wenku8.v2.data.local.db.entity.ChapterContentEntity
 import org.mewx.wenku8.v2.data.local.db.entity.ChapterEntity
+import org.mewx.wenku8.v2.data.media.OfflineFirstWenkuImageFetcher
+import org.mewx.wenku8.v2.data.media.WenkuImageRequests
 import org.mewx.wenku8.v2.data.local.db.entity.NovelEntity
 import org.mewx.wenku8.v2.data.remote.api.WenkuApiResult
 import org.mewx.wenku8.v2.data.remote.api.WenkuCatalogGateway
@@ -436,6 +439,16 @@ class NovelDownloadRepository(
 
         val coverUrl = catalogGateway.resolveCoverUrl(aid)
         if (coverUrl.isBlank()) return
+
+        if (tryCopyFromExistingLocalCaches(
+                imageUrl = coverUrl,
+                canonicalDiskKey = WenkuImageRequests.canonicalCoverCacheKey(aid),
+                targetFile = targetFile,
+            )
+        ) {
+            return
+        }
+
         val bytes = catalogGateway.downloadBinaryBytes(coverUrl) ?: return
         if (bytes.isEmpty()) return
         writeBytesAtomically(targetFile, bytes)
@@ -454,9 +467,66 @@ class NovelDownloadRepository(
             return true
         }
 
+        if (!overwriteExisting &&
+            tryCopyFromExistingLocalCaches(
+                imageUrl = imageUrl,
+                canonicalDiskKey = WenkuImageRequests.canonicalIllustrationCacheKey(imageUrl),
+                targetFile = targetFile,
+            )
+        ) {
+            return true
+        }
+
         val bytes = catalogGateway.downloadBinaryBytes(imageUrl) ?: return false
         if (bytes.isEmpty()) return false
         return writeBytesAtomically(targetFile, bytes)
+    }
+
+    /**
+     * Checks local `imgs/` / `artbook_images/` and Coil 3's persistent `DiskCache` so offline
+     * downloads promote already-viewed covers & illustrations without re-requesting Wenku8 servers.
+     */
+    private fun tryCopyFromExistingLocalCaches(
+        imageUrl: String,
+        canonicalDiskKey: String?,
+        targetFile: File,
+    ): Boolean {
+        val ctx = appContext
+        val existingFile = OfflineFirstWenkuImageFetcher.findExistingOfflineImageFile(
+            imageUrl = imageUrl,
+            storageRoots = assetRootsProvider(),
+            cacheRoot = ctx?.cacheDir,
+        )
+        if (existingFile != null &&
+            existingFile.absolutePath != targetFile.absolutePath &&
+            existingFile.isFile &&
+            existingFile.length() > 0L
+        ) {
+            val copied = runCatching {
+                writeBytesAtomically(targetFile, existingFile.readBytes())
+            }.getOrDefault(false)
+            if (copied) return true
+        }
+
+        if (ctx != null) {
+            val diskCache = runCatching { SingletonImageLoader.get(ctx).diskCache }.getOrNull()
+            val candidateKeys = listOfNotNull(canonicalDiskKey, imageUrl.trim()).distinct()
+            for (key in candidateKeys) {
+                val snapshot = runCatching { diskCache?.openSnapshot(key) }.getOrNull() ?: continue
+                val copied = snapshot.use { snap ->
+                    val cachedDataFile = snap.data.toFile()
+                    if (cachedDataFile.isFile && cachedDataFile.length() > 0L) {
+                        runCatching {
+                            writeBytesAtomically(targetFile, cachedDataFile.readBytes())
+                        }.getOrDefault(false)
+                    } else {
+                        false
+                    }
+                }
+                if (copied) return true
+            }
+        }
+        return false
     }
 
     private fun writeBytesAtomically(targetFile: File, bytes: ByteArray): Boolean {

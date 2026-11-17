@@ -254,7 +254,9 @@ class ReaderEngineV2Test {
         val fullSlot = artbookPage.elements.filterIsInstance<ReaderPageElement.ImageSlot>().single()
         assertTrue(fullSlot.isFullBleedArtbookSlot)
 
-        // 3. Dedicated `<chapter>插图</chapter>` gallery -> every illustration gets its own Artbook Page.
+        // 3. Dedicated `<chapter>插图</chapter>` gallery -> Page 0 combines the chapter heading
+        //    AND the first illustration (never a title-only Page 0!), while every illustration
+        //    still gets its own Artbook Page (`pages.size == 2` for 2 images).
         val galleryAst = WenkuChapterParser.parse(
             rawChapterText = "第一卷 插图\n<!--image-->http://pic.wenku8.cn/p1.jpg<!--image-->\n<!--image-->http://pic.wenku8.cn/p2.jpg<!--image-->",
             aid = 1,
@@ -264,9 +266,76 @@ class ReaderEngineV2Test {
             chapterTitle = "插图",
         )
         assertTrue(galleryAst.isDedicatedIllustrationChapter)
+        assertTrue(galleryAst.isPureIllustrationContent)
         val galleryLayout = paginator.paginate(galleryAst, config)
+        assertEquals(2, galleryLayout.pages.size)
+        assertTrue(galleryLayout.pages[0].elements.any { it is ReaderPageElement.TitleLine })
+        assertTrue(galleryLayout.pages[0].elements.any { it is ReaderPageElement.ImageSlot })
         val artbookPages = galleryLayout.pages.filter { it.isFullBleedArtbookPage }
         assertEquals(2, artbookPages.size)
+
+        // Vertical Bunkobon (`竖排右翻`) also places the first illustration on Page 0 beside the title column!
+        val verticalGalleryLayout = paginator.paginate(
+            galleryAst,
+            config.copy(isVerticalBunkobon = true),
+        )
+        assertEquals(2, verticalGalleryLayout.pages.size)
+        assertTrue(
+            verticalGalleryLayout.pages[0].elements.any {
+                it is ReaderPageElement.VerticalColumn && it.isTitleColumn
+            },
+        )
+        assertTrue(verticalGalleryLayout.pages[0].elements.any { it is ReaderPageElement.ImageSlot })
+    }
+
+    @Test
+    fun simplifiedAndTraditionalIllustrationChapters_areDetectedAcrossTitleAndContentForms() {
+        val positiveTitles = listOf(
+            "插图",
+            "插圖",
+            "插画",
+            "插畫",
+            "彩页",
+            "彩頁",
+            "口绘",
+            "口繪",
+            "第一卷 插图",
+            "第一卷 插圖",
+            "第二卷插圖",
+            "【彩頁】",
+            "插圖1",
+            "Illustrations",
+        )
+        for (title in positiveTitles) {
+            assertTrue(
+                "Expected '$title' to be recognized as an illustration chapter",
+                org.mewx.wenku8.v2.data.local.db.entity.ChapterEntity.isIllustrationChapterTitle(title),
+            )
+        }
+
+        val negativeProseTitles = listOf(
+            "第一章 少女的插画日记",
+            "第二章 彩页背后的秘密",
+            "第三章 插图画家的独白",
+            "序章",
+        )
+        for (title in negativeProseTitles) {
+            assertFalse(
+                "Expected prose chapter '$title' NOT to be misclassified as illustration-only",
+                org.mewx.wenku8.v2.data.local.db.entity.ChapterEntity.isIllustrationChapterTitle(title),
+            )
+        }
+
+        // Content-based pure-illustration detection works even when a chapter has an unusual title!
+        val untitledGalleryAst = WenkuChapterParser.parse(
+            rawChapterText = "第一卷 特典\n<!--image-->https://pic.wenku8.com/pictures/1/p1.jpg<!--image-->",
+            aid = 1,
+            vid = 1,
+            cid = 99,
+            volumeTitle = "第一卷",
+            chapterTitle = "特典",
+        )
+        assertTrue(untitledGalleryAst.isPureIllustrationContent)
     }
 
     @Test

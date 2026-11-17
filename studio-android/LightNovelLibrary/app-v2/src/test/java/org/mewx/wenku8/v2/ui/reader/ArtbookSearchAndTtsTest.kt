@@ -256,7 +256,6 @@ class ArtbookSearchAndTtsTest {
                         volumeTitle = "第一卷",
                         cid = 9101,
                         chapterTitle = "插图",
-                        initialParagraphIndex = 1,
                     ),
                     database = database,
                     catalogGateway = fakeGateway,
@@ -272,14 +271,27 @@ class ArtbookSearchAndTtsTest {
             }
         }
 
+        // Pure-illustration chapter automatically enters ArtbookLightboxOverlay directly!
         composeTestRule.waitUntil(timeoutMillis = 5_000L) {
             composeTestRule
-                .onAllNodesWithTag("${ReaderTestTags.INLINE_IMAGE_PREFIX}0")
+                .onAllNodesWithTag(ArtbookTestTags.OVERLAY)
                 .fetchSemanticsNodes()
                 .isNotEmpty()
         }
+        composeTestRule.onNodeWithTag(ArtbookTestTags.OVERLAY).assertIsDisplayed()
+        composeTestRule.onNodeWithTag(ArtbookTestTags.PAGE_INDICATOR).assertTextEquals("1 / 3")
+        composeTestRule.onNodeWithTag(ArtbookTestTags.READER_MODE_CHIP).assertIsDisplayed()
 
-        // Tap inline illustration card -> expands into ArtbookLightboxOverlay!
+        // 1-tap `"小说阅读"` switches back to Novel Reading Mode where Page 1 ALREADY shows
+        // the first illustration alongside the chapter heading (no title-only Page 1!).
+        composeTestRule.onNodeWithTag(ArtbookTestTags.READER_MODE_CHIP).performClick()
+        composeTestRule.waitForIdle()
+        assertEquals(
+            0,
+            composeTestRule.onAllNodesWithTag(ArtbookTestTags.OVERLAY).fetchSemanticsNodes().size,
+        )
+
+        // Tap inline illustration card on Page 1 -> re-opens ArtbookLightboxOverlay!
         composeTestRule
             .onNodeWithTag("${ReaderTestTags.INLINE_IMAGE_PREFIX}0")
             .assertIsDisplayed()
@@ -297,7 +309,7 @@ class ArtbookSearchAndTtsTest {
         composeTestRule.onNodeWithTag(ArtbookTestTags.SPREAD_OFFSET_CHIP).performClick()
         composeTestRule.onNodeWithTag(ArtbookTestTags.PAGE_INDICATOR).assertTextEquals("1 / 3")
 
-        // Rotate 90 degrees and close overlay cleanly
+        // Rotate 90 degrees and close overlay cleanly back to Novel Reading Mode
         composeTestRule.onNodeWithTag(ArtbookTestTags.ROTATE_BUTTON).performClick()
         composeTestRule.onNodeWithTag(ArtbookTestTags.CLOSE_BUTTON).performClick()
 

@@ -49,7 +49,15 @@ class OfflineFirstWenkuImageFetcher(
 
     class Factory(
         private val assetSearchRootsProvider: () -> List<File>,
+        private val cacheRootProvider: () -> File?,
     ) : Fetcher.Factory<Uri> {
+
+        constructor(
+            assetSearchRootsProvider: () -> List<File>,
+        ) : this(
+            assetSearchRootsProvider = assetSearchRootsProvider,
+            cacheRootProvider = { null },
+        )
 
         override fun create(
             data: Uri,
@@ -65,6 +73,7 @@ class OfflineFirstWenkuImageFetcher(
             val resolvedFile = findExistingOfflineImageFile(
                 imageUrl = rawUrl,
                 storageRoots = assetSearchRootsProvider(),
+                cacheRoot = cacheRootProvider(),
             ) ?: return null
 
             return OfflineFirstWenkuImageFetcher(resolvedFile)
@@ -75,12 +84,14 @@ class OfflineFirstWenkuImageFetcher(
         private val WENKU_COVER_URL_REGEX = Regex("/image/\\d+/(\\d+)/\\1s\\.jpg", RegexOption.IGNORE_CASE)
 
         /**
-         * Resolves a Wenku8 image URL against `saves/imgs/` and `imgs/` inside each candidate
-         * storage root (`context.filesDir` first, optional legacy external root second).
+         * Resolves a Wenku8 image URL against permanent `saves/imgs/` and `imgs/` inside each
+         * candidate storage root (`context.filesDir` first, optional legacy external root second),
+         * plus the shared `artbook_images` session cache inside [cacheRoot] when present.
          */
         fun findExistingOfflineImageFile(
             imageUrl: String,
             storageRoots: List<File>,
+            cacheRoot: File? = null,
         ): File? {
             val legacyFileName = WenkuXmlParsers.generateLegacyImageFileName(imageUrl)
             val coverAid = WENKU_COVER_URL_REGEX.find(imageUrl)?.groupValues?.getOrNull(1)
@@ -104,6 +115,17 @@ class OfflineFirstWenkuImageFetcher(
                     }
                 }
             }
+
+            if (cacheRoot != null && legacyFileName.isNotEmpty()) {
+                val artbookCached = File(
+                    File(cacheRoot, WenkuImageRequests.ARTBOOK_CACHE_DIR_NAME),
+                    legacyFileName,
+                )
+                if (artbookCached.isFile && artbookCached.length() > 0L) {
+                    return artbookCached
+                }
+            }
+
             return null
         }
     }

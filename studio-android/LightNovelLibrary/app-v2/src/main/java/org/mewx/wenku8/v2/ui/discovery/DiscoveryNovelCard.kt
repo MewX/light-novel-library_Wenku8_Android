@@ -56,6 +56,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import org.mewx.wenku8.v2.R
+import org.mewx.wenku8.v2.data.media.WenkuImageRequests
 import org.mewx.wenku8.v2.domain.model.DiscoveryFeedErrorKind
 import org.mewx.wenku8.v2.domain.model.DiscoveryNovelCardItem
 import org.mewx.wenku8.v2.domain.model.PaginatedNovelFeedState
@@ -173,7 +174,11 @@ fun DiscoveryNovelCard(
                 )
                 if (item.coverUrl.isNotBlank()) {
                     AsyncImage(
-                        model = item.coverUrl,
+                        model = WenkuImageRequests.rememberCoverImageRequest(
+                            aid = item.aid,
+                            coverUrl = item.coverUrl,
+                            enableCrossfade = false,
+                        ),
                         contentDescription = item.title,
                         contentScale = ContentScale.Crop,
                         modifier = Modifier.fillMaxSize(),

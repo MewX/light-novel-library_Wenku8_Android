@@ -23,6 +23,13 @@ data class ChapterAst(
     val totalCharacters: Int,
 ) {
     /**
+     * `true` when the chapter body contains at least one illustration and zero prose paragraphs
+     * (only an optional leading [ChapterBlock.TitleBlock] plus [ChapterBlock.IllustrationBlock]s).
+     */
+    val isPureIllustrationContent: Boolean
+        get() = illustrationBlocks.isNotEmpty() &&
+            blocks.none { it is ChapterBlock.ParagraphBlock }
+    /**
      * Searches this chapter's title and body paragraphs for [query], returning paragraph-anchored
      * character ranges suitable for in-book search jump & highlight (`P5.3`).
      */
@@ -247,8 +254,7 @@ object WenkuChapterParser {
 
         val normalizedChapterTitle = chapterTitle.trim()
         val isExplicitIllustrationTitle =
-            normalizedChapterTitle == ChapterEntity.ILLUSTRATION_CHAPTER_TITLE_SC ||
-                normalizedChapterTitle == ChapterEntity.ILLUSTRATION_CHAPTER_TITLE_TC
+            ChapterEntity.isIllustrationChapterTitle(normalizedChapterTitle)
         val isDedicatedIllustrationChapter = isExplicitIllustrationTitle ||
             (illustrationBlocks.isNotEmpty() && paragraphCount == 0)
 
