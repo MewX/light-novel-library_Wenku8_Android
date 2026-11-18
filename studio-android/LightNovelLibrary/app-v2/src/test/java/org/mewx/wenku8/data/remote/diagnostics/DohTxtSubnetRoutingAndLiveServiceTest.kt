@@ -493,54 +493,68 @@ class DohTxtSubnetRoutingAndLiveServiceTest {
 
         val sharedClient = OkHttpProbeTransport.defaultSharedBaseOkHttpClient()
 
-        // --- Part 1: Verify real pure-IP HTTPS JSON DoH against both Alidns (223.5.5.5) and DNSPod (1.12.12.12) ---
+        // --- Part 1: Verify real pure-IP HTTPS JSON DoH against domestic resolvers (`223.5.5.5`, `1.12.12.12`, etc.) ---
         val domesticEndpoints = ManifestRepository.defaultDomesticDohEndpoints()
-        for (ep in domesticEndpoints.take(2)) {
+        var verifiedLiveEndpointCount = 0
+        val endpointDiagnostics = mutableListOf<String>()
+        for (ep in domesticEndpoints) {
             val rawBytes = IpLiteralParser.parseNumericIpBytes(ep.resolverIpLiteral!!)!!
             val targetHost = ep.resolverIpLiteral
             val dohClient = sharedClient.newBuilder()
                 .cookieJar(CookieJar.NO_COOKIES)
-                .dns(Dns { listOf(InetAddress.getByAddress(targetHost, rawBytes.clone())) })
-                .connectTimeout(4, TimeUnit.SECONDS)
-                .readTimeout(4, TimeUnit.SECONDS)
+                .dns(PinnedHostIpDns(targetHost, rawBytes))
+                .connectTimeout(5, TimeUnit.SECONDS)
+                .readTimeout(5, TimeUnit.SECONDS)
                 .build()
 
-            // 1a. Live query for `_network_cfg.wenku8.app`
-            val cfgUrl = String.format(ep.resolveUrlTemplate, ManifestRepository.DEFAULT_DOH_TXT_CONFIG_DOMAIN)
-            dohClient.newCall(
-                Request.Builder()
-                    .url(cfgUrl)
-                    .header("Accept", "application/dns-json, application/json")
-                    .build(),
-            ).execute().use { resp ->
-                assertEquals("Live DoH ${ep.id} HTTP status must be 200", 200, resp.code)
-                val body = resp.body.string()
-                val outcome = ManifestRepository.parseDohJsonResponse(
-                    rawDohJson = body,
-                    expectedRelayHostname = relayEndpoint.relayHost,
-                    nowWallEpochMs = System.currentTimeMillis(),
-                    nowMonotonicMs = 1_000L,
-                )
-                assertTrue(
-                    "Live _network_cfg.wenku8.app on ${ep.id} must be either NXDOMAIN/NoConfigRecordPresent (before setup) or ValidManifest (after setup), got: $outcome",
-                    outcome is ManifestRepository.DohTxtParseOutcome.NoConfigRecordPresent ||
+            try {
+                // 1a. Live query for `_network_cfg.wenku8.app`
+                val cfgUrl = String.format(ep.resolveUrlTemplate, ManifestRepository.DEFAULT_DOH_TXT_CONFIG_DOMAIN)
+                val validCfg = dohClient.newCall(
+                    Request.Builder()
+                        .url(cfgUrl)
+                        .header("Accept", "application/dns-json, application/json")
+                        .build(),
+                ).execute().use { resp ->
+                    assertEquals("Live DoH ${ep.id} HTTP status must be 200", 200, resp.code)
+                    val body = resp.body.string()
+                    val outcome = ManifestRepository.parseDohJsonResponse(
+                        rawDohJson = body,
+                        expectedRelayHostname = relayEndpoint.relayHost,
+                        nowWallEpochMs = System.currentTimeMillis(),
+                        nowMonotonicMs = 1_000L,
+                    )
+                    assertTrue(
+                        "Live _network_cfg.wenku8.app on ${ep.id} must parse as ValidManifest, got: $outcome",
                         outcome is ManifestRepository.DohTxtParseOutcome.ValidManifest,
-                )
-            }
+                    )
+                    (outcome as ManifestRepository.DohTxtParseOutcome.ValidManifest).manifest
+                }
 
-            // 1b. Live query for `cloudflare.com` TXT to prove real multi-TXT RFC 1035 unquoting on live DoH wire payloads
-            val cfTxtUrl = String.format(ep.resolveUrlTemplate, "cloudflare.com")
-            dohClient.newCall(
-                Request.Builder()
-                    .url(cfTxtUrl)
-                    .header("Accept", "application/dns-json, application/json")
-                    .build(),
-            ).execute().use { resp ->
-                assertEquals(200, resp.code)
-                val body = resp.body.string()
-                assertTrue("Live DoH TXT answer from ${ep.id} must include Answer array", body.contains("\"Answer\""))
+                // 1b. Live query for `cloudflare.com` TXT to prove real multi-TXT RFC 1035 unquoting on live DoH wire payloads
+                val cfTxtUrl = String.format(ep.resolveUrlTemplate, "cloudflare.com")
+                dohClient.newCall(
+                    Request.Builder()
+                        .url(cfTxtUrl)
+                        .header("Accept", "application/dns-json, application/json")
+                        .build(),
+                ).execute().use { resp ->
+                    assertEquals(200, resp.code)
+                    val body = resp.body.string()
+                    assertTrue("Live DoH TXT answer from ${ep.id} must include Answer array", body.contains("\"Answer\""))
+                }
+
+                verifiedLiveEndpointCount++
+                endpointDiagnostics.add("${ep.id}: OK (rev=${validCfg.revision}, specs=${validCfg.candidateSpecs.size})")
+                if (verifiedLiveEndpointCount >= 2) break
+            } catch (ioe: java.io.IOException) {
+                endpointDiagnostics.add("${ep.id}: transient ${ioe.javaClass.simpleName}(${ioe.message})")
             }
         }
+        assertTrue(
+            "At least one pure-IP domestic DoH endpoint must resolve live _network_cfg.wenku8.app ValidManifest; results=$endpointDiagnostics",
+            verifiedLiveEndpointCount >= 1,
+        )
 
         // --- Part 2: Real ManifestRepository + simulated GFW-blocked Default DNS -> promotes real Cloudflare /24 IP ---
         val ipv4OnlyBundledSpecs = ManifestRepository.defaultVerifiedCloudflareSubnetSpecs()
@@ -563,9 +577,13 @@ class DohTxtSubnetRoutingAndLiveServiceTest {
             expectedRelayHostname = relayEndpoint.relayHost,
             forceRefresh = true,
         )
-        assertNotNull("Live ManifestRepository must resolve either live TXT or bundled Cloudflare subnets", resolvedManifest)
+        assertNotNull("Live ManifestRepository must resolve live _network_cfg.wenku8.app TXT", resolvedManifest)
         assertTrue(resolvedManifest!!.enabled)
         assertTrue(resolvedManifest.candidateSpecs.isNotEmpty())
+        assertTrue(
+            "Expected live DoH TXT revision (not bundled fallback), got revision=${resolvedManifest.revision}",
+            resolvedManifest.revision != "bundled-cf-subnets-v1",
+        )
 
         // Blackhole Default DNS to TEST-NET-1 (`192.0.2.1`) to simulate GFW DNS poisoning/TCP blackhole!
         val gfwBlackholeSystemDns = Dns { hostname ->
