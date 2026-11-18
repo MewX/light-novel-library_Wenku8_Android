@@ -1037,6 +1037,81 @@ class BookshelfScreenAndSyncTest {
     }
 
     @Test
+    fun continueReadingCarousel_singleBookSpansFullRowWidth() = runBlocking {
+        database.novelDao().upsertNovel(
+            NovelEntity(
+                aid = 201,
+                title = "唯一在读轻小说",
+                author = "作者Solo",
+                inBookshelf = true,
+                shelfSortOrder = 1,
+            ),
+        )
+        database.readingProgressDao().upsertProgress(
+            ReadingProgressEntity(
+                aid = 201,
+                vid = 2010,
+                cid = 2011,
+                volumeTitle = "第一卷",
+                chapterTitle = "序章",
+                progressPermille = 420,
+                updatedAtMs = 5_000L,
+            ),
+        )
+
+        val repository = BookshelfRepository(
+            database = database,
+            catalogGateway = FakeBookshelfCatalogGateway(),
+            novelTocSyncRepository = tocSyncRepository,
+            ioDispatcher = kotlinx.coroutines.Dispatchers.Unconfined,
+        )
+
+        composeTestRule.setContent {
+            Wenku8ExpressiveTheme(themeMode = Wenku8ThemeMode.CLASSIC_BLUE) {
+                BookshelfScreen(
+                    bookshelfRepository = repository,
+                    appLanguage = Wenku8API.AppLanguage.SC,
+                    viewMode = BookshelfViewMode.GRID,
+                    onViewModeSelected = {},
+                    sortMode = BookshelfSortMode.RECENT_READ,
+                    onSortModeSelected = {},
+                    onOpenSearch = {},
+                )
+            }
+        }
+        composeTestRule.waitForIdle()
+
+        val carouselBounds = composeTestRule
+            .onNodeWithTag(BookshelfTestTags.CONTINUE_READING_CAROUSEL)
+            .fetchSemanticsNode()
+            .boundsInRoot
+        val cardBounds = composeTestRule
+            .onNodeWithTag(BookshelfTestTags.CONTINUE_READING_ITEM_PREFIX + 201)
+            .fetchSemanticsNode()
+            .boundsInRoot
+        val coverBounds = composeTestRule
+            .onNodeWithTag(
+                BookshelfTestTags.CONTINUE_READING_COVER_PREFIX + 201,
+                useUnmergedTree = true,
+            )
+            .fetchSemanticsNode()
+            .boundsInRoot
+
+        assertTrue(
+            "Single-book Continue Reading card must span 100% of the carousel row width (carousel=$carouselBounds, card=$cardBounds)",
+            kotlin.math.abs(cardBounds.left - carouselBounds.left) <= 1.5f &&
+                kotlin.math.abs(cardBounds.right - carouselBounds.right) <= 1.5f &&
+                kotlin.math.abs(cardBounds.width - carouselBounds.width) <= 1.5f,
+        )
+        assertTrue(
+            "Single-book flush cover must align with card left/top/bottom edges (card=$cardBounds, cover=$coverBounds)",
+            kotlin.math.abs(coverBounds.left - cardBounds.left) <= 1.5f &&
+                kotlin.math.abs(coverBounds.top - cardBounds.top) <= 1.5f &&
+                kotlin.math.abs(coverBounds.bottom - cardBounds.bottom) <= 1.5f,
+        )
+    }
+
+    @Test
     fun cloudBookcaseSync_combinatorialConflictMatrix_handlesDeleteReAddConcurrentAddAndRelogin() = runTest {
         val tempRoot = File(context.cacheDir, "combinatorial_matrix_${System.nanoTime()}").apply { mkdirs() }
         try {

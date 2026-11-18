@@ -1147,7 +1147,6 @@ private fun ContinueReadingCarouselSection(
     onCardClick: (BookshelfItemModel) -> Unit,
     onContinueReadingClick: (BookshelfItemModel) -> Unit,
 ) {
-    val carouselState = rememberCarouselState { items.size }
     val layoutDirection = LocalLayoutDirection.current
     val isEinkMode = LocalEinkMode.current
     val carouselCardShape = MaterialTheme.shapes.medium
@@ -1163,173 +1162,236 @@ private fun ContinueReadingCarouselSection(
             color = MaterialTheme.colorScheme.onSurface,
         )
 
-        HorizontalMultiBrowseCarousel(
-            state = carouselState,
-            preferredItemWidth = 284.dp,
-            itemSpacing = 12.dp,
-            minSmallItemWidth = 56.dp,
-            maxSmallItemWidth = 104.dp,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(146.dp)
-                .testTag(BookshelfTestTags.CONTINUE_READING_CAROUSEL),
-        ) { index ->
-            val item = items[index]
-            val drawInfo = carouselItemDrawInfo
-            val isMostlyExpanded = drawInfo.maxSize <= 0f || drawInfo.size >= drawInfo.maxSize * 0.85f
-
-            Card(
-                onClick = { onCardClick(item) },
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceContainer,
-                ),
-                shape = carouselCardShape,
+        if (items.size == 1) {
+            val singleItem = items.first()
+            Box(
                 modifier = Modifier
-                    .fillMaxSize()
-                    .maskClip(carouselCardShape)
-                    .then(
-                        if (isEinkMode) {
-                            Modifier.maskBorder(
-                                BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
-                                carouselCardShape,
-                            )
-                        } else {
-                            Modifier
-                        },
-                    )
-                    .testTag(BookshelfTestTags.CONTINUE_READING_ITEM_PREFIX + item.aid),
+                    .fillMaxWidth()
+                    .height(146.dp)
+                    .testTag(BookshelfTestTags.CONTINUE_READING_CAROUSEL),
             ) {
-                Row(
+                Card(
+                    onClick = { onCardClick(singleItem) },
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                    ),
+                    shape = carouselCardShape,
+                    border = if (isEinkMode) {
+                        BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
+                    } else {
+                        null
+                    },
                     modifier = Modifier
                         .fillMaxSize()
-                        .graphicsLayer {
-                            // Material3's `HorizontalMultiBrowseCarousel` centers `maskRect` inside
-                            // `[0, itemMainAxisSize]`. Shifting inner content to `maskRect.left`
-                            // makes partially-collapsed cards expand from the left edge so the flush
-                            // book cover is always shown first instead of centered text!
-                            translationX = if (layoutDirection == LayoutDirection.Rtl) {
-                                -(size.width - drawInfo.maskRect.right)
-                            } else {
-                                drawInfo.maskRect.left
-                            }
-                        },
+                        .testTag(BookshelfTestTags.CONTINUE_READING_ITEM_PREFIX + singleItem.aid),
+                ) {
+                    ContinueReadingCardBody(
+                        item = singleItem,
+                        carouselCardShape = carouselCardShape,
+                        isMostlyExpanded = true,
+                        onContinueReadingClick = onContinueReadingClick,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                }
+            }
+        } else {
+            val carouselState = rememberCarouselState { items.size }
+            val itemSpacing = 12.dp
+            BoxWithConstraints(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(146.dp),
+            ) {
+                val evenSplitWidth =
+                    (maxWidth - itemSpacing * (items.size - 1).coerceAtLeast(0)) / items.size.coerceAtLeast(1)
+                val preferredItemWidth = maxOf(284.dp, evenSplitWidth)
+
+                HorizontalMultiBrowseCarousel(
+                    state = carouselState,
+                    preferredItemWidth = preferredItemWidth,
+                    itemSpacing = itemSpacing,
+                    minSmallItemWidth = 56.dp,
+                    maxSmallItemWidth = 104.dp,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .testTag(BookshelfTestTags.CONTINUE_READING_CAROUSEL),
+                ) { index ->
+                    val item = items[index]
+                    val drawInfo = carouselItemDrawInfo
+                    val isMostlyExpanded =
+                        drawInfo.maxSize <= 0f || drawInfo.size >= drawInfo.maxSize * 0.85f
+
+                    Card(
+                        onClick = { onCardClick(item) },
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                        ),
+                        shape = carouselCardShape,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .maskClip(carouselCardShape)
+                            .then(
+                                if (isEinkMode) {
+                                    Modifier.maskBorder(
+                                        BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                                        carouselCardShape,
+                                    )
+                                } else {
+                                    Modifier
+                                },
+                            )
+                            .testTag(BookshelfTestTags.CONTINUE_READING_ITEM_PREFIX + item.aid),
+                    ) {
+                        ContinueReadingCardBody(
+                            item = item,
+                            carouselCardShape = carouselCardShape,
+                            isMostlyExpanded = isMostlyExpanded,
+                            onContinueReadingClick = onContinueReadingClick,
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .graphicsLayer {
+                                    // Material3's `HorizontalMultiBrowseCarousel` centers `maskRect` inside
+                                    // `[0, itemMainAxisSize]`. Shifting inner content to `maskRect.left`
+                                    // makes partially-collapsed cards expand from the left edge so the flush
+                                    // book cover is always shown first instead of centered text!
+                                    translationX = if (layoutDirection == LayoutDirection.Rtl) {
+                                        -(size.width - drawInfo.maskRect.right)
+                                    } else {
+                                        drawInfo.maskRect.left
+                                    }
+                                },
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ContinueReadingCardBody(
+    item: BookshelfItemModel,
+    carouselCardShape: androidx.compose.ui.graphics.Shape,
+    isMostlyExpanded: Boolean,
+    onContinueReadingClick: (BookshelfItemModel) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        // Flush edge-to-edge cover (`贴边显示`): zero top/bottom/left margin so collapsed
+        // cards frame pure cover art and expanded cards present a clean flush spine.
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier
+                .fillMaxHeight()
+                .aspectRatio(0.71f)
+                .wenku8SharedNovelCover(
+                    origin = Wenku8SharedElementKeys.NOVEL_BOOKSHELF_CAROUSEL_ORIGIN,
+                    aid = item.aid,
+                    clipShape = carouselCardShape,
+                    enabled = isMostlyExpanded,
+                )
+                .background(MaterialTheme.colorScheme.surfaceContainerHighest)
+                .testTag(BookshelfTestTags.CONTINUE_READING_COVER_PREFIX + item.aid),
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.AutoStories,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(24.dp),
+            )
+            if (item.coverUrl.isNotBlank()) {
+                AsyncImage(
+                    model = WenkuImageRequests.rememberCoverImageRequest(
+                        aid = item.aid,
+                        coverUrl = item.coverUrl,
+                        enableCrossfade = false,
+                    ),
+                    contentDescription = item.novel.title,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
+        }
+
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxHeight()
+                .padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(
+                    text = item.novel.title,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.wenku8SharedNovelTitle(
+                        origin = Wenku8SharedElementKeys.NOVEL_BOOKSHELF_CAROUSEL_ORIGIN,
+                        aid = item.aid,
+                        enabled = isMostlyExpanded,
+                    ),
+                )
+                val chapterLabel = item.readingProgress?.chapterTitle?.takeIf { it.isNotBlank() }
+                    ?: item.novel.latestSectionName
+                if (chapterLabel.isNotBlank()) {
+                    Text(
+                        text = chapterLabel,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+
+            // Resting reading progress ALWAYS uses flat LinearProgressIndicator
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    // Flush edge-to-edge cover (`贴边显示`): zero top/bottom/left margin so collapsed
-                    // cards frame pure cover art and expanded cards present a clean flush spine.
-                    Box(
-                        contentAlignment = Alignment.Center,
-                        modifier = Modifier
-                            .fillMaxHeight()
-                            .aspectRatio(0.71f)
-                            .wenku8SharedNovelCover(
-                                origin = Wenku8SharedElementKeys.NOVEL_BOOKSHELF_CAROUSEL_ORIGIN,
-                                aid = item.aid,
-                                clipShape = carouselCardShape,
-                                enabled = isMostlyExpanded,
-                            )
-                            .background(MaterialTheme.colorScheme.surfaceContainerHighest)
-                            .testTag(BookshelfTestTags.CONTINUE_READING_COVER_PREFIX + item.aid),
-                    ) {
-                        Icon(
-                            imageVector = Icons.Outlined.AutoStories,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(24.dp),
-                        )
-                        if (item.coverUrl.isNotBlank()) {
-                            AsyncImage(
-                                model = WenkuImageRequests.rememberCoverImageRequest(
-                                    aid = item.aid,
-                                    coverUrl = item.coverUrl,
-                                    enableCrossfade = false,
-                                ),
-                                contentDescription = item.novel.title,
-                                contentScale = ContentScale.Crop,
-                                modifier = Modifier.fillMaxSize(),
-                            )
-                        }
-                    }
-
-                    Column(
+                    LinearProgressIndicator(
+                        progress = { item.readingProgressFraction },
                         modifier = Modifier
                             .weight(1f)
-                            .fillMaxHeight()
-                            .padding(horizontal = 14.dp, vertical = 12.dp),
-                        verticalArrangement = Arrangement.SpaceBetween,
-                    ) {
-                        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                            Text(
-                                text = item.novel.title,
-                                style = MaterialTheme.typography.titleSmall,
-                                fontWeight = FontWeight.SemiBold,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier.wenku8SharedNovelTitle(
-                                    origin = Wenku8SharedElementKeys.NOVEL_BOOKSHELF_CAROUSEL_ORIGIN,
-                                    aid = item.aid,
-                                    enabled = isMostlyExpanded,
-                                ),
-                            )
-                            val chapterLabel = item.readingProgress?.chapterTitle?.takeIf { it.isNotBlank() }
-                                ?: item.novel.latestSectionName
-                            if (chapterLabel.isNotBlank()) {
-                                Text(
-                                    text = chapterLabel,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                )
-                            }
-                        }
+                            .height(6.dp)
+                            .clip(CircleShape),
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = stringResource(
+                            R.string.bookshelf_progress_percent_format,
+                            item.readingProgressPercent,
+                        ),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
 
-                        // Resting reading progress ALWAYS uses flat LinearProgressIndicator
-                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                LinearProgressIndicator(
-                                    progress = { item.readingProgressFraction },
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .height(6.dp)
-                                        .clip(CircleShape),
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(
-                                    text = stringResource(
-                                        R.string.bookshelf_progress_percent_format,
-                                        item.readingProgressPercent,
-                                    ),
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            }
-
-                            FilledTonalButton(
-                                onClick = { onContinueReadingClick(item) },
-                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
-                                modifier = Modifier
-                                    .height(34.dp)
-                                    .testTag(BookshelfTestTags.CONTINUE_READING_BUTTON_PREFIX + item.aid),
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Outlined.PlayArrow,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(16.dp),
-                                )
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text(
-                                    text = stringResource(R.string.bookshelf_continue_reading_action),
-                                    style = MaterialTheme.typography.labelMedium,
-                                    maxLines = 1,
-                                )
-                            }
-                        }
-                    }
+                FilledTonalButton(
+                    onClick = { onContinueReadingClick(item) },
+                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                    modifier = Modifier
+                        .height(34.dp)
+                        .testTag(BookshelfTestTags.CONTINUE_READING_BUTTON_PREFIX + item.aid),
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.PlayArrow,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp),
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = stringResource(R.string.bookshelf_continue_reading_action),
+                        style = MaterialTheme.typography.labelMedium,
+                        maxLines = 1,
+                    )
                 }
             }
         }
