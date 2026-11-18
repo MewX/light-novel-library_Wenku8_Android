@@ -10,8 +10,10 @@ import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.longClick
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -751,9 +753,17 @@ class BookshelfScreenAndSyncTest {
         }
         composeTestRule.waitForIdle()
 
-        // 1. Continue Reading carousel, flat reading progress, and 新章节 badge render cleanly
+        // 1. Continue Reading carousel, flat reading progress + percentage labels, and 新章节 badge render cleanly
         composeTestRule.onNodeWithTag(BookshelfTestTags.CONTINUE_READING_CAROUSEL).assertIsDisplayed()
-        composeTestRule.onNodeWithText("68%").assertIsDisplayed()
+        composeTestRule.onAllNodesWithText("68%")[0].assertIsDisplayed()
+        composeTestRule.onNodeWithTag(
+            BookshelfTestTags.READING_PROGRESS_PERCENT_PREFIX + 5,
+            useUnmergedTree = true,
+        ).assertTextEquals("68%")
+        composeTestRule.onNodeWithTag(
+            BookshelfTestTags.READING_PROGRESS_PERCENT_PREFIX + 2906,
+            useUnmergedTree = true,
+        ).assertTextEquals("0%")
         composeTestRule.onNodeWithTag(BookshelfTestTags.NEW_CHAPTER_BADGE_PREFIX + 5).assertIsDisplayed()
         composeTestRule.onNodeWithTag(BookshelfTestTags.FLAT_READING_PROGRESS_PREFIX + 5).assertExists()
         composeTestRule.onNodeWithTag(BookshelfTestTags.ACTIVE_WAVY_PROGRESS_PREFIX + 5).assertDoesNotExist()
@@ -1556,6 +1566,122 @@ class BookshelfScreenAndSyncTest {
         composeTestRule.onNodeWithTag(BookshelfTestTags.CLOUD_SYNC_BUTTON).assertIsEnabled()
         composeTestRule.onNodeWithTag(BookshelfTestTags.SMART_UPDATE_TRAILING_BUTTON).assertIsEnabled()
         composeTestRule.onNodeWithTag(BookshelfTestTags.BATCH_SMART_UPDATE).assertIsEnabled()
+    }
+
+    @Test
+    fun multiVolumeNovel_finishingVolume1LastChapterShowsWholeBookPercentInsteadOf100(): Unit = runBlocking {
+        database.novelDao().upsertNovel(
+            NovelEntity(
+                aid = 3000,
+                title = "多卷进度验证作品",
+                author = "测试作者",
+                inBookshelf = true,
+                shelfSortOrder = 1,
+            ),
+        )
+        // 3 volumes * 5 chapters = 15 chapters total across the book
+        tocSyncRepository.syncNovelIndexAtomically(
+            aid = 3000,
+            language = Wenku8API.AppLanguage.SC,
+            requestStartedAtMs = 1_000L,
+            parsedVolumes = listOf(
+                ParsedVolumeToc(
+                    vid = 10,
+                    volumeTitle = "第一卷",
+                    chapters = (1..5).map { idx -> ParsedChapterToc(cid = 100 + idx, chapterTitle = "第一卷 第${idx}章") },
+                ),
+                ParsedVolumeToc(
+                    vid = 20,
+                    volumeTitle = "第二卷",
+                    chapters = (1..5).map { idx -> ParsedChapterToc(cid = 200 + idx, chapterTitle = "第二卷 第${idx}章") },
+                ),
+                ParsedVolumeToc(
+                    vid = 30,
+                    volumeTitle = "第三卷",
+                    chapters = (1..5).map { idx -> ParsedChapterToc(cid = 300 + idx, chapterTitle = "第三卷 第${idx}章") },
+                ),
+            ),
+        )
+        // Reader finishes the LAST page of Volume 1's LAST chapter (`cid = 105, progressPermille = 1000`)
+        database.readingProgressDao().upsertProgress(
+            ReadingProgressEntity(
+                aid = 3000,
+                vid = 10,
+                cid = 105,
+                volumeTitle = "第一卷",
+                chapterTitle = "第一卷 第5章",
+                progressPermille = 1000,
+                updatedAtMs = 10_000L,
+            ),
+        )
+
+        val repository = BookshelfRepository(
+            database = database,
+            catalogGateway = FakeBookshelfCatalogGateway(),
+            novelTocSyncRepository = tocSyncRepository,
+            ioDispatcher = kotlinx.coroutines.Dispatchers.Unconfined,
+        )
+
+        val snapAfterVol1 = repository.observeBookshelfSnapshot().first { it.allShelfItems.size == 1 }
+        val itemAfterVol1 = snapAfterVol1.allShelfItems.single()
+        assertEquals(15, itemAfterVol1.totalChapterCount)
+        // (4 + 1.0) / 15 = 333‰ -> 33% (NOT 100%!)
+        assertEquals(333, itemAfterVol1.bookProgressPermille)
+        assertEquals(33, itemAfterVol1.readingProgressPercent)
+
+        composeTestRule.setContent {
+            Wenku8ExpressiveTheme(themeMode = Wenku8ThemeMode.ARCHIVAL_DAY) {
+                BookshelfScreen(
+                    bookshelfRepository = repository,
+                    appLanguage = Wenku8API.AppLanguage.SC,
+                    viewMode = BookshelfViewMode.GRID,
+                    onViewModeSelected = {},
+                    sortMode = BookshelfSortMode.MANUAL_ORDER,
+                    onSortModeSelected = {},
+                )
+            }
+        }
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag(
+            BookshelfTestTags.READING_PROGRESS_PERCENT_PREFIX + 3000,
+            useUnmergedTree = true,
+        ).assertTextEquals("33%")
+
+        // Halfway through the final chapter (`cid = 305, progressPermille = 500`) -> 97% (< 100%!)
+        database.readingProgressDao().upsertProgress(
+            ReadingProgressEntity(
+                aid = 3000,
+                vid = 30,
+                cid = 305,
+                volumeTitle = "第三卷",
+                chapterTitle = "第三卷 第5章",
+                progressPermille = 500,
+                updatedAtMs = 20_000L,
+            ),
+        )
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag(
+            BookshelfTestTags.READING_PROGRESS_PERCENT_PREFIX + 3000,
+            useUnmergedTree = true,
+        ).assertTextEquals("97%")
+
+        // Final page of the final volume's final chapter (`cid = 305, progressPermille = 1000`) -> 100%!
+        database.readingProgressDao().upsertProgress(
+            ReadingProgressEntity(
+                aid = 3000,
+                vid = 30,
+                cid = 305,
+                volumeTitle = "第三卷",
+                chapterTitle = "第三卷 第5章",
+                progressPermille = 1000,
+                updatedAtMs = 30_000L,
+            ),
+        )
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag(
+            BookshelfTestTags.READING_PROGRESS_PERCENT_PREFIX + 3000,
+            useUnmergedTree = true,
+        ).assertTextEquals("100%")
     }
 
     private class FakeAccountSwitchTransport : WenkuTransport {

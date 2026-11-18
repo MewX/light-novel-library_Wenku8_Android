@@ -33,6 +33,7 @@ import java.nio.charset.StandardCharsets
 import java.text.Collator
 import java.util.Locale
 import java.util.concurrent.atomic.AtomicBoolean
+import kotlin.math.roundToInt
 
 enum class BookshelfViewMode {
     GRID,
@@ -66,6 +67,7 @@ data class BookshelfItemModel(
     val totalChapterCount: Int,
     val tags: List<String>,
     val isActivelySyncingOrDownloading: Boolean,
+    val bookProgressPermille: Int = readingProgress?.progressPermille?.coerceIn(0, 1000) ?: 0,
 ) {
     val aid: Int
         get() = novel.aid
@@ -77,10 +79,17 @@ data class BookshelfItemModel(
         get() = cachedChapterCount > 0
 
     val readingProgressFraction: Float
-        get() = ((readingProgress?.progressPermille ?: 0).coerceIn(0, 1000)) / 1000f
+        get() = (bookProgressPermille.coerceIn(0, 1000)) / 1000f
 
     val readingProgressPercent: Int
-        get() = ((readingProgress?.progressPermille ?: 0).coerceIn(0, 1000) + 5) / 10
+        get() {
+            val clamped = bookProgressPermille.coerceIn(0, 1000)
+            return when {
+                clamped <= 0 -> 0
+                clamped >= 1000 -> 100
+                else -> ((clamped + 5) / 10).coerceIn(1, 99)
+            }
+        }
 }
 
 data class BookshelfSnapshot(
@@ -239,6 +248,35 @@ class BookshelfRepository(
                 .filter { it.isNotEmpty() }
                 .distinct()
         }
+
+        /**
+         * Projects intra-chapter reading progress (`0..1000` within [currentCid]) onto whole-book
+         * progress (`0..1000`) across all ordered chapters of all volumes (`[orderedChapterCids]`).
+         *
+         * Example: For a 3-volume novel with 5 chapters per volume (15 chapters total), finishing
+         * the last page of Volume 1's 5th chapter (`chapterIndex = 4, intraChapterPermille = 1000`)
+         * yields `((4 + 1.0) / 15.0 * 1000) = 333‰` (`33%`), reaching `1000‰` (`100%`) strictly at
+         * the end of the final volume's final chapter. Falls back to [intraChapterPermille] when
+         * TOC rows have not been synchronized yet.
+         */
+        fun computeWholeBookProgressPermille(
+            intraChapterPermille: Int,
+            currentCid: Int,
+            orderedChapterCids: List<Int>,
+        ): Int {
+            val clampedIntra = intraChapterPermille.coerceIn(0, 1000)
+            if (orderedChapterCids.isEmpty() || currentCid <= 0) {
+                return clampedIntra
+            }
+            val chapterIndex = orderedChapterCids.indexOf(currentCid)
+            if (chapterIndex < 0) {
+                return clampedIntra
+            }
+            val completedPlusCurrent = chapterIndex.toDouble() + (clampedIntra.toDouble() / 1000.0)
+            return ((completedPlusCurrent / orderedChapterCids.size.toDouble()) * 1000.0)
+                .roundToInt()
+                .coerceIn(0, 1000)
+        }
     }
 
     private val syncMutex = Mutex()
@@ -284,13 +322,17 @@ class BookshelfRepository(
             database.novelDao().observeBookshelfNovels(),
             database.readingProgressDao().observeAllProgress(),
             database.chapterContentDao().observeCachedChapterCountsByNovel(),
-            database.tocDao().observeTotalChapterCountsByNovel(),
-        ) { shelfNovels, progressList, cachedCounts, totalCounts ->
+            database.tocDao().observeOrderedBookshelfChapterIds(),
+        ) { shelfNovels, progressList, cachedCounts, orderedChapterIds ->
+            val orderedCidsByAid = HashMap<Int, MutableList<Int>>()
+            for (row in orderedChapterIds) {
+                orderedCidsByAid.getOrPut(row.aid) { ArrayList() }.add(row.cid)
+            }
             DbShelfBundle(
                 shelfNovels = shelfNovels,
                 progressByAid = progressList.associateBy { it.aid },
                 cachedCountByAid = cachedCounts.associate { it.aid to it.cachedCount },
-                totalCountByAid = totalCounts.associate { it.aid to it.totalCount },
+                orderedCidsByAid = orderedCidsByAid,
             )
         }
 
@@ -301,14 +343,26 @@ class BookshelfRepository(
             _syncingNovelAids,
         ) { bundle, cloudSyncRunning, smartUpdateRunning, activeSyncAids ->
             val items = bundle.shelfNovels.map { novel ->
+                val progress = bundle.progressByAid[novel.aid]
+                val orderedCids = bundle.orderedCidsByAid[novel.aid].orEmpty()
+                val bookPermille = if (progress != null) {
+                    computeWholeBookProgressPermille(
+                        intraChapterPermille = progress.progressPermille,
+                        currentCid = progress.cid,
+                        orderedChapterCids = orderedCids,
+                    )
+                } else {
+                    0
+                }
                 BookshelfItemModel(
                     novel = novel,
                     coverUrl = catalogGateway.resolveCoverUrl(novel.aid),
-                    readingProgress = bundle.progressByAid[novel.aid],
+                    readingProgress = progress,
                     cachedChapterCount = bundle.cachedCountByAid[novel.aid] ?: 0,
-                    totalChapterCount = bundle.totalCountByAid[novel.aid] ?: 0,
+                    totalChapterCount = orderedCids.size,
                     tags = splitTagsCsv(novel.tagsCsv),
                     isActivelySyncingOrDownloading = novel.aid in activeSyncAids,
+                    bookProgressPermille = bookPermille,
                 )
             }
 
@@ -1446,6 +1500,6 @@ class BookshelfRepository(
         val shelfNovels: List<NovelEntity>,
         val progressByAid: Map<Int, ReadingProgressEntity>,
         val cachedCountByAid: Map<Int, Int>,
-        val totalCountByAid: Map<Int, Int>,
+        val orderedCidsByAid: Map<Int, List<Int>>,
     )
 }

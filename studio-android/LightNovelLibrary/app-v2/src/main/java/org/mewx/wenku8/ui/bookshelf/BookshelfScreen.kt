@@ -167,6 +167,7 @@ object BookshelfTestTags {
     const val NEW_CHAPTER_BADGE_PREFIX = "bookshelf_new_badge_"
     const val ACTIVE_WAVY_PROGRESS_PREFIX = "bookshelf_wavy_progress_"
     const val FLAT_READING_PROGRESS_PREFIX = "bookshelf_flat_progress_"
+    const val READING_PROGRESS_PERCENT_PREFIX = "bookshelf_progress_pct_"
     const val MULTI_SELECT_TOOLBAR = "bookshelf_multi_select_toolbar"
     const val BATCH_SELECT_ALL = "bookshelf_batch_select_all"
     const val BATCH_SMART_UPDATE = "bookshelf_batch_smart_update"
@@ -1340,8 +1341,9 @@ private fun ContinueReadingCardBody(
                         enabled = isMostlyExpanded,
                     ),
                 )
-                val chapterLabel = item.readingProgress?.chapterTitle?.takeIf { it.isNotBlank() }
-                    ?: item.novel.latestSectionName
+                val chapterLabel = item.readingProgress?.let { prog ->
+                    "${prog.volumeTitle} · ${prog.chapterTitle}".trim(' ', '·')
+                }?.takeIf { it.isNotBlank() } ?: item.novel.latestSectionName
                 if (chapterLabel.isNotBlank()) {
                     Text(
                         text = chapterLabel,
@@ -1768,10 +1770,11 @@ private fun BookshelfDetailListCard(
                     }
                 }
 
+                val progressLabel = item.readingProgress?.let { prog ->
+                    "${prog.volumeTitle} · ${prog.chapterTitle}".trim(' ', '·')
+                }?.takeIf { it.isNotBlank() }
                 val statusLine = when {
-                    item.readingProgress?.chapterTitle?.isNotBlank() == true -> {
-                        "${item.readingProgress.chapterTitle} (${item.readingProgressPercent}%)"
-                    }
+                    progressLabel != null -> progressLabel
                     item.novel.latestSectionName.isNotBlank() -> item.novel.latestSectionName
                     else -> item.novel.lastUpdate
                 }
@@ -1915,6 +1918,7 @@ private fun BookshelfSpineShelfRow(
                         BookshelfItemProgressIndicator(
                             item = item,
                             isEinkMode = isEinkMode,
+                            showPercentageLabel = false,
                         )
                     }
                 }
@@ -1944,7 +1948,8 @@ private fun BookshelfSpineShelfRow(
 
 /**
  * Enforces the `v2.0` Bookshelf progress indicator rule:
- * - Resting shelf cards ALWAYS use flat [LinearProgressIndicator].
+ * - Resting shelf cards ALWAYS use flat [LinearProgressIndicator], paired with an inline `%` label
+ *   on Grid and Detail List cards.
  * - [LinearWavyProgressIndicator] appears strictly when [BookshelfItemModel.isActivelySyncingOrDownloading]
  *   is `true` AND `!isEinkMode`.
  */
@@ -1953,6 +1958,7 @@ private fun BookshelfSpineShelfRow(
 private fun BookshelfItemProgressIndicator(
     item: BookshelfItemModel,
     isEinkMode: Boolean,
+    showPercentageLabel: Boolean = true,
 ) {
     if (item.isActivelySyncingOrDownloading) {
         if (isEinkMode) {
@@ -1968,6 +1974,31 @@ private fun BookshelfItemProgressIndicator(
                     .fillMaxWidth()
                     .height(8.dp)
                     .testTag(BookshelfTestTags.ACTIVE_WAVY_PROGRESS_PREFIX + item.aid),
+            )
+        }
+    } else if (showPercentageLabel) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            LinearProgressIndicator(
+                progress = { item.readingProgressFraction },
+                modifier = Modifier
+                    .weight(1f)
+                    .height(4.dp)
+                    .clip(CircleShape)
+                    .testTag(BookshelfTestTags.FLAT_READING_PROGRESS_PREFIX + item.aid),
+            )
+            Text(
+                text = stringResource(
+                    R.string.bookshelf_progress_percent_format,
+                    item.readingProgressPercent,
+                ),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                modifier = Modifier.testTag(BookshelfTestTags.READING_PROGRESS_PERCENT_PREFIX + item.aid),
             )
         }
     } else {

@@ -113,6 +113,18 @@ interface TocDao {
     @Query("SELECT aid, COUNT(*) AS total_count FROM chapters GROUP BY aid")
     fun observeTotalChapterCountsByNovel(): Flow<List<NovelTotalChapterCount>>
 
+    @Query(
+        """
+        SELECT c.aid AS aid, c.cid AS cid
+        FROM chapters AS c
+        LEFT JOIN volumes AS v ON c.vid = v.vid
+        INNER JOIN novels AS n ON c.aid = n.aid
+        WHERE n.in_bookshelf = 1
+        ORDER BY c.aid ASC, COALESCE(v.volume_order, c.vid) ASC, c.chapter_order ASC
+        """,
+    )
+    fun observeOrderedBookshelfChapterIds(): Flow<List<OrderedNovelChapterId>>
+
     @Query("DELETE FROM chapters WHERE aid = :aid AND cid IN (:obsoleteCids)")
     suspend fun deleteChaptersByIdsChunk(aid: Int, obsoleteCids: List<Int>)
 
@@ -152,6 +164,11 @@ interface TocDao {
         private const val SQLITE_SAFE_BIND_CHUNK_SIZE = 400
     }
 }
+
+data class OrderedNovelChapterId(
+    @ColumnInfo(name = "aid") val aid: Int,
+    @ColumnInfo(name = "cid") val cid: Int,
+)
 
 data class ChapterNovelMapping(
     @ColumnInfo(name = "cid") val cid: Int,
