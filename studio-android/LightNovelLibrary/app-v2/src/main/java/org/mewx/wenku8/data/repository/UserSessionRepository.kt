@@ -245,6 +245,11 @@ class UserSessionRepository(
         const val CERT_FILE_NAME: String = "cert.wk8"
         const val CANONICAL_UNAME_FILE_NAME: String = "account_uname.wk8"
         const val AVATAR_FILE_NAME: String = "avatar.jpg"
+        private const val MAX_SIGN_JSONP_CHARS: Int = 512
+        private val SIGN_JSONP_RET_REGEX = Regex(
+            pattern = """^(?:[A-Za-z0-9_$]+\s*\(\s*)?\{\s*"ret"\s*:\s*(-?\d+)(?:\s*,.*?)?\}\s*(?:\)\s*;?\s*)?$""",
+            option = RegexOption.DOT_MATCHES_ALL,
+        )
 
         fun isValidCredentialLength(identifier: String, password: String): Boolean {
             val cleanId = identifier.trim()
@@ -254,6 +259,34 @@ class UserSessionRepository(
 
         fun normalizeAccountKey(rawIdentifier: String): String =
             rawIdentifier.trim().lowercase(java.util.Locale.ROOT)
+
+        /**
+         * Parses Wenku8's `action=block&do=sign` payload:
+         * - First daily check-in returns JSONP `_cb({"ret":0});` (documented in `Wenku8API.getUserSignParams`)
+         *   or plain `"0"` / `"1"`.
+         * - Subsequent same-day check-in returns `"9"` (`SYSTEM_9_SIGN_FAILED`) or `{"ret":9}`.
+         * - Lapsed session returns `"4"` (`SYSTEM_4_NOT_LOGGED_IN`) or `{"ret":4}`.
+         * - HTML error pages / captive portals fail safely with `STRING_CONVERSION_ERROR`.
+         */
+        internal fun parseSignResponseBody(
+            rawBody: String,
+            mapServerErrorCode: (Int) -> Wenku8Error.ErrorCode,
+        ): SignServerResponse {
+            val cleaned = rawBody.trimStart('\uFEFF').trim()
+            if (cleaned.isEmpty() || cleaned.length > MAX_SIGN_JSONP_CHARS) {
+                return SignServerResponse.Failure(Wenku8Error.ErrorCode.STRING_CONVERSION_ERROR)
+            }
+            val numericCode = cleaned.toIntOrNull()
+                ?: SIGN_JSONP_RET_REGEX.matchEntire(cleaned)?.groupValues?.getOrNull(1)?.toIntOrNull()
+                ?: return SignServerResponse.Failure(Wenku8Error.ErrorCode.STRING_CONVERSION_ERROR)
+
+            return when (numericCode) {
+                0, 1 -> SignServerResponse.Success
+                4 -> SignServerResponse.NotLoggedIn
+                9 -> SignServerResponse.AlreadySigned
+                else -> SignServerResponse.Failure(mapServerErrorCode(numericCode))
+            }
+        }
     }
 
     private val authMutex = Mutex()
@@ -514,18 +547,18 @@ class UserSessionRepository(
                 return@withLock DailySignOutcome.NotSignedIn
             }
 
-            var signCode = executeSignRequestLocked()
-            if (signCode == Wenku8Error.ErrorCode.SYSTEM_4_NOT_LOGGED_IN && creds != null) {
+            var signResponse = executeSignRequestLocked()
+            if (signResponse is SignServerResponse.NotLoggedIn && creds != null) {
                 val relogin = executeLoginCallLocked(creds.identifier, creds.password)
                 if (relogin == Wenku8Error.ErrorCode.SYSTEM_1_SUCCEEDED) {
-                    signCode = executeSignRequestLocked()
+                    signResponse = executeSignRequestLocked()
                 } else {
                     return@withLock DailySignOutcome.NetworkOrServerError(relogin)
                 }
             }
 
-            when (signCode) {
-                Wenku8Error.ErrorCode.SYSTEM_1_SUCCEEDED -> {
+            when (signResponse) {
+                SignServerResponse.Success -> {
                     val (freshInfo, freshAvatar) = fetchUserInfoAndAvatarLocked(allowSingleRelogin = false)
                     val resolvedUname = freshInfo?.username?.takeIf { it.isNotBlank() }
                         ?: cachedCanonicalUsername
@@ -547,7 +580,7 @@ class UserSessionRepository(
                     DailySignOutcome.SignedAndRefreshed(updatedProfile)
                 }
 
-                Wenku8Error.ErrorCode.SYSTEM_9_SIGN_FAILED -> {
+                SignServerResponse.AlreadySigned -> {
                     if (currentSignedIn != null) {
                         _sessionState.value = currentSignedIn.copy(
                             dailySignStatus = DailySignStatus.ALREADY_SIGNED_OR_REJECTED,
@@ -556,7 +589,11 @@ class UserSessionRepository(
                     DailySignOutcome.AlreadySignedOrRefused
                 }
 
-                else -> DailySignOutcome.NetworkOrServerError(signCode)
+                SignServerResponse.NotLoggedIn -> DailySignOutcome.NetworkOrServerError(
+                    Wenku8Error.ErrorCode.SYSTEM_4_NOT_LOGGED_IN,
+                )
+
+                is SignServerResponse.Failure -> DailySignOutcome.NetworkOrServerError(signResponse.errorCode)
             }
         }
     }
@@ -675,19 +712,18 @@ class UserSessionRepository(
         return authGateway.mapServerErrorCode(numeric)
     }
 
-    private suspend fun executeSignRequestLocked(): Wenku8Error.ErrorCode {
+    private suspend fun executeSignRequestLocked(): SignServerResponse {
         val endpointUrl = authGateway.baseUrlOrEmpty.takeIf { it.isNotEmpty() }
-            ?: return Wenku8Error.ErrorCode.NETWORK_ERROR
+            ?: return SignServerResponse.Failure(Wenku8Error.ErrorCode.NETWORK_ERROR)
         val params = authGateway.userSignParams()
-            ?: return Wenku8Error.ErrorCode.PARAM_COUNT_NOT_MATCHED
+            ?: return SignServerResponse.Failure(Wenku8Error.ErrorCode.PARAM_COUNT_NOT_MATCHED)
         val bytes = transport.postForm(
             endpointUrl = endpointUrl,
             formParams = params,
             isIdempotentReadOnly = false,
-        ) ?: return Wenku8Error.ErrorCode.NETWORK_ERROR
-        val rawBody = String(bytes, StandardCharsets.UTF_8).trim()
-        val numeric = rawBody.toIntOrNull() ?: return Wenku8Error.ErrorCode.STRING_CONVERSION_ERROR
-        return authGateway.mapServerErrorCode(numeric)
+        ) ?: return SignServerResponse.Failure(Wenku8Error.ErrorCode.NETWORK_ERROR)
+        val rawBody = String(bytes, StandardCharsets.UTF_8)
+        return parseSignResponseBody(rawBody, authGateway::mapServerErrorCode)
     }
 
     private suspend fun fetchUserInfoAndAvatarLocked(
@@ -832,5 +868,12 @@ class UserSessionRepository(
             runCatching { File(savesDir, CANONICAL_UNAME_FILE_NAME).delete() }
             runCatching { File(savesDir, AVATAR_FILE_NAME).delete() }
         }
+    }
+
+    internal sealed interface SignServerResponse {
+        data object Success : SignServerResponse
+        data object AlreadySigned : SignServerResponse
+        data object NotLoggedIn : SignServerResponse
+        data class Failure(val errorCode: Wenku8Error.ErrorCode) : SignServerResponse
     }
 }

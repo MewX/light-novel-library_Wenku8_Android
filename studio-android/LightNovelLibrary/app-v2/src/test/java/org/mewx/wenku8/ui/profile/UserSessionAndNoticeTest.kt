@@ -432,6 +432,71 @@ class UserSessionAndNoticeTest {
         composeRule.onNodeWithTag(ProfileAccountTestTags.OPEN_LOGIN_SHEET_BUTTON).assertIsDisplayed()
     }
 
+    @Test
+    fun performDailySignIn_acceptsFirstDailyJsonpRetZeroAndSecondDailyCode9AndRejectsHtmlError() = runTest {
+        val rootDir = tempFolder.newFolder("wenku_daily_sign_jsonp")
+        var currentScore = 50
+        val scriptedSignPayloads = ArrayDeque(
+            listOf(
+                "_cb({\"ret\":0});",
+                "9",
+                "0",
+                "<html><body>502 Bad Gateway</body></html>",
+            ),
+        )
+
+        val transport = FakeAccountTransport(
+            onPost = { params ->
+                when (params.getAsString("op")) {
+                    "login" -> "1".toByteArray(StandardCharsets.UTF_8)
+                    "userinfo" -> """
+                        <metadata>
+                            <item name="uname">sign_tester</item>
+                            <item name="nickname">签到测试</item>
+                            <item name="uid">889</item>
+                            <item name="score">$currentScore</item>
+                            <item name="experience">120</item>
+                            <item name="rank">普通会员</item>
+                        </metadata>
+                    """.trimIndent().toByteArray(StandardCharsets.UTF_8)
+                    "sign" -> {
+                        val payload = scriptedSignPayloads.removeFirst()
+                        if (payload == "_cb({\"ret\":0});" || payload == "0") {
+                            currentScore += 1
+                        }
+                        payload.toByteArray(StandardCharsets.UTF_8)
+                    }
+                    else -> null
+                }
+            },
+        )
+
+        val repo = UserSessionRepository(
+            transport = transport,
+            assetRootsProvider = { listOf(rootDir) },
+            authGateway = FakeAccountAuthGateway(),
+        )
+        assertTrue(repo.loginWithCredentials("sign_tester", "secret123") is LoginOutcome.Success)
+
+        // 1st check-in of the day: Wenku8 returns `_cb({"ret":0});` -> succeeds and refreshes score!
+        val firstOutcome = repo.performDailySignIn()
+        assertTrue(firstOutcome is DailySignOutcome.SignedAndRefreshed)
+        assertEquals(51, (firstOutcome as DailySignOutcome.SignedAndRefreshed).updatedProfile.score)
+
+        // 2nd check-in on the same day: Wenku8 returns `9` -> reports AlreadySignedOrRefused!
+        val secondOutcome = repo.performDailySignIn()
+        assertEquals(DailySignOutcome.AlreadySignedOrRefused, secondOutcome)
+
+        // Next day plain `0` response -> also succeeds!
+        val thirdOutcome = repo.performDailySignIn()
+        assertTrue(thirdOutcome is DailySignOutcome.SignedAndRefreshed)
+        assertEquals(52, (thirdOutcome as DailySignOutcome.SignedAndRefreshed).updatedProfile.score)
+
+        // Upstream HTML error page -> must NOT fake success!
+        val htmlErrorOutcome = repo.performDailySignIn()
+        assertTrue(htmlErrorOutcome is DailySignOutcome.NetworkOrServerError)
+    }
+
     private class FakeAccountTransport(
         private val onPost: (ContentValues) -> ByteArray? = { null },
         private val onGet: (String) -> ByteArray? = { null },
