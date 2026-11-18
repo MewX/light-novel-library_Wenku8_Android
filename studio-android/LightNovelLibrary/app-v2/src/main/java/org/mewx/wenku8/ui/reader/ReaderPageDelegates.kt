@@ -361,15 +361,17 @@ fun resolveReaderVisualPalette(
     customBackgroundPath: String,
     customFontPath: String,
 ): ReaderVisualPalette {
-    val typeface = if (customFontPath.isNotBlank()) {
-        val fontFile = File(customFontPath)
-        if (fontFile.isFile && fontFile.length() > 0L) {
-            runCatching { Typeface.createFromFile(fontFile) }.getOrNull()
-        } else {
-            null
+    val typeface = when {
+        customFontPath == org.mewx.wenku8.data.local.preferences.Wenku8UserPreferences.BUILTIN_SERIF_FONT_TOKEN -> Typeface.SERIF
+        customFontPath.isNotBlank() -> {
+            val fontFile = File(customFontPath)
+            if (fontFile.isFile && fontFile.length() > 0L) {
+                runCatching { Typeface.createFromFile(fontFile) }.getOrNull()
+            } else {
+                null
+            }
         }
-    } else {
-        null
+        else -> null
     }
 
     if (isEinkMode) {
@@ -1390,7 +1392,11 @@ private fun ContinuousScrollReaderDelegate(
         rememberLazyListState(initialFirstVisibleItemIndex = initialItemIndex)
     }
     val customFontFamily = remember(palette.customTypeface) {
-        palette.customTypeface?.let { FontFamily(it) }
+        when {
+            palette.customTypeface === Typeface.SERIF -> FontFamily.Serif
+            palette.customTypeface != null -> FontFamily(palette.customTypeface)
+            else -> FontFamily.SansSerif
+        }
     }
 
     // Execute programmatic jumps from HUD scrubber, In-Book Search, Bookmarks, Undo Pill, Volume Keys, and TTS!

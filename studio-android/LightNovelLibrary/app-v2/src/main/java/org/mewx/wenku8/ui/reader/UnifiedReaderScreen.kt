@@ -1920,7 +1920,8 @@ fun UnifiedReaderScreen(
                     pageEdgeDistanceDp = livePageEdgeDistanceDp,
                     activeDraggingSlider = activeDraggingSlider,
                     selectedPaperPreset = effectivePaperPreset,
-                    hasCustomFont = preferences.readerCustomFontPath.isNotBlank(),
+                    isBuiltinSerifFont = preferences.isBuiltinSerifFont,
+                    hasCustomFont = preferences.hasCustomFontFile,
                     hasCustomDayBackground = preferences.readerCustomBackgroundPath.isNotBlank(),
                     volumeKeyPagingEnabled = preferences.volumeKeyPagingEnabled,
                     keepScreenOnEnabled = preferences.readerKeepScreenOn,
@@ -1954,6 +1955,9 @@ fun UnifiedReaderScreen(
                         )
                     },
                     onSelectPaperPreset = applyPaperPresetAndSyncGlobalTheme,
+                    onSelectBuiltinSerifFont = {
+                        onReaderCustomFontPathChanged(Wenku8UserPreferences.BUILTIN_SERIF_FONT_TOKEN)
+                    },
                     onPickCustomFont = {
                         customFontPicker.launch(arrayOf("font/*", "application/octet-stream", "*/*"))
                     },
@@ -2684,6 +2688,7 @@ private fun ReaderTypographyReflowOverlay(
     pageEdgeDistanceDp: Int,
     activeDraggingSlider: ReaderTypographySliderField?,
     selectedPaperPreset: ReaderPaperPreset,
+    isBuiltinSerifFont: Boolean,
     hasCustomFont: Boolean,
     hasCustomDayBackground: Boolean,
     volumeKeyPagingEnabled: Boolean,
@@ -2693,6 +2698,7 @@ private fun ReaderTypographyReflowOverlay(
     onSliderDragValueChanged: (ReaderTypographySliderField, Int) -> Unit,
     onSliderDragFinished: () -> Unit,
     onSelectPaperPreset: (ReaderPaperPreset) -> Unit,
+    onSelectBuiltinSerifFont: () -> Unit,
     onPickCustomFont: () -> Unit,
     onResetCustomFont: () -> Unit,
     onPickCustomBackground: () -> Unit,
@@ -2822,23 +2828,44 @@ private fun ReaderTypographyReflowOverlay(
             if (!isCapsuleMode) {
                 HorizontalDivider()
 
-                // Custom Font & Custom Day Background buttons
+                // Reader Font Selector (`系统无衬线` / `系统衬线` / `自定义 .ttf/.otf…`)
+                Text(
+                    text = stringResource(R.string.profile_reader_font_title),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
                 ) {
-                    OutlinedButton(
+                    FilterChip(
+                        selected = !isBuiltinSerifFont && !hasCustomFont,
+                        onClick = onResetCustomFont,
+                        label = { Text(stringResource(R.string.profile_reader_font_default)) },
+                    )
+                    FilterChip(
+                        selected = isBuiltinSerifFont,
+                        onClick = onSelectBuiltinSerifFont,
+                        label = { Text(stringResource(R.string.profile_reader_font_serif)) },
+                    )
+                    FilterChip(
+                        selected = hasCustomFont,
                         enabled = canImportCustomAssets,
                         onClick = onPickCustomFont,
-                        modifier = Modifier.weight(1f),
-                    ) {
-                        Text(if (hasCustomFont) "更换字体 (.ttf/.otf)" else "导入自定义字体")
-                    }
-                    if (hasCustomFont) {
-                        TextButton(onClick = onResetCustomFont) {
-                            Text("默认字体")
-                        }
-                    }
+                        label = {
+                            Text(
+                                stringResource(
+                                    if (hasCustomFont) {
+                                        R.string.profile_reader_font_custom_active
+                                    } else {
+                                        R.string.profile_reader_font_pick
+                                    },
+                                ),
+                            )
+                        },
+                    )
                 }
 
                 Row(

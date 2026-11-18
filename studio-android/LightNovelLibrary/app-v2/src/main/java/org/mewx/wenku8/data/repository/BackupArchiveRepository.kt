@@ -670,6 +670,9 @@ class BackupArchiveRepository(
     ): String {
         fun portableCustomToken(rawPath: String, slot: CustomAssetSlot): String {
             if (rawPath.isBlank()) return ""
+            if (slot == CustomAssetSlot.READER_FONT && rawPath == Wenku8UserPreferences.BUILTIN_SERIF_FONT_TOKEN) {
+                return Wenku8UserPreferences.BUILTIN_SERIF_FONT_TOKEN
+            }
             if (primaryRoot != null) {
                 val expected = File(File(primaryRoot, StorageAndCacheRepository.CUSTOM_DIR_NAME), slot.fileName)
                 if (File(rawPath).absolutePath == expected.absolutePath || rawPath.endsWith("/custom/${slot.fileName}")) {
@@ -708,6 +711,9 @@ class BackupArchiveRepository(
     ): Wenku8UserPreferences {
         val obj = JSONObject(rawJson)
         fun resolveCustomToken(token: String, slot: CustomAssetSlot): String {
+            if (slot == CustomAssetSlot.READER_FONT && token == Wenku8UserPreferences.BUILTIN_SERIF_FONT_TOKEN) {
+                return Wenku8UserPreferences.BUILTIN_SERIF_FONT_TOKEN
+            }
             if (token != "custom/${slot.fileName}") return ""
             val candidate = File(File(primaryRoot, StorageAndCacheRepository.CUSTOM_DIR_NAME), slot.fileName)
             return if (candidate.isFile && candidate.length() > 0L) candidate.absolutePath else ""

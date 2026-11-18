@@ -469,6 +469,10 @@ fun ProfileAndStudioScreen(
                     readerAssetErrorText = null
                     onReaderCustomFontPathChanged("")
                 },
+                onSelectBuiltinSerifFont = {
+                    readerAssetErrorText = null
+                    onReaderCustomFontPathChanged(Wenku8UserPreferences.BUILTIN_SERIF_FONT_TOKEN)
+                },
                 onPickCustomFont = {
                     customReaderFontLauncher.launch(arrayOf("*/*"))
                 },
@@ -966,24 +970,24 @@ private fun ReaderDefaultTypographyCard(
     ) -> Unit,
     onResetTypography: () -> Unit,
     onResetCustomFont: () -> Unit,
+    onSelectBuiltinSerifFont: () -> Unit,
     onPickCustomFont: () -> Unit,
     onResetCustomBackground: () -> Unit,
     onPickCustomBackground: () -> Unit,
     onVolumeKeyPagingChanged: (Boolean) -> Unit,
 ) {
     val previewFontFamily = remember(preferences.readerCustomFontPath) {
-        val rawPath = preferences.readerCustomFontPath
-        if (rawPath.isBlank()) {
-            FontFamily.Default
-        } else {
-            runCatching {
+        when (val rawPath = preferences.readerCustomFontPath) {
+            "" -> FontFamily.SansSerif
+            Wenku8UserPreferences.BUILTIN_SERIF_FONT_TOKEN -> FontFamily.Serif
+            else -> runCatching {
                 val file = File(rawPath)
                 if (file.isFile && file.length() > 0L) {
                     FontFamily(Typeface.createFromFile(file))
                 } else {
-                    FontFamily.Default
+                    FontFamily.SansSerif
                 }
-            }.getOrDefault(FontFamily.Default)
+            }.getOrDefault(FontFamily.SansSerif)
         }
     }
     val customBgFile = remember(preferences.readerCustomBackgroundPath) {
@@ -1135,8 +1139,10 @@ private fun ReaderDefaultTypographyCard(
 
             HorizontalDivider()
 
-            // Custom Font Picker (`reader_font_path`)
-            val hasCustomFont = preferences.readerCustomFontPath.isNotBlank()
+            // Reader Font Selector (`""` = Sans-Serif, `"builtin:serif"` = Serif, file path = Custom TTF/OTF)
+            val isSansDefault = preferences.readerCustomFontPath.isBlank()
+            val isBuiltinSerif = preferences.isBuiltinSerifFont
+            val hasCustomFontFile = preferences.hasCustomFontFile
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(
                     text = stringResource(R.string.profile_reader_font_title),
@@ -1148,17 +1154,22 @@ private fun ReaderDefaultTypographyCard(
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     FilterChip(
-                        selected = !hasCustomFont,
+                        selected = isSansDefault,
                         onClick = onResetCustomFont,
                         label = { Text(stringResource(R.string.profile_reader_font_default)) },
                     )
                     FilterChip(
-                        selected = hasCustomFont,
+                        selected = isBuiltinSerif,
+                        onClick = onSelectBuiltinSerifFont,
+                        label = { Text(stringResource(R.string.profile_reader_font_serif)) },
+                    )
+                    FilterChip(
+                        selected = hasCustomFontFile,
                         onClick = onPickCustomFont,
                         label = {
                             Text(
                                 stringResource(
-                                    if (hasCustomFont) {
+                                    if (hasCustomFontFile) {
                                         R.string.profile_reader_font_custom_active
                                     } else {
                                         R.string.profile_reader_font_pick

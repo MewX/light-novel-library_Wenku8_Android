@@ -67,7 +67,15 @@ data class Wenku8UserPreferences(
     val cachedNoticeText: String = "",
     val legacyV1InternalMigrationVersion: Int = 0,
 ) {
+    val isBuiltinSerifFont: Boolean
+        get() = readerCustomFontPath == BUILTIN_SERIF_FONT_TOKEN
+
+    val hasCustomFontFile: Boolean
+        get() = readerCustomFontPath.isNotBlank() && readerCustomFontPath != BUILTIN_SERIF_FONT_TOKEN
+
     companion object {
+        const val BUILTIN_SERIF_FONT_TOKEN = "builtin:serif"
+
         const val MIN_READER_FONT_SIZE_SP = 8
         const val MAX_READER_FONT_SIZE_SP = 36
         const val DEFAULT_READER_FONT_SIZE_SP = 18

@@ -211,9 +211,10 @@
     <string name="profile_reader_para_dist_format">段間距：%1$d dp</string>
     <string name="profile_reader_edge_dist_format">頁邊距：%1$d dp</string>
     <string name="profile_reader_reset_typography">恢復預設字體大小與間距</string>
-    <string name="profile_reader_font_title">閱讀內文自訂字型</string>
-    <string name="profile_reader_font_default">系統預設字型</string>
-    <string name="profile_reader_font_pick">選擇 .ttf/.otf 字型…</string>
+    <string name="profile_reader_font_title">閱讀內文字型</string>
+    <string name="profile_reader_font_default">系統無襯線</string>
+    <string name="profile_reader_font_serif">系統襯線</string>
+    <string name="profile_reader_font_pick">自訂 .ttf/.otf…</string>
     <string name="profile_reader_font_custom_active">已啟用自訂字型</string>
     <string name="profile_reader_font_invalid">所選檔案不是有效的 TTF/OTF 字型檔</string>
     <string name="profile_reader_bg_title">閱讀日間自訂紙張背景</string>

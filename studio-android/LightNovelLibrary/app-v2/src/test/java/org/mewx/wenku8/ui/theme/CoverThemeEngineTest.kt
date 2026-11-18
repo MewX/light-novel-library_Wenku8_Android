@@ -133,4 +133,43 @@ class CoverThemeEngineTest {
 
         assertEquals(Wenku8ThemeMode.CLASSIC_BLUE, Wenku8ThemeMode.entries.first())
     }
+
+    @Test
+    fun uiTypographyUsesUnifiedSansSerifAndReaderSupportsBuiltinSerifToken() {
+        val t = Wenku8TypographyAndShapes.EditorialTypography
+        val allUiStyles = listOf(
+            t.displayLarge,
+            t.displayMedium,
+            t.displaySmall,
+            t.headlineLarge,
+            t.headlineMedium,
+            t.headlineSmall,
+            t.titleLarge,
+            t.titleMedium,
+            t.titleSmall,
+            t.bodyLarge,
+            t.bodyMedium,
+            t.bodySmall,
+            t.labelLarge,
+            t.labelMedium,
+            t.labelSmall,
+        )
+        allUiStyles.forEach { style ->
+            assertEquals(androidx.compose.ui.text.font.FontFamily.SansSerif, style.fontFamily)
+        }
+
+        val defaultPrefs = org.mewx.wenku8.data.local.preferences.Wenku8UserPreferences()
+        assertEquals(false, defaultPrefs.isBuiltinSerifFont)
+        assertEquals(false, defaultPrefs.hasCustomFontFile)
+
+        val serifPrefs = defaultPrefs.copy(
+            readerCustomFontPath = org.mewx.wenku8.data.local.preferences.Wenku8UserPreferences.BUILTIN_SERIF_FONT_TOKEN,
+        )
+        assertEquals(true, serifPrefs.isBuiltinSerifFont)
+        assertEquals(false, serifPrefs.hasCustomFontFile)
+
+        val customFilePrefs = defaultPrefs.copy(readerCustomFontPath = "/data/user/0/custom/reader_font")
+        assertEquals(false, customFilePrefs.isBuiltinSerifFont)
+        assertEquals(true, customFilePrefs.hasCustomFontFile)
+    }
 }
