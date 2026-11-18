@@ -557,10 +557,95 @@ class SharedTransitionNavigationTest {
         composeRule.waitForIdle()
         composeRule.onNodeWithTag(DiscoveryTestTags.PERSISTENT_SEARCH_PILL).assertIsDisplayed()
     }
+
+    @Test
+    fun bookshelfLocalQuery_triggersImmediateOnlineSearchOnClickAndClearsOnTabReselect(): Unit = runBlocking {
+        database.novelDao().upsertNovels(
+            listOf(
+                NovelEntity(
+                    aid = 2906,
+                    title = "败犬女主太多了！",
+                    author = "雨森焚火",
+                    inBookshelf = true,
+                    shelfSortOrder = 1,
+                ),
+                NovelEntity(
+                    aid = 1500,
+                    title = "刀剑神域 Progressive",
+                    author = "川原砾",
+                    inBookshelf = true,
+                    shelfSortOrder = 2,
+                ),
+            ),
+        )
+
+        val fakeGateway = FakeMotionCatalogGateway()
+        val tocSyncRepository = NovelTocSyncRepository(database)
+        val discoveryRepository = DiscoveryRepository(database = database, apiClient = fakeGateway)
+        val bookshelfRepository = BookshelfRepository(
+            database = database,
+            catalogGateway = fakeGateway,
+            novelTocSyncRepository = tocSyncRepository,
+            userSessionRepository = null,
+            ioDispatcher = Dispatchers.Unconfined,
+        )
+
+        composeRule.setContent {
+            Wenku8ExpressiveTheme(themeMode = Wenku8ThemeMode.ARCHIVAL_DAY) {
+                AdaptiveMainScaffold(
+                    preferredHomeDestination = DefaultHomeDestination.BOOKSHELF,
+                    isNetworkAvailableOnColdStart = true,
+                    currentThemeMode = Wenku8ThemeMode.ARCHIVAL_DAY,
+                    onThemeModeSelected = {},
+                    onDefaultHomeSelected = {},
+                    database = database,
+                    catalogGateway = fakeGateway,
+                    novelTocSyncRepository = tocSyncRepository,
+                    discoveryRepository = discoveryRepository,
+                    bookshelfRepository = bookshelfRepository,
+                )
+            }
+        }
+        composeRule.waitForIdle()
+
+        // 1. Both shelf books are initially visible
+        composeRule.onNodeWithTag("${BookshelfTestTags.BOOK_CARD_PREFIX}2906").assertIsDisplayed()
+        composeRule.onNodeWithTag("${BookshelfTestTags.BOOK_CARD_PREFIX}1500").assertIsDisplayed()
+
+        // 2. Type keyword into Bookshelf local search -> filters out non-matching book
+        composeRule.onNodeWithTag(BookshelfTestTags.LOCAL_SEARCH_INPUT).performTextInput("刀剑")
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("${BookshelfTestTags.BOOK_CARD_PREFIX}1500").assertIsDisplayed()
+        composeRule.onNodeWithTag("${BookshelfTestTags.BOOK_CARD_PREFIX}2906").assertDoesNotExist()
+        assertEquals(emptyList<String>(), fakeGateway.recordedSearchQueries)
+
+        // 3. Tap `搜全站` -> carries keyword into UnifiedSearchScreen AND immediately triggers online search
+        composeRule.onNodeWithTag(BookshelfTestTags.ONLINE_SEARCH_TRIGGER).performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag(UnifiedSearchTestTags.SCREEN_ROOT).assertIsDisplayed()
+        composeRule.onNodeWithTag(UnifiedSearchTestTags.QUERY_INPUT).assertTextContains("刀剑")
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            fakeGateway.recordedSearchQueries.contains("刀剑")
+        }
+        assertEquals(listOf("刀剑"), fakeGateway.recordedSearchQueries)
+        composeRule.onNodeWithTag("${DiscoveryTestTags.NOVEL_CARD_PREFIX}1143").assertIsDisplayed()
+
+        // 4. Return to Bookshelf -> local search is still active, then reselecting Bookshelf tab clears it
+        //    so the full bookshelf is displayed again!
+        composeRule.onNodeWithTag(UnifiedSearchTestTags.BACK_BUTTON).performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("${BookshelfTestTags.BOOK_CARD_PREFIX}2906").assertDoesNotExist()
+
+        composeRule.onNodeWithTag("${MainScaffoldTestTags.NAV_ITEM_PREFIX}bookshelf").performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("${BookshelfTestTags.BOOK_CARD_PREFIX}2906").assertIsDisplayed()
+        composeRule.onNodeWithTag("${BookshelfTestTags.BOOK_CARD_PREFIX}1500").assertIsDisplayed()
+    }
 }
 
 private class FakeMotionCatalogGateway : WenkuCatalogGateway {
     override val isApiConfigured: Boolean = true
+    val recordedSearchQueries = mutableListOf<String>()
 
     private val sampleItem = ParsedNovelListItem(
         aid = 1143,
@@ -600,7 +685,10 @@ private class FakeMotionCatalogGateway : WenkuCatalogGateway {
         query: String,
         searchField: OnlineSearchField,
         appLanguage: Wenku8API.AppLanguage,
-    ): WenkuApiResult<List<Int>> = WenkuApiResult.Success(listOf(sampleItem.aid))
+    ): WenkuApiResult<List<Int>> {
+        recordedSearchQueries.add(query)
+        return WenkuApiResult.Success(listOf(sampleItem.aid))
+    }
 
     override suspend fun fetchNovelShortInfo(
         aid: Int,

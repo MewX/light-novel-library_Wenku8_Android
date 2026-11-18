@@ -701,6 +701,11 @@ fun AdaptiveMainScaffold(
                                                     selected = isSelected,
                                                     onClick = {
                                                         if (destination == selectedDestination) {
+                                                            if (destination == TopLevelDestination.BOOKSHELF &&
+                                                                bookshelfLocalQuery.isNotEmpty()
+                                                            ) {
+                                                                bookshelfLocalQuery = ""
+                                                            }
                                                             homeTabReselectCounter++
                                                         } else {
                                                             selectedDestination = destination
@@ -781,6 +786,7 @@ fun AdaptiveMainScaffold(
                                                 appLanguage = appLanguage,
                                                 onOpenSearch = handleOpenSearch,
                                                 onOpenSearchWithOrigin = handleOpenSearchWithOrigin,
+                                                onOpenSearchWithSeed = handleOpenSearchWithSeed,
                                                 onOpenLoginSheet = { isLoginBottomSheetOpen = true },
                                                 onOpenReadingFootprint = { tab -> activeFootprintTab = tab },
                                                 onNovelClicked = handleNovelClicked,
@@ -816,6 +822,11 @@ fun AdaptiveMainScaffold(
                                                 selected = isSelected,
                                                 onClick = {
                                                     if (destination == selectedDestination) {
+                                                        if (destination == TopLevelDestination.BOOKSHELF &&
+                                                            bookshelfLocalQuery.isNotEmpty()
+                                                        ) {
+                                                            bookshelfLocalQuery = ""
+                                                        }
                                                         homeTabReselectCounter++
                                                     } else {
                                                         selectedDestination = destination
@@ -901,6 +912,7 @@ fun AdaptiveMainScaffold(
                                                     appLanguage = appLanguage,
                                                     onOpenSearch = handleOpenSearch,
                                                     onOpenSearchWithOrigin = handleOpenSearchWithOrigin,
+                                                    onOpenSearchWithSeed = handleOpenSearchWithSeed,
                                                     onOpenLoginSheet = { isLoginBottomSheetOpen = true },
                                                     onOpenReadingFootprint = { tab -> activeFootprintTab = tab },
                                                     onNovelClicked = handleNovelClicked,
@@ -1204,6 +1216,7 @@ private fun MainDestinationBody(
     appLanguage: Wenku8API.AppLanguage,
     onOpenSearch: () -> Unit,
     onOpenSearchWithOrigin: (String) -> Unit,
+    onOpenSearchWithSeed: (String, UnifiedSearchMode) -> Unit,
     onOpenLoginSheet: () -> Unit,
     onOpenReadingFootprint: (ReadingFootprintTab) -> Unit,
     onNovelClicked: (DiscoveryNovelCardItem) -> Unit,
@@ -1224,6 +1237,14 @@ private fun MainDestinationBody(
             onDismissOfflineBanner = onDismissOfflineBanner,
             onOpenSearch = {
                 onOpenSearchWithOrigin(Wenku8SharedElementKeys.SEARCH_BAR_BOOKSHELF_ORIGIN)
+            },
+            onOpenOnlineSearch = { rawQuery ->
+                val trimmed = rawQuery.trim()
+                if (trimmed.isNotEmpty()) {
+                    onOpenSearchWithSeed(trimmed, UnifiedSearchMode.NOVEL_TITLE)
+                } else {
+                    onOpenSearchWithOrigin(Wenku8SharedElementKeys.SEARCH_BAR_BOOKSHELF_ORIGIN)
+                }
             },
             onOpenLoginSheet = onOpenLoginSheet,
             onNovelClicked = onNovelClicked,

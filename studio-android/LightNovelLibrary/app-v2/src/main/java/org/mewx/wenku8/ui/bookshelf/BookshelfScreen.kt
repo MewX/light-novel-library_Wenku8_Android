@@ -211,6 +211,7 @@ fun BookshelfScreen(
     showOfflineFallbackBanner: Boolean = false,
     onDismissOfflineBanner: () -> Unit = {},
     onOpenSearch: () -> Unit = {},
+    onOpenOnlineSearch: (String) -> Unit = { onOpenSearch() },
     onOpenLoginSheet: () -> Unit = {},
     onNovelClicked: (DiscoveryNovelCardItem) -> Unit = {},
     onNovelClickedWithOrigin: ((DiscoveryNovelCardItem, String) -> Unit)? = null,
@@ -253,6 +254,9 @@ fun BookshelfScreen(
     LaunchedEffect(reselectScrollToTopTrigger) {
         if (reselectScrollToTopTrigger != handledReselectTrigger) {
             handledReselectTrigger = reselectScrollToTopTrigger
+            if (localQuery.isNotEmpty()) {
+                updateLocalQuery("")
+            }
             if (isEinkMode || listState.firstVisibleItemIndex > 12) {
                 listState.scrollToItem(0)
             } else {
@@ -498,7 +502,7 @@ fun BookshelfScreen(
                 BookshelfSearchBarRow(
                     localQuery = localQuery,
                     onLocalQueryChange = ::updateLocalQuery,
-                    onOpenOnlineSearch = onOpenSearch,
+                    onOpenOnlineSearch = { onOpenOnlineSearch(localQuery) },
                 )
             }
 
@@ -564,7 +568,7 @@ fun BookshelfScreen(
                     EmptyBookshelfCard(
                         isSyncOrUpdateRunning = isShelfTaskRunning,
                         onCloudSyncClick = { launchCloudSync(forceRefreshAll = false) },
-                        onOpenOnlineSearch = onOpenSearch,
+                        onOpenOnlineSearch = { onOpenOnlineSearch(localQuery) },
                     )
                 }
             } else if (displayedItems.isEmpty()) {
