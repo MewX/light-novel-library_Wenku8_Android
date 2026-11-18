@@ -6,7 +6,7 @@
 #   without shipping easily-blocked static IP lists or relying on GitHub Raw (blocked in CN).
 #
 # How It Works End-to-End:
-#   1. Daily at 04:23 UTC (or on manual dispatch), `scripts/update_network_cfg_txt.py` fetches
+#   1. Daily at 04:23 UTC (or on manual dispatch), `.github/scripts/update_network_cfg_txt.py` fetches
 #      Cloudflare's official IPv4/IPv6 supernets (`cloudflare.com/ips-v4` & `ips-v6`), samples
 #      diverse `/24` slices across 8 Web-Edge Anycast supernets (~4M+ IPs), and live-probes both
 #      `wenku8-relay.mewx.org` and `wenku8-android.mewx.org` via `POST /__diagnostics/latency`.
@@ -61,7 +61,7 @@ on:
       - "v2.0"
     paths:
       - ".github/workflows/update-network-cfg.yml"
-      - "studio-android/LightNovelLibrary/scripts/update_network_cfg_txt.py"
+      - ".github/scripts/update_network_cfg_txt.py"
 
 permissions:
   contents: read
@@ -81,7 +81,7 @@ jobs:
         uses: actions/checkout@v6
 
       - name: Run offline schema, chunking & negative safety self-tests
-        run: python3 studio-android/LightNovelLibrary/scripts/update_network_cfg_txt.py --self-test
+        run: python3 .github/scripts/update_network_cfg_txt.py --self-test
 
       - name: Curate live Cloudflare subnets, validate & update DNS TXT
         env:
@@ -100,7 +100,7 @@ jobs:
           else
             FLAGS+=("--apply")
           fi
-          python3 studio-android/LightNovelLibrary/scripts/update_network_cfg_txt.py "${FLAGS[@]}"
+          python3 .github/scripts/update_network_cfg_txt.py "${FLAGS[@]}"
 
       - name: Verify live public DoH resolution & wk8-txt-v1 payload integrity
         if: ${{ inputs.dry_run != true }}
@@ -115,4 +115,4 @@ jobs:
           if [ "${INPUT_KILL_SWITCH:-false}" = "true" ]; then
             VERIFY_FLAGS+=("--kill-switch")
           fi
-          python3 studio-android/LightNovelLibrary/scripts/update_network_cfg_txt.py "${VERIFY_FLAGS[@]}"
+          python3 .github/scripts/update_network_cfg_txt.py "${VERIFY_FLAGS[@]}"

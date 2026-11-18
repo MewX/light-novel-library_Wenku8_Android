@@ -43,13 +43,13 @@ ARCHITECTURE & END-TO-END ANTI-BLOCKING DESIGN
 
 3. Operational Modes:
    - Dry-run (probes live relay & runs full validator without touching Cloudflare DNS):
-     `python3 scripts/update_network_cfg_txt.py --dry-run`
+     `python3 .github/scripts/update_network_cfg_txt.py --dry-run`
    - Scheduled / CI apply (requires `CF_API_TOKEN` and `WENKU8_APP_ZONE_ID`):
-     `CF_API_TOKEN="..." WENKU8_APP_ZONE_ID="..." python3 scripts/update_network_cfg_txt.py --apply`
+     `CF_API_TOKEN="..." WENKU8_APP_ZONE_ID="..." python3 .github/scripts/update_network_cfg_txt.py --apply`
    - Emergency remote kill-switch (`en=0`, immediately reverts all `:app-v2` clients to System DNS):
-     `CF_API_TOKEN="..." WENKU8_APP_ZONE_ID="..." python3 scripts/update_network_cfg_txt.py --kill-switch --apply`
+     `CF_API_TOKEN="..." WENKU8_APP_ZONE_ID="..." python3 .github/scripts/update_network_cfg_txt.py --kill-switch --apply`
    - Offline unit & negative-validation self-test:
-     `python3 scripts/update_network_cfg_txt.py --self-test`
+     `python3 .github/scripts/update_network_cfg_txt.py --self-test`
 """
 
 from __future__ import annotations

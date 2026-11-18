@@ -295,7 +295,7 @@ class RoutingLocalStore(
  *    bootstrap path requires **zero OS DNS lookups** and works inside mainland China even when
  *    system UDP/53 DNS is poisoned or `raw.githubusercontent.com` is blocked.
  *    The authoritative `TXT` record is rotated daily by `.github/workflows/update-network-cfg.yml`
- *    (`scripts/update_network_cfg_txt.py`) after live-verifying subnets against Wenku8 Relay.
+ *    (`.github/scripts/update_network_cfg_txt.py`) after live-verifying subnets against Wenku8 Relay.
  * 2. **Tier 2 — Optional HTTPS JSON Manifest Origins**:
  *    Supports `wenku8-ip-candidates-v1` JSON manifests if `configurationOrigins` are configured.
  * 3. **Tier 3 — Persisted Local Cache ([RoutingLocalStore])**:
