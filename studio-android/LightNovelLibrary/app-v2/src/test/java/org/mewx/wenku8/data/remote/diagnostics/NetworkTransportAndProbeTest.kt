@@ -1,12 +1,15 @@
 package org.mewx.wenku8.data.remote.diagnostics
 
 import android.content.ContentValues
+import android.os.Looper
 import kotlinx.coroutines.runBlocking
 import mockwebserver3.MockResponse
 import mockwebserver3.MockWebServer
 import mockwebserver3.SocketEffect
+import okhttp3.Call
 import okhttp3.ConnectionPool
 import okhttp3.Dns
+import okhttp3.Request
 import okio.Buffer
 import org.json.JSONObject
 import org.junit.Assert.assertArrayEquals
@@ -15,6 +18,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNotSame
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -495,6 +499,189 @@ class NetworkTransportAndProbeTest {
                 assertEquals("cf-http-500", activePinned?.candidateId)
             }
         }
+    }
+
+    @Test
+    fun legacyRelayWorker500FallsBackToColdGetAndReusesConnectionOnSubsequentSamples() = runBlocking {
+        MockWebServer().use { server ->
+            server.start(InetAddress.getByName("127.0.0.1"), 0)
+
+            val endpoint = (
+                DiagnosticsEndpointConfig.parseAndValidate(
+                    rawBaseUrl = "http://wenku8-relay.mewx.org:${server.port}/",
+                    allowCleartextForLocalTests = true,
+                ) as DiagnosticsEndpointResolution.Available
+                ).endpoint
+
+            val fakeDns = Dns { host ->
+                if (host == "wenku8-relay.mewx.org") {
+                    listOf(
+                        InetAddress.getByAddress(
+                            host,
+                            IpLiteralParser.parseNumericIpBytes("127.0.0.1", requirePublicUnicast = false)!!,
+                        ),
+                    )
+                } else {
+                    throw UnknownHostException(host)
+                }
+            }
+
+            // Sample #01 preliminary POST /__diagnostics/latency -> Cloudflare Worker 500 ("Something went wrong....")
+            server.enqueue(
+                MockResponse.Builder()
+                    .code(500)
+                    .addHeader("cf-ray", "a5c236683ef3e7e8-SYD")
+                    .addHeader("cf-placement", "remote-TPE")
+                    .body("Something went wrong....")
+                    .build(),
+            )
+            // Sample #01 automatic cold GET / -> 302 redirect on placed Worker
+            server.enqueue(
+                MockResponse.Builder()
+                    .code(302)
+                    .addHeader("Location", "https://buymeacoffee.com/mewx")
+                    .addHeader("cf-ray", "a5c2473da8ad62aa-SYD")
+                    .addHeader("cf-placement", "remote-TPE")
+                    .build(),
+            )
+            // Sample #02 cached legacy GET / -> 302 on warm reused socket
+            server.enqueue(
+                MockResponse.Builder()
+                    .code(302)
+                    .addHeader("Location", "https://buymeacoffee.com/mewx")
+                    .addHeader("cf-ray", "a5c2479999999999-SYD")
+                    .addHeader("cf-placement", "remote-TPE")
+                    .build(),
+            )
+
+            val nowMono = AtomicLong(50_000L)
+            val sharedPool = ConnectionPool(5, 60, TimeUnit.SECONDS)
+            val probeTransport = OkHttpProbeTransport(
+                systemDns = fakeDns,
+                monotonicClockMillis = { nowMono.addAndGet(12L) },
+            )
+            val arm = ProbeArmConfig(
+                armId = "legacy-arm",
+                dnsPolicy = ProbeDnsPolicy.SystemDefault,
+                connectionPool = sharedPool,
+            )
+
+            val first = probeTransport.executeProbe(
+                endpoint = endpoint,
+                armConfig = arm,
+                sampleIndex = 1,
+                explicitNonce = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            )
+            assertTrue("Legacy relay Worker must succeed via GET / fallback", first.succeeded)
+            assertEquals(302, first.httpStatusCode)
+            assertFalse("Sample #01 must measure a genuine cold socket after evicting preliminary POST", first.connectionReused)
+            assertEquals(1, first.connectAttemptCount)
+            assertEquals(OkHttpProbeTransport.LEGACY_RELAY_PROBE_SCHEMA_V1, first.serverPayload?.schema)
+            assertEquals("SYD", first.serverPayload?.ingressColo)
+            assertEquals("placed-relay:remote-TPE", first.serverPayload?.endpointRole)
+
+            val reqPost = server.takeRequest()
+            assertEquals("POST", reqPost.method)
+            assertEquals("/__diagnostics/latency", reqPost.target)
+
+            val reqGet1 = server.takeRequest()
+            assertEquals("GET", reqGet1.method)
+            assertEquals("/", reqGet1.target)
+            assertNull(reqGet1.headers["Cookie"])
+
+            val second = probeTransport.executeProbe(
+                endpoint = endpoint,
+                armConfig = arm,
+                sampleIndex = 2,
+                explicitNonce = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            )
+            assertTrue(second.succeeded)
+            assertTrue("Sample #02 must reuse the warm keep-alive connection", second.connectionReused)
+            assertEquals(0, second.connectAttemptCount)
+            assertEquals("SYD", second.serverPayload?.ingressColo)
+
+            val reqGet2 = server.takeRequest()
+            assertEquals("GET", reqGet2.method)
+            assertEquals("/", reqGet2.target)
+            assertEquals("No second POST should be sent while legacy cache TTL is active", 3, server.requestCount)
+        }
+
+        // Verify a generic non-Cloudflare HTTP 500 without relay markers does NOT fallback to GET /
+        MockWebServer().use { plain500Server ->
+            plain500Server.start(InetAddress.getByName("127.0.0.1"), 0)
+            val plainEndpoint = (
+                DiagnosticsEndpointConfig.parseAndValidate(
+                    rawBaseUrl = "http://wenku8-android.mewx.org:${plain500Server.port}/",
+                    allowCleartextForLocalTests = true,
+                ) as DiagnosticsEndpointResolution.Available
+                ).endpoint
+            val fakeDns2 = Dns { host ->
+                listOf(
+                    InetAddress.getByAddress(
+                        host,
+                        IpLiteralParser.parseNumericIpBytes("127.0.0.1", requirePublicUnicast = false)!!,
+                    ),
+                )
+            }
+            plain500Server.enqueue(
+                MockResponse.Builder()
+                    .code(500)
+                    .body("plain origin internal error")
+                    .build(),
+            )
+            val probeTransport2 = OkHttpProbeTransport(systemDns = fakeDns2)
+            val failed = probeTransport2.executeProbe(
+                endpoint = plainEndpoint,
+                armConfig = ProbeArmConfig(),
+                sampleIndex = 1,
+            )
+            assertFalse(failed.succeeded)
+            assertEquals(500, failed.httpStatusCode)
+            assertEquals(ProbeErrorCategory.HTTP_STATUS_ERROR, failed.errorCategory)
+            assertEquals(1, plain500Server.requestCount)
+        }
+    }
+
+    @Test
+    fun mainThreadSafeCancelAndPoolEvictionOffloadWorkOffAndroidMainLooper() {
+        // Robolectric unit tests execute on Android's Main Looper by default.
+        assertSame(Looper.getMainLooper(), Looper.myLooper())
+
+        var dispatchedCancelCount = 0
+        var cancelRanInlineOnCaller = false
+        val recordingExecutor = java.util.concurrent.Executor { runnable ->
+            dispatchedCancelCount += 1
+            val worker = Thread {
+                // Must execute off the Android Main Looper!
+                assertNotSame(Looper.getMainLooper(), Looper.myLooper())
+                runnable.run()
+            }
+            worker.start()
+            worker.join(2_000L)
+        }
+
+        val dummyClient = OkHttpProbeTransport.defaultSharedBaseOkHttpClient()
+        val dummyCall: Call = dummyClient.newCall(
+            Request.Builder().url("https://wenku8-relay.mewx.org/").build(),
+        )
+        OkHttpProbeTransport.cancelCallSafely(dummyCall, recordingExecutor)
+        assertEquals(1, dispatchedCancelCount)
+        assertTrue(dummyCall.isCanceled())
+        assertFalse(cancelRanInlineOnCaller)
+
+        var dispatchedEvictCount = 0
+        val evictExecutor = java.util.concurrent.Executor { runnable ->
+            dispatchedEvictCount += 1
+            val worker = Thread {
+                assertNotSame(Looper.getMainLooper(), Looper.myLooper())
+                runnable.run()
+            }
+            worker.start()
+            worker.join(2_000L)
+        }
+        val pool = ConnectionPool(5, 60, TimeUnit.SECONDS)
+        OkHttpProbeTransport.evictPoolSafely(pool, evictExecutor)
+        assertEquals(1, dispatchedEvictCount)
     }
 
     private fun gzipUtf8(text: String): ByteArray {

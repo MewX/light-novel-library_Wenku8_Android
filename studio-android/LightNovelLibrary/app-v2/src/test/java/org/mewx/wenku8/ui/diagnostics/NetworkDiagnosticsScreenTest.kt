@@ -374,6 +374,103 @@ class NetworkDiagnosticsScreenTest {
             .assertTextEquals("此版本不支持实际接口检测")
     }
 
+    @Test
+    fun nonEinkWavyProgressIndicatorHandlesIncrementalProgressFramesAndCompletionCleanly() {
+        val gateAtSample3 = CompletableDeferred<Unit>()
+        val gateAtSample8 = CompletableDeferred<Unit>()
+        val steppedTransport = fakeProbeTransport { sampleIndex, nonce ->
+            when (sampleIndex) {
+                3 -> gateAtSample3.await()
+                8 -> gateAtSample8.await()
+            }
+            if (sampleIndex == 9) {
+                buildSample(
+                    sampleIndex = sampleIndex,
+                    succeeded = false,
+                    reused = false,
+                    elapsedMs = 140L,
+                    errorCategory = ProbeErrorCategory.HTTP_STATUS_ERROR,
+                    nonce = nonce ?: "step-$sampleIndex",
+                ).copy(httpStatusCode = 502)
+            } else {
+                buildSample(
+                    sampleIndex = sampleIndex,
+                    succeeded = true,
+                    reused = sampleIndex > 1,
+                    elapsedMs = 135L,
+                    errorCategory = null,
+                    nonce = nonce ?: "step-$sampleIndex",
+                )
+            }
+        }
+
+        val viewModel = createViewModel(
+            resolution = availableResolution,
+            probeTransport = steppedTransport,
+            isApiSupported = true,
+        )
+
+        composeTestRule.setContent {
+            Wenku8ExpressiveTheme(einkModeOverride = false) {
+                NetworkDiagnosticsScreen(
+                    viewModel = viewModel,
+                    autoOptimizeEnabled = true,
+                    onAutoOptimizeChanged = {},
+                    onNavigateBack = {},
+                )
+            }
+        }
+
+        composeTestRule.onNodeWithTag(NetworkDiagnosticsTestTags.START_QUICK_CHECK_BUTTON)
+            .performClick()
+        composeTestRule.waitUntil(timeoutMillis = 5_000L) {
+            composeTestRule
+                .onAllNodes(androidx.compose.ui.test.hasTestTag(NetworkDiagnosticsTestTags.WAVY_PROGRESS_INDICATOR))
+                .fetchSemanticsNodes()
+                .isNotEmpty()
+        }
+        composeTestRule.onNodeWithTag(NetworkDiagnosticsTestTags.WAVY_PROGRESS_INDICATOR)
+            .assertIsDisplayed()
+
+        // Step from 2/10 -> 7/10 while wavy indicator animates across frames
+        gateAtSample3.complete(Unit)
+        composeTestRule.mainClock.advanceTimeBy(120L)
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag(NetworkDiagnosticsTestTags.WAVY_PROGRESS_INDICATOR)
+            .assertIsDisplayed()
+
+        // Release final gate -> complete 10th probe -> transition Running -> Finished cleanly
+        gateAtSample8.complete(Unit)
+        composeTestRule.waitUntil(timeoutMillis = 5_000L) {
+            composeTestRule
+                .onAllNodes(androidx.compose.ui.test.hasTestTag(NetworkDiagnosticsTestTags.METRIC_SUCCESS_VALUE))
+                .fetchSemanticsNodes()
+                .isNotEmpty()
+        }
+        composeTestRule.onNodeWithTag(NetworkDiagnosticsTestTags.METRIC_SUCCESS_VALUE)
+            .assertTextEquals("9 / 10 次")
+
+        // Verify HTTP status code formatting on failed sample #09 and localized Read-Only API button
+        composeTestRule.onNodeWithTag(NetworkDiagnosticsTestTags.CONTENT_LIST)
+            .performScrollToKey("sample_details_header")
+        composeTestRule.onNodeWithTag(NetworkDiagnosticsTestTags.DETAILS_TOGGLE_ROW)
+            .performClick()
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag(NetworkDiagnosticsTestTags.CONTENT_LIST)
+            .performScrollToKey("sample_9_default")
+        composeTestRule.onNodeWithText("— · http_status (HTTP 502 · 140 ms)")
+            .assertIsDisplayed()
+
+        composeTestRule.onNodeWithTag(NetworkDiagnosticsTestTags.CONTENT_LIST)
+            .performScrollToKey("advanced_comparison_lab")
+        composeTestRule.onNodeWithTag(NetworkDiagnosticsTestTags.LAB_TOGGLE_ROW)
+            .performClick()
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag(NetworkDiagnosticsTestTags.LAB_READ_ONLY_API_BUTTON)
+            .performScrollTo()
+            .assertTextEquals("实际接口连通性检测（只读）")
+    }
+
     private fun fakeProbeTransport(
         handler: suspend (sampleIndex: Int, explicitNonce: String?) -> ProbeSampleResult,
     ): DiagnosticsProbeTransport = object : DiagnosticsProbeTransport {

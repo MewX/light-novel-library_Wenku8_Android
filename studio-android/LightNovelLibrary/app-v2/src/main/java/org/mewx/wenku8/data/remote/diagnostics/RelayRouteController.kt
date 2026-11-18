@@ -429,7 +429,7 @@ class RelayRouteController(
                         index = idx + 2,
                     ) ?: break
 
-                    if (sample.succeeded) {
+                    if (sample.isAuthenticatedCandidateProbeSuccess()) {
                         reachableChallengers.add(ScreenedChallenger(candidate, sample))
                     }
                 }
@@ -471,7 +471,7 @@ class RelayRouteController(
                             ),
                             index = 10 + stepIdx,
                         ) ?: run {
-                            cPool.evictAll()
+                            OkHttpProbeTransport.evictPoolSafely(cPool)
                             refreshUiState()
                             return@withLock false
                         }
@@ -487,7 +487,7 @@ class RelayRouteController(
                             ),
                             index = 10 + stepIdx,
                         ) ?: run {
-                            lastChallengerConfirmationPool?.evictAll()
+                            lastChallengerConfirmationPool?.let { OkHttpProbeTransport.evictPoolSafely(it) }
                             refreshUiState()
                             return@withLock false
                         }
@@ -496,8 +496,10 @@ class RelayRouteController(
                 }
 
                 // --- Stage 3: Win Threshold Evaluation ---
-                if (challengerConfirmSamples.size != 3 || challengerConfirmSamples.any { !it.succeeded }) {
-                    lastChallengerConfirmationPool?.evictAll()
+                if (challengerConfirmSamples.size != 3 ||
+                    challengerConfirmSamples.any { !it.isAuthenticatedCandidateProbeSuccess() }
+                ) {
+                    lastChallengerConfirmationPool?.let { OkHttpProbeTransport.evictPoolSafely(it) }
                     refreshUiState()
                     return@withLock false
                 }
@@ -524,7 +526,7 @@ class RelayRouteController(
                     val beatsByTwentyPercent = challengerMedianMs * 5L <= ctrlMed * 4L
                     val beatsByThirtyMillis = absoluteImprovementMs >= MIN_IMPROVEMENT_ABSOLUTE_MS
                     if (!beatsByTwentyPercent || !beatsByThirtyMillis) {
-                        lastChallengerConfirmationPool?.evictAll()
+                        lastChallengerConfirmationPool?.let { OkHttpProbeTransport.evictPoolSafely(it) }
                         refreshUiState()
                         return@withLock false
                     }
@@ -549,11 +551,11 @@ class RelayRouteController(
                     index = 20,
                 )
                 if (warmGuardSample == null ||
-                    !warmGuardSample.succeeded ||
+                    !warmGuardSample.isAuthenticatedCandidateProbeSuccess() ||
                     !warmGuardSample.connectionReused ||
                     warmGuardSample.fullResponseElapsedMs > challengerMedianMs
                 ) {
-                    warmGuardPool.evictAll()
+                    OkHttpProbeTransport.evictPoolSafely(warmGuardPool)
                     refreshUiState()
                     return@withLock false
                 }
@@ -563,7 +565,7 @@ class RelayRouteController(
                 val publishNowWall = wallClockEpochMillis()
                 val remainingManifestMs = manifest.remainingAuthorizationMillis(publishNowWall, publishNowMono)
                 if (remainingManifestMs <= 0L) {
-                    warmGuardPool.evictAll()
+                    OkHttpProbeTransport.evictPoolSafely(warmGuardPool)
                     refreshUiState()
                     return@withLock false
                 }
@@ -602,7 +604,7 @@ class RelayRouteController(
                 }
                 true
             } finally {
-                temporaryPools.forEach { it.evictAll() }
+                temporaryPools.forEach { OkHttpProbeTransport.evictPoolSafely(it) }
             }
         }
 
@@ -663,7 +665,7 @@ class RelayRouteController(
                 )
             }
 
-            if (sample.succeeded && sample.observedProxyType == Proxy.Type.DIRECT) {
+            if (sample.isAuthenticatedCandidateProbeSuccess() && sample.observedProxyType == Proxy.Type.DIRECT) {
                 val provisionalMono = monotonicClockMillis()
                 val maxAuthMs = manifest.remainingAuthorizationMillis(wallClockEpochMillis(), provisionalMono)
                 val leaseMs = minOf(PROVISIONAL_RECOVERY_LEASE_MS, maxAuthMs)
@@ -691,9 +693,13 @@ class RelayRouteController(
                     return@withLock true
                 }
             }
-            pool.evictAll()
+            OkHttpProbeTransport.evictPoolSafely(pool)
         }
         false
+    }
+
+    private fun ProbeSampleResult.isAuthenticatedCandidateProbeSuccess(): Boolean {
+        return succeeded && serverPayload?.schema == OkHttpProbeTransport.PROBE_SCHEMA_V1
     }
 
     private fun selectBalancedCandidatesForScreening(

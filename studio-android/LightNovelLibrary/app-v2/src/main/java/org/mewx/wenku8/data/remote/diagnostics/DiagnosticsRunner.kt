@@ -2,9 +2,13 @@ package org.mewx.wenku8.data.remote.diagnostics
 
 import android.os.SystemClock
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import okhttp3.ConnectionPool
 import okhttp3.Protocol
@@ -70,6 +74,7 @@ class DiagnosticsRunner(
     private val stalledDnsGuard: StalledDnsGuard = StalledDnsGuard(),
     private val monotonicClockMillis: () -> Long = { SystemClock.elapsedRealtime() },
     private val wallClockEpochMillis: () -> Long = { System.currentTimeMillis() },
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
     companion object {
         const val DEFAULT_QUICK_CHECK_ATTEMPTS: Int = 10
@@ -93,13 +98,13 @@ class DiagnosticsRunner(
         overallDeadlineMillis: Long = DEFAULT_QUICK_CHECK_DEADLINE_MS,
         stopReasonOnCancellation: () -> DiagnosticsStopReason = { DiagnosticsStopReason.USER_CANCELLED },
         onProgress: (DiagnosticsLiveProgress) -> Unit = {},
-    ): DiagnosticsReport {
+    ): DiagnosticsReport = withContext(ioDispatcher) {
         val safePlanned = plannedAttempts.coerceIn(1, MAX_COMPARISON_ATTEMPTS)
         val (utcStart, tzOffset) = DiagnosticsReport.currentUtcAndOffset(wallClockEpochMillis())
         val baselineNetwork = networkObserver.currentSnapshot()
 
         if (!baselineNetwork.isConnected) {
-            return DiagnosticsReport(
+            return@withContext DiagnosticsReport(
                 utcStartedAtIso = utcStart,
                 localTimezoneOffset = tzOffset,
                 stopReason = DiagnosticsStopReason.OFFLINE,
@@ -137,7 +142,7 @@ class DiagnosticsRunner(
         }
 
         val armsSequence = List(safePlanned) { armConfig }
-        return try {
+        try {
             executePlannedSequence(
                 profileName = "quick_check_v1",
                 utcStart = utcStart,
@@ -153,7 +158,9 @@ class DiagnosticsRunner(
                 onProgress = onProgress,
             )
         } finally {
-            sharedPool.evictAll()
+            withContext(NonCancellable) {
+                OkHttpProbeTransport.evictPoolSafely(sharedPool)
+            }
         }
     }
 
@@ -167,11 +174,11 @@ class DiagnosticsRunner(
         overallDeadlineMillis: Long = MAX_COMPARISON_DEADLINE_MS,
         stopReasonOnCancellation: () -> DiagnosticsStopReason = { DiagnosticsStopReason.USER_CANCELLED },
         onProgress: (DiagnosticsLiveProgress) -> Unit = {},
-    ): DiagnosticsReport {
+    ): DiagnosticsReport = withContext(ioDispatcher) {
         val (utcStart, tzOffset) = DiagnosticsReport.currentUtcAndOffset(wallClockEpochMillis())
         val baselineNetwork = networkObserver.currentSnapshot()
         if (!baselineNetwork.isConnected) {
-            return DiagnosticsReport(
+            return@withContext DiagnosticsReport(
                 utcStartedAtIso = utcStart,
                 localTimezoneOffset = tzOffset,
                 stopReason = DiagnosticsStopReason.OFFLINE,
@@ -262,7 +269,7 @@ class DiagnosticsRunner(
             }
         }
 
-        return try {
+        try {
             executePlannedSequence(
                 profileName = axis.profileName,
                 utcStart = utcStart,
@@ -278,7 +285,9 @@ class DiagnosticsRunner(
                 onProgress = onProgress,
             )
         } finally {
-            poolsToCleanup.forEach { it.evictAll() }
+            withContext(NonCancellable) {
+                poolsToCleanup.forEach { OkHttpProbeTransport.evictPoolSafely(it) }
+            }
         }
     }
 

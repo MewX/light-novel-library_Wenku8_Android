@@ -1,5 +1,6 @@
 package org.mewx.wenku8.data.remote.diagnostics
 
+import android.os.Looper
 import android.os.SystemClock
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
@@ -13,7 +14,6 @@ import okhttp3.CookieJar
 import okhttp3.Dns
 import okhttp3.EventListener
 import okhttp3.Handshake
-import okhttp3.HttpUrl
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Protocol
@@ -34,6 +34,9 @@ import java.net.UnknownHostException
 import java.nio.charset.StandardCharsets
 import java.security.SecureRandom
 import java.util.Collections
+import java.util.Locale
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.Executor
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
@@ -84,7 +87,9 @@ data class ProbeArmConfig(
 )
 
 /**
- * Parsed server payload from `POST /__diagnostics/latency` (`wenku8-network-probe-v1`).
+ * Parsed server payload from `POST /__diagnostics/latency` (`wenku8-network-probe-v1`) or
+ * header-derived telemetry when probing a legacy relay Worker prior to `/__diagnostics/latency`
+ * deployment (`wenku8-legacy-relay-probe-v1`).
  */
 data class ParsedServerProbePayload(
     val schema: String,
@@ -137,7 +142,9 @@ interface DiagnosticsProbeTransport {
 }
 
 /**
- * Session-free, bounded OkHttp 5 diagnostic adapter (`POST /__diagnostics/latency`).
+ * Session-free, bounded OkHttp 5 diagnostic adapter (`POST /__diagnostics/latency`, with seamless
+ * fallback to `GET /` on legacy placed relay Workers that have not yet deployed
+ * `/__diagnostics/latency`).
  *
  * Guarantees per `network-connectivity-and-routing-design.md`:
  * - Uses `CookieJar.NO_COOKIES`, `Accept-Encoding: identity`, `Cache-Control: no-store`,
@@ -158,10 +165,13 @@ class OkHttpProbeTransport(
 
     companion object {
         const val PROBE_SCHEMA_V1: String = "wenku8-network-probe-v1"
+        const val LEGACY_RELAY_PROBE_SCHEMA_V1: String = "wenku8-legacy-relay-probe-v1"
+        const val LEGACY_FALLBACK_TTL_MILLIS: Long = 10L * 60L * 1_000L
         const val MAX_REQUEST_BODY_BYTES: Int = 256
         const val MAX_RESPONSE_BODY_BYTES: Int = 2_048
         private val JSON_MEDIA_TYPE = "application/json; charset=utf-8".toMediaType()
         private val NONCE_HEX_REGEX = Regex("^[0-9a-f]{32}$")
+        private val CF_RAY_COLO_REGEX = Regex("^[A-Z]{3}$")
         private val secureRandom = SecureRandom()
 
         fun defaultSharedBaseOkHttpClient(): OkHttpClient {
@@ -170,6 +180,69 @@ class OkHttpProbeTransport(
                 .readTimeout(5_000L, TimeUnit.MILLISECONDS)
                 .writeTimeout(5_000L, TimeUnit.MILLISECONDS)
                 .build()
+        }
+
+        /**
+         * Safely cancels an OkHttp [Call] without ever closing a TLS/TCP socket on Android's Main
+         * Thread (`RealCall.cancel()` -> `Socket.closeQuietly()` throws `NetworkOnMainThreadException`
+         * when invoked synchronously from a `viewModelScope` cancellation handler on Main).
+         */
+        fun cancelCallSafely(call: Call, fallbackExecutor: Executor) {
+            if (isOnAndroidMainThread()) {
+                try {
+                    fallbackExecutor.execute {
+                        runCatching { call.cancel() }
+                    }
+                } catch (_: Throwable) {
+                    Thread { runCatching { call.cancel() } }.start()
+                }
+            } else {
+                runCatching { call.cancel() }
+            }
+        }
+
+        /**
+         * Safely evicts idle sockets from [pool] off Android's Main Thread (`RealConnectionPool.evictAll()`
+         * closes idle `ConscryptEngineSocket`s synchronously, which writes TLS `close_notify` and
+         * throws `NetworkOnMainThreadException` if invoked on Main).
+         */
+        fun evictPoolSafely(pool: ConnectionPool, fallbackExecutor: Executor? = null) {
+            if (isOnAndroidMainThread()) {
+                if (fallbackExecutor != null) {
+                    try {
+                        fallbackExecutor.execute {
+                            runCatching { pool.evictAll() }
+                        }
+                        return
+                    } catch (_: Throwable) {
+                        // Fall through to dedicated short-lived thread
+                    }
+                }
+                Thread { runCatching { pool.evictAll() } }.start()
+            } else {
+                runCatching { pool.evictAll() }
+            }
+        }
+
+        private fun isOnAndroidMainThread(): Boolean {
+            return try {
+                val mainLooper = Looper.getMainLooper()
+                mainLooper != null && Looper.myLooper() === mainLooper
+            } catch (_: Throwable) {
+                false
+            }
+        }
+
+        /**
+         * Extracts the 3-letter IATA ingress colo code from a Cloudflare `cf-ray` header
+         * (e.g. `"a5c2473da8ad62aa-SYD"` -> `"SYD"`).
+         */
+        internal fun parseCfRayIngressColo(cfRayHeader: String?): String? {
+            val trimmed = cfRayHeader?.trim().orEmpty()
+            val dashIndex = trimmed.lastIndexOf('-')
+            if (dashIndex <= 0 || dashIndex >= trimmed.lastIndex) return null
+            val coloCandidate = trimmed.substring(dashIndex + 1).uppercase(Locale.ROOT)
+            return coloCandidate.takeIf { CF_RAY_COLO_REGEX.matches(it) }
         }
 
         fun generateProbeNonceHex(): String {
@@ -273,6 +346,8 @@ class OkHttpProbeTransport(
         }
     }
 
+    private val legacyRelayFallbackUntilMonoByHost = ConcurrentHashMap<String, Long>()
+
     override suspend fun executeProbe(
         endpoint: ValidatedRelayEndpoint,
         armConfig: ProbeArmConfig,
@@ -280,6 +355,19 @@ class OkHttpProbeTransport(
         explicitNonce: String?,
     ): ProbeSampleResult = withContext(ioDispatcher) {
         val nonce = explicitNonce ?: generateProbeNonceHex()
+        val hostKey = endpoint.relayHost.trim().lowercase(Locale.ROOT)
+        val fallbackUntil = legacyRelayFallbackUntilMonoByHost[hostKey]
+        val useCachedLegacyFallback = fallbackUntil != null && monotonicClockMillis() < fallbackUntil
+
+        if (useCachedLegacyFallback) {
+            return@withContext executeLegacyRelayGetProbe(
+                endpoint = endpoint,
+                armConfig = armConfig,
+                sampleIndex = sampleIndex,
+                nonce = nonce,
+            )
+        }
+
         val requestJson = JSONObject()
             .put("schema", PROBE_SCHEMA_V1)
             .put("nonce", nonce)
@@ -292,22 +380,7 @@ class OkHttpProbeTransport(
         val recorder = ProbeEventRecorder(monotonicClockMillis)
         val dnsAdapter = buildDnsForPolicy(armConfig.dnsPolicy)
         val candidateId = (armConfig.dnsPolicy as? ProbeDnsPolicy.PinnedCandidate)?.candidateId
-
-        val probeClient = baseOkHttpClient.newBuilder()
-            .cookieJar(CookieJar.NO_COOKIES)
-            .connectionPool(armConfig.connectionPool)
-            .dns(dnsAdapter)
-            .fastFallback(armConfig.fastFallback)
-            .protocols(armConfig.protocols)
-            .followRedirects(false)
-            .followSslRedirects(false)
-            .retryOnConnectionFailure(false)
-            .connectTimeout(armConfig.connectTimeoutMillis, TimeUnit.MILLISECONDS)
-            .readTimeout(armConfig.readTimeoutMillis, TimeUnit.MILLISECONDS)
-            .writeTimeout(armConfig.readTimeoutMillis, TimeUnit.MILLISECONDS)
-            .callTimeout(armConfig.callTimeoutMillis, TimeUnit.MILLISECONDS)
-            .eventListener(recorder)
-            .build()
+        val probeClient = buildArmOkHttpClient(armConfig, dnsAdapter, recorder)
 
         val request = Request.Builder()
             .url(endpoint.latencyProbeUrl)
@@ -319,7 +392,8 @@ class OkHttpProbeTransport(
         val startedAtMs = monotonicClockMillis()
         val call = probeClient.newCall(request)
 
-        try {
+        var shouldFallbackToLegacyGet = false
+        val primaryResult: ProbeSampleResult? = try {
             val response = awaitOkHttpCall(call)
             response.use { httpResponse ->
                 val statusCode = httpResponse.code
@@ -329,7 +403,7 @@ class OkHttpProbeTransport(
                 val protocolLabel = recorder.negotiatedProtocol ?: httpResponse.protocol.toString()
 
                 if (statusCode == 429) {
-                    return@withContext recorder.toResult(
+                    return@use recorder.toResult(
                         sampleIndex = sampleIndex,
                         armId = armConfig.armId,
                         candidateId = candidateId,
@@ -346,7 +420,12 @@ class OkHttpProbeTransport(
                 }
 
                 if (statusCode != 200) {
-                    return@withContext recorder.toResult(
+                    val rawText = String(boundedRead.bytes, StandardCharsets.UTF_8)
+                    if (isLegacyRelayUnsupportedLatencyRoute(statusCode, httpResponse, rawText)) {
+                        shouldFallbackToLegacyGet = true
+                        return@use null
+                    }
+                    return@use recorder.toResult(
                         sampleIndex = sampleIndex,
                         armId = armConfig.armId,
                         candidateId = candidateId,
@@ -363,7 +442,7 @@ class OkHttpProbeTransport(
                 }
 
                 if (boundedRead.exceededCap) {
-                    return@withContext recorder.toResult(
+                    return@use recorder.toResult(
                         sampleIndex = sampleIndex,
                         armId = armConfig.armId,
                         candidateId = candidateId,
@@ -386,7 +465,7 @@ class OkHttpProbeTransport(
                 )
 
                 if (validatedPayload == null) {
-                    return@withContext recorder.toResult(
+                    return@use recorder.toResult(
                         sampleIndex = sampleIndex,
                         armId = armConfig.armId,
                         candidateId = candidateId,
@@ -402,7 +481,7 @@ class OkHttpProbeTransport(
                     )
                 }
 
-                return@withContext recorder.toResult(
+                recorder.toResult(
                     sampleIndex = sampleIndex,
                     armId = armConfig.armId,
                     candidateId = candidateId,
@@ -418,12 +497,12 @@ class OkHttpProbeTransport(
                 )
             }
         } catch (cancelled: kotlinx.coroutines.CancellationException) {
-            call.cancel()
+            cancelCallSafely(call, baseOkHttpClient.dispatcher.executorService)
             throw cancelled
         } catch (ioError: IOException) {
             val fullElapsedMs = (monotonicClockMillis() - startedAtMs).coerceAtLeast(0L)
             val category = classifyProbeIoException(ioError, call.isCanceled(), recorder)
-            return@withContext recorder.toResult(
+            recorder.toResult(
                 sampleIndex = sampleIndex,
                 armId = armConfig.armId,
                 candidateId = candidateId,
@@ -438,6 +517,200 @@ class OkHttpProbeTransport(
                 serverPayload = null,
             )
         }
+
+        if (shouldFallbackToLegacyGet) {
+            legacyRelayFallbackUntilMonoByHost[hostKey] =
+                monotonicClockMillis() + LEGACY_FALLBACK_TTL_MILLIS
+            // Evict the preliminary POST socket so Sample #01 measures a genuine cold handshake,
+            // while Samples #02..#N reuse the warm GET connection on armConfig.connectionPool.
+            evictPoolSafely(armConfig.connectionPool, baseOkHttpClient.dispatcher.executorService)
+            return@withContext executeLegacyRelayGetProbe(
+                endpoint = endpoint,
+                armConfig = armConfig,
+                sampleIndex = sampleIndex,
+                nonce = nonce,
+            )
+        }
+
+        primaryResult!!
+    }
+
+    /**
+     * Detects when `POST /__diagnostics/latency` hits a legacy `wenku8-relay` Cloudflare Worker
+     * that has not yet deployed `/__diagnostics/latency` (which returns `404`, `405`, or the
+     * Worker's form-parser `500` `"Something went wrong...."` with `cf-ray` / `cf-placement`).
+     * Never matches `429` rate-limiting or `503` `diagnostics_disabled`.
+     */
+    private fun isLegacyRelayUnsupportedLatencyRoute(
+        statusCode: Int,
+        response: Response,
+        bodyPreview: String,
+    ): Boolean {
+        val hasCloudflareRelayHeaders =
+            !response.header("cf-ray").isNullOrBlank() ||
+                !response.header("cf-placement").isNullOrBlank()
+        if (statusCode == 404 || statusCode == 405) {
+            return true
+        }
+        if (statusCode == 500 &&
+            (hasCloudflareRelayHeaders || bodyPreview.contains("Something went wrong", ignoreCase = true))
+        ) {
+            return true
+        }
+        return false
+    }
+
+    /**
+     * Session-free `GET <origin>/` (`followRedirects = false`) against a legacy `wenku8-relay`
+     * Cloudflare Worker: invokes the placed Worker (`cf-placement: remote-TPE`, `HTTP 302`) with
+     * zero cookies and zero upstream Wenku8 PHP traffic while preserving cold vs warm reuse
+     * telemetry and `cf-ray` ingress colo extraction.
+     */
+    private suspend fun executeLegacyRelayGetProbe(
+        endpoint: ValidatedRelayEndpoint,
+        armConfig: ProbeArmConfig,
+        sampleIndex: Int,
+        nonce: String,
+    ): ProbeSampleResult {
+        val recorder = ProbeEventRecorder(monotonicClockMillis)
+        val dnsAdapter = buildDnsForPolicy(armConfig.dnsPolicy)
+        val candidateId = (armConfig.dnsPolicy as? ProbeDnsPolicy.PinnedCandidate)?.candidateId
+        val probeClient = buildArmOkHttpClient(armConfig, dnsAdapter, recorder)
+
+        val request = Request.Builder()
+            .url("${endpoint.canonicalOrigin}/")
+            .header("Accept-Encoding", "identity")
+            .header("Cache-Control", "no-store")
+            .get()
+            .build()
+
+        val startedAtMs = monotonicClockMillis()
+        val call = probeClient.newCall(request)
+
+        return try {
+            val response = awaitOkHttpCall(call)
+            response.use { httpResponse ->
+                val statusCode = httpResponse.code
+                val retryAfterSeconds = httpResponse.header("Retry-After")?.trim()?.toLongOrNull()
+                val boundedRead = readBoundedBody(httpResponse, MAX_RESPONSE_BODY_BYTES)
+                val fullElapsedMs = (monotonicClockMillis() - startedAtMs).coerceAtLeast(0L)
+                val protocolLabel = recorder.negotiatedProtocol ?: httpResponse.protocol.toString()
+
+                if (statusCode == 429) {
+                    return@use recorder.toResult(
+                        sampleIndex = sampleIndex,
+                        armId = armConfig.armId,
+                        candidateId = candidateId,
+                        succeeded = false,
+                        httpStatusCode = statusCode,
+                        retryAfterSeconds = retryAfterSeconds,
+                        errorCategory = ProbeErrorCategory.HTTP_RATE_LIMITED,
+                        fullElapsedMs = fullElapsedMs,
+                        negotiatedProtocol = protocolLabel,
+                        responseBodyBytesRead = boundedRead.bytes.size,
+                        bodyComplete = !boundedRead.exceededCap,
+                        serverPayload = null,
+                    )
+                }
+
+                val cfRay = httpResponse.header("cf-ray")
+                val cfPlacement = httpResponse.header("cf-placement")?.trim()?.takeIf { it.isNotEmpty() }
+                val locationHeader = httpResponse.header("Location")
+                val isExpectedLegacyRelayResponse = statusCode in 200..204 ||
+                    (
+                        statusCode in listOf(301, 302, 303, 307, 308) &&
+                            (!cfRay.isNullOrBlank() || cfPlacement != null || !locationHeader.isNullOrBlank())
+                        )
+
+                if (!isExpectedLegacyRelayResponse) {
+                    return@use recorder.toResult(
+                        sampleIndex = sampleIndex,
+                        armId = armConfig.armId,
+                        candidateId = candidateId,
+                        succeeded = false,
+                        httpStatusCode = statusCode,
+                        retryAfterSeconds = retryAfterSeconds,
+                        errorCategory = ProbeErrorCategory.HTTP_STATUS_ERROR,
+                        fullElapsedMs = fullElapsedMs,
+                        negotiatedProtocol = protocolLabel,
+                        responseBodyBytesRead = boundedRead.bytes.size,
+                        bodyComplete = !boundedRead.exceededCap,
+                        serverPayload = null,
+                    )
+                }
+
+                val legacyPayload = ParsedServerProbePayload(
+                    schema = LEGACY_RELAY_PROBE_SCHEMA_V1,
+                    nonce = nonce,
+                    endpointRole = cfPlacement?.let { "${endpoint.endpointRole}:$it" } ?: endpoint.endpointRole,
+                    ingressColo = parseCfRayIngressColo(cfRay),
+                    country = null,
+                    asn = null,
+                    clientIpFamily = null,
+                    httpProtocol = protocolLabel,
+                    transportRttMs = null,
+                    transportRttSource = null,
+                    handlerElapsedMs = null,
+                )
+
+                recorder.toResult(
+                    sampleIndex = sampleIndex,
+                    armId = armConfig.armId,
+                    candidateId = candidateId,
+                    succeeded = true,
+                    httpStatusCode = statusCode,
+                    retryAfterSeconds = null,
+                    errorCategory = null,
+                    fullElapsedMs = fullElapsedMs,
+                    negotiatedProtocol = protocolLabel,
+                    responseBodyBytesRead = boundedRead.bytes.size,
+                    bodyComplete = !boundedRead.exceededCap,
+                    serverPayload = legacyPayload,
+                )
+            }
+        } catch (cancelled: kotlinx.coroutines.CancellationException) {
+            cancelCallSafely(call, baseOkHttpClient.dispatcher.executorService)
+            throw cancelled
+        } catch (ioError: IOException) {
+            val fullElapsedMs = (monotonicClockMillis() - startedAtMs).coerceAtLeast(0L)
+            val category = classifyProbeIoException(ioError, call.isCanceled(), recorder)
+            recorder.toResult(
+                sampleIndex = sampleIndex,
+                armId = armConfig.armId,
+                candidateId = candidateId,
+                succeeded = false,
+                httpStatusCode = null,
+                retryAfterSeconds = null,
+                errorCategory = category,
+                fullElapsedMs = fullElapsedMs,
+                negotiatedProtocol = recorder.negotiatedProtocol,
+                responseBodyBytesRead = 0,
+                bodyComplete = false,
+                serverPayload = null,
+            )
+        }
+    }
+
+    private fun buildArmOkHttpClient(
+        armConfig: ProbeArmConfig,
+        dnsAdapter: Dns,
+        recorder: ProbeEventRecorder,
+    ): OkHttpClient {
+        return baseOkHttpClient.newBuilder()
+            .cookieJar(CookieJar.NO_COOKIES)
+            .connectionPool(armConfig.connectionPool)
+            .dns(dnsAdapter)
+            .fastFallback(armConfig.fastFallback)
+            .protocols(armConfig.protocols)
+            .followRedirects(false)
+            .followSslRedirects(false)
+            .retryOnConnectionFailure(false)
+            .connectTimeout(armConfig.connectTimeoutMillis, TimeUnit.MILLISECONDS)
+            .readTimeout(armConfig.readTimeoutMillis, TimeUnit.MILLISECONDS)
+            .writeTimeout(armConfig.readTimeoutMillis, TimeUnit.MILLISECONDS)
+            .callTimeout(armConfig.callTimeoutMillis, TimeUnit.MILLISECONDS)
+            .eventListener(recorder)
+            .build()
     }
 
     private fun buildDnsForPolicy(policy: ProbeDnsPolicy): Dns {
@@ -527,7 +800,9 @@ class OkHttpProbeTransport(
 
     private suspend fun awaitOkHttpCall(call: Call): Response =
         suspendCancellableCoroutine { continuation ->
-            continuation.invokeOnCancellation { call.cancel() }
+            continuation.invokeOnCancellation {
+                cancelCallSafely(call, baseOkHttpClient.dispatcher.executorService)
+            }
             call.enqueue(
                 object : Callback {
                     override fun onFailure(call: Call, e: IOException) {

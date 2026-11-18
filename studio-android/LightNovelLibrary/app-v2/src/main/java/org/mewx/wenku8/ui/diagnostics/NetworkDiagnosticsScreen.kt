@@ -63,6 +63,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -182,14 +183,16 @@ fun NetworkDiagnosticsScreen(
     // Scoped FLAG_KEEP_SCREEN_ON strictly while a manual diagnostics run is active and visible.
     DisposableEffect(isRunning, hostActivity) {
         val window = hostActivity?.window
-        val hadFlagBefore = window != null &&
-            (window.attributes.flags and WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON) != 0
+        val hadFlagBefore = runCatching {
+            window != null &&
+                (window.attributes.flags and WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON) != 0
+        }.getOrDefault(false)
         if (isRunning && window != null && !hadFlagBefore) {
-            window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+            runCatching { window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON) }
         }
         onDispose {
             if (isRunning && window != null && !hadFlagBefore) {
-                window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                runCatching { window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON) }
             }
         }
     }
@@ -596,6 +599,7 @@ private fun RunningProgressContent(
 ) {
     val fraction = (progress.completedCount.toFloat() / progress.totalPlannedCount.coerceAtLeast(1))
         .coerceIn(0f, 1f)
+    val currentFraction by rememberUpdatedState(fraction)
 
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -623,14 +627,14 @@ private fun RunningProgressContent(
     Spacer(modifier = Modifier.height(12.dp))
     if (isEinkMode) {
         LinearProgressIndicator(
-            progress = { fraction },
+            progress = { currentFraction },
             modifier = Modifier
                 .fillMaxWidth()
                 .testTag(NetworkDiagnosticsTestTags.FLAT_EINK_PROGRESS_INDICATOR),
         )
     } else {
         LinearWavyProgressIndicator(
-            progress = { fraction },
+            progress = { currentFraction },
             modifier = Modifier
                 .fillMaxWidth()
                 .testTag(NetworkDiagnosticsTestTags.WAVY_PROGRESS_INDICATOR),
@@ -844,6 +848,8 @@ private fun SampleTelemetryRow(sample: ProbeSampleResult) {
             sample.tlsHandshakeDurationMs?.let { append(" · TLS $it") }
             if (sample.responseHeadersStartMs != null) append(")")
         }
+    } else if (sample.httpStatusCode != null) {
+        "— · ${sample.errorCategory?.wireName ?: "error"} (HTTP ${sample.httpStatusCode} · ${sample.fullResponseElapsedMs} ms)"
     } else {
         "— · ${sample.errorCategory?.wireName ?: "error"} (${sample.fullResponseElapsedMs} ms)"
     }
@@ -1015,7 +1021,7 @@ private fun AdvancedComparisonLabCard(
                                 .fillMaxWidth()
                                 .testTag(NetworkDiagnosticsTestTags.LAB_READ_ONLY_API_BUTTON),
                         ) {
-                            Text(text = "Read-Only API Check")
+                            Text(text = stringResource(R.string.diag_lab_api_check_action))
                         }
                         if (readOnlyApiResultMessage != null) {
                             Text(

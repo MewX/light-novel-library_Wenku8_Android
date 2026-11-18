@@ -8,6 +8,9 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.runBlocking
+import mockwebserver3.MockResponse
+import mockwebserver3.MockWebServer
+import okio.Buffer
 import org.json.JSONObject
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -22,10 +25,14 @@ import org.junit.rules.TemporaryFolder
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import java.io.ByteArrayOutputStream
 import java.io.File
+import java.net.InetAddress
 import java.net.Proxy
+import java.nio.charset.StandardCharsets
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
+import java.util.zip.GZIPOutputStream
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34])
@@ -407,6 +414,145 @@ class DiagnosticsRunnerAndControllerTest {
         val afterTransitionRoute = controller.currentRouteForHost("wenku8-relay.mewx.org")
         assertNull(afterTransitionRoute.pinnedCandidate)
         assertTrue(afterTransitionRoute.generationId > pinnedGen)
+    }
+
+    @Test
+    fun manifestRepositoryRefreshFromIndependentOriginsDecompressesGzipPayload() = runBlocking {
+        MockWebServer().use { originServer ->
+            originServer.start(InetAddress.getByName("127.0.0.1"), 0)
+
+            val nowWall = 1_762_732_800_000L
+            val manifestJson = """
+                {
+                  "schema": "wenku8-ip-candidates-v1",
+                  "revision": "rev-gzip-1",
+                  "hostname": "wenku8-relay.mewx.org",
+                  "enabled": true,
+                  "minAppVersionCode": 0,
+                  "rolloutPermille": 1000,
+                  "issuedAt": "2025-11-10T00:00:00Z",
+                  "expiresAt": "2025-11-10T12:00:00Z",
+                  "candidates": [
+                    { "id": "cf-v4-gzip", "ip": "104.16.132.229" }
+                  ]
+                }
+            """.trimIndent()
+
+            val gzipBytes = ByteArrayOutputStream().use { baos ->
+                GZIPOutputStream(baos).use { gz ->
+                    gz.write(manifestJson.toByteArray(StandardCharsets.UTF_8))
+                }
+                baos.toByteArray()
+            }
+
+            originServer.enqueue(
+                MockResponse.Builder()
+                    .code(200)
+                    .addHeader("Content-Type", "application/json")
+                    .addHeader("Content-Encoding", "gzip")
+                    .addHeader("ETag", "\"etag-gzip-1\"")
+                    .body(Buffer().write(gzipBytes))
+                    .build(),
+            )
+
+            val repo = ManifestRepository(
+                localStore = routingLocalStore,
+                configurationOrigins = listOf("http://127.0.0.1:${originServer.port}/ip-candidates.json"),
+                wallClockEpochMillis = { nowWall },
+                monotonicClockMillis = { 10_000L },
+            )
+
+            val fetched = repo.refreshFromIndependentOrigins("wenku8-relay.mewx.org")
+            assertNotNull("Gzipped manifest from independent origin must decompress and validate", fetched)
+            assertEquals("rev-gzip-1", fetched!!.revision)
+            assertEquals(1, fetched.candidates.size)
+            assertEquals("cf-v4-gzip", fetched.candidates.first().id)
+        }
+    }
+
+    @Test
+    fun relayRouteControllerNeverPromotesCandidateIpWithoutAuthenticatedProbeSchema() = runBlocking {
+        val nowWall = 1_762_732_800_000L
+        val networkFlow = MutableStateFlow(
+            NetworkSnapshot(
+                internalNetworkHandleKey = "wifi-legacy",
+                isConnected = true,
+                underlyingTransports = setOf(UnderlyingTransportKind.WIFI),
+                isMetered = false,
+            ),
+        )
+        val fakeObserver = object : NetworkConnectivityObserver {
+            override fun currentSnapshot(): NetworkSnapshot = networkFlow.value
+            override fun observeDefaultNetworkSnapshots(): Flow<NetworkSnapshot> = networkFlow
+        }
+
+        val manifestRepo = ManifestRepository(
+            localStore = routingLocalStore,
+            wallClockEpochMillis = { nowWall },
+            monotonicClockMillis = { 20_000L },
+        )
+        manifestRepo.ingestManifestPayload(
+            rawJson = """
+                {
+                  "schema": "wenku8-ip-candidates-v1",
+                  "revision": "rev-legacy-guard",
+                  "hostname": "wenku8-relay.mewx.org",
+                  "enabled": true,
+                  "minAppVersionCode": 0,
+                  "rolloutPermille": 1000,
+                  "issuedAt": "2025-11-10T00:00:00Z",
+                  "expiresAt": "2025-11-10T12:00:00Z",
+                  "candidates": [
+                    { "id": "cf-v4-legacy", "ip": "104.16.132.229" }
+                  ]
+                }
+            """.trimIndent(),
+            expectedRelayHostname = "wenku8-relay.mewx.org",
+        )
+
+        val unauthenticatedLegacyTransport = object : DiagnosticsProbeTransport {
+            override suspend fun executeProbe(
+                endpoint: ValidatedRelayEndpoint,
+                armConfig: ProbeArmConfig,
+                sampleIndex: Int,
+                explicitNonce: String?,
+            ): ProbeSampleResult {
+                val candidateId = (armConfig.dnsPolicy as? ProbeDnsPolicy.PinnedCandidate)?.candidateId
+                val isWarmGuard = armConfig.armId.startsWith("warm_guard:")
+                val base = syntheticProbeSample(
+                    index = sampleIndex,
+                    armId = armConfig.armId,
+                    candidateId = candidateId,
+                    succeeded = true,
+                    elapsedMs = if (candidateId != null) 75L else 220L,
+                    reused = isWarmGuard,
+                )
+                return base.copy(
+                    serverPayload = base.serverPayload?.copy(
+                        schema = OkHttpProbeTransport.LEGACY_RELAY_PROBE_SCHEMA_V1,
+                    ),
+                )
+            }
+        }
+
+        val controller = RelayRouteController(
+            applicationScope = storeScope,
+            endpointResolutionProvider = { DiagnosticsEndpointResolution.Available(testEndpoint) },
+            probeTransport = unauthenticatedLegacyTransport,
+            manifestRepository = manifestRepo,
+            routingLocalStore = routingLocalStore,
+            networkObserver = fakeObserver,
+            autoProbeGapMillis = 0L,
+            monotonicClockMillis = { 20_000L },
+            wallClockEpochMillis = { nowWall },
+        )
+        controller.setAutoOptimizeEnabled(true)
+
+        assertFalse(
+            "Candidate IP promotion must require cryptographic wenku8-network-probe-v1 nonce echo",
+            controller.runCompactTournament(manualRecheck = true),
+        )
+        assertNull(controller.currentPinnedCandidateOrNull())
     }
 
     private fun syntheticProbeSample(

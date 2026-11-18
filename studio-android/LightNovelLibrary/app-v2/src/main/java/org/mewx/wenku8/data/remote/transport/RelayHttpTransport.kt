@@ -233,13 +233,13 @@ class RelayHttpTransport(
 
         fun release() {
             if (inFlightCount.decrementAndGet() <= 0 && retired.get()) {
-                connectionPool.evictAll()
+                OkHttpProbeTransport.evictPoolSafely(connectionPool)
             }
         }
 
         fun markRetiredAndEvictIfIdle() {
             if (retired.compareAndSet(false, true) && inFlightCount.get() <= 0) {
-                connectionPool.evictAll()
+                OkHttpProbeTransport.evictPoolSafely(connectionPool)
             }
         }
     }
@@ -382,7 +382,7 @@ class RelayHttpTransport(
                     readDecodedResponseBytes(response)
                 }
             } catch (cancelled: kotlinx.coroutines.CancellationException) {
-                call.cancel()
+                OkHttpProbeTransport.cancelCallSafely(call, baseOkHttpClient.dispatcher.executorService)
                 throw cancelled
             } catch (_: IOException) {
                 null
@@ -460,7 +460,7 @@ class RelayHttpTransport(
                 return AttemptOutcome.HttpSuccess(payloadBytes)
             }
         } catch (cancelled: kotlinx.coroutines.CancellationException) {
-            call.cancel()
+            OkHttpProbeTransport.cancelCallSafely(call, baseOkHttpClient.dispatcher.executorService)
             throw cancelled
         } catch (ioError: IOException) {
             routeProvider.onPassiveCallCompleted(
@@ -542,7 +542,10 @@ class RelayHttpTransport(
         while (iterator.hasNext()) {
             val (_, entry) = iterator.next()
             if (entry.inFlightCount.get() <= 0) {
-                entry.connectionPool.evictAll()
+                OkHttpProbeTransport.evictPoolSafely(
+                    entry.connectionPool,
+                    baseOkHttpClient.dispatcher.executorService,
+                )
                 iterator.remove()
             }
         }
@@ -570,7 +573,9 @@ class RelayHttpTransport(
 
     private suspend fun awaitCall(call: Call): Response =
         suspendCancellableCoroutine { continuation ->
-            continuation.invokeOnCancellation { call.cancel() }
+            continuation.invokeOnCancellation {
+                OkHttpProbeTransport.cancelCallSafely(call, baseOkHttpClient.dispatcher.executorService)
+            }
             call.enqueue(
                 object : Callback {
                     override fun onFailure(call: Call, e: IOException) {

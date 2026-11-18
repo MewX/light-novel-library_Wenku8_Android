@@ -129,6 +129,7 @@
     <string name="diag_lab_happy_eyeballs">Happy Eyeballs vs 顺序 DNS</string>
     <string name="diag_lab_ipv4_ipv6">IPv4 Only vs IPv6 Only</string>
     <string name="diag_lab_h2_h1">HTTP/2 vs HTTP/1.1 交替突发</string>
+    <string name="diag_lab_api_check_action">实际接口连通性检测（只读）</string>
     <string name="diag_lab_api_unsupported_stub">此版本不支持实际接口检测</string>
 
     <string name="diag_share_sheet_title">导出并分享诊断报告</string>

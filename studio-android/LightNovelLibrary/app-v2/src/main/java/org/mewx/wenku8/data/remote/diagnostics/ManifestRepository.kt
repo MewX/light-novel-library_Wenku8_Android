@@ -491,7 +491,6 @@ class ManifestRepository(
         for (originUrl in configurationOrigins) {
             val reqBuilder = Request.Builder()
                 .url(originUrl)
-                .header("Accept-Encoding", "gzip")
                 .get()
             if (!cachedRecord.etag.isNullOrBlank() && !cachedRecord.rawJson.isNullOrBlank()) {
                 reqBuilder.header("If-None-Match", cachedRecord.etag)
