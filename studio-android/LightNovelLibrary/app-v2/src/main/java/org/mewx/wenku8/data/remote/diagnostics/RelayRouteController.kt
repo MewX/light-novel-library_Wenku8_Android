@@ -75,6 +75,7 @@ class RelayRouteController(
         const val PROVISIONAL_RECOVERY_LEASE_MS: Long = 10L * 60L * 1_000L
         const val CANDIDATE_QUARANTINE_DURATION_MS: Long = 30L * 60L * 1_000L
         const val MIN_TOURNAMENT_COOLDOWN_MS: Long = 30L * 60L * 1_000L
+        const val DIAGNOSTICS_DISABLED_COOLDOWN_MS: Long = 60L * 60L * 1_000L
         const val MAX_RECOVERY_CALLS: Int = 6
         const val MAX_RECOVERY_DURATION_MS: Long = 20_000L
         const val MIN_IMPROVEMENT_ABSOLUTE_MS: Long = 30L
@@ -100,6 +101,7 @@ class RelayRouteController(
     @Volatile private var activeLease: LeaseRecord? = null
     @Volatile private var lastObservedNetwork: NetworkSnapshot? = null
     @Volatile private var lastFullTournamentAtMonotonicMs: Long? = null
+    @Volatile private var diagnosticsPausedUntilMonotonicMs: Long? = null
     @Volatile private var activeBackgroundJob: Job? = null
 
     private val quarantinedUntilMonotonicById = ConcurrentHashMap<String, Long>()
@@ -245,7 +247,7 @@ class RelayRouteController(
         succeeded: Boolean,
         connectionSetupMs: Long?,
     ) {
-        if (!allowPassiveBackgroundProbing) {
+        if (!allowPassiveBackgroundProbing || isDiagnosticsPausedAt(monotonicClockMillis())) {
             return
         }
         if (!succeeded && candidateId == null && userAutoOptimizeEnabled) {
@@ -320,8 +322,12 @@ class RelayRouteController(
                 return@withLock false
             }
             if (!manualRecheck) {
+                val nowCheckMono = monotonicClockMillis()
+                if (isDiagnosticsPausedAt(nowCheckMono)) {
+                    return@withLock false
+                }
                 val lastRun = lastFullTournamentAtMonotonicMs
-                if (lastRun != null && monotonicClockMillis() - lastRun < MIN_TOURNAMENT_COOLDOWN_MS) {
+                if (lastRun != null && nowCheckMono - lastRun < MIN_TOURNAMENT_COOLDOWN_MS) {
                     return@withLock false
                 }
             }
@@ -386,6 +392,15 @@ class RelayRouteController(
                         armConfig = armConfig,
                         sampleIndex = index,
                     )
+                }
+                if (sample.httpStatusCode == 503) {
+                    // Server disabled /__diagnostics/latency: stop cycle immediately and pause automatic probes for 1h.
+                    diagnosticsPausedUntilMonotonicMs = monotonicClockMillis() + DIAGNOSTICS_DISABLED_COOLDOWN_MS
+                    return null
+                }
+                if (sample.errorCategory == ProbeErrorCategory.HTTP_RATE_LIMITED) {
+                    // Respect HTTP 429 immediately rather than probing remaining candidates.
+                    return null
                 }
                 if (sample.observedProxyType != Proxy.Type.DIRECT) {
                     // Proxy active: direct candidate selection is disallowed per spec!
@@ -623,6 +638,9 @@ class RelayRouteController(
         if (resolution !is DiagnosticsEndpointResolution.Available || !userAutoOptimizeEnabled) {
             return@withLock false
         }
+        if (isDiagnosticsPausedAt(monotonicClockMillis())) {
+            return@withLock false
+        }
         val endpoint = resolution.endpoint
         val baselineNetwork = networkObserver.currentSnapshot()
         if (!baselineNetwork.isConnected) return@withLock false
@@ -671,6 +689,16 @@ class RelayRouteController(
                 )
             }
 
+            if (sample.httpStatusCode == 503) {
+                diagnosticsPausedUntilMonotonicMs = monotonicClockMillis() + DIAGNOSTICS_DISABLED_COOLDOWN_MS
+                OkHttpProbeTransport.evictPoolSafely(pool)
+                break
+            }
+            if (sample.errorCategory == ProbeErrorCategory.HTTP_RATE_LIMITED) {
+                OkHttpProbeTransport.evictPoolSafely(pool)
+                break
+            }
+
             if (sample.isAuthenticatedCandidateProbeSuccess() && sample.observedProxyType == Proxy.Type.DIRECT) {
                 val provisionalMono = monotonicClockMillis()
                 val maxAuthMs = manifest.remainingAuthorizationMillis(wallClockEpochMillis(), provisionalMono)
@@ -702,6 +730,11 @@ class RelayRouteController(
             OkHttpProbeTransport.evictPoolSafely(pool)
         }
         false
+    }
+
+    private fun isDiagnosticsPausedAt(nowMono: Long): Boolean {
+        val pausedUntil = diagnosticsPausedUntilMonotonicMs ?: return false
+        return nowMono < pausedUntil
     }
 
     private fun ProbeSampleResult.isAuthenticatedCandidateProbeSuccess(): Boolean {

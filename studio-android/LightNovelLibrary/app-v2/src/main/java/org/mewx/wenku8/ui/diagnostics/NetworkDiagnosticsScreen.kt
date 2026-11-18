@@ -1219,6 +1219,7 @@ private fun formatStopReasonHeadline(stopReason: DiagnosticsStopReason): String 
         DiagnosticsStopReason.BACKGROUNDED -> "Paused in Background"
         DiagnosticsStopReason.NETWORK_TRANSITION -> "Network Switched"
         DiagnosticsStopReason.RATE_LIMITED -> "Rate Limited"
+        DiagnosticsStopReason.DIAGNOSTICS_DISABLED -> "Diagnostics Disabled"
         DiagnosticsStopReason.DEADLINE_EXCEEDED -> "Timed Out"
         DiagnosticsStopReason.OFFLINE -> "Offline"
     }

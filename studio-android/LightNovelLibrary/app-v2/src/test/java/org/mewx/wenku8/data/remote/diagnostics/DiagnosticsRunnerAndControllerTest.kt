@@ -593,6 +593,133 @@ class DiagnosticsRunnerAndControllerTest {
         assertNull(controller.currentPinnedCandidateOrNull())
     }
 
+    @Test
+    fun relayRouteControllerAndRunnerShortCircuitOn503DiagnosticsDisabledAndPauseOneHour() = runBlocking {
+        val nowWall = 1_762_732_800_000L
+        val monoClock = AtomicLong(50_000L)
+        val networkFlow = MutableStateFlow(
+            NetworkSnapshot(
+                internalNetworkHandleKey = "wifi-disabled-check",
+                isConnected = true,
+                underlyingTransports = setOf(UnderlyingTransportKind.WIFI),
+                isMetered = false,
+            ),
+        )
+        val fakeObserver = object : NetworkConnectivityObserver {
+            override fun currentSnapshot(): NetworkSnapshot = networkFlow.value
+            override fun observeDefaultNetworkSnapshots(): Flow<NetworkSnapshot> = networkFlow
+        }
+
+        val manifestRepo = ManifestRepository(
+            localStore = routingLocalStore,
+            wallClockEpochMillis = { nowWall },
+            monotonicClockMillis = { monoClock.get() },
+        )
+        manifestRepo.ingestManifestPayload(
+            rawJson = """
+                {
+                  "schema": "wenku8-ip-candidates-v1",
+                  "revision": "rev-503-pause",
+                  "hostname": "wenku8-relay.mewx.org",
+                  "enabled": true,
+                  "minAppVersionCode": 0,
+                  "rolloutPermille": 1000,
+                  "issuedAt": "2025-11-10T00:00:00Z",
+                  "expiresAt": "2025-11-10T12:00:00Z",
+                  "candidates": [
+                    { "id": "cf-1", "ip": "104.16.132.229" },
+                    { "id": "cf-2", "ip": "104.16.133.229" },
+                    { "id": "cf-3", "ip": "2606:4700::6810:84e5" },
+                    { "id": "cf-4", "ip": "2606:4700::6810:85e5" }
+                  ]
+                }
+            """.trimIndent(),
+            expectedRelayHostname = "wenku8-relay.mewx.org",
+        )
+
+        var serverDisabled = true
+        var probesSent = 0
+        val transport = object : DiagnosticsProbeTransport {
+            override suspend fun executeProbe(
+                endpoint: ValidatedRelayEndpoint,
+                armConfig: ProbeArmConfig,
+                sampleIndex: Int,
+                explicitNonce: String?,
+            ): ProbeSampleResult {
+                probesSent += 1
+                val candidateId = (armConfig.dnsPolicy as? ProbeDnsPolicy.PinnedCandidate)?.candidateId
+                if (serverDisabled) {
+                    return syntheticProbeSample(
+                        index = sampleIndex,
+                        armId = armConfig.armId,
+                        candidateId = candidateId,
+                        succeeded = false,
+                        elapsedMs = 35L,
+                        reused = false,
+                    ).copy(
+                        httpStatusCode = 503,
+                        errorCategory = ProbeErrorCategory.HTTP_STATUS_ERROR,
+                        serverPayload = null,
+                    )
+                }
+                return syntheticProbeSample(
+                    index = sampleIndex,
+                    armId = armConfig.armId,
+                    candidateId = candidateId,
+                    succeeded = true,
+                    elapsedMs = if (candidateId != null) 80L else 220L,
+                    reused = armConfig.armId.startsWith("warm_guard:"),
+                )
+            }
+        }
+
+        // 1. Manual runner stops after 1st sample with DIAGNOSTICS_DISABLED instead of probing 10 times
+        val runner = DiagnosticsRunner(
+            probeTransport = transport,
+            networkObserver = fakeObserver,
+            monotonicClockMillis = { monoClock.get() },
+            wallClockEpochMillis = { nowWall },
+        )
+        val disabledReport = runner.runQuickCheck(
+            endpoint = testEndpoint,
+            plannedAttempts = 10,
+            interSampleGapMillis = 0L,
+        )
+        assertEquals(1, probesSent)
+        assertEquals(DiagnosticsStopReason.DIAGNOSTICS_DISABLED, disabledReport.stopReason)
+
+        // 2. Compact tournament stops immediately on controlScreen 503 (1 probe, NOT 5) & pauses auto cycles for 1h
+        probesSent = 0
+        val controller = RelayRouteController(
+            applicationScope = storeScope,
+            endpointResolutionProvider = { DiagnosticsEndpointResolution.Available(testEndpoint) },
+            probeTransport = transport,
+            manifestRepository = manifestRepo,
+            routingLocalStore = routingLocalStore,
+            networkObserver = fakeObserver,
+            autoProbeGapMillis = 0L,
+            initialAutoOptimizeEnabled = true,
+            monotonicClockMillis = { monoClock.get() },
+            wallClockEpochMillis = { nowWall },
+        )
+        assertFalse(controller.runCompactTournament(manualRecheck = false))
+        assertEquals("503 on controlScreen must short-circuit without probing 4 candidates", 1, probesSent)
+        assertTrue(controller.uiState.value is AutoRoutingModeState.EnabledUsingDefault)
+
+        // Even after normal 30-min tournament cooldown (+45 min), automatic probes remain paused (< 60 min)!
+        serverDisabled = false
+        probesSent = 0
+        monoClock.addAndGet(45L * 60L * 1_000L)
+        assertFalse(controller.runCompactTournament(manualRecheck = false))
+        assertFalse(controller.runBootstrapRecovery())
+        assertEquals("Automatic probes must stay paused during 1-hour 503 cooldown", 0, probesSent)
+
+        // Once 1 hour has elapsed (+20 min -> +65 min total), automatic tournament resumes normally
+        monoClock.addAndGet(20L * 60L * 1_000L)
+        assertTrue(controller.runCompactTournament(manualRecheck = false))
+        assertTrue(probesSent > 1)
+    }
+
     private fun syntheticProbeSample(
         index: Int,
         armId: String,

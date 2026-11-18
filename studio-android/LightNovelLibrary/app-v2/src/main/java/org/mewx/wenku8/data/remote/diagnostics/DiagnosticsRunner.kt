@@ -371,9 +371,13 @@ class DiagnosticsRunner(
                 collectedSamples.add(sampleOrTimeout)
                 publishProgress()
 
-                // Never retry around HTTP 429 rate limiting!
+                // Never retry around HTTP 429 rate limiting or HTTP 503 server-side disable!
                 if (sampleOrTimeout.errorCategory == ProbeErrorCategory.HTTP_RATE_LIMITED) {
                     stopReason = DiagnosticsStopReason.RATE_LIMITED
+                    break
+                }
+                if (sampleOrTimeout.httpStatusCode == 503) {
+                    stopReason = DiagnosticsStopReason.DIAGNOSTICS_DISABLED
                     break
                 }
 

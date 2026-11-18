@@ -16,6 +16,7 @@ enum class DiagnosticsStopReason(val wireName: String) {
     BACKGROUNDED("backgrounded"),
     NETWORK_TRANSITION("network_transition"),
     RATE_LIMITED("rate_limited"),
+    DIAGNOSTICS_DISABLED("diagnostics_disabled"),
     DEADLINE_EXCEEDED("deadline_exceeded"),
     OFFLINE("offline"),
 }
