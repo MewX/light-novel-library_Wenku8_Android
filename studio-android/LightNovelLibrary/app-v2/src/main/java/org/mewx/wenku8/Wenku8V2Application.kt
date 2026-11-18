@@ -6,6 +6,7 @@ import coil3.PlatformContext
 import coil3.SingletonImageLoader
 import org.mewx.wenku8.api.Wenku8API
 import org.mewx.wenku8.di.AppContainer
+import org.mewx.wenku8.ui.detail.ServerSupportAdInitializer
 
 /**
  * Application entry point for Wenku8 `:app-v2`.
@@ -30,6 +31,7 @@ class Wenku8V2Application : Application(), SingletonImageLoader.Factory {
         appContainer = AppContainer(this)
         appContainer.triggerAutomaticInternalMigrationIfNeeded()
         appContainer.triggerStartupAccountAndNoticeSync()
+        ServerSupportAdInitializer.warmUpInBackground(this, appContainer.applicationScope)
     }
 
     override fun newImageLoader(context: PlatformContext): ImageLoader {

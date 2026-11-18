@@ -5,6 +5,7 @@ import android.content.Intent
 import android.content.res.Configuration
 import android.graphics.Bitmap
 import android.graphics.Color as AndroidColor
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasTestTag
@@ -650,6 +651,81 @@ class NovelDetailAndDownloadTest {
                 formatted,
             )
         }
+    }
+
+    @Test
+    fun serverSupportBannerAd_hidesBoxWhileLoadingOrFailedAndPreservesStateAcrossScroll() {
+        assertEquals(
+            listOf(ServerSupportAdConstants.PRODUCTION_BANNER_AD_UNIT_ID),
+            ServerSupportAdConstants.candidateBannerAdUnitIds(isDebugBuild = false),
+        )
+        assertEquals(
+            listOf(
+                ServerSupportAdConstants.PRODUCTION_BANNER_AD_UNIT_ID,
+                ServerSupportAdConstants.DEV_TEST_BANNER_AD_UNIT_ID,
+            ),
+            ServerSupportAdConstants.candidateBannerAdUnitIds(isDebugBuild = true),
+        )
+
+        val holder = NovelDetailBannerAdHolder(initialPhase = BannerAdLoadPhase.Loading)
+        assertEquals(false, holder.shouldRenderVisibleCard)
+
+        composeTestRule.setContent {
+            Wenku8ExpressiveTheme(themeMode = Wenku8ThemeMode.ARCHIVAL_DAY) {
+                androidx.compose.foundation.lazy.LazyColumn(
+                    modifier = androidx.compose.ui.Modifier
+                        .testTag("ad_scroll_test_list"),
+                ) {
+                    item(key = "top") {
+                        androidx.compose.material3.Text("顶部简介")
+                    }
+                    if (holder.shouldRenderVisibleCard) {
+                        item(key = "detail_server_support_ad") {
+                            ServerSupportBannerAd(holder = holder)
+                        }
+                    }
+                    items(40) { idx ->
+                        androidx.compose.material3.Text(
+                            text = "章节行 $idx",
+                            modifier = androidx.compose.ui.Modifier
+                                .testTag("scroll_row_$idx"),
+                        )
+                    }
+                }
+            }
+        }
+        composeTestRule.waitForIdle()
+
+        // 1. While Loading: no empty box rendered on open
+        composeTestRule.onNodeWithTag(NovelDetailTestTags.SERVER_SUPPORT_AD_CARD)
+            .assertDoesNotExist()
+
+        // 2. When Failed: remains invisible both initially and after scrolling down & back up
+        composeTestRule.runOnIdle { holder.markFailedForTest() }
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag(NovelDetailTestTags.SERVER_SUPPORT_AD_CARD)
+            .assertDoesNotExist()
+
+        val scrollList = composeTestRule.onNodeWithTag("ad_scroll_test_list")
+        scrollList.performScrollToNode(hasTestTag("scroll_row_35"))
+        composeTestRule.waitForIdle()
+        scrollList.performScrollToNode(hasTestTag("scroll_row_0"))
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag(NovelDetailTestTags.SERVER_SUPPORT_AD_CARD)
+            .assertDoesNotExist()
+
+        // 3. When Loaded: card renders and remains Loaded across scrolling down & back up
+        composeTestRule.runOnIdle { holder.markLoadedForTest() }
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag(NovelDetailTestTags.SERVER_SUPPORT_AD_CARD)
+            .assertIsDisplayed()
+
+        scrollList.performScrollToNode(hasTestTag("scroll_row_35"))
+        composeTestRule.waitForIdle()
+        scrollList.performScrollToNode(hasTestTag(NovelDetailTestTags.SERVER_SUPPORT_AD_CARD))
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag(NovelDetailTestTags.SERVER_SUPPORT_AD_CARD)
+            .assertIsDisplayed()
     }
 }
 

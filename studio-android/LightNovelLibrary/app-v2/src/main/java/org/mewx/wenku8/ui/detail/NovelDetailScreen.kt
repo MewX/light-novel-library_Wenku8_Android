@@ -552,7 +552,17 @@ fun NovelDetailScreen(
                 )
             },
         ) { innerPadding ->
+            val bannerAdHolder = rememberNovelDetailBannerAdHolder(
+                aid = aid,
+                isNetworkAvailableOverride = isNetworkAvailableForAdOverride,
+                isGmsAvailableOverride = isGmsAvailableForAdOverride,
+                enableLiveAdViewInflation = enableLiveAdViewInflation,
+            )
             Box(modifier = Modifier.fillMaxSize()) {
+                ServerSupportBannerAdStagingHost(
+                    holder = bannerAdHolder,
+                    modifier = Modifier.padding(innerPadding),
+                )
                 LazyColumn(
                     modifier = Modifier
                         .fillMaxSize()
@@ -779,13 +789,13 @@ fun NovelDetailScreen(
                         )
                     }
 
-                    // 6. Single Zero-CLS Server-Support Inline Banner (between Synopsis and Volume Directory)
-                    item(key = "detail_server_support_ad") {
-                        ServerSupportBannerAd(
-                            isNetworkAvailableOverride = isNetworkAvailableForAdOverride,
-                            isGmsAvailableOverride = isGmsAvailableForAdOverride,
-                            enableLiveAdViewInflation = enableLiveAdViewInflation,
-                        )
+                    // 6. Single Server-Support Inline Banner (between Synopsis and Volume Directory)
+                    if (bannerAdHolder.shouldRenderVisibleCard) {
+                        item(key = "detail_server_support_ad") {
+                            ServerSupportBannerAd(
+                                holder = bannerAdHolder,
+                            )
+                        }
                     }
 
                     // 7. Volume Directory Header + Filter + Order Controls
