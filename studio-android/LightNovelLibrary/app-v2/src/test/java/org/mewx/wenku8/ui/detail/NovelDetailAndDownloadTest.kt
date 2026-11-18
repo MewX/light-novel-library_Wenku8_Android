@@ -655,6 +655,7 @@ class NovelDetailAndDownloadTest {
 
     @Test
     fun serverSupportBannerAd_hidesBoxWhileLoadingOrFailedAndPreservesStateAcrossScroll() {
+        ServerSupportAdConstants.resetSessionPreferredAdUnitForTest()
         assertEquals(
             listOf(ServerSupportAdConstants.PRODUCTION_BANNER_AD_UNIT_ID),
             ServerSupportAdConstants.candidateBannerAdUnitIds(isDebugBuild = false),
@@ -666,6 +667,34 @@ class NovelDetailAndDownloadTest {
             ),
             ServerSupportAdConstants.candidateBannerAdUnitIds(isDebugBuild = true),
         )
+
+        // Caching a successful debug fallback promotes it to index 0 so subsequent loads skip
+        // waiting on a failing round-trip, while release builds strictly keep PRODUCTION only.
+        ServerSupportAdConstants.recordSuccessfulAdUnitId(ServerSupportAdConstants.DEV_TEST_BANNER_AD_UNIT_ID)
+        assertEquals(
+            listOf(
+                ServerSupportAdConstants.DEV_TEST_BANNER_AD_UNIT_ID,
+                ServerSupportAdConstants.PRODUCTION_BANNER_AD_UNIT_ID,
+            ),
+            ServerSupportAdConstants.candidateBannerAdUnitIds(isDebugBuild = true),
+        )
+        assertEquals(
+            listOf(ServerSupportAdConstants.PRODUCTION_BANNER_AD_UNIT_ID),
+            ServerSupportAdConstants.candidateBannerAdUnitIds(isDebugBuild = false),
+        )
+        ServerSupportAdConstants.resetSessionPreferredAdUnitForTest()
+
+        // Activity-pooled holder retains Loaded phase across detail screen detach -> next novel attach
+        val pooledHolder = NovelDetailBannerAdHolder(
+            initialPhase = BannerAdLoadPhase.Loaded,
+            ownedByActivityPool = true,
+        )
+        pooledHolder.onDetailConsumerAttached()
+        assertEquals(1, pooledHolder.activeDetailConsumers)
+        assertTrue(pooledHolder.shouldRenderVisibleCard)
+        pooledHolder.onDetailConsumerDetached()
+        assertEquals(0, pooledHolder.activeDetailConsumers)
+        assertTrue("Preloaded Activity-pooled holder must stay Loaded for 0ms next-book open", pooledHolder.shouldRenderVisibleCard)
 
         val holder = NovelDetailBannerAdHolder(initialPhase = BannerAdLoadPhase.Loading)
         assertEquals(false, holder.shouldRenderVisibleCard)

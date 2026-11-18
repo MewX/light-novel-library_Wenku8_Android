@@ -26,6 +26,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.launch
 import org.mewx.wenku8.api.Wenku8API
 import org.mewx.wenku8.data.local.preferences.Wenku8UserPreferences
+import org.mewx.wenku8.ui.detail.PrewarmServerSupportBannerAdEffect
 import org.mewx.wenku8.ui.detail.ReaderLaunchRequest
 import org.mewx.wenku8.ui.navigation.AdaptiveMainScaffold
 import org.mewx.wenku8.ui.navigation.Wenku8DeepLinks
@@ -130,123 +131,126 @@ class MainActivity : AppCompatActivity(), HardwareVolumeKeyHost {
                             .background(MaterialTheme.colorScheme.background),
                     )
                 } else {
-                    AdaptiveMainScaffold(
-                        preferredHomeDestination = loadedPreferences.defaultHomeDestination,
-                        isNetworkAvailableOnColdStart = hasActiveNetworkOnColdStart,
-                        currentThemeMode = loadedPreferences.themeMode,
-                        onThemeModeSelected = { selectedMode ->
-                            coroutineScope.launch {
-                                preferencesRepository.setThemeMode(selectedMode)
-                            }
-                        },
-                        onDefaultHomeSelected = { selectedHome ->
-                            coroutineScope.launch {
-                                preferencesRepository.setDefaultHomeDestination(selectedHome)
-                            }
-                        },
-                        userPreferences = loadedPreferences,
-                        database = appContainer.database,
-                        catalogGateway = appContainer.wenkuApiClient,
-                        novelTocSyncRepository = appContainer.novelTocSyncRepository,
-                        externalReaderLaunchRequest = pendingWidgetReaderRequest,
-                        externalOpenBookshelf = pendingWidgetOpenBookshelf,
-                        externalOpenNovelAid = pendingExternalNovelAid,
-                        onExternalLaunchConsumed = {
-                            pendingWidgetReaderRequest = null
-                            pendingWidgetOpenBookshelf = false
-                            pendingExternalNovelAid = 0
-                        },
-                        relayRouteController = appContainer.relayRouteController,
-                        discoveryRepository = discoveryRepository,
-                        userSessionRepository = appContainer.userSessionRepository,
-                        serverNoticeAndUpdateRepository = appContainer.serverNoticeAndUpdateRepository,
-                        storageAndCacheRepository = appContainer.storageAndCacheRepository,
-                        backupArchiveRepository = appContainer.backupArchiveRepository,
-                        reviewsRepository = appContainer.reviewsRepository,
-                        bookshelfRepository = appContainer.bookshelfRepository,
-                        novelDetailRepository = appContainer.novelDetailRepository,
-                        novelDownloadRepository = appContainer.novelDownloadRepository,
-                        legacyV1StorageMigrator = appContainer.legacyV1StorageMigrator,
-                        appLanguage = loadedPreferences.appLanguage,
-                        networkDiagnosticsViewModelFactory = appContainer.networkDiagnosticsViewModelFactory,
-                        autoOptimizeConnectionEnabled = loadedPreferences.autoOptimizeConnectionEnabled,
-                        onAutoOptimizeConnectionChanged = { enabled ->
-                            coroutineScope.launch {
-                                preferencesRepository.setAutoOptimizeConnectionEnabled(enabled)
-                                appContainer.relayRouteController.setAutoOptimizeEnabled(enabled)
-                                if (enabled) {
-                                    appContainer.relayRouteController.runCompactTournament(manualRecheck = true)
+                    Box(modifier = Modifier.fillMaxSize()) {
+                        PrewarmServerSupportBannerAdEffect()
+                        AdaptiveMainScaffold(
+                            preferredHomeDestination = loadedPreferences.defaultHomeDestination,
+                            isNetworkAvailableOnColdStart = hasActiveNetworkOnColdStart,
+                            currentThemeMode = loadedPreferences.themeMode,
+                            onThemeModeSelected = { selectedMode ->
+                                coroutineScope.launch {
+                                    preferencesRepository.setThemeMode(selectedMode)
                                 }
-                            }
-                        },
-                        onBookshelfViewModeSelected = { selectedViewMode ->
-                            coroutineScope.launch {
-                                preferencesRepository.setBookshelfViewMode(selectedViewMode)
-                            }
-                        },
-                        onBookshelfSortModeSelected = { selectedSortMode ->
-                            coroutineScope.launch {
-                                preferencesRepository.setBookshelfSortMode(selectedSortMode)
-                            }
-                        },
-                        onAppLanguageSelected = { newLanguage ->
-                            coroutineScope.launch {
-                                preferencesRepository.setAppLanguage(newLanguage)
-                            }
-                            val bcp47Tag = if (newLanguage == Wenku8API.AppLanguage.TC) "zh-TW" else "zh-CN"
-                            AppCompatDelegate.setApplicationLocales(LocaleListCompat.forLanguageTags(bcp47Tag))
-                        },
-                        onEinkModeChanged = { enabled ->
-                            coroutineScope.launch {
-                                preferencesRepository.setEinkModeEnabled(enabled)
-                            }
-                        },
-                        onReaderTypographyChanged = { fontSizeSp, lineDistDp, paraDistDp, edgeDistDp ->
-                            coroutineScope.launch {
-                                preferencesRepository.setReaderTypography(
-                                    fontSizeSp = fontSizeSp,
-                                    lineDistanceDp = lineDistDp,
-                                    paragraphDistanceDp = paraDistDp,
-                                    pageEdgeDistanceDp = edgeDistDp,
-                                )
-                            }
-                        },
-                        onReaderCustomFontPathChanged = { path ->
-                            coroutineScope.launch {
-                                preferencesRepository.setReaderCustomFontPath(path)
-                            }
-                        },
-                        onReaderCustomBackgroundPathChanged = { path ->
-                            coroutineScope.launch {
-                                preferencesRepository.setReaderCustomBackgroundPath(path)
-                            }
-                        },
-                        onReaderPageTurnModeChanged = { mode ->
-                            coroutineScope.launch {
-                                preferencesRepository.setReaderPageTurnMode(mode)
-                            }
-                        },
-                        onReaderPaperPresetChanged = { preset ->
-                            coroutineScope.launch {
-                                preferencesRepository.setReaderPaperPreset(preset)
-                            }
-                        },
-                        onReaderKeepScreenOnChanged = { enabled ->
-                            coroutineScope.launch {
-                                preferencesRepository.setReaderKeepScreenOn(enabled)
-                            }
-                        },
-                        onReaderEdgeBrightnessDragChanged = { enabled ->
-                            coroutineScope.launch {
-                                preferencesRepository.setReaderEdgeBrightnessDragEnabled(enabled)
-                            }
-                        },
-                        onVolumeKeyPagingChanged = { enabled ->
-                            coroutineScope.launch {
-                                preferencesRepository.setVolumeKeyPagingEnabled(enabled)
-                            }
-                        },
-                    )
+                            },
+                            onDefaultHomeSelected = { selectedHome ->
+                                coroutineScope.launch {
+                                    preferencesRepository.setDefaultHomeDestination(selectedHome)
+                                }
+                            },
+                            userPreferences = loadedPreferences,
+                            database = appContainer.database,
+                            catalogGateway = appContainer.wenkuApiClient,
+                            novelTocSyncRepository = appContainer.novelTocSyncRepository,
+                            externalReaderLaunchRequest = pendingWidgetReaderRequest,
+                            externalOpenBookshelf = pendingWidgetOpenBookshelf,
+                            externalOpenNovelAid = pendingExternalNovelAid,
+                            onExternalLaunchConsumed = {
+                                pendingWidgetReaderRequest = null
+                                pendingWidgetOpenBookshelf = false
+                                pendingExternalNovelAid = 0
+                            },
+                            relayRouteController = appContainer.relayRouteController,
+                            discoveryRepository = discoveryRepository,
+                            userSessionRepository = appContainer.userSessionRepository,
+                            serverNoticeAndUpdateRepository = appContainer.serverNoticeAndUpdateRepository,
+                            storageAndCacheRepository = appContainer.storageAndCacheRepository,
+                            backupArchiveRepository = appContainer.backupArchiveRepository,
+                            reviewsRepository = appContainer.reviewsRepository,
+                            bookshelfRepository = appContainer.bookshelfRepository,
+                            novelDetailRepository = appContainer.novelDetailRepository,
+                            novelDownloadRepository = appContainer.novelDownloadRepository,
+                            legacyV1StorageMigrator = appContainer.legacyV1StorageMigrator,
+                            appLanguage = loadedPreferences.appLanguage,
+                            networkDiagnosticsViewModelFactory = appContainer.networkDiagnosticsViewModelFactory,
+                            autoOptimizeConnectionEnabled = loadedPreferences.autoOptimizeConnectionEnabled,
+                            onAutoOptimizeConnectionChanged = { enabled ->
+                                coroutineScope.launch {
+                                    preferencesRepository.setAutoOptimizeConnectionEnabled(enabled)
+                                    appContainer.relayRouteController.setAutoOptimizeEnabled(enabled)
+                                    if (enabled) {
+                                        appContainer.relayRouteController.runCompactTournament(manualRecheck = true)
+                                    }
+                                }
+                            },
+                            onBookshelfViewModeSelected = { selectedViewMode ->
+                                coroutineScope.launch {
+                                    preferencesRepository.setBookshelfViewMode(selectedViewMode)
+                                }
+                            },
+                            onBookshelfSortModeSelected = { selectedSortMode ->
+                                coroutineScope.launch {
+                                    preferencesRepository.setBookshelfSortMode(selectedSortMode)
+                                }
+                            },
+                            onAppLanguageSelected = { newLanguage ->
+                                coroutineScope.launch {
+                                    preferencesRepository.setAppLanguage(newLanguage)
+                                }
+                                val bcp47Tag = if (newLanguage == Wenku8API.AppLanguage.TC) "zh-TW" else "zh-CN"
+                                AppCompatDelegate.setApplicationLocales(LocaleListCompat.forLanguageTags(bcp47Tag))
+                            },
+                            onEinkModeChanged = { enabled ->
+                                coroutineScope.launch {
+                                    preferencesRepository.setEinkModeEnabled(enabled)
+                                }
+                            },
+                            onReaderTypographyChanged = { fontSizeSp, lineDistDp, paraDistDp, edgeDistDp ->
+                                coroutineScope.launch {
+                                    preferencesRepository.setReaderTypography(
+                                        fontSizeSp = fontSizeSp,
+                                        lineDistanceDp = lineDistDp,
+                                        paragraphDistanceDp = paraDistDp,
+                                        pageEdgeDistanceDp = edgeDistDp,
+                                    )
+                                }
+                            },
+                            onReaderCustomFontPathChanged = { path ->
+                                coroutineScope.launch {
+                                    preferencesRepository.setReaderCustomFontPath(path)
+                                }
+                            },
+                            onReaderCustomBackgroundPathChanged = { path ->
+                                coroutineScope.launch {
+                                    preferencesRepository.setReaderCustomBackgroundPath(path)
+                                }
+                            },
+                            onReaderPageTurnModeChanged = { mode ->
+                                coroutineScope.launch {
+                                    preferencesRepository.setReaderPageTurnMode(mode)
+                                }
+                            },
+                            onReaderPaperPresetChanged = { preset ->
+                                coroutineScope.launch {
+                                    preferencesRepository.setReaderPaperPreset(preset)
+                                }
+                            },
+                            onReaderKeepScreenOnChanged = { enabled ->
+                                coroutineScope.launch {
+                                    preferencesRepository.setReaderKeepScreenOn(enabled)
+                                }
+                            },
+                            onReaderEdgeBrightnessDragChanged = { enabled ->
+                                coroutineScope.launch {
+                                    preferencesRepository.setReaderEdgeBrightnessDragEnabled(enabled)
+                                }
+                            },
+                            onVolumeKeyPagingChanged = { enabled ->
+                                coroutineScope.launch {
+                                    preferencesRepository.setVolumeKeyPagingEnabled(enabled)
+                                }
+                            },
+                        )
+                    }
                 }
             }
         }
