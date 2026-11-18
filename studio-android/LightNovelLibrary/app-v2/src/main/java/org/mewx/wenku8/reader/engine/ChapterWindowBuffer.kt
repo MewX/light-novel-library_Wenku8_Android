@@ -3,8 +3,11 @@ package org.mewx.wenku8.reader.engine
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -169,6 +172,24 @@ data class ReaderWindowSnapshot(
 
         return null
     }
+
+    /**
+     * Stable, collision-free page identity for `HorizontalPager` so cross-chapter/volume window
+     * shifts and `prevSlot` expansions preserve subcompositions without aliasing across chapters.
+     */
+    fun virtualPagePagerKey(virtualPageIndex: Int): Any {
+        if (virtualPageIndex !in 0 until totalVirtualPages) {
+            return "oob_$virtualPageIndex"
+        }
+        val res = resolveVirtualPage(virtualPageIndex) ?: return "empty_$virtualPageIndex"
+        val slotKind = when (res.slot) {
+            is ChapterWindowSlot.Loaded -> 'L'
+            is ChapterWindowSlot.Loading -> 'P'
+            is ChapterWindowSlot.Unloaded -> 'U'
+            is ChapterWindowSlot.Error -> 'E'
+        }
+        return "${res.slot.chapter.cid}_${slotKind}_${res.pageIndexInSlot}"
+    }
 }
 
 /**
@@ -205,6 +226,7 @@ class ChapterWindowBuffer(
     private val stateMutex = Mutex()
     private val astCache = LinkedHashMap<Int, ChapterAst>()
     private val activeSlotJobs = HashMap<Int, Job>()
+    private val inFlightAstLoads = HashMap<Int, Deferred<Result<ChapterAst>>>()
 
     private val _snapshotFlow = MutableStateFlow(ReaderWindowSnapshot(aid = aid))
     val snapshotFlow: StateFlow<ReaderWindowSnapshot> = _snapshotFlow.asStateFlow()
@@ -767,31 +789,17 @@ class ChapterWindowBuffer(
             val ast = if (cachedAst != null) {
                 cachedAst
             } else {
-                val rawText = if (!preloadedLocalText.isNullOrBlank()) {
-                    preloadedLocalText
-                } else {
-                    fetchChapterTextOfflineFirst(chapterMeta).getOrElse { error ->
-                        return ChapterWindowSlot.Error(
-                            chapter = chapterMeta,
-                            message = error.message ?: "章节加载失败",
-                        )
-                    }
-                }
-                val parsed = withContext(computeDispatcher) {
-                    WenkuChapterParser.parse(
-                        rawChapterText = rawText,
-                        aid = aid,
-                        vid = chapterMeta.vid,
-                        cid = chapterMeta.cid,
-                        volumeTitle = chapterMeta.volumeTitle,
-                        chapterTitle = chapterMeta.chapterTitle,
-                        knownImageAspectRatios = config.knownImageAspectRatios,
+                val astResult = resolveOrLoadChapterAst(
+                    chapterMeta = chapterMeta,
+                    knownImageAspectRatios = config.knownImageAspectRatios,
+                    preloadedLocalText = preloadedLocalText,
+                )
+                astResult.getOrElse { error ->
+                    return ChapterWindowSlot.Error(
+                        chapter = chapterMeta,
+                        message = error.message ?: "章节加载失败",
                     )
                 }
-                stateMutex.withLock {
-                    astCache[chapterMeta.cid] = parsed
-                }
-                parsed
             }
 
             val paginatedLayout = withContext(computeDispatcher) {
@@ -809,6 +817,58 @@ class ChapterWindowBuffer(
                 message = unexpected.message ?: "章节排版失败",
             )
         }
+    }
+
+    private suspend fun resolveOrLoadChapterAst(
+        chapterMeta: OrderedChapterWithVolume,
+        knownImageAspectRatios: Map<String, Float>,
+        preloadedLocalText: String?,
+    ): Result<ChapterAst> {
+        val cid = chapterMeta.cid
+        var newlyCreated: Deferred<Result<ChapterAst>>? = null
+        val deferred = synchronized(inFlightAstLoads) {
+            val existing = inFlightAstLoads[cid]
+            if (existing != null && !existing.isCompleted && !existing.isCancelled) {
+                existing
+            } else {
+                val created = scope.async(start = CoroutineStart.LAZY) {
+                    val rawText = if (!preloadedLocalText.isNullOrBlank()) {
+                        preloadedLocalText
+                    } else {
+                        fetchChapterTextOfflineFirst(chapterMeta).getOrElse { err ->
+                            return@async Result.failure(err)
+                        }
+                    }
+                    val parsed = withContext(computeDispatcher) {
+                        WenkuChapterParser.parse(
+                            rawChapterText = rawText,
+                            aid = aid,
+                            vid = chapterMeta.vid,
+                            cid = cid,
+                            volumeTitle = chapterMeta.volumeTitle,
+                            chapterTitle = chapterMeta.chapterTitle,
+                            knownImageAspectRatios = knownImageAspectRatios,
+                        )
+                    }
+                    stateMutex.withLock {
+                        astCache[cid] = parsed
+                    }
+                    Result.success(parsed)
+                }
+                inFlightAstLoads[cid] = created
+                newlyCreated = created
+                created
+            }
+        }
+        newlyCreated?.invokeOnCompletion {
+            synchronized(inFlightAstLoads) {
+                if (inFlightAstLoads[cid] === newlyCreated) {
+                    inFlightAstLoads.remove(cid)
+                }
+            }
+        }
+        deferred.start()
+        return deferred.await()
     }
 
     private suspend fun fetchChapterTextOfflineFirst(
@@ -937,6 +997,12 @@ class ChapterWindowBuffer(
             job.cancel()
         }
         activeSlotJobs.clear()
+        synchronized(inFlightAstLoads) {
+            for (deferred in inFlightAstLoads.values) {
+                deferred.cancel()
+            }
+            inFlightAstLoads.clear()
+        }
     }
 
     private data class ReflowInputs(

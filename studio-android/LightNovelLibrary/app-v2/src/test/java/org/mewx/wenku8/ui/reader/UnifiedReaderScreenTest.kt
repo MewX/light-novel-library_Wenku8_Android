@@ -27,6 +27,7 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import org.junit.After
@@ -832,10 +833,281 @@ class UnifiedReaderScreenTest {
             ),
         )
     }
+
+    @Test
+    fun crossChapterFlip_whileNextChapterPrefetchCompletes_neverFlashesPreviousChapterLastPage(): Unit = runBlocking {
+        database.novelDao().upsertNovel(
+            NovelEntity(
+                aid = 2200,
+                title = "跨卷翻页测试",
+                author = "测试作者",
+                inBookshelf = true,
+                metaSyncedAtMs = 1_000L,
+            ),
+        )
+        tocSyncRepository.syncNovelIndexAtomically(
+            aid = 2200,
+            language = Wenku8API.AppLanguage.SC,
+            requestStartedAtMs = 2_000L,
+            parsedVolumes = listOf(
+                ParsedVolumeToc(
+                    vid = 701,
+                    volumeTitle = "第一卷",
+                    chapters = listOf(
+                        ParsedChapterToc(cid = 7001, chapterTitle = "终章"),
+                    ),
+                ),
+                ParsedVolumeToc(
+                    vid = 702,
+                    volumeTitle = "第二卷",
+                    chapters = listOf(
+                        ParsedChapterToc(cid = 8001, chapterTitle = "第一章 新篇"),
+                    ),
+                ),
+            ),
+        )
+        // Short 2-page chapter for Volume 1 end so flipping to page 2 triggers 70% prefetch of Volume 2 (`8001`).
+        val vol1EndBody = buildString {
+            appendLine("第一卷 终章")
+            repeat(12) { idx ->
+                appendLine("　　第一卷终章第${idx + 1}段测试正文，用于验证跨卷翻页不会闪回上一章最后一页。")
+            }
+        }
+        database.chapterContentDao().upsertChapterContent(
+            ChapterContentEntity(
+                cid = 7001,
+                aid = 2200,
+                contentLang = Wenku8API.AppLanguage.SC.name,
+                contentText = vol1EndBody,
+                byteLength = vol1EndBody.toByteArray().size,
+                sha256Checksum = "sha_7001",
+                downloadedAtMs = 1_700_000_000_000L,
+            ),
+        )
+
+        val nextVolumeGate = CompletableDeferred<String>()
+        fakeGateway.gatedChapterResponses[8001] = nextVolumeGate
+
+        composeTestRule.setContent {
+            Wenku8ExpressiveTheme(themeMode = Wenku8ThemeMode.ARCHIVAL_DAY) {
+                UnifiedReaderScreen(
+                    launchRequest = ReaderLaunchRequest(
+                        aid = 2200,
+                        vid = 701,
+                        cid = 7001,
+                        novelTitle = "跨卷翻页测试",
+                        volumeTitle = "第一卷",
+                        chapterTitle = "终章",
+                    ),
+                    database = database,
+                    catalogGateway = fakeGateway,
+                    novelTocSyncRepository = tocSyncRepository,
+                    preferences = Wenku8UserPreferences(),
+                    onReaderTypographyChanged = { _, _, _, _ -> },
+                    onNavigateBack = {},
+                    lineBreaker = DeterministicCellLineBreaker,
+                    ioDispatcher = Dispatchers.Main.immediate,
+                    computeDispatcher = Dispatchers.Main.immediate,
+                )
+            }
+        }
+
+        composeTestRule.waitUntil(5_000) {
+            composeTestRule
+                .onAllNodesWithTag("${ReaderTestTags.PAGE_CANVAS_PREFIX}CURRENT_0")
+                .fetchSemanticsNodes()
+                .isNotEmpty()
+        }
+        composeTestRule.waitForIdle()
+
+        // Advance through Volume 1's pages until `LOADING_SLOT` is the immediate next page.
+        var guardSteps = 0
+        while (guardSteps < 8 &&
+            composeTestRule.onAllNodesWithTag(ReaderTestTags.LOADING_SLOT).fetchSemanticsNodes().isEmpty()
+        ) {
+            composeTestRule.onNodeWithTag(ReaderTestTags.PAGED_HORIZONTAL_PAGER).performTouchInput {
+                click(Offset(width * 0.85f, centerY))
+            }
+            composeTestRule.waitForIdle()
+            guardSteps++
+        }
+
+        // Now we are on the LAST page of `7001`, and 70% prefetch for `8001` is waiting on `nextVolumeGate`.
+        assertEquals(1, fakeGateway.fetchCountByCid[8001] ?: 0)
+
+        composeTestRule.mainClock.autoAdvance = false
+        try {
+            // Tap right zone to flip across volume boundary onto `8001` (`Loading` slot).
+            composeTestRule.onNodeWithTag(ReaderTestTags.PAGED_HORIZONTAL_PAGER).performTouchInput {
+                click(Offset(width * 0.85f, centerY))
+            }
+            composeTestRule.mainClock.advanceTimeBy(80)
+
+            // Complete `8001` background prefetch MID-FLIP (`totalVirtualPages` expands while activeVirtualPageIndex is still on `7001`!).
+            val vol2StartBody = buildString {
+                appendLine("第二卷 第一章 新篇")
+                repeat(24) { idx ->
+                    appendLine("　　第二卷第一章第${idx + 1}段测试正文，跨卷加载完成后应稳定停留在新卷首页。")
+                }
+            }
+            nextVolumeGate.complete(vol2StartBody)
+
+            // Advance frame-by-frame to completion.
+            repeat(30) {
+                composeTestRule.mainClock.advanceTimeBy(32)
+            }
+        } finally {
+            composeTestRule.mainClock.autoAdvance = true
+        }
+        composeTestRule.waitForIdle()
+
+        // Coalesced AST fetch: `8001` was fetched over the network ONLY ONCE, and reader landed on `8001` Page 1!
+        assertEquals(1, fakeGateway.fetchCountByCid[8001] ?: 0)
+        val savedProgress = database.readingProgressDao().getProgressForNovel(2200)
+        assertNotNull(savedProgress)
+        assertEquals(8001, savedProgress?.cid)
+        assertEquals(0, savedProgress?.paragraphIndex)
+        composeTestRule.onNodeWithTag("${ReaderTestTags.PAGE_CANVAS_PREFIX}CURRENT_0").assertIsDisplayed()
+    }
+
+    @Test
+    fun openingFirstPage_fastFlipToPageTwoWhilePrevChapterLoads_staysOnPageTwo(): Unit = runBlocking {
+        database.novelDao().upsertNovel(
+            NovelEntity(
+                aid = 2300,
+                title = "快速翻页防回跳测试",
+                author = "测试作者",
+                inBookshelf = true,
+                metaSyncedAtMs = 1_000L,
+            ),
+        )
+        tocSyncRepository.syncNovelIndexAtomically(
+            aid = 2300,
+            language = Wenku8API.AppLanguage.SC,
+            requestStartedAtMs = 2_000L,
+            parsedVolumes = listOf(
+                ParsedVolumeToc(
+                    vid = 901,
+                    volumeTitle = "第一卷",
+                    chapters = listOf(
+                        ParsedChapterToc(cid = 9001, chapterTitle = "第一章 前篇"),
+                        ParsedChapterToc(cid = 9002, chapterTitle = "第二章 本篇"),
+                    ),
+                ),
+            ),
+        )
+        // Cache ONLY Chapter 2 (`9002`) locally; keep Chapter 1 (`9001`, `prevSlot`) gated on network!
+        val ch2Body = buildString {
+            appendLine("第一卷 第二章 本篇")
+            repeat(60) { idx ->
+                appendLine("　　第二章本篇第${idx + 1}段测试正文，用于验证刚打开第一页立即向后翻页不会被前章加载拉回第一页。")
+            }
+        }
+        database.chapterContentDao().upsertChapterContent(
+            ChapterContentEntity(
+                cid = 9002,
+                aid = 2300,
+                contentLang = Wenku8API.AppLanguage.SC.name,
+                contentText = ch2Body,
+                byteLength = ch2Body.toByteArray().size,
+                sha256Checksum = "sha_9002",
+                downloadedAtMs = 1_700_000_000_000L,
+            ),
+        )
+
+        val prevChapterGate = CompletableDeferred<String>()
+        fakeGateway.gatedChapterResponses[9001] = prevChapterGate
+
+        composeTestRule.setContent {
+            Wenku8ExpressiveTheme(themeMode = Wenku8ThemeMode.ARCHIVAL_DAY) {
+                UnifiedReaderScreen(
+                    launchRequest = ReaderLaunchRequest(
+                        aid = 2300,
+                        vid = 901,
+                        cid = 9002,
+                        novelTitle = "快速翻页防回跳测试",
+                        volumeTitle = "第一卷",
+                        chapterTitle = "第二章 本篇",
+                    ),
+                    database = database,
+                    catalogGateway = fakeGateway,
+                    novelTocSyncRepository = tocSyncRepository,
+                    preferences = Wenku8UserPreferences(),
+                    onReaderTypographyChanged = { _, _, _, _ -> },
+                    onNavigateBack = {},
+                    lineBreaker = DeterministicCellLineBreaker,
+                    ioDispatcher = Dispatchers.Main.immediate,
+                    computeDispatcher = Dispatchers.Main.immediate,
+                )
+            }
+        }
+
+        composeTestRule.waitUntil(5_000) {
+            composeTestRule
+                .onAllNodesWithTag("${ReaderTestTags.PAGE_CANVAS_PREFIX}CURRENT_0")
+                .fetchSemanticsNodes()
+                .isNotEmpty()
+        }
+
+        composeTestRule.mainClock.autoAdvance = false
+        try {
+            // Immediately tap NEXT on Page 1 -> Page 2 while `prevSlot` (`9001`) is still downloading!
+            composeTestRule.onNodeWithTag(ReaderTestTags.PAGED_HORIZONTAL_PAGER).performTouchInput {
+                click(Offset(width * 0.85f, centerY))
+            }
+            composeTestRule.mainClock.advanceTimeBy(64)
+
+            // Now `prevSlot` (`9001`) finishes downloading a large multi-page chapter mid-animation!
+            val ch1LongBody = buildString {
+                appendLine("第一卷 第一章 前篇")
+                repeat(40) { idx ->
+                    appendLine("　　第一章前篇第${idx + 1}段测试正文，占满十余页从而触发大幅虚拟页码偏移。")
+                }
+            }
+            prevChapterGate.complete(ch1LongBody)
+
+            repeat(30) {
+                composeTestRule.mainClock.advanceTimeBy(32)
+            }
+        } finally {
+            composeTestRule.mainClock.autoAdvance = true
+        }
+        composeTestRule.waitForIdle()
+
+        // Reader MUST stay on Chapter 2 Page 2 (`CURRENT_1`), NOT snap back to Page 1 (`CURRENT_0`)!
+        composeTestRule.onNodeWithTag("${ReaderTestTags.PAGE_CANVAS_PREFIX}CURRENT_1").assertIsDisplayed()
+        val progressAfterPage2 = database.readingProgressDao().getProgressForNovel(2300)
+        assertEquals(9002, progressAfterPage2?.cid)
+        assertTrue(
+            "Expected Page 2 paragraphIndex > 0, got ${progressAfterPage2?.paragraphIndex}",
+            (progressAfterPage2?.paragraphIndex ?: 0) > 0,
+        )
+
+        // Rapid double-tap (`Page 2 -> Page 3 -> Page 4`) advances cumulatively without losing the second tap!
+        composeTestRule.mainClock.autoAdvance = false
+        try {
+            composeTestRule.onNodeWithTag(ReaderTestTags.PAGED_HORIZONTAL_PAGER).performTouchInput {
+                click(Offset(width * 0.85f, centerY))
+            }
+            composeTestRule.mainClock.advanceTimeBy(48)
+            composeTestRule.onNodeWithTag(ReaderTestTags.PAGED_HORIZONTAL_PAGER).performTouchInput {
+                click(Offset(width * 0.85f, centerY))
+            }
+            repeat(30) {
+                composeTestRule.mainClock.advanceTimeBy(32)
+            }
+        } finally {
+            composeTestRule.mainClock.autoAdvance = true
+        }
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag("${ReaderTestTags.PAGE_CANVAS_PREFIX}CURRENT_3").assertIsDisplayed()
+    }
 }
 
 private class FakeUnifiedReaderGateway : WenkuCatalogGateway {
     override val isApiConfigured: Boolean = true
+    val gatedChapterResponses = mutableMapOf<Int, CompletableDeferred<String>>()
+    val fetchCountByCid = mutableMapOf<Int, Int>()
 
     override fun resolveCoverUrl(aid: Int): String = ""
 
@@ -877,7 +1149,11 @@ private class FakeUnifiedReaderGateway : WenkuCatalogGateway {
         aid: Int,
         cid: Int,
         appLanguage: Wenku8API.AppLanguage,
-    ): WenkuApiResult<String> = WenkuApiResult.ApiNotConfigured
+    ): WenkuApiResult<String> {
+        fetchCountByCid[cid] = (fetchCountByCid[cid] ?: 0) + 1
+        val gate = gatedChapterResponses[cid] ?: return WenkuApiResult.ApiNotConfigured
+        return WenkuApiResult.Success(gate.await())
+    }
 
     override suspend fun fetchCloudBookshelf(
         appLanguage: Wenku8API.AppLanguage,

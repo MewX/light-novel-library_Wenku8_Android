@@ -128,13 +128,18 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.yield
 import org.mewx.wenku8.api.Wenku8API
 import org.mewx.wenku8.R
 import org.mewx.wenku8.Wenku8V2Application
@@ -161,6 +166,7 @@ import org.mewx.wenku8.reader.engine.ReaderPageElement
 import org.mewx.wenku8.reader.engine.ReaderWindowSnapshot
 import org.mewx.wenku8.reader.engine.ReadingAnchor
 import org.mewx.wenku8.reader.engine.StaticLayoutPaginator
+import org.mewx.wenku8.reader.engine.WindowSlotRole
 import org.mewx.wenku8.reader.model.ReaderPageTurnMode
 import org.mewx.wenku8.reader.model.ReaderPaperPreset
 import org.mewx.wenku8.ui.components.ActionTooltipBox
@@ -716,6 +722,7 @@ fun UnifiedReaderScreen(
     val latestSnapshotForKey by rememberUpdatedState(snapshot)
     val latestPageTurnMode by rememberUpdatedState(preferences.readerPageTurnMode)
     val latestIsEinkMode by rememberUpdatedState(isEinkMode)
+    val latestPagedStepHandler = remember { arrayOfNulls<(Int) -> Unit>(1) }
 
     val handleAndroidVolumeKeyEvent: (AndroidKeyEvent) -> Boolean = remember(windowBuffer, coroutineScope) {
         { nativeEvent ->
@@ -727,28 +734,37 @@ fun UnifiedReaderScreen(
                 repeatCount = nativeEvent.repeatCount,
             )
             if (actionToRun != null) {
-                val snap = latestSnapshotForKey
-                val targetVirtual = when (actionToRun) {
-                    ReaderTapZoneAction.PREV_PAGE -> snap.activeVirtualPageIndex - 1
-                    ReaderTapZoneAction.NEXT_PAGE -> snap.activeVirtualPageIndex + 1
-                    ReaderTapZoneAction.TOGGLE_HUD -> snap.activeVirtualPageIndex
-                }
-                if (targetVirtual in 0 until snap.totalVirtualPages) {
-                    val originRevision = snap.coordinateRevision
-                    val resolvedTarget = snap.resolveVirtualPage(targetVirtual)
-                    coroutineScope.launch {
-                        windowBuffer.onVirtualPageSettled(
-                            virtualPageIndex = targetVirtual,
-                            expectedCoordinateRevision = originRevision,
-                        )
-                        if (latestPageTurnMode == ReaderPageTurnMode.CONTINUOUS_SCROLL &&
-                            resolvedTarget?.page != null
-                        ) {
-                            dispatchContinuousScrollJump(
-                                cid = resolvedTarget.slot.chapter.cid,
-                                paragraphIndex = resolvedTarget.page.startAnchor.paragraphIndex,
-                                animated = !latestIsEinkMode,
+                val pagedStep = latestPagedStepHandler[0]
+                if (latestPageTurnMode != ReaderPageTurnMode.CONTINUOUS_SCROLL && pagedStep != null) {
+                    when (actionToRun) {
+                        ReaderTapZoneAction.PREV_PAGE -> pagedStep(-1)
+                        ReaderTapZoneAction.NEXT_PAGE -> pagedStep(+1)
+                        ReaderTapZoneAction.TOGGLE_HUD -> Unit
+                    }
+                } else {
+                    val snap = latestSnapshotForKey
+                    val targetVirtual = when (actionToRun) {
+                        ReaderTapZoneAction.PREV_PAGE -> snap.activeVirtualPageIndex - 1
+                        ReaderTapZoneAction.NEXT_PAGE -> snap.activeVirtualPageIndex + 1
+                        ReaderTapZoneAction.TOGGLE_HUD -> snap.activeVirtualPageIndex
+                    }
+                    if (targetVirtual in 0 until snap.totalVirtualPages) {
+                        val originRevision = snap.coordinateRevision
+                        val resolvedTarget = snap.resolveVirtualPage(targetVirtual)
+                        coroutineScope.launch {
+                            windowBuffer.onVirtualPageSettled(
+                                virtualPageIndex = targetVirtual,
+                                expectedCoordinateRevision = originRevision,
                             )
+                            if (latestPageTurnMode == ReaderPageTurnMode.CONTINUOUS_SCROLL &&
+                                resolvedTarget?.page != null
+                            ) {
+                                dispatchContinuousScrollJump(
+                                    cid = resolvedTarget.slot.chapter.cid,
+                                    paragraphIndex = resolvedTarget.page.startAnchor.paragraphIndex,
+                                    animated = !latestIsEinkMode,
+                                )
+                            }
                         }
                     }
                 }
@@ -908,6 +924,33 @@ fun UnifiedReaderScreen(
             }
         }
 
+        val boundedInitialVirtualPage = if (snapshot.totalVirtualPages > 0) {
+            snapshot.activeVirtualPageIndex.coerceIn(0, snapshot.totalVirtualPages - 1)
+        } else {
+            0
+        }
+        val pagerState = rememberPagerState(
+            initialPage = boundedInitialVirtualPage,
+        ) {
+            snapshot.totalVirtualPages.coerceAtLeast(1)
+        }
+
+        var programmaticSnapCount by remember { mutableIntStateOf(0) }
+        val inFlightStepRef = remember { arrayOfNulls<InFlightStepTarget>(1) }
+        val interruptedStepRef = remember { arrayOfNulls<InFlightStepTarget>(1) }
+        var stepAnimationJob by remember { mutableStateOf<Job?>(null) }
+        val latestWindowSnapshot by rememberUpdatedState(snapshot)
+        val syncedSnapshotTracker = remember {
+            PagerCoordinateSyncTracker(
+                revision = snapshot.coordinateRevision,
+                currentCid = snapshot.currentSlot?.chapter?.cid ?: 0,
+                currentSlotLoaded = snapshot.currentSlot is ChapterWindowSlot.Loaded,
+                prevPageCount = snapshot.prevPageCount,
+                activeVirtualPageIndex = snapshot.activeVirtualPageIndex,
+                layoutConfig = snapshot.layoutConfig,
+            )
+        }
+
         // Open requested chapter on initial mount; re-paginate in memory on subsequent config changes!
         var didInitialOpen by remember(launchRequest.aid, launchRequest.cid) { mutableStateOf(false) }
         LaunchedEffect(launchRequest.aid, launchRequest.cid, currentLayoutConfig) {
@@ -949,46 +992,173 @@ fun UnifiedReaderScreen(
                     fallbackChapterTitle = launchRequest.chapterTitle,
                 )
             } else {
+                // Preserve any live/in-flight paged target (e.g. fast Page 1 -> Page 2 flip while
+                // immersive system bars asynchronously hide and expand viewportHeightPx).
+                val livePagedAnchor = if (preferences.readerPageTurnMode != ReaderPageTurnMode.CONTINUOUS_SCROLL) {
+                    val stepTarget = (inFlightStepRef[0] ?: interruptedStepRef[0])
+                        ?.takeIf { it.coordinateRevision == snapshot.coordinateRevision }
+                        ?.targetVirtualPage
+                    val candidateVirtual = stepTarget
+                        ?: if (syncedSnapshotTracker.revision == snapshot.coordinateRevision) {
+                            if (pagerState.isScrollInProgress) pagerState.targetPage else pagerState.currentPage
+                        } else {
+                            null
+                        }
+                    candidateVirtual
+                        ?.let { snapshot.resolveVirtualPage(it) }
+                        ?.takeIf { it.role == WindowSlotRole.CURRENT }
+                        ?.page
+                        ?.startAnchor
+                } else {
+                    null
+                }
                 windowBuffer.updateLayoutConfig(
                     newConfig = currentLayoutConfig,
-                    lockedAnchorOverride = dragLockedAnchor,
+                    lockedAnchorOverride = dragLockedAnchor ?: livePagedAnchor,
                 )
             }
         }
 
-        val boundedInitialVirtualPage = if (snapshot.totalVirtualPages > 0) {
-            snapshot.activeVirtualPageIndex.coerceIn(0, snapshot.totalVirtualPages - 1)
-        } else {
-            0
-        }
-        val pagerState = rememberPagerState(
-            initialPage = boundedInitialVirtualPage,
-        ) {
-            snapshot.totalVirtualPages.coerceAtLeast(1)
-        }
+        val curLoadedSlotForSync = snapshot.currentSlot as? ChapterWindowSlot.Loaded
+        val isPrevSlotTranslationOnly =
+            syncedSnapshotTracker.currentSlotLoaded &&
+                curLoadedSlotForSync != null &&
+                syncedSnapshotTracker.currentCid == curLoadedSlotForSync.chapter.cid &&
+                syncedSnapshotTracker.layoutConfig == snapshot.layoutConfig &&
+                snapshot.prevPageCount != syncedSnapshotTracker.prevPageCount
 
-        var isProgrammaticPagerSnap by remember { mutableStateOf(false) }
-        val latestWindowSnapshot by rememberUpdatedState(snapshot)
-        val syncedRevisionHolder = remember { longArrayOf(snapshot.coordinateRevision) }
-        if (syncedRevisionHolder[0] != snapshot.coordinateRevision) {
-            syncedRevisionHolder[0] = snapshot.coordinateRevision
+        if (syncedSnapshotTracker.revision != snapshot.coordinateRevision) {
+            val oldRevision = syncedSnapshotTracker.revision
+            val deltaPrev = snapshot.prevPageCount - syncedSnapshotTracker.prevPageCount
+            syncedSnapshotTracker.revision = snapshot.coordinateRevision
+            syncedSnapshotTracker.currentCid = snapshot.currentSlot?.chapter?.cid ?: 0
+            syncedSnapshotTracker.currentSlotLoaded = curLoadedSlotForSync != null
+            syncedSnapshotTracker.prevPageCount = snapshot.prevPageCount
+            syncedSnapshotTracker.activeVirtualPageIndex = snapshot.activeVirtualPageIndex
+            syncedSnapshotTracker.layoutConfig = snapshot.layoutConfig
+            syncedSnapshotTracker.lastRevisionWasPrevSlotTranslationOnly = isPrevSlotTranslationOnly
+
             if (snapshot.totalVirtualPages > 0) {
-                val target = snapshot.activeVirtualPageIndex.coerceIn(0, snapshot.totalVirtualPages - 1)
-                if (pagerState.currentPage != target || pagerState.currentPageOffsetFraction != 0f) {
-                    pagerState.requestScrollToPage(page = target, pageOffsetFraction = 0f)
+                val maxPage = snapshot.totalVirtualPages - 1
+                if (isPrevSlotTranslationOnly) {
+                    syncedSnapshotTracker.wasScrollingAtExplicitReset = false
+                    val interruptedStep = interruptedStepRef[0]
+                    if (interruptedStep != null && interruptedStep.coordinateRevision == oldRevision) {
+                        interruptedStep.targetVirtualPage =
+                            (interruptedStep.targetVirtualPage + deltaPrev).coerceIn(0, maxPage)
+                        interruptedStep.coordinateRevision = snapshot.coordinateRevision
+                    }
+                    val activeStep = inFlightStepRef[0]
+                    if (activeStep != null && activeStep.coordinateRevision == oldRevision) {
+                        val shiftedStepTarget = (activeStep.targetVirtualPage + deltaPrev).coerceIn(0, maxPage)
+                        activeStep.targetVirtualPage = shiftedStepTarget
+                        activeStep.coordinateRevision = snapshot.coordinateRevision
+                        val shiftedCurrent = (pagerState.currentPage + deltaPrev).coerceIn(0, maxPage)
+                        pagerState.requestScrollToPage(
+                            page = shiftedCurrent,
+                            pageOffsetFraction = pagerState.currentPageOffsetFraction,
+                        )
+                        syncedSnapshotTracker.pendingPostSyncSettlePage = shiftedStepTarget
+                    } else {
+                        val shiftedCurrent = (pagerState.currentPage + deltaPrev).coerceIn(0, maxPage)
+                        val keepFraction = if (pagerState.isScrollInProgress) {
+                            pagerState.currentPageOffsetFraction
+                        } else {
+                            0f
+                        }
+                        if (pagerState.currentPage != shiftedCurrent ||
+                            pagerState.currentPageOffsetFraction != keepFraction
+                        ) {
+                            pagerState.requestScrollToPage(
+                                page = shiftedCurrent,
+                                pageOffsetFraction = keepFraction,
+                            )
+                        }
+                        syncedSnapshotTracker.pendingPostSyncSettlePage =
+                            if (!pagerState.isScrollInProgress &&
+                                shiftedCurrent != snapshot.activeVirtualPageIndex
+                            ) {
+                                shiftedCurrent
+                            } else {
+                                -1
+                            }
+                    }
+                } else {
+                    inFlightStepRef[0] = null
+                    interruptedStepRef[0] = null
+                    syncedSnapshotTracker.pendingPostSyncSettlePage = -1
+                    syncedSnapshotTracker.wasScrollingAtExplicitReset = pagerState.isScrollInProgress
+                    val target = snapshot.activeVirtualPageIndex.coerceIn(0, maxPage)
+                    if (pagerState.currentPage != target || pagerState.currentPageOffsetFraction != 0f) {
+                        pagerState.requestScrollToPage(page = target, pageOffsetFraction = 0f)
+                    }
                 }
             }
         }
 
-        LaunchedEffect(snapshot.coordinateRevision, snapshot.activeVirtualPageIndex, snapshot.totalVirtualPages) {
-            if (snapshot.totalVirtualPages > 0) {
-                val target = snapshot.activeVirtualPageIndex.coerceIn(0, snapshot.totalVirtualPages - 1)
-                if (pagerState.currentPage != target || pagerState.currentPageOffsetFraction != 0f) {
-                    isProgrammaticPagerSnap = true
+        // Only realign programmatically when `coordinateRevision` shifts (never on background
+        // `nextSlot` prefetch changing `totalVirtualPages` or post-settle `activeVirtualPageIndex`!).
+        LaunchedEffect(snapshot.coordinateRevision) {
+            val rev = snapshot.coordinateRevision
+            if (snapshot.totalVirtualPages <= 0) return@LaunchedEffect
+            val maxPage = snapshot.totalVirtualPages - 1
+
+            if (syncedSnapshotTracker.lastRevisionWasPrevSlotTranslationOnly) {
+                val settleTarget = syncedSnapshotTracker.pendingPostSyncSettlePage
+                if (settleTarget in 0..maxPage) {
+                    syncedSnapshotTracker.pendingPostSyncSettlePage = -1
+                    if (pagerState.currentPage != settleTarget || pagerState.currentPageOffsetFraction != 0f) {
+                        programmaticSnapCount += 1
+                        try {
+                            pagerState.scrollToPage(settleTarget)
+                        } finally {
+                            programmaticSnapCount -= 1
+                        }
+                    }
+                    if (inFlightStepRef[0] == null) {
+                        interruptedStepRef[0] = null
+                    }
+                    windowBuffer.onVirtualPageSettled(
+                        virtualPageIndex = settleTarget,
+                        expectedCoordinateRevision = rev,
+                    )
+                }
+            } else {
+                stepAnimationJob?.cancel()
+                val target = snapshot.activeVirtualPageIndex.coerceIn(0, maxPage)
+                val needsExplicitScrollCancel = syncedSnapshotTracker.wasScrollingAtExplicitReset &&
+                    (pagerState.currentPage != target || pagerState.currentPageOffsetFraction != 0f)
+                val driftedWhileIdle = !pagerState.isScrollInProgress &&
+                    programmaticSnapCount == 0 &&
+                    inFlightStepRef[0] == null &&
+                    (pagerState.currentPage != target || pagerState.currentPageOffsetFraction != 0f)
+                if (needsExplicitScrollCancel || driftedWhileIdle) {
+                    programmaticSnapCount += 1
                     try {
                         pagerState.scrollToPage(target)
                     } finally {
-                        isProgrammaticPagerSnap = false
+                        programmaticSnapCount -= 1
+                    }
+                }
+            }
+        }
+
+        // Realign `pagerState` when switching from `CONTINUOUS_SCROLL` back into any paged mode.
+        var previousPageTurnMode by remember { mutableStateOf(preferences.readerPageTurnMode) }
+        LaunchedEffect(preferences.readerPageTurnMode) {
+            val wasContinuous = previousPageTurnMode == ReaderPageTurnMode.CONTINUOUS_SCROLL
+            previousPageTurnMode = preferences.readerPageTurnMode
+            if (wasContinuous &&
+                preferences.readerPageTurnMode != ReaderPageTurnMode.CONTINUOUS_SCROLL &&
+                snapshot.totalVirtualPages > 0
+            ) {
+                val target = snapshot.activeVirtualPageIndex.coerceIn(0, snapshot.totalVirtualPages - 1)
+                if (pagerState.currentPage != target || pagerState.currentPageOffsetFraction != 0f) {
+                    programmaticSnapCount += 1
+                    try {
+                        pagerState.scrollToPage(target)
+                    } finally {
+                        programmaticSnapCount -= 1
                     }
                 }
             }
@@ -1006,45 +1176,106 @@ fun UnifiedReaderScreen(
                 .collect { (settledPage, scrolling, rev) ->
                     val curSnap = latestWindowSnapshot
                     if (!scrolling &&
-                        !isProgrammaticPagerSnap &&
-                        curSnap.currentSlot != null &&
-                        curSnap.coordinateRevision == rev &&
-                        syncedRevisionHolder[0] == rev &&
-                        pagerState.currentPage == settledPage &&
-                        settledPage != curSnap.activeVirtualPageIndex
+                        programmaticSnapCount == 0 &&
+                        inFlightStepRef[0] == null
                     ) {
-                        windowBuffer.onVirtualPageSettled(
-                            virtualPageIndex = settledPage,
-                            expectedCoordinateRevision = rev,
-                        )
+                        interruptedStepRef[0] = null
+                        if (curSnap.currentSlot != null &&
+                            curSnap.coordinateRevision == rev &&
+                            syncedSnapshotTracker.revision == rev &&
+                            pagerState.currentPage == settledPage &&
+                            settledPage != curSnap.activeVirtualPageIndex
+                        ) {
+                            windowBuffer.onVirtualPageSettled(
+                                virtualPageIndex = settledPage,
+                                expectedCoordinateRevision = rev,
+                            )
+                        }
                     }
                 }
         }
 
         fun stepPageBy(delta: Int) {
+            if (snapshot.totalVirtualPages <= 0) return
             val originRevision = snapshot.coordinateRevision
-            val targetVirtual = snapshot.activeVirtualPageIndex + delta
+            val existingStep = (inFlightStepRef[0] ?: interruptedStepRef[0])
+                ?.takeIf { it.coordinateRevision == originRevision }
+            interruptedStepRef[0] = null
+            val wasScrollingBeforeStep = existingStep != null || pagerState.isScrollInProgress
+            val basePage = existingStep?.targetVirtualPage
+                ?: if (syncedSnapshotTracker.revision == originRevision &&
+                    pagerState.currentPage in 0 until snapshot.totalVirtualPages
+                ) {
+                    if (pagerState.isScrollInProgress) pagerState.targetPage else pagerState.currentPage
+                } else {
+                    snapshot.activeVirtualPageIndex
+                }
+            val targetVirtual = basePage + delta
             if (targetVirtual !in 0 until snapshot.totalVirtualPages) return
-            coroutineScope.launch {
+
+            val stepRecord = InFlightStepTarget(
+                targetVirtualPage = targetVirtual,
+                coordinateRevision = originRevision,
+            )
+            inFlightStepRef[0] = stepRecord
+            val previousJob = stepAnimationJob
+            stepAnimationJob = coroutineScope.launch {
+                previousJob?.cancel()
                 val instantFlip = isEinkMode ||
                     preferences.readerPageTurnMode == ReaderPageTurnMode.EINK_INSTANT
-                isProgrammaticPagerSnap = true
+                programmaticSnapCount += 1
+                var cancelledOrInterrupted = false
                 try {
+                    if (wasScrollingBeforeStep) {
+                        // Let `HorizontalPager`'s `DraggableNode` channel consumer process `DragStopped`
+                        // and enqueue `ScrollingLogic.onDragStopped` (`MutatePriority.Default`) first so
+                        // our new step animation preempts the 0-velocity snap-back instead of vice versa.
+                        yield()
+                        yield()
+                    }
                     if (instantFlip) {
-                        pagerState.scrollToPage(targetVirtual)
+                        pagerState.scrollToPage(stepRecord.targetVirtualPage)
                     } else {
-                        runCatching { pagerState.animateScrollToPage(targetVirtual) }
-                            .onFailure { pagerState.scrollToPage(targetVirtual) }
+                        var retriedDefaultPreemption = false
+                        while (true) {
+                            val revBeforeAnimate = stepRecord.coordinateRevision
+                            try {
+                                pagerState.animateScrollToPage(stepRecord.targetVirtualPage)
+                                break
+                            } catch (ce: CancellationException) {
+                                if (!currentCoroutineContext().isActive) {
+                                    cancelledOrInterrupted = true
+                                    throw ce
+                                }
+                                if (!retriedDefaultPreemption &&
+                                    syncedSnapshotTracker.revision == revBeforeAnimate
+                                ) {
+                                    retriedDefaultPreemption = true
+                                    continue
+                                }
+                                cancelledOrInterrupted = true
+                                if (syncedSnapshotTracker.revision == stepRecord.coordinateRevision) {
+                                    interruptedStepRef[0] = stepRecord
+                                }
+                                break
+                            }
+                        }
                     }
                 } finally {
-                    isProgrammaticPagerSnap = false
+                    programmaticSnapCount -= 1
+                    if (inFlightStepRef[0] === stepRecord) {
+                        inFlightStepRef[0] = null
+                    }
                 }
-                windowBuffer.onVirtualPageSettled(
-                    virtualPageIndex = targetVirtual,
-                    expectedCoordinateRevision = originRevision,
-                )
+                if (!cancelledOrInterrupted) {
+                    windowBuffer.onVirtualPageSettled(
+                        virtualPageIndex = stepRecord.targetVirtualPage,
+                        expectedCoordinateRevision = stepRecord.coordinateRevision,
+                    )
+                }
             }
         }
+        latestPagedStepHandler[0] = ::stepPageBy
 
         fun jumpToChapterWithUndo(
             targetCid: Int,
@@ -1083,14 +1314,17 @@ fun UnifiedReaderScreen(
                         windowBuffer.syncActiveAnchorInCurrentChapter(targetAnchor)
                         persistReadingProgress(prevChapter, targetAnchor)
                     } else {
+                        inFlightStepRef[0] = null
+                        interruptedStepRef[0] = null
+                        stepAnimationJob?.cancel()
                         val originRevision = snapshot.coordinateRevision
                         val resolvedLocal = loadedCur.layout.resolvePageIndexForAnchor(targetAnchor)
                         val targetVirtual = snapshot.prevPageCount + resolvedLocal
-                        isProgrammaticPagerSnap = true
+                        programmaticSnapCount += 1
                         try {
                             pagerState.scrollToPage(targetVirtual)
                         } finally {
-                            isProgrammaticPagerSnap = false
+                            programmaticSnapCount -= 1
                         }
                         windowBuffer.onVirtualPageSettled(
                             virtualPageIndex = targetVirtual,
@@ -1359,9 +1593,11 @@ fun UnifiedReaderScreen(
                     (targetLocalPage != snapshot.activePageIndexInCurrentChapter ||
                         pagerState.currentPage != targetVirtual)
                 ) {
+                    inFlightStepRef[0] = null
+                    stepAnimationJob?.cancel()
                     val instantFlip = isEinkMode ||
                         preferences.readerPageTurnMode == ReaderPageTurnMode.EINK_INSTANT
-                    isProgrammaticPagerSnap = true
+                    programmaticSnapCount += 1
                     try {
                         if (instantFlip) {
                             pagerState.scrollToPage(targetVirtual)
@@ -1370,7 +1606,7 @@ fun UnifiedReaderScreen(
                                 .onFailure { pagerState.scrollToPage(targetVirtual) }
                         }
                     } finally {
-                        isProgrammaticPagerSnap = false
+                        programmaticSnapCount -= 1
                     }
                     windowBuffer.onVirtualPageSettled(
                         virtualPageIndex = targetVirtual,
@@ -1431,16 +1667,21 @@ fun UnifiedReaderScreen(
             continuousScrollJumpCommand = continuousScrollJumpCommand,
             onTapZoneAction = { action ->
                 if (isTypographyPanelOpen) {
+                    interruptedStepRef[0] = null
                     activeDraggingSlider = null
                     dragLockedAnchor = null
                     isTypographyPanelOpen = false
                 } else if (isHudVisible && action != ReaderTapZoneAction.TOGGLE_HUD) {
+                    interruptedStepRef[0] = null
                     isHudVisible = false
                 } else {
                     when (action) {
                         ReaderTapZoneAction.PREV_PAGE -> stepPageBy(-1)
                         ReaderTapZoneAction.NEXT_PAGE -> stepPageBy(+1)
-                        ReaderTapZoneAction.TOGGLE_HUD -> isHudVisible = !isHudVisible
+                        ReaderTapZoneAction.TOGGLE_HUD -> {
+                            interruptedStepRef[0] = null
+                            isHudVisible = !isHudVisible
+                        }
                     }
                 }
             },
@@ -1865,17 +2106,20 @@ fun UnifiedReaderScreen(
                                             persistReadingProgress(ch, targetUndo.anchor)
                                         }
                                     } else {
+                                        inFlightStepRef[0] = null
+                                        interruptedStepRef[0] = null
+                                        stepAnimationJob?.cancel()
                                         val originRevision = snapshot.coordinateRevision
                                         val resolvedIdx = (snapshot.currentSlot as? ChapterWindowSlot.Loaded)
                                             ?.layout
                                             ?.resolvePageIndexForAnchor(targetUndo.anchor)
                                             ?: (targetUndo.pageIndexOneBased - 1).coerceAtLeast(0)
                                         val targetVirtual = snapshot.prevPageCount + resolvedIdx
-                                        isProgrammaticPagerSnap = true
+                                        programmaticSnapCount += 1
                                         try {
                                             pagerState.scrollToPage(targetVirtual)
                                         } finally {
-                                            isProgrammaticPagerSnap = false
+                                            programmaticSnapCount -= 1
                                         }
                                         windowBuffer.onVirtualPageSettled(
                                             virtualPageIndex = targetVirtual,
@@ -2120,11 +2364,14 @@ fun UnifiedReaderScreen(
                                             val originRevision = snapshot.coordinateRevision
                                             val targetVirtual = snapshot.prevPageCount + targetLocalPage
                                             coroutineScope.launch {
-                                                isProgrammaticPagerSnap = true
+                                                inFlightStepRef[0] = null
+                                                interruptedStepRef[0] = null
+                                                stepAnimationJob?.cancel()
+                                                programmaticSnapCount += 1
                                                 try {
                                                     pagerState.scrollToPage(targetVirtual)
                                                 } finally {
-                                                    isProgrammaticPagerSnap = false
+                                                    programmaticSnapCount -= 1
                                                 }
                                                 windowBuffer.onVirtualPageSettled(
                                                     virtualPageIndex = targetVirtual,
@@ -2604,11 +2851,14 @@ fun UnifiedReaderScreen(
                                 val targetVirtual = snapshot.prevPageCount + targetLocalPage
                                 if (targetVirtual in 0 until snapshot.totalVirtualPages) {
                                     coroutineScope.launch {
-                                        isProgrammaticPagerSnap = true
+                                        inFlightStepRef[0] = null
+                                        interruptedStepRef[0] = null
+                                        stepAnimationJob?.cancel()
+                                        programmaticSnapCount += 1
                                         try {
                                             pagerState.scrollToPage(targetVirtual)
                                         } finally {
-                                            isProgrammaticPagerSnap = false
+                                            programmaticSnapCount -= 1
                                         }
                                         windowBuffer.onVirtualPageSettled(
                                             virtualPageIndex = targetVirtual,
@@ -3003,6 +3253,23 @@ private data class SliderSpec(
     val max: Int,
     val unit: String,
     val tag: String,
+)
+
+private class PagerCoordinateSyncTracker(
+    var revision: Long,
+    var currentCid: Int,
+    var currentSlotLoaded: Boolean,
+    var prevPageCount: Int,
+    var activeVirtualPageIndex: Int,
+    var layoutConfig: ReaderLayoutConfig?,
+    var lastRevisionWasPrevSlotTranslationOnly: Boolean = false,
+    var wasScrollingAtExplicitReset: Boolean = false,
+    var pendingPostSyncSettlePage: Int = -1,
+)
+
+private class InFlightStepTarget(
+    var targetVirtualPage: Int,
+    var coordinateRevision: Long,
 )
 
 private fun Context.findHostActivity(): Activity? {

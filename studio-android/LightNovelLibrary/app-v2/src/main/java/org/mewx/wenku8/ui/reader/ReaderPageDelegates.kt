@@ -17,6 +17,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -450,17 +451,68 @@ fun ReaderViewportHost(
             .fillMaxSize()
             .background(palette.backgroundColor)
             .testTag(ReaderTestTags.VIEWPORT_CONTAINER)
-            .pointerInput(effectiveMode, isRtlBunkobon) {
+            .pointerInput(effectiveMode, isRtlBunkobon, pagerState) {
                 if (effectiveMode != ReaderPageTurnMode.CONTINUOUS_SCROLL) {
-                    detectTapGestures { offset ->
-                        val action = resolveNineZoneTapAction(
-                            tapX = offset.x,
-                            tapY = offset.y,
-                            viewportWidth = size.width.toFloat(),
-                            viewportHeight = size.height.toFloat(),
-                            isRtlBook = isRtlBunkobon,
+                    awaitEachGesture {
+                        val down = awaitFirstDown(
+                            requireUnconsumed = false,
+                            pass = PointerEventPass.Initial,
                         )
-                        latestOnTapZoneAction(action)
+                        val wasScrollingAtDown = pagerState.isScrollInProgress
+                        if (!wasScrollingAtDown) {
+                            // Idle viewport: wait on `PointerEventPass.Main` so child clickables
+                            // (inline illustrations, Error-slot retry/diagnostics buttons) consume `up` first.
+                            val up = withTimeoutOrNull(viewConfiguration.longPressTimeoutMillis) {
+                                waitForUpOrCancellation(pass = PointerEventPass.Main)
+                            }
+                            if (up != null) {
+                                val action = resolveNineZoneTapAction(
+                                    tapX = up.position.x,
+                                    tapY = up.position.y,
+                                    viewportWidth = size.width.toFloat(),
+                                    viewportHeight = size.height.toFloat(),
+                                    isRtlBook = isRtlBunkobon,
+                                )
+                                latestOnTapZoneAction(action)
+                            }
+                        } else {
+                            // Pager is mid-turn (`animateScrollToPage` or settling fling): `HorizontalPager`
+                            // consumes `down` immediately on `Main` (`shouldScrollImmediately == true`) and
+                            // holds `MutatePriority.UserInput` until `Main` processes `UP`. Observe on
+                            // `PointerEventPass.Final` so `UserInput` is already released when `stepPageBy` runs!
+                            val pointerId = down.id
+                            val touchSlop = viewConfiguration.touchSlop
+                            val upPos = withTimeoutOrNull(viewConfiguration.longPressTimeoutMillis) {
+                                var resultPos: Offset? = null
+                                while (true) {
+                                    val event = awaitPointerEvent(pass = PointerEventPass.Final)
+                                    if (event.changes.count { it.pressed } > 1) {
+                                        break
+                                    }
+                                    val change = event.changes.firstOrNull { it.id == pointerId } ?: break
+                                    val dx = change.position.x - down.position.x
+                                    val dy = change.position.y - down.position.y
+                                    if (abs(dx) > touchSlop || abs(dy) > touchSlop) {
+                                        break
+                                    }
+                                    if (!change.pressed) {
+                                        resultPos = change.position
+                                        break
+                                    }
+                                }
+                                resultPos
+                            }
+                            if (upPos != null) {
+                                val action = resolveNineZoneTapAction(
+                                    tapX = upPos.x,
+                                    tapY = upPos.y,
+                                    viewportWidth = size.width.toFloat(),
+                                    viewportHeight = size.height.toFloat(),
+                                    isRtlBook = isRtlBunkobon,
+                                )
+                                latestOnTapZoneAction(action)
+                            }
+                        }
                     }
                 }
             }
@@ -592,6 +644,7 @@ fun ReaderViewportHost(
                     reverseLayout = isRtlBunkobon,
                     beyondViewportPageCount = 1,
                     flingBehavior = flingBehavior,
+                    key = { virtualPageIndex -> snapshot.virtualPagePagerKey(virtualPageIndex) },
                     modifier = Modifier
                         .fillMaxSize()
                         .testTag(ReaderTestTags.PAGED_HORIZONTAL_PAGER),
@@ -656,9 +709,7 @@ private fun Modifier.applyPageTurnTransition(
                         alpha = 1f
                         // `pageOffset > 0f`: outgoing upper page slides off to the left naturally.
                         // `pageOffset < 0f`: incoming underlying page (`virtualPageIndex > currentPage`) stays pinned!
-                        if (pageOffset < 0f) {
-                            translationX = pageOffset * size.width
-                        }
+                        translationX = if (pageOffset < 0f) pageOffset * size.width else 0f
                     }
                 }
                 .drawWithContent {
