@@ -1088,7 +1088,7 @@ class ManifestRepository(
 
             val request = Request.Builder()
                 .url(requestUrl)
-                .header("Accept", "application/dns-json, application/json")
+                .header("Accept", "application/dns-json")
                 .get()
                 .build()
 

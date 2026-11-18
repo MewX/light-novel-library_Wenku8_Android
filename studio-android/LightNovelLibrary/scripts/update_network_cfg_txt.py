@@ -624,7 +624,7 @@ def validate_live_doh_url(
     and validates the returned TXT record through `validate_txt_record_before_publish`."""
     req = urllib.request.Request(
         url=doh_url,
-        headers={"Accept": "application/dns-json, application/json", "User-Agent": USER_AGENT},
+        headers={"Accept": "application/dns-json", "User-Agent": USER_AGENT},
     )
     with urllib.request.urlopen(req, timeout=10) as resp:
         payload = json.loads(resp.read().decode("utf-8"))
