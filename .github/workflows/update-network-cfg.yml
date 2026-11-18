@@ -1,0 +1,73 @@
+name: Update Network Config TXT
+
+on:
+  schedule:
+    # Rotate fresh live-verified Cloudflare Web Edge /24 subnets daily at 04:23 UTC
+    # with a 30-day manifest validity buffer.
+    - cron: "23 4 * * *"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Dry-run only (probe subnets & print TXT without updating Cloudflare DNS)"
+        required: false
+        default: false
+        type: boolean
+      kill_switch:
+        description: "Emergency kill-switch (publish en=0 to revert all clients to System DNS)"
+        required: false
+        default: false
+        type: boolean
+  push:
+    branches:
+      - "master"
+      - "v2.0"
+    paths:
+      - ".github/workflows/update-network-cfg.yml"
+      - "studio-android/LightNovelLibrary/scripts/update_network_cfg_txt.py"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: update-network-cfg-dns
+  cancel-in-progress: false
+
+jobs:
+  curate-and-publish-txt:
+    name: Curate Cloudflare subnets & update _network_cfg.wenku8.app
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Run script self-test
+        run: python3 studio-android/LightNovelLibrary/scripts/update_network_cfg_txt.py --self-test
+
+      - name: Curate live Cloudflare subnets and update DNS TXT
+        env:
+          CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+          WENKU8_APP_ZONE_ID: ${{ secrets.WENKU8_APP_ZONE_ID }}
+          INPUT_DRY_RUN: ${{ inputs.dry_run }}
+          INPUT_KILL_SWITCH: ${{ inputs.kill_switch }}
+        run: |
+          set -euo pipefail
+          FLAGS=()
+          if [ "${INPUT_KILL_SWITCH:-false}" = "true" ]; then
+            FLAGS+=("--kill-switch")
+          fi
+          if [ "${INPUT_DRY_RUN:-false}" = "true" ]; then
+            FLAGS+=("--dry-run")
+          else
+            FLAGS+=("--apply")
+          fi
+          python3 studio-android/LightNovelLibrary/scripts/update_network_cfg_txt.py "${FLAGS[@]}"
+
+      - name: Verify public DoH resolution
+        if: ${{ inputs.dry_run != true }}
+        run: |
+          set -euo pipefail
+          RESP="$(curl -fsS -H 'Accept: application/dns-json' 'https://cloudflare-dns.com/dns-query?name=_network_cfg.wenku8.app&type=TXT')"
+          echo "Public DoH response: $RESP"
+          echo "$RESP" | grep -q "wk8-txt-v1"
