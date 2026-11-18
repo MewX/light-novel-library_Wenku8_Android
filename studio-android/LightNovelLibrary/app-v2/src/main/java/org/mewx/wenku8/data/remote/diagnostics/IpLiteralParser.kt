@@ -1,6 +1,8 @@
 package org.mewx.wenku8.data.remote.diagnostics
 
 import java.net.InetAddress
+import java.util.Locale
+import java.util.Random
 
 enum class IpAddressFamily(val wireLabel: String) {
     IPV4("ipv4"),
@@ -22,6 +24,137 @@ enum class IpAddressFamily(val wireLabel: String) {
 }
 
 /**
+ * Represents either a single numeric IP (`/32` IPv4 or `/128` IPv6) or a verified Anycast subnet
+ * prefix (`16..31` IPv4, `32..127` IPv6) from which clients sample random host addresses without
+ * touching OS DNS.
+ */
+data class CandidateAddressSpec(
+    val idPrefix: String,
+    val networkBytes: ByteArray,
+    val prefixLength: Int,
+    val family: IpAddressFamily,
+    val canonicalSpec: String,
+) {
+    val isSingleHost: Boolean
+        get() = (family == IpAddressFamily.IPV4 && prefixLength == 32) ||
+            (family == IpAddressFamily.IPV6 && prefixLength == 128)
+
+    fun sampleCandidateEntry(
+        random: Random,
+        requirePublicUnicast: Boolean = true,
+    ): CandidateIpEntry? {
+        if (isSingleHost) {
+            val copy = networkBytes.clone()
+            if (requirePublicUnicast && !IpLiteralParser.isPublicRoutableUnicast(copy)) {
+                return null
+            }
+            val ipText = IpLiteralParser.formatNumericIpBytes(copy)
+            return CandidateIpEntry(
+                id = idPrefix,
+                ipLiteral = ipText,
+                rawIpBytes = copy,
+                family = family,
+            )
+        }
+
+        return when (family) {
+            IpAddressFamily.IPV4 -> {
+                val hostBits = 32 - prefixLength
+                val baseInt = ((networkBytes[0].toInt() and 0xFF) shl 24) or
+                    ((networkBytes[1].toInt() and 0xFF) shl 16) or
+                    ((networkBytes[2].toInt() and 0xFF) shl 8) or
+                    (networkBytes[3].toInt() and 0xFF)
+                val hostOffset = if (prefixLength == 31) {
+                    random.nextInt(2)
+                } else {
+                    val totalAddresses = 1 shl hostBits
+                    // Strictly pick inside `1 .. totalAddresses - 2` (never `.0` network or broadcast).
+                    1 + random.nextInt((totalAddresses - 2).coerceAtLeast(1))
+                }
+                val sampledInt = baseInt or hostOffset
+                val sampledBytes = byteArrayOf(
+                    ((sampledInt ushr 24) and 0xFF).toByte(),
+                    ((sampledInt ushr 16) and 0xFF).toByte(),
+                    ((sampledInt ushr 8) and 0xFF).toByte(),
+                    (sampledInt and 0xFF).toByte(),
+                )
+                if (requirePublicUnicast && !IpLiteralParser.isPublicRoutableUnicast(sampledBytes)) {
+                    return null
+                }
+                val ipText = IpLiteralParser.formatNumericIpBytes(sampledBytes)
+                CandidateIpEntry(
+                    id = "$idPrefix-$ipText",
+                    ipLiteral = ipText,
+                    rawIpBytes = sampledBytes,
+                    family = IpAddressFamily.IPV4,
+                )
+            }
+
+            IpAddressFamily.IPV6 -> {
+                val sampledBytes = networkBytes.clone()
+                val fullPrefixBytes = prefixLength / 8
+                val partialBits = prefixLength % 8
+
+                var nonZeroHostBit = false
+                if (partialBits > 0 && fullPrefixBytes < 16) {
+                    val hostMask = (1 shl (8 - partialBits)) - 1
+                    val randBits = random.nextInt(256) and hostMask
+                    if (randBits != 0) nonZeroHostBit = true
+                    sampledBytes[fullPrefixBytes] =
+                        ((sampledBytes[fullPrefixBytes].toInt() and (hostMask.inv() and 0xFF)) or randBits).toByte()
+                }
+
+                val firstFullHostByte = if (partialBits > 0) fullPrefixBytes + 1 else fullPrefixBytes
+                for (idx in firstFullHostByte until 16) {
+                    val randByte = random.nextInt(256)
+                    if (randByte != 0) nonZeroHostBit = true
+                    sampledBytes[idx] = randByte.toByte()
+                }
+                if (!nonZeroHostBit) {
+                    // Avoid Subnet-Router Anycast all-zeros host identifier (`::0`).
+                    sampledBytes[15] = (sampledBytes[15].toInt() or 0x01).toByte()
+                }
+                if (requirePublicUnicast && !IpLiteralParser.isPublicRoutableUnicast(sampledBytes)) {
+                    return null
+                }
+                val ipText = IpLiteralParser.formatNumericIpBytes(sampledBytes)
+                val compactIdSuffix = String.format(
+                    Locale.ROOT,
+                    "%02x%02x%02x%02x",
+                    sampledBytes[12].toInt() and 0xFF,
+                    sampledBytes[13].toInt() and 0xFF,
+                    sampledBytes[14].toInt() and 0xFF,
+                    sampledBytes[15].toInt() and 0xFF,
+                )
+                CandidateIpEntry(
+                    id = "$idPrefix-$compactIdSuffix",
+                    ipLiteral = ipText,
+                    rawIpBytes = sampledBytes,
+                    family = IpAddressFamily.IPV6,
+                )
+            }
+        }
+    }
+
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (other !is CandidateAddressSpec) return false
+        return idPrefix == other.idPrefix &&
+            prefixLength == other.prefixLength &&
+            family == other.family &&
+            networkBytes.contentEquals(other.networkBytes)
+    }
+
+    override fun hashCode(): Int {
+        var result = idPrefix.hashCode()
+        result = 31 * result + networkBytes.contentHashCode()
+        result = 31 * result + prefixLength
+        result = 31 * result + family.hashCode()
+        return result
+    }
+}
+
+/**
  * Pure-Kotlin DNS-free numeric IPv4 / IPv6 literal parser and public-address validator.
  *
  * Architectural rationale (`network-connectivity-and-routing-design.md` §Candidate-list service):
@@ -34,6 +167,9 @@ enum class IpAddressFamily(val wireLabel: String) {
  *   zone-scoped (`%`), CIDR (`/`), bracketed (`[...]`), and port-bearing (`:443` on IPv4) inputs.
  */
 object IpLiteralParser {
+
+    const val MIN_IPV4_SUBNET_PREFIX_LEN: Int = 16
+    const val MIN_IPV6_SUBNET_PREFIX_LEN: Int = 32
 
     /**
      * Parses [rawLiteral] strictly as a numeric IPv4 (`ByteArray(4)`) or unbracketed IPv6
@@ -63,6 +199,159 @@ object IpLiteralParser {
             return null
         }
         return parsedBytes
+    }
+
+    /**
+     * Parses either an exact numeric IP literal (`104.16.132.229`, `2606:4700::6810:84e5`) or a
+     * bounded CIDR subnet (`104.18.32.0/24` with `/16..32`, `2606:4700:3030::/48` with `/32..128`)
+     * into a DNS-free [CandidateAddressSpec].
+     */
+    fun parseCandidateSpec(
+        idPrefix: String,
+        rawIpOrCidr: String,
+        requirePublicUnicast: Boolean = true,
+    ): CandidateAddressSpec? {
+        val trimmed = rawIpOrCidr.trim()
+        if (trimmed.isEmpty() || trimmed.length > 49) return null
+        if (trimmed.any { it == '[' || it == ']' || it == '%' || it.isWhitespace() }) {
+            return null
+        }
+
+        val slashIndex = trimmed.indexOf('/')
+        if (slashIndex < 0) {
+            val ipBytes = parseNumericIpBytes(trimmed, requirePublicUnicast = requirePublicUnicast)
+                ?: return null
+            val family = IpAddressFamily.fromRawBytesOrNull(ipBytes) ?: return null
+            val prefixLen = if (family == IpAddressFamily.IPV4) 32 else 128
+            return CandidateAddressSpec(
+                idPrefix = idPrefix,
+                networkBytes = ipBytes,
+                prefixLength = prefixLen,
+                family = family,
+                canonicalSpec = formatNumericIpBytes(ipBytes),
+            )
+        }
+
+        val ipPart = trimmed.substring(0, slashIndex)
+        val prefixPart = trimmed.substring(slashIndex + 1)
+        if (ipPart.isEmpty() || prefixPart.isEmpty() || prefixPart.length > 3 || prefixPart.contains('/')) {
+            return null
+        }
+        if (prefixPart.length > 1 && prefixPart[0] == '0') return null
+        val prefixLen = prefixPart.toIntOrNull() ?: return null
+
+        val rawBytes = if (ipPart.contains(':')) {
+            parseIpv6Literal(ipPart)
+        } else {
+            parseIpv4Literal(ipPart)
+        } ?: return null
+
+        val family = IpAddressFamily.fromRawBytesOrNull(rawBytes) ?: return null
+        when (family) {
+            IpAddressFamily.IPV4 -> {
+                if (prefixLen !in MIN_IPV4_SUBNET_PREFIX_LEN..32) return null
+            }
+            IpAddressFamily.IPV6 -> {
+                if (prefixLen !in MIN_IPV6_SUBNET_PREFIX_LEN..128) return null
+            }
+        }
+
+        val maskedNetwork = maskNetworkPrefix(rawBytes, prefixLen)
+        if (requirePublicUnicast) {
+            // Verify both first and last addresses in the CIDR block stay strictly inside public unicast!
+            val broadcastOrLast = fillHostBitsOne(maskedNetwork, prefixLen)
+            if (!isPublicRoutableUnicast(maskedNetwork) || !isPublicRoutableUnicast(broadcastOrLast)) {
+                return null
+            }
+        }
+
+        val canonicalIp = formatNumericIpBytes(maskedNetwork)
+        val canonicalSpec = if ((family == IpAddressFamily.IPV4 && prefixLen == 32) ||
+            (family == IpAddressFamily.IPV6 && prefixLen == 128)
+        ) {
+            canonicalIp
+        } else {
+            "$canonicalIp/$prefixLen"
+        }
+        return CandidateAddressSpec(
+            idPrefix = idPrefix,
+            networkBytes = maskedNetwork,
+            prefixLength = prefixLen,
+            family = family,
+            canonicalSpec = canonicalSpec,
+        )
+    }
+
+    fun formatNumericIpBytes(bytes: ByteArray): String {
+        return when (bytes.size) {
+            4 -> "${bytes[0].toInt() and 0xFF}.${bytes[1].toInt() and 0xFF}." +
+                "${bytes[2].toInt() and 0xFF}.${bytes[3].toInt() and 0xFF}"
+            16 -> {
+                val groups = IntArray(8) { i ->
+                    ((bytes[i * 2].toInt() and 0xFF) shl 8) or (bytes[i * 2 + 1].toInt() and 0xFF)
+                }
+                // Compress longest run of >= 2 zero hextets per RFC 5952
+                var bestStart = -1
+                var bestLen = 0
+                var curStart = -1
+                var curLen = 0
+                for (i in 0 until 8) {
+                    if (groups[i] == 0) {
+                        if (curStart == -1) {
+                            curStart = i
+                            curLen = 1
+                        } else {
+                            curLen += 1
+                        }
+                        if (curLen >= 2 && curLen > bestLen) {
+                            bestStart = curStart
+                            bestLen = curLen
+                        }
+                    } else {
+                        curStart = -1
+                        curLen = 0
+                    }
+                }
+                if (bestStart == -1) {
+                    groups.joinToString(":") { it.toString(16) }
+                } else {
+                    val left = (0 until bestStart).joinToString(":") { groups[it].toString(16) }
+                    val right = ((bestStart + bestLen) until 8).joinToString(":") { groups[it].toString(16) }
+                    "$left::$right"
+                }
+            }
+            else -> ""
+        }
+    }
+
+    private fun maskNetworkPrefix(raw: ByteArray, prefixLen: Int): ByteArray {
+        val out = raw.clone()
+        val fullBytes = prefixLen / 8
+        val remBits = prefixLen % 8
+        if (remBits > 0 && fullBytes < out.size) {
+            val mask = (0xFF shl (8 - remBits)) and 0xFF
+            out[fullBytes] = (out[fullBytes].toInt() and mask).toByte()
+        }
+        val clearStart = if (remBits > 0) fullBytes + 1 else fullBytes
+        for (i in clearStart until out.size) {
+            out[i] = 0
+        }
+        return out
+    }
+
+    private fun fillHostBitsOne(maskedNetwork: ByteArray, prefixLen: Int): ByteArray {
+        val out = maskedNetwork.clone()
+        val fullBytes = prefixLen / 8
+        val remBits = prefixLen % 8
+        if (remBits > 0 && fullBytes < out.size) {
+            val hostMask = (1 shl (8 - remBits)) - 1
+            out[fullBytes] = (out[fullBytes].toInt() or hostMask).toByte()
+        }
+        val setStart = if (remBits > 0) fullBytes + 1 else fullBytes
+        for (i in setStart until out.size) {
+            out[i] = 0xFF.toByte()
+        }
+        return out
     }
 
     /**

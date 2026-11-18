@@ -63,6 +63,7 @@ class RelayRouteController(
     private val autoProbeGapMillis: Long = DEFAULT_AUTO_PROBE_GAP_MS,
     private val initialAutoOptimizeEnabled: Boolean = false,
     private val allowPassiveBackgroundProbing: Boolean = false,
+    private val allowBootstrapRecoveryOnDefaultFailure: Boolean = false,
     private val monotonicClockMillis: () -> Long = { SystemClock.elapsedRealtime() },
     private val wallClockEpochMillis: () -> Long = { System.currentTimeMillis() },
 ) : RelayRouteProvider {
@@ -247,16 +248,23 @@ class RelayRouteController(
         succeeded: Boolean,
         connectionSetupMs: Long?,
     ) {
-        if (!allowPassiveBackgroundProbing || isDiagnosticsPausedAt(monotonicClockMillis())) {
+        if (isDiagnosticsPausedAt(monotonicClockMillis())) {
             return
         }
         if (!succeeded && candidateId == null && userAutoOptimizeEnabled) {
+            if (!allowPassiveBackgroundProbing && !allowBootstrapRecoveryOnDefaultFailure) {
+                return
+            }
             // Default route failed -> coalesce bounded bootstrap recovery if idle
             if (activeBackgroundJob?.isActive != true && manualDiagnosticsActiveCount.get() == 0) {
                 activeBackgroundJob = applicationScope.launch {
                     runBootstrapRecovery()
                 }
             }
+            return
+        }
+
+        if (!allowPassiveBackgroundProbing) {
             return
         }
 
@@ -321,7 +329,9 @@ class RelayRouteController(
             if (!manualRecheck && (baselineNetwork.isPowerSaveMode || baselineNetwork.isDataSaverRestricted)) {
                 return@withLock false
             }
-            if (!manualRecheck) {
+            if (manualRecheck) {
+                diagnosticsPausedUntilMonotonicMs = null
+            } else {
                 val nowCheckMono = monotonicClockMillis()
                 if (isDiagnosticsPausedAt(nowCheckMono)) {
                     return@withLock false
@@ -346,8 +356,10 @@ class RelayRouteController(
                 return true
             }
 
-            val manifest = manifestRepository.refreshFromIndependentOrigins(endpoint.relayHost)
-                ?: manifestRepository.loadCachedOrInMemoryManifest(endpoint.relayHost)
+            val manifest = manifestRepository.refreshFromIndependentOrigins(
+                expectedRelayHostname = endpoint.relayHost,
+                forceRefresh = manualRecheck,
+            ) ?: manifestRepository.loadCachedOrInMemoryManifest(endpoint.relayHost)
                 ?: return@withLock false
 
             if (!manifest.enabled) {
@@ -364,7 +376,7 @@ class RelayRouteController(
             }
 
             val eligibleCandidates = selectBalancedCandidatesForScreening(
-                allCandidates = manifest.candidates,
+                allCandidates = manifest.sampleCandidates(),
                 nowMono = nowMono,
                 maxCount = 4,
             )
@@ -379,11 +391,13 @@ class RelayRouteController(
 
             suspend fun runBudgetedTournamentProbe(armConfig: ProbeArmConfig, index: Int): ProbeSampleResult? {
                 if (!canContinueTournament()) return null
-                val budgetOk = routingLocalStore.tryConsumeAutomaticProbeBudget(
-                    nowEpochMs = wallClockEpochMillis(),
-                    isMeteredOrUnknown = baselineNetwork.isMetered || baselineNetwork.underlyingTransports.isEmpty(),
-                )
-                if (!budgetOk) return null
+                if (!manualRecheck) {
+                    val budgetOk = routingLocalStore.tryConsumeAutomaticProbeBudget(
+                        nowEpochMs = wallClockEpochMillis(),
+                        isMeteredOrUnknown = baselineNetwork.isMetered || baselineNetwork.underlyingTransports.isEmpty(),
+                    )
+                    if (!budgetOk) return null
+                }
                 probesUsed += 1
 
                 val sample = stalledDnsGuard.semaphore.withPermit {
@@ -467,7 +481,7 @@ class RelayRouteController(
                     return@withLock false
                 }
 
-                // --- Stage 2: Counterbalanced Confirmation (C, D, D, C, C, D = 6 fresh-pool probes) ---
+                // --- Stage 2: Counterbalanced Confirmation (C, D, D, C, C, D = up to 6 fresh-pool probes) ---
                 val challengerConfirmSamples = mutableListOf<ProbeSampleResult>()
                 val controlConfirmSamples = mutableListOf<ProbeSampleResult>()
                 var lastChallengerConfirmationPool: ConnectionPool? = null
@@ -498,6 +512,12 @@ class RelayRouteController(
                         }
                         challengerConfirmSamples.add(cSample)
                     } else {
+                        // When Default DNS already failed in Stage 1 AND failed its first Stage 2 confirmation,
+                        // `controlAllSucceeded` is guaranteed false; skip 2nd/3rd doomed default timeouts so a
+                        // GFW-blocked default route cannot exhaust the 25s tournament deadline!
+                        if (!controlScreen.succeeded && controlConfirmSamples.any { !it.succeeded }) {
+                            continue
+                        }
                         val dPool = ConnectionPool(1, 30, TimeUnit.SECONDS).also { temporaryPools.add(it) }
                         val dSample = runBudgetedTournamentProbe(
                             armConfig = ProbeArmConfig(
@@ -571,10 +591,20 @@ class RelayRouteController(
                     ),
                     index = 20,
                 )
+                val warmLatencyAcceptable = if (promotedOnReliability || controlMedianMs == null) {
+                    true
+                } else {
+                    // Allow normal upstream/Smart-Placement jitter (+50 ms over cold median) as long as
+                    // the reused connection remains meaningfully faster than the Default route.
+                    val jitterCeilingMs = challengerMedianMs + 50L
+                    warmGuardSample != null &&
+                        warmGuardSample.fullResponseElapsedMs <= jitterCeilingMs &&
+                        warmGuardSample.fullResponseElapsedMs < controlMedianMs
+                }
                 if (warmGuardSample == null ||
                     !warmGuardSample.isAuthenticatedCandidateProbeSuccess() ||
                     !warmGuardSample.connectionReused ||
-                    warmGuardSample.fullResponseElapsedMs > challengerMedianMs
+                    !warmLatencyAcceptable
                 ) {
                     OkHttpProbeTransport.evictPoolSafely(warmGuardPool)
                     refreshUiState()
@@ -659,7 +689,7 @@ class RelayRouteController(
         val startedMono = monotonicClockMillis()
         var callsUsed = 0
 
-        for (candidate in selectBalancedCandidatesForScreening(manifest.candidates, nowMono, maxCount = MAX_RECOVERY_CALLS)) {
+        for (candidate in selectBalancedCandidatesForScreening(manifest.sampleCandidates(), nowMono, maxCount = MAX_RECOVERY_CALLS)) {
             if (callsUsed >= MAX_RECOVERY_CALLS) break
             if (monotonicClockMillis() - startedMono >= MAX_RECOVERY_DURATION_MS) break
             if (!routingLocalStore.tryConsumeAutomaticProbeBudget(

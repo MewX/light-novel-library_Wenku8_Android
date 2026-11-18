@@ -499,24 +499,18 @@ class RelayHttpTransport(
             val dnsAdapter = if (pinned == null) {
                 systemDns
             } else {
-                Dns { hostname ->
-                    if (hostname.trimEnd('.').equals(pinned.relayHost, ignoreCase = true)) {
-                        listOf(
-                            InetAddress.getByAddress(
-                                pinned.relayHost,
-                                pinned.rawIpBytes.clone(),
-                            ),
-                        )
-                    } else {
-                        systemDns.lookup(hostname)
-                    }
-                }
+                org.mewx.wenku8.data.remote.diagnostics.PinnedHostIpDns(
+                    relayHostname = pinned.relayHost,
+                    rawIpBytes = pinned.rawIpBytes,
+                    fallbackDns = systemDns,
+                )
             }
 
             val client = baseOkHttpClient.newBuilder()
                 .cookieJar(CookieJar.NO_COOKIES) // Managed explicitly via WenkuSessionCookieStore
                 .connectionPool(pool)
                 .dns(dnsAdapter)
+                .protocols(listOf(Protocol.HTTP_2, Protocol.HTTP_1_1))
                 .fastFallback(pinned == null)
                 .retryOnConnectionFailure(false)
                 .followRedirects(pinned == null)

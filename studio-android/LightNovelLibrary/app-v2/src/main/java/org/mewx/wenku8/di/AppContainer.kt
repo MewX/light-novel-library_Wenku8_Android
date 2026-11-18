@@ -105,6 +105,9 @@ class AppContainer(context: Context) {
         ManifestRepository(
             localStore = routingLocalStore,
             baseOkHttpClient = sharedBaseOkHttpClient,
+            dohTxtDomain = ManifestRepository.DEFAULT_DOH_TXT_CONFIG_DOMAIN,
+            dohEndpoints = ManifestRepository.defaultDomesticDohEndpoints(),
+            bundledCandidateSpecs = ManifestRepository.defaultVerifiedCloudflareSubnetSpecs(),
         )
     }
 
@@ -129,6 +132,7 @@ class AppContainer(context: Context) {
             routingLocalStore = routingLocalStore,
             networkObserver = diagnosticsNetworkMonitor,
             stalledDnsGuard = stalledDnsGuard,
+            allowBootstrapRecoveryOnDefaultFailure = true,
         ).also { controller ->
             applicationScope.launch {
                 userPreferencesRepository.preferencesFlow

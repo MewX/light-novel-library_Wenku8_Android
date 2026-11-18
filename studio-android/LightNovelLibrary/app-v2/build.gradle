@@ -105,6 +105,7 @@ android {
             returnDefaultValues = true
             all {
                 systemProperty 'robolectric.graphicsMode', 'NATIVE'
+                systemProperty 'wenku8.liveNetworkTest', System.getProperty('wenku8.liveNetworkTest', 'false')
                 maxHeapSize = '2048m'
                 jacoco {
                     includeNoLocationClasses = true

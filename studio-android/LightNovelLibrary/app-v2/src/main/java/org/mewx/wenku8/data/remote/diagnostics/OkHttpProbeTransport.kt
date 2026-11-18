@@ -717,29 +717,14 @@ class OkHttpProbeTransport(
         return when (policy) {
             ProbeDnsPolicy.SystemDefault -> systemDns
 
-            ProbeDnsPolicy.Ipv4Only -> Dns { hostname ->
-                val ipv4List = systemDns.lookup(hostname).filterIsInstance<Inet4Address>()
-                if (ipv4List.isEmpty()) {
-                    throw AddressFamilyUnavailableException(IpAddressFamily.IPV4)
-                }
-                ipv4List
-            }
+            ProbeDnsPolicy.Ipv4Only -> AddressFamilyFilteredDns(systemDns, IpAddressFamily.IPV4)
 
-            ProbeDnsPolicy.Ipv6Only -> Dns { hostname ->
-                val ipv6List = systemDns.lookup(hostname).filterIsInstance<Inet6Address>()
-                if (ipv6List.isEmpty()) {
-                    throw AddressFamilyUnavailableException(IpAddressFamily.IPV6)
-                }
-                ipv6List
-            }
+            ProbeDnsPolicy.Ipv6Only -> AddressFamilyFilteredDns(systemDns, IpAddressFamily.IPV6)
 
-            is ProbeDnsPolicy.PinnedCandidate -> Dns { hostname ->
-                // Never fall back to system DNS inside a candidate probe!
-                if (!hostname.trimEnd('.').equals(policy.relayHostname, ignoreCase = true)) {
-                    throw UnknownHostException("Candidate probe DNS refused unexpected host")
-                }
-                listOf(InetAddress.getByAddress(policy.relayHostname, policy.rawIpBytes.clone()))
-            }
+            is ProbeDnsPolicy.PinnedCandidate -> PinnedHostIpDns(
+                relayHostname = policy.relayHostname,
+                rawIpBytes = policy.rawIpBytes,
+            )
         }
     }
 
@@ -998,3 +983,66 @@ class OkHttpProbeTransport(
         }
     }
 }
+
+/**
+ * Value-equal DNS-free [Dns] adapter that maps [relayHostname] directly to [rawIpBytes] via
+ * `InetAddress.getByAddress` without invoking OS DNS.
+ *
+ * Implementing value-based [equals] and [hashCode] is essential for OkHttp connection pooling:
+ * `okhttp3.Address.equalsNonHost` compares `this.dns == that.dns`, so anonymous `Dns { ... }`
+ * lambdas would fail equality and force a cold TCP+TLS handshake on every call!
+ */
+internal class PinnedHostIpDns(
+    relayHostname: String,
+    rawIpBytes: ByteArray,
+    private val fallbackDns: Dns? = null,
+) : Dns {
+    private val normalizedHost: String = relayHostname.trim().trimEnd('.').lowercase(Locale.ROOT)
+    private val ipBytes: ByteArray = rawIpBytes.clone()
+
+    override fun lookup(hostname: String): List<InetAddress> {
+        if (hostname.trim().trimEnd('.').equals(normalizedHost, ignoreCase = true)) {
+            return listOf(InetAddress.getByAddress(normalizedHost, ipBytes.clone()))
+        }
+        val fb = fallbackDns ?: throw UnknownHostException("Pinned DNS refused unexpected host: $hostname")
+        return fb.lookup(hostname)
+    }
+
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (other !is PinnedHostIpDns) return false
+        return normalizedHost == other.normalizedHost && ipBytes.contentEquals(other.ipBytes)
+    }
+
+    override fun hashCode(): Int {
+        return 31 * normalizedHost.hashCode() + ipBytes.contentHashCode()
+    }
+}
+
+internal class AddressFamilyFilteredDns(
+    private val baseDns: Dns,
+    private val family: IpAddressFamily,
+) : Dns {
+    override fun lookup(hostname: String): List<InetAddress> {
+        val all = baseDns.lookup(hostname)
+        val filtered = when (family) {
+            IpAddressFamily.IPV4 -> all.filterIsInstance<Inet4Address>()
+            IpAddressFamily.IPV6 -> all.filterIsInstance<Inet6Address>()
+        }
+        if (filtered.isEmpty()) {
+            throw AddressFamilyUnavailableException(family)
+        }
+        return filtered
+    }
+
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (other !is AddressFamilyFilteredDns) return false
+        return baseDns == other.baseDns && family == other.family
+    }
+
+    override fun hashCode(): Int {
+        return 31 * baseDns.hashCode() + family.hashCode()
+    }
+}
+
