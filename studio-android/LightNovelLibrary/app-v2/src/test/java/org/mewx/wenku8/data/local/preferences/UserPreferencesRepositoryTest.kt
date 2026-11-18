@@ -45,7 +45,7 @@ class UserPreferencesRepositoryTest {
         assertEquals(20, defaults.readerParagraphDistanceDp)
         assertEquals(8, defaults.readerPageEdgeDistanceDp)
         assertTrue(defaults.volumeKeyPagingEnabled)
-        assertTrue(defaults.autoOptimizeConnectionEnabled)
+        assertFalse(defaults.autoOptimizeConnectionEnabled)
     }
 
     @Test

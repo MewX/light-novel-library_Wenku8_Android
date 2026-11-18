@@ -61,6 +61,8 @@ class RelayRouteController(
     private val stalledDnsGuard: StalledDnsGuard = StalledDnsGuard(),
     private val appVersionCode: Int = BuildConfig.VERSION_CODE,
     private val autoProbeGapMillis: Long = DEFAULT_AUTO_PROBE_GAP_MS,
+    private val initialAutoOptimizeEnabled: Boolean = false,
+    private val allowPassiveBackgroundProbing: Boolean = false,
     private val monotonicClockMillis: () -> Long = { SystemClock.elapsedRealtime() },
     private val wallClockEpochMillis: () -> Long = { System.currentTimeMillis() },
 ) : RelayRouteProvider {
@@ -94,7 +96,7 @@ class RelayRouteController(
     private val manualDiagnosticsActiveCount = AtomicInteger(0)
     private val rotationCursor = AtomicInteger(0)
 
-    @Volatile private var userAutoOptimizeEnabled: Boolean = true
+    @Volatile private var userAutoOptimizeEnabled: Boolean = initialAutoOptimizeEnabled
     @Volatile private var activeLease: LeaseRecord? = null
     @Volatile private var lastObservedNetwork: NetworkSnapshot? = null
     @Volatile private var lastFullTournamentAtMonotonicMs: Long? = null
@@ -166,9 +168,10 @@ class RelayRouteController(
     fun currentManifestRevisionOrNull(): String? = activeLease?.manifestRevision
 
     /**
-     * Restores default system-DNS routing and optionally schedules an immediate re-evaluation.
+     * Restores default system-DNS routing without consuming relay quota unless
+     * [triggerTournamentNow] is explicitly requested.
      */
-    fun resetToDefaultAndReevaluate(triggerTournamentNow: Boolean = true) {
+    fun resetToDefaultAndReevaluate(triggerTournamentNow: Boolean = false) {
         activeBackgroundJob?.cancel()
         quarantinedUntilMonotonicById.clear()
         synchronized(routeStateLock) {
@@ -242,6 +245,9 @@ class RelayRouteController(
         succeeded: Boolean,
         connectionSetupMs: Long?,
     ) {
+        if (!allowPassiveBackgroundProbing) {
+            return
+        }
         if (!succeeded && candidateId == null && userAutoOptimizeEnabled) {
             // Default route failed -> coalesce bounded bootstrap recovery if idle
             if (activeBackgroundJob?.isActive != true && manualDiagnosticsActiveCount.get() == 0) {
@@ -771,10 +777,12 @@ class RelayRouteController(
     }
 
     private fun computeInitialUiState(): AutoRoutingModeState {
-        return if (endpointResolutionProvider() is DiagnosticsEndpointResolution.Available) {
+        return if (endpointResolutionProvider() !is DiagnosticsEndpointResolution.Available) {
+            AutoRoutingModeState.UnavailableStub
+        } else if (userAutoOptimizeEnabled) {
             AutoRoutingModeState.EnabledUsingDefault
         } else {
-            AutoRoutingModeState.UnavailableStub
+            AutoRoutingModeState.DisabledByUser
         }
     }
 }

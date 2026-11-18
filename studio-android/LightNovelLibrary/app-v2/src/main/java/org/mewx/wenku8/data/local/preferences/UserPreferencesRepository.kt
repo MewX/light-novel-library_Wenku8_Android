@@ -63,7 +63,7 @@ data class Wenku8UserPreferences(
     val readerKeepScreenOn: Boolean = false,
     val readerEdgeBrightnessDragEnabled: Boolean = false,
     val volumeKeyPagingEnabled: Boolean = true,
-    val autoOptimizeConnectionEnabled: Boolean = true,
+    val autoOptimizeConnectionEnabled: Boolean = false,
     val cachedNoticeText: String = "",
     val legacyV1InternalMigrationVersion: Int = 0,
 ) {
@@ -499,7 +499,7 @@ class UserPreferencesRepository(
             readerKeepScreenOn = prefs[Keys.READER_KEEP_SCREEN_ON] ?: false,
             readerEdgeBrightnessDragEnabled = prefs[Keys.READER_EDGE_BRIGHTNESS_DRAG] ?: false,
             volumeKeyPagingEnabled = prefs[Keys.VOLUME_KEY_PAGING_ENABLED] ?: true,
-            autoOptimizeConnectionEnabled = prefs[Keys.AUTO_OPTIMIZE_CONNECTION_ENABLED] ?: true,
+            autoOptimizeConnectionEnabled = prefs[Keys.AUTO_OPTIMIZE_CONNECTION_ENABLED] ?: false,
             cachedNoticeText = prefs[Keys.CACHED_NOTICE_TEXT] ?: "",
             legacyV1InternalMigrationVersion = prefs[Keys.LEGACY_V1_MIGRATION_VERSION] ?: 0,
         )

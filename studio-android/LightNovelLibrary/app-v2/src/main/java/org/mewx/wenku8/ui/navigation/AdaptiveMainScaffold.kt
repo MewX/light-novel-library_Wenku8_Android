@@ -241,7 +241,7 @@ fun AdaptiveMainScaffold(
     legacyV1StorageMigrator: LegacyV1StorageMigrator? = null,
     appLanguage: Wenku8API.AppLanguage = Wenku8API.AppLanguage.SC,
     networkDiagnosticsViewModelFactory: NetworkDiagnosticsViewModel.Factory? = null,
-    autoOptimizeConnectionEnabled: Boolean = true,
+    autoOptimizeConnectionEnabled: Boolean = false,
     onAutoOptimizeConnectionChanged: (Boolean) -> Unit = {},
     onBookshelfViewModeSelected: (BookshelfViewMode) -> Unit = {},
     onBookshelfSortModeSelected: (BookshelfSortMode) -> Unit = {},
@@ -1282,7 +1282,7 @@ private fun MainDestinationBody(
             autoRoutingState = autoRoutingState,
             onAutoOptimizeConnectionChanged = onAutoOptimizeConnectionChanged,
             onResetDefaultConnection = {
-                relayRouteController?.resetToDefaultAndReevaluate(triggerTournamentNow = true)
+                relayRouteController?.resetToDefaultAndReevaluate(triggerTournamentNow = false)
             },
             onOpenNetworkDiagnostics = onOpenNetworkDiagnostics,
             onAppLanguageSelected = onAppLanguageSelected,

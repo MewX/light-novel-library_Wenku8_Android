@@ -366,7 +366,7 @@ class DiagnosticsRunnerAndControllerTest {
             }
         }
 
-        val controller = RelayRouteController(
+        val passiveDefaultController = RelayRouteController(
             applicationScope = storeScope,
             endpointResolutionProvider = { DiagnosticsEndpointResolution.Available(testEndpoint) },
             probeTransport = tournamentTransport,
@@ -377,6 +377,44 @@ class DiagnosticsRunnerAndControllerTest {
             monotonicClockMillis = { monoClock.get() },
             wallClockEpochMillis = { nowWall },
         )
+        assertTrue(passiveDefaultController.uiState.value is AutoRoutingModeState.DisabledByUser)
+        passiveDefaultController.onPassiveCallCompleted(
+            generationId = 1L,
+            candidateId = null,
+            succeeded = false,
+            connectionSetupMs = null,
+        )
+        repeat(5) {
+            passiveDefaultController.onPassiveCallCompleted(
+                generationId = 1L,
+                candidateId = null,
+                succeeded = true,
+                connectionSetupMs = 950L,
+            )
+        }
+        assertEquals("Passive default controller must emit zero background probes", 0, totalProbesSent)
+
+        val controller = RelayRouteController(
+            applicationScope = storeScope,
+            endpointResolutionProvider = { DiagnosticsEndpointResolution.Available(testEndpoint) },
+            probeTransport = tournamentTransport,
+            manifestRepository = manifestRepo,
+            routingLocalStore = routingLocalStore,
+            networkObserver = fakeObserver,
+            autoProbeGapMillis = 0L,
+            initialAutoOptimizeEnabled = true,
+            monotonicClockMillis = { monoClock.get() },
+            wallClockEpochMillis = { nowWall },
+        )
+
+        // Even when auto-optimize is toggled ON, ordinary failed/slow API calls must NOT silently burn relay quota
+        controller.onPassiveCallCompleted(
+            generationId = 1L,
+            candidateId = null,
+            succeeded = false,
+            connectionSetupMs = null,
+        )
+        assertEquals(0, totalProbesSent)
 
         // 1. Sub-threshold improvement (Default 120ms vs Challenger 98ms -> 22ms < 30ms): NOT promoted!
         defaultLatencyMs = 120L

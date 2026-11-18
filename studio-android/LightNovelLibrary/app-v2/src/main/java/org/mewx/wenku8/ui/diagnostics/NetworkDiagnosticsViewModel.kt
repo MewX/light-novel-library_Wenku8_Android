@@ -140,7 +140,7 @@ class NetworkDiagnosticsViewModel(
 
     fun resetDefaultAndReevaluateRoute() {
         if (activeRunJob?.isActive == true) return
-        relayRouteController.resetToDefaultAndReevaluate(triggerTournamentNow = true)
+        relayRouteController.resetToDefaultAndReevaluate(triggerTournamentNow = false)
     }
 
     override fun onCleared() {
