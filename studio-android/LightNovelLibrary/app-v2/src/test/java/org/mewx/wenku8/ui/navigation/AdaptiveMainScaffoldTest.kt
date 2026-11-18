@@ -152,4 +152,59 @@ class AdaptiveMainScaffoldTest {
         assertTrue(observedEinkFlag)
         assertEquals(Color.White, observedBackgroundColor)
     }
+
+    @Test
+    fun doubleBackToExit_showsClassicToastExpiresAfterTwoSecondsAndResetsOnTabSwitch() {
+        var fakeMonoMs = 10_000L
+        var exitCount = 0
+        var backDispatcher: androidx.activity.OnBackPressedDispatcher? = null
+
+        composeTestRule.setContent {
+            backDispatcher = androidx.activity.compose.LocalOnBackPressedDispatcherOwner.current
+                ?.onBackPressedDispatcher
+            Box(modifier = Modifier.size(width = 412.dp, height = 892.dp)) {
+                Wenku8ExpressiveTheme(themeMode = Wenku8ThemeMode.CLASSIC_BLUE) {
+                    AdaptiveMainScaffold(
+                        preferredHomeDestination = DefaultHomeDestination.LATEST,
+                        isNetworkAvailableOnColdStart = true,
+                        currentThemeMode = Wenku8ThemeMode.CLASSIC_BLUE,
+                        onThemeModeSelected = {},
+                        onDefaultHomeSelected = {},
+                        exitBackClockMonoMs = { fakeMonoMs },
+                        onRequestExitApp = { exitCount++ },
+                    )
+                }
+            }
+        }
+        composeTestRule.waitForIdle()
+
+        // 1. First back press shows v1's classic kaomoji toast and does NOT exit
+        composeTestRule.runOnIdle { backDispatcher!!.onBackPressed() }
+        assertEquals(0, exitCount)
+        val toastText = org.robolectric.shadows.ShadowToast.getTextOfLatestToast().orEmpty()
+        assertTrue(
+            "Expected classic v1 press_twice_to_exit toast, got: $toastText",
+            toastText.contains("退出请再戳一下返回键哦"),
+        )
+
+        // 2. Waiting >= 2000ms disarms exit; pressing Back again re-prompts instead of exiting
+        fakeMonoMs += 2_100L
+        composeTestRule.runOnIdle { backDispatcher!!.onBackPressed() }
+        assertEquals(0, exitCount)
+
+        // 3. Switching top-level tabs also resets the armed state
+        fakeMonoMs += 400L
+        composeTestRule
+            .onNodeWithTag("${MainScaffoldTestTags.NAV_ITEM_PREFIX}bookshelf")
+            .performClick()
+        composeTestRule.waitForIdle()
+        fakeMonoMs += 300L
+        composeTestRule.runOnIdle { backDispatcher!!.onBackPressed() }
+        assertEquals(0, exitCount)
+
+        // 4. Second back press within 2000ms exits cleanly
+        fakeMonoMs += 600L
+        composeTestRule.runOnIdle { backDispatcher!!.onBackPressed() }
+        assertEquals(1, exitCount)
+    }
 }

@@ -1,5 +1,11 @@
 package org.mewx.wenku8.ui.navigation
 
+import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
+import android.os.SystemClock
+import android.widget.Toast
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.ExperimentalSharedTransitionApi
@@ -53,13 +59,16 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.IntOffset
@@ -270,6 +279,8 @@ fun AdaptiveMainScaffold(
     onNovelClicked: (DiscoveryNovelCardItem) -> Unit = {},
     onOpenReader: (ReaderLaunchRequest) -> Unit = {},
     onOpenNetworkDiagnostics: () -> Unit = {},
+    exitBackClockMonoMs: () -> Long = SystemClock::elapsedRealtime,
+    onRequestExitApp: (() -> Unit)? = null,
 ) {
     val effectivePreferences = userPreferences ?: Wenku8UserPreferences(
         appLanguage = appLanguage,
@@ -610,6 +621,42 @@ fun AdaptiveMainScaffold(
                 )
             }
             else -> ScaffoldSceneState.HomeShell
+        }
+
+        // Preserve v1's classic double-back-to-exit (`MainActivity.exitBy2Click`, 2000ms window).
+        // Registered outer-most so inner BackHandlers (child scenes, two-pane detail, bookshelf
+        // multi-select/local filter, bottom sheets, and dialogs) always take precedence first.
+        val scaffoldContext = LocalContext.current
+        var lastExitBackPressMonoMs by remember { mutableLongStateOf(-DOUBLE_BACK_EXIT_WINDOW_MS) }
+        var activeExitToast by remember { mutableStateOf<Toast?>(null) }
+        val isAtRootHomeShell = activeScene == ScaffoldSceneState.HomeShell &&
+            !showTwoPaneExpandedDetail &&
+            !isLoginBottomSheetOpen
+
+        LaunchedEffect(isAtRootHomeShell, selectedDestination) {
+            lastExitBackPressMonoMs = -DOUBLE_BACK_EXIT_WINDOW_MS
+        }
+
+        BackHandler(enabled = isAtRootHomeShell) {
+            val nowMono = exitBackClockMonoMs()
+            if (nowMono - lastExitBackPressMonoMs in 0L until DOUBLE_BACK_EXIT_WINDOW_MS) {
+                lastExitBackPressMonoMs = -DOUBLE_BACK_EXIT_WINDOW_MS
+                activeExitToast?.cancel()
+                activeExitToast = null
+                if (onRequestExitApp != null) {
+                    onRequestExitApp()
+                } else {
+                    scaffoldContext.findScaffoldHostActivity()?.finish()
+                }
+            } else {
+                lastExitBackPressMonoMs = nowMono
+                activeExitToast?.cancel()
+                activeExitToast = Toast.makeText(
+                    scaffoldContext,
+                    scaffoldContext.getText(R.string.press_twice_to_exit),
+                    Toast.LENGTH_SHORT,
+                ).also { it.show() }
+            }
         }
 
         SharedTransitionLayout(modifier = Modifier.fillMaxSize()) {
@@ -1410,4 +1457,12 @@ private fun MainDestinationBody(
             }
         }
     }
+}
+
+internal const val DOUBLE_BACK_EXIT_WINDOW_MS = 2_000L
+
+private tailrec fun Context.findScaffoldHostActivity(): Activity? = when (this) {
+    is Activity -> this
+    is ContextWrapper -> baseContext.findScaffoldHostActivity()
+    else -> null
 }

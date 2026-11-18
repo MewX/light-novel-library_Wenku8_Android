@@ -477,4 +477,5 @@
     <string name="reader_toc_current_volume_header_format">本卷目录 (%1$d)</string>
     <string name="reader_toc_illustration_badge">🖼 插图</string>
     <string name="reader_toc_cached_badge">已缓存</string>
+    <string name="press_twice_to_exit">"<b>退出请再戳一下返回键哦～</b> &lt;(=～￣▽￣)→)￣▽￣=)&gt;o "</string>
 </resources>
