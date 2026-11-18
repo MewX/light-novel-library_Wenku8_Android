@@ -89,6 +89,19 @@ class AppContainer(context: Context) {
             .build()
     }
 
+    // =========================================================================
+    // Network Diagnostics & Anti-Blocking Relay Routing Stack
+    // =========================================================================
+    // - `manifestRepository`: Resolves live rotated Cloudflare /24 & /48 Anycast subnets from
+    //   `_network_cfg.wenku8.app` via pure-IP domestic HTTPS DoH (`223.5.5.5`, `1.12.12.12`, etc.),
+    //   falling back to `routingLocalStore` cache and 24 bundled Cloudflare subnets offline.
+    // - `relayRouteController`: Runs bounded diagnostics tournaments & bootstrap recovery when
+    //   Default System DNS is poisoned/degraded, promoting verified Cloudflare IPs with warm HTTP/2
+    //   connection pools while respecting user opt-in (`autoOptimizeConnectionEnabled`) and 24h budgets.
+    // - `wenkuTransport` (`RelayHttpTransport`): Executes all Wenku8 relay POST calls over the
+    //   active route with full TLS hostname verification and automatic pre-send fallback to System DNS
+    //   if a pinned candidate IP ever becomes unreachable. (Note: `sharedImageOkHttpClient` above
+    //   serves `pic.wenku8.com` cover/illustration CDN assets and intentionally stays on `Dns.SYSTEM`.)
     val stalledDnsGuard: StalledDnsGuard by lazy {
         StalledDnsGuard(maxConcurrentProbePermits = 2)
     }

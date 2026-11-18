@@ -1,14 +1,52 @@
+# ==============================================================================================
+# Scheduled Cloudflare Subnet Rotation & DNS TXT Publisher (_network_cfg.wenku8.app)
+# ==============================================================================================
+# Purpose:
+#   Keeps Wenku8 Android v2 (`:app-v2`) resilient against GFW DNS poisoning & IP blocking
+#   without shipping easily-blocked static IP lists or relying on GitHub Raw (blocked in CN).
+#
+# How It Works End-to-End:
+#   1. Daily at 04:23 UTC (or on manual dispatch), `scripts/update_network_cfg_txt.py` fetches
+#      Cloudflare's official IPv4/IPv6 supernets (`cloudflare.com/ips-v4` & `ips-v6`), samples
+#      diverse `/24` slices across 8 Web-Edge Anycast supernets (~4M+ IPs), and live-probes both
+#      `wenku8-relay.mewx.org` and `wenku8-android.mewx.org` via `POST /__diagnostics/latency`.
+#   2. Before ANY Cloudflare DNS write API call is allowed, `validate_txt_record_before_publish`
+#      enforces hard safety gates (aborting non-zero on failure so the existing 30-day DNS record
+#      remains intact):
+#        - Target guard: only `_network_cfg.wenku8.app` (`type == TXT`) can ever be touched.
+#        - RFC 1035 wire & <=255-byte multi-chunk lossless round-trip check (`<= 1,100` bytes).
+#        - Exact Android `:app-v2` `wk8-txt-v1` schema parity, timestamp sanity, and monotonic
+#          anti-rollback (`new_iat >= existing_live_iat`).
+#        - Quorum & diversity (`>= 8` IPv4 `/24` subnets across `>= 3` `/16` families, `<= 64` total).
+#        - Mathematical Cloudflare ASN ownership proof (`subnet_of` official Cloudflare supernets)
+#          + public routable unicast check (blocks RFC1918/TEST-NET/third-party IPs).
+#   3. Android `:app-v2` (`ManifestRepository`) resolves `_network_cfg.wenku8.app` over pure-IP
+#      domestic HTTPS JSON DoH (`223.5.5.5`, `1.12.12.12`, `223.6.6.6`, `120.53.53.53` — zero
+#      bootstrap OS DNS needed), randomly samples `.1..254` host IPs inside each `/24`, and
+#      promotes a healthy route only when validated by `RelayRouteController` (with automatic
+#      pre-send fallback to System DNS in `RelayHttpTransport` if a pinned IP later degrades).
+#
+# Required GitHub Repository Secrets:
+#   - `CF_API_TOKEN`: Cloudflare API Token scoped to `Zone -> DNS -> Edit` on `wenku8.app` only.
+#   - `WENKU8_APP_ZONE_ID`: Cloudflare Zone ID for `wenku8.app`.
+#
+# Manual Operations (Actions -> "Update Network Config TXT" -> "Run workflow"):
+#   - `dry_run = true`: Probes subnets & runs all validation gates without modifying Cloudflare DNS.
+#   - `kill_switch = true`: Publishes `v=wk8-txt-v1;...;en=0;c=` so all `:app-v2` clients
+#     immediately drop candidate-IP routing and revert to Default System DNS.
+# ==============================================================================================
+
 name: Update Network Config TXT
 
 on:
   schedule:
     # Rotate fresh live-verified Cloudflare Web Edge /24 subnets daily at 04:23 UTC
-    # with a 30-day manifest validity buffer.
+    # with a 30-day manifest validity buffer (`exp = iat + 30d`).
     - cron: "23 4 * * *"
   workflow_dispatch:
     inputs:
       dry_run:
-        description: "Dry-run only (probe subnets & print TXT without updating Cloudflare DNS)"
+        description: "Dry-run only (probe subnets, validate & print TXT without updating Cloudflare DNS)"
         required: false
         default: false
         type: boolean
@@ -42,10 +80,10 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v6
 
-      - name: Run script self-test
+      - name: Run offline schema, chunking & negative safety self-tests
         run: python3 studio-android/LightNovelLibrary/scripts/update_network_cfg_txt.py --self-test
 
-      - name: Curate live Cloudflare subnets and update DNS TXT
+      - name: Curate live Cloudflare subnets, validate & update DNS TXT
         env:
           CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
           WENKU8_APP_ZONE_ID: ${{ secrets.WENKU8_APP_ZONE_ID }}
@@ -64,10 +102,17 @@ jobs:
           fi
           python3 studio-android/LightNovelLibrary/scripts/update_network_cfg_txt.py "${FLAGS[@]}"
 
-      - name: Verify public DoH resolution
+      - name: Verify live public DoH resolution & wk8-txt-v1 payload integrity
         if: ${{ inputs.dry_run != true }}
+        env:
+          INPUT_KILL_SWITCH: ${{ inputs.kill_switch }}
         run: |
           set -euo pipefail
-          RESP="$(curl -fsS -H 'Accept: application/dns-json' 'https://cloudflare-dns.com/dns-query?name=_network_cfg.wenku8.app&type=TXT')"
-          echo "Public DoH response: $RESP"
-          echo "$RESP" | grep -q "wk8-txt-v1"
+          VERIFY_FLAGS=(
+            "--verify-doh-url"
+            "https://cloudflare-dns.com/dns-query?name=_network_cfg.wenku8.app&type=TXT"
+          )
+          if [ "${INPUT_KILL_SWITCH:-false}" = "true" ]; then
+            VERIFY_FLAGS+=("--kill-switch")
+          fi
+          python3 studio-android/LightNovelLibrary/scripts/update_network_cfg_txt.py "${VERIFY_FLAGS[@]}"

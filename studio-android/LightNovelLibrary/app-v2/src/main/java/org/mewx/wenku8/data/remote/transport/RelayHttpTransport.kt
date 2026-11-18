@@ -142,13 +142,32 @@ object NativeLightUserSessionCookieStore : WenkuSessionCookieStore {
 }
 
 /**
- * Production OkHttp 5 transport implementing [WenkuTransport] with:
- * - One dedicated `OkHttpClient` + `ConnectionPool` per active route generation (`fastFallback(true)`
- *   Happy Eyeballs on default system DNS; `fastFallback(false)` + DNS-free `InetAddress.getByAddress`
- *   on pinned candidate routes) and idle pool eviction (`evictAll()`) on route switches.
- * - Full wire & `PHPSESSID` session compatibility with `LightNetwork.LightHttpPostConnection`.
- * - Exact `EventListener.requestHeadersStart` pre-send vs post-send fallback & replay boundary
- *   within a shared `10s` total POST deadline (`3s` connect, `5s` read).
+ * Production OkHttp 5 transport implementing [WenkuTransport] with dynamic candidate-IP routing
+ * and automatic System-DNS fallback.
+ *
+ * ### Transport & Security Invariants
+ * - **Full TLS SNI & Certificate Pinning to Relay Domain**:
+ *   Even when [RelayRouteProvider] supplies a [PinnedRelayCandidate], the HTTP request URL and
+ *   `Host` header remain `https://wenku8-relay.mewx.org/...` (or `wenku8-android.mewx.org`). Only
+ *   the socket-level DNS lookup is overridden via `PinnedHostIpDns` (`InetAddress.getByAddress`),
+ *   so TLS 1.3 SNI and X.509 certificate hostname verification are **never weakened**.
+ * - **Per-Generation `ConnectionPool` & Warm HTTP/2 Handoff**:
+ *   Maintains one dedicated `OkHttpClient` + `ConnectionPool` per route `generationId` (`fastFallback(true)`
+ *   Happy Eyeballs on Default System DNS; `fastFallback(false)` + value-equal `PinnedHostIpDns` on
+ *   pinned candidate routes so warm HTTP/2 sockets validated by `RelayRouteController` are reused
+ *   without an extra TCP+TLS handshake) and safely evicts retired pools once in-flight calls finish.
+ * - **Safe Pre-Send Automatic Fallback vs Post-Send Non-Replay**:
+ *   Tracks exact byte transmission via `EventListener.requestHeadersStart`:
+ *   1. If a pinned candidate IP fails *before* any HTTP request bytes leave the device (TCP connect
+ *      timeout, RST, or TLS handshake failure), calls [RelayRouteProvider.fallbackRouteAfterCandidateFailure]
+ *      (`failureBeforeSend = true`) to quarantine the broken IP and **transparently retries once**
+ *      on Default System DNS within the remaining `10s` total POST deadline.
+ *   2. If a failure occurs *after* request headers started transmitting (`failureBeforeSend = false`),
+ *      revokes the pinned route for future calls without replaying potentially non-idempotent POST
+ *      actions (such as login, bookshelf mutation, or review posting).
+ * - **Legacy Wire & Session Compatibility**:
+ *   Preserves `LightNetwork.LightHttpPostConnection`'s exact `&k=v` form encoding, transparent gzip
+ *   handling, and `PHPSESSID` synchronization with `:api`'s [LightUserSession].
  */
 class RelayHttpTransport(
     private val baseOkHttpClient: OkHttpClient = OkHttpProbeTransport.defaultSharedBaseOkHttpClient(),

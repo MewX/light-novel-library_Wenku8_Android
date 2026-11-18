@@ -40,16 +40,37 @@ sealed interface AutoRoutingModeState {
 }
 
 /**
- * Process-owned `"自动优化连接"` controller (`network-connectivity-and-routing-design.md` §Candidate-IP selection).
+ * Process-owned `"自动优化连接"` route selection controller implementing [RelayRouteProvider].
  *
- * Coordinates:
- * - Compact Idle Tournament (`<= 18` probes / `25s` deadline, `500 ms` inter-probe gap, `5` screen +
- *   `6/9` counterbalanced confirm + `1` warm-reuse socket guard, `>= 20%` AND `>= 30 ms` win rule).
- * - Bounded Bootstrap Recovery (`<= 6` calls / `20s`, `10-minute` provisional lease).
- * - Immediate yield when foreground book/chapter requests arrive (`foregroundInFlightCount > 0`)
- *   and strict mutual exclusion with manual diagnostics runs.
- * - Automatic revocation on network/VPN transition, remote `enabled=false` manifest, candidate
- *   failure (`30 min` quarantine), lease expiry (`<= 6h`), or user toggling Off.
+ * ### Routing Lifecycle & Safety Model
+ * 1. **Default-First Principle**:
+ *    Ordinary API calls use Default System DNS (`ActiveRelayRoute.pinnedCandidate == null`) unless
+ *    user opt-in (`autoOptimizeConnectionEnabled`) is active AND a candidate Cloudflare IP has
+ *    proven strictly healthier or faster on the current network.
+ * 2. **Compact Idle Tournament ([runCompactTournament])**:
+ *    - Resolves fresh candidate subnets via [ManifestRepository] (`_network_cfg.wenku8.app` DoH TXT
+ *      -> local cache -> bundled Cloudflare Anycast subnets) and samples random `.1..254` host IPs.
+ *    - **Stage 1–3**: Screens Default DNS + up to 4 sampled candidates (`POST /__diagnostics/latency`
+ *      with cryptographic nonce echo), then runs counterbalanced interleaved confirmation (`<= 18`
+ *      total probes, `<= 25s` wall budget, `500 ms` inter-probe gap).
+ *    - **Promotion Criteria**: Promotes a candidate either on **reliability recovery** (Default DNS
+ *      fails while candidate achieves `100%` confirmed success) OR on **latency win** (`>= 20%` AND
+ *      `>= 30 ms` median RTT reduction over Default DNS).
+ *    - **Stage 4 Warm-Reuse Guard**: Confirms HTTP/2 socket reuse (`connectionReused == true`) on a
+ *      dedicated [ConnectionPool] before handing that warm pool directly to [RelayHttpTransport].
+ * 3. **Bounded Bootstrap Recovery ([onPassiveCallCompleted])**:
+ *    When a foreground API call fails on Default System DNS (e.g. GFW DNS poisoning or blackholed
+ *    edge IP) and `allowBootstrapRecoveryOnDefaultFailure` is enabled, runs a fast `<= 6`-probe /
+ *    `20s` recovery check and grants a `10-minute` provisional lease (`PROVISIONAL_RECOVERY_LEASE_MS`)
+ *    immediately upon finding a working candidate IP.
+ * 4. **Foreground Priority & Automatic Revocation / Fallback**:
+ *    - Pauses background probing immediately whenever a foreground book/chapter call is in flight
+ *      (`foregroundInFlightCount > 0`) or manual diagnostics is running.
+ *    - Enforces rolling 24h probe budgets via [RoutingLocalStore] (`<= 120` total, `<= 60` metered).
+ *    - Revokes active leases immediately on Wi-Fi/Cellular/VPN network transitions, lease expiry
+ *      (`<= 6h`), remote `en=0` kill-switch, or user toggling Off.
+ *    - If a pinned candidate IP later fails in [RelayHttpTransport], [fallbackRouteAfterCandidateFailure]
+ *      quarantines that candidate for `30 minutes` and atomically reverts to Default System DNS.
  */
 class RelayRouteController(
     private val applicationScope: CoroutineScope,

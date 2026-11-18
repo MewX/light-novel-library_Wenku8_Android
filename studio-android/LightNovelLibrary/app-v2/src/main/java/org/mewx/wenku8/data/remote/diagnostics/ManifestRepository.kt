@@ -283,9 +283,37 @@ class RoutingLocalStore(
 }
 
 /**
- * Parser, validator, and multi-origin fetcher for `wenku8-ip-candidates-v1` JSON manifests and
- * `_network_cfg.wenku8.app` DNS `TXT` records resolved over pure-IP domestic DoH (`223.5.5.5`,
- * `1.12.12.12`, `223.6.6.6`, `120.53.53.53`).
+ * Parser, validator, and multi-tier configuration resolver for candidate Cloudflare Anycast
+ * subnets/IPs used by [RelayRouteController].
+ *
+ * ### End-to-End Discovery & Fallback Hierarchy
+ * When [refreshFromIndependentOrigins] is invoked, candidate configurations are resolved in order:
+ * 1. **Tier 1 — Pure-IP Domestic HTTPS JSON DoH (`_network_cfg.wenku8.app` `TXT`)**:
+ *    Queries domestic public DoH endpoints ([defaultDomesticDohEndpoints]: Alidns `223.5.5.5` /
+ *    `223.6.6.6` and DNSPod `1.12.12.12` / `120.53.53.53`) directly by numeric IP literal via
+ *    [PinnedHostIpDns]. Because these resolvers include their numeric IP in X.509 SANs, this
+ *    bootstrap path requires **zero OS DNS lookups** and works inside mainland China even when
+ *    system UDP/53 DNS is poisoned or `raw.githubusercontent.com` is blocked.
+ *    The authoritative `TXT` record is rotated daily by `.github/workflows/update-network-cfg.yml`
+ *    (`scripts/update_network_cfg_txt.py`) after live-verifying subnets against Wenku8 Relay.
+ * 2. **Tier 2 — Optional HTTPS JSON Manifest Origins**:
+ *    Supports `wenku8-ip-candidates-v1` JSON manifests if `configurationOrigins` are configured.
+ * 3. **Tier 3 — Persisted Local Cache ([RoutingLocalStore])**:
+ *    Reuses the last validated manifest stored in `network_routing_local.preferences_pb` while
+ *    still within both wall-clock `expiresAt` (`<= 30d`) and monotonic `authorizedLifetimeMs` (`<= 24h`).
+ * 4. **Tier 4 — Bundled Verified Cloudflare Anycast Subnets ([defaultVerifiedCloudflareSubnetSpecs])**:
+ *    Offline-first floor of 22 IPv4 `/24` subnets + 2 IPv6 `/48` prefixes (`~5,500+` IPv4 hosts)
+ *    used only when all live DoH/HTTPS origins are unreachable and no valid cached manifest exists
+ *    (never overrides an explicit `en=0` remote kill-switch).
+ *
+ * ### `wk8-txt-v1` Wire Format & Safety Invariants
+ * - Primary record: `v=wk8-txt-v1;rev=<id>;en=<0|1>;iat=<sec>;exp=<sec>;c=<cidr1,cidr2,...>`
+ * - Optional multi-RRset continuation: `v=wk8-txt-ext1;rev=<id>;p=<2..N>;c=<more_cidrs>`
+ * - RFC 1035 multi-chunk unquoting: Long `TXT` records (`> 255` bytes) split by authoritative DNS
+ *   into `"chunk1" "chunk2"` are concatenated seamlessly before parsing.
+ * - **Anti-rollback & Kill-switch**: [RoutingLocalStore] rejects manifests whose `issuedAt`
+ *   regresses below `newestAcceptedIssuedAtMs`, while an authenticated `en=0` record acts as an
+ *   immediate remote kill-switch that revokes cached candidates and forces Default System DNS.
  */
 class ManifestRepository(
     private val localStore: RoutingLocalStore,

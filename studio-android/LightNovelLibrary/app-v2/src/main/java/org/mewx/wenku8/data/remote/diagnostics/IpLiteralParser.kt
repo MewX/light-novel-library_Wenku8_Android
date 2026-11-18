@@ -24,9 +24,20 @@ enum class IpAddressFamily(val wireLabel: String) {
 }
 
 /**
- * Represents either a single numeric IP (`/32` IPv4 or `/128` IPv6) or a verified Anycast subnet
- * prefix (`16..31` IPv4, `32..127` IPv6) from which clients sample random host addresses without
- * touching OS DNS.
+ * Represents either a single numeric IP (`/32` IPv4 or `/128` IPv6) or a verified Cloudflare
+ * Anycast subnet prefix (`/16..31` IPv4, `/32..127` IPv6) from which clients sample random
+ * usable host addresses without touching OS DNS.
+ *
+ * ### Why Subnet Sampling?
+ * Publishing `/24` IPv4 subnets (`254` usable hosts each) and `/48` IPv6 prefixes (`2^80` hosts)
+ * instead of static `/32` IPs prevents trivial enumeration/blocking of hardcoded IP pools:
+ * - On IPv4 `/16..30`, [sampleCandidateEntry] uniformly samples offsets `1 .. (2^hostBits - 2)`,
+ *   strictly avoiding `.0` network and `.255` broadcast addresses.
+ * - On IPv6 `/32..127`, [sampleCandidateEntry] randomizes host bits while ensuring at least one
+ *   host bit is non-zero (avoiding the RFC 4291 `::0` Subnet-Router Anycast address).
+ * - Every sampled address is re-verified through [IpLiteralParser.isPublicRoutableUnicast] so
+ *   RFC 1918 private, loopback, link-local, CGNAT (`100.64/10`), documentation (`TEST-NET`),
+ *   multicast, and reserved ranges can never be dialed.
  */
 data class CandidateAddressSpec(
     val idPrefix: String,
