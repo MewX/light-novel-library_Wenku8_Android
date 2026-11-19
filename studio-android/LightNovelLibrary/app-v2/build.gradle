@@ -19,8 +19,8 @@ android {
         targetSdkVersion rootProject.targetSdkVersion
         versionCode 100
         versionName "2.0.0"
-        // Protocol version registered in :api's TokenManager during parallel v2 development.
-        // Update alongside :api + relay secret registration at final v2.0 cutover.
+        // TODO(v2.0-release): Register "2.0" in :api (native-lib.cpp / TokenManager) and
+        // wenku8-relay (v1_crypto.ts ALLOWED_SECURE_PREFIXES), then update this from "1.31" to "2.0".
         buildConfigField "String", "API_PROTOCOL_VERSION", "\"1.31\""
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
@@ -53,18 +53,14 @@ android {
         }
     }
 
-    flavorDimensions "default"
+    flavorDimensions "channel"
     productFlavors {
-        alpha {
-            dimension "default"
-            buildConfigField "String", "DISTRIBUTION_CHANNEL", "\"alpha\""
-        }
-        baidu {
-            dimension "default"
-            buildConfigField "String", "DISTRIBUTION_CHANNEL", "\"baidu\""
+        'default' {
+            dimension "channel"
+            buildConfigField "String", "DISTRIBUTION_CHANNEL", "\"default\""
         }
         playstore {
-            dimension "default"
+            dimension "channel"
             buildConfigField "String", "DISTRIBUTION_CHANNEL", "\"playstore\""
         }
     }
@@ -204,19 +200,19 @@ def v2GeneratedExcludes = [
         '**/*$Lambda$*.*', '**/*$inlined$*.*',
 ]
 
-tasks.register('jacocoAlphaDebugUnitTestReport', JacocoReport) {
-    dependsOn 'testAlphaDebugUnitTest'
+tasks.register('jacocoDefaultDebugUnitTestReport', JacocoReport) {
+    dependsOn 'testDefaultDebugUnitTest'
     group = 'verification'
-    description = 'Generates JaCoCo XML/HTML coverage for the app-v2 alphaDebug JVM & Compose unit tests.'
+    description = 'Generates JaCoCo XML/HTML coverage for the app-v2 defaultDebug JVM & Compose unit tests.'
     reports {
         xml.required = true
         html.required = true
     }
     classDirectories.setFrom(files([
-            fileTree(dir: layout.buildDirectory.dir('tmp/kotlin-classes/alphaDebug').get(),
+            fileTree(dir: layout.buildDirectory.dir('tmp/kotlin-classes/defaultDebug').get(),
                     excludes: v2GeneratedExcludes),
     ]))
     sourceDirectories.setFrom(files(['src/main/java']))
     executionData.setFrom(fileTree(dir: layout.buildDirectory.get().asFile,
-            includes: ['outputs/unit_test_code_coverage/**/*.exec']))
+            includes: ['outputs/unit_test_code_coverage/defaultDebugUnitTest/**/*.exec']))
 }

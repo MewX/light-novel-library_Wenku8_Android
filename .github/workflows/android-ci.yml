@@ -42,21 +42,23 @@ jobs:
     # daemon + forked Robolectric worker stay comfortably within ubuntu-latest's 7 GB RAM.
     - name: Run JVM unit tests and generate JaCoCo reports
       run: |
-        ./gradlew -Dorg.gradle.jvmargs="-Xmx2560M -Dkotlin.daemon.jvm.options=-Xmx1536M" --max-workers=2 --stacktrace :app-v2:jacocoAlphaDebugUnitTestReport :app-v1:jacocoAlphaDebugUnitTestReport
+        ./gradlew -Dorg.gradle.jvmargs="-Xmx2560M -Dkotlin.daemon.jvm.options=-Xmx1536M" --max-workers=2 --stacktrace :app-v2:jacocoDefaultDebugUnitTestReport :app-v1:jacocoAlphaDebugUnitTestReport
         ./gradlew --stop
 
     # Stop the test-phase Gradle daemon above before switching heap size; otherwise Gradle leaves
     # the 2.5 GB daemon resident in RAM and spawns a second 3+ GB daemon alongside it, exhausting
-    # ubuntu-latest's 7 GB RAM during :app-v2:packageAlphaDebug / R8 minification.
-    - name: Assemble alpha debug and release APKs (:app-v2 & :app-v1)
+    # ubuntu-latest's 7 GB RAM during :app-v2:packageDefaultDebug / R8 minification.
+    - name: Assemble default (:app-v2) and alpha (:app-v1) debug & release APKs
       run: |
-        ./gradlew -Dorg.gradle.jvmargs="-Xmx3072M -Dkotlin.daemon.jvm.options=-Xmx1536M" --max-workers=2 --stacktrace assembleAlpha
+        ./gradlew -Dorg.gradle.jvmargs="-Xmx3072M -Dkotlin.daemon.jvm.options=-Xmx1536M" --max-workers=2 --stacktrace :app-v2:assembleDefault :app-v1:assembleAlpha
         ./gradlew --stop
 
     - name: Verify JVM coverage reports exist
       run: |
-        for MODULE in app-v2 app-v1; do
-          XML="$MODULE/build/reports/jacoco/jacocoAlphaDebugUnitTestReport/jacocoAlphaDebugUnitTestReport.xml"
+        for PAIR in "app-v2:jacocoDefaultDebugUnitTestReport" "app-v1:jacocoAlphaDebugUnitTestReport"; do
+          MODULE="${PAIR%%:*}"
+          TASK="${PAIR##*:}"
+          XML="$MODULE/build/reports/jacoco/$TASK/$TASK.xml"
           if [ ! -s "$XML" ]; then
             echo "::error::No JVM coverage XML at $XML -- the report task was skipped or produced empty output."
             exit 1
@@ -81,7 +83,7 @@ jobs:
     - name: Upload app-v2 JVM coverage to Coveralls
       uses: coverallsapp/github-action@v2
       with:
-        file: studio-android/LightNovelLibrary/app-v2/build/reports/jacoco/jacocoAlphaDebugUnitTestReport/jacocoAlphaDebugUnitTestReport.xml
+        file: studio-android/LightNovelLibrary/app-v2/build/reports/jacoco/jacocoDefaultDebugUnitTestReport/jacocoDefaultDebugUnitTestReport.xml
         format: jacoco
         base-path: studio-android/LightNovelLibrary/app-v2/src/main/java
         flag-name: jvm-v2
