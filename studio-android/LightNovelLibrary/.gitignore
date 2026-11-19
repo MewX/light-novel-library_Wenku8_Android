@@ -13,4 +13,5 @@ baidu/
 coolapk/
 alpha/
 playstore/
+!app-v2/src/playstore/
 

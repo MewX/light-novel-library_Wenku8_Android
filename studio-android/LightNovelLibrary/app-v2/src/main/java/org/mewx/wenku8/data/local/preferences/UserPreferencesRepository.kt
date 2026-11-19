@@ -7,6 +7,7 @@ import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.intPreferencesKey
+import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStoreFile
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
@@ -66,6 +67,8 @@ data class Wenku8UserPreferences(
     val autoOptimizeConnectionEnabled: Boolean = false,
     val cachedNoticeText: String = "",
     val legacyV1InternalMigrationVersion: Int = 0,
+    val lastAutoUpdateCheckEpochMs: Long = 0L,
+    val dismissedUpdateVersionCode: Int = 0,
 ) {
     val isBuiltinSerifFont: Boolean
         get() = readerCustomFontPath == BUILTIN_SERIF_FONT_TOKEN
@@ -317,6 +320,14 @@ class UserPreferencesRepository(
         dataStore.edit { it[Keys.CACHED_NOTICE_TEXT] = noticeText }
     }
 
+    suspend fun recordAutoUpdateCheck(epochMs: Long) {
+        dataStore.edit { it[Keys.LAST_AUTO_UPDATE_CHECK_EPOCH_MS] = epochMs.coerceAtLeast(0L) }
+    }
+
+    suspend fun setDismissedUpdateVersionCode(versionCode: Int) {
+        dataStore.edit { it[Keys.DISMISSED_UPDATE_VERSION_CODE] = versionCode.coerceAtLeast(0) }
+    }
+
     /**
      * Atomically writes all settings parsed from a legacy `v1.31` `settings.wk8` file (`P0.3`)
      * and stamps [migrationVersion] so internal-storage migration runs strictly once.
@@ -510,6 +521,8 @@ class UserPreferencesRepository(
             autoOptimizeConnectionEnabled = prefs[Keys.AUTO_OPTIMIZE_CONNECTION_ENABLED] ?: false,
             cachedNoticeText = prefs[Keys.CACHED_NOTICE_TEXT] ?: "",
             legacyV1InternalMigrationVersion = prefs[Keys.LEGACY_V1_MIGRATION_VERSION] ?: 0,
+            lastAutoUpdateCheckEpochMs = (prefs[Keys.LAST_AUTO_UPDATE_CHECK_EPOCH_MS] ?: 0L).coerceAtLeast(0L),
+            dismissedUpdateVersionCode = (prefs[Keys.DISMISSED_UPDATE_VERSION_CODE] ?: 0).coerceAtLeast(0),
         )
     }
 
@@ -541,6 +554,8 @@ class UserPreferencesRepository(
         val AUTO_OPTIMIZE_CONNECTION_ENABLED = booleanPreferencesKey("auto_optimize_connection_enabled")
         val CACHED_NOTICE_TEXT = stringPreferencesKey("cached_notice_text")
         val LEGACY_V1_MIGRATION_VERSION = intPreferencesKey("legacy_v1_internal_migrated_version")
+        val LAST_AUTO_UPDATE_CHECK_EPOCH_MS = longPreferencesKey("last_auto_update_check_epoch_ms")
+        val DISMISSED_UPDATE_VERSION_CODE = intPreferencesKey("dismissed_update_version_code")
     }
 
     companion object {

@@ -48,6 +48,8 @@ import org.mewx.wenku8.data.repository.DiscoveryRepository
 import org.mewx.wenku8.data.repository.NovelTocSyncRepository
 import org.mewx.wenku8.data.repository.ServerNoticeAndUpdateRepository
 import org.mewx.wenku8.data.repository.UserSessionRepository
+import org.mewx.wenku8.data.update.AppUpdateCoordinator
+import org.mewx.wenku8.data.update.ChannelAppUpdateFactory
 import org.mewx.wenku8.ui.diagnostics.NetworkDiagnosticsViewModel
 import android.os.SystemClock
 import java.io.File
@@ -230,6 +232,14 @@ class AppContainer(context: Context) {
         ServerNoticeAndUpdateRepository(
             transport = wenkuTransport,
             assetRootsProvider = ::resolveLocalAssetRoots,
+        )
+    }
+
+    val appUpdateCoordinator: AppUpdateCoordinator by lazy {
+        ChannelAppUpdateFactory.create(
+            context = appContext,
+            serverNoticeAndUpdateRepository = serverNoticeAndUpdateRepository,
+            userPreferencesRepository = userPreferencesRepository,
         )
     }
 
