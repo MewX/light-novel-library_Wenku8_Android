@@ -174,12 +174,9 @@ class MainActivity : AppCompatActivity(), HardwareVolumeKeyHost {
                             networkDiagnosticsViewModelFactory = appContainer.networkDiagnosticsViewModelFactory,
                             autoOptimizeConnectionEnabled = loadedPreferences.autoOptimizeConnectionEnabled,
                             onAutoOptimizeConnectionChanged = { enabled ->
+                                appContainer.relayRouteController.onUserToggledAutoOptimize(enabled)
                                 coroutineScope.launch {
                                     preferencesRepository.setAutoOptimizeConnectionEnabled(enabled)
-                                    appContainer.relayRouteController.setAutoOptimizeEnabled(enabled)
-                                    if (enabled) {
-                                        appContainer.relayRouteController.runCompactTournament(manualRecheck = true)
-                                    }
                                 }
                             },
                             onBookshelfViewModeSelected = { selectedViewMode ->

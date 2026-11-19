@@ -146,6 +146,7 @@ class AppContainer(context: Context) {
             networkObserver = diagnosticsNetworkMonitor,
             stalledDnsGuard = stalledDnsGuard,
             allowBootstrapRecoveryOnDefaultFailure = true,
+            allowAutoSelectOnEnable = true,
         ).also { controller ->
             applicationScope.launch {
                 userPreferencesRepository.preferencesFlow

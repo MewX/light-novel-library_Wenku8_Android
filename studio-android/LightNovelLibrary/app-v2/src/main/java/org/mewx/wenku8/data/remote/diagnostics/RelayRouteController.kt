@@ -15,12 +15,30 @@ import okhttp3.ConnectionPool
 import org.mewx.wenku8.BuildConfig
 import org.mewx.wenku8.data.remote.transport.ActiveRelayRoute
 import org.mewx.wenku8.data.remote.transport.PinnedRelayCandidate
+import org.mewx.wenku8.data.remote.transport.RelayHttpTransport
 import org.mewx.wenku8.data.remote.transport.RelayRouteProvider
 import java.net.Proxy
+import java.util.Locale
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
+
+/**
+ * UI-visible summary of a verified candidate Cloudflare relay IP recorded on the current network
+ * (e.g., after running Quick Check or background candidate screening), ready to be activated via
+ * the `"自动优化连接"` toggle or already active.
+ *
+ * Note: Raw [ipLiteral] is shown **only** on the local device UI and is never exported in shared
+ * diagnostic reports (`DiagnosticsReport.toRedactedJsonString`).
+ */
+data class RecordedCandidateSummary(
+    val candidateId: String,
+    val ipLiteral: String,
+    val medianLatencyMs: Long,
+    val ingressColo: String?,
+    val manifestRevision: String,
+)
 
 sealed interface AutoRoutingModeState {
     data object UnavailableStub : AutoRoutingModeState
@@ -35,6 +53,8 @@ sealed interface AutoRoutingModeState {
         val reductionPercent: Int?,
         val confirmedSampleCount: Int,
         val promotedOnReliability: Boolean,
+        val selectedIpLiteral: String = "",
+        val ingressColo: String? = null,
     ) : AutoRoutingModeState
     data object RestoredDefaultAfterFallback : AutoRoutingModeState
 }
@@ -43,34 +63,28 @@ sealed interface AutoRoutingModeState {
  * Process-owned `"自动优化连接"` route selection controller implementing [RelayRouteProvider].
  *
  * ### Routing Lifecycle & Safety Model
- * 1. **Default-First Principle**:
- *    Ordinary API calls use Default System DNS (`ActiveRelayRoute.pinnedCandidate == null`) unless
- *    user opt-in (`autoOptimizeConnectionEnabled`) is active AND a candidate Cloudflare IP has
- *    proven strictly healthier or faster on the current network.
- * 2. **Compact Idle Tournament ([runCompactTournament])**:
+ * 1. **Relay-Only Scope & Default-First Safety**:
+ *    Pinned candidate IPs apply **exclusively** to our Cloudflare relay service (`wenku8-relay.mewx.org`,
+ *    `wenku8-android.mewx.org`). Direct Wenku8 website/image CDNs (`*.wenku8.com`, `pic.wenku8.com`,
+ *    `*.wenku8.net`, `*.wenku8.cn`, `wenku8.mewx.org`) always use Default System DNS.
+ * 2. **Automatic Good-IP Recording & Toggle-to-Use ([discoverAndRecordPreferredCandidate])**:
+ *    - Running manual Quick Check automatically screens & verifies a healthy Cloudflare candidate IP
+ *      (including warm HTTP/2 reuse) and records it in [recordedCandidateSummary] for the current network.
+ *    - Turning on `"自动优化连接"` immediately activates that recorded IP on the relay service (or
+ *      automatically selects a working candidate IP in the background if none was recorded yet).
+ * 3. **Compact Idle Tournament ([runCompactTournament]) & Bootstrap Recovery ([runBootstrapRecovery])**:
  *    - Resolves fresh candidate subnets via [ManifestRepository] (`_network_cfg.wenku8.app` DoH TXT
  *      -> local cache -> bundled Cloudflare Anycast subnets) and samples random `.1..254` host IPs.
- *    - **Stage 1–3**: Screens Default DNS + up to 4 sampled candidates (`POST /__diagnostics/latency`
- *      with cryptographic nonce echo), then runs counterbalanced interleaved confirmation (`<= 18`
- *      total probes, `<= 25s` wall budget, `500 ms` inter-probe gap).
- *    - **Promotion Criteria**: Promotes a candidate either on **reliability recovery** (Default DNS
- *      fails while candidate achieves `100%` confirmed success) OR on **latency win** (`>= 20%` AND
- *      `>= 30 ms` median RTT reduction over Default DNS).
- *    - **Stage 4 Warm-Reuse Guard**: Confirms HTTP/2 socket reuse (`connectionReused == true`) on a
- *      dedicated [ConnectionPool] before handing that warm pool directly to [RelayHttpTransport].
- * 3. **Bounded Bootstrap Recovery ([onPassiveCallCompleted])**:
- *    When a foreground API call fails on Default System DNS (e.g. GFW DNS poisoning or blackholed
- *    edge IP) and `allowBootstrapRecoveryOnDefaultFailure` is enabled, runs a fast `<= 6`-probe /
- *    `20s` recovery check and grants a `10-minute` provisional lease (`PROVISIONAL_RECOVERY_LEASE_MS`)
- *    immediately upon finding a working candidate IP.
- * 4. **Foreground Priority & Automatic Revocation / Fallback**:
- *    - Pauses background probing immediately whenever a foreground book/chapter call is in flight
- *      (`foregroundInFlightCount > 0`) or manual diagnostics is running.
+ *    - Confirms HTTP/2 socket reuse (`connectionReused == true`) on a dedicated [ConnectionPool]
+ *      before handing that warm pool directly to [RelayHttpTransport].
+ * 4. **Foreground Priority & Automatic DNS Fallback / Re-selection**:
+ *    - Pauses background probing whenever a foreground call or manual diagnostics run is active.
  *    - Enforces rolling 24h probe budgets via [RoutingLocalStore] (`<= 120` total, `<= 60` metered).
- *    - Revokes active leases immediately on Wi-Fi/Cellular/VPN network transitions, lease expiry
- *      (`<= 6h`), remote `en=0` kill-switch, or user toggling Off.
- *    - If a pinned candidate IP later fails in [RelayHttpTransport], [fallbackRouteAfterCandidateFailure]
- *      quarantines that candidate for `30 minutes` and atomically reverts to Default System DNS.
+ *    - Revokes active leases and recorded IPs immediately on Wi-Fi/Cellular/VPN network transitions,
+ *      lease expiry (`<= 6h`), remote `en=0` kill-switch, or user toggling Off.
+ *    - If a pinned candidate IP fails in [RelayHttpTransport], [fallbackRouteAfterCandidateFailure]
+ *      quarantines that candidate for `30 minutes`, immediately falls back to Default System DNS,
+ *      and (when [allowAutoSelectOnEnable] is enabled) selects a replacement IP in the background.
  */
 class RelayRouteController(
     private val applicationScope: CoroutineScope,
@@ -85,6 +99,7 @@ class RelayRouteController(
     private val initialAutoOptimizeEnabled: Boolean = false,
     private val allowPassiveBackgroundProbing: Boolean = false,
     private val allowBootstrapRecoveryOnDefaultFailure: Boolean = false,
+    private val allowAutoSelectOnEnable: Boolean = false,
     private val monotonicClockMillis: () -> Long = { SystemClock.elapsedRealtime() },
     private val wallClockEpochMillis: () -> Long = { System.currentTimeMillis() },
 ) : RelayRouteProvider {
@@ -100,6 +115,8 @@ class RelayRouteController(
         const val DIAGNOSTICS_DISABLED_COOLDOWN_MS: Long = 60L * 60L * 1_000L
         const val MAX_RECOVERY_CALLS: Int = 6
         const val MAX_RECOVERY_DURATION_MS: Long = 20_000L
+        const val MAX_DISCOVERY_SCREEN_CANDIDATES: Int = 4
+        const val MAX_DISCOVERY_DURATION_MS: Long = 20_000L
         const val MIN_IMPROVEMENT_ABSOLUTE_MS: Long = 30L
     }
 
@@ -112,6 +129,26 @@ class RelayRouteController(
         val baselineSetupMs: Long?,
     )
 
+    private data class RecordedCandidateRecord(
+        val candidate: CandidateIpEntry,
+        val manifestRevision: String,
+        val medianLatencyMs: Long,
+        val ingressColo: String?,
+        val confirmedSampleCount: Int,
+        val warmPool: ConnectionPool?,
+        val expiresAtMonotonicMs: Long,
+        val baselineSetupMs: Long?,
+        val networkSnapshot: NetworkSnapshot,
+    ) {
+        fun toSummary(): RecordedCandidateSummary = RecordedCandidateSummary(
+            candidateId = candidate.id,
+            ipLiteral = candidate.ipLiteral,
+            medianLatencyMs = medianLatencyMs,
+            ingressColo = ingressColo,
+            manifestRevision = manifestRevision,
+        )
+    }
+
     private val routeStateLock = Any()
     private val controllerMutex = Mutex()
     private val generationCounter = AtomicLong(1L)
@@ -121,6 +158,7 @@ class RelayRouteController(
 
     @Volatile private var userAutoOptimizeEnabled: Boolean = initialAutoOptimizeEnabled
     @Volatile private var activeLease: LeaseRecord? = null
+    @Volatile private var recordedCandidateRecord: RecordedCandidateRecord? = null
     @Volatile private var lastObservedNetwork: NetworkSnapshot? = null
     @Volatile private var lastFullTournamentAtMonotonicMs: Long? = null
     @Volatile private var diagnosticsPausedUntilMonotonicMs: Long? = null
@@ -131,6 +169,9 @@ class RelayRouteController(
 
     private val _uiState = MutableStateFlow<AutoRoutingModeState>(computeInitialUiState())
     val uiState: StateFlow<AutoRoutingModeState> = _uiState.asStateFlow()
+
+    private val _recordedCandidateSummary = MutableStateFlow<RecordedCandidateSummary?>(null)
+    val recordedCandidateSummary: StateFlow<RecordedCandidateSummary?> = _recordedCandidateSummary.asStateFlow()
 
     init {
         // Observe live network transitions to revoke stale route leases immediately.
@@ -146,18 +187,98 @@ class RelayRouteController(
     }
 
     fun setAutoOptimizeEnabled(enabled: Boolean) {
-        userAutoOptimizeEnabled = enabled
+        updateAutoOptimizeEnabled(enabled = enabled, triggeredByUser = false)
+    }
+
+    /**
+     * Explicit user toggle handler for `"自动优化连接"`.
+     *
+     * - When turned **ON**: immediately activates any fresh, non-quarantined [recordedCandidateSummary]
+     *   on the current network; if none is recorded yet, automatically selects a working candidate IP
+     *   in the background.
+     * - When turned **OFF**: immediately stops routing via the pinned IP and reverts to System DNS,
+     *   while retaining the recorded candidate summary on the current network so the user can toggle
+     *   it back on at any time.
+     */
+    fun onUserToggledAutoOptimize(enabled: Boolean) {
+        updateAutoOptimizeEnabled(enabled = enabled, triggeredByUser = true)
+    }
+
+    private fun updateAutoOptimizeEnabled(enabled: Boolean, triggeredByUser: Boolean) {
         if (!enabled) {
+            userAutoOptimizeEnabled = false
             activeBackgroundJob?.cancel()
             synchronized(routeStateLock) {
                 if (activeLease != null) {
                     activeLease = null
                     generationCounter.incrementAndGet()
                 }
+                pruneRecordedCandidateLocked(monotonicClockMillis(), networkObserver.currentSnapshot())
+                refreshUiStateLocked()
             }
-            refreshUiState()
-        } else {
-            refreshUiState()
+            return
+        }
+
+        val wasEnabled = userAutoOptimizeEnabled
+        userAutoOptimizeEnabled = true
+        var activatedFromRecordOrExisting = false
+        synchronized(routeStateLock) {
+            val nowMono = monotonicClockMillis()
+            val currentNet = networkObserver.currentSnapshot()
+            val existing = activeLease
+            if (existing != null && nowMono < existing.leaseExpiresAtMonotonicMs) {
+                activatedFromRecordOrExisting = true
+                return@synchronized
+            }
+            if (existing != null) {
+                activeLease = null
+                generationCounter.incrementAndGet()
+            }
+
+            val validRecord = pruneRecordedCandidateLocked(nowMono, currentNet)
+            if (validRecord != null && endpointResolutionProvider() is DiagnosticsEndpointResolution.Available) {
+                val handoffPool = validRecord.warmPool
+                recordedCandidateRecord = validRecord.copy(warmPool = null)
+                val nextGen = generationCounter.incrementAndGet()
+                activeLease = LeaseRecord(
+                    generationId = nextGen,
+                    candidate = validRecord.candidate,
+                    manifestRevision = validRecord.manifestRevision,
+                    warmPool = handoffPool,
+                    leaseExpiresAtMonotonicMs = validRecord.expiresAtMonotonicMs,
+                    baselineSetupMs = validRecord.baselineSetupMs,
+                )
+                _uiState.value = AutoRoutingModeState.OptimizedRouteActive(
+                    candidateId = validRecord.candidate.id,
+                    manifestRevision = validRecord.manifestRevision,
+                    medianLatencyMs = validRecord.medianLatencyMs,
+                    controlMedianLatencyMs = null,
+                    reductionPercent = null,
+                    confirmedSampleCount = validRecord.confirmedSampleCount,
+                    promotedOnReliability = true,
+                    selectedIpLiteral = validRecord.candidate.ipLiteral,
+                    ingressColo = validRecord.ingressColo,
+                )
+                activatedFromRecordOrExisting = true
+            } else {
+                refreshUiStateLocked()
+            }
+        }
+
+        if (!activatedFromRecordOrExisting &&
+            (triggeredByUser || (allowAutoSelectOnEnable && !wasEnabled)) &&
+            endpointResolutionProvider() is DiagnosticsEndpointResolution.Available &&
+            manualDiagnosticsActiveCount.get() == 0 &&
+            activeBackgroundJob?.isActive != true
+        ) {
+            _uiState.value = AutoRoutingModeState.ComparingConnections
+            activeBackgroundJob = applicationScope.launch {
+                discoverAndRecordPreferredCandidate(
+                    applyIfEnabled = true,
+                    invokedFromManualCheck = false,
+                    userInitiated = triggeredByUser,
+                )
+            }
         }
     }
 
@@ -192,25 +313,59 @@ class RelayRouteController(
     fun currentManifestRevisionOrNull(): String? = activeLease?.manifestRevision
 
     /**
-     * Restores default system-DNS routing without consuming relay quota unless
-     * [triggerTournamentNow] is explicitly requested.
+     * Restores default system-DNS routing and clears recorded candidate overrides without consuming
+     * relay quota unless [triggerTournamentNow] is explicitly requested.
      */
     fun resetToDefaultAndReevaluate(triggerTournamentNow: Boolean = false) {
         activeBackgroundJob?.cancel()
         quarantinedUntilMonotonicById.clear()
+        var poolToEvict: ConnectionPool? = null
         synchronized(routeStateLock) {
             activeLease = null
+            poolToEvict = recordedCandidateRecord?.warmPool
+            recordedCandidateRecord = null
+            _recordedCandidateSummary.value = null
             generationCounter.incrementAndGet()
             refreshUiStateLocked()
         }
-        if (triggerTournamentNow && userAutoOptimizeEnabled) {
+        poolToEvict?.let { OkHttpProbeTransport.evictPoolSafely(it) }
+        if (triggerTournamentNow) {
             activeBackgroundJob = applicationScope.launch {
-                runCompactTournament(manualRecheck = true)
+                discoverAndRecordPreferredCandidate(
+                    applyIfEnabled = userAutoOptimizeEnabled,
+                    invokedFromManualCheck = false,
+                    userInitiated = true,
+                )
             }
         }
     }
 
+    private fun isAllowedRelayHost(normalizedHost: String): Boolean {
+        if (normalizedHost.isEmpty() || RelayHttpTransport.isDirectWenkuOriginOrCdnHost(normalizedHost)) {
+            return false
+        }
+        if (RelayHttpTransport.defaultAllowedRelayHosts().contains(normalizedHost)) {
+            return true
+        }
+        val configuredHost = (endpointResolutionProvider() as? DiagnosticsEndpointResolution.Available)
+            ?.endpoint
+            ?.relayHost
+            ?.trim()
+            ?.trimEnd('.')
+            ?.lowercase(Locale.ROOT)
+        return !configuredHost.isNullOrEmpty() &&
+            !RelayHttpTransport.isDirectWenkuOriginOrCdnHost(configuredHost) &&
+            normalizedHost == configuredHost
+    }
+
     override fun currentRouteForHost(host: String): ActiveRelayRoute {
+        val normalizedHost = host.trim().trimEnd('.').lowercase(Locale.ROOT)
+        if (!isAllowedRelayHost(normalizedHost)) {
+            return ActiveRelayRoute(
+                generationId = generationCounter.get(),
+                pinnedCandidate = null,
+            )
+        }
         return synchronized(routeStateLock) {
             val nowMono = monotonicClockMillis()
             val lease = activeLease
@@ -230,7 +385,7 @@ class RelayRouteController(
                 generationId = lease.generationId,
                 pinnedCandidate = PinnedRelayCandidate(
                     candidateId = lease.candidate.id,
-                    relayHost = host,
+                    relayHost = normalizedHost,
                     rawIpBytes = lease.candidate.rawIpBytes,
                     warmConnectionPool = lease.warmPool,
                 ),
@@ -246,13 +401,20 @@ class RelayRouteController(
         val quarantineUntil = monotonicClockMillis() + CANDIDATE_QUARANTINE_DURATION_MS
         quarantinedUntilMonotonicById[failedCandidateId] = quarantineUntil
 
-        return synchronized(routeStateLock) {
+        var stalePoolToEvict: ConnectionPool? = null
+        val fallbackRoute = synchronized(routeStateLock) {
             val current = activeLease
             val nextGen = if (current != null && current.generationId == failedGenerationId) {
                 activeLease = null
                 generationCounter.incrementAndGet()
             } else {
                 generationCounter.get()
+            }
+            val recorded = recordedCandidateRecord
+            if (recorded != null && recorded.candidate.id == failedCandidateId) {
+                stalePoolToEvict = recorded.warmPool
+                recordedCandidateRecord = null
+                _recordedCandidateSummary.value = null
             }
             _uiState.value = if (userAutoOptimizeEnabled) {
                 AutoRoutingModeState.RestoredDefaultAfterFallback
@@ -261,6 +423,22 @@ class RelayRouteController(
             }
             ActiveRelayRoute(generationId = nextGen, pinnedCandidate = null)
         }
+        stalePoolToEvict?.let { OkHttpProbeTransport.evictPoolSafely(it) }
+
+        if (userAutoOptimizeEnabled &&
+            allowAutoSelectOnEnable &&
+            manualDiagnosticsActiveCount.get() == 0 &&
+            activeBackgroundJob?.isActive != true
+        ) {
+            activeBackgroundJob = applicationScope.launch {
+                discoverAndRecordPreferredCandidate(
+                    applyIfEnabled = true,
+                    invokedFromManualCheck = false,
+                    userInitiated = false,
+                )
+            }
+        }
+        return fallbackRoute
     }
 
     override fun onPassiveCallCompleted(
@@ -654,7 +832,25 @@ class RelayRouteController(
                     (tcp + tls).takeIf { it > 0L }
                 }.minOrNull()
 
+                val winnerColo = warmGuardSample.serverPayload?.ingressColo
+                    ?: bestChallenger.sample.serverPayload?.ingressColo
+                var oldRecordedPool: ConnectionPool? = null
                 synchronized(routeStateLock) {
+                    oldRecordedPool = recordedCandidateRecord?.warmPool
+                    val newRecord = RecordedCandidateRecord(
+                        candidate = bestChallenger.candidate,
+                        manifestRevision = manifest.revision,
+                        medianLatencyMs = challengerMedianMs,
+                        ingressColo = winnerColo,
+                        confirmedSampleCount = challengerConfirmSamples.size,
+                        warmPool = null,
+                        expiresAtMonotonicMs = publishNowMono + leaseDurationMs,
+                        baselineSetupMs = baselineSetupMs,
+                        networkSnapshot = baselineNetwork,
+                    )
+                    recordedCandidateRecord = newRecord
+                    _recordedCandidateSummary.value = newRecord.toSummary()
+
                     val newGen = generationCounter.incrementAndGet()
                     activeLease = LeaseRecord(
                         generationId = newGen,
@@ -672,13 +868,272 @@ class RelayRouteController(
                         reductionPercent = reductionPct,
                         confirmedSampleCount = challengerConfirmSamples.size,
                         promotedOnReliability = promotedOnReliability,
+                        selectedIpLiteral = bestChallenger.candidate.ipLiteral,
+                        ingressColo = winnerColo,
                     )
                 }
+                oldRecordedPool?.let { OkHttpProbeTransport.evictPoolSafely(it) }
                 true
             } finally {
                 temporaryPools.forEach { OkHttpProbeTransport.evictPoolSafely(it) }
             }
         }
+
+    /**
+     * Screens up to [MAX_DISCOVERY_SCREEN_CANDIDATES] authorized Cloudflare relay candidates,
+     * verifies HTTP/2 warm socket reuse on the fastest healthy candidate, and records it in
+     * [recordedCandidateSummary] for the current network.
+     *
+     * - When [applyIfEnabled] is `true` and [userAutoOptimizeEnabled] is currently ON, immediately
+     *   activates the verified candidate as [activeLease] + [AutoRoutingModeState.OptimizedRouteActive].
+     * - When [userAutoOptimizeEnabled] is OFF (e.g. after running manual Quick Check), stores the
+     *   verified candidate so the UI can show its IP & latency near the toggle and activate it
+     *   instantaneously as soon as the user flips the toggle ON.
+     */
+    suspend fun discoverAndRecordPreferredCandidate(
+        applyIfEnabled: Boolean = true,
+        invokedFromManualCheck: Boolean = false,
+        userInitiated: Boolean = false,
+    ): RecordedCandidateSummary? = controllerMutex.withLock {
+        val resolution = endpointResolutionProvider()
+        if (resolution !is DiagnosticsEndpointResolution.Available) {
+            refreshUiState()
+            return@withLock null
+        }
+        if (!invokedFromManualCheck && manualDiagnosticsActiveCount.get() > 0) {
+            return@withLock null
+        }
+        if (!userInitiated && isDiagnosticsPausedAt(monotonicClockMillis())) {
+            refreshUiState()
+            return@withLock null
+        }
+
+        val baselineNetwork = networkObserver.currentSnapshot()
+        if (!baselineNetwork.isConnected) {
+            refreshUiState()
+            return@withLock null
+        }
+        if (!userInitiated && (baselineNetwork.isPowerSaveMode || baselineNetwork.isDataSaverRestricted)) {
+            refreshUiState()
+            return@withLock null
+        }
+
+        val endpoint = resolution.endpoint
+        val manifest = manifestRepository.refreshFromIndependentOrigins(
+            expectedRelayHostname = endpoint.relayHost,
+            forceRefresh = false,
+        ) ?: manifestRepository.loadCachedOrInMemoryManifest(endpoint.relayHost)
+            ?: run {
+                refreshUiState()
+                return@withLock null
+            }
+
+        if (!manifest.enabled) {
+            revokeActiveOverrideLocked()
+            return@withLock null
+        }
+
+        val rolloutBucket = routingLocalStore.getOrCreateRolloutBucket()
+        val nowWall = wallClockEpochMillis()
+        val nowMono = monotonicClockMillis()
+        if (!manifest.isAuthorizedForOrdinaryTraffic(nowWall, nowMono, appVersionCode, rolloutBucket)) {
+            revokeActiveOverrideLocked()
+            return@withLock null
+        }
+
+        val eligibleCandidates = selectBalancedCandidatesForScreening(
+            allCandidates = manifest.sampleCandidates(),
+            nowMono = nowMono,
+            maxCount = MAX_DISCOVERY_SCREEN_CANDIDATES,
+        )
+        if (eligibleCandidates.isEmpty()) {
+            refreshUiState()
+            return@withLock null
+        }
+
+        if (applyIfEnabled && userAutoOptimizeEnabled && activeLease == null) {
+            _uiState.value = AutoRoutingModeState.ComparingConnections
+        }
+
+        val startedAtMono = monotonicClockMillis()
+        val poolsToEvict = mutableListOf<ConnectionPool>()
+
+        fun canContinueDiscovery(): Boolean {
+            if (!invokedFromManualCheck && manualDiagnosticsActiveCount.get() > 0) return false
+            if (monotonicClockMillis() - startedAtMono >= MAX_DISCOVERY_DURATION_MS) return false
+            if (networkObserver.currentSnapshot().hasTransitionedFrom(baselineNetwork)) return false
+            return true
+        }
+
+        suspend fun runDiscoveryProbe(armConfig: ProbeArmConfig, sampleIndex: Int): ProbeSampleResult? {
+            while (!userInitiated && foregroundInFlightCount.get() > 0) {
+                if (!canContinueDiscovery()) return null
+                delay(50L)
+            }
+            if (!canContinueDiscovery()) return null
+            if (!userInitiated) {
+                val budgetOk = routingLocalStore.tryConsumeAutomaticProbeBudget(
+                    nowEpochMs = wallClockEpochMillis(),
+                    isMeteredOrUnknown = baselineNetwork.isMetered || baselineNetwork.underlyingTransports.isEmpty(),
+                )
+                if (!budgetOk) return null
+            }
+            val sample = stalledDnsGuard.semaphore.withPermit {
+                probeTransport.executeProbe(
+                    endpoint = endpoint,
+                    armConfig = armConfig,
+                    sampleIndex = sampleIndex,
+                )
+            }
+            if (sample.httpStatusCode == 503) {
+                diagnosticsPausedUntilMonotonicMs = monotonicClockMillis() + DIAGNOSTICS_DISABLED_COOLDOWN_MS
+                return null
+            }
+            if (sample.errorCategory == ProbeErrorCategory.HTTP_RATE_LIMITED) {
+                return null
+            }
+            if (sample.observedProxyType != Proxy.Type.DIRECT) {
+                return null
+            }
+            if (autoProbeGapMillis > 0L && canContinueDiscovery()) {
+                delay(autoProbeGapMillis)
+            }
+            return sample
+        }
+
+        data class ScreenedDiscoveryCandidate(
+            val candidate: CandidateIpEntry,
+            val sample: ProbeSampleResult,
+            val pool: ConnectionPool,
+        )
+
+        var retainedWinnerPool: ConnectionPool? = null
+        try {
+            val screened = mutableListOf<ScreenedDiscoveryCandidate>()
+            for ((idx, candidate) in eligibleCandidates.withIndex()) {
+                val pool = ConnectionPool(2, 60, TimeUnit.SECONDS).also { poolsToEvict.add(it) }
+                val sample = runDiscoveryProbe(
+                    armConfig = ProbeArmConfig(
+                        armId = "discover:${candidate.id}",
+                        dnsPolicy = ProbeDnsPolicy.PinnedCandidate(
+                            candidateId = candidate.id,
+                            relayHostname = endpoint.relayHost,
+                            rawIpBytes = candidate.rawIpBytes,
+                        ),
+                        fastFallback = false,
+                        connectionPool = pool,
+                    ),
+                    sampleIndex = 100 + idx,
+                ) ?: break
+
+                if (sample.isAuthenticatedCandidateProbeSuccess()) {
+                    screened.add(ScreenedDiscoveryCandidate(candidate, sample, pool))
+                }
+            }
+
+            val best = screened.minByOrNull { it.sample.fullResponseElapsedMs } ?: run {
+                refreshUiState()
+                return@withLock null
+            }
+
+            // Verify warm HTTP/2 connection reuse on the winning candidate's pool before recording/promoting.
+            val warmSample = runDiscoveryProbe(
+                armConfig = ProbeArmConfig(
+                    armId = "discover_warm:${best.candidate.id}",
+                    dnsPolicy = ProbeDnsPolicy.PinnedCandidate(
+                        candidateId = best.candidate.id,
+                        relayHostname = endpoint.relayHost,
+                        rawIpBytes = best.candidate.rawIpBytes,
+                    ),
+                    fastFallback = false,
+                    connectionPool = best.pool,
+                ),
+                sampleIndex = 110,
+            )
+            if (warmSample == null ||
+                !warmSample.isAuthenticatedCandidateProbeSuccess() ||
+                !warmSample.connectionReused
+            ) {
+                refreshUiState()
+                return@withLock null
+            }
+
+            val publishNowMono = monotonicClockMillis()
+            val publishNowWall = wallClockEpochMillis()
+            val remainingManifestMs = manifest.remainingAuthorizationMillis(publishNowWall, publishNowMono)
+            if (remainingManifestMs <= 0L) {
+                refreshUiState()
+                return@withLock null
+            }
+
+            // Retain the verified warm pool; remove it from `poolsToEvict` so `finally` only cleans non-winners.
+            poolsToEvict.remove(best.pool)
+            retainedWinnerPool = best.pool
+
+            val leaseDurationMs = minOf(MAX_LEASE_DURATION_MS, remainingManifestMs)
+            val medianMs = DiagnosticsSummaryStats.computeMedianSorted(
+                listOf(best.sample.fullResponseElapsedMs, warmSample.fullResponseElapsedMs).sorted(),
+            ) ?: warmSample.fullResponseElapsedMs
+            val ingressColo = warmSample.serverPayload?.ingressColo ?: best.sample.serverPayload?.ingressColo
+            val baselineSetupMs = run {
+                val tcp = best.sample.tcpConnectDurationMs ?: 0L
+                val tls = best.sample.tlsHandshakeDurationMs ?: 0L
+                (tcp + tls).takeIf { it > 0L }
+            }
+
+            var oldRecordedPool: ConnectionPool? = null
+            val summary = synchronized(routeStateLock) {
+                oldRecordedPool = recordedCandidateRecord?.warmPool
+                val shouldActivateNow = applyIfEnabled && userAutoOptimizeEnabled
+                val newRecord = RecordedCandidateRecord(
+                    candidate = best.candidate,
+                    manifestRevision = manifest.revision,
+                    medianLatencyMs = medianMs,
+                    ingressColo = ingressColo,
+                    confirmedSampleCount = 2,
+                    warmPool = if (shouldActivateNow) null else retainedWinnerPool,
+                    expiresAtMonotonicMs = publishNowMono + leaseDurationMs,
+                    baselineSetupMs = baselineSetupMs,
+                    networkSnapshot = baselineNetwork,
+                )
+                recordedCandidateRecord = newRecord
+                val recordedSummary = newRecord.toSummary()
+                _recordedCandidateSummary.value = recordedSummary
+
+                if (shouldActivateNow) {
+                    val nextGen = generationCounter.incrementAndGet()
+                    activeLease = LeaseRecord(
+                        generationId = nextGen,
+                        candidate = best.candidate,
+                        manifestRevision = manifest.revision,
+                        warmPool = retainedWinnerPool,
+                        leaseExpiresAtMonotonicMs = publishNowMono + leaseDurationMs,
+                        baselineSetupMs = baselineSetupMs,
+                    )
+                    _uiState.value = AutoRoutingModeState.OptimizedRouteActive(
+                        candidateId = best.candidate.id,
+                        manifestRevision = manifest.revision,
+                        medianLatencyMs = medianMs,
+                        controlMedianLatencyMs = null,
+                        reductionPercent = null,
+                        confirmedSampleCount = 2,
+                        promotedOnReliability = true,
+                        selectedIpLiteral = best.candidate.ipLiteral,
+                        ingressColo = ingressColo,
+                    )
+                } else {
+                    refreshUiStateLocked()
+                }
+                retainedWinnerPool = null
+                recordedSummary
+            }
+            oldRecordedPool?.let { OkHttpProbeTransport.evictPoolSafely(it) }
+            summary
+        } finally {
+            retainedWinnerPool?.let { OkHttpProbeTransport.evictPoolSafely(it) }
+            poolsToEvict.forEach { OkHttpProbeTransport.evictPoolSafely(it) }
+        }
+    }
 
     /**
      * Bounded `<= 6`-call / `20s` bootstrap availability recovery granting a `10-minute`
@@ -755,7 +1210,24 @@ class RelayRouteController(
                 val maxAuthMs = manifest.remainingAuthorizationMillis(wallClockEpochMillis(), provisionalMono)
                 val leaseMs = minOf(PROVISIONAL_RECOVERY_LEASE_MS, maxAuthMs)
                 if (leaseMs > 0L) {
+                    val ingressColo = sample.serverPayload?.ingressColo
+                    var oldRecordedPool: ConnectionPool? = null
                     synchronized(routeStateLock) {
+                        oldRecordedPool = recordedCandidateRecord?.warmPool
+                        val newRecord = RecordedCandidateRecord(
+                            candidate = candidate,
+                            manifestRevision = manifest.revision,
+                            medianLatencyMs = sample.fullResponseElapsedMs,
+                            ingressColo = ingressColo,
+                            confirmedSampleCount = 1,
+                            warmPool = null,
+                            expiresAtMonotonicMs = provisionalMono + leaseMs,
+                            baselineSetupMs = null,
+                            networkSnapshot = baselineNetwork,
+                        )
+                        recordedCandidateRecord = newRecord
+                        _recordedCandidateSummary.value = newRecord.toSummary()
+
                         val nextGen = generationCounter.incrementAndGet()
                         activeLease = LeaseRecord(
                             generationId = nextGen,
@@ -773,8 +1245,11 @@ class RelayRouteController(
                             reductionPercent = null,
                             confirmedSampleCount = 1,
                             promotedOnReliability = true,
+                            selectedIpLiteral = candidate.ipLiteral,
+                            ingressColo = ingressColo,
                         )
                     }
+                    oldRecordedPool?.let { OkHttpProbeTransport.evictPoolSafely(it) }
                     return@withLock true
                 }
             }
@@ -817,26 +1292,74 @@ class RelayRouteController(
         return picked
     }
 
+    private fun pruneRecordedCandidateLocked(
+        nowMono: Long,
+        currentNetwork: NetworkSnapshot,
+    ): RecordedCandidateRecord? {
+        val record = recordedCandidateRecord ?: return null
+        val quarantinedUntil = quarantinedUntilMonotonicById[record.candidate.id] ?: 0L
+        val isInvalid =
+            !currentNetwork.isConnected ||
+                nowMono >= record.expiresAtMonotonicMs ||
+                nowMono < quarantinedUntil ||
+                currentNetwork.hasTransitionedFrom(record.networkSnapshot)
+        if (isInvalid) {
+            record.warmPool?.let { OkHttpProbeTransport.evictPoolSafely(it) }
+            recordedCandidateRecord = null
+            _recordedCandidateSummary.value = null
+            return null
+        }
+        return record
+    }
+
     private fun revokeActiveOverrideOnNetworkTransition() {
+        activeBackgroundJob?.cancel()
         quarantinedUntilMonotonicById.clear()
         synchronized(recentPassiveSetupTimesMs) { recentPassiveSetupTimesMs.clear() }
+        var poolToEvict: ConnectionPool? = null
         synchronized(routeStateLock) {
             if (activeLease != null) {
                 activeLease = null
                 generationCounter.incrementAndGet()
             }
+            poolToEvict = recordedCandidateRecord?.warmPool
+            recordedCandidateRecord = null
+            _recordedCandidateSummary.value = null
             refreshUiStateLocked()
+        }
+        poolToEvict?.let { OkHttpProbeTransport.evictPoolSafely(it) }
+
+        val currentNet = networkObserver.currentSnapshot()
+        if (userAutoOptimizeEnabled &&
+            allowAutoSelectOnEnable &&
+            currentNet.isConnected &&
+            endpointResolutionProvider() is DiagnosticsEndpointResolution.Available &&
+            manualDiagnosticsActiveCount.get() == 0
+        ) {
+            _uiState.value = AutoRoutingModeState.ComparingConnections
+            activeBackgroundJob = applicationScope.launch {
+                discoverAndRecordPreferredCandidate(
+                    applyIfEnabled = true,
+                    invokedFromManualCheck = false,
+                    userInitiated = false,
+                )
+            }
         }
     }
 
     private fun revokeActiveOverrideLocked() {
+        var poolToEvict: ConnectionPool? = null
         synchronized(routeStateLock) {
             if (activeLease != null) {
                 activeLease = null
                 generationCounter.incrementAndGet()
             }
+            poolToEvict = recordedCandidateRecord?.warmPool
+            recordedCandidateRecord = null
+            _recordedCandidateSummary.value = null
             refreshUiStateLocked()
         }
+        poolToEvict?.let { OkHttpProbeTransport.evictPoolSafely(it) }
     }
 
     private fun refreshUiState() {

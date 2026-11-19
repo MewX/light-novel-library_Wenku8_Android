@@ -7,6 +7,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import mockwebserver3.MockResponse
 import mockwebserver3.MockWebServer
@@ -718,6 +719,209 @@ class DiagnosticsRunnerAndControllerTest {
         monoClock.addAndGet(20L * 60L * 1_000L)
         assertTrue(controller.runCompactTournament(manualRecheck = false))
         assertTrue(probesSent > 1)
+    }
+
+    @Test
+    fun discoverRecordsGoodIpAndTogglingSwitchImmediatelyActivatesRelayOnlyRouteWithAutoFallback() = runBlocking {
+        val nowWall = 1_762_740_000_000L // 2025-11-10T02:00:00Z
+        val monoClock = AtomicLong(10_000L)
+        val networkFlow = MutableStateFlow(
+            NetworkSnapshot(
+                internalNetworkHandleKey = "wifi-home",
+                isConnected = true,
+                underlyingTransports = setOf(UnderlyingTransportKind.WIFI),
+                isVpnActive = false,
+                isMetered = false,
+            ),
+        )
+        val fakeObserver = object : NetworkConnectivityObserver {
+            override fun currentSnapshot(): NetworkSnapshot = networkFlow.value
+            override fun observeDefaultNetworkSnapshots(): Flow<NetworkSnapshot> = networkFlow
+        }
+
+        val manifestRepo = ManifestRepository(
+            localStore = routingLocalStore,
+            wallClockEpochMillis = { nowWall },
+            monotonicClockMillis = { monoClock.get() },
+        )
+        manifestRepo.ingestManifestPayload(
+            rawJson = """
+                {
+                  "schema": "wenku8-ip-candidates-v1",
+                  "revision": "rev-recorded-ip",
+                  "hostname": "wenku8-relay.mewx.org",
+                  "enabled": true,
+                  "minAppVersionCode": 0,
+                  "rolloutPermille": 1000,
+                  "issuedAt": "2025-11-10T00:00:00Z",
+                  "expiresAt": "2025-11-10T12:00:00Z",
+                  "candidates": [
+                    { "id": "cf-v4-blocked", "ip": "104.21.48.10" },
+                    { "id": "cf-v4-good", "ip": "162.159.135.88" },
+                    { "id": "cf-v4-backup", "ip": "172.67.150.42" }
+                  ]
+                }
+            """.trimIndent(),
+            expectedRelayHostname = "wenku8-relay.mewx.org",
+        )
+
+        var probesSent = 0
+        val transport = object : DiagnosticsProbeTransport {
+            override suspend fun executeProbe(
+                endpoint: ValidatedRelayEndpoint,
+                armConfig: ProbeArmConfig,
+                sampleIndex: Int,
+                explicitNonce: String?,
+            ): ProbeSampleResult {
+                probesSent += 1
+                val candidateId = (armConfig.dnsPolicy as? ProbeDnsPolicy.PinnedCandidate)?.candidateId
+                val isWarmVerify = armConfig.armId.startsWith("discover_warm:")
+                return when (candidateId) {
+                    "cf-v4-blocked" -> syntheticProbeSample(
+                        index = sampleIndex,
+                        armId = armConfig.armId,
+                        candidateId = candidateId,
+                        succeeded = false,
+                        elapsedMs = 3_000L,
+                        reused = false,
+                    )
+                    "cf-v4-good" -> syntheticProbeSample(
+                        index = sampleIndex,
+                        armId = armConfig.armId,
+                        candidateId = candidateId,
+                        succeeded = true,
+                        elapsedMs = if (isWarmVerify) 82L else 94L,
+                        reused = isWarmVerify,
+                    )
+                    "cf-v4-backup" -> syntheticProbeSample(
+                        index = sampleIndex,
+                        armId = armConfig.armId,
+                        candidateId = candidateId,
+                        succeeded = true,
+                        elapsedMs = if (isWarmVerify) 118L else 132L,
+                        reused = isWarmVerify,
+                    )
+                    else -> syntheticProbeSample(
+                        index = sampleIndex,
+                        armId = armConfig.armId,
+                        candidateId = null,
+                        succeeded = true,
+                        elapsedMs = 240L,
+                        reused = false,
+                    )
+                }
+            }
+        }
+
+        val controller = RelayRouteController(
+            applicationScope = storeScope,
+            endpointResolutionProvider = { DiagnosticsEndpointResolution.Available(testEndpoint) },
+            probeTransport = transport,
+            manifestRepository = manifestRepo,
+            routingLocalStore = routingLocalStore,
+            networkObserver = fakeObserver,
+            autoProbeGapMillis = 0L,
+            initialAutoOptimizeEnabled = false,
+            allowAutoSelectOnEnable = true,
+            monotonicClockMillis = { monoClock.get() },
+            wallClockEpochMillis = { nowWall },
+        )
+
+        // 1. Discover & record good IP while toggle is OFF (simulating post-QuickCheck recording)
+        val recorded = controller.discoverAndRecordPreferredCandidate(
+            applyIfEnabled = true,
+            invokedFromManualCheck = true,
+            userInitiated = true,
+        )
+        assertNotNull(recorded)
+        assertEquals("cf-v4-good", recorded!!.candidateId)
+        assertEquals("162.159.135.88", recorded.ipLiteral)
+        assertEquals("HKG", recorded.ingressColo)
+        assertEquals(recorded, controller.recordedCandidateSummary.value)
+        assertTrue(controller.uiState.value is AutoRoutingModeState.DisabledByUser)
+        assertNull(controller.currentRouteForHost("wenku8-relay.mewx.org").pinnedCandidate)
+
+        // 2. User flips toggle ON -> immediately activates recorded IP with ZERO additional probes!
+        val probesBeforeToggle = probesSent
+        controller.onUserToggledAutoOptimize(true)
+        assertEquals("Recorded IP must activate instantaneously without extra probes", probesBeforeToggle, probesSent)
+        val activeState = controller.uiState.value as AutoRoutingModeState.OptimizedRouteActive
+        assertEquals("cf-v4-good", activeState.candidateId)
+        assertEquals("162.159.135.88", activeState.selectedIpLiteral)
+        assertEquals("HKG", activeState.ingressColo)
+
+        val relayRoute = controller.currentRouteForHost("wenku8-relay.mewx.org")
+        assertNotNull(relayRoute.pinnedCandidate)
+        assertEquals(
+            "162.159.135.88",
+            InetAddress.getByAddress(relayRoute.pinnedCandidate!!.rawIpBytes).hostAddress,
+        )
+
+        // 3. Strict Relay-Only Host Scoping: Wenku8 website & image CDNs MUST NEVER use pinned IP!
+        for (nonRelayHost in listOf(
+            "pic.wenku8.com",
+            "img.wenku8.com",
+            "app.wenku8.com",
+            "www.wenku8.net",
+            "wenku8.cn",
+            "wenku8.mewx.org",
+            "cdn.example.org",
+        )) {
+            assertNull(
+                "Host $nonRelayHost must stay on System DNS and never use pinned relay IP",
+                controller.currentRouteForHost(nonRelayHost).pinnedCandidate,
+            )
+        }
+        assertTrue(org.mewx.wenku8.data.remote.transport.RelayHttpTransport.isDirectWenkuOriginOrCdnHost("pic.wenku8.com"))
+        assertTrue(org.mewx.wenku8.data.remote.transport.RelayHttpTransport.isDirectWenkuOriginOrCdnHost("www.wenku8.net"))
+        assertFalse(org.mewx.wenku8.data.remote.transport.RelayHttpTransport.isDirectWenkuOriginOrCdnHost("wenku8-relay.mewx.org"))
+
+        // 4. User toggles OFF -> reverts to System DNS while keeping recorded IP near the toggle;
+        //    toggling ON again immediately re-activates!
+        controller.onUserToggledAutoOptimize(false)
+        assertTrue(controller.uiState.value is AutoRoutingModeState.DisabledByUser)
+        assertNull(controller.currentRouteForHost("wenku8-relay.mewx.org").pinnedCandidate)
+        assertEquals("162.159.135.88", controller.recordedCandidateSummary.value?.ipLiteral)
+
+        controller.onUserToggledAutoOptimize(true)
+        assertEquals(
+            "cf-v4-good",
+            (controller.uiState.value as AutoRoutingModeState.OptimizedRouteActive).candidateId,
+        )
+
+        // 5. Pinned IP fails during an in-flight foreground call -> immediate fallback route uses
+        //    Default System DNS (`pinnedCandidate == null`), background re-selection yields until
+        //    the foreground retry finishes (`onForegroundCallFinished`), then promotes `cf-v4-backup`!
+        val currentGen = controller.currentRouteForHost("wenku8-relay.mewx.org").generationId
+        controller.onForegroundCallStarted()
+        val immediateFallback = controller.fallbackRouteAfterCandidateFailure(
+            failedGenerationId = currentGen,
+            failedCandidateId = "cf-v4-good",
+            failureBeforeSend = true,
+        )
+        assertNull("Immediate in-flight fallback must use System DNS", immediateFallback.pinnedCandidate)
+        controller.onForegroundCallFinished()
+
+        val reselectedState = kotlinx.coroutines.withTimeout(5_000L) {
+            controller.uiState.first { it is AutoRoutingModeState.OptimizedRouteActive }
+        } as AutoRoutingModeState.OptimizedRouteActive
+        assertEquals("cf-v4-backup", reselectedState.candidateId)
+        assertEquals("172.67.150.42", reselectedState.selectedIpLiteral)
+
+        // 6. Network transition (Wi-Fi -> Cellular) clears old network's IP & re-evaluates on Cellular
+        networkFlow.value = NetworkSnapshot(
+            internalNetworkHandleKey = "cell-5g",
+            isConnected = true,
+            underlyingTransports = setOf(UnderlyingTransportKind.CELLULAR),
+            isVpnActive = false,
+            isMetered = true,
+        )
+        val cellActive = kotlinx.coroutines.withTimeout(5_000L) {
+            controller.uiState.first {
+                it is AutoRoutingModeState.OptimizedRouteActive && it.selectedIpLiteral == "162.159.135.88"
+            }
+        } as AutoRoutingModeState.OptimizedRouteActive
+        assertEquals("162.159.135.88", cellActive.selectedIpLiteral)
     }
 
     private fun syntheticProbeSample(

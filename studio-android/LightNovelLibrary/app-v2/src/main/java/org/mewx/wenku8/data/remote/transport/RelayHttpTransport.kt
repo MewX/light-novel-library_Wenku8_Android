@@ -189,17 +189,34 @@ class RelayHttpTransport(
         private val FORM_MEDIA_TYPE = "application/x-www-form-urlencoded".toMediaType()
         private const val MIN_REMAINING_BUDGET_FOR_FALLBACK_MS: Long = 350L
 
+        /**
+         * Returns `true` when [host] belongs to Wenku8's direct website / image CDN origins
+         * (`*.wenku8.com`, `*.wenku8.net`, `*.wenku8.cn`) or static notice host (`wenku8.mewx.org`),
+         * which must **always** resolve via System DNS and never be pinned to Cloudflare relay IPs.
+         */
+        fun isDirectWenkuOriginOrCdnHost(host: String): Boolean {
+            val normalized = host.trim().trimEnd('.').lowercase(Locale.ROOT)
+            if (normalized.isEmpty()) return false
+            return normalized == "wenku8.com" ||
+                normalized.endsWith(".wenku8.com") ||
+                normalized == "wenku8.net" ||
+                normalized.endsWith(".wenku8.net") ||
+                normalized == "wenku8.cn" ||
+                normalized.endsWith(".wenku8.cn") ||
+                normalized == "wenku8.mewx.org"
+        }
+
         fun defaultAllowedRelayHosts(): Set<String> {
             val dynamicHost = try {
                 val base = Wenku8API.BASE_URL.orEmpty()
-                URI(base).host?.lowercase(Locale.ROOT)
+                URI(base).host?.trim()?.trimEnd('.')?.lowercase(Locale.ROOT)
             } catch (_: Throwable) {
                 null
             }
             return buildSet {
                 add("wenku8-relay.mewx.org")
                 add("wenku8-android.mewx.org")
-                if (!dynamicHost.isNullOrBlank()) {
+                if (!dynamicHost.isNullOrBlank() && !isDirectWenkuOriginOrCdnHost(dynamicHost)) {
                     add(dynamicHost)
                 }
             }
@@ -297,7 +314,8 @@ class RelayHttpTransport(
 
         val requestBodyBytes = encodeFormBodyBytes(formParams)
         val overallStartedAtMs = monotonicClockMillis()
-        val isScopedRelayHost = allowedRelayHostsProvider().contains(targetHost)
+        val isScopedRelayHost =
+            !isDirectWenkuOriginOrCdnHost(targetHost) && allowedRelayHostsProvider().contains(targetHost)
 
         routeProvider.onForegroundCallStarted()
         return try {
