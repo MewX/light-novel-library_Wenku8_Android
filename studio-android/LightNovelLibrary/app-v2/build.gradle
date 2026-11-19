@@ -1,5 +1,4 @@
 apply plugin: 'com.android.application'
-apply plugin: 'org.jetbrains.kotlin.android'
 apply plugin: 'org.jetbrains.kotlin.plugin.compose'
 apply plugin: 'org.jetbrains.kotlin.plugin.serialization'
 apply plugin: 'com.google.devtools.ksp'
@@ -71,14 +70,6 @@ android {
         coreLibraryDesugaringEnabled true
     }
 
-    kotlinOptions {
-        jvmTarget = '17'
-        freeCompilerArgs += [
-                '-opt-in=androidx.compose.material3.ExperimentalMaterial3Api',
-                '-opt-in=androidx.compose.material3.ExperimentalMaterial3ExpressiveApi',
-        ]
-    }
-
     buildFeatures {
         compose true
         buildConfig true
@@ -124,13 +115,13 @@ dependencies {
     coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.1.5'
 
     // Core AndroidX & AppCompat (retained for per-app SC/TC locale switching on API 23-32).
-    implementation 'androidx.core:core-ktx:1.16.0'
-    implementation 'androidx.appcompat:appcompat:1.7.1'
+    implementation 'androidx.core:core-ktx:1.19.1'
+    implementation 'androidx.appcompat:appcompat:1.8.0'
     implementation 'androidx.documentfile:documentfile:1.1.0'
-    implementation 'androidx.activity:activity-compose:1.12.4'
-    implementation 'androidx.lifecycle:lifecycle-runtime-ktx:2.10.0'
-    implementation 'androidx.lifecycle:lifecycle-runtime-compose:2.10.0'
-    implementation 'androidx.lifecycle:lifecycle-viewmodel-compose:2.10.0'
+    implementation 'androidx.activity:activity-compose:1.13.0'
+    implementation 'androidx.lifecycle:lifecycle-runtime-ktx:2.11.0'
+    implementation 'androidx.lifecycle:lifecycle-runtime-compose:2.11.0'
+    implementation 'androidx.lifecycle:lifecycle-viewmodel-compose:2.11.0'
 
     // Jetpack Compose & Material 3 Expressive (M3e 1.5.0-rc01). Zero third-party UI libraries.
     def composeBom = platform('androidx.compose:compose-bom:2026.09.00')
@@ -144,13 +135,13 @@ dependencies {
     implementation 'androidx.compose.foundation:foundation'
     implementation 'androidx.compose.material3:material3:1.5.0-rc01'
     implementation 'androidx.compose.material:material-icons-extended:1.7.8'
-    implementation 'androidx.compose.material3.adaptive:adaptive:1.2.0'
+    implementation 'androidx.compose.material3.adaptive:adaptive:1.3.0'
     implementation 'androidx.graphics:graphics-shapes:1.1.0'
-    implementation 'androidx.navigation:navigation-compose:2.9.7'
+    implementation 'androidx.navigation:navigation-compose:2.10.2'
 
     // Coroutines & Kotlinx Serialization
-    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2'
-    implementation 'org.jetbrains.kotlinx:kotlinx-serialization-json:1.10.0'
+    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0'
+    implementation 'org.jetbrains.kotlinx:kotlinx-serialization-json:1.13.0'
 
     // Room SQLite (WAL) & Preferences DataStore (wired in P0.2)
     def roomVersion = '2.8.5'
@@ -158,18 +149,18 @@ dependencies {
     implementation "androidx.room:room-ktx:${roomVersion}"
     ksp "androidx.room:room-compiler:${roomVersion}"
     // 1.2.1+ fixes 16 KB page-size PT_GNU_RELRO segment alignment in libdatastore_shared_counter.so.
-    implementation 'androidx.datastore:datastore-preferences:1.2.1'
+    implementation 'androidx.datastore:datastore-preferences:1.3.0'
 
     // OkHttp 5.x & Coil 3 (wired in P0.3 / Phase 2)
     implementation 'com.squareup.okhttp3:okhttp:5.5.1'
-    implementation 'io.coil-kt.coil3:coil-compose:3.4.0'
-    implementation 'io.coil-kt.coil3:coil-network-okhttp:3.4.0'
+    implementation 'io.coil-kt.coil3:coil-compose:3.6.3'
+    implementation 'io.coil-kt.coil3:coil-network-okhttp:3.6.3'
 
     // WorkManager for atomic background novel downloads (Phase 4)
-    implementation 'androidx.work:work-runtime-ktx:2.11.0'
+    implementation 'androidx.work:work-runtime-ktx:2.12.0'
 
     // Minimal server-support inline banner exclusively on NovelDetailScreen (Phase 4)
-    implementation 'com.google.android.gms:play-services-ads:23.6.0'
+    implementation 'com.google.android.gms:play-services-ads:25.5.0'
 
     // Debug Compose tooling
     debugImplementation 'androidx.compose.ui:ui-tooling'
@@ -177,11 +168,11 @@ dependencies {
 
     // JVM Unit & Robolectric Compose UI Tests
     testImplementation 'junit:junit:4.13.2'
-    testImplementation 'org.robolectric:robolectric:4.16.1'
+    testImplementation 'org.robolectric:robolectric:4.18'
     testImplementation 'androidx.test:core-ktx:1.7.0'
     testImplementation 'androidx.test.ext:junit-ktx:1.3.0'
     testImplementation 'androidx.compose.ui:ui-test-junit4'
-    testImplementation 'org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2'
+    testImplementation 'org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0'
     testImplementation "androidx.room:room-testing:${roomVersion}"
     testImplementation 'com.squareup.okhttp3:mockwebserver3:5.5.1'
 
