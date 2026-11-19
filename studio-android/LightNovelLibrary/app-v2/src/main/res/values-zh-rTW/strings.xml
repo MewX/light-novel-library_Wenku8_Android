@@ -101,9 +101,19 @@
     <string name="diag_auto_status_optimized_reliability">已最佳化目前網路連線（節點 %1$s · 可用性復原）</string>
     <string name="diag_auto_status_restored_default">已恢復預設連線</string>
     <string name="diag_action_reset_reevaluate">恢復預設連線並重新評估</string>
+    <string name="diag_selected_ip_title_format">目前生效中轉 IP：%1$s · %2$d ms</string>
+    <string name="diag_selected_ip_title_with_colo_format">目前生效中轉 IP：%1$s · %2$d ms · 節點 %3$s</string>
+    <string name="diag_selected_ip_scope_hint">僅作用於文庫中轉介面（封面/插圖等直連 CDN 保持預設連線）· 若失效將自動回退系統 DNS</string>
+    <string name="diag_recorded_ip_title_format">已記錄可用優選 IP：%1$s · %2$d ms</string>
+    <string name="diag_recorded_ip_title_with_colo_format">已記錄可用優選 IP：%1$s · %2$d ms · 節點 %3$s</string>
+    <string name="diag_recorded_ip_toggle_hint">開啟「自動最佳化連線」開關即可立即在中轉服務上使用該 IP（不影響封面/插圖直連 CDN）</string>
+    <string name="diag_usage_guide_title">使用說明</string>
+    <string name="diag_usage_guide_step1">1. 測速並記錄可用 IP：當書架同步、目錄或章節載入緩慢/失敗時，點擊「開始快速檢測」，系統會檢測目前網路並自動篩選、記錄一個可用的優選 IP。</string>
+    <string name="diag_usage_guide_step2">2. 開啟開關立即生效：打開「自動最佳化連線」即可在中轉服務上使用已記錄的優選 IP（若尚未手動檢測，也會在背景自動優選）；該 IP 失效或切換 Wi-Fi / 行動網路時會自動回退預設 DNS 並重新優選。</string>
+    <string name="diag_usage_guide_step3">3. 僅用於中轉服務：優選 IP 僅作用於文庫 API 中轉服務；小說封面、插圖（pic.wenku8.com 等）及文庫官網直連 CDN 始終使用系統預設連線。</string>
 
     <string name="diag_quick_card_title">中轉連線快速檢測</string>
-    <string name="diag_quick_idle_desc">測量目前網路至文庫中轉服務的連通性與回應延遲（10 次請求，間隔 1 秒）。僅傳送固定診斷封包，不攜帶登入 Cookie，不讀取帳號與書架內容。</string>
+    <string name="diag_quick_idle_desc">測量目前網路至文庫中轉服務的連通性與回應延遲（10 次請求，間隔 1 秒），並在完成後自動記錄一個可用優選 IP。僅傳送固定診斷封包，不攜帶登入 Cookie，不讀取帳號與書架內容。</string>
     <string name="diag_action_start_quick">開始快速檢測</string>
     <string name="diag_running_progress_format">正在檢測 · 已完成 %1$d / %2$d 次（成功 %3$d · 失敗 %4$d）</string>
     <string name="diag_action_stop_keep_partial">停止檢測（保留已完成結果）</string>
@@ -196,6 +206,7 @@
     <string name="profile_network_card_title">網路與中轉連線</string>
     <string name="profile_network_open_diag">網路檢測與診斷報告</string>
     <string name="profile_network_reset_default">恢復預設連線</string>
+    <string name="profile_network_usage_hint">僅最佳化文庫 API 中轉服務（封面/插圖等直連 CDN 不受影響），失效自動回退預設 DNS；可進入「網路檢測」測速並記錄可用優選 IP。</string>
 
     <string name="profile_appearance_title">外觀、啟動與全域偏好</string>
     <string name="profile_lang_title">文庫內容與介面語言</string>

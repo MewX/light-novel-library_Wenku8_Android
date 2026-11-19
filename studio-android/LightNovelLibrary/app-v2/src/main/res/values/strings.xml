@@ -101,9 +101,19 @@
     <string name="diag_auto_status_optimized_reliability">已优化当前网络连接（节点 %1$s · 可用性恢复）</string>
     <string name="diag_auto_status_restored_default">已恢复默认连接</string>
     <string name="diag_action_reset_reevaluate">恢复默认连接并重新评估</string>
+    <string name="diag_selected_ip_title_format">当前生效中转 IP：%1$s · %2$d ms</string>
+    <string name="diag_selected_ip_title_with_colo_format">当前生效中转 IP：%1$s · %2$d ms · 节点 %3$s</string>
+    <string name="diag_selected_ip_scope_hint">仅作用于文库中转接口（封面/插图等直连 CDN 保持默认连接）· 若失效将自动回退系统 DNS</string>
+    <string name="diag_recorded_ip_title_format">已记录可用优选 IP：%1$s · %2$d ms</string>
+    <string name="diag_recorded_ip_title_with_colo_format">已记录可用优选 IP：%1$s · %2$d ms · 节点 %3$s</string>
+    <string name="diag_recorded_ip_toggle_hint">开启「自动优化连接」开关即可立即在中转服务上使用该 IP（不影响封面/插图直连 CDN）</string>
+    <string name="diag_usage_guide_title">使用说明</string>
+    <string name="diag_usage_guide_step1">1. 测速并记录可用 IP：当书架同步、目录或章节加载缓慢/失败时，点击「开始快速检测」，系统会检测当前网络并自动筛选、记录一个可用的优选 IP。</string>
+    <string name="diag_usage_guide_step2">2. 开启开关立即生效：打开「自动优化连接」即可在中转服务上使用已记录的优选 IP（若尚未手动检测，也会在后台自动优选）；该 IP 失效或切换 Wi-Fi / 移动网络时会自动回退默认 DNS 并重新优选。</string>
+    <string name="diag_usage_guide_step3">3. 仅用于中转服务：优选 IP 仅作用于文库 API 中转服务；小说封面、插图（pic.wenku8.com 等）及文库官网直连 CDN 始终使用系统默认连接。</string>
 
     <string name="diag_quick_card_title">中转连接快速检测</string>
-    <string name="diag_quick_idle_desc">测量当前网络到文库中转服务的连通性与响应延迟（10 次请求，间隔 1 秒）。仅发送固定诊断包，不携带登录 Cookie，不读取账号与书架内容。</string>
+    <string name="diag_quick_idle_desc">测量当前网络到文库中转服务的连通性与响应延迟（10 次请求，间隔 1 秒），并在完成后自动记录一个可用优选 IP。仅发送固定诊断包，不携带登录 Cookie，不读取账号与书架内容。</string>
     <string name="diag_action_start_quick">开始快速检测</string>
     <string name="diag_running_progress_format">正在检测 · 已完成 %1$d / %2$d 次（成功 %3$d · 失败 %4$d）</string>
     <string name="diag_action_stop_keep_partial">停止检测（保留已完成结果）</string>
@@ -196,6 +206,7 @@
     <string name="profile_network_card_title">网络与中转连接</string>
     <string name="profile_network_open_diag">网络检测与诊断报告</string>
     <string name="profile_network_reset_default">恢复默认连接</string>
+    <string name="profile_network_usage_hint">仅优化文库 API 中转服务（封面/插图等直连 CDN 不受影响），失效自动回退默认 DNS；可进入「网络检测」测速并记录可用优选 IP。</string>
 
     <string name="profile_appearance_title">外观、启动与全局偏好</string>
     <string name="profile_lang_title">文库内容与界面语言</string>

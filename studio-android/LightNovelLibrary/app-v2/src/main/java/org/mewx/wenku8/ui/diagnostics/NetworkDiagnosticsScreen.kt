@@ -32,6 +32,7 @@ import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.ExpandLess
 import androidx.compose.material.icons.outlined.ExpandMore
+import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.NetworkCheck
 import androidx.compose.material.icons.outlined.PlayArrow
 import androidx.compose.material.icons.outlined.Refresh
@@ -87,6 +88,7 @@ import org.mewx.wenku8.data.remote.diagnostics.DiagnosticsReport
 import org.mewx.wenku8.data.remote.diagnostics.DiagnosticsStopReason
 import org.mewx.wenku8.data.remote.diagnostics.NetworkSnapshot
 import org.mewx.wenku8.data.remote.diagnostics.ProbeSampleResult
+import org.mewx.wenku8.data.remote.diagnostics.RecordedCandidateSummary
 import org.mewx.wenku8.data.remote.diagnostics.UnderlyingTransportKind
 import org.mewx.wenku8.ui.components.TooltipIconButton
 import org.mewx.wenku8.ui.theme.LocalEinkMode
@@ -101,6 +103,10 @@ object NetworkDiagnosticsTestTags {
     const val HEADER_SHARE_BUTTON = "network_diagnostics_header_share"
     const val AUTO_OPTIMIZE_SWITCH = "network_diagnostics_auto_opt_switch"
     const val AUTO_OPTIMIZE_STATUS_TEXT = "network_diagnostics_auto_opt_status"
+    const val SELECTED_IP_BANNER = "network_diagnostics_selected_ip_banner"
+    const val SELECTED_IP_TEXT = "network_diagnostics_selected_ip_text"
+    const val RECORDED_IP_BANNER = "network_diagnostics_recorded_ip_banner"
+    const val RECORDED_IP_TEXT = "network_diagnostics_recorded_ip_text"
     const val RESET_REEVALUATE_BUTTON = "network_diagnostics_reset_reevaluate"
     const val START_QUICK_CHECK_BUTTON = "network_diagnostics_start_quick_check"
     const val STOP_ACTIVE_RUN_BUTTON = "network_diagnostics_stop_active_run"
@@ -115,6 +121,7 @@ object NetworkDiagnosticsTestTags {
     const val RETEST_BUTTON = "network_diagnostics_retest_button"
     const val DETAILS_TOGGLE_ROW = "network_diagnostics_details_toggle"
     const val SAMPLE_ROW_PREFIX = "network_diagnostics_sample_row_"
+    const val USAGE_GUIDE_CARD = "network_diagnostics_usage_guide_card"
     const val LAB_TOGGLE_ROW = "network_diagnostics_lab_toggle"
     const val LAB_AXIS_BUTTON_PREFIX = "network_diagnostics_lab_axis_"
     const val LAB_READ_ONLY_API_BUTTON = "network_diagnostics_lab_api_button"
@@ -147,6 +154,7 @@ fun NetworkDiagnosticsScreen(
     val networkSnapshot by viewModel.networkSnapshot.collectAsStateWithLifecycle()
     val runState by viewModel.runState.collectAsStateWithLifecycle()
     val autoRoutingState by viewModel.autoRoutingState.collectAsStateWithLifecycle()
+    val recordedCandidate by viewModel.recordedCandidate.collectAsStateWithLifecycle()
 
     val isRunning = runState is DiagnosticsRunUiState.Running
     val finishedReport = (runState as? DiagnosticsRunUiState.Finished)?.report
@@ -251,10 +259,14 @@ fun NetworkDiagnosticsScreen(
                 NetworkAndAutoRoutingCard(
                     networkSnapshot = networkSnapshot,
                     autoRoutingState = autoRoutingState,
+                    recordedCandidate = recordedCandidate,
                     isServiceConfigured = viewModel.isServiceConfigured,
                     isRunning = isRunning,
                     autoOptimizeEnabled = autoOptimizeEnabled,
-                    onAutoOptimizeChanged = onAutoOptimizeChanged,
+                    onAutoOptimizeChanged = { enabled ->
+                        viewModel.onUserToggledAutoOptimize(enabled)
+                        onAutoOptimizeChanged(enabled)
+                    },
                     onResetAndReevaluate = { viewModel.resetDefaultAndReevaluateRoute() },
                 )
             }
@@ -313,6 +325,10 @@ fun NetworkDiagnosticsScreen(
                         }
                     },
                 )
+            }
+
+            item(key = "usage_guide_card") {
+                DiagnosticsUsageGuideCard()
             }
         }
     }
@@ -411,6 +427,7 @@ private fun DiagnosticsTopBar(
 private fun NetworkAndAutoRoutingCard(
     networkSnapshot: NetworkSnapshot,
     autoRoutingState: AutoRoutingModeState,
+    recordedCandidate: RecordedCandidateSummary?,
     isServiceConfigured: Boolean,
     isRunning: Boolean,
     autoOptimizeEnabled: Boolean,
@@ -497,6 +514,26 @@ private fun NetworkAndAutoRoutingCard(
                 )
             }
 
+            val activeIpState = (autoRoutingState as? AutoRoutingModeState.OptimizedRouteActive)
+                ?.takeIf { !isStubUnavailable && it.selectedIpLiteral.isNotBlank() }
+            if (activeIpState != null) {
+                Spacer(modifier = Modifier.height(12.dp))
+                RelayIpSelectionBanner(
+                    isActive = true,
+                    ipLiteral = activeIpState.selectedIpLiteral,
+                    medianLatencyMs = activeIpState.medianLatencyMs,
+                    ingressColo = activeIpState.ingressColo,
+                )
+            } else if (!isStubUnavailable && recordedCandidate != null) {
+                Spacer(modifier = Modifier.height(12.dp))
+                RelayIpSelectionBanner(
+                    isActive = false,
+                    ipLiteral = recordedCandidate.ipLiteral,
+                    medianLatencyMs = recordedCandidate.medianLatencyMs,
+                    ingressColo = recordedCandidate.ingressColo,
+                )
+            }
+
             Spacer(modifier = Modifier.height(14.dp))
             OutlinedButton(
                 onClick = onResetAndReevaluate,
@@ -509,6 +546,140 @@ private fun NetworkAndAutoRoutingCard(
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(text = stringResource(R.string.diag_action_reset_reevaluate))
             }
+        }
+    }
+}
+
+@Composable
+private fun RelayIpSelectionBanner(
+    isActive: Boolean,
+    ipLiteral: String,
+    medianLatencyMs: Long,
+    ingressColo: String?,
+) {
+    val containerColor = if (isActive) {
+        MaterialTheme.colorScheme.secondaryContainer
+    } else {
+        MaterialTheme.colorScheme.surfaceContainerHighest
+    }
+    val contentColor = if (isActive) {
+        MaterialTheme.colorScheme.onSecondaryContainer
+    } else {
+        MaterialTheme.colorScheme.onSurface
+    }
+    val headline = if (isActive) {
+        if (!ingressColo.isNullOrBlank()) {
+            stringResource(
+                R.string.diag_selected_ip_title_with_colo_format,
+                ipLiteral,
+                medianLatencyMs,
+                ingressColo,
+            )
+        } else {
+            stringResource(R.string.diag_selected_ip_title_format, ipLiteral, medianLatencyMs)
+        }
+    } else {
+        if (!ingressColo.isNullOrBlank()) {
+            stringResource(
+                R.string.diag_recorded_ip_title_with_colo_format,
+                ipLiteral,
+                medianLatencyMs,
+                ingressColo,
+            )
+        } else {
+            stringResource(R.string.diag_recorded_ip_title_format, ipLiteral, medianLatencyMs)
+        }
+    }
+    val subtitle = if (isActive) {
+        stringResource(R.string.diag_selected_ip_scope_hint)
+    } else {
+        stringResource(R.string.diag_recorded_ip_toggle_hint)
+    }
+
+    Surface(
+        color = containerColor,
+        contentColor = contentColor,
+        shape = MaterialTheme.shapes.medium,
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag(
+                if (isActive) {
+                    NetworkDiagnosticsTestTags.SELECTED_IP_BANNER
+                } else {
+                    NetworkDiagnosticsTestTags.RECORDED_IP_BANNER
+                },
+            )
+            .einkHairlineBorder(MaterialTheme.shapes.medium),
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            Text(
+                text = headline,
+                style = MaterialTheme.typography.bodyMedium,
+                fontFamily = FontFamily.Monospace,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.testTag(
+                    if (isActive) {
+                        NetworkDiagnosticsTestTags.SELECTED_IP_TEXT
+                    } else {
+                        NetworkDiagnosticsTestTags.RECORDED_IP_TEXT
+                    },
+                ),
+            )
+            Text(
+                text = subtitle,
+                style = MaterialTheme.typography.bodySmall,
+                color = contentColor.copy(alpha = 0.85f),
+            )
+        }
+    }
+}
+
+@Composable
+private fun DiagnosticsUsageGuideCard() {
+    Card(
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+        ),
+        shape = MaterialTheme.shapes.large,
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag(NetworkDiagnosticsTestTags.USAGE_GUIDE_CARD)
+            .einkHairlineBorder(MaterialTheme.shapes.large),
+    ) {
+        Column(
+            modifier = Modifier.padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = Icons.Outlined.Info,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = stringResource(R.string.diag_usage_guide_title),
+                    style = MaterialTheme.typography.titleMedium,
+                )
+            }
+            Text(
+                text = stringResource(R.string.diag_usage_guide_step1),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(
+                text = stringResource(R.string.diag_usage_guide_step2),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(
+                text = stringResource(R.string.diag_usage_guide_step3),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }

@@ -471,6 +471,157 @@ class NetworkDiagnosticsScreenTest {
             .assertTextEquals("实际接口连通性检测（只读）")
     }
 
+    @Test
+    fun quickCheckRecordsGoodIpNearToggleAndTogglingSwitchDisplaysSelectedIpAndUsageGuide() {
+        val nowWall = 1_762_740_000_000L
+        val manifestRepository = ManifestRepository(
+            localStore = routingLocalStore,
+            wallClockEpochMillis = { nowWall },
+            monotonicClockMillis = { 10_000L },
+        )
+        kotlinx.coroutines.runBlocking {
+            manifestRepository.ingestManifestPayload(
+                rawJson = """
+                    {
+                      "schema": "wenku8-ip-candidates-v1",
+                      "revision": "rev-ui-record",
+                      "hostname": "wenku8-relay.mewx.org",
+                      "enabled": true,
+                      "minAppVersionCode": 0,
+                      "rolloutPermille": 1000,
+                      "issuedAt": "2025-11-10T00:00:00Z",
+                      "expiresAt": "2025-11-10T12:00:00Z",
+                      "candidates": [
+                        { "id": "cf-v4-slow", "ip": "104.18.32.77" },
+                        { "id": "cf-v4-best", "ip": "162.159.135.99" }
+                      ]
+                    }
+                """.trimIndent(),
+                expectedRelayHostname = "wenku8-relay.mewx.org",
+            )
+        }
+
+        val probeTransport = object : DiagnosticsProbeTransport {
+            override suspend fun executeProbe(
+                endpoint: ValidatedRelayEndpoint,
+                armConfig: ProbeArmConfig,
+                sampleIndex: Int,
+                explicitNonce: String?,
+            ): ProbeSampleResult {
+                val candidateId =
+                    (armConfig.dnsPolicy as? org.mewx.wenku8.data.remote.diagnostics.ProbeDnsPolicy.PinnedCandidate)?.candidateId
+                val isWarm = armConfig.armId.startsWith("discover_warm:") || sampleIndex > 1 && candidateId == null
+                val latency = when (candidateId) {
+                    "cf-v4-best" -> if (isWarm) 86L else 94L
+                    "cf-v4-slow" -> 210L
+                    else -> 190L
+                }
+                return buildSample(
+                    sampleIndex = sampleIndex,
+                    succeeded = true,
+                    reused = isWarm,
+                    elapsedMs = latency,
+                    errorCategory = null,
+                    nonce = explicitNonce ?: "ui-$sampleIndex",
+                ).copy(armId = armConfig.armId, candidateId = candidateId)
+            }
+        }
+
+        val networkFlow = MutableStateFlow(
+            NetworkSnapshot(
+                internalNetworkHandleKey = "net-wifi-ui",
+                isConnected = true,
+                underlyingTransports = setOf(UnderlyingTransportKind.WIFI),
+                isVpnActive = false,
+                isMetered = false,
+            ),
+        )
+        val observer = object : NetworkConnectivityObserver {
+            override fun currentSnapshot(): NetworkSnapshot = networkFlow.value
+            override fun observeDefaultNetworkSnapshots(): Flow<NetworkSnapshot> = networkFlow
+        }
+        val runner = DiagnosticsRunner(probeTransport = probeTransport, networkObserver = observer)
+        val controller = RelayRouteController(
+            applicationScope = appScope,
+            endpointResolutionProvider = { availableResolution },
+            probeTransport = probeTransport,
+            manifestRepository = manifestRepository,
+            routingLocalStore = routingLocalStore,
+            networkObserver = observer,
+            autoProbeGapMillis = 0L,
+            initialAutoOptimizeEnabled = false,
+            allowAutoSelectOnEnable = true,
+            monotonicClockMillis = { 10_000L },
+            wallClockEpochMillis = { nowWall },
+        )
+        val viewModel = NetworkDiagnosticsViewModel(
+            endpointResolutionProvider = { availableResolution },
+            diagnosticsRunner = runner,
+            relayRouteController = controller,
+            networkObserver = observer,
+            quickCheckInterSampleGapMillis = 0L,
+            comparisonInterSampleGapMillis = 0L,
+        )
+
+        var exportedReport: DiagnosticsReport? = null
+        val toggleState = androidx.compose.runtime.mutableStateOf(false)
+        composeTestRule.setContent {
+            Wenku8ExpressiveTheme {
+                NetworkDiagnosticsScreen(
+                    viewModel = viewModel,
+                    autoOptimizeEnabled = toggleState.value,
+                    onAutoOptimizeChanged = { toggleState.value = it },
+                    onNavigateBack = {},
+                    onExportReportOverride = { report, _ -> exportedReport = report },
+                )
+            }
+        }
+
+        // 1. Verify Usage Guide card exists and explains how to use & relay-only scope
+        composeTestRule.onNodeWithTag(NetworkDiagnosticsTestTags.CONTENT_LIST)
+            .performScrollToKey("usage_guide_card")
+        composeTestRule.onNodeWithTag(NetworkDiagnosticsTestTags.USAGE_GUIDE_CARD)
+            .assertIsDisplayed()
+        composeTestRule.onNodeWithText("使用说明")
+            .assertIsDisplayed()
+
+        // 2. Scroll back up and run Quick Check while toggle is OFF
+        composeTestRule.onNodeWithTag(NetworkDiagnosticsTestTags.CONTENT_LIST)
+            .performScrollToKey("quick_check_card")
+        composeTestRule.onNodeWithTag(NetworkDiagnosticsTestTags.START_QUICK_CHECK_BUTTON)
+            .performClick()
+        composeTestRule.waitForIdle()
+
+        // 3. Recorded good IP appears right near the OFF toggle!
+        composeTestRule.onNodeWithTag(NetworkDiagnosticsTestTags.CONTENT_LIST)
+            .performScrollToKey("network_and_auto_routing_card")
+        composeTestRule.onNodeWithTag(NetworkDiagnosticsTestTags.RECORDED_IP_BANNER)
+            .assertIsDisplayed()
+        composeTestRule.onNodeWithTag(NetworkDiagnosticsTestTags.RECORDED_IP_TEXT)
+            .assertTextEquals("已记录可用优选 IP：162.159.135.99 · 90 ms · 节点 LAX")
+
+        // 4. Flip toggle ON -> immediately activates recorded IP and shows Selected IP banner!
+        composeTestRule.onNodeWithTag(NetworkDiagnosticsTestTags.AUTO_OPTIMIZE_SWITCH)
+            .performClick()
+        composeTestRule.waitForIdle()
+        assertTrue(toggleState.value)
+        composeTestRule.onNodeWithTag(NetworkDiagnosticsTestTags.SELECTED_IP_BANNER)
+            .assertIsDisplayed()
+        composeTestRule.onNodeWithTag(NetworkDiagnosticsTestTags.SELECTED_IP_TEXT)
+            .assertTextEquals("当前生效中转 IP：162.159.135.99 · 90 ms · 节点 LAX")
+
+        // 5. Privacy guarantee: exported JSON report still never leaks raw candidate IP literals
+        composeTestRule.onNodeWithTag(NetworkDiagnosticsTestTags.HEADER_SHARE_BUTTON)
+            .performClick()
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag(NetworkDiagnosticsTestTags.PRE_SHARE_CONFIRM_BUTTON)
+            .performClick()
+        composeTestRule.waitForIdle()
+        assertNotNull(exportedReport)
+        val redactedJson = exportedReport!!.toRedactedJsonString("test-note")
+        assertFalse(redactedJson.contains("162.159.135.99"))
+    }
+
     private fun fakeProbeTransport(
         handler: suspend (sampleIndex: Int, explicitNonce: String?) -> ProbeSampleResult,
     ): DiagnosticsProbeTransport = object : DiagnosticsProbeTransport {

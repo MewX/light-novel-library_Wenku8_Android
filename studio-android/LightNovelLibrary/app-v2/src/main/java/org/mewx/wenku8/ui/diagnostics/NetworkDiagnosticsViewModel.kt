@@ -17,6 +17,7 @@ import org.mewx.wenku8.data.remote.diagnostics.DiagnosticsStopReason
 import org.mewx.wenku8.data.remote.diagnostics.NetworkConnectivityObserver
 import org.mewx.wenku8.data.remote.diagnostics.NetworkSnapshot
 import org.mewx.wenku8.data.remote.diagnostics.ReadOnlyApiDiagnosticCapability
+import org.mewx.wenku8.data.remote.diagnostics.RecordedCandidateSummary
 import org.mewx.wenku8.data.remote.diagnostics.RelayRouteController
 import org.mewx.wenku8.data.remote.diagnostics.StubSafeReadOnlyApiCapability
 
@@ -31,6 +32,8 @@ sealed interface DiagnosticsRunUiState {
  *
  * - Survives Activity configuration changes (rotation, foldable posture, SC/TC locale changes).
  * - Enforces strict mutual exclusion against [RelayRouteController]'s automatic background probes.
+ * - Automatically screens and records a verified Cloudflare relay IP after Quick Check completes so
+ *   the user can see it near the toggle and activate it immediately for the relay service.
  * - Cancels an active run with [DiagnosticsStopReason.BACKGROUNDED] when the host Activity stops
  *   without configuration change (Home, screen lock), while preserving completed reports across
  *   Android's Share Sheet chooser.
@@ -52,6 +55,8 @@ class NetworkDiagnosticsViewModel(
     val runState: StateFlow<DiagnosticsRunUiState> = _runState.asStateFlow()
 
     val autoRoutingState = relayRouteController.uiState
+    val recordedCandidate: StateFlow<RecordedCandidateSummary?> =
+        relayRouteController.recordedCandidateSummary
 
     private var activeRunJob: Job? = null
     @Volatile private var pendingStopReason: DiagnosticsStopReason = DiagnosticsStopReason.USER_CANCELLED
@@ -67,6 +72,10 @@ class NetworkDiagnosticsViewModel(
     val isServiceConfigured: Boolean
         get() = endpointResolutionProvider() is DiagnosticsEndpointResolution.Available
 
+    fun onUserToggledAutoOptimize(enabled: Boolean) {
+        relayRouteController.onUserToggledAutoOptimize(enabled)
+    }
+
     fun startQuickCheck() {
         if (activeRunJob?.isActive == true) return
         val resolution = endpointResolutionProvider()
@@ -76,9 +85,10 @@ class NetworkDiagnosticsViewModel(
         activeRunJob = viewModelScope.launch {
             relayRouteController.onManualDiagnosticsStarted()
             try {
+                val activeCandidateAtStart = relayRouteController.currentPinnedCandidateOrNull()
                 val report = diagnosticsRunner.runQuickCheck(
                     endpoint = resolution.endpoint,
-                    activeCandidate = relayRouteController.currentPinnedCandidateOrNull(),
+                    activeCandidate = activeCandidateAtStart,
                     manifestRevision = relayRouteController.currentManifestRevisionOrNull(),
                     interSampleGapMillis = quickCheckInterSampleGapMillis,
                     stopReasonOnCancellation = { pendingStopReason },
@@ -87,6 +97,31 @@ class NetworkDiagnosticsViewModel(
                     },
                 )
                 _runState.value = DiagnosticsRunUiState.Finished(report)
+
+                if (report.stopReason == DiagnosticsStopReason.COMPLETED &&
+                    report.baselineNetwork.isConnected
+                ) {
+                    if (activeCandidateAtStart == null) {
+                        relayRouteController.discoverAndRecordPreferredCandidate(
+                            applyIfEnabled = true,
+                            invokedFromManualCheck = true,
+                            userInitiated = true,
+                        )
+                    } else if (report.summary.succeededCount == 0) {
+                        val failedGen =
+                            relayRouteController.currentRouteForHost(resolution.endpoint.relayHost).generationId
+                        relayRouteController.fallbackRouteAfterCandidateFailure(
+                            failedGenerationId = failedGen,
+                            failedCandidateId = activeCandidateAtStart.id,
+                            failureBeforeSend = true,
+                        )
+                        relayRouteController.discoverAndRecordPreferredCandidate(
+                            applyIfEnabled = true,
+                            invokedFromManualCheck = true,
+                            userInitiated = true,
+                        )
+                    }
+                }
             } finally {
                 relayRouteController.onManualDiagnosticsFinished()
             }

@@ -88,6 +88,7 @@ import org.mewx.wenku8.data.local.preferences.Wenku8UserPreferences
 import org.mewx.wenku8.data.migration.DocumentTreeSaveSource
 import org.mewx.wenku8.data.migration.LegacyV1StorageMigrator
 import org.mewx.wenku8.data.remote.diagnostics.AutoRoutingModeState
+import org.mewx.wenku8.data.remote.diagnostics.RecordedCandidateSummary
 import org.mewx.wenku8.data.repository.AccountSessionState
 import org.mewx.wenku8.data.repository.BackupArchiveMode
 import org.mewx.wenku8.data.repository.BackupArchiveRepository
@@ -112,6 +113,8 @@ object ProfileStudioTestTags {
     const val OPEN_FOOTPRINT_STATS_BUTTON = "profile_open_footprint_stats_button"
     const val OPEN_FOOTPRINT_BOOKMARKS_BUTTON = "profile_open_footprint_bookmarks_button"
     const val AUTO_ROUTING_SWITCH = "profile_auto_routing_switch"
+    const val SELECTED_IP_TEXT = "profile_selected_ip_text"
+    const val RECORDED_IP_TEXT = "profile_recorded_ip_text"
     const val OPEN_DIAGNOSTICS_BUTTON = "profile_open_diagnostics_button"
     const val RESET_DEFAULT_ROUTE_BUTTON = "profile_reset_default_route_button"
     const val LANG_CHIP_SC = "profile_lang_chip_sc"
@@ -165,6 +168,7 @@ fun ProfileAndStudioScreen(
     totalBookmarkNoteCount: Int = 0,
     onOpenReadingFootprint: (ReadingFootprintTab) -> Unit = {},
     autoRoutingState: AutoRoutingModeState = AutoRoutingModeState.EnabledUsingDefault,
+    recordedCandidate: RecordedCandidateSummary? = null,
     onAutoOptimizeConnectionChanged: (Boolean) -> Unit = {},
     onResetDefaultConnection: () -> Unit = {},
     onOpenNetworkDiagnostics: () -> Unit = {},
@@ -434,6 +438,7 @@ fun ProfileAndStudioScreen(
             NetworkRoutingStudioCard(
                 autoOptimizeEnabled = preferences.autoOptimizeConnectionEnabled,
                 autoRoutingState = autoRoutingState,
+                recordedCandidate = recordedCandidate,
                 onAutoOptimizeChanged = onAutoOptimizeConnectionChanged,
                 onOpenDiagnostics = onOpenNetworkDiagnostics,
                 onResetDefaultConnection = onResetDefaultConnection,
@@ -728,10 +733,12 @@ private fun FootprintMetricTile(
 private fun NetworkRoutingStudioCard(
     autoOptimizeEnabled: Boolean,
     autoRoutingState: AutoRoutingModeState,
+    recordedCandidate: RecordedCandidateSummary?,
     onAutoOptimizeChanged: (Boolean) -> Unit,
     onOpenDiagnostics: () -> Unit,
     onResetDefaultConnection: () -> Unit,
 ) {
+    val isStubUnavailable = autoRoutingState == AutoRoutingModeState.UnavailableStub
     val statusText = when (autoRoutingState) {
         AutoRoutingModeState.UnavailableStub -> stringResource(R.string.diag_auto_status_unavailable_stub)
         AutoRoutingModeState.DisabledByUser -> stringResource(R.string.diag_auto_status_disabled)
@@ -793,8 +800,86 @@ private fun NetworkRoutingStudioCard(
                 Switch(
                     checked = autoOptimizeEnabled,
                     onCheckedChange = onAutoOptimizeChanged,
-                    enabled = autoRoutingState != AutoRoutingModeState.UnavailableStub,
+                    enabled = !isStubUnavailable,
                     modifier = Modifier.testTag(ProfileStudioTestTags.AUTO_ROUTING_SWITCH),
+                )
+            }
+
+            val activeIpState = (autoRoutingState as? AutoRoutingModeState.OptimizedRouteActive)
+                ?.takeIf { !isStubUnavailable && it.selectedIpLiteral.isNotBlank() }
+            if (activeIpState != null) {
+                val activeIpLine = if (!activeIpState.ingressColo.isNullOrBlank()) {
+                    stringResource(
+                        R.string.diag_selected_ip_title_with_colo_format,
+                        activeIpState.selectedIpLiteral,
+                        activeIpState.medianLatencyMs,
+                        activeIpState.ingressColo,
+                    )
+                } else {
+                    stringResource(
+                        R.string.diag_selected_ip_title_format,
+                        activeIpState.selectedIpLiteral,
+                        activeIpState.medianLatencyMs,
+                    )
+                }
+                Surface(
+                    color = MaterialTheme.colorScheme.secondaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                    shape = MaterialTheme.shapes.medium,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .einkHairlineBorder(MaterialTheme.shapes.medium),
+                ) {
+                    Text(
+                        text = activeIpLine,
+                        style = MaterialTheme.typography.bodySmall,
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier
+                            .padding(horizontal = 12.dp, vertical = 8.dp)
+                            .testTag(ProfileStudioTestTags.SELECTED_IP_TEXT),
+                    )
+                }
+            } else if (!isStubUnavailable && recordedCandidate != null) {
+                val recordedIpLine = if (!recordedCandidate.ingressColo.isNullOrBlank()) {
+                    stringResource(
+                        R.string.diag_recorded_ip_title_with_colo_format,
+                        recordedCandidate.ipLiteral,
+                        recordedCandidate.medianLatencyMs,
+                        recordedCandidate.ingressColo,
+                    )
+                } else {
+                    stringResource(
+                        R.string.diag_recorded_ip_title_format,
+                        recordedCandidate.ipLiteral,
+                        recordedCandidate.medianLatencyMs,
+                    )
+                }
+                Surface(
+                    color = MaterialTheme.colorScheme.surfaceContainerHighest,
+                    contentColor = MaterialTheme.colorScheme.onSurface,
+                    shape = MaterialTheme.shapes.medium,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .einkHairlineBorder(MaterialTheme.shapes.medium),
+                ) {
+                    Text(
+                        text = recordedIpLine,
+                        style = MaterialTheme.typography.bodySmall,
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier
+                            .padding(horizontal = 12.dp, vertical = 8.dp)
+                            .testTag(ProfileStudioTestTags.RECORDED_IP_TEXT),
+                    )
+                }
+            }
+
+            if (!isStubUnavailable) {
+                Text(
+                    text = stringResource(R.string.profile_network_usage_hint),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
 
@@ -817,7 +902,7 @@ private fun NetworkRoutingStudioCard(
 
                 OutlinedButton(
                     onClick = onResetDefaultConnection,
-                    enabled = autoRoutingState != AutoRoutingModeState.UnavailableStub,
+                    enabled = !isStubUnavailable,
                     modifier = Modifier.testTag(ProfileStudioTestTags.RESET_DEFAULT_ROUTE_BUTTON),
                 ) {
                     Icon(

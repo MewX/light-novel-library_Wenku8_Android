@@ -1336,6 +1336,12 @@ private fun MainDestinationBody(
         } else {
             AutoRoutingModeState.DisabledByUser
         }
+        val recordedCandidate = if (relayRouteController != null) {
+            val rec by relayRouteController.recordedCandidateSummary.collectAsStateWithLifecycle()
+            rec
+        } else {
+            null
+        }
 
         ProfileAndStudioScreen(
             preferences = preferences,
@@ -1348,7 +1354,11 @@ private fun MainDestinationBody(
             totalBookmarkNoteCount = totalBookmarkNotes,
             onOpenReadingFootprint = onOpenReadingFootprint,
             autoRoutingState = autoRoutingState,
-            onAutoOptimizeConnectionChanged = onAutoOptimizeConnectionChanged,
+            recordedCandidate = recordedCandidate,
+            onAutoOptimizeConnectionChanged = { enabled ->
+                relayRouteController?.onUserToggledAutoOptimize(enabled)
+                onAutoOptimizeConnectionChanged(enabled)
+            },
             onResetDefaultConnection = {
                 relayRouteController?.resetToDefaultAndReevaluate(triggerTournamentNow = false)
             },
