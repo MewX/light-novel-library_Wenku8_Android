@@ -97,6 +97,8 @@ import org.mewx.wenku8.data.repository.DeepCleanProgress
 import org.mewx.wenku8.data.repository.ServerNoticeAndUpdateRepository
 import org.mewx.wenku8.data.repository.StorageAndCacheRepository
 import org.mewx.wenku8.data.repository.UserSessionRepository
+import org.mewx.wenku8.data.update.AppUpdateCoordinator
+import org.mewx.wenku8.data.update.AppUpdateUiState
 import org.mewx.wenku8.ui.components.TooltipIconButton
 import org.mewx.wenku8.ui.navigation.DefaultHomeDestination
 import org.mewx.wenku8.ui.navigation.MainScaffoldTestTags
@@ -185,6 +187,7 @@ fun ProfileAndStudioScreen(
     onVolumeKeyPagingChanged: (Boolean) -> Unit = {},
     userSessionRepository: UserSessionRepository? = null,
     serverNoticeAndUpdateRepository: ServerNoticeAndUpdateRepository? = null,
+    appUpdateCoordinator: AppUpdateCoordinator? = null,
     storageAndCacheRepository: StorageAndCacheRepository? = null,
     backupArchiveRepository: BackupArchiveRepository? = null,
     legacyV1StorageMigrator: LegacyV1StorageMigrator? = null,
@@ -205,6 +208,12 @@ fun ProfileAndStudioScreen(
     }
     val sessionState = if (userSessionRepository != null) {
         val state by userSessionRepository.sessionState.collectAsStateWithLifecycle()
+        state
+    } else {
+        null
+    }
+    val appUpdateUiState: AppUpdateUiState? = if (appUpdateCoordinator != null) {
+        val state by appUpdateCoordinator.uiState.collectAsStateWithLifecycle()
         state
     } else {
         null
@@ -544,10 +553,17 @@ fun ProfileAndStudioScreen(
             )
         }
 
-        // 9. App Update Check (`CheckAppNewVersion`), Open-Source License & About Card
+        // 9. App Update Check (Play Flexible In-App Update / Direct Channel), Open-Source License & About Card
         item(key = "profile_about_and_license_card") {
             AboutAndLicenseSection(
                 serverNoticeAndUpdateRepository = serverNoticeAndUpdateRepository,
+                appUpdateUiState = appUpdateUiState,
+                onManualCheckForUpdate = {
+                    coroutineScope.launch {
+                        appUpdateCoordinator?.checkForUpdate(isUserInitiated = true)
+                    }
+                },
+                onCompleteAppUpdate = { appUpdateCoordinator?.completeUpdate() },
                 onOpenLicense = { showLicenseDialog = true },
                 onOpenAbout = { showAboutDialog = true },
             )
@@ -1508,11 +1524,20 @@ private fun StorageAndBackupStudioCard(
 @Composable
 private fun AboutAndLicenseSection(
     serverNoticeAndUpdateRepository: ServerNoticeAndUpdateRepository?,
+    appUpdateUiState: AppUpdateUiState? = null,
+    onManualCheckForUpdate: () -> Unit = {},
+    onCompleteAppUpdate: () -> Unit = {},
     onOpenLicense: () -> Unit,
     onOpenAbout: () -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        if (serverNoticeAndUpdateRepository != null) {
+        if (appUpdateUiState != null) {
+            AppUpdateCheckCard(
+                uiState = appUpdateUiState,
+                onCheckForUpdate = onManualCheckForUpdate,
+                onCompleteUpdate = onCompleteAppUpdate,
+            )
+        } else if (serverNoticeAndUpdateRepository != null) {
             AppUpdateCheckCard(
                 onCheckForUpdate = { serverNoticeAndUpdateRepository.checkForAppUpdate() },
             )

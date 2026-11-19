@@ -192,9 +192,19 @@
     <string name="update_checking">正在檢查新版本…</string>
     <string name="update_up_to_date_format">目前已是最新版本 (Build %1$d)</string>
     <string name="update_available_title">發現新版本</string>
+    <string name="update_available_card_format">發現新版本 (Build %1$d)</string>
     <string name="update_available_body_format">偵測到新版本 (Build %2$d，目前 Build %1$d)，可前往發布頁下載更新。</string>
     <string name="update_action_download">前往下載頁</string>
+    <string name="update_action_update_now">立即更新</string>
+    <string name="update_action_later">稍後再說</string>
+    <string name="update_downloading">正在背景下載更新…</string>
+    <string name="update_downloading_percent_format">正在背景下載更新 (%1$d%%)</string>
+    <string name="update_ready_to_install">新版本已下載完成，重新啟動應用程式即可安裝</string>
+    <string name="update_action_restart_install">重啟安裝</string>
     <string name="update_check_failed">檢查更新失敗，請稍後重試</string>
+    <string name="update_play_check_failed">無法連線 Google Play 檢查更新</string>
+    <string name="update_action_open_play_store">前往 Google Play</string>
+    <string name="update_badge_content_desc">有可用的應用程式更新</string>
 
     <!-- Profile & Studio Screen (P3.2 — 100% v1.31 Settings + .wk8backup.zip) -->
     <string name="profile_footprint_title">閱讀足跡與書籤</string>

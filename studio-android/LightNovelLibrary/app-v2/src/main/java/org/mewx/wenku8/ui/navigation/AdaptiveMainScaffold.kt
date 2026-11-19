@@ -30,6 +30,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.width
@@ -40,6 +41,8 @@ import androidx.compose.material.icons.outlined.CloudOff
 import androidx.compose.material.icons.outlined.NetworkCheck
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.AssistChip
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilterChip
@@ -49,6 +52,11 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.ShortNavigationBar
 import androidx.compose.material3.ShortNavigationBarItem
+import androidx.compose.material3.Snackbar
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.WideNavigationRail
@@ -71,6 +79,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -98,6 +108,9 @@ import org.mewx.wenku8.data.repository.ReviewsRepository
 import org.mewx.wenku8.data.repository.ServerNoticeAndUpdateRepository
 import org.mewx.wenku8.data.repository.StorageAndCacheRepository
 import org.mewx.wenku8.data.repository.UserSessionRepository
+import org.mewx.wenku8.data.update.AppUpdateAutoPrompt
+import org.mewx.wenku8.data.update.AppUpdateCoordinator
+import org.mewx.wenku8.data.update.AppUpdateUiState
 import org.mewx.wenku8.domain.model.DiscoveryNovelCardItem
 import org.mewx.wenku8.domain.model.UnifiedSearchMode
 import org.mewx.wenku8.reader.model.ReaderPageTurnMode
@@ -112,9 +125,11 @@ import org.mewx.wenku8.ui.discovery.LatestScreen
 import org.mewx.wenku8.ui.discovery.PersistentSearchEntryPill
 import org.mewx.wenku8.ui.discovery.RankingsScreen
 import org.mewx.wenku8.ui.profile.AccountLoginBottomSheet
+import org.mewx.wenku8.ui.profile.DirectUpdateAvailableDialog
 import org.mewx.wenku8.ui.profile.ProfileAndStudioScreen
 import org.mewx.wenku8.ui.profile.ReadingFootprintScreen
 import org.mewx.wenku8.ui.profile.ReadingFootprintTab
+import org.mewx.wenku8.ui.profile.openSafeBrowserUrl
 import org.mewx.wenku8.ui.reader.UnifiedReaderScreen
 import org.mewx.wenku8.ui.reviews.ReviewListScreen
 import org.mewx.wenku8.ui.reviews.ReviewThreadScreen
@@ -135,6 +150,8 @@ object MainScaffoldTestTags {
     const val DISMISS_OFFLINE_BANNER_BUTTON = "main_dismiss_offline_banner"
     const val DESTINATION_SCREEN_PREFIX = "destination_screen_"
     const val NAV_ITEM_PREFIX = "nav_item_"
+    const val PROFILE_UPDATE_BADGE = "main_profile_update_badge"
+    const val UPDATE_READY_SNACKBAR = "main_update_ready_snackbar"
 }
 
 private val MediumWindowWidthBreakpoint = 600.dp
@@ -241,6 +258,9 @@ fun AdaptiveMainScaffold(
     discoveryRepository: DiscoveryRepository? = null,
     userSessionRepository: UserSessionRepository? = null,
     serverNoticeAndUpdateRepository: ServerNoticeAndUpdateRepository? = null,
+    appUpdateCoordinator: AppUpdateCoordinator? = null,
+    onLaunchPlayFlexibleUpdate: (() -> Boolean)? = null,
+    onOpenDirectUpdateUrl: ((String) -> Unit)? = null,
     storageAndCacheRepository: StorageAndCacheRepository? = null,
     backupArchiveRepository: BackupArchiveRepository? = null,
     reviewsRepository: ReviewsRepository? = null,
@@ -627,11 +647,87 @@ fun AdaptiveMainScaffold(
         // Registered outer-most so inner BackHandlers (child scenes, two-pane detail, bookshelf
         // multi-select/local filter, bottom sheets, and dialogs) always take precedence first.
         val scaffoldContext = LocalContext.current
+        val scaffoldCoroutineScope = rememberCoroutineScope()
         var lastExitBackPressMonoMs by remember { mutableLongStateOf(-DOUBLE_BACK_EXIT_WINDOW_MS) }
         var activeExitToast by remember { mutableStateOf<Toast?>(null) }
         val isAtRootHomeShell = activeScene == ScaffoldSceneState.HomeShell &&
             !showTwoPaneExpandedDetail &&
             !isLoginBottomSheetOpen
+
+        val appUpdateUiState: AppUpdateUiState = if (appUpdateCoordinator != null) {
+            val state by appUpdateCoordinator.uiState.collectAsStateWithLifecycle()
+            state
+        } else {
+            AppUpdateUiState.Idle
+        }
+        val pendingAutoUpdatePrompt: AppUpdateAutoPrompt? = if (appUpdateCoordinator != null) {
+            val prompt by appUpdateCoordinator.pendingAutoPrompt.collectAsStateWithLifecycle()
+            prompt
+        } else {
+            null
+        }
+        val showProfileUpdateBadge: Boolean = if (appUpdateCoordinator != null) {
+            val badge by appUpdateCoordinator.showProfileUpdateBadge.collectAsStateWithLifecycle()
+            badge
+        } else {
+            false
+        }
+
+        var hasTriggeredColdStartUpdateCheck by rememberSaveable { mutableStateOf(false) }
+        LaunchedEffect(appUpdateCoordinator, isNetworkAvailableOnColdStart) {
+            if (appUpdateCoordinator != null &&
+                isNetworkAvailableOnColdStart &&
+                !hasTriggeredColdStartUpdateCheck
+            ) {
+                hasTriggeredColdStartUpdateCheck = true
+                appUpdateCoordinator.checkForUpdate(isUserInitiated = false)
+            }
+        }
+
+        LaunchedEffect(appUpdateCoordinator, activeScene, selectedDestination, showProfileUpdateBadge) {
+            if (appUpdateCoordinator != null &&
+                activeScene == ScaffoldSceneState.HomeShell &&
+                selectedDestination == TopLevelDestination.PROFILE &&
+                showProfileUpdateBadge
+            ) {
+                appUpdateCoordinator.clearProfileUpdateBadge()
+            }
+        }
+
+        val canSurfaceAppUpdatePrompt = isAtRootHomeShell &&
+            externalReaderLaunchRequest == null &&
+            externalOpenNovelAid <= 0
+
+        LaunchedEffect(appUpdateCoordinator, pendingAutoUpdatePrompt, canSurfaceAppUpdatePrompt) {
+            if (appUpdateCoordinator != null &&
+                canSurfaceAppUpdatePrompt &&
+                pendingAutoUpdatePrompt is AppUpdateAutoPrompt.PlayStoreFlexible
+            ) {
+                onLaunchPlayFlexibleUpdate?.invoke()
+            }
+        }
+
+        val updateSnackbarHostState = remember { SnackbarHostState() }
+        val readyToInstallMessage = stringResource(R.string.update_ready_to_install)
+        val restartInstallLabel = stringResource(R.string.update_action_restart_install)
+        val updateBadgeContentDescription = stringResource(R.string.update_badge_content_desc)
+        val canShowReadyUpdateSnackbar = appUpdateUiState is AppUpdateUiState.ReadyToInstall &&
+            activeScene !is ScaffoldSceneState.Reader
+
+        LaunchedEffect(canShowReadyUpdateSnackbar, readyToInstallMessage, restartInstallLabel) {
+            if (canShowReadyUpdateSnackbar) {
+                val snackbarResult = updateSnackbarHostState.showSnackbar(
+                    message = readyToInstallMessage,
+                    actionLabel = restartInstallLabel,
+                    duration = SnackbarDuration.Indefinite,
+                )
+                if (snackbarResult == SnackbarResult.ActionPerformed) {
+                    appUpdateCoordinator?.completeUpdate()
+                }
+            } else {
+                updateSnackbarHostState.currentSnackbarData?.dismiss()
+            }
+        }
 
         LaunchedEffect(isAtRootHomeShell, selectedDestination) {
             lastExitBackPressMonoMs = -DOUBLE_BACK_EXIT_WINDOW_MS
@@ -712,14 +808,35 @@ fun AdaptiveMainScaffold(
                                                         }
                                                     },
                                                     icon = {
-                                                        Icon(
-                                                            imageVector = if (isSelected) {
-                                                                destination.selectedIcon
-                                                            } else {
-                                                                destination.unselectedIcon
-                                                            },
-                                                            contentDescription = labelText,
-                                                        )
+                                                        val navIcon: @Composable () -> Unit = {
+                                                            Icon(
+                                                                imageVector = if (isSelected) {
+                                                                    destination.selectedIcon
+                                                                } else {
+                                                                    destination.unselectedIcon
+                                                                },
+                                                                contentDescription = labelText,
+                                                            )
+                                                        }
+                                                        if (destination == TopLevelDestination.PROFILE &&
+                                                            showProfileUpdateBadge
+                                                        ) {
+                                                            BadgedBox(
+                                                                badge = {
+                                                                    Badge(
+                                                                        modifier = Modifier
+                                                                            .testTag(MainScaffoldTestTags.PROFILE_UPDATE_BADGE)
+                                                                            .semantics {
+                                                                                contentDescription = updateBadgeContentDescription
+                                                                            },
+                                                                    )
+                                                                },
+                                                            ) {
+                                                                navIcon()
+                                                            }
+                                                        } else {
+                                                            navIcon()
+                                                        }
                                                     },
                                                     label = { Text(text = labelText) },
                                                     modifier = Modifier.testTag(
@@ -765,6 +882,7 @@ fun AdaptiveMainScaffold(
                                                 discoveryRepository = discoveryRepository,
                                                 userSessionRepository = userSessionRepository,
                                                 serverNoticeAndUpdateRepository = serverNoticeAndUpdateRepository,
+                                                appUpdateCoordinator = appUpdateCoordinator,
                                                 storageAndCacheRepository = storageAndCacheRepository,
                                                 backupArchiveRepository = backupArchiveRepository,
                                                 bookshelfRepository = bookshelfRepository,
@@ -835,14 +953,35 @@ fun AdaptiveMainScaffold(
                                                     }
                                                 },
                                                 icon = {
-                                                    Icon(
-                                                        imageVector = if (isSelected) {
-                                                            destination.selectedIcon
-                                                        } else {
-                                                            destination.unselectedIcon
-                                                        },
-                                                        contentDescription = labelText,
-                                                    )
+                                                    val navIcon: @Composable () -> Unit = {
+                                                        Icon(
+                                                            imageVector = if (isSelected) {
+                                                                destination.selectedIcon
+                                                            } else {
+                                                                destination.unselectedIcon
+                                                            },
+                                                            contentDescription = labelText,
+                                                        )
+                                                    }
+                                                    if (destination == TopLevelDestination.PROFILE &&
+                                                        showProfileUpdateBadge
+                                                    ) {
+                                                        BadgedBox(
+                                                            badge = {
+                                                                Badge(
+                                                                    modifier = Modifier
+                                                                        .testTag(MainScaffoldTestTags.PROFILE_UPDATE_BADGE)
+                                                                        .semantics {
+                                                                            contentDescription = updateBadgeContentDescription
+                                                                        },
+                                                                )
+                                                            },
+                                                        ) {
+                                                            navIcon()
+                                                        }
+                                                    } else {
+                                                        navIcon()
+                                                    }
                                                 },
                                                 label = { Text(text = labelText) },
                                                 modifier = Modifier.testTag(
@@ -891,6 +1030,7 @@ fun AdaptiveMainScaffold(
                                                     discoveryRepository = discoveryRepository,
                                                     userSessionRepository = userSessionRepository,
                                                     serverNoticeAndUpdateRepository = serverNoticeAndUpdateRepository,
+                                                    appUpdateCoordinator = appUpdateCoordinator,
                                                     storageAndCacheRepository = storageAndCacheRepository,
                                                     backupArchiveRepository = backupArchiveRepository,
                                                     bookshelfRepository = bookshelfRepository,
@@ -1172,6 +1312,50 @@ fun AdaptiveMainScaffold(
                 onLoginSuccess = { isLoginBottomSheetOpen = false },
             )
         }
+
+        if (canSurfaceAppUpdatePrompt &&
+            pendingAutoUpdatePrompt is AppUpdateAutoPrompt.DirectDownloadDialog &&
+            appUpdateCoordinator != null
+        ) {
+            DirectUpdateAvailableDialog(
+                currentVersionCode = pendingAutoUpdatePrompt.currentVersionCode,
+                latestVersionCode = pendingAutoUpdatePrompt.targetVersionCode,
+                downloadPageUrl = pendingAutoUpdatePrompt.downloadPageUrl,
+                onDismiss = {
+                    scaffoldCoroutineScope.launch {
+                        appUpdateCoordinator.dismissAutoPrompt(suppressForThisVersion = true)
+                    }
+                },
+                onOpenDownloadUrl = { url ->
+                    scaffoldCoroutineScope.launch {
+                        appUpdateCoordinator.dismissAutoPrompt(suppressForThisVersion = true)
+                    }
+                    if (onOpenDirectUpdateUrl != null) {
+                        onOpenDirectUpdateUrl(url)
+                    } else {
+                        openSafeBrowserUrl(scaffoldContext, url)
+                    }
+                },
+            )
+        }
+
+        SnackbarHost(
+            hostState = updateSnackbarHostState,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .navigationBarsPadding()
+                .padding(
+                    start = 16.dp,
+                    end = 16.dp,
+                    bottom = if (activeScene == ScaffoldSceneState.HomeShell && isCompactWidth) 88.dp else 16.dp,
+                )
+                .testTag(MainScaffoldTestTags.UPDATE_READY_SNACKBAR),
+        ) { snackbarData ->
+            Snackbar(
+                snackbarData = snackbarData,
+                modifier = Modifier.einkHairlineBorder(MaterialTheme.shapes.small),
+            )
+        }
     }
 }
 
@@ -1201,6 +1385,7 @@ private fun MainDestinationBody(
     discoveryRepository: DiscoveryRepository?,
     userSessionRepository: UserSessionRepository?,
     serverNoticeAndUpdateRepository: ServerNoticeAndUpdateRepository?,
+    appUpdateCoordinator: AppUpdateCoordinator?,
     storageAndCacheRepository: StorageAndCacheRepository?,
     backupArchiveRepository: BackupArchiveRepository?,
     bookshelfRepository: BookshelfRepository?,
@@ -1371,6 +1556,7 @@ private fun MainDestinationBody(
             onVolumeKeyPagingChanged = onVolumeKeyPagingChanged,
             userSessionRepository = userSessionRepository,
             serverNoticeAndUpdateRepository = serverNoticeAndUpdateRepository,
+            appUpdateCoordinator = appUpdateCoordinator,
             storageAndCacheRepository = storageAndCacheRepository,
             backupArchiveRepository = backupArchiveRepository,
             legacyV1StorageMigrator = legacyV1StorageMigrator,

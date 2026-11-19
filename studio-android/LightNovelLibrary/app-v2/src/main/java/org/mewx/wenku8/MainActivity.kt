@@ -9,6 +9,7 @@ import android.os.Bundle
 import android.view.KeyEvent
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.compose.foundation.background
@@ -23,6 +24,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.core.os.LocaleListCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.launch
 import org.mewx.wenku8.api.Wenku8API
 import org.mewx.wenku8.data.local.preferences.Wenku8UserPreferences
@@ -49,6 +51,32 @@ class MainActivity : AppCompatActivity(), HardwareVolumeKeyHost {
     private var pendingWidgetReaderRequest by mutableStateOf<ReaderLaunchRequest?>(null)
     private var pendingWidgetOpenBookshelf by mutableStateOf(false)
     private var pendingExternalNovelAid by mutableIntStateOf(0)
+
+    private val playUpdateLauncher = registerForActivityResult(
+        ActivityResultContracts.StartIntentSenderForResult(),
+    ) { result ->
+        val coordinator =
+            (application as? Wenku8V2Application)?.appContainer?.appUpdateCoordinator ?: return@registerForActivityResult
+        lifecycleScope.launch {
+            coordinator.onUpdateFlowResult(result.resultCode)
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        val coordinator =
+            (application as? Wenku8V2Application)?.appContainer?.appUpdateCoordinator ?: return
+        lifecycleScope.launch {
+            coordinator.onHostResumed()
+        }
+    }
+
+    override fun onDestroy() {
+        if (isFinishing) {
+            (application as? Wenku8V2Application)?.appContainer?.appUpdateCoordinator?.dispose()
+        }
+        super.onDestroy()
+    }
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
         if (event.keyCode == KeyEvent.KEYCODE_VOLUME_UP ||
@@ -165,6 +193,10 @@ class MainActivity : AppCompatActivity(), HardwareVolumeKeyHost {
                             discoveryRepository = discoveryRepository,
                             userSessionRepository = appContainer.userSessionRepository,
                             serverNoticeAndUpdateRepository = appContainer.serverNoticeAndUpdateRepository,
+                            appUpdateCoordinator = appContainer.appUpdateCoordinator,
+                            onLaunchPlayFlexibleUpdate = {
+                                appContainer.appUpdateCoordinator.startFlexibleUpdate(playUpdateLauncher)
+                            },
                             storageAndCacheRepository = appContainer.storageAndCacheRepository,
                             backupArchiveRepository = appContainer.backupArchiveRepository,
                             reviewsRepository = appContainer.reviewsRepository,

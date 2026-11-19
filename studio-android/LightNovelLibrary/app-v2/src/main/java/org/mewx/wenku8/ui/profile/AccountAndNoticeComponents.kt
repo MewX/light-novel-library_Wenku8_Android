@@ -90,6 +90,8 @@ import org.mewx.wenku8.data.repository.DailySignOutcome
 import org.mewx.wenku8.data.repository.LoginOutcome
 import org.mewx.wenku8.data.repository.ParsedServerNotice
 import org.mewx.wenku8.data.repository.UserSessionRepository
+import org.mewx.wenku8.data.update.AppUpdateCoordinator
+import org.mewx.wenku8.data.update.AppUpdateUiState
 import org.mewx.wenku8.ui.theme.LocalEinkMode
 import org.mewx.wenku8.ui.theme.einkHairlineBorder
 import java.io.File
@@ -116,6 +118,9 @@ object ProfileAccountTestTags {
 
     const val CHECK_UPDATE_BUTTON = "profile_check_update_button"
     const val UPDATE_AVAILABLE_DIALOG = "profile_update_available_dialog"
+    const val UPDATE_RESTART_INSTALL_BUTTON = "profile_update_restart_install"
+    const val UPDATE_PLAY_FALLBACK_BUTTON = "profile_update_play_fallback"
+    const val UPDATE_DOWNLOAD_PROGRESS = "profile_update_download_progress"
 }
 
 /**
@@ -993,41 +998,263 @@ fun AppUpdateCheckCard(
     }
 
     pendingUpdate?.let { update ->
-        AlertDialog(
-            onDismissRequest = { pendingUpdate = null },
-            modifier = Modifier.testTag(ProfileAccountTestTags.UPDATE_AVAILABLE_DIALOG),
-            title = { Text(text = stringResource(R.string.update_available_title)) },
-            text = {
-                Text(
-                    text = stringResource(
-                        R.string.update_available_body_format,
-                        update.currentVersionCode,
-                        update.latestVersionCode,
-                    ),
-                )
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        val url = update.downloadPageUrl
-                        pendingUpdate = null
-                        if (onOpenDownloadUrl != null) {
-                            onOpenDownloadUrl(url)
-                        } else {
-                            openSafeBrowserUrl(context, url)
-                        }
-                    },
-                ) {
-                    Text(text = stringResource(R.string.update_action_download))
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { pendingUpdate = null }) {
-                    Text(text = stringResource(R.string.action_cancel))
+        DirectUpdateAvailableDialog(
+            currentVersionCode = update.currentVersionCode,
+            latestVersionCode = update.latestVersionCode,
+            downloadPageUrl = update.downloadPageUrl,
+            onDismiss = { pendingUpdate = null },
+            onOpenDownloadUrl = { url ->
+                pendingUpdate = null
+                if (onOpenDownloadUrl != null) {
+                    onOpenDownloadUrl(url)
+                } else {
+                    openSafeBrowserUrl(context, url)
                 }
             },
         )
     }
+}
+
+/**
+ * Channel-aware update card driven by [AppUpdateUiState] (`playstore` Flexible In-App Updates
+ * vs `default` external release-page updates).
+ */
+@Composable
+fun AppUpdateCheckCard(
+    uiState: AppUpdateUiState,
+    onCheckForUpdate: () -> Unit,
+    onCompleteUpdate: () -> Unit,
+    modifier: Modifier = Modifier,
+    onOpenDownloadUrl: ((String) -> Unit)? = null,
+    onOpenPlayStoreFallback: (() -> Unit)? = null,
+) {
+    val context = LocalContext.current
+    val isEink = LocalEinkMode.current
+    val isHighlighted = uiState is AppUpdateUiState.UpdateAvailable ||
+        uiState is AppUpdateUiState.ReadyToInstall
+
+    val statusLine: String? = when (uiState) {
+        AppUpdateUiState.Idle -> null
+        AppUpdateUiState.Checking -> stringResource(R.string.update_checking)
+        is AppUpdateUiState.UpToDate -> stringResource(
+            R.string.update_up_to_date_format,
+            uiState.currentVersionCode,
+        )
+        is AppUpdateUiState.UpdateAvailable -> stringResource(
+            R.string.update_available_card_format,
+            uiState.targetVersionCode,
+        )
+        is AppUpdateUiState.Downloading -> {
+            val fraction = uiState.progressFraction
+            if (fraction != null) {
+                stringResource(R.string.update_downloading_percent_format, (fraction * 100f).toInt())
+            } else {
+                stringResource(R.string.update_downloading)
+            }
+        }
+        AppUpdateUiState.ReadyToInstall -> stringResource(R.string.update_ready_to_install)
+        is AppUpdateUiState.Failed -> if (uiState.canOpenPlayStoreFallback) {
+            stringResource(R.string.update_play_check_failed)
+        } else {
+            stringResource(R.string.update_check_failed)
+        }
+    }
+
+    Card(
+        colors = CardDefaults.cardColors(
+            containerColor = if (isHighlighted && !isEink) {
+                MaterialTheme.colorScheme.secondaryContainer
+            } else {
+                MaterialTheme.colorScheme.surfaceContainerLow
+            },
+        ),
+        shape = MaterialTheme.shapes.large,
+        modifier = modifier
+            .fillMaxWidth()
+            .einkHairlineBorder(MaterialTheme.shapes.large),
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp, vertical = 14.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.SystemUpdateAlt,
+                    contentDescription = null,
+                    tint = if (isHighlighted && !isEink) {
+                        MaterialTheme.colorScheme.onSecondaryContainer
+                    } else {
+                        MaterialTheme.colorScheme.primary
+                    },
+                )
+                Spacer(modifier = Modifier.width(12.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = stringResource(R.string.update_action_check),
+                        style = MaterialTheme.typography.titleSmall,
+                        color = if (isHighlighted && !isEink) {
+                            MaterialTheme.colorScheme.onSecondaryContainer
+                        } else {
+                            MaterialTheme.colorScheme.onSurface
+                        },
+                    )
+                    statusLine?.let { line ->
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = line,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = if (isHighlighted && !isEink) {
+                                MaterialTheme.colorScheme.onSecondaryContainer
+                            } else {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            },
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.width(8.dp))
+                when (uiState) {
+                    AppUpdateUiState.ReadyToInstall -> {
+                        Button(
+                            onClick = onCompleteUpdate,
+                            modifier = Modifier.testTag(ProfileAccountTestTags.UPDATE_RESTART_INSTALL_BUTTON),
+                        ) {
+                            Text(text = stringResource(R.string.update_action_restart_install))
+                        }
+                    }
+                    is AppUpdateUiState.UpdateAvailable -> {
+                        Button(
+                            onClick = {
+                                if (uiState.isPlayStoreManaged) {
+                                    onCheckForUpdate()
+                                } else {
+                                    val url = uiState.downloadPageUrl.orEmpty()
+                                    if (url.isNotBlank()) {
+                                        if (onOpenDownloadUrl != null) {
+                                            onOpenDownloadUrl(url)
+                                        } else {
+                                            openSafeBrowserUrl(context, url)
+                                        }
+                                    } else {
+                                        onCheckForUpdate()
+                                    }
+                                }
+                            },
+                            modifier = Modifier.testTag(ProfileAccountTestTags.CHECK_UPDATE_BUTTON),
+                        ) {
+                            Text(
+                                text = stringResource(
+                                    if (uiState.isPlayStoreManaged) {
+                                        R.string.update_action_update_now
+                                    } else {
+                                        R.string.update_action_download
+                                    },
+                                ),
+                            )
+                        }
+                    }
+                    is AppUpdateUiState.Downloading -> {
+                        OutlinedButton(
+                            enabled = false,
+                            onClick = {},
+                            modifier = Modifier.testTag(ProfileAccountTestTags.CHECK_UPDATE_BUTTON),
+                        ) {
+                            Text(text = stringResource(R.string.update_action_check))
+                        }
+                    }
+                    else -> {
+                        OutlinedButton(
+                            enabled = uiState !is AppUpdateUiState.Checking,
+                            onClick = onCheckForUpdate,
+                            modifier = Modifier.testTag(ProfileAccountTestTags.CHECK_UPDATE_BUTTON),
+                        ) {
+                            Text(text = stringResource(R.string.update_action_check))
+                        }
+                    }
+                }
+            }
+
+            if (uiState is AppUpdateUiState.Downloading) {
+                val fraction = uiState.progressFraction
+                if (fraction != null) {
+                    LinearProgressIndicator(
+                        progress = { fraction },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag(ProfileAccountTestTags.UPDATE_DOWNLOAD_PROGRESS),
+                    )
+                } else {
+                    LinearProgressIndicator(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag(ProfileAccountTestTags.UPDATE_DOWNLOAD_PROGRESS),
+                    )
+                }
+            }
+
+            if (uiState is AppUpdateUiState.Failed && uiState.canOpenPlayStoreFallback) {
+                Row(
+                    horizontalArrangement = Arrangement.End,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    TextButton(
+                        onClick = {
+                            if (onOpenPlayStoreFallback != null) {
+                                onOpenPlayStoreFallback()
+                            } else {
+                                openPlayStoreListing(context)
+                            }
+                        },
+                        modifier = Modifier.testTag(ProfileAccountTestTags.UPDATE_PLAY_FALLBACK_BUTTON),
+                    ) {
+                        Text(text = stringResource(R.string.update_action_open_play_store))
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Shared direct-channel update dialog opening the external release page (`https://wenku8.mewx.org/`).
+ */
+@Composable
+fun DirectUpdateAvailableDialog(
+    currentVersionCode: Int,
+    latestVersionCode: Int,
+    downloadPageUrl: String,
+    onDismiss: () -> Unit,
+    onOpenDownloadUrl: (String) -> Unit,
+    dismissLabel: String = stringResource(R.string.update_action_later),
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        modifier = Modifier.testTag(ProfileAccountTestTags.UPDATE_AVAILABLE_DIALOG),
+        title = { Text(text = stringResource(R.string.update_available_title)) },
+        text = {
+            Text(
+                text = stringResource(
+                    R.string.update_available_body_format,
+                    currentVersionCode,
+                    latestVersionCode,
+                ),
+            )
+        },
+        confirmButton = {
+            Button(onClick = { onOpenDownloadUrl(downloadPageUrl) }) {
+                Text(text = stringResource(R.string.update_action_download))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(text = dismissLabel)
+            }
+        },
+    )
 }
 
 internal fun openSafeBrowserUrl(context: Context, rawUrl: String) {
@@ -1042,5 +1269,26 @@ internal fun openSafeBrowserUrl(context: Context, rawUrl: String) {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
         context.startActivity(intent)
+    }
+}
+
+internal fun openPlayStoreListing(context: Context) {
+    val packageName = context.packageName
+    val marketOpened = runCatching {
+        val marketIntent = Intent(
+            Intent.ACTION_VIEW,
+            Uri.parse("${AppUpdateCoordinator.PLAY_STORE_MARKET_URI_PREFIX}$packageName"),
+        ).apply {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        context.startActivity(marketIntent)
+        true
+    }.getOrDefault(false)
+
+    if (!marketOpened) {
+        openSafeBrowserUrl(
+            context,
+            "${AppUpdateCoordinator.PLAY_STORE_WEB_URL_PREFIX}$packageName",
+        )
     }
 }
