@@ -27,8 +27,10 @@
         <activity
             android:name=".MainActivity"
             android:exported="true"
-            android:launchMode="singleTop"
+            android:launchMode="singleTask"
             android:windowSoftInputMode="adjustResize">
+            <!-- Verified Android App Links for https://share.wenku8.app/book/<aid>.
+                 Requires https://share.wenku8.app/.well-known/assetlinks.json (HTTP 200 JSON, no redirects). -->
             <intent-filter android:autoVerify="true">
                 <action android:name="android.intent.action.VIEW" />
 
@@ -39,6 +41,20 @@
                 <data android:scheme="http" />
                 <data android:host="share.wenku8.app" />
                 <data android:pathPrefix="/book/" />
+            </intent-filter>
+
+            <!-- Custom URI scheme fallback (wenku8://book/<aid>) for browser "Open in App" CTAs
+                 and devices/ROMs where App Links domain verification is unavailable. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+
+                <data
+                    android:scheme="wenku8"
+                    android:host="book"
+                    android:pathPrefix="/" />
             </intent-filter>
         </activity>
 

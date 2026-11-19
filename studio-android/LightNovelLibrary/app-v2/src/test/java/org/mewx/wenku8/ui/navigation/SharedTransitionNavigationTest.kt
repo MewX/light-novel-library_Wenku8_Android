@@ -428,10 +428,11 @@ class SharedTransitionNavigationTest {
     fun shareBookDeepLink_resolvesInManifest_parsesUrlVariants_andOpensNovelDetailScreen() {
         val context = ApplicationProvider.getApplicationContext<Context>()
 
-        // 1. Verify AndroidManifest.xml registers https & http share.wenku8.app/book/<aid> for MainActivity
+        // 1. Verify AndroidManifest.xml registers https/http share.wenku8.app/book/<aid> & wenku8://book/<aid> for MainActivity
         for (url in listOf(
             "https://share.wenku8.app/book/2906",
             "http://share.wenku8.app/book/1500",
+            "wenku8://book/2906",
         )) {
             val viewIntent = Intent(Intent.ACTION_VIEW, Uri.parse(url)).apply {
                 addCategory(Intent.CATEGORY_BROWSABLE)
@@ -448,6 +449,8 @@ class SharedTransitionNavigationTest {
         }
 
         // 2. Verify Wenku8DeepLinks & DiscoveryRepository.parseDirectAidOrNull parsing
+        assertEquals("https://share.wenku8.app/book/2906", Wenku8DeepLinks.buildShareBookUrl(2906))
+        assertEquals("wenku8://book/2906", Wenku8DeepLinks.buildAppSchemeBookUrl(2906))
         assertEquals(
             2906,
             Wenku8DeepLinks.parseShareBookIntentAid(
@@ -461,14 +464,28 @@ class SharedTransitionNavigationTest {
             ),
         )
         assertEquals(
+            2906,
+            Wenku8DeepLinks.parseShareBookIntentAid(
+                Intent(Intent.ACTION_VIEW, Uri.parse("wenku8://book/2906")),
+            ),
+        )
+        assertEquals(
+            1500,
+            Wenku8DeepLinks.parseShareBookUriAid(Uri.parse("wenku8://book/1500/?from=web#cta")),
+        )
+        assertEquals(
             5,
-            Wenku8DeepLinks.parseShareBookUriAid(Uri.parse("https://share.wenku8.app/book/5.htm")),
+            Wenku8DeepLinks.parseShareBookUriAid(Uri.parse("https://share.wenku8.app/book/5.HTM")),
         )
         assertEquals(
             5,
             DiscoveryRepository.parseDirectAidOrNull(
                 "《狼与香辛料》（作者：支仓冻砂） https://share.wenku8.app/book/5",
             ),
+        )
+        assertEquals(
+            2906,
+            DiscoveryRepository.parseDirectAidOrNull("wenku8://book/2906"),
         )
         assertNull(
             Wenku8DeepLinks.parseShareBookIntentAid(
@@ -479,6 +496,9 @@ class SharedTransitionNavigationTest {
         assertNull(Wenku8DeepLinks.parseShareBookUriAid(Uri.parse("https://share.wenku8.app/book/0")))
         assertNull(Wenku8DeepLinks.parseShareBookUriAid(Uri.parse("https://share.wenku8.app/book/abc")))
         assertNull(Wenku8DeepLinks.parseShareBookUriAid(Uri.parse("https://www.wenku8.net/book/5.htm")))
+        assertNull(Wenku8DeepLinks.parseShareBookUriAid(Uri.parse("wenku8://book")))
+        assertNull(Wenku8DeepLinks.parseShareBookUriAid(Uri.parse("wenku8://book/0")))
+        assertNull(Wenku8DeepLinks.parseShareBookUriAid(Uri.parse("wenku8://other/2906")))
 
         // 3. Verify AdaptiveMainScaffold opens NovelDetailScreen on cold-start & onNewIntent deep links
         val fakeGateway = FakeMotionCatalogGateway()

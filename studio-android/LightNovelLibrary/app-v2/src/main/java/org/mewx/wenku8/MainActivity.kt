@@ -102,7 +102,9 @@ class MainActivity : AppCompatActivity(), HardwareVolumeKeyHost {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
 
-        if (savedInstanceState == null) {
+        val launchedFromHistory =
+            ((intent?.flags ?: 0) and Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY) != 0
+        if (savedInstanceState == null && !launchedFromHistory) {
             consumeExternalDeepLinkIfPresent(intent)
         }
 
