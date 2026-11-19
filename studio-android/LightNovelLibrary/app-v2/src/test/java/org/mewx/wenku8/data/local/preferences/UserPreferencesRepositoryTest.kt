@@ -147,4 +147,24 @@ class UserPreferencesRepositoryTest {
         assertEquals(Wenku8ThemeMode.CLASSIC_BLUE, backToBlue.themeMode)
         assertEquals(org.mewx.wenku8.reader.model.ReaderPaperPreset.EYE_CARE_GREEN, backToBlue.readerPaperPreset)
     }
+
+    @Test
+    fun updateCheckPreferencesPersistAndClampNegativeValues() = runTest(UnconfinedTestDispatcher()) {
+        val repository = createRepository(this)
+        val initial = repository.preferencesFlow.first()
+        assertEquals(0L, initial.lastAutoUpdateCheckEpochMs)
+        assertEquals(0, initial.dismissedUpdateVersionCode)
+
+        repository.recordAutoUpdateCheck(1_700_000_000_000L)
+        repository.setDismissedUpdateVersionCode(105)
+        val updated = repository.preferencesFlow.first()
+        assertEquals(1_700_000_000_000L, updated.lastAutoUpdateCheckEpochMs)
+        assertEquals(105, updated.dismissedUpdateVersionCode)
+
+        repository.recordAutoUpdateCheck(-42L)
+        repository.setDismissedUpdateVersionCode(-7)
+        val clamped = repository.preferencesFlow.first()
+        assertEquals(0L, clamped.lastAutoUpdateCheckEpochMs)
+        assertEquals(0, clamped.dismissedUpdateVersionCode)
+    }
 }
