@@ -35,6 +35,7 @@ import org.junit.Test
 import org.junit.rules.TemporaryFolder
 import org.junit.runner.RunWith
 import android.content.ContentValues
+import org.mewx.wenku8.BuildConfig
 import org.mewx.wenku8.api.Wenku8API
 import org.mewx.wenku8.api.Wenku8Error
 import org.mewx.wenku8.data.local.db.Wenku8Database
@@ -606,7 +607,9 @@ class ProfileAndBackupTest {
 
             // 6. About dialog matches v1 info & credits + 5-tap version Easter egg
             composeTestRule.onNodeWithTag(ProfileStudioTestTags.OPEN_ABOUT_BUTTON).performClick()
-            composeTestRule.onNodeWithText("版本：2.0.0 (100)").assertIsDisplayed()
+            composeTestRule.onNodeWithText(
+                "版本：${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
+            ).assertIsDisplayed()
             composeTestRule.onNodeWithTag(ProfileStudioTestTags.ABOUT_HOMEPAGE_LINK).assertIsDisplayed()
             composeTestRule.onNodeWithText("QQ交流群: 2166068158")
                 .performScrollTo()
