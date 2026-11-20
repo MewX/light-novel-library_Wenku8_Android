@@ -81,6 +81,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.HorizontalFloatingToolbar
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
@@ -98,6 +99,7 @@ import androidx.compose.material3.TooltipBox
 import androidx.compose.material3.TooltipDefaults
 import androidx.compose.material3.rememberTooltipState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -113,7 +115,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
@@ -123,7 +124,6 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -2545,7 +2545,9 @@ fun UnifiedReaderScreen(
                         .einkHairlineBorder(MaterialTheme.shapes.large),
                 ) {
                     BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
-                        val useStackedScrubberCaption = maxWidth < 360.dp || hudFontScale > 1.1f
+                        // Inside the 12dp outer HUD padding, 320dp inner corresponds to ~344dp screen width
+                        // so 360dp-412dp screens keep the exact single-row scrubber unchanged.
+                        val useStackedScrubberCaption = maxWidth < 320.dp || hudFontScale > 1.1f
                         val chapterButtonPadding = if (useStackedScrubberCaption) {
                             PaddingValues(horizontal = 6.dp, vertical = 4.dp)
                         } else {
@@ -2677,18 +2679,22 @@ fun UnifiedReaderScreen(
                 HorizontalFloatingToolbar(
                     expanded = true,
                     colors = FloatingToolbarDefaults.standardFloatingToolbarColors(),
-                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
                     modifier = Modifier
                         .einkHairlineBorder(FloatingToolbarDefaults.ContainerShape)
                         .testTag(ReaderTestTags.HUD_FLOATING_TOOLBAR),
                 ) {
                     AppBarRow(
                         overflowIndicator = { menuState ->
-                            Box(
-                                modifier = Modifier.heightIn(min = 48.dp),
-                                contentAlignment = Alignment.Center,
+                            CompositionLocalProvider(
+                                LocalContentColor provides MaterialTheme.colorScheme.primary,
                             ) {
-                                AppBarOverflowIndicator(menuState)
+                                Box(
+                                    modifier = Modifier.heightIn(min = 48.dp),
+                                    contentAlignment = Alignment.Center,
+                                ) {
+                                    AppBarOverflowIndicator(menuState)
+                                }
                             }
                         },
                     ) {
@@ -3271,29 +3277,20 @@ private fun ReaderToolbarActionButton(
     tag: String,
     onClick: () -> Unit,
 ) {
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
-        modifier = Modifier
-            .widthIn(min = 48.dp)
-            .heightIn(min = 48.dp)
-            .clip(RoundedCornerShape(12.dp))
-            .clickable(role = Role.Button, onClick = onClick)
-            .padding(horizontal = 6.dp, vertical = 4.dp)
-            .testTag(tag),
+    TextButton(
+        onClick = onClick,
+        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
+        modifier = Modifier.testTag(tag),
     ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            modifier = Modifier.size(22.dp),
-        )
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelSmall,
-            maxLines = 1,
-            softWrap = false,
-            overflow = TextOverflow.Ellipsis,
-        )
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Icon(imageVector = icon, contentDescription = label)
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelSmall,
+                maxLines = 1,
+                softWrap = false,
+            )
+        }
     }
 }
 

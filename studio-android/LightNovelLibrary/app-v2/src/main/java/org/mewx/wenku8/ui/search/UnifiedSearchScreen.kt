@@ -36,8 +36,8 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.FilledTonalButton
-import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -313,7 +313,7 @@ fun UnifiedSearchScreen(
 
                         if (useCompactSearchBar) {
                             ActionTooltipBox(tooltipText = searchSubmitLabel) {
-                                FilledTonalIconButton(
+                                FilledIconButton(
                                     onClick = { triggerOnlineSearch() },
                                     enabled = queryText.isNotBlank(),
                                     modifier = Modifier.testTag(UnifiedSearchTestTags.SUBMIT_BUTTON),
