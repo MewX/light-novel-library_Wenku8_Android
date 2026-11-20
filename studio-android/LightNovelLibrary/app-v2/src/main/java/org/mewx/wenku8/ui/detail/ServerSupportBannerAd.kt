@@ -63,46 +63,39 @@ import java.util.concurrent.atomic.AtomicBoolean
 
 object ServerSupportAdConstants {
     /**
-     * Official Google demo Banner Ad Unit ID used only as a fallback in debug builds when the
-     * primary unit reports no-fill on an unverified emulator/dev environment.
+     * Official Google demo AdMob App ID bound via manifest placeholder on debug builds.
+     */
+    const val DEV_TEST_ADMOB_APP_ID = "ca-app-pub-3940256099942544~3347511713"
+
+    /**
+     * Production AdMob App ID bound via manifest placeholder on release builds (`org.mewx.wenku8`).
+     */
+    const val PRODUCTION_ADMOB_APP_ID = "ca-app-pub-7333757578973883~9635263460"
+
+    /**
+     * Official Google demo Banner Ad Unit ID used exclusively on debug builds so local and
+     * open-source contributors' debug builds never request live production ads or trigger
+     * AdMob Invalid Traffic policy warnings.
      */
     const val DEV_TEST_BANNER_AD_UNIT_ID = "ca-app-pub-3940256099942544/6300978111"
 
     /**
-     * Production Novel Info inline banner Ad Unit ID matching `com.google.android.gms.ads.APPLICATION_ID`
-     * (`ca-app-pub-7333757578973883~9635263460`) and Wenku8 v1 (`org.mewx.wenku8`).
+     * Production Novel Info inline banner Ad Unit ID matching [PRODUCTION_ADMOB_APP_ID]
+     * and Wenku8 v1 (`org.mewx.wenku8`), used exclusively on release builds (`!BuildConfig.DEBUG`).
      */
     const val PRODUCTION_BANNER_AD_UNIT_ID = "ca-app-pub-7333757578973883/9658350163"
 
-    @Volatile
-    private var sessionPreferredAdUnitId: String? = null
-
-    fun recordSuccessfulAdUnitId(adUnitId: String) {
-        sessionPreferredAdUnitId = adUnitId
-    }
-
-    internal fun resetSessionPreferredAdUnitForTest() {
-        sessionPreferredAdUnitId = null
-    }
-
     /**
-     * Ordered Ad Unit IDs to try. Defaults to [PRODUCTION_BANNER_AD_UNIT_ID] first (matching
-     * `org.mewx.wenku8`), falls back once to [DEV_TEST_BANNER_AD_UNIT_ID] in debug builds, and
-     * promotes whichever unit succeeded earlier in this session to avoid repeating a slow failed
-     * round-trip on subsequent loads.
+     * Ordered Ad Unit IDs to try:
+     * - Debug builds (`isDebugBuild = true`): strictly [DEV_TEST_BANNER_AD_UNIT_ID] only.
+     * - Release builds (`isDebugBuild = false`): strictly [PRODUCTION_BANNER_AD_UNIT_ID] only.
      */
-    fun candidateBannerAdUnitIds(isDebugBuild: Boolean = BuildConfig.DEBUG): List<String> {
-        if (!isDebugBuild) {
-            return listOf(PRODUCTION_BANNER_AD_UNIT_ID)
-        }
-        val base = listOf(PRODUCTION_BANNER_AD_UNIT_ID, DEV_TEST_BANNER_AD_UNIT_ID)
-        val preferred = sessionPreferredAdUnitId
-        return if (preferred != null && preferred in base) {
-            listOf(preferred) + base.filterNot { it == preferred }
+    fun candidateBannerAdUnitIds(isDebugBuild: Boolean = BuildConfig.DEBUG): List<String> =
+        if (isDebugBuild) {
+            listOf(DEV_TEST_BANNER_AD_UNIT_ID)
         } else {
-            base
+            listOf(PRODUCTION_BANNER_AD_UNIT_ID)
         }
-    }
 
     val RESERVED_BANNER_SLOT_HEIGHT = 50.dp
     internal const val RETRY_AFTER_FAILURE_COOLDOWN_MS = 30_000L
@@ -424,7 +417,6 @@ private suspend fun startHolderBannerLoad(
                 adListener = object : AdListener() {
                     override fun onAdLoaded() {
                         holder.loadInProgress = false
-                        ServerSupportAdConstants.recordSuccessfulAdUnitId(adUnit)
                         holder.phase = BannerAdLoadPhase.Loaded
                         if (holder.activeDetailConsumers == 0) {
                             runCatching {

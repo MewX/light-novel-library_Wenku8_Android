@@ -39,12 +39,16 @@ android {
             debuggable true
             minifyEnabled false
             enableUnitTestCoverage true
+            // Official Google demo AdMob App ID so local/open-source debug builds never hit
+            // production AdMob inventory or trigger Invalid Traffic policy warnings.
+            manifestPlaceholders = [ADMOB_APP_ID: "ca-app-pub-3940256099942544~3347511713"]
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
         release {
             debuggable false
             minifyEnabled true
             shrinkResources true
+            manifestPlaceholders = [ADMOB_APP_ID: "ca-app-pub-7333757578973883~9635263460"]
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
             ndk {
                 abiFilters 'armeabi-v7a', 'arm64-v8a', 'x86', 'x86_64'

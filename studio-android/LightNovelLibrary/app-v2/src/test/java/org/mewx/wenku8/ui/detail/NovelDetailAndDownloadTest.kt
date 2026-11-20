@@ -654,35 +654,55 @@ class NovelDetailAndDownloadTest {
     }
 
     @Test
-    fun serverSupportBannerAd_hidesBoxWhileLoadingOrFailedAndPreservesStateAcrossScroll() {
-        ServerSupportAdConstants.resetSessionPreferredAdUnitForTest()
+    fun serverSupportBannerAd_debugBuildUsesTestAdMobAppAndBannerIdsExclusively() {
+        val debugUnits = ServerSupportAdConstants.candidateBannerAdUnitIds(isDebugBuild = true)
         assertEquals(
-            listOf(ServerSupportAdConstants.PRODUCTION_BANNER_AD_UNIT_ID),
-            ServerSupportAdConstants.candidateBannerAdUnitIds(isDebugBuild = false),
+            listOf(ServerSupportAdConstants.DEV_TEST_BANNER_AD_UNIT_ID),
+            debugUnits,
         )
-        assertEquals(
-            listOf(
-                ServerSupportAdConstants.PRODUCTION_BANNER_AD_UNIT_ID,
-                ServerSupportAdConstants.DEV_TEST_BANNER_AD_UNIT_ID,
-            ),
-            ServerSupportAdConstants.candidateBannerAdUnitIds(isDebugBuild = true),
+        assertFalse(
+            "Debug builds must never request the production AdMob banner unit ID",
+            debugUnits.contains(ServerSupportAdConstants.PRODUCTION_BANNER_AD_UNIT_ID),
         )
 
-        // Caching a successful debug fallback promotes it to index 0 so subsequent loads skip
-        // waiting on a failing round-trip, while release builds strictly keep PRODUCTION only.
-        ServerSupportAdConstants.recordSuccessfulAdUnitId(ServerSupportAdConstants.DEV_TEST_BANNER_AD_UNIT_ID)
+        val releaseUnits = ServerSupportAdConstants.candidateBannerAdUnitIds(isDebugBuild = false)
         assertEquals(
-            listOf(
-                ServerSupportAdConstants.DEV_TEST_BANNER_AD_UNIT_ID,
-                ServerSupportAdConstants.PRODUCTION_BANNER_AD_UNIT_ID,
-            ),
-            ServerSupportAdConstants.candidateBannerAdUnitIds(isDebugBuild = true),
+            listOf(ServerSupportAdConstants.PRODUCTION_BANNER_AD_UNIT_ID),
+            releaseUnits,
         )
+        assertFalse(
+            "Release builds must never fall back to the Google demo AdMob banner unit ID",
+            releaseUnits.contains(ServerSupportAdConstants.DEV_TEST_BANNER_AD_UNIT_ID),
+        )
+
+        // Default parameter tracks BuildConfig.DEBUG (true in debug unit tests).
+        assertEquals(
+            listOf(ServerSupportAdConstants.DEV_TEST_BANNER_AD_UNIT_ID),
+            ServerSupportAdConstants.candidateBannerAdUnitIds(),
+        )
+
+        // Merged debug AndroidManifest must resolve ADMOB_APP_ID to Google's official demo App ID.
+        val appContext = ApplicationProvider.getApplicationContext<android.content.Context>()
+        @Suppress("DEPRECATION")
+        val appInfo = appContext.packageManager.getApplicationInfo(
+            appContext.packageName,
+            android.content.pm.PackageManager.GET_META_DATA,
+        )
+        val resolvedAdMobAppId = appInfo.metaData?.getString("com.google.android.gms.ads.APPLICATION_ID")
+        assertEquals(ServerSupportAdConstants.DEV_TEST_ADMOB_APP_ID, resolvedAdMobAppId)
+        assertTrue(resolvedAdMobAppId != ServerSupportAdConstants.PRODUCTION_ADMOB_APP_ID)
+    }
+
+    @Test
+    fun serverSupportBannerAd_hidesBoxWhileLoadingOrFailedAndPreservesStateAcrossScroll() {
         assertEquals(
             listOf(ServerSupportAdConstants.PRODUCTION_BANNER_AD_UNIT_ID),
             ServerSupportAdConstants.candidateBannerAdUnitIds(isDebugBuild = false),
         )
-        ServerSupportAdConstants.resetSessionPreferredAdUnitForTest()
+        assertEquals(
+            listOf(ServerSupportAdConstants.DEV_TEST_BANNER_AD_UNIT_ID),
+            ServerSupportAdConstants.candidateBannerAdUnitIds(isDebugBuild = true),
+        )
 
         // Activity-pooled holder retains Loaded phase across detail screen detach -> next novel attach
         val pooledHolder = NovelDetailBannerAdHolder(
