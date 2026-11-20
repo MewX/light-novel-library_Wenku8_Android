@@ -436,4 +436,66 @@ class Bookshelf3dShelfSectionTest {
         composeRule.waitForIdle()
         composeRule.onNodeWithTag(BookshelfTestTags.SPINE_3D_CONTAINER).assertDoesNotExist()
     }
+
+    @Test
+    fun continueReadingPromotion_placesRecentBooksAtFrontWithPreservedNumbersAndDistinctStyling() {
+        val items = sampleItems(6)
+        var screenWidthDp by mutableStateOf(412.dp)
+        var themeMode by mutableStateOf(Wenku8ThemeMode.CLASSIC_BLUE)
+
+        composeRule.setContent {
+            Wenku8ExpressiveTheme(themeMode = themeMode) {
+                Box(modifier = Modifier.size(screenWidthDp, 820.dp)) {
+                    Bookshelf3dShelfSection(
+                        items = items,
+                        availableWidth = screenWidthDp - 32.dp,
+                        availableHeight = 820.dp,
+                        selectedAidSet = emptySet(),
+                        isMultiSelectActive = false,
+                        isEinkMode = themeMode == Wenku8ThemeMode.E_INK,
+                        continueReadingAids = listOf(1005, 1003),
+                        onItemClick = {},
+                        onItemLongClick = {},
+                        onContinueReadingClick = {},
+                    )
+                }
+            }
+        }
+        composeRule.waitForIdle()
+
+        // 1. Slot 0 is the most recently read book (aid=1005), keeping its original shelf rank #05
+        composeRule.onNodeWithTag(BookshelfTestTags.SPINE_3D_INDEX_COUNTER).assertTextContains("01 / 06")
+        composeRule.onNodeWithTag(BookshelfTestTags.SPINE_3D_CONTINUE_BADGE).assertIsDisplayed()
+        composeRule.onNodeWithText("#05").assertIsDisplayed()
+        assertTrue(composeRule.onAllNodesWithText("轻小说测试作品第5部").fetchSemanticsNodes().isNotEmpty())
+        val compactLightBmp = composeRule.onRoot().captureToImage()
+        assertTrue(compactLightBmp.width > 0 && compactLightBmp.height > 0)
+
+        // 2. Step next to slot 1 -> second Continue Reading book (aid=1003), preserving original rank #03
+        composeRule.onNodeWithTag(BookshelfTestTags.SPINE_3D_NEXT_BUTTON).performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag(BookshelfTestTags.SPINE_3D_INDEX_COUNTER).assertTextContains("02 / 06")
+        composeRule.onNodeWithTag(BookshelfTestTags.SPINE_3D_CONTINUE_BADGE).assertIsDisplayed()
+        composeRule.onNodeWithText("#03").assertIsDisplayed()
+
+        // 3. Switch to wide tablet + E-Ink mode while focused on Continue Reading book
+        screenWidthDp = 960.dp
+        themeMode = Wenku8ThemeMode.E_INK
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag(BookshelfTestTags.SPINE_3D_WIDE_PANEL).assertIsDisplayed()
+        composeRule.onNodeWithTag(BookshelfTestTags.SPINE_3D_CONTINUE_BADGE).assertIsDisplayed()
+        composeRule.onNodeWithText("#03 / 06 · WK-01003").assertIsDisplayed()
+        val wideEinkBmp = composeRule.onRoot().captureToImage()
+        assertTrue(wideEinkBmp.width > 0 && wideEinkBmp.height > 0)
+
+        // 4. Step next to slot 2 -> regular shelf book #01 (aid=1001), no Continue Reading badge
+        themeMode = Wenku8ThemeMode.CARBON_NIGHT
+        composeRule.onNodeWithTag(BookshelfTestTags.SPINE_3D_NEXT_BUTTON).performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag(BookshelfTestTags.SPINE_3D_INDEX_COUNTER).assertTextContains("03 / 06")
+        composeRule.onNodeWithTag(BookshelfTestTags.SPINE_3D_CONTINUE_BADGE).assertDoesNotExist()
+        composeRule.onNodeWithText("#01 / 06 · WK-01001").assertIsDisplayed()
+        val wideDarkBmp = composeRule.onRoot().captureToImage()
+        assertTrue(wideDarkBmp.width > 0 && wideDarkBmp.height > 0)
+    }
 }

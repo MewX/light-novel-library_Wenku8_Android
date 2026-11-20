@@ -364,4 +364,30 @@ class Bookshelf3dGeometryTest {
         assertTrue(longAsciiRuns[0].isRotatedLatin)
         assertTrue(longAsciiRuns[0].text.endsWith("…"))
     }
+
+    @Test
+    fun build3dShelfEntries_promotesContinueReadingToFront_preservesOriginalSortNumbers_andDeduplicates() {
+        val sortedBooks = listOf(101, 102, 103, 104, 105)
+
+        // Empty continue-reading list preserves original order and 1-based numbers
+        val plain = build3dShelfEntries(sortedBooks, emptyList()) { it }
+        assertEquals(sortedBooks, plain.map { it.item })
+        assertEquals(listOf(1, 2, 3, 4, 5), plain.map { it.shelfOrderNumber })
+        assertTrue(plain.none { it.isContinueReading })
+
+        // Empty sorted list yields empty result even if continue-reading IDs are provided
+        assertTrue(build3dShelfEntries(emptyList<Int>(), listOf(105, 103)) { it }.isEmpty())
+
+        // Continue-reading books move to the front in recency order, ignoring unknown/duplicate IDs,
+        // while keeping every book's canonical 1-based sort number from the original shelf order.
+        val promoted = build3dShelfEntries(
+            sortedItems = sortedBooks,
+            continueReadingIds = listOf(105, 999, 103, 105),
+            idSelector = { it },
+        )
+        assertEquals(listOf(105, 103, 101, 102, 104), promoted.map { it.item })
+        assertEquals(listOf(5, 3, 1, 2, 4), promoted.map { it.shelfOrderNumber })
+        assertEquals(listOf(true, true, false, false, false), promoted.map { it.isContinueReading })
+    }
 }
+

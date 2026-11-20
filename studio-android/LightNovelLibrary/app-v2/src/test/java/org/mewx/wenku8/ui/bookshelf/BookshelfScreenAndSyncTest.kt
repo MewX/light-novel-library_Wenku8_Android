@@ -799,6 +799,7 @@ class BookshelfScreenAndSyncTest {
         ).performClick()
         composeTestRule.waitForIdle()
         assertEquals(BookshelfViewMode.DETAIL_LIST, activeViewMode)
+        composeTestRule.onNodeWithTag(BookshelfTestTags.CONTINUE_READING_CAROUSEL).assertIsDisplayed()
         composeTestRule.onNodeWithTag(BookshelfTestTags.SPINE_3D_CONTAINER).assertDoesNotExist()
         composeTestRule.onNodeWithTag(BookshelfTestTags.BOOK_CARD_PREFIX + 5).assertIsDisplayed()
         composeTestRule.onNodeWithTag(
@@ -811,8 +812,10 @@ class BookshelfScreenAndSyncTest {
         ).performClick()
         composeTestRule.waitForIdle()
         assertEquals(BookshelfViewMode.SPINE_3D, activeViewMode)
+        composeTestRule.onNodeWithTag(BookshelfTestTags.CONTINUE_READING_CAROUSEL).assertDoesNotExist()
         composeTestRule.onNodeWithTag(BookshelfTestTags.SPINE_3D_CONTAINER).assertIsDisplayed()
         composeTestRule.onNodeWithTag(BookshelfTestTags.SPINE_3D_STAGE).assertIsDisplayed()
+        composeTestRule.onNodeWithTag(BookshelfTestTags.SPINE_3D_CONTINUE_BADGE).assertIsDisplayed()
         composeTestRule.onNodeWithTag(BookshelfTestTags.BOOK_CARD_PREFIX + 5).assertIsDisplayed()
 
         // 5. Long-press multi-select summons HorizontalFloatingToolbar; long-pressing each small
@@ -856,6 +859,7 @@ class BookshelfScreenAndSyncTest {
         assertEquals(listOf(5), remainingAids)
 
         // 6. Switching away from SPINE_3D back to GRID immediately disposes the 3D view tree
+        // and restores the Continue Reading carousel.
         composeTestRule.onNodeWithTag(
             BookshelfTestTags.VIEW_MODE_CHIP_PREFIX + BookshelfViewMode.GRID.name,
         ).performClick()
@@ -863,6 +867,8 @@ class BookshelfScreenAndSyncTest {
         assertEquals(BookshelfViewMode.GRID, activeViewMode)
         composeTestRule.onNodeWithTag(BookshelfTestTags.SPINE_3D_CONTAINER).assertDoesNotExist()
         composeTestRule.onNodeWithTag(BookshelfTestTags.SPINE_3D_STAGE).assertDoesNotExist()
+        composeTestRule.onNodeWithTag(BookshelfTestTags.CONTINUE_READING_CAROUSEL).assertIsDisplayed()
+        Unit
     }
 
     @Test
