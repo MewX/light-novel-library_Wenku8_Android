@@ -186,6 +186,7 @@ object BookshelfTestTags {
     const val SPINE_3D_SPOTLIGHT_CARD = "bookshelf_spine3d_spotlight_card"
     const val SPINE_3D_WIDE_PANEL = "bookshelf_spine3d_wide_panel"
     const val SPINE_3D_PRIMARY_ACTION = "bookshelf_spine3d_primary_action"
+    const val SPINE_3D_CONTINUE_BADGE = "bookshelf_spine3d_continue_badge"
 }
 
 /**
@@ -533,7 +534,8 @@ fun BookshelfScreen(
                 )
             }
 
-            val showContinueCarousel = snapshot.continueReadingItems.isNotEmpty() &&
+            val showContinueCarousel = viewMode != BookshelfViewMode.SPINE_3D &&
+                snapshot.continueReadingItems.isNotEmpty() &&
                 localQuery.isBlank() &&
                 activeFilter == BookshelfFilter.All
             if (showContinueCarousel) {
@@ -652,6 +654,17 @@ fun BookshelfScreen(
 
                     BookshelfViewMode.SPINE_3D -> {
                         item(key = "spine_3d_shelf_section") {
+                            val spine3dContinueAids = remember(
+                                snapshot.continueReadingItems,
+                                localQuery,
+                                activeFilter,
+                            ) {
+                                if (localQuery.isBlank() && activeFilter == BookshelfFilter.All) {
+                                    snapshot.continueReadingItems.map { it.aid }
+                                } else {
+                                    emptyList()
+                                }
+                            }
                             Bookshelf3dShelfSection(
                                 items = displayedItems,
                                 availableWidth = availableContentWidth,
@@ -659,6 +672,7 @@ fun BookshelfScreen(
                                 selectedAidSet = selectedAidSet,
                                 isMultiSelectActive = isMultiSelectActive,
                                 isEinkMode = isEinkMode,
+                                continueReadingAids = spine3dContinueAids,
                                 onItemClick = { item ->
                                     if (isMultiSelectActive) {
                                         toggleSelection(item.aid)

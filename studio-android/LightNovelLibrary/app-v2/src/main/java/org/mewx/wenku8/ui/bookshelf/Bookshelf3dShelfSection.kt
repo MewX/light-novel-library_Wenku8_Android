@@ -138,8 +138,20 @@ internal fun Bookshelf3dShelfSection(
     onItemLongClick: (BookshelfItemModel) -> Unit,
     onContinueReadingClick: (BookshelfItemModel) -> Unit,
     modifier: Modifier = Modifier,
+    continueReadingAids: List<Int> = emptyList(),
 ) {
     if (items.isEmpty()) return
+
+    val entries = remember(items, continueReadingAids) {
+        build3dShelfEntries(
+            sortedItems = items,
+            continueReadingIds = continueReadingAids,
+            idSelector = { it.aid },
+        )
+    }
+    val continueReadingCount = remember(entries) {
+        entries.count { it.isContinueReading }
+    }
 
     val coroutineScope = rememberCoroutineScope()
     val hapticFeedback = LocalHapticFeedback.current
@@ -152,34 +164,35 @@ internal fun Bookshelf3dShelfSection(
     }
 
     // Track focused book by aid across filter/sort/deletion mutations so focus stays stable.
-    var savedFocusedAid by rememberSaveable { mutableIntStateOf(items.first().aid) }
+    var savedFocusedAid by rememberSaveable { mutableIntStateOf(entries.first().item.aid) }
     val focusAnimatable = remember { Animatable(0f) }
     var isScrubbing by remember { mutableStateOf(false) }
 
-    val itemIdsKey = remember(items) { items.map { it.aid } }
-    LaunchedEffect(itemIdsKey) {
-        val existingIdx = items.indexOfFirst { it.aid == savedFocusedAid }
+    val entryIdsKey = remember(entries) { entries.map { it.item.aid } }
+    LaunchedEffect(entryIdsKey) {
+        val existingIdx = entries.indexOfFirst { it.item.aid == savedFocusedAid }
         val resolvedIdx = if (existingIdx >= 0) {
             existingIdx
         } else {
-            focusAnimatable.value.roundToInt().coerceIn(0, items.lastIndex)
+            focusAnimatable.value.roundToInt().coerceIn(0, entries.lastIndex)
         }
-        savedFocusedAid = items[resolvedIdx].aid
+        savedFocusedAid = entries[resolvedIdx].item.aid
         if (abs(focusAnimatable.value - resolvedIdx.toFloat()) > 0.001f) {
             focusAnimatable.snapTo(resolvedIdx.toFloat())
         }
     }
 
-    val focusedIndex by remember(items.size) {
+    val focusedIndex by remember(entries.size) {
         derivedStateOf {
-            focusAnimatable.value.roundToInt().coerceIn(0, items.lastIndex)
+            focusAnimatable.value.roundToInt().coerceIn(0, entries.lastIndex)
         }
     }
-    val focusedItem = items[focusedIndex]
+    val focusedEntry = entries[focusedIndex]
+    val focusedItem = focusedEntry.item
 
     var lastHapticIndex by remember { mutableIntStateOf(focusedIndex) }
     LaunchedEffect(focusedIndex) {
-        savedFocusedAid = items[focusedIndex].aid
+        savedFocusedAid = entries[focusedIndex].item.aid
         if (focusedIndex != lastHapticIndex) {
             lastHapticIndex = focusedIndex
             if (!isEinkMode) {
@@ -188,16 +201,16 @@ internal fun Bookshelf3dShelfSection(
         }
     }
 
-    val latestItems by rememberUpdatedState(items)
+    val latestEntries by rememberUpdatedState(entries)
     val latestIsEinkMode by rememberUpdatedState(isEinkMode)
     val latestIsMultiSelectActive by rememberUpdatedState(isMultiSelectActive)
     val latestOnItemClick by rememberUpdatedState(onItemClick)
     val latestOnItemLongClick by rememberUpdatedState(onItemLongClick)
 
     val animateFocusTo: (Int) -> Unit = { targetIndex ->
-        val currentItems = latestItems
-        if (currentItems.isNotEmpty()) {
-            val clamped = targetIndex.coerceIn(0, currentItems.lastIndex).toFloat()
+        val currentEntries = latestEntries
+        if (currentEntries.isNotEmpty()) {
+            val clamped = targetIndex.coerceIn(0, currentEntries.lastIndex).toFloat()
             coroutineScope.launch {
                 if (latestIsEinkMode) {
                     focusAnimatable.snapTo(clamped)
@@ -215,7 +228,7 @@ internal fun Bookshelf3dShelfSection(
     }
 
     val handleBookTap: (Int) -> Unit = { index ->
-        val tappedItem = latestItems.getOrNull(index)
+        val tappedItem = latestEntries.getOrNull(index)?.item
         if (tappedItem != null) {
             if (latestIsMultiSelectActive) {
                 latestOnItemClick(tappedItem)
@@ -234,7 +247,7 @@ internal fun Bookshelf3dShelfSection(
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             Bookshelf3dStage(
-                items = items,
+                entries = entries,
                 focusOffset = focusAnimatable.value,
                 focusedIndex = focusedIndex,
                 metrics = metrics,
@@ -242,44 +255,45 @@ internal fun Bookshelf3dShelfSection(
                 isScrubbing = isScrubbing,
                 isEinkMode = isEinkMode,
                 onDragFocusDelta = { deltaFocus ->
-                    val currentItems = latestItems
-                    if (currentItems.size > 1) {
+                    val currentEntries = latestEntries
+                    if (currentEntries.size > 1) {
                         val next = (focusAnimatable.value + deltaFocus)
-                            .coerceIn(0f, currentItems.lastIndex.toFloat())
+                            .coerceIn(0f, currentEntries.lastIndex.toFloat())
                         coroutineScope.launch { focusAnimatable.snapTo(next) }
                     }
                 },
                 onFlingReleased = { velocityPxPerSec, pitchPx ->
-                    val currentItems = latestItems
-                    if (currentItems.size > 1) {
+                    val currentEntries = latestEntries
+                    if (currentEntries.size > 1) {
                         val target = Bookshelf3dSnapPhysics.computeFlingTargetIndex(
                             currentFocus = focusAnimatable.value,
                             velocityPxPerSec = velocityPxPerSec,
                             pitchPx = pitchPx,
-                            itemCount = currentItems.size,
+                            itemCount = currentEntries.size,
                         )
                         animateFocusTo(target)
                     }
                 },
                 onBookTap = handleBookTap,
                 onBookLongPress = { index ->
-                    latestItems.getOrNull(index)?.let { latestOnItemLongClick(it) }
+                    latestEntries.getOrNull(index)?.item?.let { latestOnItemLongClick(it) }
                 },
             )
 
             Bookshelf3dFastScroller(
-                items = items,
+                entries = entries,
+                continueReadingCount = continueReadingCount,
                 focusOffset = focusAnimatable.value,
                 focusedIndex = focusedIndex,
                 isScrubbing = isScrubbing,
                 isEinkMode = isEinkMode,
                 onScrubStart = { fraction ->
                     isScrubbing = true
-                    val next = Bookshelf3dSnapPhysics.fractionToFocus(fraction, items.size)
+                    val next = Bookshelf3dSnapPhysics.fractionToFocus(fraction, entries.size)
                     coroutineScope.launch { focusAnimatable.snapTo(next) }
                 },
                 onScrubMove = { fraction ->
-                    val next = Bookshelf3dSnapPhysics.fractionToFocus(fraction, items.size)
+                    val next = Bookshelf3dSnapPhysics.fractionToFocus(fraction, entries.size)
                     coroutineScope.launch { focusAnimatable.snapTo(next) }
                 },
                 onScrubEnd = {
@@ -287,7 +301,7 @@ internal fun Bookshelf3dShelfSection(
                     animateFocusTo(focusAnimatable.value.roundToInt())
                 },
                 onTapJumpFraction = { fraction ->
-                    val target = Bookshelf3dSnapPhysics.fractionToFocus(fraction, items.size).roundToInt()
+                    val target = Bookshelf3dSnapPhysics.fractionToFocus(fraction, entries.size).roundToInt()
                     animateFocusTo(target)
                 },
                 onStepDelta = { delta ->
@@ -315,8 +329,9 @@ internal fun Bookshelf3dShelfSection(
                 shelfColumn(Modifier.width(metrics.stageWidthDp.dp))
                 Bookshelf3dWideSpotlightPanel(
                     item = focusedItem,
-                    index = focusedIndex,
-                    totalCount = items.size,
+                    shelfOrderNumber = focusedEntry.shelfOrderNumber,
+                    totalCount = entries.size,
+                    isContinueReading = focusedEntry.isContinueReading,
                     isSelected = focusedItem.aid in selectedAidSet,
                     isMultiSelectActive = isMultiSelectActive,
                     isEinkMode = isEinkMode,
@@ -338,6 +353,9 @@ internal fun Bookshelf3dShelfSection(
                 shelfColumn(Modifier.fillMaxWidth())
                 Bookshelf3dCompactSpotlightCard(
                     item = focusedItem,
+                    shelfOrderNumber = focusedEntry.shelfOrderNumber,
+                    totalCount = entries.size,
+                    isContinueReading = focusedEntry.isContinueReading,
                     isSelected = focusedItem.aid in selectedAidSet,
                     isMultiSelectActive = isMultiSelectActive,
                     isEinkMode = isEinkMode,
@@ -353,7 +371,7 @@ internal fun Bookshelf3dShelfSection(
 
 @Composable
 private fun Bookshelf3dStage(
-    items: List<BookshelfItemModel>,
+    entries: List<Bookshelf3dShelfEntry<BookshelfItemModel>>,
     focusOffset: Float,
     focusedIndex: Int,
     metrics: Bookshelf3dMetrics,
@@ -376,7 +394,7 @@ private fun Bookshelf3dStage(
     val reusableShadowPath = remember { Path() }
 
     val visiblePoses = Bookshelf3dGeometry.computeVisiblePosesPx(
-        itemCount = items.size,
+        itemCount = entries.size,
         focus = focusOffset,
         metrics = metrics,
         density = densityFactor,
@@ -415,12 +433,12 @@ private fun Bookshelf3dStage(
             .draggable(
                 state = draggableState,
                 orientation = Orientation.Horizontal,
-                enabled = items.size > 1,
+                enabled = entries.size > 1,
                 onDragStopped = { velocityPxPerSec ->
                     latestOnFlingReleased(velocityPxPerSec, latestPitchPx)
                 },
             )
-            .pointerInput(items.size) {
+            .pointerInput(entries.size) {
                 detectTapGestures(
                     onTap = { tapOffset ->
                         Bookshelf3dGeometry.hitTestBookIndex(tapOffset, latestPoses)?.let { hitIdx ->
@@ -481,11 +499,13 @@ private fun Bookshelf3dStage(
 
         // Layer 2: Fixed back-to-front (ascending index) 3D book solids
         visiblePoses.forEach { pose ->
-            val item = items[pose.index]
+            val entry = entries[pose.index]
+            val item = entry.item
             key(item.aid) {
                 Bookshelf3dBookVolume(
                     item = item,
-                    displayNumber = pose.index + 1,
+                    displayNumber = entry.shelfOrderNumber,
+                    isContinueReading = entry.isContinueReading,
                     pose = pose,
                     metrics = metrics,
                     spineMatrix = spineMatrix,
@@ -494,7 +514,7 @@ private fun Bookshelf3dStage(
                     shouldLoadCover = Bookshelf3dGeometry.shouldLoadBookCover(
                         index = pose.index,
                         focusedIndex = focusedIndex,
-                        itemCount = items.size,
+                        itemCount = entries.size,
                         isScrubbing = isScrubbing,
                     ),
                     isSelected = item.aid in selectedAidSet,
@@ -508,7 +528,8 @@ private fun Bookshelf3dStage(
         Layout(
             content = {
                 visiblePoses.forEach { pose ->
-                    val item = items[pose.index]
+                    val entry = entries[pose.index]
+                    val item = entry.item
                     val isSelected = item.aid in selectedAidSet
                     val isFocused = pose.index == focusedIndex
                     val label = "${item.novel.title} ${item.novel.author}".trim()
@@ -569,6 +590,7 @@ private fun Bookshelf3dStage(
 private fun Bookshelf3dBookVolume(
     item: BookshelfItemModel,
     displayNumber: Int,
+    isContinueReading: Boolean,
     pose: Bookshelf3dBookPose,
     metrics: Bookshelf3dMetrics,
     spineMatrix: Matrix,
@@ -582,20 +604,27 @@ private fun Bookshelf3dBookVolume(
     val colorScheme = MaterialTheme.colorScheme
     val spineSurfaceColor = when {
         isEinkMode -> colorScheme.surface
-        isDark -> colorScheme.surfaceContainerHigh
+        isContinueReading -> colorScheme.tertiaryContainer
         else -> colorScheme.surfaceContainerHigh
     }
     val coverSleeveColor = when {
         isEinkMode -> colorScheme.surface
+        isContinueReading -> colorScheme.tertiaryContainer
         isDark -> colorScheme.surfaceContainer
         else -> colorScheme.surface
     }
     val edgeBorderColor = when {
         isSelected -> colorScheme.primary
         isEinkMode -> colorScheme.onSurface
+        isContinueReading -> colorScheme.tertiary.copy(alpha = 0.72f)
         else -> colorScheme.outlineVariant
     }
-    val edgeBorderWidth = if (isSelected) 2.dp else 0.8.dp
+    val edgeBorderWidth = when {
+        isSelected -> 2.dp
+        isContinueReading && isEinkMode -> 1.6.dp
+        isContinueReading -> 1.2.dp
+        else -> 0.8.dp
+    }
 
     val coverAnchor = pose.spineQuad[1]
     val coverPlacedX = coverAnchor.x.roundToInt()
@@ -610,23 +639,25 @@ private fun Bookshelf3dBookVolume(
 
     val capStartColor = when {
         isEinkMode -> colorScheme.surface
+        isContinueReading -> colorScheme.tertiaryContainer
         isDark -> colorScheme.surfaceContainerHighest
         else -> colorScheme.surfaceVariant
     }
     val capEndColor = when {
         isEinkMode -> colorScheme.surface
+        isContinueReading -> colorScheme.surfaceContainerHigh
         isDark -> colorScheme.surfaceContainerHigh
         else -> colorScheme.surface
     }
-    val capStrokeColor = if (isEinkMode) {
-        colorScheme.onSurface
-    } else {
-        colorScheme.outline.copy(alpha = if (isDark) 0.34f else 0.28f)
+    val capStrokeColor = when {
+        isEinkMode -> colorScheme.onSurface
+        isContinueReading -> colorScheme.tertiary.copy(alpha = 0.58f)
+        else -> colorScheme.outline.copy(alpha = if (isDark) 0.34f else 0.28f)
     }
-    val capPageLineColor = if (isEinkMode) {
-        colorScheme.onSurface.copy(alpha = 0.28f)
-    } else {
-        colorScheme.outline.copy(alpha = 0.18f)
+    val capPageLineColor = when {
+        isEinkMode -> colorScheme.onSurface.copy(alpha = 0.28f)
+        isContinueReading -> colorScheme.tertiary.copy(alpha = 0.24f)
+        else -> colorScheme.outline.copy(alpha = 0.18f)
     }
     val capPath = remember { Path() }
     val capGradientColors = remember(capStartColor, capEndColor) {
@@ -649,6 +680,7 @@ private fun Bookshelf3dBookVolume(
         Bookshelf3dCoverFace(
             item = item,
             displayNumber = displayNumber,
+            isContinueReading = isContinueReading,
             sleeveColor = coverSleeveColor,
             borderColor = edgeBorderColor,
             borderWidth = edgeBorderWidth,
@@ -704,7 +736,11 @@ private fun Bookshelf3dBookVolume(
         drawPath(
             path = capPath,
             color = if (isSelected) colorScheme.primary else capStrokeColor,
-            style = if (isSelected) CAP_STROKE_SELECTED else CAP_STROKE_NORMAL,
+            style = when {
+                isSelected -> CAP_STROKE_SELECTED
+                isContinueReading -> CAP_STROKE_CONTINUE
+                else -> CAP_STROKE_NORMAL
+            },
         )
     }
 
@@ -724,6 +760,7 @@ private fun Bookshelf3dBookVolume(
         Bookshelf3dSpineFace(
             item = item,
             displayNumber = displayNumber,
+            isContinueReading = isContinueReading,
             spineColor = spineSurfaceColor,
             borderColor = edgeBorderColor,
             borderWidth = edgeBorderWidth,
@@ -736,6 +773,7 @@ private fun Bookshelf3dBookVolume(
 
 private val TOP_CAP_PAGE_LINE_STEPS = floatArrayOf(0.35f, 0.68f)
 private val CAP_STROKE_NORMAL = Stroke(width = 1f)
+private val CAP_STROKE_CONTINUE = Stroke(width = 1.5f)
 private val CAP_STROKE_SELECTED = Stroke(width = 2.2f)
 private val COVER_CLIP_SHAPE = RoundedCornerShape(3.dp)
 
@@ -743,6 +781,7 @@ private val COVER_CLIP_SHAPE = RoundedCornerShape(3.dp)
 private fun Bookshelf3dCoverFace(
     item: BookshelfItemModel,
     displayNumber: Int,
+    isContinueReading: Boolean,
     sleeveColor: Color,
     borderColor: Color,
     borderWidth: Dp,
@@ -753,6 +792,11 @@ private fun Bookshelf3dCoverFace(
     isEinkMode: Boolean,
 ) {
     val coverClipShape = COVER_CLIP_SHAPE
+    val labelColor = if (isContinueReading && !isEinkMode) {
+        MaterialTheme.colorScheme.onTertiaryContainer
+    } else {
+        MaterialTheme.colorScheme.onSurfaceVariant
+    }
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -777,8 +821,9 @@ private fun Bookshelf3dCoverFace(
                         fontSize = 8.sp,
                         lineHeight = 10.sp,
                         letterSpacing = 0.6.sp,
+                        fontWeight = if (isContinueReading) FontWeight.Bold else FontWeight.Normal,
                     ),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = labelColor,
                     maxLines = 1,
                 )
                 if (isSelected) {
@@ -794,6 +839,19 @@ private fun Bookshelf3dCoverFace(
                             .size(6.dp)
                             .clip(CircleShape)
                             .background(MaterialTheme.colorScheme.primary),
+                    )
+                } else if (isContinueReading) {
+                    Box(
+                        modifier = Modifier
+                            .size(6.dp)
+                            .clip(CircleShape)
+                            .background(
+                                if (isEinkMode) {
+                                    MaterialTheme.colorScheme.onSurface
+                                } else {
+                                    MaterialTheme.colorScheme.tertiary
+                                },
+                            ),
                     )
                 }
             }
@@ -840,7 +898,7 @@ private fun Bookshelf3dCoverFace(
                     lineHeight = 9.sp,
                     letterSpacing = 0.5.sp,
                 ),
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
+                color = labelColor.copy(alpha = 0.85f),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -862,6 +920,7 @@ private fun Bookshelf3dCoverFace(
 private fun Bookshelf3dSpineFace(
     item: BookshelfItemModel,
     displayNumber: Int,
+    isContinueReading: Boolean,
     spineColor: Color,
     borderColor: Color,
     borderWidth: Dp,
@@ -869,10 +928,17 @@ private fun Bookshelf3dSpineFace(
     isSelected: Boolean,
     isEinkMode: Boolean,
 ) {
-    val activeAccent = if (isFocused || isSelected) {
-        MaterialTheme.colorScheme.primary
+    val activeAccent = when {
+        isSelected -> MaterialTheme.colorScheme.primary
+        isContinueReading && !isEinkMode -> MaterialTheme.colorScheme.tertiary
+        isContinueReading && isEinkMode -> MaterialTheme.colorScheme.onSurface
+        isFocused -> MaterialTheme.colorScheme.primary
+        else -> MaterialTheme.colorScheme.onSurfaceVariant
+    }
+    val spineTitleColor = if (isContinueReading && !isEinkMode) {
+        MaterialTheme.colorScheme.onTertiaryContainer
     } else {
-        MaterialTheme.colorScheme.onSurfaceVariant
+        MaterialTheme.colorScheme.onSurface
     }
 
     Box(
@@ -881,10 +947,32 @@ private fun Bookshelf3dSpineFace(
             .background(spineColor)
             .border(borderWidth, borderColor),
     ) {
+        // Distinct top bookmark-ribbon stripe for Continue Reading volumes
+        if (isContinueReading) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(if (isEinkMode) 4.dp else 3.5.dp)
+                    .align(Alignment.TopCenter)
+                    .background(
+                        if (isEinkMode) {
+                            MaterialTheme.colorScheme.onSurface
+                        } else {
+                            MaterialTheme.colorScheme.tertiary
+                        },
+                    ),
+            )
+        }
+
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 1.dp, vertical = 6.dp),
+                .padding(
+                    start = 1.dp,
+                    end = 1.dp,
+                    top = if (isContinueReading) 7.dp else 6.dp,
+                    bottom = 6.dp,
+                ),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.SpaceBetween,
         ) {
@@ -894,7 +982,7 @@ private fun Bookshelf3dSpineFace(
                     fontFamily = FontFamily.Monospace,
                     fontSize = 7.5.sp,
                     lineHeight = 9.sp,
-                    fontWeight = if (isFocused) FontWeight.Bold else FontWeight.Medium,
+                    fontWeight = if (isFocused || isContinueReading) FontWeight.Bold else FontWeight.Medium,
                 ),
                 color = activeAccent,
                 maxLines = 1,
@@ -909,7 +997,7 @@ private fun Bookshelf3dSpineFace(
             ) {
                 Bookshelf3dSpineTitle(
                     title = item.novel.title,
-                    color = MaterialTheme.colorScheme.onSurface,
+                    color = spineTitleColor,
                 )
             }
 
@@ -926,7 +1014,13 @@ private fun Bookshelf3dSpineFace(
                         .fillMaxWidth(0.65f)
                         .height(3.dp)
                         .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.outlineVariant),
+                        .background(
+                            if (isContinueReading && !isEinkMode) {
+                                MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.22f)
+                            } else {
+                                MaterialTheme.colorScheme.outlineVariant
+                            },
+                        ),
                 ) {
                     Box(
                         modifier = Modifier
@@ -1041,7 +1135,8 @@ private fun Modifier.rotateQuarterTurnClockwise(): Modifier = this
  */
 @Composable
 internal fun Bookshelf3dFastScroller(
-    items: List<BookshelfItemModel>,
+    entries: List<Bookshelf3dShelfEntry<BookshelfItemModel>>,
+    continueReadingCount: Int,
     focusOffset: Float,
     focusedIndex: Int,
     isScrubbing: Boolean,
@@ -1053,7 +1148,7 @@ internal fun Bookshelf3dFastScroller(
     onStepDelta: (Int) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val itemCount = items.size
+    val itemCount = entries.size
     val fraction = Bookshelf3dSnapPhysics.focusToFraction(focusOffset, itemCount)
     val digits = if (itemCount >= 100) 3 else 2
     val counterLabel = "${(focusedIndex + 1).toString().padStart(digits, '0')} / ${itemCount.toString().padStart(digits, '0')}"
@@ -1063,7 +1158,11 @@ internal fun Bookshelf3dFastScroller(
         itemCount,
     )
     val scrollerDesc = stringResource(R.string.bookshelf_spine3d_fast_scroller_desc)
-    val focusedTitle = items.getOrNull(focusedIndex)?.novel?.title.orEmpty()
+    val focusedEntry = entries.getOrNull(focusedIndex)
+    val focusedTitle = focusedEntry?.item?.novel?.title.orEmpty()
+    val focusedOrderTag = focusedEntry?.let {
+        "#${it.shelfOrderNumber.toString().padStart(digits, '0')}"
+    }.orEmpty()
 
     var trackWidthPx by remember { mutableIntStateOf(1) }
     val latestOnScrubStart by rememberUpdatedState(onScrubStart)
@@ -1077,8 +1176,26 @@ internal fun Bookshelf3dFastScroller(
         MaterialTheme.colorScheme.surfaceContainerHighest
     }
     val activeTrackColor = MaterialTheme.colorScheme.primary
-    val thumbColor = MaterialTheme.colorScheme.primary
-    val thumbGripColor = MaterialTheme.colorScheme.onPrimary
+    val continueZoneColor = if (isEinkMode) {
+        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.25f)
+    } else {
+        MaterialTheme.colorScheme.tertiary.copy(alpha = 0.34f)
+    }
+    val continueTickColor = if (isEinkMode) {
+        MaterialTheme.colorScheme.onSurface
+    } else {
+        MaterialTheme.colorScheme.tertiary
+    }
+    val thumbColor = if (focusedEntry?.isContinueReading == true && !isEinkMode) {
+        MaterialTheme.colorScheme.tertiary
+    } else {
+        MaterialTheme.colorScheme.primary
+    }
+    val thumbGripColor = if (focusedEntry?.isContinueReading == true && !isEinkMode) {
+        MaterialTheme.colorScheme.onTertiary
+    } else {
+        MaterialTheme.colorScheme.onPrimary
+    }
     val tickColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.45f)
     val trackOutlineColor = MaterialTheme.colorScheme.outline
 
@@ -1100,7 +1217,7 @@ internal fun Bookshelf3dFastScroller(
                     .testTag(BookshelfTestTags.SPINE_3D_SCRUB_PREVIEW),
             ) {
                 Text(
-                    text = "$counterLabel · $focusedTitle",
+                    text = "$counterLabel ($focusedOrderTag) · $focusedTitle",
                     style = MaterialTheme.typography.labelMedium,
                     fontWeight = FontWeight.SemiBold,
                     maxLines = 1,
@@ -1198,6 +1315,19 @@ internal fun Bookshelf3dFastScroller(
                             )
                         }
 
+                        // Leading Continue Reading highlight zone on the track
+                        if (continueReadingCount > 0 && itemCount > 1) {
+                            val endFraction = ((continueReadingCount - 1).coerceAtLeast(0).toFloat() / (itemCount - 1))
+                                .coerceIn(0f, 1f)
+                            val zoneWidth = (usableWidth * endFraction).coerceAtLeast(trackHeight)
+                            drawRoundRect(
+                                color = continueZoneColor,
+                                topLeft = Offset(halfThumb, centerY - trackHeight / 2f),
+                                size = Size(zoneWidth, trackHeight),
+                                cornerRadius = CornerRadius(trackHeight / 2f, trackHeight / 2f),
+                            )
+                        }
+
                         // Active filled segment
                         val activeWidth = (thumbCenterX - halfThumb).coerceAtLeast(0f)
                         if (activeWidth > 0f) {
@@ -1215,9 +1345,10 @@ internal fun Bookshelf3dFastScroller(
                             for (i in 0 until itemCount) {
                                 val tickX = halfThumb + usableWidth * (i.toFloat() / (itemCount - 1))
                                 if (abs(tickX - thumbCenterX) > halfThumb + 2f) {
+                                    val isContinueTick = i < continueReadingCount
                                     drawCircle(
-                                        color = tickColor,
-                                        radius = tickRadius,
+                                        color = if (isContinueTick) continueTickColor else tickColor,
+                                        radius = if (isContinueTick) tickRadius * 1.25f else tickRadius,
                                         center = Offset(tickX, centerY),
                                     )
                                 }
@@ -1282,6 +1413,39 @@ internal fun Bookshelf3dFastScroller(
     }
 }
 
+@Composable
+private fun ContinueReadingSpineBadge(
+    isEinkMode: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    val containerColor = if (isEinkMode) {
+        MaterialTheme.colorScheme.onSurface
+    } else {
+        MaterialTheme.colorScheme.tertiaryContainer
+    }
+    val contentColor = if (isEinkMode) {
+        MaterialTheme.colorScheme.surface
+    } else {
+        MaterialTheme.colorScheme.onTertiaryContainer
+    }
+    Surface(
+        color = containerColor,
+        contentColor = contentColor,
+        shape = CircleShape,
+        modifier = modifier
+            .semantics(mergeDescendants = true) {}
+            .testTag(BookshelfTestTags.SPINE_3D_CONTINUE_BADGE),
+    ) {
+        Text(
+            text = stringResource(R.string.bookshelf_continue_reading_section),
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 1,
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+        )
+    }
+}
+
 /**
  * Compact & Medium screen spotlight card below the 3D bookshelf showing the focused book's title,
  * metadata, reading progress, unread badge, and quick action button.
@@ -1290,6 +1454,9 @@ internal fun Bookshelf3dFastScroller(
 @Composable
 private fun Bookshelf3dCompactSpotlightCard(
     item: BookshelfItemModel,
+    shelfOrderNumber: Int,
+    totalCount: Int,
+    isContinueReading: Boolean,
     isSelected: Boolean,
     isMultiSelectActive: Boolean,
     isEinkMode: Boolean,
@@ -1304,13 +1471,17 @@ private fun Bookshelf3dCompactSpotlightCard(
         MaterialTheme.colorScheme.surfaceContainerLow
     }
     val cardShape = MaterialTheme.shapes.large
+    val digits = if (totalCount >= 100) 3 else 2
     Card(
         colors = CardDefaults.cardColors(containerColor = containerColor),
         shape = cardShape,
-        border = if (isSelected) {
-            BorderStroke(2.dp, MaterialTheme.colorScheme.primary)
-        } else {
-            null
+        border = when {
+            isSelected -> BorderStroke(2.dp, MaterialTheme.colorScheme.primary)
+            isContinueReading && !isEinkMode -> BorderStroke(
+                1.dp,
+                MaterialTheme.colorScheme.tertiary.copy(alpha = 0.55f),
+            )
+            else -> null
         },
         modifier = modifier
             .clip(cardShape)
@@ -1333,6 +1504,19 @@ private fun Bookshelf3dCompactSpotlightCard(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 Text(
+                    text = "#${shelfOrderNumber.toString().padStart(digits, '0')}",
+                    style = MaterialTheme.typography.labelMedium.copy(
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.Bold,
+                    ),
+                    color = if (isContinueReading && !isEinkMode) {
+                        MaterialTheme.colorScheme.tertiary
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    },
+                    maxLines = 1,
+                )
+                Text(
                     text = item.novel.title,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
@@ -1345,6 +1529,9 @@ private fun Bookshelf3dCompactSpotlightCard(
                             aid = item.aid,
                         ),
                 )
+                if (isContinueReading) {
+                    ContinueReadingSpineBadge(isEinkMode = isEinkMode)
+                }
                 if (item.novel.hasUnreadUpdate) {
                     NewChapterPillBadge(aid = item.aid)
                 }
@@ -1471,8 +1658,9 @@ private fun Bookshelf3dCompactSpotlightCard(
 @Composable
 private fun Bookshelf3dWideSpotlightPanel(
     item: BookshelfItemModel,
-    index: Int,
+    shelfOrderNumber: Int,
     totalCount: Int,
+    isContinueReading: Boolean,
     isSelected: Boolean,
     isMultiSelectActive: Boolean,
     isEinkMode: Boolean,
@@ -1493,10 +1681,13 @@ private fun Bookshelf3dWideSpotlightPanel(
     Card(
         colors = CardDefaults.cardColors(containerColor = containerColor),
         shape = cardShape,
-        border = if (isSelected) {
-            BorderStroke(2.dp, MaterialTheme.colorScheme.primary)
-        } else {
-            null
+        border = when {
+            isSelected -> BorderStroke(2.dp, MaterialTheme.colorScheme.primary)
+            isContinueReading && !isEinkMode -> BorderStroke(
+                1.dp,
+                MaterialTheme.colorScheme.tertiary.copy(alpha = 0.55f),
+            )
+            else -> null
         },
         modifier = modifier
             .clip(cardShape)
@@ -1508,7 +1699,7 @@ private fun Bookshelf3dWideSpotlightPanel(
             .testTag(BookshelfTestTags.SPINE_3D_WIDE_PANEL),
     ) {
         AnimatedContent(
-            targetState = item,
+            targetState = Triple(item, shelfOrderNumber, isContinueReading),
             transitionSpec = {
                 if (isEinkMode) {
                     fadeIn(snap()) togetherWith fadeOut(snap())
@@ -1517,7 +1708,7 @@ private fun Bookshelf3dWideSpotlightPanel(
                 }
             },
             label = "bookshelf_3d_wide_spotlight",
-        ) { target ->
+        ) { (target, targetOrderNumber, targetIsContinue) ->
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -1530,21 +1721,33 @@ private fun Bookshelf3dWideSpotlightPanel(
                     horizontalArrangement = Arrangement.SpaceBetween,
                 ) {
                     Text(
-                        text = "${(index + 1).toString().padStart(digits, '0')} / ${totalCount.toString().padStart(digits, '0')} · WK-${target.aid.toString().padStart(5, '0')}",
+                        text = "#${targetOrderNumber.toString().padStart(digits, '0')} / ${totalCount.toString().padStart(digits, '0')} · WK-${target.aid.toString().padStart(5, '0')}",
                         style = MaterialTheme.typography.labelMedium.copy(
                             fontFamily = FontFamily.Monospace,
                         ),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = if (targetIsContinue && !isEinkMode) {
+                            MaterialTheme.colorScheme.tertiary
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        },
                     )
-                    if (target.novel.hasUnreadUpdate) {
-                        NewChapterPillBadge(aid = target.aid)
-                    } else if (isSelected) {
-                        Icon(
-                            imageVector = Icons.Filled.CheckCircle,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(22.dp),
-                        )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        if (targetIsContinue) {
+                            ContinueReadingSpineBadge(isEinkMode = isEinkMode)
+                        }
+                        if (target.novel.hasUnreadUpdate) {
+                            NewChapterPillBadge(aid = target.aid)
+                        } else if (isSelected) {
+                            Icon(
+                                imageVector = Icons.Filled.CheckCircle,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(22.dp),
+                            )
+                        }
                     }
                 }
 

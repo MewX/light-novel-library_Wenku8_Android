@@ -672,3 +672,73 @@ fun parseSpineTitleRuns(
     val truncated = allRuns.size > maxRuns
     return allRuns.take(maxRuns) to truncated
 }
+
+/**
+ * One book slot placed on the 3D bookshelf, preserving its original 1-based [shelfOrderNumber]
+ * from the active shelf sort order even when promoted to the front as a Continue Reading entry.
+ */
+data class Bookshelf3dShelfEntry<T>(
+    val item: T,
+    val shelfOrderNumber: Int,
+    val isContinueReading: Boolean,
+)
+
+/**
+ * Reorders [sortedItems] for the 3D bookshelf by promoting books whose IDs appear in
+ * [continueReadingIds] (preserving recency order in [continueReadingIds]) to the front of the
+ * shelf, while retaining each book's canonical 1-based `shelfOrderNumber` from [sortedItems]
+ * without duplicating any book.
+ */
+fun <T> build3dShelfEntries(
+    sortedItems: List<T>,
+    continueReadingIds: List<Int>,
+    idSelector: (T) -> Int,
+): List<Bookshelf3dShelfEntry<T>> {
+    if (sortedItems.isEmpty()) return emptyList()
+    if (continueReadingIds.isEmpty()) {
+        return sortedItems.mapIndexed { idx, item ->
+            Bookshelf3dShelfEntry(
+                item = item,
+                shelfOrderNumber = idx + 1,
+                isContinueReading = false,
+            )
+        }
+    }
+
+    val rankById = HashMap<Int, Pair<T, Int>>(sortedItems.size)
+    sortedItems.forEachIndexed { idx, item ->
+        rankById[idSelector(item)] = item to (idx + 1)
+    }
+
+    val promotedIds = HashSet<Int>(continueReadingIds.size)
+    val promoted = ArrayList<Bookshelf3dShelfEntry<T>>(continueReadingIds.size)
+    for (id in continueReadingIds) {
+        if (!promotedIds.add(id)) continue
+        val pair = rankById[id] ?: continue
+        promoted.add(
+            Bookshelf3dShelfEntry(
+                item = pair.first,
+                shelfOrderNumber = pair.second,
+                isContinueReading = true,
+            ),
+        )
+    }
+
+    val remaining = ArrayList<Bookshelf3dShelfEntry<T>>(
+        (sortedItems.size - promoted.size).coerceAtLeast(0),
+    )
+    sortedItems.forEachIndexed { idx, item ->
+        val id = idSelector(item)
+        if (id !in promotedIds) {
+            remaining.add(
+                Bookshelf3dShelfEntry(
+                    item = item,
+                    shelfOrderNumber = idx + 1,
+                    isContinueReading = false,
+                ),
+            )
+        }
+    }
+
+    return promoted + remaining
+}
