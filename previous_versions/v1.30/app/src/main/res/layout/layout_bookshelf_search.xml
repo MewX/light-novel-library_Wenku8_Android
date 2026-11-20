@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Mirrors layout_search so the two search screens feel the same. The toolbar is shared verbatim;
+  only the hint differs, and that is set in code so the global search keeps its own wording.
+-->
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="horizontal"
+    android:fitsSystemWindows="true"
+    android:background="@color/default_white">
+
+    <include layout="@layout/toolbar_search" />
+
+    <View
+        android:id="@+id/divider"
+        android:layout_width="match_parent"
+        android:layout_below="@id/toolbar_actionbar"
+        android:layout_height="1px"
+        android:background="@color/mySearchToggleColor"/>
+
+    <RelativeLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_below="@id/divider"
+        android:background="@color/myWindowBackground">
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/bookshelf_search_list"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:scrollbars="vertical"
+            android:fastScrollEnabled="false"/>
+
+        <!-- A shelf filtered down to nothing looks identical to one that failed to load. -->
+        <TextView
+            android:id="@+id/bookshelf_search_empty"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_centerInParent="true"
+            android:padding="24dp"
+            android:text="@string/bookshelf_search_empty"
+            android:textColor="@color/login_hint_text"
+            android:textSize="16sp"
+            android:visibility="gone"/>
+    </RelativeLayout>
+</RelativeLayout>

@@ -1,0 +1,29 @@
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <!--
+      Check Updates is the cheap path: one listing request, then only the novels that actually
+      changed. It sits in the bar because it is the one people want.
+
+      Force Updates re-downloads the whole shelf and can take minutes, so it stays in the overflow
+      and asks first. It used to be what pulling the list down did.
+
+      The icon is the white variant. Action bar icons here are drawn white on the accent-coloured
+      bar, as ic_search and ic_download already are, while plain ic_update is grey because the
+      settings screen draws it on a light background.
+    -->
+    <item
+        android:id="@+id/action_bookshelf_search"
+        android:title="@string/bookshelf_search_hint"
+        android:icon="@drawable/ic_search"
+        app:showAsAction="withText|ifRoom" />
+    <item
+        android:id="@+id/action_check_updates"
+        android:title="@string/bookshelf_action_check_updates"
+        android:icon="@drawable/ic_update_white"
+        app:showAsAction="withText|ifRoom" />
+    <item
+        android:id="@+id/action_force_updates"
+        android:title="@string/bookshelf_action_force_updates"
+        app:showAsAction="never" />
+</menu>

@@ -1,0 +1,10 @@
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    tools:context=".MainActivity">
+    <item
+    android:id="@+id/action_submit"
+    android:title="@string/action_review_submit"
+    android:icon="@drawable/ic_svg_send_white"
+    app:showAsAction="withText|ifRoom" />
+</menu>
