@@ -392,5 +392,149 @@ class Bookshelf3dGeometryTest {
         assertEquals(listOf(5, 3, 1, 2, 4), promoted.map { it.shelfOrderNumber })
         assertEquals(listOf(true, true, false, false, false), promoted.map { it.isContinueReading })
     }
+
+    @Test
+    fun discreteExtractionMode_quantizesFocus_liftsOnlyFocusedBook_andShiftsSlotsIdenticallyInPlace() {
+        val metrics = Bookshelf3dGeometry.computeMetrics(availableWidthDp = 412f, availableHeightDp = 760f)
+        val density = 2.5f
+
+        // Fractional focus 2.35f quantizes to integer 2f; ONLY book 2 is lifted (weight = 1f),
+        // while immediate neighbors 1 and 3 stay completely flush on the shelf rail (weight = 0f).
+        val posesAtFractional = Bookshelf3dGeometry.computeVisiblePosesPx(
+            itemCount = 12,
+            focus = 2.35f,
+            metrics = metrics,
+            density = density,
+            discreteExtraction = true,
+        )
+        val posesAtTwo = Bookshelf3dGeometry.computeVisiblePosesPx(
+            itemCount = 12,
+            focus = 2f,
+            metrics = metrics,
+            density = density,
+            discreteExtraction = true,
+        )
+        assertEquals(posesAtTwo.map { it.index }, posesAtFractional.map { it.index })
+        posesAtFractional.forEachIndexed { i, pose ->
+            assertEquals(posesAtTwo[i].origin.x, pose.origin.x, 1e-4f)
+            assertEquals(posesAtTwo[i].origin.y, pose.origin.y, 1e-4f)
+            val expectedWeight = if (pose.index == 2) 1f else 0f
+            assertEquals(expectedWeight, pose.weight, 1e-5f)
+        }
+
+        // Shifting focus from 2 -> 3 shifts every book into the exact screen coordinates of the
+        // preceding slot (book-by-book in-place shift with zero geometry drift).
+        for (slotOffset in -2..2) {
+            val poseBefore = Bookshelf3dGeometry.computeBookPosePx(
+                index = 2 + slotOffset,
+                focus = 2f,
+                metrics = metrics,
+                density = density,
+                discreteExtraction = true,
+            )
+            val poseAfter = Bookshelf3dGeometry.computeBookPosePx(
+                index = 3 + slotOffset,
+                focus = 3f,
+                metrics = metrics,
+                density = density,
+                discreteExtraction = true,
+            )
+            assertEquals(poseBefore.origin.x, poseAfter.origin.x, 1e-4f)
+            assertEquals(poseBefore.origin.y, poseAfter.origin.y, 1e-4f)
+            assertEquals(poseBefore.weight, poseAfter.weight, 1e-5f)
+        }
+    }
+
+    @Test
+    fun discreteStepPhysics_advancesOrRetreatsStrictlyOneBookPerSwipeAndClampsEdges() {
+        val threshold = 48f
+
+        // Large left drag + high velocity still steps strictly +1 (no multi-book inertia fling)
+        assertEquals(
+            4,
+            Bookshelf3dSnapPhysics.computeDiscreteStepTargetIndex(
+                currentIndex = 3,
+                totalDragPx = -420f,
+                velocityPxPerSec = -2400f,
+                stepThresholdPx = threshold,
+                itemCount = 20,
+            ),
+        )
+        // Large right drag + high velocity still steps strictly -1
+        assertEquals(
+            2,
+            Bookshelf3dSnapPhysics.computeDiscreteStepTargetIndex(
+                currentIndex = 3,
+                totalDragPx = 420f,
+                velocityPxPerSec = 2400f,
+                stepThresholdPx = threshold,
+                itemCount = 20,
+            ),
+        )
+        // Short fast flick left/right below distance threshold still steps +/-1
+        assertEquals(
+            4,
+            Bookshelf3dSnapPhysics.computeDiscreteStepTargetIndex(
+                currentIndex = 3,
+                totalDragPx = -12f,
+                velocityPxPerSec = -220f,
+                stepThresholdPx = threshold,
+                itemCount = 20,
+            ),
+        )
+        assertEquals(
+            2,
+            Bookshelf3dSnapPhysics.computeDiscreteStepTargetIndex(
+                currentIndex = 3,
+                totalDragPx = 12f,
+                velocityPxPerSec = 220f,
+                stepThresholdPx = threshold,
+                itemCount = 20,
+            ),
+        )
+        // Tiny micro-jitter stays on current book
+        assertEquals(
+            3,
+            Bookshelf3dSnapPhysics.computeDiscreteStepTargetIndex(
+                currentIndex = 3,
+                totalDragPx = -5f,
+                velocityPxPerSec = -40f,
+                stepThresholdPx = threshold,
+                itemCount = 20,
+            ),
+        )
+        // Edge clamping & single-item guard
+        assertEquals(
+            0,
+            Bookshelf3dSnapPhysics.computeDiscreteStepTargetIndex(
+                currentIndex = 0,
+                totalDragPx = 120f,
+                velocityPxPerSec = 500f,
+                stepThresholdPx = threshold,
+                itemCount = 20,
+            ),
+        )
+        assertEquals(
+            19,
+            Bookshelf3dSnapPhysics.computeDiscreteStepTargetIndex(
+                currentIndex = 19,
+                totalDragPx = -120f,
+                velocityPxPerSec = -500f,
+                stepThresholdPx = threshold,
+                itemCount = 20,
+            ),
+        )
+        assertEquals(
+            0,
+            Bookshelf3dSnapPhysics.computeDiscreteStepTargetIndex(
+                currentIndex = 0,
+                totalDragPx = -120f,
+                velocityPxPerSec = -500f,
+                stepThresholdPx = threshold,
+                itemCount = 1,
+            ),
+        )
+    }
 }
+
 

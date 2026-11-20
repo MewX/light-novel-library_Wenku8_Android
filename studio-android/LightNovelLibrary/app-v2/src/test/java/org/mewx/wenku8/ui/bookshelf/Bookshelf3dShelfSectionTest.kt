@@ -24,6 +24,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeLeft
+import androidx.compose.ui.test.swipeRight
 import androidx.compose.ui.unit.dp
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -498,4 +499,76 @@ class Bookshelf3dShelfSectionTest {
         val wideDarkBmp = composeRule.onRoot().captureToImage()
         assertTrue(wideDarkBmp.width > 0 && wideDarkBmp.height > 0)
     }
+
+    @Test
+    fun einkMode_swipesStepExactlyOneBookAtATimeInPlace_andFastScrubberQuantizesDiscretely() {
+        val items = sampleItems(8)
+        val openedAids = mutableListOf<Int>()
+
+        composeRule.setContent {
+            Wenku8ExpressiveTheme(themeMode = Wenku8ThemeMode.E_INK) {
+                Box(modifier = Modifier.size(412.dp, 820.dp)) {
+                    Bookshelf3dShelfSection(
+                        items = items,
+                        availableWidth = 380.dp,
+                        availableHeight = 820.dp,
+                        selectedAidSet = emptySet(),
+                        isMultiSelectActive = false,
+                        isEinkMode = true,
+                        onItemClick = { openedAids += it.aid },
+                        onItemLongClick = {},
+                        onContinueReadingClick = {},
+                    )
+                }
+            }
+        }
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithTag(BookshelfTestTags.SPINE_3D_INDEX_COUNTER).assertTextContains("01 / 08")
+
+        // 1. A full swipeLeft on the 3D stage in E-Ink mode steps strictly +1 book (no inertia fling)
+        composeRule.onNodeWithTag(BookshelfTestTags.SPINE_3D_STAGE).performTouchInput {
+            swipeLeft()
+        }
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag(BookshelfTestTags.SPINE_3D_INDEX_COUNTER).assertTextContains("02 / 08")
+
+        // 2. A second swipeLeft steps strictly +1 again -> 03 / 08
+        composeRule.onNodeWithTag(BookshelfTestTags.SPINE_3D_STAGE).performTouchInput {
+            swipeLeft()
+        }
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag(BookshelfTestTags.SPINE_3D_INDEX_COUNTER).assertTextContains("03 / 08")
+
+        // 3. A swipeRight retreats strictly -1 -> 02 / 08
+        composeRule.onNodeWithTag(BookshelfTestTags.SPINE_3D_STAGE).performTouchInput {
+            swipeRight()
+        }
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag(BookshelfTestTags.SPINE_3D_INDEX_COUNTER).assertTextContains("02 / 08")
+
+        // 4. Tapping the popped-up focused book (aid=1002) opens it immediately
+        composeRule.onNodeWithTag(BookshelfTestTags.BOOK_CARD_PREFIX + 1002).performClick()
+        composeRule.waitForIdle()
+        assertEquals(listOf(1002), openedAids)
+
+        // 5. Dragging the fast scrollbar in E-Ink mode quantizes to discrete integer books cleanly
+        composeRule.onNodeWithTag(BookshelfTestTags.SPINE_3D_FAST_SCROLLER_TRACK).performTouchInput {
+            down(Offset(width * 0.2f, centerY))
+            moveTo(Offset(width * 0.52f, centerY))
+            moveTo(Offset(width * 0.86f, centerY))
+        }
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag(BookshelfTestTags.SPINE_3D_SCRUB_PREVIEW).assertIsDisplayed()
+        val einkScrubBmp = composeRule.onRoot().captureToImage()
+        assertTrue(einkScrubBmp.width > 0 && einkScrubBmp.height > 0)
+
+        composeRule.onNodeWithTag(BookshelfTestTags.SPINE_3D_FAST_SCROLLER_TRACK).performTouchInput {
+            up()
+        }
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag(BookshelfTestTags.SPINE_3D_SCRUB_PREVIEW).assertDoesNotExist()
+        composeRule.onNodeWithTag(BookshelfTestTags.SPINE_3D_INDEX_COUNTER).assertTextContains("07 / 08")
+    }
 }
+

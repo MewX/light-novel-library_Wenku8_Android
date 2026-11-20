@@ -172,14 +172,20 @@ object Bookshelf3dGeometry {
     /**
      * Computes exact pixel-space poses strictly culled to books intersecting the stage viewport,
      * avoiding composing off-screen 3D volumes that would otherwise be clipped away.
+     *
+     * When [discreteExtraction] is `true` (E-Ink high-contrast mode), [focus] is quantized to the
+     * nearest integer slot and only the focused book stays lifted (`weight = 1f`) while flanking
+     * books stay flush on the shelf row (`weight = 0f`), eliminating intermediate 3D animation.
      */
     fun computeVisiblePosesPx(
         itemCount: Int,
         focus: Float,
         metrics: Bookshelf3dMetrics,
         density: Float,
+        discreteExtraction: Boolean = false,
     ): List<Bookshelf3dBookPose> {
-        val range = computeVisibleIndexRange(itemCount, focus, metrics)
+        val effectiveFocus = if (discreteExtraction) focus.roundToInt().toFloat() else focus
+        val range = computeVisibleIndexRange(itemCount, effectiveFocus, metrics)
         if (range.isEmpty()) return emptyList()
         val scale = density.coerceAtLeast(0.5f)
         val stageWidthPx = metrics.stageWidthDp * scale
@@ -188,9 +194,10 @@ object Bookshelf3dGeometry {
         for (idx in range) {
             val pose = computeBookPosePx(
                 index = idx,
-                focus = focus,
+                focus = effectiveFocus,
                 metrics = metrics,
                 density = scale,
+                discreteExtraction = discreteExtraction,
             )
             if (pose.solidBounds.right >= -marginPx && pose.solidBounds.left <= stageWidthPx + marginPx) {
                 result.add(pose)
@@ -207,6 +214,7 @@ object Bookshelf3dGeometry {
         focus: Float,
         metrics: Bookshelf3dMetrics,
         density: Float,
+        discreteExtraction: Boolean = false,
     ): Bookshelf3dBookPose {
         val scale = density.coerceAtLeast(0.5f)
         val stageWidthPx = metrics.stageWidthDp * scale
@@ -218,8 +226,13 @@ object Bookshelf3dGeometry {
         val pullDistPx = metrics.pullDistanceDp * scale
         val baseYPx = metrics.baseYDp * scale
 
-        val delta = index - focus
-        val weight = extractionWeight(delta)
+        val effectiveFocus = if (discreteExtraction) focus.roundToInt().toFloat() else focus
+        val delta = index - effectiveFocus
+        val weight = if (discreteExtraction) {
+            if (abs(delta) < 0.5f) 1f else 0f
+        } else {
+            extractionWeight(delta)
+        }
         val pullPx = pullDistPx * weight * (1.24f - 0.24f * weight)
         val lift = weight * weight * (3f - 2f * weight)
         val railYPx = railOffsetYDp(delta) * scale
@@ -600,6 +613,34 @@ object Bookshelf3dSnapPhysics {
         }
 
         return rawTarget.coerceIn(0, itemCount - 1)
+    }
+
+    /**
+     * Computes a discrete single-book target index `[0..itemCount - 1]` for E-Ink mode swipes:
+     * each horizontal swipe shifts by at most 1 book in place with zero multi-book inertia fling.
+     *
+     * Sign convention matches natural touch scrolling:
+     * - Swiping finger LEFT (`totalDragPx < 0` or `velocityPxPerSec < 0`) advances `+1`.
+     * - Swiping finger RIGHT (`totalDragPx > 0` or `velocityPxPerSec > 0`) retreats `-1`.
+     */
+    fun computeDiscreteStepTargetIndex(
+        currentIndex: Int,
+        totalDragPx: Float,
+        velocityPxPerSec: Float,
+        stepThresholdPx: Float,
+        itemCount: Int,
+        minFlickVelocityPxPerSec: Float = 120f,
+    ): Int {
+        if (itemCount <= 1) return 0
+        val clampedCurrent = currentIndex.coerceIn(0, itemCount - 1)
+        val threshold = stepThresholdPx.coerceAtLeast(1f)
+        val deltaStep = when {
+            totalDragPx <= -threshold -> 1
+            totalDragPx >= threshold -> -1
+            abs(velocityPxPerSec) >= minFlickVelocityPxPerSec -> if (velocityPxPerSec < 0f) 1 else -1
+            else -> 0
+        }
+        return (clampedCurrent + deltaStep).coerceIn(0, itemCount - 1)
     }
 
     /**

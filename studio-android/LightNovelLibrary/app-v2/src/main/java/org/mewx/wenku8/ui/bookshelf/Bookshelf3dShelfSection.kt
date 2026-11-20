@@ -55,6 +55,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -189,6 +190,16 @@ internal fun Bookshelf3dShelfSection(
     }
     val focusedEntry = entries[focusedIndex]
     val focusedItem = focusedEntry.item
+    val displayFocusOffset = if (isEinkMode) focusedIndex.toFloat() else focusAnimatable.value
+
+    LaunchedEffect(isEinkMode) {
+        if (isEinkMode) {
+            val snapped = focusAnimatable.value.roundToInt().coerceIn(0, entries.lastIndex).toFloat()
+            if (abs(focusAnimatable.value - snapped) > 0.001f) {
+                focusAnimatable.snapTo(snapped)
+            }
+        }
+    }
 
     var lastHapticIndex by remember { mutableIntStateOf(focusedIndex) }
     LaunchedEffect(focusedIndex) {
@@ -248,7 +259,7 @@ internal fun Bookshelf3dShelfSection(
         ) {
             Bookshelf3dStage(
                 entries = entries,
-                focusOffset = focusAnimatable.value,
+                focusOffset = displayFocusOffset,
                 focusedIndex = focusedIndex,
                 metrics = metrics,
                 selectedAidSet = selectedAidSet,
@@ -274,6 +285,19 @@ internal fun Bookshelf3dShelfSection(
                         animateFocusTo(target)
                     }
                 },
+                onEinkSwipeStep = { totalDragPx, velocityPxPerSec, pitchPx ->
+                    val currentEntries = latestEntries
+                    if (currentEntries.size > 1) {
+                        val target = Bookshelf3dSnapPhysics.computeDiscreteStepTargetIndex(
+                            currentIndex = focusAnimatable.value.roundToInt(),
+                            totalDragPx = totalDragPx,
+                            velocityPxPerSec = velocityPxPerSec,
+                            stepThresholdPx = pitchPx * 0.65f,
+                            itemCount = currentEntries.size,
+                        )
+                        animateFocusTo(target)
+                    }
+                },
                 onBookTap = handleBookTap,
                 onBookLongPress = { index ->
                     latestEntries.getOrNull(index)?.item?.let { latestOnItemLongClick(it) }
@@ -283,18 +307,24 @@ internal fun Bookshelf3dShelfSection(
             Bookshelf3dFastScroller(
                 entries = entries,
                 continueReadingCount = continueReadingCount,
-                focusOffset = focusAnimatable.value,
+                focusOffset = displayFocusOffset,
                 focusedIndex = focusedIndex,
                 isScrubbing = isScrubbing,
                 isEinkMode = isEinkMode,
                 onScrubStart = { fraction ->
                     isScrubbing = true
-                    val next = Bookshelf3dSnapPhysics.fractionToFocus(fraction, entries.size)
-                    coroutineScope.launch { focusAnimatable.snapTo(next) }
+                    val rawNext = Bookshelf3dSnapPhysics.fractionToFocus(fraction, entries.size)
+                    val next = if (latestIsEinkMode) rawNext.roundToInt().toFloat() else rawNext
+                    if (abs(focusAnimatable.value - next) > 0.001f) {
+                        coroutineScope.launch { focusAnimatable.snapTo(next) }
+                    }
                 },
                 onScrubMove = { fraction ->
-                    val next = Bookshelf3dSnapPhysics.fractionToFocus(fraction, entries.size)
-                    coroutineScope.launch { focusAnimatable.snapTo(next) }
+                    val rawNext = Bookshelf3dSnapPhysics.fractionToFocus(fraction, entries.size)
+                    val next = if (latestIsEinkMode) rawNext.roundToInt().toFloat() else rawNext
+                    if (abs(focusAnimatable.value - next) > 0.001f) {
+                        coroutineScope.launch { focusAnimatable.snapTo(next) }
+                    }
                 },
                 onScrubEnd = {
                     isScrubbing = false
@@ -380,6 +410,7 @@ private fun Bookshelf3dStage(
     isEinkMode: Boolean,
     onDragFocusDelta: (Float) -> Unit,
     onFlingReleased: (velocityPxPerSec: Float, pitchPx: Float) -> Unit,
+    onEinkSwipeStep: (totalDragPx: Float, velocityPxPerSec: Float, pitchPx: Float) -> Unit,
     onBookTap: (Int) -> Unit,
     onBookLongPress: (Int) -> Unit,
 ) {
@@ -398,17 +429,25 @@ private fun Bookshelf3dStage(
         focus = focusOffset,
         metrics = metrics,
         density = densityFactor,
+        discreteExtraction = isEinkMode,
     )
 
     val latestPoses by rememberUpdatedState(visiblePoses)
     val latestPitchPx by rememberUpdatedState(pitchPx)
+    val latestIsEinkMode by rememberUpdatedState(isEinkMode)
     val latestOnDragFocusDelta by rememberUpdatedState(onDragFocusDelta)
     val latestOnFlingReleased by rememberUpdatedState(onFlingReleased)
+    val latestOnEinkSwipeStep by rememberUpdatedState(onEinkSwipeStep)
     val latestOnBookTap by rememberUpdatedState(onBookTap)
     val latestOnBookLongPress by rememberUpdatedState(onBookLongPress)
 
+    var einkDragAccumulatedPx by remember { mutableFloatStateOf(0f) }
+
     val draggableState = rememberDraggableState { deltaPx ->
-        if (latestPitchPx > 0f) {
+        if (latestIsEinkMode) {
+            // Accumulate swipe distance without mid-gesture repaints on E-Ink panels.
+            einkDragAccumulatedPx += deltaPx
+        } else if (latestPitchPx > 0f) {
             // Dragging finger LEFT (deltaPx < 0) advances to higher indices (+deltaFocus).
             latestOnDragFocusDelta(-deltaPx / latestPitchPx)
         }
@@ -434,8 +473,15 @@ private fun Bookshelf3dStage(
                 state = draggableState,
                 orientation = Orientation.Horizontal,
                 enabled = entries.size > 1,
+                onDragStarted = { einkDragAccumulatedPx = 0f },
                 onDragStopped = { velocityPxPerSec ->
-                    latestOnFlingReleased(velocityPxPerSec, latestPitchPx)
+                    if (latestIsEinkMode) {
+                        val totalDrag = einkDragAccumulatedPx
+                        einkDragAccumulatedPx = 0f
+                        latestOnEinkSwipeStep(totalDrag, velocityPxPerSec, latestPitchPx)
+                    } else {
+                        latestOnFlingReleased(velocityPxPerSec, latestPitchPx)
+                    }
                 },
             )
             .pointerInput(entries.size) {
@@ -1290,8 +1336,8 @@ internal fun Bookshelf3dFastScroller(
                     contentAlignment = Alignment.Center,
                 ) {
                     Canvas(modifier = Modifier.fillMaxSize()) {
-                        val thumbWidth = (if (isScrubbing) 30.dp else 24.dp).toPx()
-                        val thumbHeight = (if (isScrubbing) 18.dp else 14.dp).toPx()
+                        val thumbWidth = (if (isScrubbing && !isEinkMode) 30.dp else 24.dp).toPx()
+                        val thumbHeight = (if (isScrubbing && !isEinkMode) 18.dp else 14.dp).toPx()
                         val trackHeight = 6.dp.toPx()
                         val halfThumb = thumbWidth / 2f
                         val usableWidth = (size.width - thumbWidth).coerceAtLeast(1f)
