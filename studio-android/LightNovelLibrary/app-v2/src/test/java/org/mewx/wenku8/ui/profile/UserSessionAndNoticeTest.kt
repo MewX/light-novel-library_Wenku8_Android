@@ -38,6 +38,7 @@ import org.mewx.wenku8.data.repository.AccountAuthGateway
 import org.mewx.wenku8.data.repository.AccountSessionState
 import org.mewx.wenku8.data.repository.AppVersionCheckResult
 import org.mewx.wenku8.data.repository.DailySignOutcome
+import org.mewx.wenku8.data.repository.DailySignStatus
 import org.mewx.wenku8.data.repository.LoginOutcome
 import org.mewx.wenku8.data.repository.ServerNoticeAndUpdateRepository
 import org.mewx.wenku8.data.repository.StoredAccountCredentials
@@ -495,6 +496,146 @@ class UserSessionAndNoticeTest {
         // Upstream HTML error page -> must NOT fake success!
         val htmlErrorOutcome = repo.performDailySignIn()
         assertTrue(htmlErrorOutcome is DailySignOutcome.NetworkOrServerError)
+    }
+
+    @Test
+    fun performDailySignIn_acceptsLiveXmlMetadataResponseMergesFallbackHandlesReloginAndRejectsInvalidXml() = runTest {
+        val rootDir = tempFolder.newFolder("wenku_daily_sign_xml")
+        var currentScore = 328
+        var currentExperience = 328
+        var failNextUserInfo = false
+        var loginCalls = 0
+        val scriptedSignPayloads = ArrayDeque(
+            listOf(
+                // 1. Live first daily check-in response from Wenku8
+                """
+                <?xml version="1.0" encoding="utf-8"?>
+                <metadata>
+                <item name="score">329</item>
+                <item name="experience">329</item>
+                </metadata>
+                """.trimIndent(),
+                // 2. Second same-day check-in response
+                "9",
+                // 3. Follow-up day where post-sign userinfo fetch fails transiently
+                """
+                <?xml version="1.0" encoding="utf-8"?>
+                <metadata>
+                <item name="score">330</item>
+                <item name="experience">330</item>
+                </metadata>
+                """.trimIndent(),
+                // 4. Lapsed session -> single re-login -> XML check-in succeeds
+                "4",
+                """
+                <?xml version="1.0" encoding="utf-8"?>
+                <metadata>
+                <item name="score">331</item>
+                <item name="experience">331</item>
+                </metadata>
+                """.trimIndent(),
+                // 5. Invalid XML responses that must fail safely
+                """
+                <?xml version="1.0" encoding="utf-8"?>
+                <metadata></metadata>
+                """.trimIndent(),
+                """
+                <?xml version="1.0" encoding="utf-8"?>
+                <metadata>
+                <item name="score">not_a_number</item>
+                <item name="experience">abc</item>
+                </metadata>
+                """.trimIndent(),
+                "<html><body>502 Bad Gateway</body></html>",
+            ),
+        )
+
+        val transport = FakeAccountTransport(
+            onPost = { params ->
+                when (params.getAsString("op")) {
+                    "login" -> {
+                        loginCalls++
+                        "1".toByteArray(StandardCharsets.UTF_8)
+                    }
+                    "userinfo" -> {
+                        if (failNextUserInfo) {
+                            failNextUserInfo = false
+                            null
+                        } else {
+                            """
+                            <?xml version="1.0" encoding="utf-8"?>
+                            <metadata>
+                            <item name="uname"><![CDATA[xml_tester]]></item>
+                            <item name="nickname"><![CDATA[XML签到测试]]></item>
+                            <item name="uid">77586</item>
+                            <item name="score">$currentScore</item>
+                            <item name="experience">$currentExperience</item>
+                            <item name="rank"><![CDATA[普通会员]]></item>
+                            </metadata>
+                            """.trimIndent().toByteArray(StandardCharsets.UTF_8)
+                        }
+                    }
+                    "sign" -> {
+                        val payload = scriptedSignPayloads.removeFirst()
+                        if (payload.contains(">329<")) {
+                            currentScore = 329
+                            currentExperience = 329
+                        } else if (payload.contains(">331<")) {
+                            currentScore = 331
+                            currentExperience = 331
+                        }
+                        payload.toByteArray(StandardCharsets.UTF_8)
+                    }
+                    else -> null
+                }
+            },
+        )
+
+        val repo = UserSessionRepository(
+            transport = transport,
+            assetRootsProvider = { listOf(rootDir) },
+            authGateway = FakeAccountAuthGateway(),
+        )
+        assertTrue(repo.loginWithCredentials("xml_tester", "secret123") is LoginOutcome.Success)
+        assertEquals(1, loginCalls)
+
+        // 1st check-in: live XML <metadata> with score=329, experience=329
+        val first = repo.performDailySignIn()
+        assertTrue(first is DailySignOutcome.SignedAndRefreshed)
+        val firstProfile = (first as DailySignOutcome.SignedAndRefreshed).updatedProfile
+        assertEquals(329, firstProfile.score)
+        assertEquals(329, firstProfile.experience)
+        val firstState = repo.sessionState.value as AccountSessionState.SignedIn
+        assertEquals(DailySignStatus.SIGNED_IN_SUCCESS, firstState.dailySignStatus)
+
+        // 2nd check-in on same day: plain '9' -> AlreadySignedOrRefused
+        assertEquals(DailySignOutcome.AlreadySignedOrRefused, repo.performDailySignIn())
+
+        // 3rd check-in: follow-up userinfo returns null transiently, XML metrics still apply to cached profile
+        failNextUserInfo = true
+        val third = repo.performDailySignIn()
+        assertTrue(third is DailySignOutcome.SignedAndRefreshed)
+        val thirdProfile = (third as DailySignOutcome.SignedAndRefreshed).updatedProfile
+        assertEquals(330, thirdProfile.score)
+        assertEquals(330, thirdProfile.experience)
+        assertEquals("xml_tester", thirdProfile.username)
+
+        // 4th check-in: lapsed session ('4') triggers single re-login and retries -> XML success
+        val fourth = repo.performDailySignIn()
+        assertTrue(fourth is DailySignOutcome.SignedAndRefreshed)
+        assertEquals(2, loginCalls)
+        assertEquals(331, (fourth as DailySignOutcome.SignedAndRefreshed).updatedProfile.score)
+        assertEquals(331, fourth.updatedProfile.experience)
+
+        // Invalid XML / HTML responses must NOT fake success
+        repeat(3) {
+            val invalid = repo.performDailySignIn()
+            assertTrue(invalid is DailySignOutcome.NetworkOrServerError)
+            assertEquals(
+                Wenku8Error.ErrorCode.STRING_CONVERSION_ERROR,
+                (invalid as DailySignOutcome.NetworkOrServerError).errorCode,
+            )
+        }
     }
 
     private class FakeAccountTransport(

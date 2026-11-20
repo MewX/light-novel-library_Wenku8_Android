@@ -245,7 +245,7 @@ class UserSessionRepository(
         const val CERT_FILE_NAME: String = "cert.wk8"
         const val CANONICAL_UNAME_FILE_NAME: String = "account_uname.wk8"
         const val AVATAR_FILE_NAME: String = "avatar.jpg"
-        private const val MAX_SIGN_JSONP_CHARS: Int = 512
+        private const val MAX_SIGN_RESPONSE_CHARS: Int = 4096
         private val SIGN_JSONP_RET_REGEX = Regex(
             pattern = """^(?:[A-Za-z0-9_$]+\s*\(\s*)?\{\s*"ret"\s*:\s*(-?\d+)(?:\s*,.*?)?\}\s*(?:\)\s*;?\s*)?$""",
             option = RegexOption.DOT_MATCHES_ALL,
@@ -262,26 +262,36 @@ class UserSessionRepository(
 
         /**
          * Parses Wenku8's `action=block&do=sign` payload:
-         * - First daily check-in returns JSONP `_cb({"ret":0});` (documented in `Wenku8API.getUserSignParams`)
-         *   or plain `"0"` / `"1"`.
+         * - Live first daily check-in returns XML `<metadata>` containing the updated `score` and
+         *   `experience` items (`<?xml ...><metadata><item name="score">...</item>...</metadata>`).
+         * - Legacy/fallback success formats: plain `"0"` / `"1"` or JSONP `_cb({"ret":0});`.
          * - Subsequent same-day check-in returns `"9"` (`SYSTEM_9_SIGN_FAILED`) or `{"ret":9}`.
          * - Lapsed session returns `"4"` (`SYSTEM_4_NOT_LOGGED_IN`) or `{"ret":4}`.
-         * - HTML error pages / captive portals fail safely with `STRING_CONVERSION_ERROR`.
+         * - HTML error pages, empty `<metadata/>`, and captive portals fail safely with
+         *   `STRING_CONVERSION_ERROR`.
          */
         internal fun parseSignResponseBody(
             rawBody: String,
             mapServerErrorCode: (Int) -> Wenku8Error.ErrorCode,
         ): SignServerResponse {
             val cleaned = rawBody.trimStart('\uFEFF').trim()
-            if (cleaned.isEmpty() || cleaned.length > MAX_SIGN_JSONP_CHARS) {
+            if (cleaned.isEmpty() || cleaned.length > MAX_SIGN_RESPONSE_CHARS) {
                 return SignServerResponse.Failure(Wenku8Error.ErrorCode.STRING_CONVERSION_ERROR)
+            }
+            if (cleaned.startsWith('<')) {
+                val parsedXml = WenkuXmlParsers.parseDailySignResult(cleaned)
+                    ?: return SignServerResponse.Failure(Wenku8Error.ErrorCode.STRING_CONVERSION_ERROR)
+                return SignServerResponse.Success(
+                    updatedScore = parsedXml.score,
+                    updatedExperience = parsedXml.experience,
+                )
             }
             val numericCode = cleaned.toIntOrNull()
                 ?: SIGN_JSONP_RET_REGEX.matchEntire(cleaned)?.groupValues?.getOrNull(1)?.toIntOrNull()
                 ?: return SignServerResponse.Failure(Wenku8Error.ErrorCode.STRING_CONVERSION_ERROR)
 
             return when (numericCode) {
-                0, 1 -> SignServerResponse.Success
+                0, 1 -> SignServerResponse.Success()
                 4 -> SignServerResponse.NotLoggedIn
                 9 -> SignServerResponse.AlreadySigned
                 else -> SignServerResponse.Failure(mapServerErrorCode(numericCode))
@@ -558,7 +568,7 @@ class UserSessionRepository(
             }
 
             when (signResponse) {
-                SignServerResponse.Success -> {
+                is SignServerResponse.Success -> {
                     val (freshInfo, freshAvatar) = fetchUserInfoAndAvatarLocked(allowSingleRelogin = false)
                     val resolvedUname = freshInfo?.username?.takeIf { it.isNotBlank() }
                         ?: cachedCanonicalUsername
@@ -567,9 +577,13 @@ class UserSessionRepository(
                     if (!resolvedUname.isNullOrBlank()) {
                         persistCanonicalUsernameLocked(resolvedUname)
                     }
-                    val updatedProfile = freshInfo ?: currentSignedIn?.profile ?: ParsedUserInfo(
+                    val baseProfile = freshInfo ?: currentSignedIn?.profile ?: ParsedUserInfo(
                         username = resolvedUname ?: creds?.identifier.orEmpty(),
                         nickname = resolvedUname ?: creds?.identifier.orEmpty(),
+                    )
+                    val updatedProfile = baseProfile.copy(
+                        score = signResponse.updatedScore ?: baseProfile.score,
+                        experience = signResponse.updatedExperience ?: baseProfile.experience,
                     )
                     _sessionState.value = AccountSessionState.SignedIn(
                         profile = updatedProfile,
@@ -871,7 +885,10 @@ class UserSessionRepository(
     }
 
     internal sealed interface SignServerResponse {
-        data object Success : SignServerResponse
+        data class Success(
+            val updatedScore: Int? = null,
+            val updatedExperience: Int? = null,
+        ) : SignServerResponse
         data object AlreadySigned : SignServerResponse
         data object NotLoggedIn : SignServerResponse
         data class Failure(val errorCode: Wenku8Error.ErrorCode) : SignServerResponse

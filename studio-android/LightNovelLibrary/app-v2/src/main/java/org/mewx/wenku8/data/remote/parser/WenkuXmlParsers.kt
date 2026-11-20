@@ -58,6 +58,11 @@ data class ParsedUserInfo(
     val rank: String = "",
 )
 
+data class ParsedDailySignResult(
+    val score: Int? = null,
+    val experience: Int? = null,
+)
+
 data class ParsedReviewThreadItem(
     val rid: Int,
     val title: String,
@@ -625,6 +630,53 @@ object WenkuXmlParsers {
                 experience = experience,
                 rank = rank,
             )
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    /**
+     * Parses Wenku8's `action=block&do=sign` first daily check-in XML response:
+     * ```xml
+     * <?xml version="1.0" encoding="utf-8"?>
+     * <metadata>
+     * <item name="score">329</item>
+     * <item name="experience">329</item>
+     * </metadata>
+     * ```
+     *
+     * Rejects HTML error pages, empty `<metadata/>`, and non-numeric item text unless `<metadata>`
+     * and at least one valid integer `score` or `experience` item are present.
+     */
+    fun parseDailySignResult(rawXml: String?): ParsedDailySignResult? {
+        if (rawXml.isNullOrBlank()) return null
+
+        return try {
+            val parser = newPullParser(rawXml)
+            var sawMetadataRoot = false
+            var score: Int? = null
+            var experience: Int? = null
+
+            var eventType = parser.eventType
+            while (eventType != XmlPullParser.END_DOCUMENT) {
+                if (eventType == XmlPullParser.START_TAG) {
+                    when (parser.name) {
+                        "metadata" -> sawMetadataRoot = true
+                        "item" -> if (sawMetadataRoot) {
+                            val attrName = parser.getAttributeValue(null, "name")
+                                ?: parser.safePositionalAttribute(0)
+                            when (attrName) {
+                                "score" -> score = parser.nextText().trim().toIntOrNull()
+                                "experience" -> experience = parser.nextText().trim().toIntOrNull()
+                            }
+                        }
+                    }
+                }
+                eventType = parser.next()
+            }
+
+            if (!sawMetadataRoot || (score == null && experience == null)) return null
+            ParsedDailySignResult(score = score, experience = experience)
         } catch (_: Exception) {
             null
         }
