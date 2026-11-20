@@ -53,12 +53,16 @@ object Bookshelf3dGeometry {
      */
     const val COVER_LOAD_LEFT_RADIUS: Int = 1
     const val COVER_LOAD_RIGHT_RADIUS: Int = 2
+    const val COVER_LOAD_SCRUB_RIGHT_RADIUS: Int = 1
     const val COVER_LOAD_LAST_ITEM_RIGHT_RADIUS: Int = 4
 
     /**
-     * Returns `true` only when the book at [index] has a visible or immediately adjacent cover face
-     * and the user is not rapidly scrubbing the fast scrollbar (preventing Coil bitmap decode churn
-     * across dozens of intermediate books during fast scrubbing).
+     * Returns `true` when the book at [index] has a visible or immediately adjacent cover face.
+     *
+     * During active fast-scrollbar scrubbing (`isScrubbing == true`), we still keep the focused
+     * book and its immediate neighbors (`[-1..+1]`, plus the exposed trailing book) mounted so
+     * covers stay visible instead of reverting to placeholder icons, while capping simultaneous
+     * requests and letting Coil serve cached covers synchronously and cancel passed ones.
      */
     fun shouldLoadBookCover(
         index: Int,
@@ -67,9 +71,9 @@ object Bookshelf3dGeometry {
         isScrubbing: Boolean,
     ): Boolean {
         if (itemCount <= 0 || index !in 0 until itemCount) return false
-        if (isScrubbing) return false
         val delta = index - focusedIndex
-        if (delta in -COVER_LOAD_LEFT_RADIUS..COVER_LOAD_RIGHT_RADIUS) return true
+        val rightRadius = if (isScrubbing) COVER_LOAD_SCRUB_RIGHT_RADIUS else COVER_LOAD_RIGHT_RADIUS
+        if (delta in -COVER_LOAD_LEFT_RADIUS..rightRadius) return true
         return index == itemCount - 1 && delta in 0..COVER_LOAD_LAST_ITEM_RIGHT_RADIUS
     }
 

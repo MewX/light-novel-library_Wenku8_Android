@@ -213,17 +213,17 @@ class Bookshelf3dGeometryTest {
     }
 
     @Test
-    fun shouldLoadBookCover_limitsActiveCoversToVisibleWindowAndPausesWhileScrubbing() {
+    fun shouldLoadBookCover_keepsVisibleCoversLoadedDuringScrubbingAndCapsWindow() {
         val total = 50
         val focus = 20
 
-        // Rapid fast-scroller scrubbing suspends cover loading completely to avoid bitmap churn
-        for (i in 0 until total) {
-            assertFalse(
-                "Expected cover loading paused during scrubbing at index=$i",
-                Bookshelf3dGeometry.shouldLoadBookCover(i, focus, total, isScrubbing = true),
-            )
+        // Active fast-scrollbar scrubbing keeps the focused book + immediate neighbors [-1..+1]
+        // loaded so covers stay visible instead of dropping to placeholder icons, while excluding
+        // distant occluded books to cap concurrent bitmap/network churn.
+        val loadedWhileScrubbing = (0 until total).filter {
+            Bookshelf3dGeometry.shouldLoadBookCover(it, focus, total, isScrubbing = true)
         }
+        assertEquals(listOf(19, 20, 21), loadedWhileScrubbing)
 
         // Settled browsing loads at most [-1..+2] = 4 covers in the middle of the shelf
         val loadedMiddle = (0 until total).filter {
@@ -231,9 +231,12 @@ class Bookshelf3dGeometryTest {
         }
         assertEquals(listOf(19, 20, 21, 22), loadedMiddle)
 
-        // Near the end of the shelf, the exposed last book cover (index 49) is also eligible within +4
+        // Near the end of the shelf, the exposed last book cover (index 49) stays eligible within +4
+        // both when settled and while scrubbing.
         assertTrue(Bookshelf3dGeometry.shouldLoadBookCover(49, focusedIndex = 45, itemCount = total, isScrubbing = false))
+        assertTrue(Bookshelf3dGeometry.shouldLoadBookCover(49, focusedIndex = 45, itemCount = total, isScrubbing = true))
         assertFalse(Bookshelf3dGeometry.shouldLoadBookCover(49, focusedIndex = 44, itemCount = total, isScrubbing = false))
+        assertFalse(Bookshelf3dGeometry.shouldLoadBookCover(49, focusedIndex = 44, itemCount = total, isScrubbing = true))
 
         // Out-of-bounds & empty guards
         assertFalse(Bookshelf3dGeometry.shouldLoadBookCover(0, 0, itemCount = 0, isScrubbing = false))
