@@ -640,7 +640,9 @@ class Bookshelf3dShelfSectionTest {
                                         Box(
                                             modifier = Modifier
                                                 .fillMaxSize()
-                                                .bookshelf3dCoverPerspectiveMorph(enterSlant),
+                                                .bookshelf3dCoverPerspectiveMorph(
+                                                    slantedFractionProvider = { enterSlant },
+                                                ),
                                         )
                                     }
                                 }

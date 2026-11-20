@@ -1034,20 +1034,23 @@ private fun NovelHeroHeaderCard(
             val heroCoverShape = MaterialTheme.shapes.medium
             val isFrom3dShelf = sharedTransitionOrigin == Wenku8SharedElementKeys.NOVEL_BOOKSHELF_3D_ORIGIN
             val sharedCtx = LocalWenku8SharedTransition.current
-            val enterSlantedFraction = if (isFrom3dShelf && sharedCtx != null && !isEinkMode) {
-                val animatedSlant by sharedCtx.animatedVisibilityScope.transition.animateFloat(
+            val enterSlantedFractionState = if (isFrom3dShelf && sharedCtx != null && !isEinkMode) {
+                sharedCtx.animatedVisibilityScope.transition.animateFloat(
                     transitionSpec = { expressiveSharedFloatSpec(isEinkMode = false) },
                     label = "detail_cover_3d_enter_slant",
                 ) { enterExitState ->
                     if (enterExitState == EnterExitState.PreEnter) 1f else 0f
                 }
-                animatedSlant
             } else {
-                0f
+                null
             }
-            val effectiveCoverShape = if (isFrom3dShelf && enterSlantedFraction > 0.001f) {
+            val enterSlantedFractionProvider: () -> Float = remember(enterSlantedFractionState) {
+                { enterSlantedFractionState?.value ?: 0f }
+            }
+            val enterSlantedValue = enterSlantedFractionState?.value ?: 0f
+            val effectiveCoverShape = if (isFrom3dShelf && enterSlantedValue > 0.001f) {
                 RoundedCornerShape(
-                    Bookshelf3dGeometry.interpolatedCoverCornerDp(enterSlantedFraction).dp,
+                    Bookshelf3dGeometry.interpolatedCoverCornerDp(enterSlantedValue).dp,
                 )
             } else {
                 heroCoverShape
@@ -1068,7 +1071,10 @@ private fun NovelHeroHeaderCard(
                     tonalElevation = if (isEinkMode) 0.dp else 4.dp,
                     modifier = Modifier
                         .fillMaxSize()
-                        .bookshelf3dCoverPerspectiveMorph(slantedFraction = enterSlantedFraction)
+                        .bookshelf3dCoverPerspectiveMorph(
+                            enabled = isFrom3dShelf && !isEinkMode,
+                            slantedFractionProvider = enterSlantedFractionProvider,
+                        )
                         .einkHairlineBorder(effectiveCoverShape),
                 ) {
                     if (coverUrl.isNotBlank()) {

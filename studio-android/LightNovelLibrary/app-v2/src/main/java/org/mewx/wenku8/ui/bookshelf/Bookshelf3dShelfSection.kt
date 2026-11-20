@@ -455,20 +455,26 @@ private fun Bookshelf3dStage(
     } else {
         null
     }
-    val isFocusedCoverTransitionActive = sharedCtx != null &&
-        focusedCoverSharedState != null &&
-        focusedCoverSharedState.isMatchFound &&
-        sharedCtx.sharedTransitionScope.isTransitionActive
-    val returnSlantedFraction = if (sharedCtx != null && !isEinkMode) {
-        val animatedSlant by sharedCtx.animatedVisibilityScope.transition.animateFloat(
+    val isCoverTransitionActiveProvider: () -> Boolean = remember(sharedCtx, focusedCoverSharedState) {
+        {
+            sharedCtx != null &&
+                focusedCoverSharedState != null &&
+                focusedCoverSharedState.isMatchFound &&
+                sharedCtx.sharedTransitionScope.isTransitionActive
+        }
+    }
+    val returnSlantedFractionState = if (sharedCtx != null && !isEinkMode) {
+        sharedCtx.animatedVisibilityScope.transition.animateFloat(
             transitionSpec = { expressiveSharedFloatSpec(isEinkMode = false) },
             label = "bookshelf_3d_cover_return_slant",
         ) { enterExitState ->
             if (enterExitState == EnterExitState.Visible) 1f else 0f
         }
-        animatedSlant
     } else {
-        1f
+        null
+    }
+    val returnSlantedFractionProvider: () -> Float = remember(returnSlantedFractionState) {
+        { returnSlantedFractionState?.value ?: 1f }
     }
 
     val latestPoses by rememberUpdatedState(visiblePoses)
@@ -589,7 +595,11 @@ private fun Bookshelf3dStage(
                         itemCount = entries.size,
                         isScrubbing = isScrubbing,
                     ),
-                    hideCoverArtworkForSharedTransition = isBookFocused && isFocusedCoverTransitionActive,
+                    hideCoverArtworkForSharedTransitionProvider = if (isBookFocused) {
+                        isCoverTransitionActiveProvider
+                    } else {
+                        ALWAYS_FALSE_PROVIDER
+                    },
                     isSelected = item.aid in selectedAidSet,
                     isDark = isDark,
                     isEinkMode = isEinkMode,
@@ -598,9 +608,9 @@ private fun Bookshelf3dStage(
         }
 
         // Layer 2b: Screen-space shared-element cover anchor placed at the exact post-matrix
-        // projected visual bounds of the focused 3D cover (invisible at rest; renders in the root
-        // overlay during Detail <-> Bookshelf transitions, smoothly morphing upright -> 3D slant +
-        // horizontal foreshortening so returning covers land seamlessly with zero pop).
+        // projected visual bounds of the focused 3D cover (invisible at rest via draw-phase alpha;
+        // renders in the root overlay during Detail <-> Bookshelf transitions, smoothly morphing
+        // upright -> 3D slant + horizontal foreshortening with zero 1-frame flash).
         if (focusedPose != null && focusedEntry != null && focusedCoverSharedState != null && sharedCtx != null) {
             val focusedItem = focusedEntry.item
             val visualCoverRect = Bookshelf3dGeometry.computeCoverArtworkVisualBoundsPx(
@@ -609,10 +619,6 @@ private fun Bookshelf3dStage(
             )
             val anchorWidthDp = with(density) { visualCoverRect.width.toDp() }
             val anchorHeightDp = with(density) { visualCoverRect.height.toDp() }
-            val mountOverlayCover = sharedCtx.sharedTransitionScope.isTransitionActive
-            val morphCornerShape = RoundedCornerShape(
-                Bookshelf3dGeometry.interpolatedCoverCornerDp(returnSlantedFraction).dp,
-            )
             key(focusedItem.aid) {
                 Box(
                     modifier = Modifier
@@ -632,38 +638,44 @@ private fun Bookshelf3dStage(
                             sharedContentState = focusedCoverSharedState,
                         )
                         .graphicsLayer {
-                            alpha = if (isFocusedCoverTransitionActive) 1f else 0f
+                            alpha = if (isCoverTransitionActiveProvider()) 1f else 0f
                         },
                 ) {
-                    if (mountOverlayCover) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .bookshelf3dCoverPerspectiveMorph(
-                                    slantedFraction = returnSlantedFraction,
-                                )
-                                .clip(morphCornerShape)
-                                .background(MaterialTheme.colorScheme.surfaceContainerHighest),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Icon(
-                                imageVector = Icons.Outlined.AutoStories,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                                modifier = Modifier.size(24.dp),
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .bookshelf3dCoverPerspectiveMorph(
+                                enabled = !isEinkMode,
+                                slantedFractionProvider = returnSlantedFractionProvider,
                             )
-                            if (focusedItem.coverUrl.isNotBlank()) {
-                                AsyncImage(
-                                    model = WenkuImageRequests.rememberCoverImageRequest(
-                                        aid = focusedItem.aid,
-                                        coverUrl = focusedItem.coverUrl,
-                                        enableCrossfade = false,
-                                    ),
-                                    contentDescription = focusedItem.novel.title,
-                                    contentScale = ContentScale.Crop,
-                                    modifier = Modifier.fillMaxSize(),
+                            .graphicsLayer {
+                                shape = RoundedCornerShape(
+                                    Bookshelf3dGeometry.interpolatedCoverCornerDp(
+                                        returnSlantedFractionProvider(),
+                                    ).dp,
                                 )
+                                clip = true
                             }
+                            .background(MaterialTheme.colorScheme.surfaceContainerHighest),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.AutoStories,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                            modifier = Modifier.size(24.dp),
+                        )
+                        if (!isScrubbing && focusedItem.coverUrl.isNotBlank()) {
+                            AsyncImage(
+                                model = WenkuImageRequests.rememberCoverImageRequest(
+                                    aid = focusedItem.aid,
+                                    coverUrl = focusedItem.coverUrl,
+                                    enableCrossfade = false,
+                                ),
+                                contentDescription = focusedItem.novel.title,
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.fillMaxSize(),
+                            )
                         }
                     }
                 }
@@ -728,33 +740,47 @@ private fun Bookshelf3dStage(
 
 /**
  * Applies smooth isometric vertical shear and horizontal perspective foreshortening around the
- * cover's center without altering its reported layout bounds (`LayoutCoordinates`), enabling
- * seamless 3D <-> flat shared-element cover morphs in both directions.
+ * cover's center without altering its reported layout bounds (`LayoutCoordinates`) or mutating
+ * the modifier chain when crossing `0f`, enabling flicker-free 3D <-> flat shared-element cover
+ * morphs in both directions.
  */
 internal fun Modifier.bookshelf3dCoverPerspectiveMorph(
-    slantedFraction: Float,
+    enabled: Boolean = true,
+    slantedFractionProvider: () -> Float,
 ): Modifier {
-    val t = slantedFraction.coerceIn(0f, 1f)
-    if (t <= 0.001f) return this
+    if (!enabled) return this
     return this
         .drawWithContent {
-            val matrix = Bookshelf3dGeometry.buildInterpolatedCoverMorphMatrix(
-                overlayWidthPx = size.width,
-                slantedFraction = t,
-            )
-            drawContext.canvas.save()
-            drawContext.canvas.concat(matrix)
-            drawContent()
-            drawContext.canvas.restore()
+            val t = slantedFractionProvider().coerceIn(0f, 1f)
+            if (t <= 0.001f) {
+                drawContent()
+            } else {
+                val matrix = Bookshelf3dGeometry.buildInterpolatedCoverMorphMatrix(
+                    overlayWidthPx = size.width,
+                    slantedFraction = t,
+                )
+                drawContext.canvas.save()
+                drawContext.canvas.concat(matrix)
+                drawContent()
+                drawContext.canvas.restore()
+            }
         }
         .layout { measurable, constraints ->
-            val targetW = constraints.maxWidth.coerceAtLeast(1)
-            val targetH = constraints.maxHeight.coerceAtLeast(1)
-            val sx = Bookshelf3dGeometry.interpolatedCoverScaleX(t)
-            val unforeshortenedW = (targetW / sx).roundToInt().coerceAtLeast(1)
-            val placeable = measurable.measure(Constraints.fixed(unforeshortenedW, targetH))
-            layout(targetW, targetH) {
-                placeable.place(0, 0)
+            val t = slantedFractionProvider().coerceIn(0f, 1f)
+            if (t <= 0.001f) {
+                val placeable = measurable.measure(constraints)
+                layout(placeable.width, placeable.height) {
+                    placeable.place(0, 0)
+                }
+            } else {
+                val targetW = constraints.maxWidth.coerceAtLeast(1)
+                val targetH = constraints.maxHeight.coerceAtLeast(1)
+                val sx = Bookshelf3dGeometry.interpolatedCoverScaleX(t)
+                val unforeshortenedW = (targetW / sx).roundToInt().coerceAtLeast(1)
+                val placeable = measurable.measure(Constraints.fixed(unforeshortenedW, targetH))
+                layout(targetW, targetH) {
+                    placeable.place(0, 0)
+                }
             }
         }
 }
@@ -776,7 +802,7 @@ private fun Bookshelf3dBookVolume(
     coverMatrix: Matrix,
     isFocused: Boolean,
     shouldLoadCover: Boolean,
-    hideCoverArtworkForSharedTransition: Boolean,
+    hideCoverArtworkForSharedTransitionProvider: () -> Boolean,
     isSelected: Boolean,
     isDark: Boolean,
     isEinkMode: Boolean,
@@ -866,7 +892,7 @@ private fun Bookshelf3dBookVolume(
             borderWidth = edgeBorderWidth,
             extractionWeight = pose.weight,
             shouldLoadCover = shouldLoadCover,
-            hideCoverArtworkForSharedTransition = hideCoverArtworkForSharedTransition,
+            hideCoverArtworkForSharedTransitionProvider = hideCoverArtworkForSharedTransitionProvider,
             isSelected = isSelected,
             isEinkMode = isEinkMode,
         )
@@ -951,6 +977,7 @@ private fun Bookshelf3dBookVolume(
     }
 }
 
+private val ALWAYS_FALSE_PROVIDER: () -> Boolean = { false }
 private val TOP_CAP_PAGE_LINE_STEPS = floatArrayOf(0.35f, 0.68f)
 private val CAP_STROKE_NORMAL = Stroke(width = 1f)
 private val CAP_STROKE_CONTINUE = Stroke(width = 1.5f)
@@ -967,7 +994,7 @@ private fun Bookshelf3dCoverFace(
     borderWidth: Dp,
     extractionWeight: Float,
     shouldLoadCover: Boolean,
-    hideCoverArtworkForSharedTransition: Boolean,
+    hideCoverArtworkForSharedTransitionProvider: () -> Boolean,
     isSelected: Boolean,
     isEinkMode: Boolean,
 ) {
@@ -1050,7 +1077,7 @@ private fun Bookshelf3dCoverFace(
                     modifier = Modifier
                         .fillMaxSize()
                         .graphicsLayer {
-                            alpha = if (hideCoverArtworkForSharedTransition) 0f else 1f
+                            alpha = if (hideCoverArtworkForSharedTransitionProvider()) 0f else 1f
                         },
                     contentAlignment = Alignment.Center,
                 ) {
