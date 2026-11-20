@@ -40,9 +40,9 @@ object Bookshelf3dGeometry {
     const val LIFT_HEIGHT_FRACTION: Float = 0.56f
     const val PULL_COVER_FRACTION: Float = 0.84f
 
-    const val WIDE_LAYOUT_MIN_WIDTH_DP: Float = 760f
-    const val WIDE_LAYOUT_MIN_HEIGHT_DP: Float = 380f
-    const val COMPACT_HEIGHT_THRESHOLD_DP: Float = 460f
+    const val WIDE_LAYOUT_MIN_WIDTH_DP: Float = 720f
+    const val WIDE_LAYOUT_MIN_HEIGHT_DP: Float = 300f
+    const val COMPACT_HEIGHT_THRESHOLD_DP: Float = 480f
     const val COVER_LOAD_RADIUS: Int = 3
 
     /**
@@ -53,18 +53,18 @@ object Bookshelf3dGeometry {
         availableHeightDp: Float,
     ): Bookshelf3dMetrics {
         val safeWidth = availableWidthDp.coerceAtLeast(240f)
-        val safeHeight = availableHeightDp.coerceAtLeast(280f)
+        val safeHeight = availableHeightDp.coerceAtLeast(260f)
         val isTwoPane = safeWidth >= WIDE_LAYOUT_MIN_WIDTH_DP &&
             safeHeight >= WIDE_LAYOUT_MIN_HEIGHT_DP
 
         val stageWidthDp = if (isTwoPane) {
-            ((safeWidth - 32f) * 0.54f).coerceIn(340f, 520f)
+            ((safeWidth - 32f) * 0.54f).coerceIn(320f, 520f)
         } else {
             safeWidth.coerceIn(240f, 540f)
         }
 
         val heightScale = if (safeHeight < COMPACT_HEIGHT_THRESHOLD_DP) {
-            (safeHeight / COMPACT_HEIGHT_THRESHOLD_DP).coerceIn(0.68f, 1.0f)
+            ((safeHeight - 56f) / 420f).coerceIn(0.62f, 1.0f)
         } else {
             1.0f
         }
@@ -72,13 +72,14 @@ object Bookshelf3dGeometry {
         val spineWidthDp = (stageWidthDp * 0.045f).coerceIn(14f, 19f)
         val gapDp = (stageWidthDp * 0.028f).coerceIn(9f, 12f)
         val pitchDp = spineWidthDp + gapDp
-        val coverWidthDp = (stageWidthDp * 0.32f).coerceIn(88f, 130f) * heightScale
-        val bodyHeightDp = (((coverWidthDp - 20f).coerceAtLeast(56f)) * 166f / 118f + 54f)
-            .coerceIn(132f, 212f)
+        val coverWidthDp = ((stageWidthDp * 0.32f).coerceIn(88f, 130f) * heightScale)
+            .coerceAtLeast(72f)
+        val bodyHeightDp = (((coverWidthDp - 20f).coerceAtLeast(50f)) * 166f / 118f + 54f * heightScale)
+            .coerceIn(116f, 212f)
         val footprintDp = spineWidthDp + coverWidthDp * DEPTH_X
         val pullDistanceDp = coverWidthDp * PULL_COVER_FRACTION
-        val baseYDp = -coverWidthDp * DEPTH_Y + bodyHeightDp * LIFT_HEIGHT_FRACTION + 10f
-        val stageHeightDp = baseYDp + bodyHeightDp + 38f
+        val baseYDp = -coverWidthDp * DEPTH_Y + bodyHeightDp * LIFT_HEIGHT_FRACTION + 10f * heightScale
+        val stageHeightDp = baseYDp + bodyHeightDp + 32f * heightScale
 
         val maxSideSlots = ceil(
             (stageWidthDp / 2f + footprintDp + pullDistanceDp * DEPTH_X) / pitchDp,
@@ -387,16 +388,29 @@ object Bookshelf3dGeometry {
                     ),
                 )
             } else {
-                // Book to the left of focus: try unobstructed full spine first, then lower spine
-                // peeking below the lifted focal book.
+                // Book to the left of focus: try unobstructed full spine first, then left spine
+                // strip bounded by the next neighbor, and finally lower spine peeking below the
+                // lifted focal book.
+                val fullSpineRight = pose.origin.x + pose.spineWidthPx
+                val clippedSpineRight = nextPose?.origin?.x?.let { min(fullSpineRight, it) } ?: fullSpineRight
                 add(
                     Rect(
                         left = pose.origin.x,
                         top = pose.origin.y,
-                        right = pose.origin.x + pose.spineWidthPx,
+                        right = fullSpineRight,
                         bottom = pose.origin.y + pose.bodyHeightPx,
                     ),
                 )
+                if (clippedSpineRight - pose.origin.x > 2f && clippedSpineRight < fullSpineRight) {
+                    add(
+                        Rect(
+                            left = pose.origin.x,
+                            top = pose.origin.y,
+                            right = clippedSpineRight,
+                            bottom = pose.origin.y + pose.bodyHeightPx,
+                        ),
+                    )
+                }
                 if (focusedPose != null) {
                     val belowFocusTop = focusedPose.solidBounds.bottom
                     val bottom = pose.origin.y + pose.bodyHeightPx
@@ -405,10 +419,20 @@ object Bookshelf3dGeometry {
                             Rect(
                                 left = pose.origin.x,
                                 top = belowFocusTop,
-                                right = pose.origin.x + pose.spineWidthPx,
+                                right = fullSpineRight,
                                 bottom = bottom,
                             ),
                         )
+                        if (clippedSpineRight - pose.origin.x > 2f && clippedSpineRight < fullSpineRight) {
+                            add(
+                                Rect(
+                                    left = pose.origin.x,
+                                    top = belowFocusTop,
+                                    right = clippedSpineRight,
+                                    bottom = bottom,
+                                ),
+                            )
+                        }
                     }
                 }
             }

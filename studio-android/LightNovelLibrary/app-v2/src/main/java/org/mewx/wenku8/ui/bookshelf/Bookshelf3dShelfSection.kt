@@ -188,33 +188,42 @@ internal fun Bookshelf3dShelfSection(
         }
     }
 
-    fun animateFocusTo(targetIndex: Int) {
-        val clamped = targetIndex.coerceIn(0, items.lastIndex).toFloat()
-        coroutineScope.launch {
-            if (isEinkMode) {
-                focusAnimatable.snapTo(clamped)
-            } else {
-                focusAnimatable.animateTo(
-                    targetValue = clamped,
-                    animationSpec = spring(
-                        dampingRatio = Spring.DampingRatioNoBouncy,
-                        stiffness = Spring.StiffnessMediumLow,
-                    ),
-                )
+    val latestItems by rememberUpdatedState(items)
+    val latestIsEinkMode by rememberUpdatedState(isEinkMode)
+    val latestIsMultiSelectActive by rememberUpdatedState(isMultiSelectActive)
+    val latestOnItemClick by rememberUpdatedState(onItemClick)
+    val latestOnItemLongClick by rememberUpdatedState(onItemLongClick)
+
+    val animateFocusTo: (Int) -> Unit = { targetIndex ->
+        val currentItems = latestItems
+        if (currentItems.isNotEmpty()) {
+            val clamped = targetIndex.coerceIn(0, currentItems.lastIndex).toFloat()
+            coroutineScope.launch {
+                if (latestIsEinkMode) {
+                    focusAnimatable.snapTo(clamped)
+                } else {
+                    focusAnimatable.animateTo(
+                        targetValue = clamped,
+                        animationSpec = spring(
+                            dampingRatio = Spring.DampingRatioNoBouncy,
+                            stiffness = Spring.StiffnessMediumLow,
+                        ),
+                    )
+                }
             }
         }
     }
 
-    fun handleBookTap(index: Int) {
-        val tappedItem = items.getOrNull(index) ?: return
-        if (isMultiSelectActive) {
-            onItemClick(tappedItem)
-            return
-        }
-        if (abs(focusAnimatable.value - index) < 0.08f) {
-            onItemClick(tappedItem)
-        } else {
-            animateFocusTo(index)
+    val handleBookTap: (Int) -> Unit = { index ->
+        val tappedItem = latestItems.getOrNull(index)
+        if (tappedItem != null) {
+            if (latestIsMultiSelectActive) {
+                latestOnItemClick(tappedItem)
+            } else if (abs(focusAnimatable.value - index) < 0.08f) {
+                latestOnItemClick(tappedItem)
+            } else {
+                animateFocusTo(index)
+            }
         }
     }
 
@@ -232,26 +241,28 @@ internal fun Bookshelf3dShelfSection(
                 selectedAidSet = selectedAidSet,
                 isEinkMode = isEinkMode,
                 onDragFocusDelta = { deltaFocus ->
-                    if (items.size > 1) {
+                    val currentItems = latestItems
+                    if (currentItems.size > 1) {
                         val next = (focusAnimatable.value + deltaFocus)
-                            .coerceIn(0f, items.lastIndex.toFloat())
+                            .coerceIn(0f, currentItems.lastIndex.toFloat())
                         coroutineScope.launch { focusAnimatable.snapTo(next) }
                     }
                 },
                 onFlingReleased = { velocityPxPerSec, pitchPx ->
-                    if (items.size > 1) {
+                    val currentItems = latestItems
+                    if (currentItems.size > 1) {
                         val target = Bookshelf3dSnapPhysics.computeFlingTargetIndex(
                             currentFocus = focusAnimatable.value,
                             velocityPxPerSec = velocityPxPerSec,
                             pitchPx = pitchPx,
-                            itemCount = items.size,
+                            itemCount = currentItems.size,
                         )
                         animateFocusTo(target)
                     }
                 },
-                onBookTap = ::handleBookTap,
+                onBookTap = handleBookTap,
                 onBookLongPress = { index ->
-                    items.getOrNull(index)?.let(onItemLongClick)
+                    latestItems.getOrNull(index)?.let { latestOnItemLongClick(it) }
                 },
             )
 
@@ -308,6 +319,7 @@ internal fun Bookshelf3dShelfSection(
                     isSelected = focusedItem.aid in selectedAidSet,
                     isMultiSelectActive = isMultiSelectActive,
                     isEinkMode = isEinkMode,
+                    isCompactHeight = availableHeight.value < Bookshelf3dGeometry.COMPACT_HEIGHT_THRESHOLD_DP,
                     onOpenDetail = { onItemClick(focusedItem) },
                     onLongPress = { onItemLongClick(focusedItem) },
                     onContinueReading = { onContinueReadingClick(focusedItem) },
@@ -1236,7 +1248,7 @@ internal fun Bookshelf3dFastScroller(
                 shape = CircleShape,
                 modifier = Modifier
                     .einkHairlineBorder(CircleShape)
-                    .semantics { contentDescription = indexAccessibilityDesc }
+                    .semantics(mergeDescendants = true) { contentDescription = indexAccessibilityDesc }
                     .testTag(BookshelfTestTags.SPINE_3D_INDEX_COUNTER),
             ) {
                 Text(
@@ -1447,6 +1459,7 @@ private fun Bookshelf3dWideSpotlightPanel(
     isSelected: Boolean,
     isMultiSelectActive: Boolean,
     isEinkMode: Boolean,
+    isCompactHeight: Boolean = false,
     onOpenDetail: () -> Unit,
     onLongPress: () -> Unit,
     onContinueReading: () -> Unit,
@@ -1491,8 +1504,8 @@ private fun Bookshelf3dWideSpotlightPanel(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(22.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
+                    .padding(if (isCompactHeight) 14.dp else 22.dp),
+                verticalArrangement = Arrangement.spacedBy(if (isCompactHeight) 8.dp else 12.dp),
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
