@@ -57,7 +57,8 @@
   - **Artbook 插图画集灯箱**：一键抽离本卷全部插图，支持双指无级缩放、跨页彩插左右拼合、底部胶片缩略图速览与高清原图保存，并内置全文检索、章节书签与系统 TTS 语音朗读。
 - **本地优先 Room 数据库（WAL）与智能云端同步**：
   - 采用 Room SQLite（WAL 并发模式）管理书架元数据、分卷目录、阅读进度、阅读时长热力图与离线缓存状态。
-  - 本地书架支持**网格 / 列表 / 书脊**三视图切换、“继续阅读”轮播卡片、进入书架自动云端同步（带防抖 TTL 与任务互斥保护），以及将智能更新与强制刷新收纳合一的折叠式 `云端同步 | ▾` 按钮。
+  - 本地书架支持**网格 / 列表 / 3D 立体书脊**三视图切换：全新打造的 **3D 立体书脊视图**（灵感源自 [`Wenku8_Flutter`](https://github.com/mikufoxxx/Wenku8_Flutter)）提供真实透视书脊与封面展开、滑动惯性吸附、底部快速滑块与聚焦详情卡，并将近期阅读作品自动前置至书脊队首，配合专属主题色高亮与“继续阅读”状态卡片，一眼直达上次阅读进度。
+  - 网格与列表视图内置“继续阅读”轮播卡片、进入书架自动云端同步（带防抖 TTL 与任务互斥保护），以及将智能更新与强制刷新收纳合一的折叠式 `云端同步 | ▾` 按钮。
   - 离线缓存支持 **智能更新、仅下载未缓存章节、分卷选择下载、全本覆盖重下** 四种策略。
 - **`1.x` 无损自动迁移与 `.wk8backup.zip` 便携备份**：首次启动自动检测并迁移 `1.x` 的本地书架、阅读进度、离线小说文本与插图以及登录凭据；同时提供全新的 `.wk8backup.zip` 一键导出与智能合并导入。
 - **默认开启的自动网络中转优化与诊断中心**：内置 Cloudflare 中转连通性自动评估、故障无缝切换与单轴对比实验工具，显著提升不同网络环境下的访问成功率。
@@ -71,6 +72,8 @@
   - **完全由 `Gemini Carbon (High)` 完成** —— 独立完成了 `v2.0` 的旧版代码考古、产品与视觉设计文档（[`docs/designs/v2/`](docs/designs/v2/README.md)）、`:app-v2` 全部 Kotlin / Jetpack Compose 源代码、Room 数据库与 `1.x` 迁移器、阅读与插图引擎、GitHub Actions CI 适配以及全套单元与 Robolectric UI 测试。
 - **项目原作者、架构指导与基础设施维护**：
   - [**MewX**](https://www.mewx.org) —— 项目发起人、`0.5.x` 与 `1.x` 版本原作者、中转与分享服务端基础设施搭建，以及 `2.0` Vibe Coding 过程中的产品决策、体验把控与真机验收。
+- **设计灵感与社区致谢**：
+  - [**Wenku8_Flutter**](https://github.com/mikufoxxx/Wenku8_Flutter)（by `mikufoxxx`）—— `2.0` 本地书架 **3D 立体书脊视图** 的视觉与交互灵感来源。
 - **历史版本（`1.x` / `0.5.x`）贡献与特别致谢**：
   - **Yanix**（[SeraphRoy / Baby Pepper](https://github.com/SeraphRoy)）—— `1.x` 版本代码贡献
   - **Jack Liu**（[aaassseee](https://github.com/aaassseee)）—— `1.x` 版本代码贡献
@@ -83,9 +86,15 @@
 
 > 点击任意缩略图即可查看 `1080 × 2400` 高清原图（源文件位于 [`screenshots/v2/`](screenshots/v2/)）。
 
-- **主导航与全站发现（本地书架 · 最新更新 · 二维排行榜 · 即时+全站搜索）**
+- **本地书架三视图（网格 · 列表 · 3D 书脊初始“继续阅读”态 · 3D 书脊滑动浏览）**
 
 [![2.0-bookshelf](screenshots/v2/2.0-bookshelf.thumb.jpg)](screenshots/v2/2.0-bookshelf.jpg)
+[![2.0-bookshelf-list](screenshots/v2/2.0-bookshelf-list.thumb.jpg)](screenshots/v2/2.0-bookshelf-list.jpg)
+[![2.0-bookshelf-spine-3d](screenshots/v2/2.0-bookshelf-spine-3d.thumb.jpg)](screenshots/v2/2.0-bookshelf-spine-3d.jpg)
+[![2.0-bookshelf-spine-3d-scroll](screenshots/v2/2.0-bookshelf-spine-3d-scroll.thumb.jpg)](screenshots/v2/2.0-bookshelf-spine-3d-scroll.jpg)
+
+- **全站发现与检索（最新更新 · 二维排行榜 · 即时+全站搜索）**
+
 [![2.0-latest](screenshots/v2/2.0-latest.thumb.jpg)](screenshots/v2/2.0-latest.jpg)
 [![2.0-rankings](screenshots/v2/2.0-rankings.thumb.jpg)](screenshots/v2/2.0-rankings.jpg)
 [![2.0-search](screenshots/v2/2.0-search.thumb.jpg)](screenshots/v2/2.0-search.jpg)
@@ -151,7 +160,7 @@ studio-android/LightNovelLibrary/app-v2/src/main/java/org/mewx/wenku8
 ├── reader/                              # CJK StaticLayout 分页引擎、日式竖排渲染与章节内容解析器
 ├── tts/                                 # Android TextToSpeech 章节朗读控制器
 ├── ui/
-│   ├── bookshelf/                       # 书架页（网格/列表/书脊、继续阅读轮播、云端同步折叠菜单）
+│   ├── bookshelf/                       # 书架页（网格/列表/3D 立体书脊、继续阅读轮播、云端同步折叠菜单）
 │   ├── latest/                          # 最新页（最近更新 / 最新入库 / 完结精品）
 │   ├── rankings/                        # 二维排行榜矩阵（点击/推荐/收藏/字数 × 日/周/月/总榜）
 │   ├── search/                          # 即时本地书架匹配 + 全站搜索（标题/作者/AID 直达）
