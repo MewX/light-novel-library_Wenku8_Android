@@ -37,12 +37,13 @@ jobs:
     - name: Grant execute permission for gradlew
       run: chmod +x gradlew
 
-    # Run JVM + Robolectric Compose unit tests and generate JaCoCo XML reports for both :app-v2 and
-    # :app-v1 first (before R8 release minification) with bounded daemon heaps so Gradle + Kotlin
-    # daemon + forked Robolectric worker stay comfortably within ubuntu-latest's 7 GB RAM.
-    - name: Run JVM unit tests and generate JaCoCo reports
+    # Run JVM + Robolectric Compose unit tests for both :app-v2 and :app-v1 first (before R8
+    # release minification) with bounded daemon heaps so Gradle + Kotlin daemon + forked
+    # Robolectric worker stay comfortably within ubuntu-latest's 7 GB RAM. Coverage is collected
+    # for :app-v2 only (:app-v1 is excluded from test coverage).
+    - name: Run JVM unit tests and generate app-v2 JaCoCo report
       run: |
-        ./gradlew -Dorg.gradle.jvmargs="-Xmx2560M -Dkotlin.daemon.jvm.options=-Xmx1536M" --max-workers=2 --stacktrace :app-v2:jacocoDefaultDebugUnitTestReport :app-v1:jacocoAlphaDebugUnitTestReport
+        ./gradlew -Dorg.gradle.jvmargs="-Xmx2560M -Dkotlin.daemon.jvm.options=-Xmx1536M" --max-workers=2 --stacktrace :app-v2:jacocoDefaultDebugUnitTestReport :app-v1:testAlphaDebugUnitTest
         ./gradlew --stop
 
     # Stop the test-phase Gradle daemon above before switching heap size; otherwise Gradle leaves
@@ -53,19 +54,15 @@ jobs:
         ./gradlew -Dorg.gradle.jvmargs="-Xmx3072M -Dkotlin.daemon.jvm.options=-Xmx1536M" --max-workers=2 --stacktrace :app-v2:assembleDefault :app-v1:assembleAlpha
         ./gradlew --stop
 
-    - name: Verify JVM coverage reports exist
+    - name: Verify app-v2 JVM coverage report exists
       run: |
-        for PAIR in "app-v2:jacocoDefaultDebugUnitTestReport" "app-v1:jacocoAlphaDebugUnitTestReport"; do
-          MODULE="${PAIR%%:*}"
-          TASK="${PAIR##*:}"
-          XML="$MODULE/build/reports/jacoco/$TASK/$TASK.xml"
-          if [ ! -s "$XML" ]; then
-            echo "::error::No JVM coverage XML at $XML -- the report task was skipped or produced empty output."
-            exit 1
-          fi
-          echo "--- $MODULE JVM report line counter ---"
-          grep -o '<counter type="LINE"[^/]*/>' "$XML" | tail -1
-        done
+        XML="app-v2/build/reports/jacoco/jacocoDefaultDebugUnitTestReport/jacocoDefaultDebugUnitTestReport.xml"
+        if [ ! -s "$XML" ]; then
+          echo "::error::No JVM coverage XML at $XML -- the report task was skipped or produced empty output."
+          exit 1
+        fi
+        echo "--- app-v2 JVM report line counter ---"
+        grep -o '<counter type="LINE"[^/]*/>' "$XML" | tail -1
 
     - name: Upload unit test reports
       if: always()
@@ -77,9 +74,8 @@ jobs:
           studio-android/LightNovelLibrary/app-v1/build/reports/tests/
         if-no-files-found: ignore
 
-    # Upload both :app-v2 and :app-v1 JVM coverage to Coveralls under distinct parallel flags, each
-    # paired with its own module `base-path` so JaCoCo package paths (`org/mewx/wenku8/...` in
-    # app-v2 and `org/mewx/wenku8/v1/...` in app-v1) resolve cleanly against the git tree.
+    # Upload :app-v2 JVM coverage to Coveralls (:app-v1 is excluded from test coverage).
+    # `base-path` maps JaCoCo package paths (`org/mewx/wenku8/...`) onto the git tree.
     - name: Upload app-v2 JVM coverage to Coveralls
       uses: coverallsapp/github-action@v2
       with:
@@ -87,20 +83,6 @@ jobs:
         format: jacoco
         base-path: studio-android/LightNovelLibrary/app-v2/src/main/java
         flag-name: jvm-v2
-        parallel: true
-        github-token: ${{ secrets.GITHUB_TOKEN }}
-        fail-on-error: false
-      env:
-        COVERALLS_REPO_TOKEN: ${{ secrets.COVERALLS_REPO_TOKEN }}
-
-    - name: Upload app-v1 JVM coverage to Coveralls
-      uses: coverallsapp/github-action@v2
-      with:
-        file: studio-android/LightNovelLibrary/app-v1/build/reports/jacoco/jacocoAlphaDebugUnitTestReport/jacocoAlphaDebugUnitTestReport.xml
-        format: jacoco
-        base-path: studio-android/LightNovelLibrary/app-v1/src/main/java
-        flag-name: jvm
-        parallel: true
         github-token: ${{ secrets.GITHUB_TOKEN }}
         fail-on-error: false
       env:
@@ -159,7 +141,7 @@ jobs:
           echo "--- device state before tests ---"
           adb shell dumpsys power | grep -E "mWakefulness=" || true
           adb shell dumpsys window | grep -iE "isKeyguardShowing" || true
-          ./gradlew -Dorg.gradle.jvmargs="-Xmx2048M" --stacktrace :app-v1:connectedAlphaDebugAndroidTest :app-v1:jacocoAlphaDebugAndroidTestReport
+          ./gradlew -Dorg.gradle.jvmargs="-Xmx2048M" --stacktrace :app-v1:connectedAlphaDebugAndroidTest
 
     - name: Upload instrumented test report
       if: always()
@@ -168,44 +150,3 @@ jobs:
         name: instrumented-test-results
         path: studio-android/LightNovelLibrary/app-v1/build/reports/androidTests/
         if-no-files-found: ignore
-
-    - name: Verify instrumented coverage report exists
-      run: |
-        echo "--- .ec execution data found on disk ---"
-        find app-v1/build/outputs -name '*.ec' -printf '%p (%s bytes)\n' 2>/dev/null || echo "NONE"
-        XML=app-v1/build/reports/jacoco/jacocoAlphaDebugAndroidTestReport/jacocoAlphaDebugAndroidTestReport.xml
-        if [ ! -s "$XML" ]; then
-          echo "::error::No instrumented coverage XML at $XML -- the report task was skipped, which means no .ec files were found."
-          exit 1
-        fi
-        echo "--- report line counter ---"
-        grep -o '<counter type="LINE"[^/]*/>' "$XML" | tail -1
-
-    - name: Upload instrumented coverage to Coveralls
-      uses: coverallsapp/github-action@v2
-      with:
-        file: studio-android/LightNovelLibrary/app-v1/build/reports/jacoco/jacocoAlphaDebugAndroidTestReport/jacocoAlphaDebugAndroidTestReport.xml
-        format: jacoco
-        base-path: studio-android/LightNovelLibrary/app-v1/src/main/java
-        flag-name: instrumented
-        parallel: true
-        github-token: ${{ secrets.GITHUB_TOKEN }}
-        fail-on-error: false
-      env:
-        COVERALLS_REPO_TOKEN: ${{ secrets.COVERALLS_REPO_TOKEN }}
-
-  coverage-finish:
-    name: Publish merged coverage
-    needs: [ build-and-test, instrumented-test ]
-    if: always()
-    runs-on: ubuntu-latest
-    steps:
-    - name: Close the Coveralls parallel build
-      uses: coverallsapp/github-action@v2
-      with:
-        parallel-finished: true
-        carryforward: jvm,jvm-v2,instrumented
-        github-token: ${{ secrets.GITHUB_TOKEN }}
-        fail-on-error: false
-      env:
-        COVERALLS_REPO_TOKEN: ${{ secrets.COVERALLS_REPO_TOKEN }}
