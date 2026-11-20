@@ -1,6 +1,7 @@
 package org.mewx.wenku8.ui.profile
 
 import android.graphics.Typeface
+import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
@@ -24,10 +25,12 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Archive
+import androidx.compose.material.icons.outlined.BugReport
 import androidx.compose.material.icons.outlined.CleaningServices
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.CloudOff
 import androidx.compose.material.icons.outlined.Description
+import androidx.compose.material.icons.outlined.Email
 import androidx.compose.material.icons.outlined.FolderOpen
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.NetworkCheck
@@ -137,6 +140,8 @@ object ProfileStudioTestTags {
     const val IMPORT_LEGACY_SAF_BUTTON = "profile_import_legacy_saf_button"
     const val OPEN_LICENSE_BUTTON = "profile_open_license_button"
     const val OPEN_ABOUT_BUTTON = "profile_open_about_button"
+    const val REPORT_BUG_GITHUB_BUTTON = "profile_report_bug_github_button"
+    const val FEEDBACK_EMAIL_BUTTON = "profile_feedback_email_button"
     const val ABOUT_VERSION_TAP_TARGET = "profile_about_version_tap_target"
     const val ABOUT_CHANNEL_TEXT = "profile_about_channel_text"
     const val ABOUT_HOMEPAGE_LINK = "profile_about_homepage_link"
@@ -1534,6 +1539,23 @@ private fun AboutAndLicenseSection(
     onOpenLicense: () -> Unit,
     onOpenAbout: () -> Unit,
 ) {
+    val context = LocalContext.current
+    val channelLabel = distributionChannelLabel(isPlayStoreChannel)
+    val feedbackEmailSubject = stringResource(
+        R.string.profile_feedback_email_subject_format,
+        BuildConfig.VERSION_NAME,
+        BuildConfig.VERSION_CODE,
+    )
+    val feedbackEmailBody = stringResource(
+        R.string.profile_feedback_email_body_format,
+        BuildConfig.VERSION_NAME,
+        BuildConfig.VERSION_CODE,
+        channelLabel,
+        Build.VERSION.RELEASE.orEmpty().ifEmpty { "Unknown" },
+        Build.VERSION.SDK_INT,
+        formatDeviceModel(),
+    )
+
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         if (appUpdateUiState != null) {
             AppUpdateCheckCard(
@@ -1593,6 +1615,38 @@ private fun AboutAndLicenseSection(
                         )
                         Spacer(modifier = Modifier.width(ButtonDefaults.IconSpacing))
                         Text(text = stringResource(R.string.profile_about_action))
+                    }
+
+                    OutlinedButton(
+                        onClick = { openSafeBrowserUrl(context, GITHUB_ISSUES_URL) },
+                        modifier = Modifier.testTag(ProfileStudioTestTags.REPORT_BUG_GITHUB_BUTTON),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.BugReport,
+                            contentDescription = null,
+                            modifier = Modifier.size(ButtonDefaults.IconSize),
+                        )
+                        Spacer(modifier = Modifier.width(ButtonDefaults.IconSpacing))
+                        Text(text = stringResource(R.string.profile_report_bug_github_action))
+                    }
+
+                    OutlinedButton(
+                        onClick = {
+                            openFeedbackEmail(
+                                context = context,
+                                subject = feedbackEmailSubject,
+                                body = feedbackEmailBody,
+                            )
+                        },
+                        modifier = Modifier.testTag(ProfileStudioTestTags.FEEDBACK_EMAIL_BUTTON),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.Email,
+                            contentDescription = null,
+                            modifier = Modifier.size(ButtonDefaults.IconSize),
+                        )
+                        Spacer(modifier = Modifier.width(ButtonDefaults.IconSpacing))
+                        Text(text = stringResource(R.string.profile_feedback_email_action))
                     }
                 }
             }

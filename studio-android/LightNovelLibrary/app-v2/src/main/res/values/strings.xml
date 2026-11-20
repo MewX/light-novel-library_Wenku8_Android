@@ -268,11 +268,16 @@
     <string name="profile_legacy_saf_import_action">从外部文件夹导入旧版 v1.x 存档</string>
     <string name="profile_legacy_saf_import_success_format">旧版存档导入完成：书架 %1$d 部 · 离线章节 %2$d 章 · 进度 %3$d 条</string>
 
-    <string name="profile_about_section_title">更新、开源许可与关于</string>
+    <string name="profile_about_section_title">反馈、开源许可与关于</string>
     <string name="profile_license_action">开源许可声明</string>
     <string name="profile_license_dialog_title">开源许可与版权声明</string>
     <string name="profile_about_action">关于轻小说文库</string>
     <string name="profile_about_dialog_title">关于轻小说文库</string>
+    <string name="profile_report_bug_github_action">问题反馈 (GitHub)</string>
+    <string name="profile_feedback_email_action">邮件反馈</string>
+    <string name="profile_feedback_email_subject_format">轻小说文库 v%1$s (%2$d) 问题反馈</string>
+    <string name="profile_feedback_email_body_format">应用版本：%1$s (%2$d)\n发行渠道：%3$s\n系统版本：Android %4$s (API %5$d)\n设备型号：%6$s\n\n请在此描述遇到的问题或建议：\n</string>
+    <string name="profile_feedback_email_fallback_toast">未找到邮件应用，已复制邮箱地址：%1$s</string>
     <string name="about_wenku8_title">轻小说文库 (Wenku8.com)</string>
     <string name="about_version_format">版本：%1$s (%2$d)</string>
     <string name="about_channel_format">发行渠道：%1$s</string>

@@ -1,8 +1,12 @@
 package org.mewx.wenku8.ui.profile
 
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.os.Build
+import android.widget.Toast
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -1287,6 +1291,66 @@ internal fun openSafeBrowserUrl(context: Context, rawUrl: String) {
         }
         context.startActivity(intent)
     }
+}
+
+internal const val GITHUB_ISSUES_URL =
+    "https://github.com/MewX/light-novel-library_Wenku8_Android/issues"
+internal const val FEEDBACK_EMAIL_ADDRESS = "wenku8@mewx.org"
+
+internal fun formatDeviceModel(
+    manufacturer: String = Build.MANUFACTURER.orEmpty(),
+    model: String = Build.MODEL.orEmpty(),
+): String {
+    val cleanManufacturer = manufacturer.trim()
+    val cleanModel = model.trim()
+    return when {
+        cleanManufacturer.isEmpty() -> cleanModel.ifEmpty { "Unknown" }
+        cleanModel.isEmpty() -> cleanManufacturer
+        cleanModel.startsWith(cleanManufacturer, ignoreCase = true) -> cleanModel
+        else -> "$cleanManufacturer $cleanModel"
+    }
+}
+
+internal fun buildFeedbackEmailIntent(
+    address: String = FEEDBACK_EMAIL_ADDRESS,
+    subject: String,
+    body: String,
+): Intent {
+    val mailtoUri = Uri.parse(
+        "mailto:$address?subject=${Uri.encode(subject)}&body=${Uri.encode(body)}",
+    )
+    return Intent(Intent.ACTION_SENDTO, mailtoUri).apply {
+        putExtra(Intent.EXTRA_SUBJECT, subject)
+        putExtra(Intent.EXTRA_TEXT, body)
+        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    }
+}
+
+internal fun openFeedbackEmail(
+    context: Context,
+    subject: String,
+    body: String,
+    address: String = FEEDBACK_EMAIL_ADDRESS,
+): Boolean {
+    val intent = buildFeedbackEmailIntent(
+        address = address,
+        subject = subject,
+        body = body,
+    )
+    val launched = runCatching {
+        context.startActivity(intent)
+        true
+    }.getOrDefault(false)
+    if (!launched) {
+        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+        clipboard?.setPrimaryClip(ClipData.newPlainText("email", address))
+        Toast.makeText(
+            context,
+            context.getString(R.string.profile_feedback_email_fallback_toast, address),
+            Toast.LENGTH_SHORT,
+        ).show()
+    }
+    return launched
 }
 
 internal fun openPlayStoreListing(context: Context) {

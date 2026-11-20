@@ -1,6 +1,12 @@
 package org.mewx.wenku8.ui.profile
 
+import android.app.Application
+import android.content.ActivityNotFoundException
+import android.content.ClipboardManager
+import android.content.ContentValues
 import android.content.Context
+import android.content.ContextWrapper
+import android.content.Intent
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.getValue
@@ -34,7 +40,6 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
 import org.junit.runner.RunWith
-import android.content.ContentValues
 import org.mewx.wenku8.BuildConfig
 import org.mewx.wenku8.api.Wenku8API
 import org.mewx.wenku8.api.Wenku8Error
@@ -78,6 +83,7 @@ import org.mewx.wenku8.ui.navigation.DefaultHomeDestination
 import org.mewx.wenku8.ui.theme.Wenku8ExpressiveTheme
 import org.mewx.wenku8.ui.theme.Wenku8ThemeMode
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.Shadows
 import org.robolectric.annotation.Config
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
@@ -1010,6 +1016,80 @@ class ProfileAndBackupTest {
                 destDb.close()
             }
         }
+
+    @Test
+    fun profileFeedbackActionsLaunchGitHubIssuesAndVersionedEmailClient() {
+        val app = ApplicationProvider.getApplicationContext<Application>()
+        val shadowApp = Shadows.shadowOf(app)
+        shadowApp.clearNextStartedActivities()
+
+        composeTestRule.setContent {
+            Box(modifier = Modifier.size(width = 412.dp, height = 892.dp)) {
+                Wenku8ExpressiveTheme(themeMode = Wenku8ThemeMode.SYSTEM) {
+                    ProfileAndStudioScreen(
+                        preferences = Wenku8UserPreferences(),
+                        onThemeModeSelected = {},
+                        onDefaultHomeSelected = {},
+                        modifier = Modifier.composeTestTagForLazyList(),
+                    )
+                }
+            }
+        }
+
+        // 1. GitHub Issues button opens https://github.com/MewX/light-novel-library_Wenku8_Android/issues
+        composeTestRule.onNodeWithTag(ProfileStudioTestTags.LIST)
+            .performScrollToNode(hasTestTag(ProfileStudioTestTags.REPORT_BUG_GITHUB_BUTTON))
+        composeTestRule.onNodeWithTag(ProfileStudioTestTags.REPORT_BUG_GITHUB_BUTTON)
+            .assertIsDisplayed()
+            .performClick()
+
+        val githubIntent = shadowApp.nextStartedActivity
+        assertNotNull("Expected browser intent for GitHub Issues", githubIntent)
+        assertEquals(Intent.ACTION_VIEW, githubIntent.action)
+        assertEquals(GITHUB_ISSUES_URL, githubIntent.dataString)
+
+        // 2. Email feedback button opens default email client for wenku8@mewx.org with version info
+        composeTestRule.onNodeWithTag(ProfileStudioTestTags.LIST)
+            .performScrollToNode(hasTestTag(ProfileStudioTestTags.FEEDBACK_EMAIL_BUTTON))
+        composeTestRule.onNodeWithTag(ProfileStudioTestTags.FEEDBACK_EMAIL_BUTTON)
+            .assertIsDisplayed()
+            .performClick()
+
+        val emailIntent = shadowApp.nextStartedActivity
+        assertNotNull("Expected ACTION_SENDTO intent for feedback email", emailIntent)
+        assertEquals(Intent.ACTION_SENDTO, emailIntent.action)
+        val emailUri = emailIntent.dataString.orEmpty()
+        assertTrue(
+            "Expected mailto:$FEEDBACK_EMAIL_ADDRESS URI, got: $emailUri",
+            emailUri.startsWith("mailto:$FEEDBACK_EMAIL_ADDRESS?"),
+        )
+        val subject = emailIntent.getStringExtra(Intent.EXTRA_SUBJECT).orEmpty()
+        val body = emailIntent.getStringExtra(Intent.EXTRA_TEXT).orEmpty()
+        assertTrue("Subject must mention version name", subject.contains(BuildConfig.VERSION_NAME))
+        assertTrue("Subject must mention version code", subject.contains(BuildConfig.VERSION_CODE.toString()))
+        assertTrue("Body must mention version name", body.contains(BuildConfig.VERSION_NAME))
+        assertTrue("Body must mention version code", body.contains(BuildConfig.VERSION_CODE.toString()))
+
+        // 3. Fallback copies email address to clipboard if no email app is installed
+        val noMailContext = object : ContextWrapper(app) {
+            override fun startActivity(intent: Intent?) {
+                throw ActivityNotFoundException("No email client")
+            }
+        }
+        val launched = openFeedbackEmail(
+            context = noMailContext,
+            subject = subject,
+            body = body,
+        )
+        assertFalse(launched)
+        val clipboard = app.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        assertEquals(FEEDBACK_EMAIL_ADDRESS, clipboard.primaryClip?.getItemAt(0)?.text?.toString())
+
+        // 4. Device model formatting avoids duplicating manufacturer prefix
+        assertEquals("Google Pixel 8", formatDeviceModel("Google", "Pixel 8"))
+        assertEquals("Pixel 8", formatDeviceModel("Pixel", "Pixel 8"))
+        assertEquals("Unknown", formatDeviceModel("", ""))
+    }
 
     private fun Modifier.composeTestTagForLazyList(): Modifier =
         this.testTag(ProfileStudioTestTags.LIST)
