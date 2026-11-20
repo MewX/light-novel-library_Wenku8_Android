@@ -11,11 +11,14 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -74,6 +77,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -82,6 +86,8 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
@@ -193,7 +199,13 @@ fun ServerNoticeBannerCard(
                                     openSafeBrowserUrl(context, link.url)
                                 }
                             },
-                            label = { Text(text = link.label) },
+                            label = {
+                                Text(
+                                    text = link.label,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            },
                             trailingIcon = {
                                 Icon(
                                     imageVector = Icons.AutoMirrored.Outlined.OpenInNew,
@@ -405,14 +417,17 @@ fun AccountProfileCard(
                         )
                         Spacer(modifier = Modifier.width(14.dp))
                         Column(modifier = Modifier.weight(1f)) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
+                            FlowRow(
                                 horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalArrangement = Arrangement.spacedBy(4.dp),
+                                itemVerticalAlignment = Alignment.CenterVertically,
                             ) {
                                 Text(
                                     text = profile.nickname.ifEmpty { profile.username },
                                     style = MaterialTheme.typography.titleLarge,
                                     fontWeight = FontWeight.SemiBold,
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis,
                                 )
                                 if (profile.rank.isNotEmpty()) {
                                     Surface(
@@ -424,6 +439,8 @@ fun AccountProfileCard(
                                         Text(
                                             text = profile.rank,
                                             style = MaterialTheme.typography.labelMedium,
+                                            maxLines = 1,
+                                            softWrap = false,
                                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
                                         )
                                     }
@@ -434,30 +451,46 @@ fun AccountProfileCard(
                                 text = stringResource(R.string.auth_username_format, profile.username),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
                             )
                         }
                     }
 
                     Spacer(modifier = Modifier.height(16.dp))
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    ) {
-                        ProfileMetricPill(
-                            label = stringResource(R.string.auth_stat_uid),
-                            value = profile.uid.takeIf { it > 0 }?.toString() ?: "—",
-                            modifier = Modifier.weight(1f),
-                        )
-                        ProfileMetricPill(
-                            label = stringResource(R.string.auth_stat_score),
-                            value = profile.score.toString(),
-                            modifier = Modifier.weight(1f),
-                        )
-                        ProfileMetricPill(
-                            label = stringResource(R.string.auth_stat_experience),
-                            value = profile.experience.toString(),
-                            modifier = Modifier.weight(1f),
-                        )
+                    BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+                        val metricHorizontalPadding = if (maxWidth < 308.dp) 6.dp else 8.dp
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(IntrinsicSize.Min),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        ) {
+                            ProfileMetricPill(
+                                label = stringResource(R.string.auth_stat_uid),
+                                value = profile.uid.takeIf { it > 0 }?.toString() ?: "—",
+                                horizontalPadding = metricHorizontalPadding,
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .fillMaxHeight(),
+                            )
+                            ProfileMetricPill(
+                                label = stringResource(R.string.auth_stat_score),
+                                value = profile.score.toString(),
+                                horizontalPadding = metricHorizontalPadding,
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .fillMaxHeight(),
+                            )
+                            ProfileMetricPill(
+                                label = stringResource(R.string.auth_stat_experience),
+                                value = profile.experience.toString(),
+                                horizontalPadding = metricHorizontalPadding,
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .fillMaxHeight(),
+                            )
+                        }
                     }
 
                     signFeedbackMessageResId?.let { resId ->
@@ -672,6 +705,7 @@ private fun AccountAvatarCircle(
 private fun ProfileMetricPill(
     label: String,
     value: String,
+    horizontalPadding: Dp = 8.dp,
     modifier: Modifier = Modifier,
 ) {
     Surface(
@@ -681,18 +715,30 @@ private fun ProfileMetricPill(
     ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 10.dp),
+            verticalArrangement = Arrangement.Center,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = horizontalPadding, vertical = 10.dp),
         ) {
             Text(
                 text = value,
-                style = MaterialTheme.typography.titleMedium,
+                style = if (value.length >= 6) {
+                    MaterialTheme.typography.titleSmall
+                } else {
+                    MaterialTheme.typography.titleMedium
+                },
                 fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                softWrap = false,
+                overflow = TextOverflow.Ellipsis,
             )
             Spacer(modifier = Modifier.height(2.dp))
             Text(
                 text = label,
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
         }
     }
@@ -874,9 +920,10 @@ fun AccountLoginBottomSheet(
 
             if (registerPageUrl.isNotEmpty() || forgotPasswordUrl.isNotEmpty()) {
                 Spacer(modifier = Modifier.height(8.dp))
-                Row(
+                FlowRow(
                     horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally),
-                    verticalAlignment = Alignment.CenterVertically,
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                    itemVerticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     if (registerPageUrl.isNotEmpty()) {
@@ -917,6 +964,7 @@ fun AccountLoginBottomSheet(
 /**
  * Manual `CheckAppNewVersion` row/card + update confirmation dialog for `Tab 4 · 我的`.
  */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun AppUpdateCheckCard(
     onCheckForUpdate: suspend () -> AppVersionCheckResult,
@@ -925,6 +973,7 @@ fun AppUpdateCheckCard(
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val fontScale = LocalDensity.current.fontScale
 
     var isChecking by remember { mutableStateOf(false) }
     var statusLine by rememberSaveable { mutableStateOf<String?>(null) }
@@ -932,6 +981,32 @@ fun AppUpdateCheckCard(
 
     val checkingLabel = stringResource(R.string.update_checking)
     val failedLabel = stringResource(R.string.update_check_failed)
+
+    val triggerCheck: () -> Unit = {
+        scope.launch {
+            isChecking = true
+            statusLine = checkingLabel
+            try {
+                when (val res = onCheckForUpdate()) {
+                    is AppVersionCheckResult.UpToDate -> {
+                        statusLine = context.getString(
+                            R.string.update_up_to_date_format,
+                            res.currentVersionCode,
+                        )
+                    }
+                    is AppVersionCheckResult.UpdateAvailable -> {
+                        statusLine = null
+                        pendingUpdate = res
+                    }
+                    AppVersionCheckResult.NetworkOrParseFailure -> {
+                        statusLine = failedLabel
+                    }
+                }
+            } finally {
+                isChecking = false
+            }
+        }
+    }
 
     Card(
         colors = CardDefaults.cardColors(
@@ -942,62 +1017,97 @@ fun AppUpdateCheckCard(
             .fillMaxWidth()
             .einkHairlineBorder(MaterialTheme.shapes.large),
     ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 20.dp, vertical = 14.dp),
-        ) {
-            Icon(
-                imageVector = Icons.Outlined.SystemUpdateAlt,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-            )
-            Spacer(modifier = Modifier.width(12.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = stringResource(R.string.update_action_check),
-                    style = MaterialTheme.typography.titleSmall,
-                )
-                statusLine?.let { line ->
-                    Spacer(modifier = Modifier.height(2.dp))
-                    Text(
-                        text = line,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
-            OutlinedButton(
-                enabled = !isChecking,
-                onClick = {
-                    scope.launch {
-                        isChecking = true
-                        statusLine = checkingLabel
-                        try {
-                            when (val res = onCheckForUpdate()) {
-                                is AppVersionCheckResult.UpToDate -> {
-                                    statusLine = context.getString(
-                                        R.string.update_up_to_date_format,
-                                        res.currentVersionCode,
-                                    )
-                                }
-                                is AppVersionCheckResult.UpdateAvailable -> {
-                                    statusLine = null
-                                    pendingUpdate = res
-                                }
-                                AppVersionCheckResult.NetworkOrParseFailure -> {
-                                    statusLine = failedLabel
-                                }
+        BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+            val useStackedLayout = maxWidth < 348.dp || fontScale > 1.1f
+            if (useStackedLayout) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 14.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.SystemUpdateAlt,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = stringResource(R.string.update_action_check),
+                                style = MaterialTheme.typography.titleSmall,
+                            )
+                            statusLine?.let { line ->
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    text = line,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
                             }
-                        } finally {
-                            isChecking = false
                         }
                     }
-                },
-                modifier = Modifier.testTag(ProfileAccountTestTags.CHECK_UPDATE_BUTTON),
-            ) {
-                Text(text = stringResource(R.string.update_action_check))
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        OutlinedButton(
+                            enabled = !isChecking,
+                            onClick = triggerCheck,
+                            modifier = Modifier.testTag(ProfileAccountTestTags.CHECK_UPDATE_BUTTON),
+                        ) {
+                            Text(
+                                text = stringResource(R.string.update_action_check),
+                                maxLines = 1,
+                                softWrap = false,
+                            )
+                        }
+                    }
+                }
+            } else {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 20.dp, vertical = 14.dp),
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.SystemUpdateAlt,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = stringResource(R.string.update_action_check),
+                            style = MaterialTheme.typography.titleSmall,
+                        )
+                        statusLine?.let { line ->
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = line,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    OutlinedButton(
+                        enabled = !isChecking,
+                        onClick = triggerCheck,
+                        modifier = Modifier.testTag(ProfileAccountTestTags.CHECK_UPDATE_BUTTON),
+                    ) {
+                        Text(
+                            text = stringResource(R.string.update_action_check),
+                            maxLines = 1,
+                            softWrap = false,
+                        )
+                    }
+                }
             }
         }
     }
@@ -1035,6 +1145,7 @@ internal fun distributionChannelLabel(
  * Channel-aware update card driven by [AppUpdateUiState] (`playstore` Flexible In-App Updates
  * vs `default` external release-page updates).
  */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun AppUpdateCheckCard(
     uiState: AppUpdateUiState,
@@ -1047,6 +1158,7 @@ fun AppUpdateCheckCard(
 ) {
     val context = LocalContext.current
     val isEink = LocalEinkMode.current
+    val fontScale = LocalDensity.current.fontScale
     val isHighlighted = uiState is AppUpdateUiState.UpdateAvailable ||
         uiState is AppUpdateUiState.ReadyToInstall
     val channelLabel = distributionChannelLabel(isPlayStoreChannel)
@@ -1083,6 +1195,82 @@ fun AppUpdateCheckCard(
         }
     }
 
+    val renderActionButton: @Composable () -> Unit = {
+        when (uiState) {
+            AppUpdateUiState.ReadyToInstall -> {
+                Button(
+                    onClick = onCompleteUpdate,
+                    modifier = Modifier.testTag(ProfileAccountTestTags.UPDATE_RESTART_INSTALL_BUTTON),
+                ) {
+                    Text(
+                        text = stringResource(R.string.update_action_restart_install),
+                        maxLines = 1,
+                        softWrap = false,
+                    )
+                }
+            }
+            is AppUpdateUiState.UpdateAvailable -> {
+                Button(
+                    onClick = {
+                        if (uiState.isPlayStoreManaged) {
+                            onCheckForUpdate()
+                        } else {
+                            val url = uiState.downloadPageUrl.orEmpty()
+                            if (url.isNotBlank()) {
+                                if (onOpenDownloadUrl != null) {
+                                    onOpenDownloadUrl(url)
+                                } else {
+                                    openSafeBrowserUrl(context, url)
+                                }
+                            } else {
+                                onCheckForUpdate()
+                            }
+                        }
+                    },
+                    modifier = Modifier.testTag(ProfileAccountTestTags.CHECK_UPDATE_BUTTON),
+                ) {
+                    Text(
+                        text = stringResource(
+                            if (uiState.isPlayStoreManaged) {
+                                R.string.update_action_update_now
+                            } else {
+                                R.string.update_action_download
+                            },
+                        ),
+                        maxLines = 1,
+                        softWrap = false,
+                    )
+                }
+            }
+            is AppUpdateUiState.Downloading -> {
+                OutlinedButton(
+                    enabled = false,
+                    onClick = {},
+                    modifier = Modifier.testTag(ProfileAccountTestTags.CHECK_UPDATE_BUTTON),
+                ) {
+                    Text(
+                        text = stringResource(R.string.update_action_check),
+                        maxLines = 1,
+                        softWrap = false,
+                    )
+                }
+            }
+            else -> {
+                OutlinedButton(
+                    enabled = uiState !is AppUpdateUiState.Checking,
+                    onClick = onCheckForUpdate,
+                    modifier = Modifier.testTag(ProfileAccountTestTags.CHECK_UPDATE_BUTTON),
+                ) {
+                    Text(
+                        text = stringResource(R.string.update_action_check),
+                        maxLines = 1,
+                        softWrap = false,
+                    )
+                }
+            }
+        }
+    }
+
     Card(
         colors = CardDefaults.cardColors(
             containerColor = if (isHighlighted && !isEink) {
@@ -1096,108 +1284,97 @@ fun AppUpdateCheckCard(
             .fillMaxWidth()
             .einkHairlineBorder(MaterialTheme.shapes.large),
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 20.dp, vertical = 14.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxWidth(),
+        BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+            val useStackedLayout = maxWidth < 348.dp || fontScale > 1.1f
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = if (useStackedLayout) 16.dp else 20.dp, vertical = 14.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                Icon(
-                    imageVector = Icons.Outlined.SystemUpdateAlt,
-                    contentDescription = null,
-                    tint = if (isHighlighted && !isEink) {
-                        MaterialTheme.colorScheme.onSecondaryContainer
-                    } else {
-                        MaterialTheme.colorScheme.primary
-                    },
-                )
-                Spacer(modifier = Modifier.width(12.dp))
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = stringResource(R.string.update_action_check),
-                        style = MaterialTheme.typography.titleSmall,
-                        color = if (isHighlighted && !isEink) {
-                            MaterialTheme.colorScheme.onSecondaryContainer
-                        } else {
-                            MaterialTheme.colorScheme.onSurface
-                        },
-                    )
-                    Spacer(modifier = Modifier.height(2.dp))
-                    Text(
-                        text = statusLine,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = if (isHighlighted && !isEink) {
-                            MaterialTheme.colorScheme.onSecondaryContainer
-                        } else {
-                            MaterialTheme.colorScheme.onSurfaceVariant
-                        },
-                    )
-                }
-                Spacer(modifier = Modifier.width(8.dp))
-                when (uiState) {
-                    AppUpdateUiState.ReadyToInstall -> {
-                        Button(
-                            onClick = onCompleteUpdate,
-                            modifier = Modifier.testTag(ProfileAccountTestTags.UPDATE_RESTART_INSTALL_BUTTON),
-                        ) {
-                            Text(text = stringResource(R.string.update_action_restart_install))
-                        }
-                    }
-                    is AppUpdateUiState.UpdateAvailable -> {
-                        Button(
-                            onClick = {
-                                if (uiState.isPlayStoreManaged) {
-                                    onCheckForUpdate()
-                                } else {
-                                    val url = uiState.downloadPageUrl.orEmpty()
-                                    if (url.isNotBlank()) {
-                                        if (onOpenDownloadUrl != null) {
-                                            onOpenDownloadUrl(url)
-                                        } else {
-                                            openSafeBrowserUrl(context, url)
-                                        }
-                                    } else {
-                                        onCheckForUpdate()
-                                    }
-                                }
+                if (useStackedLayout) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.SystemUpdateAlt,
+                            contentDescription = null,
+                            tint = if (isHighlighted && !isEink) {
+                                MaterialTheme.colorScheme.onSecondaryContainer
+                            } else {
+                                MaterialTheme.colorScheme.primary
                             },
-                            modifier = Modifier.testTag(ProfileAccountTestTags.CHECK_UPDATE_BUTTON),
-                        ) {
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = stringResource(
-                                    if (uiState.isPlayStoreManaged) {
-                                        R.string.update_action_update_now
-                                    } else {
-                                        R.string.update_action_download
-                                    },
-                                ),
+                                text = stringResource(R.string.update_action_check),
+                                style = MaterialTheme.typography.titleSmall,
+                                color = if (isHighlighted && !isEink) {
+                                    MaterialTheme.colorScheme.onSecondaryContainer
+                                } else {
+                                    MaterialTheme.colorScheme.onSurface
+                                },
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = statusLine,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = if (isHighlighted && !isEink) {
+                                    MaterialTheme.colorScheme.onSecondaryContainer
+                                } else {
+                                    MaterialTheme.colorScheme.onSurfaceVariant
+                                },
                             )
                         }
                     }
-                    is AppUpdateUiState.Downloading -> {
-                        OutlinedButton(
-                            enabled = false,
-                            onClick = {},
-                            modifier = Modifier.testTag(ProfileAccountTestTags.CHECK_UPDATE_BUTTON),
-                        ) {
-                            Text(text = stringResource(R.string.update_action_check))
-                        }
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        renderActionButton()
                     }
-                    else -> {
-                        OutlinedButton(
-                            enabled = uiState !is AppUpdateUiState.Checking,
-                            onClick = onCheckForUpdate,
-                            modifier = Modifier.testTag(ProfileAccountTestTags.CHECK_UPDATE_BUTTON),
-                        ) {
-                            Text(text = stringResource(R.string.update_action_check))
+                } else {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.SystemUpdateAlt,
+                            contentDescription = null,
+                            tint = if (isHighlighted && !isEink) {
+                                MaterialTheme.colorScheme.onSecondaryContainer
+                            } else {
+                                MaterialTheme.colorScheme.primary
+                            },
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = stringResource(R.string.update_action_check),
+                                style = MaterialTheme.typography.titleSmall,
+                                color = if (isHighlighted && !isEink) {
+                                    MaterialTheme.colorScheme.onSecondaryContainer
+                                } else {
+                                    MaterialTheme.colorScheme.onSurface
+                                },
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = statusLine,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = if (isHighlighted && !isEink) {
+                                    MaterialTheme.colorScheme.onSecondaryContainer
+                                } else {
+                                    MaterialTheme.colorScheme.onSurfaceVariant
+                                },
+                            )
                         }
+                        Spacer(modifier = Modifier.width(8.dp))
+                        renderActionButton()
                     }
                 }
-            }
 
             if (uiState is AppUpdateUiState.Downloading) {
                 val fraction = uiState.progressFraction
@@ -1235,6 +1412,7 @@ fun AppUpdateCheckCard(
                         Text(text = stringResource(R.string.update_action_open_play_store))
                     }
                 }
+            }
             }
         }
     }

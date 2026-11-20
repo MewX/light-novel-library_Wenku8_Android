@@ -7,12 +7,15 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -66,7 +69,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
@@ -75,6 +81,8 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.documentfile.provider.DocumentFile
@@ -369,9 +377,20 @@ fun ProfileAndStudioScreen(
         }
     }
 
+    val density = LocalDensity.current
+    val initialScreenWidthDp = LocalConfiguration.current.screenWidthDp.dp
+    var listWidthDp by remember(initialScreenWidthDp) { mutableStateOf(initialScreenWidthDp) }
+    val horizontalPadding = if (listWidthDp < 360.dp) 16.dp else 20.dp
+
     LazyColumn(
-        modifier = modifier.fillMaxSize(),
-        contentPadding = PaddingValues(horizontal = 20.dp, vertical = 16.dp),
+        modifier = modifier
+            .fillMaxSize()
+            .onSizeChanged { size ->
+                if (size.width > 0) {
+                    listWidthDp = with(density) { size.width.toDp() }
+                }
+            },
+        contentPadding = PaddingValues(horizontal = horizontalPadding, vertical = 16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         if (showOfflineFallbackBanner) {
@@ -670,51 +689,109 @@ private fun ReadingFootprintCard(
                 style = MaterialTheme.typography.titleMedium,
             )
             Spacer(modifier = Modifier.height(14.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                FootprintMetricTile(
-                    valueText = stringResource(R.string.profile_footprint_minutes_format, totalMinutes),
-                    labelText = stringResource(R.string.profile_footprint_minutes_label),
-                    modifier = Modifier.weight(1f),
-                )
-                FootprintMetricTile(
-                    valueText = formatCompactCount(totalCharactersRead),
-                    labelText = stringResource(R.string.profile_footprint_chars_label),
-                    modifier = Modifier.weight(1f),
-                )
-                FootprintMetricTile(
-                    valueText = totalBookmarkNoteCount.toString(),
-                    labelText = stringResource(R.string.profile_footprint_notes_label),
-                    modifier = Modifier.weight(1f),
-                )
-            }
-            Spacer(modifier = Modifier.height(12.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                FilledTonalButton(
-                    onClick = { onOpenReadingFootprint(ReadingFootprintTab.STATS) },
-                    modifier = Modifier
-                        .weight(1f)
-                        .testTag(ProfileStudioTestTags.OPEN_FOOTPRINT_STATS_BUTTON),
-                ) {
-                    Text(text = stringResource(R.string.profile_footprint_open_stats))
-                }
-                OutlinedButton(
-                    onClick = { onOpenReadingFootprint(ReadingFootprintTab.BOOKMARKS) },
-                    modifier = Modifier
-                        .weight(1f)
-                        .testTag(ProfileStudioTestTags.OPEN_FOOTPRINT_BOOKMARKS_BUTTON),
-                ) {
-                    Text(
-                        text = stringResource(
-                            R.string.profile_footprint_open_bookmarks_format,
-                            totalBookmarkNoteCount,
-                        ),
-                    )
+            BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+                val isCompactCard = maxWidth < 316.dp
+                val tileHorizontalPadding = if (isCompactCard) 8.dp else 12.dp
+                val useCompactWrappingActions = isCompactCard || LocalDensity.current.fontScale > 1.05f
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(IntrinsicSize.Min),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        FootprintMetricTile(
+                            valueText = stringResource(R.string.profile_footprint_minutes_format, totalMinutes),
+                            labelText = stringResource(R.string.profile_footprint_minutes_label),
+                            horizontalPadding = tileHorizontalPadding,
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxHeight(),
+                        )
+                        FootprintMetricTile(
+                            valueText = formatCompactCount(totalCharactersRead),
+                            labelText = stringResource(R.string.profile_footprint_chars_label),
+                            horizontalPadding = tileHorizontalPadding,
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxHeight(),
+                        )
+                        FootprintMetricTile(
+                            valueText = totalBookmarkNoteCount.toString(),
+                            labelText = stringResource(R.string.profile_footprint_notes_label),
+                            horizontalPadding = tileHorizontalPadding,
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxHeight(),
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(12.dp))
+                    if (useCompactWrappingActions) {
+                        FlowRow(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            FilledTonalButton(
+                                onClick = { onOpenReadingFootprint(ReadingFootprintTab.STATS) },
+                                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp),
+                                modifier = Modifier.testTag(ProfileStudioTestTags.OPEN_FOOTPRINT_STATS_BUTTON),
+                            ) {
+                                Text(
+                                    text = stringResource(R.string.profile_footprint_open_stats),
+                                    maxLines = 1,
+                                    softWrap = false,
+                                )
+                            }
+                            OutlinedButton(
+                                onClick = { onOpenReadingFootprint(ReadingFootprintTab.BOOKMARKS) },
+                                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp),
+                                modifier = Modifier.testTag(ProfileStudioTestTags.OPEN_FOOTPRINT_BOOKMARKS_BUTTON),
+                            ) {
+                                Text(
+                                    text = stringResource(
+                                        R.string.profile_footprint_open_bookmarks_format,
+                                        totalBookmarkNoteCount,
+                                    ),
+                                    maxLines = 1,
+                                    softWrap = false,
+                                )
+                            }
+                        }
+                    } else {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        ) {
+                            FilledTonalButton(
+                                onClick = { onOpenReadingFootprint(ReadingFootprintTab.STATS) },
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .testTag(ProfileStudioTestTags.OPEN_FOOTPRINT_STATS_BUTTON),
+                            ) {
+                                Text(
+                                    text = stringResource(R.string.profile_footprint_open_stats),
+                                    maxLines = 1,
+                                    softWrap = false,
+                                )
+                            }
+                            OutlinedButton(
+                                onClick = { onOpenReadingFootprint(ReadingFootprintTab.BOOKMARKS) },
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .testTag(ProfileStudioTestTags.OPEN_FOOTPRINT_BOOKMARKS_BUTTON),
+                            ) {
+                                Text(
+                                    text = stringResource(
+                                        R.string.profile_footprint_open_bookmarks_format,
+                                        totalBookmarkNoteCount,
+                                    ),
+                                    maxLines = 1,
+                                    softWrap = false,
+                                )
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -725,6 +802,7 @@ private fun ReadingFootprintCard(
 private fun FootprintMetricTile(
     valueText: String,
     labelText: String,
+    horizontalPadding: Dp = 12.dp,
     modifier: Modifier = Modifier,
 ) {
     Surface(
@@ -733,20 +811,29 @@ private fun FootprintMetricTile(
         modifier = modifier.einkHairlineBorder(MaterialTheme.shapes.medium),
     ) {
         Column(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 12.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = horizontalPadding, vertical = 12.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
         ) {
             Text(
                 text = valueText,
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                softWrap = false,
+                overflow = TextOverflow.Ellipsis,
             )
             Spacer(modifier = Modifier.height(2.dp))
             Text(
                 text = labelText,
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 2,
+                textAlign = TextAlign.Center,
+                overflow = TextOverflow.Ellipsis,
             )
         }
     }
@@ -1123,20 +1210,25 @@ private fun ReaderDefaultTypographyCard(
             modifier = Modifier.padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            Row(
+            FlowRow(
                 modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+                itemVerticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
                     text = stringResource(R.string.profile_reader_studio_title),
                     style = MaterialTheme.typography.titleMedium,
-                    modifier = Modifier.weight(1f),
                 )
                 TextButton(
                     onClick = onResetTypography,
                     modifier = Modifier.testTag(ProfileStudioTestTags.RESET_TYPOGRAPHY_BUTTON),
                 ) {
-                    Text(text = stringResource(R.string.profile_reader_reset_typography))
+                    Text(
+                        text = stringResource(R.string.profile_reader_reset_typography),
+                        maxLines = 1,
+                        softWrap = false,
+                    )
                 }
             }
 
@@ -1401,6 +1493,7 @@ private fun StorageAndBackupStudioCard(
     onRequestImportBackup: () -> Unit,
     onRequestImportLegacySaf: () -> Unit,
 ) {
+    val fontScale = LocalDensity.current.fontScale
     Card(
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceContainer,
@@ -1433,6 +1526,7 @@ private fun StorageAndBackupStudioCard(
                     FilledTonalButton(
                         onClick = onRunFastClean,
                         enabled = isCacheCleanAvailable,
+                        contentPadding = ButtonDefaults.ButtonWithIconContentPadding,
                         modifier = Modifier.testTag(ProfileStudioTestTags.FAST_CLEAN_BUTTON),
                     ) {
                         Icon(
@@ -1441,12 +1535,17 @@ private fun StorageAndBackupStudioCard(
                             modifier = Modifier.size(ButtonDefaults.IconSize),
                         )
                         Spacer(modifier = Modifier.width(ButtonDefaults.IconSpacing))
-                        Text(text = stringResource(R.string.profile_cache_fast_action))
+                        Text(
+                            text = stringResource(R.string.profile_cache_fast_action),
+                            maxLines = 1,
+                            softWrap = false,
+                        )
                     }
 
                     OutlinedButton(
                         onClick = onRunDeepClean,
                         enabled = isCacheCleanAvailable,
+                        contentPadding = ButtonDefaults.ButtonWithIconContentPadding,
                         modifier = Modifier.testTag(ProfileStudioTestTags.DEEP_CLEAN_BUTTON),
                     ) {
                         Icon(
@@ -1455,7 +1554,11 @@ private fun StorageAndBackupStudioCard(
                             modifier = Modifier.size(ButtonDefaults.IconSize),
                         )
                         Spacer(modifier = Modifier.width(ButtonDefaults.IconSpacing))
-                        Text(text = stringResource(R.string.profile_cache_deep_action))
+                        Text(
+                            text = stringResource(R.string.profile_cache_deep_action),
+                            maxLines = 1,
+                            softWrap = false,
+                        )
                     }
                 }
             }
@@ -1470,6 +1573,7 @@ private fun StorageAndBackupStudioCard(
                 FilledTonalButton(
                     onClick = onRequestExportBackup,
                     enabled = isBackupAvailable,
+                    contentPadding = ButtonDefaults.ButtonWithIconContentPadding,
                     modifier = Modifier.testTag(ProfileStudioTestTags.EXPORT_BACKUP_BUTTON),
                 ) {
                     Icon(
@@ -1478,12 +1582,17 @@ private fun StorageAndBackupStudioCard(
                         modifier = Modifier.size(ButtonDefaults.IconSize),
                     )
                     Spacer(modifier = Modifier.width(ButtonDefaults.IconSpacing))
-                    Text(text = stringResource(R.string.profile_backup_export_action))
+                    Text(
+                        text = stringResource(R.string.profile_backup_export_action),
+                        maxLines = 1,
+                        softWrap = false,
+                    )
                 }
 
                 OutlinedButton(
                     onClick = onRequestImportBackup,
                     enabled = isBackupAvailable,
+                    contentPadding = ButtonDefaults.ButtonWithIconContentPadding,
                     modifier = Modifier.testTag(ProfileStudioTestTags.IMPORT_BACKUP_BUTTON),
                 ) {
                     Icon(
@@ -1492,20 +1601,56 @@ private fun StorageAndBackupStudioCard(
                         modifier = Modifier.size(ButtonDefaults.IconSize),
                     )
                     Spacer(modifier = Modifier.width(ButtonDefaults.IconSpacing))
-                    Text(text = stringResource(R.string.profile_backup_import_action))
+                    Text(
+                        text = stringResource(R.string.profile_backup_import_action),
+                        maxLines = 1,
+                        softWrap = false,
+                    )
                 }
             }
 
             // Legacy v1.x External Folder SAF Import
-            AssistChip(
-                onClick = onRequestImportLegacySaf,
-                enabled = isLegacySafAvailable,
-                label = { Text(text = stringResource(R.string.profile_legacy_saf_import_action)) },
-                leadingIcon = {
-                    Icon(imageVector = Icons.Outlined.FolderOpen, contentDescription = null)
-                },
-                modifier = Modifier.testTag(ProfileStudioTestTags.IMPORT_LEGACY_SAF_BUTTON),
-            )
+            BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+                val useWrapSafeButton = maxWidth < 316.dp || fontScale > 1.05f
+                if (useWrapSafeButton) {
+                    OutlinedButton(
+                        onClick = onRequestImportLegacySaf,
+                        enabled = isLegacySafAvailable,
+                        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag(ProfileStudioTestTags.IMPORT_LEGACY_SAF_BUTTON),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.FolderOpen,
+                            contentDescription = null,
+                            modifier = Modifier.size(ButtonDefaults.IconSize),
+                        )
+                        Spacer(modifier = Modifier.width(ButtonDefaults.IconSpacing))
+                        Text(
+                            text = stringResource(R.string.profile_legacy_saf_import_action),
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                } else {
+                    AssistChip(
+                        onClick = onRequestImportLegacySaf,
+                        enabled = isLegacySafAvailable,
+                        label = {
+                            Text(
+                                text = stringResource(R.string.profile_legacy_saf_import_action),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        },
+                        leadingIcon = {
+                            Icon(imageVector = Icons.Outlined.FolderOpen, contentDescription = null)
+                        },
+                        modifier = Modifier.testTag(ProfileStudioTestTags.IMPORT_LEGACY_SAF_BUTTON),
+                    )
+                }
+            }
 
             if (statusMessage != null) {
                 Surface(
@@ -1663,7 +1808,10 @@ private fun BackupExportModeDialog(
         onDismissRequest = onDismiss,
         title = { Text(text = stringResource(R.string.profile_backup_mode_dialog_title)) },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
                 Surface(
                     color = MaterialTheme.colorScheme.secondaryContainer,
                     shape = MaterialTheme.shapes.medium,

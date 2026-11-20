@@ -18,10 +18,12 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -29,6 +31,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -77,6 +80,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.PlatformTextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -93,6 +97,7 @@ import org.mewx.wenku8.data.local.db.dao.BookmarkNoteWithNovel
 import org.mewx.wenku8.data.local.db.dao.ReadingHistoryWithNovel
 import org.mewx.wenku8.data.local.db.entity.ReadingSessionEntity
 import org.mewx.wenku8.data.media.WenkuImageRequests
+import org.mewx.wenku8.ui.components.horizontalScrollFadeEdge
 import org.mewx.wenku8.domain.model.DiscoveryNovelCardItem
 import org.mewx.wenku8.ui.components.TooltipIconButton
 import org.mewx.wenku8.ui.detail.ReaderLaunchRequest
@@ -703,225 +708,272 @@ private fun ReadingStatsHeatmapTabContent(
 
     val totalMinutes = (stats.totalReadingSeconds / 60L).coerceAtLeast(0L)
 
-    LazyColumn(
-        modifier = modifier,
-        contentPadding = PaddingValues(horizontal = 20.dp, vertical = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-    ) {
-        // 1. Streak & Cumulative Overview Card
-        item(key = "stats_streak_hero_card") {
-            Card(
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceContainer,
-                ),
-                shape = MaterialTheme.shapes.large,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .einkHairlineBorder(MaterialTheme.shapes.large),
-            ) {
-                Column(modifier = Modifier.padding(20.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    ) {
-                        Surface(
-                            color = MaterialTheme.colorScheme.primaryContainer,
-                            contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                            shape = MaterialTheme.shapes.medium,
-                            modifier = Modifier.einkHairlineBorder(MaterialTheme.shapes.medium),
+    val fontScale = LocalDensity.current.fontScale
+    BoxWithConstraints(modifier = modifier) {
+        val horizontalPadding = if (maxWidth < 360.dp) 16.dp else 20.dp
+        val isCompactCard = maxWidth < 360.dp || fontScale > 1.1f
+
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(horizontal = horizontalPadding, vertical = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            // 1. Streak & Cumulative Overview Card
+            item(key = "stats_streak_hero_card") {
+                Card(
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                    ),
+                    shape = MaterialTheme.shapes.large,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .einkHairlineBorder(MaterialTheme.shapes.large),
+                ) {
+                    Column(modifier = Modifier.padding(if (isCompactCard) 16.dp else 20.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(if (isCompactCard) 8.dp else 12.dp),
                         ) {
-                            Icon(
-                                imageVector = Icons.Outlined.LocalFireDepartment,
-                                contentDescription = null,
-                                modifier = Modifier.padding(12.dp),
-                            )
-                        }
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = stringResource(R.string.footprint_streak_current_label),
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                            Text(
-                                text = stringResource(
-                                    R.string.footprint_streak_days_format,
-                                    stats.currentStreakDays,
-                                ),
-                                style = MaterialTheme.typography.headlineMedium,
-                                fontWeight = FontWeight.Bold,
-                                modifier = Modifier.testTag(ReadingFootprintTestTags.CURRENT_STREAK_VALUE),
-                            )
-                        }
-                        Column(horizontalAlignment = Alignment.End) {
-                            Text(
-                                text = stringResource(R.string.footprint_streak_longest_label),
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                            Text(
-                                text = stringResource(
-                                    R.string.footprint_streak_days_format,
-                                    stats.longestStreakDays,
-                                ),
-                                style = MaterialTheme.typography.titleLarge,
-                                fontWeight = FontWeight.SemiBold,
-                                modifier = Modifier.testTag(ReadingFootprintTestTags.LONGEST_STREAK_VALUE),
-                            )
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    ) {
-                        StatsMetricBox(
-                            valueText = stringResource(R.string.profile_footprint_minutes_format, totalMinutes),
-                            labelText = stringResource(R.string.profile_footprint_minutes_label),
-                            modifier = Modifier.weight(1f),
-                        )
-                        StatsMetricBox(
-                            valueText = formatPosterCompactCount(stats.totalCharactersRead),
-                            labelText = stringResource(R.string.profile_footprint_chars_label),
-                            modifier = Modifier.weight(1f),
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(10.dp))
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    ) {
-                        StatsMetricBox(
-                            valueText = stringResource(
-                                R.string.footprint_streak_days_format,
-                                stats.activeDaysCount,
-                            ),
-                            labelText = stringResource(R.string.footprint_active_days_label),
-                            modifier = Modifier.weight(1f),
-                        )
-                        StatsMetricBox(
-                            valueText = if (stats.averageSpeedCharsPerMinute > 0) {
-                                stringResource(
-                                    R.string.footprint_speed_cpm_format,
-                                    stats.averageSpeedCharsPerMinute,
+                            Surface(
+                                color = MaterialTheme.colorScheme.primaryContainer,
+                                contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                                shape = MaterialTheme.shapes.medium,
+                                modifier = Modifier.einkHairlineBorder(MaterialTheme.shapes.medium),
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Outlined.LocalFireDepartment,
+                                    contentDescription = null,
+                                    modifier = Modifier.padding(12.dp),
                                 )
-                            } else {
-                                "$bookmarkCount"
-                            },
-                            labelText = if (stats.averageSpeedCharsPerMinute > 0) {
-                                stringResource(R.string.footprint_speed_label)
-                            } else {
-                                stringResource(R.string.profile_footprint_notes_label)
-                            },
-                            modifier = Modifier.weight(1f),
-                        )
+                            }
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = stringResource(R.string.footprint_streak_current_label),
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                                Text(
+                                    text = stringResource(
+                                        R.string.footprint_streak_days_format,
+                                        stats.currentStreakDays,
+                                    ),
+                                    style = if (isCompactCard) {
+                                        MaterialTheme.typography.titleLarge
+                                    } else {
+                                        MaterialTheme.typography.headlineMedium
+                                    },
+                                    fontWeight = FontWeight.Bold,
+                                    maxLines = 1,
+                                    softWrap = false,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.testTag(ReadingFootprintTestTags.CURRENT_STREAK_VALUE),
+                                )
+                            }
+                            Column(horizontalAlignment = Alignment.End) {
+                                Text(
+                                    text = stringResource(R.string.footprint_streak_longest_label),
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                                Text(
+                                    text = stringResource(
+                                        R.string.footprint_streak_days_format,
+                                        stats.longestStreakDays,
+                                    ),
+                                    style = if (isCompactCard) {
+                                        MaterialTheme.typography.titleMedium
+                                    } else {
+                                        MaterialTheme.typography.titleLarge
+                                    },
+                                    fontWeight = FontWeight.SemiBold,
+                                    maxLines = 1,
+                                    softWrap = false,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.testTag(ReadingFootprintTestTags.LONGEST_STREAK_VALUE),
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(IntrinsicSize.Min),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        ) {
+                            StatsMetricBox(
+                                valueText = stringResource(R.string.profile_footprint_minutes_format, totalMinutes),
+                                labelText = stringResource(R.string.profile_footprint_minutes_label),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .fillMaxHeight(),
+                            )
+                            StatsMetricBox(
+                                valueText = formatPosterCompactCount(stats.totalCharactersRead),
+                                labelText = stringResource(R.string.profile_footprint_chars_label),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .fillMaxHeight(),
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(IntrinsicSize.Min),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        ) {
+                            StatsMetricBox(
+                                valueText = stringResource(
+                                    R.string.footprint_streak_days_format,
+                                    stats.activeDaysCount,
+                                ),
+                                labelText = stringResource(R.string.footprint_active_days_label),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .fillMaxHeight(),
+                            )
+                            StatsMetricBox(
+                                valueText = if (stats.averageSpeedCharsPerMinute > 0) {
+                                    stringResource(
+                                        R.string.footprint_speed_cpm_format,
+                                        stats.averageSpeedCharsPerMinute,
+                                    )
+                                } else {
+                                    "$bookmarkCount"
+                                },
+                                labelText = if (stats.averageSpeedCharsPerMinute > 0) {
+                                    stringResource(R.string.footprint_speed_label)
+                                } else {
+                                    stringResource(R.string.profile_footprint_notes_label)
+                                },
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .fillMaxHeight(),
+                            )
+                        }
                     }
                 }
             }
-        }
 
-        // 2. Interactive 16-Week Daily Reading Activity Heatmap
-        item(key = "stats_calendar_heatmap_card") {
-            Card(
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceContainer,
-                ),
-                shape = MaterialTheme.shapes.large,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .einkHairlineBorder(MaterialTheme.shapes.large),
-            ) {
-                Column(modifier = Modifier.padding(20.dp)) {
-                    Text(
-                        text = stringResource(R.string.footprint_heatmap_title),
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold,
-                    )
-                    Spacer(modifier = Modifier.height(14.dp))
+            // 2. Interactive 16-Week Daily Reading Activity Heatmap
+            item(key = "stats_calendar_heatmap_card") {
+                Card(
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                    ),
+                    shape = MaterialTheme.shapes.large,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .einkHairlineBorder(MaterialTheme.shapes.large),
+                ) {
+                    Column(modifier = Modifier.padding(if (isCompactCard) 16.dp else 20.dp)) {
+                        Text(
+                            text = stringResource(R.string.footprint_heatmap_title),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                        Spacer(modifier = Modifier.height(14.dp))
 
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .horizontalScroll(rememberScrollState(initial = Int.MAX_VALUE))
-                            .testTag(ReadingFootprintTestTags.HEATMAP_GRID),
-                        horizontalArrangement = Arrangement.spacedBy(5.dp),
-                    ) {
-                        // Weekday legend column (Mon..Sun)
-                        val weekdayLabels = listOf("一", "", "三", "", "五", "", "日")
-                        Column(
-                            verticalArrangement = Arrangement.spacedBy(5.dp),
-                            modifier = Modifier.padding(end = 4.dp),
+                        val heatmapScrollState = rememberScrollState(initial = Int.MAX_VALUE)
+                        val heatmapFadeColor = MaterialTheme.colorScheme.surfaceContainer
+                        val weekdayLabelStyle = MaterialTheme.typography.labelSmall.copy(
+                            platformStyle = PlatformTextStyle(includeFontPadding = false),
+                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.Top,
                         ) {
-                            weekdayLabels.forEach { label ->
-                                Box(
-                                    modifier = Modifier.size(16.dp),
-                                    contentAlignment = Alignment.Center,
-                                ) {
-                                    if (label.isNotEmpty()) {
-                                        Text(
-                                            text = label,
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        )
+                            // Pinned weekday legend column (Mon..Sun) outside horizontalScroll
+                            val weekdayLabels = listOf("一", "", "三", "", "五", "", "日")
+                            Column(
+                                verticalArrangement = Arrangement.spacedBy(5.dp),
+                                modifier = Modifier.padding(end = 6.dp),
+                            ) {
+                                weekdayLabels.forEach { label ->
+                                    Box(
+                                        modifier = Modifier.size(16.dp),
+                                        contentAlignment = Alignment.Center,
+                                    ) {
+                                        if (label.isNotEmpty()) {
+                                            Text(
+                                                text = label,
+                                                style = weekdayLabelStyle,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                maxLines = 1,
+                                                softWrap = false,
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+
+                            Row(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .horizontalScrollFadeEdge(
+                                        scrollState = heatmapScrollState,
+                                        fadeColor = heatmapFadeColor,
+                                        isEink = isEinkMode,
+                                    )
+                                    .horizontalScroll(heatmapScrollState)
+                                    .testTag(ReadingFootprintTestTags.HEATMAP_GRID),
+                                horizontalArrangement = Arrangement.spacedBy(5.dp),
+                            ) {
+                                stats.heatmapWeeks.forEach { weekColumn ->
+                                    Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                                        weekColumn.forEach { cell ->
+                                            val isSelected = cell.epochDay == selectedCellEpochDay
+                                            val cellColor = heatmapCellColor(
+                                                level = cell.intensityLevel,
+                                                isFutureDay = cell.isFutureDay,
+                                                isEinkMode = isEinkMode,
+                                            )
+                                            val cellShape = RoundedCornerShape(4.dp)
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(16.dp)
+                                                    .clip(cellShape)
+                                                    .background(cellColor)
+                                                    .then(
+                                                        if (isSelected) {
+                                                            Modifier.border(
+                                                                width = 1.5.dp,
+                                                                color = MaterialTheme.colorScheme.onSurface,
+                                                                shape = cellShape,
+                                                            )
+                                                        } else if (isEinkMode && !cell.isFutureDay) {
+                                                            Modifier.border(
+                                                                width = 0.75.dp,
+                                                                color = MaterialTheme.colorScheme.outline,
+                                                                shape = cellShape,
+                                                            )
+                                                        } else {
+                                                            Modifier
+                                                        },
+                                                    )
+                                                    .clickable(enabled = !cell.isFutureDay) {
+                                                        selectedCellEpochDay = cell.epochDay
+                                                    }
+                                                    .testTag("${ReadingFootprintTestTags.HEATMAP_CELL_PREFIX}${cell.epochDay}"),
+                                            )
+                                        }
                                     }
                                 }
                             }
                         }
 
-                        stats.heatmapWeeks.forEach { weekColumn ->
-                            Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                                weekColumn.forEach { cell ->
-                                    val isSelected = cell.epochDay == selectedCellEpochDay
-                                    val cellColor = heatmapCellColor(
-                                        level = cell.intensityLevel,
-                                        isFutureDay = cell.isFutureDay,
-                                        isEinkMode = isEinkMode,
-                                    )
-                                    val cellShape = RoundedCornerShape(4.dp)
-                                    Box(
-                                        modifier = Modifier
-                                            .size(16.dp)
-                                            .clip(cellShape)
-                                            .background(cellColor)
-                                            .then(
-                                                if (isSelected) {
-                                                    Modifier.border(
-                                                        width = 1.5.dp,
-                                                        color = MaterialTheme.colorScheme.onSurface,
-                                                        shape = cellShape,
-                                                    )
-                                                } else if (isEinkMode && !cell.isFutureDay) {
-                                                    Modifier.border(
-                                                        width = 0.75.dp,
-                                                        color = MaterialTheme.colorScheme.outline,
-                                                        shape = cellShape,
-                                                    )
-                                                } else {
-                                                    Modifier
-                                                },
-                                            )
-                                            .clickable(enabled = !cell.isFutureDay) {
-                                                selectedCellEpochDay = cell.epochDay
-                                            }
-                                            .testTag("${ReadingFootprintTestTags.HEATMAP_CELL_PREFIX}${cell.epochDay}"),
-                                    )
-                                }
-                            }
-                        }
-                    }
+                        Spacer(modifier = Modifier.height(14.dp))
 
-                    Spacer(modifier = Modifier.height(14.dp))
-
-                    // Legend + Selected Day Readout
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                    ) {
+                        // Legend + Selected Day Readout
                         val inspected = selectedCell
                         val readoutText = if (inspected != null) {
                             val dateStr = LocalDate.ofEpochDay(inspected.epochDay)
@@ -939,55 +991,88 @@ private fun ReadingStatsHeatmapTabContent(
                         } else {
                             ""
                         }
-                        Text(
-                            text = readoutText,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier
-                                .weight(1f)
-                                .testTag(ReadingFootprintTestTags.HEATMAP_SELECTED_LABEL),
-                        )
-
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp),
-                        ) {
-                            Text(
-                                text = stringResource(R.string.footprint_heatmap_legend_less),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                            for (lvl in 0..4) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(11.dp)
-                                        .clip(RoundedCornerShape(3.dp))
-                                        .background(
-                                            heatmapCellColor(
-                                                level = lvl,
-                                                isFutureDay = false,
-                                                isEinkMode = isEinkMode,
+                        val heatmapLegendRow: @Composable () -> Unit = {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            ) {
+                                Text(
+                                    text = stringResource(R.string.footprint_heatmap_legend_less),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 1,
+                                    softWrap = false,
+                                )
+                                for (lvl in 0..4) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(11.dp)
+                                            .clip(RoundedCornerShape(3.dp))
+                                            .background(
+                                                heatmapCellColor(
+                                                    level = lvl,
+                                                    isFutureDay = false,
+                                                    isEinkMode = isEinkMode,
+                                                ),
                                             ),
-                                        ),
+                                    )
+                                }
+                                Text(
+                                    text = stringResource(R.string.footprint_heatmap_legend_more),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 1,
+                                    softWrap = false,
                                 )
                             }
-                            Text(
-                                text = stringResource(R.string.footprint_heatmap_legend_more),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
                         }
-                    }
 
-                    Spacer(modifier = Modifier.height(16.dp))
+                        if (isCompactCard) {
+                            Column(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalArrangement = Arrangement.spacedBy(6.dp),
+                            ) {
+                                Text(
+                                    text = readoutText,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.testTag(ReadingFootprintTestTags.HEATMAP_SELECTED_LABEL),
+                                )
+                                Box(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    contentAlignment = Alignment.CenterEnd,
+                                ) {
+                                    heatmapLegendRow()
+                                }
+                            }
+                        } else {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            ) {
+                                Text(
+                                    text = readoutText,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .testTag(ReadingFootprintTestTags.HEATMAP_SELECTED_LABEL),
+                                )
+                                heatmapLegendRow()
+                            }
+                        }
 
-                    FilledTonalButton(
-                        onClick = onSharePoster,
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Icon(imageVector = Icons.Outlined.Share, contentDescription = null)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(text = stringResource(R.string.footprint_action_share_poster))
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        FilledTonalButton(
+                            onClick = onSharePoster,
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Icon(imageVector = Icons.Outlined.Share, contentDescription = null)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(text = stringResource(R.string.footprint_action_share_poster))
+                        }
                     }
                 }
             }
@@ -1036,18 +1121,26 @@ private fun StatsMetricBox(
         modifier = modifier.einkHairlineBorder(MaterialTheme.shapes.medium),
     ) {
         Column(
-            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.Center,
         ) {
             Text(
                 text = valueText,
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                softWrap = false,
+                overflow = TextOverflow.Ellipsis,
             )
             Spacer(modifier = Modifier.height(2.dp))
             Text(
                 text = labelText,
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
             )
         }
     }
@@ -1077,160 +1170,290 @@ private fun ReadingHistoryTabContent(
     val timeFormatter = remember {
         DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm", Locale.getDefault())
     }
+    val fontScale = LocalDensity.current.fontScale
 
-    LazyColumn(
-        modifier = modifier,
-        contentPadding = PaddingValues(horizontal = 20.dp, vertical = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        items(
-            items = historyItems,
-            key = { "history_${it.aid}" },
-        ) { item ->
-            val coverUrl = "https://img.wenku8.com/image/${item.aid / 1000}/${item.aid}/${item.aid}s.jpg"
-            val progressFraction = (item.progressPermille.coerceIn(0, 1000) / 1000f)
-            val progressPercent = (item.progressPermille.coerceIn(0, 1000) / 10)
-            val updatedText = remember(item.updatedAtMs) {
-                runCatching {
-                    Instant.ofEpochMilli(item.updatedAtMs)
-                        .atZone(ZoneId.systemDefault())
-                        .format(timeFormatter)
-                }.getOrDefault("")
-            }
+    BoxWithConstraints(modifier = modifier) {
+        val horizontalPadding = if (maxWidth < 360.dp) 16.dp else 20.dp
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(horizontal = horizontalPadding, vertical = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            items(
+                items = historyItems,
+                key = { "history_${it.aid}" },
+            ) { item ->
+                val coverUrl = "https://img.wenku8.com/image/${item.aid / 1000}/${item.aid}/${item.aid}s.jpg"
+                val progressFraction = (item.progressPermille.coerceIn(0, 1000) / 1000f)
+                val progressPercent = (item.progressPermille.coerceIn(0, 1000) / 10)
+                val updatedText = remember(item.updatedAtMs) {
+                    runCatching {
+                        Instant.ofEpochMilli(item.updatedAtMs)
+                            .atZone(ZoneId.systemDefault())
+                            .format(timeFormatter)
+                    }.getOrDefault("")
+                }
 
-            Card(
-                onClick = {
-                    onOpenNovelDetail(
-                        DiscoveryNovelCardItem(
+                val resumeAction: () -> Unit = {
+                    onOpenReader(
+                        ReaderLaunchRequest(
                             aid = item.aid,
-                            title = item.novelTitle.ifBlank { "AID #${item.aid}" },
-                            author = item.novelAuthor,
-                            bookStatus = "",
-                            lastUpdate = "",
-                            tags = emptyList(),
-                            introShort = "",
-                            coverUrl = coverUrl,
-                            inLocalBookshelf = item.inBookshelf,
+                            novelTitle = item.novelTitle.ifBlank { "AID #${item.aid}" },
+                            vid = item.vid,
+                            volumeTitle = item.volumeTitle,
+                            cid = item.cid,
+                            chapterTitle = item.chapterTitle,
+                            initialParagraphIndex = item.paragraphIndex.coerceAtLeast(0),
+                            initialCharOffset = item.charOffset.coerceAtLeast(0),
                         ),
                     )
-                },
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceContainer,
-                ),
-                shape = MaterialTheme.shapes.large,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .einkHairlineBorder(MaterialTheme.shapes.large)
-                    .testTag("${ReadingFootprintTestTags.HISTORY_ITEM_PREFIX}${item.aid}"),
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(14.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(14.dp),
-                ) {
-                    val historyCoverShape = MaterialTheme.shapes.small
-                    AsyncImage(
-                        model = WenkuImageRequests.rememberCoverImageRequest(
-                            aid = item.aid,
-                            coverUrl = coverUrl,
-                            enableCrossfade = false,
-                        ),
-                        contentDescription = item.novelTitle,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier
-                            .size(width = 60.dp, height = 84.dp)
-                            .wenku8SharedNovelCover(
-                                origin = Wenku8SharedElementKeys.NOVEL_FOOTPRINT_HISTORY_ORIGIN,
-                                aid = item.aid,
-                                clipShape = historyCoverShape,
-                            )
-                            .clip(historyCoverShape)
-                            .einkHairlineBorder(historyCoverShape),
-                    )
+                }
 
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = item.novelTitle.ifBlank { "AID #${item.aid}" },
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.SemiBold,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.wenku8SharedNovelTitle(
-                                origin = Wenku8SharedElementKeys.NOVEL_FOOTPRINT_HISTORY_ORIGIN,
+                Card(
+                    onClick = {
+                        onOpenNovelDetail(
+                            DiscoveryNovelCardItem(
                                 aid = item.aid,
+                                title = item.novelTitle.ifBlank { "AID #${item.aid}" },
+                                author = item.novelAuthor,
+                                bookStatus = "",
+                                lastUpdate = "",
+                                tags = emptyList(),
+                                introShort = "",
+                                coverUrl = coverUrl,
+                                inLocalBookshelf = item.inBookshelf,
                             ),
                         )
-                        Spacer(modifier = Modifier.height(2.dp))
-                        Text(
-                            text = buildString {
-                                if (item.volumeTitle.isNotBlank()) {
-                                    append(item.volumeTitle)
-                                    append(" · ")
-                                }
-                                append(item.chapterTitle.ifBlank { "第 ${item.cid} 章" })
-                            },
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                        Spacer(modifier = Modifier.height(6.dp))
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        ) {
-                            LinearProgressIndicator(
-                                progress = { progressFraction },
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .height(5.dp),
-                            )
-                            Text(
-                                text = "$progressPercent%",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.primary,
-                            )
-                        }
-                        if (updatedText.isNotEmpty()) {
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(
-                                text = updatedText,
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                    }
+                    },
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                    ),
+                    shape = MaterialTheme.shapes.large,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .einkHairlineBorder(MaterialTheme.shapes.large)
+                        .testTag("${ReadingFootprintTestTags.HISTORY_ITEM_PREFIX}${item.aid}"),
+                ) {
+                    BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+                        val useBottomFooterCta = maxWidth < 340.dp || fontScale > 1.1f
+                        val historyCoverShape = MaterialTheme.shapes.small
 
-                    FilledTonalButton(
-                        onClick = {
-                            onOpenReader(
-                                ReaderLaunchRequest(
-                                    aid = item.aid,
-                                    novelTitle = item.novelTitle.ifBlank { "AID #${item.aid}" },
-                                    vid = item.vid,
-                                    volumeTitle = item.volumeTitle,
-                                    cid = item.cid,
-                                    chapterTitle = item.chapterTitle,
-                                    initialParagraphIndex = item.paragraphIndex.coerceAtLeast(0),
-                                    initialCharOffset = item.charOffset.coerceAtLeast(0),
-                                ),
-                            )
-                        },
-                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
-                        modifier = Modifier.testTag("${ReadingFootprintTestTags.HISTORY_RESUME_PREFIX}${item.aid}"),
-                    ) {
-                        Icon(
-                            imageVector = Icons.Outlined.PlayArrow,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp),
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            text = stringResource(R.string.footprint_history_continue_action),
-                            style = MaterialTheme.typography.labelMedium,
-                        )
+                        if (useBottomFooterCta) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(14.dp),
+                                verticalArrangement = Arrangement.spacedBy(10.dp),
+                            ) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                ) {
+                                    AsyncImage(
+                                        model = WenkuImageRequests.rememberCoverImageRequest(
+                                            aid = item.aid,
+                                            coverUrl = coverUrl,
+                                            enableCrossfade = false,
+                                        ),
+                                        contentDescription = item.novelTitle,
+                                        contentScale = ContentScale.Crop,
+                                        modifier = Modifier
+                                            .size(width = 56.dp, height = 78.dp)
+                                            .wenku8SharedNovelCover(
+                                                origin = Wenku8SharedElementKeys.NOVEL_FOOTPRINT_HISTORY_ORIGIN,
+                                                aid = item.aid,
+                                                clipShape = historyCoverShape,
+                                            )
+                                            .clip(historyCoverShape)
+                                            .einkHairlineBorder(historyCoverShape),
+                                    )
+
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = item.novelTitle.ifBlank { "AID #${item.aid}" },
+                                            style = MaterialTheme.typography.titleSmall,
+                                            fontWeight = FontWeight.SemiBold,
+                                            maxLines = 2,
+                                            overflow = TextOverflow.Ellipsis,
+                                            modifier = Modifier.wenku8SharedNovelTitle(
+                                                origin = Wenku8SharedElementKeys.NOVEL_FOOTPRINT_HISTORY_ORIGIN,
+                                                aid = item.aid,
+                                            ),
+                                        )
+                                        Spacer(modifier = Modifier.height(2.dp))
+                                        Text(
+                                            text = buildString {
+                                                if (item.volumeTitle.isNotBlank()) {
+                                                    append(item.volumeTitle)
+                                                    append(" · ")
+                                                }
+                                                append(item.chapterTitle.ifBlank { "第 ${item.cid} 章" })
+                                            },
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                        )
+                                        Spacer(modifier = Modifier.height(6.dp))
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                        ) {
+                                            LinearProgressIndicator(
+                                                progress = { progressFraction },
+                                                modifier = Modifier
+                                                    .weight(1f)
+                                                    .height(5.dp),
+                                            )
+                                            Text(
+                                                text = "$progressPercent%",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = MaterialTheme.colorScheme.primary,
+                                                maxLines = 1,
+                                                softWrap = false,
+                                            )
+                                        }
+                                    }
+                                }
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                ) {
+                                    Text(
+                                        text = updatedText,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                        modifier = Modifier.weight(1f),
+                                    )
+                                    FilledTonalButton(
+                                        onClick = resumeAction,
+                                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+                                        modifier = Modifier.testTag("${ReadingFootprintTestTags.HISTORY_RESUME_PREFIX}${item.aid}"),
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Outlined.PlayArrow,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(18.dp),
+                                        )
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text(
+                                            text = stringResource(R.string.footprint_history_continue_action),
+                                            style = MaterialTheme.typography.labelMedium,
+                                            maxLines = 1,
+                                            softWrap = false,
+                                        )
+                                    }
+                                }
+                            }
+                        } else {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(14.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(14.dp),
+                            ) {
+                                AsyncImage(
+                                    model = WenkuImageRequests.rememberCoverImageRequest(
+                                        aid = item.aid,
+                                        coverUrl = coverUrl,
+                                        enableCrossfade = false,
+                                    ),
+                                    contentDescription = item.novelTitle,
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier
+                                        .size(width = 60.dp, height = 84.dp)
+                                        .wenku8SharedNovelCover(
+                                            origin = Wenku8SharedElementKeys.NOVEL_FOOTPRINT_HISTORY_ORIGIN,
+                                            aid = item.aid,
+                                            clipShape = historyCoverShape,
+                                        )
+                                        .clip(historyCoverShape)
+                                        .einkHairlineBorder(historyCoverShape),
+                                )
+
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = item.novelTitle.ifBlank { "AID #${item.aid}" },
+                                        style = MaterialTheme.typography.titleSmall,
+                                        fontWeight = FontWeight.SemiBold,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                        modifier = Modifier.wenku8SharedNovelTitle(
+                                            origin = Wenku8SharedElementKeys.NOVEL_FOOTPRINT_HISTORY_ORIGIN,
+                                            aid = item.aid,
+                                        ),
+                                    )
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                    Text(
+                                        text = buildString {
+                                            if (item.volumeTitle.isNotBlank()) {
+                                                append(item.volumeTitle)
+                                                append(" · ")
+                                            }
+                                            append(item.chapterTitle.ifBlank { "第 ${item.cid} 章" })
+                                        },
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                    Spacer(modifier = Modifier.height(6.dp))
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    ) {
+                                        LinearProgressIndicator(
+                                            progress = { progressFraction },
+                                            modifier = Modifier
+                                                .weight(1f)
+                                                .height(5.dp),
+                                        )
+                                        Text(
+                                            text = "$progressPercent%",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.primary,
+                                            maxLines = 1,
+                                            softWrap = false,
+                                        )
+                                    }
+                                    if (updatedText.isNotEmpty()) {
+                                        Spacer(modifier = Modifier.height(4.dp))
+                                        Text(
+                                            text = updatedText,
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                        )
+                                    }
+                                }
+
+                                FilledTonalButton(
+                                    onClick = resumeAction,
+                                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+                                    modifier = Modifier.testTag("${ReadingFootprintTestTags.HISTORY_RESUME_PREFIX}${item.aid}"),
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Outlined.PlayArrow,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(18.dp),
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        text = stringResource(R.string.footprint_history_continue_action),
+                                        style = MaterialTheme.typography.labelMedium,
+                                        maxLines = 1,
+                                        softWrap = false,
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -1245,6 +1468,7 @@ private fun CrossBookBookmarksHubTabContent(
     onDeleteBookmark: (Long) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val isEinkMode = LocalEinkMode.current
     var searchQuery by rememberSaveable { mutableStateOf("") }
     var selectedNovelAidFilter by rememberSaveable { mutableStateOf(0) }
 
@@ -1269,212 +1493,234 @@ private fun CrossBookBookmarksHubTabContent(
         }
     }
 
-    Column(modifier = modifier) {
-        OutlinedTextField(
-            value = searchQuery,
-            onValueChange = { searchQuery = it },
-            singleLine = true,
-            leadingIcon = {
-                Icon(imageVector = Icons.Outlined.Search, contentDescription = null)
-            },
-            trailingIcon = {
-                if (searchQuery.isNotEmpty()) {
-                    val clearLabel = stringResource(R.string.action_clear)
-                    TooltipIconButton(
-                        tooltipText = clearLabel,
-                        onClick = { searchQuery = "" },
-                    ) {
-                        Icon(imageVector = Icons.Outlined.Close, contentDescription = clearLabel)
+    BoxWithConstraints(modifier = modifier) {
+        val horizontalPadding = if (maxWidth < 360.dp) 16.dp else 20.dp
+        Column(modifier = Modifier.fillMaxSize()) {
+            OutlinedTextField(
+                value = searchQuery,
+                onValueChange = { searchQuery = it },
+                singleLine = true,
+                leadingIcon = {
+                    Icon(imageVector = Icons.Outlined.Search, contentDescription = null)
+                },
+                trailingIcon = {
+                    if (searchQuery.isNotEmpty()) {
+                        val clearLabel = stringResource(R.string.action_clear)
+                        TooltipIconButton(
+                            tooltipText = clearLabel,
+                            onClick = { searchQuery = "" },
+                        ) {
+                            Icon(imageVector = Icons.Outlined.Close, contentDescription = clearLabel)
+                        }
                     }
-                }
-            },
-            placeholder = {
-                Text(text = stringResource(R.string.footprint_bookmarks_search_placeholder))
-            },
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 20.dp, vertical = 10.dp)
-                .testTag(ReadingFootprintTestTags.BOOKMARK_SEARCH_INPUT),
-        )
-
-        if (distinctNovels.size > 1) {
-            Row(
+                },
+                placeholder = {
+                    Text(
+                        text = stringResource(R.string.footprint_bookmarks_search_placeholder),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .horizontalScroll(rememberScrollState())
-                    .padding(horizontal = 20.dp, vertical = 4.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                FilterChip(
-                    selected = selectedNovelAidFilter == 0,
-                    onClick = { selectedNovelAidFilter = 0 },
-                    label = {
-                        Text(
-                            text = "${stringResource(R.string.footprint_bookmarks_filter_all)} (${bookmarks.size})",
+                    .padding(horizontal = horizontalPadding, vertical = 10.dp)
+                    .testTag(ReadingFootprintTestTags.BOOKMARK_SEARCH_INPUT),
+            )
+
+            if (distinctNovels.size > 1) {
+                val filterScrollState = rememberScrollState()
+                val filterFadeColor = MaterialTheme.colorScheme.background
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScrollFadeEdge(
+                            scrollState = filterScrollState,
+                            fadeColor = filterFadeColor,
+                            isEink = isEinkMode,
                         )
-                    },
-                )
-                distinctNovels.forEach { (aid, title, count) ->
+                        .horizontalScroll(filterScrollState)
+                        .padding(horizontal = horizontalPadding, vertical = 4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
                     FilterChip(
-                        selected = selectedNovelAidFilter == aid,
-                        onClick = {
-                            selectedNovelAidFilter = if (selectedNovelAidFilter == aid) 0 else aid
-                        },
+                        selected = selectedNovelAidFilter == 0,
+                        onClick = { selectedNovelAidFilter = 0 },
                         label = {
                             Text(
-                                text = "$title ($count)",
+                                text = "${stringResource(R.string.footprint_bookmarks_filter_all)} (${bookmarks.size})",
                                 maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
+                                softWrap = false,
                             )
                         },
                     )
-                }
-            }
-        }
-
-        if (filteredBookmarks.isEmpty()) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(32.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    text = stringResource(R.string.footprint_bookmarks_empty),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            return
-        }
-
-        val dateFormatter = remember {
-            DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm", Locale.getDefault())
-        }
-
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(horizontal = 20.dp, vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            items(
-                items = filteredBookmarks,
-                key = { "bm_${it.id}" },
-            ) { item ->
-                val createdText = remember(item.createdAtMs) {
-                    runCatching {
-                        Instant.ofEpochMilli(item.createdAtMs)
-                            .atZone(ZoneId.systemDefault())
-                            .format(dateFormatter)
-                    }.getOrDefault("")
-                }
-
-                Card(
-                    onClick = { onJumpToBookmark(item) },
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceContainer,
-                    ),
-                    shape = MaterialTheme.shapes.large,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .einkHairlineBorder(MaterialTheme.shapes.large)
-                        .testTag("${ReadingFootprintTestTags.BOOKMARK_ITEM_PREFIX}${item.id}"),
-                ) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Column(modifier = Modifier.weight(1f)) {
+                    distinctNovels.forEach { (aid, title, count) ->
+                        FilterChip(
+                            selected = selectedNovelAidFilter == aid,
+                            onClick = {
+                                selectedNovelAidFilter = if (selectedNovelAidFilter == aid) 0 else aid
+                            },
+                            label = {
                                 Text(
-                                    text = item.novelTitle.ifBlank { "AID #${item.aid}" },
-                                    style = MaterialTheme.typography.titleSmall,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = MaterialTheme.colorScheme.primary,
+                                    text = "$title ($count)",
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
                                 )
+                            },
+                            modifier = Modifier.widthIn(max = 200.dp),
+                        )
+                    }
+                }
+            }
+
+            if (filteredBookmarks.isEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(32.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = stringResource(R.string.footprint_bookmarks_empty),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                return@BoxWithConstraints
+            }
+
+            val dateFormatter = remember {
+                DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm", Locale.getDefault())
+            }
+
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(horizontal = horizontalPadding, vertical = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                items(
+                    items = filteredBookmarks,
+                    key = { "bm_${it.id}" },
+                ) { item ->
+                    val createdText = remember(item.createdAtMs) {
+                        runCatching {
+                            Instant.ofEpochMilli(item.createdAtMs)
+                                .atZone(ZoneId.systemDefault())
+                                .format(dateFormatter)
+                        }.getOrDefault("")
+                    }
+
+                    Card(
+                        onClick = { onJumpToBookmark(item) },
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                        ),
+                        shape = MaterialTheme.shapes.large,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .einkHairlineBorder(MaterialTheme.shapes.large)
+                            .testTag("${ReadingFootprintTestTags.BOOKMARK_ITEM_PREFIX}${item.id}"),
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = item.novelTitle.ifBlank { "AID #${item.aid}" },
+                                        style = MaterialTheme.typography.titleSmall,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = MaterialTheme.colorScheme.primary,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                    Text(
+                                        text = buildString {
+                                            if (item.volumeTitle.isNotBlank()) {
+                                                append(item.volumeTitle)
+                                                append(" · ")
+                                            }
+                                            append(item.chapterTitle.ifBlank { "第 ${item.cid} 章" })
+                                        },
+                                        style = MaterialTheme.typography.labelMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                }
+                                val deleteLabel = stringResource(R.string.footprint_bookmarks_delete_desc)
+                                TooltipIconButton(
+                                    tooltipText = deleteLabel,
+                                    onClick = { onDeleteBookmark(item.id) },
+                                    modifier = Modifier.testTag(
+                                        "${ReadingFootprintTestTags.BOOKMARK_DELETE_PREFIX}${item.id}",
+                                    ),
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Outlined.DeleteOutline,
+                                        contentDescription = deleteLabel,
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                            }
+
+                            if (item.snippetText.isNotBlank()) {
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Surface(
+                                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                                    shape = MaterialTheme.shapes.small,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .einkHairlineBorder(MaterialTheme.shapes.small),
+                                ) {
+                                    Text(
+                                        text = "「${item.snippetText.trim()}」",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        maxLines = 3,
+                                        overflow = TextOverflow.Ellipsis,
+                                        modifier = Modifier.padding(12.dp),
+                                    )
+                                }
+                            }
+
+                            if (item.noteMarkdown.isNotBlank()) {
+                                Spacer(modifier = Modifier.height(8.dp))
                                 Text(
-                                    text = buildString {
-                                        if (item.volumeTitle.isNotBlank()) {
-                                            append(item.volumeTitle)
-                                            append(" · ")
-                                        }
-                                        append(item.chapterTitle.ifBlank { "第 ${item.cid} 章" })
-                                    },
-                                    style = MaterialTheme.typography.labelMedium,
+                                    text = item.noteMarkdown,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                )
+                            }
+
+                            Spacer(modifier = Modifier.height(10.dp))
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            ) {
+                                Text(
+                                    text = createdText,
+                                    style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.weight(1f),
                                 )
-                            }
-                            val deleteLabel = stringResource(R.string.footprint_bookmarks_delete_desc)
-                            TooltipIconButton(
-                                tooltipText = deleteLabel,
-                                onClick = { onDeleteBookmark(item.id) },
-                                modifier = Modifier.testTag(
-                                    "${ReadingFootprintTestTags.BOOKMARK_DELETE_PREFIX}${item.id}",
-                                ),
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Outlined.DeleteOutline,
-                                    contentDescription = deleteLabel,
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            }
-                        }
-
-                        if (item.snippetText.isNotBlank()) {
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Surface(
-                                color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                                shape = MaterialTheme.shapes.small,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .einkHairlineBorder(MaterialTheme.shapes.small),
-                            ) {
-                                Text(
-                                    text = "「${item.snippetText.trim()}」",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    maxLines = 3,
-                                    overflow = TextOverflow.Ellipsis,
-                                    modifier = Modifier.padding(12.dp),
-                                )
-                            }
-                        }
-
-                        if (item.noteMarkdown.isNotBlank()) {
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text(
-                                text = item.noteMarkdown,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurface,
-                            )
-                        }
-
-                        Spacer(modifier = Modifier.height(10.dp))
-
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                        ) {
-                            Text(
-                                text = createdText,
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                            FilledTonalButton(
-                                onClick = { onJumpToBookmark(item) },
-                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
-                                modifier = Modifier.testTag(
-                                    "${ReadingFootprintTestTags.BOOKMARK_JUMP_PREFIX}${item.id}",
-                                ),
-                            ) {
-                                Text(
-                                    text = stringResource(R.string.footprint_bookmarks_jump_action),
-                                    style = MaterialTheme.typography.labelMedium,
-                                )
+                                FilledTonalButton(
+                                    onClick = { onJumpToBookmark(item) },
+                                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                                    modifier = Modifier.testTag(
+                                        "${ReadingFootprintTestTags.BOOKMARK_JUMP_PREFIX}${item.id}",
+                                    ),
+                                ) {
+                                    Text(
+                                        text = stringResource(R.string.footprint_bookmarks_jump_action),
+                                        style = MaterialTheme.typography.labelMedium,
+                                        maxLines = 1,
+                                        softWrap = false,
+                                    )
+                                }
                             }
                         }
                     }
