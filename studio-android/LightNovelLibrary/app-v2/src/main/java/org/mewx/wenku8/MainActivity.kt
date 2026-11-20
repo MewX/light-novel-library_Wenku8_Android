@@ -2,13 +2,13 @@ package org.mewx.wenku8
 
 import android.content.Context
 import android.content.Intent
+import android.content.res.Configuration
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.os.Build
 import android.os.Bundle
 import android.view.KeyEvent
 import androidx.activity.compose.setContent
-import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AppCompatDelegate
@@ -34,6 +34,7 @@ import org.mewx.wenku8.ui.navigation.AdaptiveMainScaffold
 import org.mewx.wenku8.ui.navigation.Wenku8DeepLinks
 import org.mewx.wenku8.ui.reader.HardwareVolumeKeyHost
 import org.mewx.wenku8.ui.theme.Wenku8ExpressiveTheme
+import org.mewx.wenku8.ui.theme.applyTransparentEdgeToEdge
 import org.mewx.wenku8.widget.ContinueReadingAppWidgetProvider
 import org.mewx.wenku8.widget.parseWidgetReaderLaunchRequest
 
@@ -127,7 +128,9 @@ class MainActivity : AppCompatActivity(), HardwareVolumeKeyHost {
                 setTurnScreenOn(true)
             }
         }
-        enableEdgeToEdge()
+        val isSystemDark =
+            (resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
+        applyTransparentEdgeToEdge(isDark = isSystemDark)
         super.onCreate(savedInstanceState)
 
         val launchedFromHistory =

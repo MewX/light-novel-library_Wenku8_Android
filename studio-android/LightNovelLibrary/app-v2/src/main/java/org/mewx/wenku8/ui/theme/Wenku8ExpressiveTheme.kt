@@ -1,7 +1,13 @@
 package org.mewx.wenku8.ui.theme
 
 import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
+import android.graphics.Color as AndroidColor
 import android.os.Build
+import androidx.activity.ComponentActivity
+import androidx.activity.SystemBarStyle
+import androidx.activity.enableEdgeToEdge
 import androidx.compose.animation.core.FiniteAnimationSpec
 import androidx.compose.animation.core.snap
 import androidx.compose.foundation.BorderStroke
@@ -14,13 +20,54 @@ import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowCompat
+
+/**
+ * Semi-transparent dark fallback scrim used ONLY on API 24–25 where the platform cannot render
+ * dark 3-button navigation icons over light backgrounds. Matches AndroidX's `DefaultDarkScrim`.
+ */
+internal val LegacyApi24NavBarDarkScrim: Int = AndroidColor.argb(0x80, 0x1b, 0x1b, 0x1b)
+
+/**
+ * Configures fully transparent edge-to-edge status and navigation bars with platform contrast
+ * scrim enforcement disabled (`isNavigationBarContrastEnforced = false` on API 29+) so 3-button
+ * navigation bars seamlessly inherit the Compose `ShortNavigationBar` / `Scaffold` surface color
+ * instead of showing Android's default ~80% opaque white scrim.
+ */
+fun ComponentActivity.applyTransparentEdgeToEdge(isDark: Boolean) {
+    val statusBarStyle = if (isDark) {
+        SystemBarStyle.dark(AndroidColor.TRANSPARENT)
+    } else {
+        SystemBarStyle.light(
+            scrim = AndroidColor.TRANSPARENT,
+            darkScrim = AndroidColor.TRANSPARENT,
+        )
+    }
+    val navigationBarStyle = if (isDark) {
+        SystemBarStyle.dark(AndroidColor.TRANSPARENT)
+    } else {
+        SystemBarStyle.light(
+            scrim = AndroidColor.TRANSPARENT,
+            darkScrim = LegacyApi24NavBarDarkScrim,
+        )
+    }
+    enableEdgeToEdge(
+        statusBarStyle = statusBarStyle,
+        navigationBarStyle = navigationBarStyle,
+    )
+}
+
+private tailrec fun Context.findHostActivity(): Activity? = when (this) {
+    is Activity -> this
+    is ContextWrapper -> baseContext.findHostActivity()
+    else -> null
+}
 
 /**
  * Zero-duration [MotionScheme] injected into [MaterialExpressiveTheme] whenever E-Ink mode is active.
@@ -75,11 +122,20 @@ fun Wenku8ExpressiveTheme(
     }
 
     if (!view.isInEditMode) {
-        SideEffect {
-            val window = (context as? Activity)?.window ?: return@SideEffect
-            val insetsController = WindowCompat.getInsetsController(window, view)
-            insetsController.isAppearanceLightStatusBars = !isDarkEffective
-            insetsController.isAppearanceLightNavigationBars = !isDarkEffective
+        DisposableEffect(context, view, isDarkEffective) {
+            val activity = context.findHostActivity()
+            if (activity is ComponentActivity) {
+                activity.applyTransparentEdgeToEdge(isDark = isDarkEffective)
+            } else if (activity != null) {
+                val window = activity.window
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    window.isNavigationBarContrastEnforced = false
+                }
+                val insetsController = WindowCompat.getInsetsController(window, view)
+                insetsController.isAppearanceLightStatusBars = !isDarkEffective
+                insetsController.isAppearanceLightNavigationBars = !isDarkEffective
+            }
+            onDispose { }
         }
     }
 
