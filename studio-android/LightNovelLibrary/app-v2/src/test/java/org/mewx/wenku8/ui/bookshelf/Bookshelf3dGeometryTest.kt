@@ -16,14 +16,16 @@ class Bookshelf3dGeometryTest {
         val foldableMedium = Bookshelf3dGeometry.computeMetrics(availableWidthDp = 640f, availableHeightDp = 840f)
         val tabletLandscape = Bookshelf3dGeometry.computeMetrics(availableWidthDp = 960f, availableHeightDp = 700f)
         val shortLandscapePhone = Bookshelf3dGeometry.computeMetrics(availableWidthDp = 800f, availableHeightDp = 360f)
+        val narrowSplitScreen = Bookshelf3dGeometry.computeMetrics(availableWidthDp = 360f, availableHeightDp = 360f)
 
-        // Compact & medium screens use single-column layout; wide tablets activate two-pane spotlight
+        // Compact & medium screens use single-column layout; wide tablets & landscape phones activate two-pane spotlight
         assertFalse(compactPhone.isTwoPane)
         assertFalse(standardPhone.isTwoPane)
         assertFalse(foldableMedium.isTwoPane)
+        assertFalse(narrowSplitScreen.isTwoPane)
         assertTrue(tabletLandscape.isTwoPane)
-        // Short landscape phone stays single-column and scales cover height down so it fits vertically
-        assertFalse(shortLandscapePhone.isTwoPane)
+        assertTrue(shortLandscapePhone.isTwoPane)
+        // Short landscape phone scales cover & stage height down so shelf + scroller fit inside 360dp
         assertTrue(
             "Short landscape cover (${shortLandscapePhone.coverWidthDp}) should scale below standard (${standardPhone.coverWidthDp})",
             shortLandscapePhone.coverWidthDp < standardPhone.coverWidthDp,
@@ -31,6 +33,10 @@ class Bookshelf3dGeometryTest {
         assertTrue(
             "Short landscape stageHeight (${shortLandscapePhone.stageHeightDp}) should be more compact than standard (${standardPhone.stageHeightDp})",
             shortLandscapePhone.stageHeightDp < standardPhone.stageHeightDp,
+        )
+        assertTrue(
+            "Short landscape stageHeight + scroller (${shortLandscapePhone.stageHeightDp + 46f}) should fit within 360dp",
+            shortLandscapePhone.stageHeightDp + 46f <= 360f,
         )
 
         // Stage width never exceeds available width and caps cleanly on large screens

@@ -1,0 +1,353 @@
+package org.mewx.wenku8.ui.bookshelf
+
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.size
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertTextContains
+import androidx.compose.ui.test.click
+import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.longClick
+import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performSemanticsAction
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipeLeft
+import androidx.compose.ui.unit.dp
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
+import org.junit.Rule
+import org.junit.Test
+import org.junit.runner.RunWith
+import org.mewx.wenku8.data.local.db.entity.NovelEntity
+import org.mewx.wenku8.data.local.db.entity.ReadingProgressEntity
+import org.mewx.wenku8.data.repository.BookshelfItemModel
+import org.mewx.wenku8.ui.theme.Wenku8ExpressiveTheme
+import org.mewx.wenku8.ui.theme.Wenku8ThemeMode
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
+
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [34], qualifiers = "w1024dp-h900dp")
+class Bookshelf3dShelfSectionTest {
+
+    @get:Rule
+    val composeRule = createComposeRule()
+
+    private fun sampleItems(count: Int): List<BookshelfItemModel> = List(count) { idx ->
+        val aid = 1001 + idx
+        val hasProgress = idx % 2 == 0
+        BookshelfItemModel(
+            novel = NovelEntity(
+                aid = aid,
+                title = when (idx) {
+                    0 -> "狼与香辛料"
+                    1 -> "刀剑神域 Sword Art Online"
+                    2 -> "败犬女主太多了！"
+                    else -> "轻小说测试作品第${idx + 1}部"
+                },
+                author = "作者${idx + 1}",
+                pressId = if (idx % 2 == 0) "电击文库" else "GAGAGA文库",
+                bookStatus = if (idx % 3 == 0) "已完成" else "连载中",
+                tagsCsv = "奇幻 冒险 校园",
+                introShort = "这是第${idx + 1}部测试轻小说的简介内容。",
+                latestSectionName = "第${idx + 1}卷 尾声",
+                hasUnreadUpdate = idx == 0 || idx == 2,
+                inBookshelf = true,
+                shelfSortOrder = idx + 1,
+            ),
+            readingProgress = if (hasProgress) {
+                ReadingProgressEntity(
+                    aid = aid,
+                    vid = aid * 10,
+                    cid = aid * 10 + 1,
+                    volumeTitle = "第一卷",
+                    chapterTitle = "第一章 启程",
+                    progressPermille = 520,
+                    updatedAtMs = 1_700_000_000_000L - idx * 1_000L,
+                )
+            } else {
+                null
+            },
+            cachedChapterCount = if (idx == 0) 12 else if (idx == 1) 4 else 0,
+            totalChapterCount = if (idx == 0) 20 else 0,
+            tags = listOf("奇幻", "冒险", "校园"),
+            isActivelySyncingOrDownloading = idx == 2,
+            coverUrl = "",
+        )
+    }
+
+    @Test
+    fun fastScroller_supportsSteppers_tapJump_continuousScrubPreview_andSemanticsProgress() {
+        val items = sampleItems(12)
+        val openedAids = mutableListOf<Int>()
+        val continuedAids = mutableListOf<Int>()
+
+        composeRule.setContent {
+            Wenku8ExpressiveTheme(themeMode = Wenku8ThemeMode.ARCHIVAL_DAY) {
+                Box(modifier = Modifier.size(412.dp, 820.dp)) {
+                    Bookshelf3dShelfSection(
+                        items = items,
+                        availableWidth = 380.dp,
+                        availableHeight = 820.dp,
+                        selectedAidSet = emptySet(),
+                        isMultiSelectActive = false,
+                        isEinkMode = false,
+                        onItemClick = { openedAids += it.aid },
+                        onItemLongClick = {},
+                        onContinueReadingClick = { continuedAids += it.aid },
+                    )
+                }
+            }
+        }
+        composeRule.waitForIdle()
+
+        // Initial state: book #1 focused, prev disabled, next enabled, counter shows 01 / 12
+        composeRule.onNodeWithTag(BookshelfTestTags.SPINE_3D_STAGE).assertIsDisplayed()
+        composeRule.onNodeWithTag(BookshelfTestTags.SPINE_3D_SPOTLIGHT_CARD).assertIsDisplayed()
+        composeRule.onNodeWithTag(BookshelfTestTags.SPINE_3D_WIDE_PANEL).assertDoesNotExist()
+        composeRule.onNodeWithTag(BookshelfTestTags.SPINE_3D_INDEX_COUNTER).assertTextContains("01 / 12")
+        composeRule.onNodeWithTag(BookshelfTestTags.SPINE_3D_PREV_BUTTON).assertIsNotEnabled()
+        composeRule.onNodeWithTag(BookshelfTestTags.SPINE_3D_NEXT_BUTTON).assertIsEnabled()
+
+        // Primary CTA on focused book with progress triggers continue reading
+        composeRule.onNodeWithTag(BookshelfTestTags.SPINE_3D_PRIMARY_ACTION).performClick()
+        assertEquals(listOf(1001), continuedAids)
+
+        // Next chevron advances to book #2 (no progress -> primary CTA opens detail)
+        composeRule.onNodeWithTag(BookshelfTestTags.SPINE_3D_NEXT_BUTTON).performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag(BookshelfTestTags.SPINE_3D_INDEX_COUNTER).assertTextContains("02 / 12")
+        composeRule.onNodeWithTag(BookshelfTestTags.SPINE_3D_PREV_BUTTON).assertIsEnabled()
+        composeRule.onNodeWithTag(BookshelfTestTags.SPINE_3D_PRIMARY_ACTION).performClick()
+        assertEquals(listOf(1002), openedAids)
+
+        // Prev chevron returns to book #1
+        composeRule.onNodeWithTag(BookshelfTestTags.SPINE_3D_PREV_BUTTON).performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag(BookshelfTestTags.SPINE_3D_INDEX_COUNTER).assertTextContains("01 / 12")
+
+        // Tap near the right end of fast scroller track jumps to the last book (12 / 12)
+        composeRule.onNodeWithTag(BookshelfTestTags.SPINE_3D_FAST_SCROLLER_TRACK).performTouchInput {
+            click(Offset(right - 2f, centerY))
+        }
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag(BookshelfTestTags.SPINE_3D_INDEX_COUNTER).assertTextContains("12 / 12")
+        composeRule.onNodeWithTag(BookshelfTestTags.SPINE_3D_NEXT_BUTTON).assertIsNotEnabled()
+
+        // Semantics SetProgress jumps directly to middle book
+        composeRule.onNodeWithTag(BookshelfTestTags.SPINE_3D_FAST_SCROLLER_TRACK)
+            .performSemanticsAction(SemanticsActions.SetProgress) { action ->
+                action(0.5f)
+            }
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag(BookshelfTestTags.SPINE_3D_INDEX_COUNTER).assertTextContains("07 / 12")
+
+        // Continuous drag scrub shows floating preview bubble and hides it cleanly on release
+        composeRule.onNodeWithTag(BookshelfTestTags.SPINE_3D_FAST_SCROLLER_TRACK).performTouchInput {
+            down(Offset(width * 0.1f, centerY))
+            moveBy(Offset(width * 0.25f, 0f))
+        }
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag(BookshelfTestTags.SPINE_3D_SCRUB_PREVIEW).assertIsDisplayed()
+
+        composeRule.onNodeWithTag(BookshelfTestTags.SPINE_3D_FAST_SCROLLER_TRACK).performTouchInput {
+            up()
+        }
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag(BookshelfTestTags.SPINE_3D_SCRUB_PREVIEW).assertDoesNotExist()
+    }
+
+    @Test
+    fun stageGestures_tapUnfocusedCentersFirst_tapFocusedOpens_swipeAdvances_andLongPressSelects() {
+        val items = sampleItems(6)
+        val openedAids = mutableListOf<Int>()
+        var selectedAids by mutableStateOf(emptySet<Int>())
+
+        composeRule.setContent {
+            Wenku8ExpressiveTheme(themeMode = Wenku8ThemeMode.CLASSIC_BLUE) {
+                Box(modifier = Modifier.size(412.dp, 820.dp)) {
+                    Bookshelf3dShelfSection(
+                        items = items,
+                        availableWidth = 380.dp,
+                        availableHeight = 820.dp,
+                        selectedAidSet = selectedAids,
+                        isMultiSelectActive = selectedAids.isNotEmpty(),
+                        isEinkMode = false,
+                        onItemClick = { item ->
+                            if (selectedAids.isNotEmpty()) {
+                                selectedAids = if (item.aid in selectedAids) {
+                                    selectedAids - item.aid
+                                } else {
+                                    selectedAids + item.aid
+                                }
+                            } else {
+                                openedAids += item.aid
+                            }
+                        },
+                        onItemLongClick = { item ->
+                            selectedAids = selectedAids + item.aid
+                        },
+                        onContinueReadingClick = {},
+                    )
+                }
+            }
+        }
+        composeRule.waitForIdle()
+
+        // 1. Tapping unfocused neighbor (aid=1002) centers it first without opening detail
+        composeRule.onNodeWithTag(BookshelfTestTags.BOOK_CARD_PREFIX + 1002).performClick()
+        composeRule.waitForIdle()
+        assertEquals(emptyList<Int>(), openedAids)
+        composeRule.onNodeWithTag(BookshelfTestTags.SPINE_3D_INDEX_COUNTER).assertTextContains("02 / 06")
+
+        // 2. Tapping the now-focused book (aid=1002) opens its detail page
+        composeRule.onNodeWithTag(BookshelfTestTags.BOOK_CARD_PREFIX + 1002).performClick()
+        composeRule.waitForIdle()
+        assertEquals(listOf(1002), openedAids)
+
+        // 3. Swiping left on the 3D stage advances focus further down the shelf
+        composeRule.onNodeWithTag(BookshelfTestTags.SPINE_3D_STAGE).performTouchInput {
+            swipeLeft()
+        }
+        composeRule.waitForIdle()
+        val counterText = composeRule.onNodeWithTag(BookshelfTestTags.SPINE_3D_INDEX_COUNTER)
+            .fetchSemanticsNode()
+            .config
+            .toString()
+        assertTrue("Expected swipeLeft to move past book 02 (counter=$counterText)", !counterText.contains("01 / 06"))
+
+        // 4. Long-pressing a book activates multi-select; subsequent tap toggles selection instead of opening
+        composeRule.onNodeWithTag(BookshelfTestTags.BOOK_CARD_PREFIX + 1001)
+            .performTouchInput { longClick() }
+        composeRule.waitForIdle()
+        assertTrue(1001 in selectedAids)
+
+        composeRule.onNodeWithTag(BookshelfTestTags.BOOK_CARD_PREFIX + 1002).performClick()
+        composeRule.waitForIdle()
+        assertEquals(setOf(1001, 1002), selectedAids)
+        assertEquals(listOf(1002), openedAids) // Did NOT trigger extra open while multi-selecting
+    }
+
+    @Test
+    fun multiScreenAdaptation_rendersWideTwoPaneOnTablet_andCompactLayoutOnSmallPhoneAndShortLandscape() {
+        val items = sampleItems(5)
+        var screenWidthDp by mutableStateOf(960.dp)
+        var screenHeightDp by mutableStateOf(700.dp)
+        var themeMode by mutableStateOf(Wenku8ThemeMode.CARBON_NIGHT)
+        val continuedAids = mutableListOf<Int>()
+
+        composeRule.setContent {
+            Wenku8ExpressiveTheme(themeMode = themeMode) {
+                Box(modifier = Modifier.size(screenWidthDp, screenHeightDp)) {
+                    Bookshelf3dShelfSection(
+                        items = items,
+                        availableWidth = screenWidthDp - 32.dp,
+                        availableHeight = screenHeightDp,
+                        selectedAidSet = emptySet(),
+                        isMultiSelectActive = false,
+                        isEinkMode = themeMode == Wenku8ThemeMode.E_INK,
+                        onItemClick = {},
+                        onItemLongClick = {},
+                        onContinueReadingClick = { continuedAids += it.aid },
+                    )
+                }
+            }
+        }
+        composeRule.waitForIdle()
+
+        // 1. Wide tablet (960x700) uses side-by-side two-pane layout with wide spotlight panel
+        composeRule.onNodeWithTag(BookshelfTestTags.SPINE_3D_WIDE_PANEL).assertIsDisplayed()
+        composeRule.onNodeWithTag(BookshelfTestTags.SPINE_3D_SPOTLIGHT_CARD).assertDoesNotExist()
+        composeRule.onNodeWithText("狼与香辛料").assertIsDisplayed()
+        composeRule.onNodeWithTag(BookshelfTestTags.SPINE_3D_PRIMARY_ACTION).performClick()
+        assertEquals(listOf(1001), continuedAids)
+
+        val stageBoundsWide = composeRule.onNodeWithTag(BookshelfTestTags.SPINE_3D_STAGE)
+            .fetchSemanticsNode().boundsInRoot
+        val panelBoundsWide = composeRule.onNodeWithTag(BookshelfTestTags.SPINE_3D_WIDE_PANEL)
+            .fetchSemanticsNode().boundsInRoot
+        assertTrue(
+            "Wide panel ($panelBoundsWide) must sit to the right of 3D stage ($stageBoundsWide)",
+            panelBoundsWide.left >= stageBoundsWide.right - 2f,
+        )
+
+        // 2. Compact narrow phone (320x568) switches cleanly to single-column compact spotlight card
+        screenWidthDp = 320.dp
+        screenHeightDp = 568.dp
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag(BookshelfTestTags.SPINE_3D_SPOTLIGHT_CARD).assertIsDisplayed()
+        composeRule.onNodeWithTag(BookshelfTestTags.SPINE_3D_WIDE_PANEL).assertDoesNotExist()
+        val stageBoundsCompact = composeRule.onNodeWithTag(BookshelfTestTags.SPINE_3D_STAGE)
+            .fetchSemanticsNode().boundsInRoot
+        assertTrue(
+            "Compact phone stage width (${stageBoundsCompact.width}) must fit inside viewport",
+            stageBoundsCompact.width <= with(composeRule.density) { 320.dp.toPx() } + 1f,
+        )
+
+        // 3. Short landscape phone (800x360) uses compact two-pane layout with reduced stage height + E-Ink mode
+        screenWidthDp = 800.dp
+        screenHeightDp = 360.dp
+        themeMode = Wenku8ThemeMode.E_INK
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag(BookshelfTestTags.SPINE_3D_WIDE_PANEL).assertIsDisplayed()
+        composeRule.onNodeWithTag(BookshelfTestTags.SPINE_3D_SPOTLIGHT_CARD).assertDoesNotExist()
+        val stageBoundsShortLandscape = composeRule.onNodeWithTag(BookshelfTestTags.SPINE_3D_STAGE)
+            .fetchSemanticsNode().boundsInRoot
+        assertTrue(
+            "Short landscape stage height (${stageBoundsShortLandscape.height}) should be more compact than tablet (${stageBoundsWide.height})",
+            stageBoundsShortLandscape.height < stageBoundsWide.height,
+        )
+    }
+
+    @Test
+    fun singleBookAndDynamicListShrink_handlesEdgeCasesAndWavyProgressCleanly() {
+        var currentItems by mutableStateOf(sampleItems(3))
+
+        composeRule.setContent {
+            Wenku8ExpressiveTheme(themeMode = Wenku8ThemeMode.ARCHIVAL_DAY) {
+                Box(modifier = Modifier.size(412.dp, 820.dp)) {
+                    Bookshelf3dShelfSection(
+                        items = currentItems,
+                        availableWidth = 380.dp,
+                        availableHeight = 820.dp,
+                        selectedAidSet = emptySet(),
+                        isMultiSelectActive = false,
+                        isEinkMode = false,
+                        onItemClick = {},
+                        onItemLongClick = {},
+                        onContinueReadingClick = {},
+                    )
+                }
+            }
+        }
+        composeRule.waitForIdle()
+
+        // Navigate to item #3 (aid=1003, which has isActivelySyncingOrDownloading = true)
+        composeRule.onNodeWithTag(BookshelfTestTags.SPINE_3D_NEXT_BUTTON).performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag(BookshelfTestTags.SPINE_3D_NEXT_BUTTON).performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag(BookshelfTestTags.SPINE_3D_INDEX_COUNTER).assertTextContains("03 / 03")
+        composeRule.onNodeWithTag(BookshelfTestTags.ACTIVE_WAVY_PROGRESS_PREFIX + 1003).assertExists()
+
+        // Shrink list to a single book (removing the previously focused book): focus clamps cleanly
+        // and fast scroller hides track/chevrons while keeping 01 / 01 badge visible.
+        currentItems = listOf(currentItems.first())
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag(BookshelfTestTags.SPINE_3D_INDEX_COUNTER).assertTextContains("01 / 01")
+        composeRule.onNodeWithTag(BookshelfTestTags.SPINE_3D_FAST_SCROLLER_TRACK).assertDoesNotExist()
+        composeRule.onNodeWithTag(BookshelfTestTags.SPINE_3D_PREV_BUTTON).assertDoesNotExist()
+        composeRule.onNodeWithTag(BookshelfTestTags.SPINE_3D_NEXT_BUTTON).assertDoesNotExist()
+        assertTrue(composeRule.onAllNodesWithText("狼与香辛料").fetchSemanticsNodes().isNotEmpty())
+    }
+}
