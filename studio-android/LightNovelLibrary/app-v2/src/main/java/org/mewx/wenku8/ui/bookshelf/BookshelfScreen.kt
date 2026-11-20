@@ -187,6 +187,7 @@ object BookshelfTestTags {
     const val SPINE_3D_WIDE_PANEL = "bookshelf_spine3d_wide_panel"
     const val SPINE_3D_PRIMARY_ACTION = "bookshelf_spine3d_primary_action"
     const val SPINE_3D_CONTINUE_BADGE = "bookshelf_spine3d_continue_badge"
+    const val SPINE_3D_COVER_SHARED_ANCHOR = "bookshelf_spine3d_cover_shared_anchor"
 }
 
 /**

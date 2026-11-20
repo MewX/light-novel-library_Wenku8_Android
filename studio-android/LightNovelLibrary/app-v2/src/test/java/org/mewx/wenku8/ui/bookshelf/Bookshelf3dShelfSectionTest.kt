@@ -1,12 +1,18 @@
 package org.mewx.wenku8.ui.bookshelf
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.SharedTransitionLayout
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
@@ -34,10 +40,14 @@ import org.junit.runner.RunWith
 import org.mewx.wenku8.data.local.db.entity.NovelEntity
 import org.mewx.wenku8.data.local.db.entity.ReadingProgressEntity
 import org.mewx.wenku8.data.repository.BookshelfItemModel
+import org.mewx.wenku8.ui.theme.ProvideWenku8SharedTransition
 import org.mewx.wenku8.ui.theme.Wenku8ExpressiveTheme
+import org.mewx.wenku8.ui.theme.Wenku8SharedElementKeys
 import org.mewx.wenku8.ui.theme.Wenku8ThemeMode
+import org.mewx.wenku8.ui.theme.wenku8SharedNovelCover
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import kotlin.math.abs
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], qualifiers = "w1024dp-h900dp")
@@ -570,6 +580,166 @@ class Bookshelf3dShelfSectionTest {
         composeRule.waitForIdle()
         composeRule.onNodeWithTag(BookshelfTestTags.SPINE_3D_SCRUB_PREVIEW).assertDoesNotExist()
         composeRule.onNodeWithTag(BookshelfTestTags.SPINE_3D_INDEX_COUNTER).assertTextContains("10 / 12")
+    }
+
+    @OptIn(ExperimentalSharedTransitionApi::class)
+    @Test
+    fun sharedTransitionRoundTrip_restoresNonZeroFocusOnFrame1_andAnchorsCoverAtProjectedBounds() {
+        val items = sampleItems(8)
+        var detailAid by mutableStateOf<Int?>(null)
+        var capturedDensity = 1f
+
+        composeRule.setContent {
+            capturedDensity = LocalDensity.current.density
+            val saveableStateHolder = rememberSaveableStateHolder()
+            Wenku8ExpressiveTheme(themeMode = Wenku8ThemeMode.ARCHIVAL_DAY) {
+                SharedTransitionLayout {
+                    AnimatedContent(
+                        targetState = detailAid,
+                        label = "test_3d_shared_round_trip",
+                    ) { activeDetailAid ->
+                        ProvideWenku8SharedTransition(
+                            sharedTransitionScope = this@SharedTransitionLayout,
+                            animatedVisibilityScope = this@AnimatedContent,
+                        ) {
+                            if (activeDetailAid == null) {
+                                saveableStateHolder.SaveableStateProvider(key = "bookshelf_3d") {
+                                    Box(modifier = Modifier.size(412.dp, 820.dp)) {
+                                        Bookshelf3dShelfSection(
+                                            items = items,
+                                            availableWidth = 380.dp,
+                                            availableHeight = 820.dp,
+                                            selectedAidSet = emptySet(),
+                                            isMultiSelectActive = false,
+                                            isEinkMode = false,
+                                            onItemClick = { clicked -> detailAid = clicked.aid },
+                                            onItemLongClick = {},
+                                            onContinueReadingClick = {},
+                                        )
+                                    }
+                                }
+                            } else {
+                                Box(modifier = Modifier.size(412.dp, 820.dp)) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(width = 132.dp, height = 198.dp)
+                                            .wenku8SharedNovelCover(
+                                                origin = Wenku8SharedElementKeys.NOVEL_BOOKSHELF_CARD_ORIGIN,
+                                                aid = activeDetailAid,
+                                                clipShape = RoundedCornerShape(14.dp),
+                                            ),
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        composeRule.waitForIdle()
+
+        // Step focus to book index 3 (04 / 08, aid = 1004)
+        repeat(3) {
+            composeRule.onNodeWithTag(BookshelfTestTags.SPINE_3D_NEXT_BUTTON).performClick()
+            composeRule.waitForIdle()
+        }
+        composeRule.onNodeWithTag(BookshelfTestTags.SPINE_3D_INDEX_COUNTER).assertTextContains("04 / 08")
+
+        // Verify the screen-space shared anchor sits at the exact post-matrix visual cover bounds
+        val metrics = Bookshelf3dGeometry.computeMetrics(availableWidthDp = 380f, availableHeightDp = 820f)
+        val expectedPose = Bookshelf3dGeometry.computeBookPosePx(
+            index = 3,
+            focus = 3f,
+            metrics = metrics,
+            density = capturedDensity,
+        )
+        val expectedVisualRect = Bookshelf3dGeometry.computeCoverArtworkVisualBoundsPx(
+            pose = expectedPose,
+            density = capturedDensity,
+        )
+
+        fun assertAnchorMatchesExpectedVisualBounds() {
+            val stageBounds = composeRule.onNodeWithTag(BookshelfTestTags.SPINE_3D_STAGE)
+                .fetchSemanticsNode()
+                .boundsInRoot
+            val anchorBounds = composeRule.onNodeWithTag(BookshelfTestTags.SPINE_3D_COVER_SHARED_ANCHOR)
+                .fetchSemanticsNode()
+                .boundsInRoot
+            val relLeft = anchorBounds.left - stageBounds.left
+            val relTop = anchorBounds.top - stageBounds.top
+            val tolerancePx = 2.5f
+            assertTrue(
+                "Anchor left ($relLeft) should match projected left (${expectedVisualRect.left})",
+                abs(relLeft - expectedVisualRect.left) <= tolerancePx,
+            )
+            assertTrue(
+                "Anchor top ($relTop) should match projected top (${expectedVisualRect.top})",
+                abs(relTop - expectedVisualRect.top) <= tolerancePx,
+            )
+            assertTrue(
+                "Anchor width (${anchorBounds.width}) should match projected width (${expectedVisualRect.width})",
+                abs(anchorBounds.width - expectedVisualRect.width) <= tolerancePx,
+            )
+            assertTrue(
+                "Anchor height (${anchorBounds.height}) should match projected height (${expectedVisualRect.height})",
+                abs(anchorBounds.height - expectedVisualRect.height) <= tolerancePx,
+            )
+        }
+
+        assertAnchorMatchesExpectedVisualBounds()
+
+        // Tap focused book (aid = 1004) to transition to Detail scene (3D shelf leaves composition)
+        composeRule.onNodeWithTag(BookshelfTestTags.BOOK_CARD_PREFIX + 1004).performClick()
+        composeRule.waitForIdle()
+        assertEquals(1004, detailAid)
+        composeRule.onNodeWithTag(BookshelfTestTags.SPINE_3D_STAGE).assertDoesNotExist()
+
+        // Return to 3D shelf with manual clock stepping so we inspect the very first entering frame
+        // and verify 01 / 08 NEVER flashes before focus restoration!
+        composeRule.mainClock.autoAdvance = false
+        try {
+            composeRule.runOnUiThread {
+                detailAid = null
+            }
+            var enteredOnFrame = -1
+            for (frame in 1..6) {
+                composeRule.mainClock.advanceTimeByFrame()
+                val counterNodes = composeRule
+                    .onAllNodesWithText("01 / 08", substring = false)
+                    .fetchSemanticsNodes()
+                assertTrue(
+                    "Frame $frame must never flash reset counter 01 / 08 while returning to 3D shelf",
+                    counterNodes.isEmpty(),
+                )
+                val targetNodes = composeRule
+                    .onAllNodesWithText("04 / 08", substring = false)
+                    .fetchSemanticsNodes()
+                if (targetNodes.isNotEmpty()) {
+                    enteredOnFrame = frame
+                    break
+                }
+            }
+            assertTrue(
+                "3D shelf should re-enter with 04 / 08 within the first frames (enteredOnFrame=$enteredOnFrame)",
+                enteredOnFrame in 1..6,
+            )
+            composeRule.onNodeWithTag(BookshelfTestTags.SPINE_3D_INDEX_COUNTER).assertTextContains("04 / 08")
+            composeRule.onNodeWithTag(BookshelfTestTags.SPINE_3D_COVER_SHARED_ANCHOR).assertExists()
+
+            // Mid-transition frame: render overlay cover + hidden sheared face cleanly
+            composeRule.mainClock.advanceTimeBy(64L)
+            val midTransitionBmp = composeRule.onRoot().captureToImage()
+            assertTrue(midTransitionBmp.width > 0 && midTransitionBmp.height > 0)
+        } finally {
+            composeRule.mainClock.autoAdvance = true
+        }
+
+        // Post-transition settled state: still focused on 04 / 08 with exact projected anchor bounds
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag(BookshelfTestTags.SPINE_3D_INDEX_COUNTER).assertTextContains("04 / 08")
+        assertAnchorMatchesExpectedVisualBounds()
+        val settledBmp = composeRule.onRoot().captureToImage()
+        assertTrue(settledBmp.width > 0 && settledBmp.height > 0)
     }
 }
 

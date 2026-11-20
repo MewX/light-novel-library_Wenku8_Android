@@ -56,6 +56,10 @@ object Bookshelf3dGeometry {
     const val COVER_LOAD_SCRUB_RIGHT_RADIUS: Int = 1
     const val COVER_LOAD_LAST_ITEM_RIGHT_RADIUS: Int = 4
 
+    const val COVER_ARTWORK_HORIZONTAL_PADDING_DP: Float = 7f
+    const val COVER_ARTWORK_TOP_INSET_DP: Float = 24f
+    const val COVER_ARTWORK_BOTTOM_INSET_DP: Float = 21f
+
     /**
      * Returns `true` when the book at [index] has a visible or immediately adjacent cover face.
      *
@@ -523,6 +527,45 @@ object Bookshelf3dGeometry {
         }
 
         return clampedSolid
+    }
+
+    /**
+     * Computes the exact screen-space visual rectangle of the cover artwork inside a 3D book
+     * volume after applying `coverMatrix` (`scaleX = DEPTH_X`, `skewY = DEPTH_Y`), centered at the
+     * sheared parallelogram's visual center with its projected width and vertical span.
+     *
+     * Because Compose's `SharedTransitionLayout` reads `LayoutCoordinates` (ignoring `drawWithContent`
+     * canvas transforms), anchoring the shared-element cover at this projected rectangle prevents
+     * returning covers from flying into the shifted/oversized pre-matrix layout box and snapping.
+     */
+    fun computeCoverArtworkVisualBoundsPx(
+        pose: Bookshelf3dBookPose,
+        density: Float,
+        horizontalPaddingDp: Float = COVER_ARTWORK_HORIZONTAL_PADDING_DP,
+        topInsetDp: Float = COVER_ARTWORK_TOP_INSET_DP,
+        bottomInsetDp: Float = COVER_ARTWORK_BOTTOM_INSET_DP,
+    ): Rect {
+        val scale = density.coerceAtLeast(0.5f)
+        val padX = horizontalPaddingDp * scale
+        val topInset = topInsetDp * scale
+        val bottomInset = bottomInsetDp * scale
+        val coverAnchor = pose.spineQuad[1]
+
+        val localArtWidth = (pose.coverWidthPx - 2f * padX).coerceAtLeast(1f)
+        val localArtHeight = (pose.bodyHeightPx - topInset - bottomInset).coerceAtLeast(1f)
+        val midLocalX = pose.coverWidthPx * 0.5f
+
+        val visualLeft = coverAnchor.x + padX * DEPTH_X
+        val visualWidth = localArtWidth * DEPTH_X
+        val visualCenterY = coverAnchor.y + midLocalX * DEPTH_Y + topInset + localArtHeight * 0.5f
+        val visualTop = visualCenterY - localArtHeight * 0.5f
+
+        return Rect(
+            left = visualLeft,
+            top = visualTop,
+            right = visualLeft + visualWidth,
+            bottom = visualTop + localArtHeight,
+        )
     }
 }
 

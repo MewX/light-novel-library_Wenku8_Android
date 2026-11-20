@@ -136,15 +136,17 @@ fun Modifier.wenku8SharedNovelCover(
     aid: Int,
     clipShape: Shape,
     enabled: Boolean = true,
+    sharedContentState: SharedTransitionScope.SharedContentState? = null,
 ): Modifier {
     if (!enabled || aid <= 0 || LocalEinkMode.current) return this
     val sharedCtx = LocalWenku8SharedTransition.current ?: return this
     val boundsTransformSpec = rememberExpressiveBoundsSpec()
     return with(sharedCtx.sharedTransitionScope) {
+        val state = sharedContentState ?: rememberSharedContentState(
+            key = Wenku8SharedElementKeys.novelCoverKey(origin, aid),
+        )
         this@wenku8SharedNovelCover.sharedElement(
-            sharedContentState = rememberSharedContentState(
-                key = Wenku8SharedElementKeys.novelCoverKey(origin, aid),
-            ),
+            sharedContentState = state,
             animatedVisibilityScope = sharedCtx.animatedVisibilityScope,
             boundsTransform = { _, _ -> boundsTransformSpec },
             clipInOverlayDuringTransition = OverlayClip(clipShape),

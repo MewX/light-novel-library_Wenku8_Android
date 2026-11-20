@@ -444,6 +444,68 @@ class Bookshelf3dGeometryTest {
             assertEquals(poseBefore.weight, poseAfter.weight, 1e-5f)
         }
     }
+
+    @Test
+    fun computeCoverArtworkVisualBoundsPx_matchesProjectedShearedParallelogramCenterAndWidth() {
+        val metrics = Bookshelf3dGeometry.computeMetrics(availableWidthDp = 412f, availableHeightDp = 820f)
+        val density = 2.5f
+        val focusedPose = Bookshelf3dGeometry.computeBookPosePx(
+            index = 3,
+            focus = 3f,
+            metrics = metrics,
+            density = density,
+        )
+
+        val visualRect = Bookshelf3dGeometry.computeCoverArtworkVisualBoundsPx(
+            pose = focusedPose,
+            density = density,
+        )
+
+        val padX = Bookshelf3dGeometry.COVER_ARTWORK_HORIZONTAL_PADDING_DP * density
+        val topInset = Bookshelf3dGeometry.COVER_ARTWORK_TOP_INSET_DP * density
+        val bottomInset = Bookshelf3dGeometry.COVER_ARTWORK_BOTTOM_INSET_DP * density
+        val localArtWidth = focusedPose.coverWidthPx - 2f * padX
+        val localArtHeight = focusedPose.bodyHeightPx - topInset - bottomInset
+        val coverAnchor = focusedPose.spineQuad[1]
+
+        // Apply exact coverMatrix transform (x' = anchor.x + x * DEPTH_X, y' = anchor.y + x * DEPTH_Y + y)
+        // to the 4 local corners of the artwork rectangle and check visual center & horizontal span.
+        val tlX = coverAnchor.x + padX * Bookshelf3dGeometry.DEPTH_X
+        val tlY = coverAnchor.y + padX * Bookshelf3dGeometry.DEPTH_Y + topInset
+        val trX = coverAnchor.x + (focusedPose.coverWidthPx - padX) * Bookshelf3dGeometry.DEPTH_X
+        val trY = coverAnchor.y + (focusedPose.coverWidthPx - padX) * Bookshelf3dGeometry.DEPTH_Y + topInset
+        val brX = trX
+        val brY = trY + localArtHeight
+        val blX = tlX
+        val blY = tlY + localArtHeight
+
+        val expectedCenterX = (tlX + trX + brX + blX) / 4f
+        val expectedCenterY = (tlY + trY + brY + blY) / 4f
+
+        assertEquals(tlX, visualRect.left, 1e-3f)
+        assertEquals(trX, visualRect.right, 1e-3f)
+        assertEquals(expectedCenterX, visualRect.center.x, 1e-3f)
+        assertEquals(expectedCenterY, visualRect.center.y, 1e-3f)
+        assertEquals(localArtWidth * Bookshelf3dGeometry.DEPTH_X, visualRect.width, 1e-3f)
+        assertEquals(localArtHeight, visualRect.height, 1e-3f)
+
+        // Verify the projected visual rect differs substantially from the untransformed pre-matrix
+        // layout rect (confirming why attaching sharedElement inside the matrix box drifted/snapped).
+        val untransformedCenterX = coverAnchor.x + focusedPose.coverWidthPx * 0.5f
+        val untransformedCenterY = coverAnchor.y + topInset + localArtHeight * 0.5f
+        assertTrue(
+            "Projected X center (${visualRect.center.x}) should sit left of untransformed ($untransformedCenterX)",
+            untransformedCenterX - visualRect.center.x > 10f * density,
+        )
+        assertTrue(
+            "Projected Y center (${visualRect.center.y}) should sit above untransformed ($untransformedCenterY)",
+            untransformedCenterY - visualRect.center.y > 10f * density,
+        )
+        assertTrue(
+            "Projected width (${visualRect.width}) should be narrower than untransformed ($localArtWidth)",
+            localArtWidth - visualRect.width > 15f * density,
+        )
+    }
 }
 
 

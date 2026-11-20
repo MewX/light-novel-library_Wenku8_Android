@@ -1,6 +1,7 @@
 package org.mewx.wenku8.ui.bookshelf
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.snap
@@ -75,6 +76,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Matrix
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
@@ -113,6 +115,7 @@ import org.mewx.wenku8.data.repository.BookshelfItemModel
 import org.mewx.wenku8.ui.components.TooltipIconButton
 import org.mewx.wenku8.ui.discovery.BookStatusBadge
 import org.mewx.wenku8.ui.discovery.DiscoveryTestTags
+import org.mewx.wenku8.ui.theme.LocalWenku8SharedTransition
 import org.mewx.wenku8.ui.theme.Wenku8SharedElementKeys
 import org.mewx.wenku8.ui.theme.einkHairlineBorder
 import org.mewx.wenku8.ui.theme.wenku8SharedNovelCover
@@ -163,9 +166,12 @@ internal fun Bookshelf3dShelfSection(
         )
     }
 
-    // Track focused book by aid across filter/sort/deletion mutations so focus stays stable.
+    // Track focused book by aid across filter/sort/deletion mutations and navigation round-trips.
+    // Initialize focusAnimatable synchronously from savedFocusedAid so returning from NovelDetail
+    // renders the exact focused book on Frame 1 for SharedTransitionLayout lookahead alignment.
     var savedFocusedAid by rememberSaveable { mutableIntStateOf(entries.first().item.aid) }
-    val focusAnimatable = remember { Animatable(0f) }
+    val initialFocusIndex = entries.indexOfFirst { it.item.aid == savedFocusedAid }.coerceAtLeast(0)
+    val focusAnimatable = remember { Animatable(initialFocusIndex.toFloat()) }
     var isScrubbing by remember { mutableStateOf(false) }
 
     val entryIdsKey = remember(entries) { entries.map { it.item.aid } }
@@ -243,6 +249,7 @@ internal fun Bookshelf3dShelfSection(
             if (latestIsMultiSelectActive) {
                 latestOnItemClick(tappedItem)
             } else if (abs(focusAnimatable.value - index) < 0.08f) {
+                savedFocusedAid = tappedItem.aid
                 latestOnItemClick(tappedItem)
             } else {
                 animateFocusTo(index)
@@ -352,9 +359,15 @@ internal fun Bookshelf3dShelfSection(
                     isMultiSelectActive = isMultiSelectActive,
                     isEinkMode = isEinkMode,
                     isCompactHeight = availableHeight.value < Bookshelf3dGeometry.COMPACT_HEIGHT_THRESHOLD_DP,
-                    onOpenDetail = { onItemClick(focusedItem) },
+                    onOpenDetail = {
+                        savedFocusedAid = focusedItem.aid
+                        onItemClick(focusedItem)
+                    },
                     onLongPress = { onItemLongClick(focusedItem) },
-                    onContinueReading = { onContinueReadingClick(focusedItem) },
+                    onContinueReading = {
+                        savedFocusedAid = focusedItem.aid
+                        onContinueReadingClick(focusedItem)
+                    },
                     modifier = Modifier.weight(1f),
                 )
             }
@@ -375,9 +388,15 @@ internal fun Bookshelf3dShelfSection(
                     isSelected = focusedItem.aid in selectedAidSet,
                     isMultiSelectActive = isMultiSelectActive,
                     isEinkMode = isEinkMode,
-                    onClick = { onItemClick(focusedItem) },
+                    onClick = {
+                        savedFocusedAid = focusedItem.aid
+                        onItemClick(focusedItem)
+                    },
                     onLongClick = { onItemLongClick(focusedItem) },
-                    onContinueReading = { onContinueReadingClick(focusedItem) },
+                    onContinueReading = {
+                        savedFocusedAid = focusedItem.aid
+                        onContinueReadingClick(focusedItem)
+                    },
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
@@ -385,6 +404,7 @@ internal fun Bookshelf3dShelfSection(
     }
 }
 
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 private fun Bookshelf3dStage(
     entries: List<Bookshelf3dShelfEntry<BookshelfItemModel>>,
@@ -416,6 +436,26 @@ private fun Bookshelf3dStage(
         density = densityFactor,
         discreteExtraction = isEinkMode,
     )
+
+    val focusedPose = visiblePoses.firstOrNull { it.index == focusedIndex }
+    val focusedEntry = focusedPose?.let { entries.getOrNull(it.index) }
+    val sharedCtx = LocalWenku8SharedTransition.current
+    val focusedCoverSharedState = if (sharedCtx != null && !isEinkMode && focusedEntry != null) {
+        with(sharedCtx.sharedTransitionScope) {
+            rememberSharedContentState(
+                key = Wenku8SharedElementKeys.novelCoverKey(
+                    Wenku8SharedElementKeys.NOVEL_BOOKSHELF_CARD_ORIGIN,
+                    focusedEntry.item.aid,
+                ),
+            )
+        }
+    } else {
+        null
+    }
+    val isFocusedCoverTransitionActive = sharedCtx != null &&
+        focusedCoverSharedState != null &&
+        focusedCoverSharedState.isMatchFound &&
+        sharedCtx.sharedTransitionScope.isTransitionActive
 
     val latestPoses by rememberUpdatedState(visiblePoses)
     val latestPitchPx by rememberUpdatedState(pitchPx)
@@ -518,6 +558,7 @@ private fun Bookshelf3dStage(
         visiblePoses.forEach { pose ->
             val entry = entries[pose.index]
             val item = entry.item
+            val isBookFocused = pose.index == focusedIndex
             key(item.aid) {
                 Bookshelf3dBookVolume(
                     item = item,
@@ -527,17 +568,79 @@ private fun Bookshelf3dStage(
                     metrics = metrics,
                     spineMatrix = spineMatrix,
                     coverMatrix = coverMatrix,
-                    isFocused = pose.index == focusedIndex,
+                    isFocused = isBookFocused,
                     shouldLoadCover = Bookshelf3dGeometry.shouldLoadBookCover(
                         index = pose.index,
                         focusedIndex = focusedIndex,
                         itemCount = entries.size,
                         isScrubbing = isScrubbing,
                     ),
+                    hideCoverArtworkForSharedTransition = isBookFocused && isFocusedCoverTransitionActive,
                     isSelected = item.aid in selectedAidSet,
                     isDark = isDark,
                     isEinkMode = isEinkMode,
                 )
+            }
+        }
+
+        // Layer 2b: Screen-space shared-element cover anchor placed at the exact post-matrix
+        // projected visual bounds of the focused 3D cover (invisible at rest; renders in the root
+        // overlay during Detail <-> Bookshelf transitions so returning covers land dead-center).
+        if (focusedPose != null && focusedEntry != null && focusedCoverSharedState != null && sharedCtx != null) {
+            val focusedItem = focusedEntry.item
+            val visualCoverRect = Bookshelf3dGeometry.computeCoverArtworkVisualBoundsPx(
+                pose = focusedPose,
+                density = densityFactor,
+            )
+            val anchorWidthDp = with(density) { visualCoverRect.width.toDp() }
+            val anchorHeightDp = with(density) { visualCoverRect.height.toDp() }
+            val mountOverlayCover = sharedCtx.sharedTransitionScope.isTransitionActive
+            key(focusedItem.aid) {
+                Box(
+                    modifier = Modifier
+                        .offset {
+                            IntOffset(
+                                x = visualCoverRect.left.roundToInt(),
+                                y = visualCoverRect.top.roundToInt(),
+                            )
+                        }
+                        .size(width = anchorWidthDp, height = anchorHeightDp)
+                        .testTag(BookshelfTestTags.SPINE_3D_COVER_SHARED_ANCHOR)
+                        .wenku8SharedNovelCover(
+                            origin = Wenku8SharedElementKeys.NOVEL_BOOKSHELF_CARD_ORIGIN,
+                            aid = focusedItem.aid,
+                            clipShape = COVER_CLIP_SHAPE,
+                            enabled = !isEinkMode,
+                            sharedContentState = focusedCoverSharedState,
+                        )
+                        .graphicsLayer {
+                            alpha = if (isFocusedCoverTransitionActive) 1f else 0f
+                        }
+                        .clip(COVER_CLIP_SHAPE)
+                        .background(MaterialTheme.colorScheme.surfaceContainerHighest),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    if (mountOverlayCover) {
+                        Icon(
+                            imageVector = Icons.Outlined.AutoStories,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                            modifier = Modifier.size(24.dp),
+                        )
+                        if (focusedItem.coverUrl.isNotBlank()) {
+                            AsyncImage(
+                                model = WenkuImageRequests.rememberCoverImageRequest(
+                                    aid = focusedItem.aid,
+                                    coverUrl = focusedItem.coverUrl,
+                                    enableCrossfade = false,
+                                ),
+                                contentDescription = focusedItem.novel.title,
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.fillMaxSize(),
+                            )
+                        }
+                    }
+                }
             }
         }
 
@@ -614,6 +717,7 @@ private fun Bookshelf3dBookVolume(
     coverMatrix: Matrix,
     isFocused: Boolean,
     shouldLoadCover: Boolean,
+    hideCoverArtworkForSharedTransition: Boolean,
     isSelected: Boolean,
     isDark: Boolean,
     isEinkMode: Boolean,
@@ -702,8 +806,8 @@ private fun Bookshelf3dBookVolume(
             borderColor = edgeBorderColor,
             borderWidth = edgeBorderWidth,
             extractionWeight = pose.weight,
-            isFocused = isFocused,
             shouldLoadCover = shouldLoadCover,
+            hideCoverArtworkForSharedTransition = hideCoverArtworkForSharedTransition,
             isSelected = isSelected,
             isEinkMode = isEinkMode,
         )
@@ -803,8 +907,8 @@ private fun Bookshelf3dCoverFace(
     borderColor: Color,
     borderWidth: Dp,
     extractionWeight: Float,
-    isFocused: Boolean,
     shouldLoadCover: Boolean,
+    hideCoverArtworkForSharedTransition: Boolean,
     isSelected: Boolean,
     isEinkMode: Boolean,
 ) {
@@ -827,7 +931,9 @@ private fun Bookshelf3dCoverFace(
             verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(14.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
@@ -877,48 +983,58 @@ private fun Bookshelf3dCoverFace(
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f)
-                    .wenku8SharedNovelCover(
-                        origin = Wenku8SharedElementKeys.NOVEL_BOOKSHELF_CARD_ORIGIN,
-                        aid = item.aid,
-                        clipShape = coverClipShape,
-                        enabled = isFocused,
-                    )
                     .clip(coverClipShape)
                     .background(MaterialTheme.colorScheme.surfaceContainerHighest),
                 contentAlignment = Alignment.Center,
             ) {
-                Icon(
-                    imageVector = Icons.Outlined.AutoStories,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                    modifier = Modifier.size(24.dp),
-                )
-                if (shouldLoadCover && item.coverUrl.isNotBlank()) {
-                    AsyncImage(
-                        model = WenkuImageRequests.rememberCoverImageRequest(
-                            aid = item.aid,
-                            coverUrl = item.coverUrl,
-                            enableCrossfade = false,
-                        ),
-                        contentDescription = item.novel.title,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize(),
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .graphicsLayer {
+                            alpha = if (hideCoverArtworkForSharedTransition) 0f else 1f
+                        },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.AutoStories,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                        modifier = Modifier.size(24.dp),
                     )
+                    if (shouldLoadCover && item.coverUrl.isNotBlank()) {
+                        AsyncImage(
+                            model = WenkuImageRequests.rememberCoverImageRequest(
+                                aid = item.aid,
+                                coverUrl = item.coverUrl,
+                                enableCrossfade = false,
+                            ),
+                            contentDescription = item.novel.title,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    }
                 }
             }
 
-            Text(
-                text = "WK-${item.aid.toString().padStart(5, '0')}",
-                style = MaterialTheme.typography.labelSmall.copy(
-                    fontFamily = FontFamily.Monospace,
-                    fontSize = 7.5.sp,
-                    lineHeight = 9.sp,
-                    letterSpacing = 0.5.sp,
-                ),
-                color = labelColor.copy(alpha = 0.85f),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(11.dp),
+                contentAlignment = Alignment.CenterStart,
+            ) {
+                Text(
+                    text = "WK-${item.aid.toString().padStart(5, '0')}",
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 7.5.sp,
+                        lineHeight = 9.sp,
+                        letterSpacing = 0.5.sp,
+                    ),
+                    color = labelColor.copy(alpha = 0.85f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
         }
 
         // Depth recession scrim on books tucked deeper into the shelf bank
