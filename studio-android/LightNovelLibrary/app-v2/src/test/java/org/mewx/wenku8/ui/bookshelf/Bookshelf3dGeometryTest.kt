@@ -169,6 +169,14 @@ class Bookshelf3dGeometryTest {
         val samplePoses = listOf(
             Bookshelf3dGeometry.computeBookPosePx(0, 0f, metrics, density),
         )
+        // Top page-edge cap hit-testing on the focused book
+        val focusedPose = samplePoses.first()
+        val topCapCenter = Offset(
+            x = focusedPose.topCapQuad.map { it.x }.average().toFloat(),
+            y = focusedPose.topCapQuad.map { it.y }.average().toFloat(),
+        )
+        assertEquals(0, Bookshelf3dGeometry.hitTestBookIndex(topCapCenter, samplePoses))
+
         assertNull(Bookshelf3dGeometry.hitTestBookIndex(Offset(-500f, -500f), samplePoses))
         assertNull(Bookshelf3dGeometry.hitTestBookIndex(Offset(stageW + 500f, stageH + 500f), samplePoses))
     }
@@ -200,6 +208,45 @@ class Bookshelf3dGeometryTest {
                 velocityPxPerSec = 10f,
                 pitchPx = pitchPx,
                 itemCount = 10,
+            ),
+        )
+
+        // Moderate directional flick right above threshold guarantees at least 1 slot advance
+        assertEquals(
+            3,
+            Bookshelf3dSnapPhysics.computeFlingTargetIndex(
+                currentFocus = 2.0f,
+                velocityPxPerSec = -200f,
+                pitchPx = pitchPx,
+                itemCount = 20,
+            ),
+        )
+        assertEquals(
+            7,
+            Bookshelf3dSnapPhysics.computeFlingTargetIndex(
+                currentFocus = 8.0f,
+                velocityPxPerSec = 200f,
+                pitchPx = pitchPx,
+                itemCount = 20,
+            ),
+        )
+        // Flick when slightly off-integer with runway requirement (covers minRunway floor/ceil)
+        assertEquals(
+            4,
+            Bookshelf3dSnapPhysics.computeFlingTargetIndex(
+                currentFocus = 2.4f,
+                velocityPxPerSec = -420f,
+                pitchPx = pitchPx,
+                itemCount = 20,
+            ),
+        )
+        assertEquals(
+            6,
+            Bookshelf3dSnapPhysics.computeFlingTargetIndex(
+                currentFocus = 7.6f,
+                velocityPxPerSec = 420f,
+                pitchPx = pitchPx,
+                itemCount = 20,
             ),
         )
 

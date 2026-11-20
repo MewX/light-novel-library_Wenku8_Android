@@ -12,12 +12,14 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertTextContains
+import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTouchInput
@@ -349,5 +351,89 @@ class Bookshelf3dShelfSectionTest {
         composeRule.onNodeWithTag(BookshelfTestTags.SPINE_3D_PREV_BUTTON).assertDoesNotExist()
         composeRule.onNodeWithTag(BookshelfTestTags.SPINE_3D_NEXT_BUTTON).assertDoesNotExist()
         assertTrue(composeRule.onAllNodesWithText("狼与香辛料").fetchSemanticsNodes().isNotEmpty())
+    }
+
+    @Test
+    fun largeLibraryAndRenderPass_drawsAcrossThemes_handlesSelectionWidePanelEmptyAndSemantics() {
+        var currentItems by mutableStateOf(
+            List(105) { idx ->
+                val base = sampleItems(1).first()
+                base.copy(
+                    novel = base.novel.copy(
+                        aid = 2001 + idx,
+                        title = if (idx == 0) "无职转生 Mushoku Tensei" else "大容量书架作品第${idx + 1}部",
+                        author = if (idx == 0) "" else "作者${idx + 1}",
+                        pressId = if (idx == 0) "" else "电击文库",
+                        bookStatus = if (idx == 0) "" else "连载中",
+                        introShort = if (idx == 0) "" else "简介 $idx",
+                        hasUnreadUpdate = false,
+                        latestSectionName = "",
+                    ),
+                    readingProgress = null,
+                    cachedChapterCount = if (idx == 0) 5 else 0,
+                    totalChapterCount = 0,
+                    tags = if (idx == 0) emptyList() else listOf("奇幻"),
+                )
+            },
+        )
+        var themeMode by mutableStateOf(Wenku8ThemeMode.CLASSIC_BLUE)
+        var screenWidthDp by mutableStateOf(960.dp)
+        var selectedAids by mutableStateOf(emptySet<Int>())
+        val openedAids = mutableListOf<Int>()
+
+        composeRule.setContent {
+            Wenku8ExpressiveTheme(themeMode = themeMode) {
+                Box(modifier = Modifier.size(screenWidthDp, 720.dp)) {
+                    Bookshelf3dShelfSection(
+                        items = currentItems,
+                        availableWidth = screenWidthDp - 32.dp,
+                        availableHeight = 720.dp,
+                        selectedAidSet = selectedAids,
+                        isMultiSelectActive = selectedAids.isNotEmpty(),
+                        isEinkMode = themeMode == Wenku8ThemeMode.E_INK,
+                        onItemClick = { openedAids += it.aid },
+                        onItemLongClick = { selectedAids = selectedAids + it.aid },
+                        onContinueReadingClick = {},
+                    )
+                }
+            }
+        }
+        composeRule.waitForIdle()
+
+        // 1. 105-book library uses 3-digit counter formatting and draws cleanly in Light mode
+        composeRule.onNodeWithTag(BookshelfTestTags.SPINE_3D_INDEX_COUNTER).assertTextContains("001 / 105")
+        val lightBitmap = composeRule.onRoot().captureToImage()
+        assertTrue(lightBitmap.width > 0 && lightBitmap.height > 0)
+
+        // 2. Semantics actions on exposed book anchor trigger OnClick (open focused) & OnLongClick (select)
+        composeRule.onNodeWithTag(BookshelfTestTags.BOOK_CARD_PREFIX + 2001)
+            .performSemanticsAction(SemanticsActions.OnClick)
+        composeRule.waitForIdle()
+        assertEquals(listOf(2001), openedAids)
+
+        composeRule.onNodeWithTag(BookshelfTestTags.BOOK_CARD_PREFIX + 2001)
+            .performSemanticsAction(SemanticsActions.OnLongClick)
+        composeRule.waitForIdle()
+        assertTrue(2001 in selectedAids)
+
+        // 3. Draw pass in E-Ink mode with selected wide panel + fast scroller
+        themeMode = Wenku8ThemeMode.E_INK
+        composeRule.waitForIdle()
+        val einkBitmap = composeRule.onRoot().captureToImage()
+        assertTrue(einkBitmap.width > 0 && einkBitmap.height > 0)
+
+        // 4. Draw pass in Dark mode on compact phone with <=20 books (exercises track tick marks)
+        currentItems = sampleItems(8)
+        selectedAids = emptySet()
+        themeMode = Wenku8ThemeMode.CARBON_NIGHT
+        screenWidthDp = 390.dp
+        composeRule.waitForIdle()
+        val darkBitmap = composeRule.onRoot().captureToImage()
+        assertTrue(darkBitmap.width > 0 && darkBitmap.height > 0)
+
+        // 5. Empty list exits cleanly without rendering container
+        currentItems = emptyList()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag(BookshelfTestTags.SPINE_3D_CONTAINER).assertDoesNotExist()
     }
 }
