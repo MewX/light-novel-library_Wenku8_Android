@@ -506,6 +506,90 @@ class Bookshelf3dGeometryTest {
             localArtWidth - visualRect.width > 15f * density,
         )
     }
+
+    @Test
+    fun buildInterpolatedCoverMorphMatrix_interpolatesIdentityToExact3dParallelogramCornersAndScale() {
+        val metrics = Bookshelf3dGeometry.computeMetrics(availableWidthDp = 412f, availableHeightDp = 820f)
+        val density = 2.5f
+        val focusedPose = Bookshelf3dGeometry.computeBookPosePx(
+            index = 3,
+            focus = 3f,
+            metrics = metrics,
+            density = density,
+        )
+        val visualRect = Bookshelf3dGeometry.computeCoverArtworkVisualBoundsPx(
+            pose = focusedPose,
+            density = density,
+        )
+        val padX = Bookshelf3dGeometry.COVER_ARTWORK_HORIZONTAL_PADDING_DP * density
+        val topInset = Bookshelf3dGeometry.COVER_ARTWORK_TOP_INSET_DP * density
+        val bottomInset = Bookshelf3dGeometry.COVER_ARTWORK_BOTTOM_INSET_DP * density
+        val localArtWidth = focusedPose.coverWidthPx - 2f * padX
+        val localArtHeight = focusedPose.bodyHeightPx - topInset - bottomInset
+        val coverAnchor = focusedPose.spineQuad[1]
+
+        // 1. At slantedFraction = 0f (Detail hero): exact identity & 12dp corner radius
+        assertEquals(1f, Bookshelf3dGeometry.interpolatedCoverScaleX(0f), 1e-5f)
+        assertEquals(12f, Bookshelf3dGeometry.interpolatedCoverCornerDp(0f), 1e-5f)
+        val flatMatrix = Bookshelf3dGeometry.buildInterpolatedCoverMorphMatrix(
+            overlayWidthPx = 116f * density,
+            slantedFraction = 0f,
+        )
+        val flatCorner = flatMatrix.map(Offset(116f * density, 164f * density))
+        assertEquals(116f * density, flatCorner.x, 1e-3f)
+        assertEquals(164f * density, flatCorner.y, 1e-3f)
+
+        // 2. At slantedFraction = 0.5f: halfway foreshortening & centered vertical shear
+        val midScaleX = Bookshelf3dGeometry.interpolatedCoverScaleX(0.5f)
+        assertEquals((1f + Bookshelf3dGeometry.DEPTH_X) * 0.5f, midScaleX, 1e-5f)
+        assertEquals(7.5f, Bookshelf3dGeometry.interpolatedCoverCornerDp(0.5f), 1e-5f)
+        val midOverlayW = 100f * density
+        val midUnforeshortenedW = midOverlayW / midScaleX
+        val midMatrix = Bookshelf3dGeometry.buildInterpolatedCoverMorphMatrix(
+            overlayWidthPx = midOverlayW,
+            slantedFraction = 0.5f,
+        )
+        val midCenter = midMatrix.map(Offset(midUnforeshortenedW * 0.5f, 80f * density))
+        assertEquals(midOverlayW * 0.5f, midCenter.x, 1e-3f)
+        assertEquals(80f * density, midCenter.y, 1e-3f)
+        val midRightTop = midMatrix.map(Offset(midUnforeshortenedW, 0f))
+        assertEquals(midOverlayW, midRightTop.x, 1e-3f)
+        assertTrue("Right edge rises upward (negative Y) at 50% slant", midRightTop.y < 0f)
+
+        // 3. At slantedFraction = 1f (3D Shelf): exact DEPTH_X foreshortening, 3dp corner radius,
+        // and all 4 mapped corners of [0, localArtWidth] x [0, localArtHeight] match Bookshelf3dCoverFace to 0px
+        assertEquals(Bookshelf3dGeometry.DEPTH_X, Bookshelf3dGeometry.interpolatedCoverScaleX(1f), 1e-5f)
+        assertEquals(3f, Bookshelf3dGeometry.interpolatedCoverCornerDp(1f), 1e-5f)
+        val slantedMatrix = Bookshelf3dGeometry.buildInterpolatedCoverMorphMatrix(
+            overlayWidthPx = visualRect.width,
+            slantedFraction = 1f,
+        )
+        val stageOffset = Offset(visualRect.left, visualRect.top)
+        val mappedTl = stageOffset + slantedMatrix.map(Offset(0f, 0f))
+        val mappedTr = stageOffset + slantedMatrix.map(Offset(localArtWidth, 0f))
+        val mappedBr = stageOffset + slantedMatrix.map(Offset(localArtWidth, localArtHeight))
+        val mappedBl = stageOffset + slantedMatrix.map(Offset(0f, localArtHeight))
+
+        val expectedTl = Offset(
+            coverAnchor.x + padX * Bookshelf3dGeometry.DEPTH_X,
+            coverAnchor.y + padX * Bookshelf3dGeometry.DEPTH_Y + topInset,
+        )
+        val expectedTr = Offset(
+            coverAnchor.x + (focusedPose.coverWidthPx - padX) * Bookshelf3dGeometry.DEPTH_X,
+            coverAnchor.y + (focusedPose.coverWidthPx - padX) * Bookshelf3dGeometry.DEPTH_Y + topInset,
+        )
+        val expectedBr = Offset(expectedTr.x, expectedTr.y + localArtHeight)
+        val expectedBl = Offset(expectedTl.x, expectedTl.y + localArtHeight)
+
+        assertEquals(expectedTl.x, mappedTl.x, 1e-2f)
+        assertEquals(expectedTl.y, mappedTl.y, 1e-2f)
+        assertEquals(expectedTr.x, mappedTr.x, 1e-2f)
+        assertEquals(expectedTr.y, mappedTr.y, 1e-2f)
+        assertEquals(expectedBr.x, mappedBr.x, 1e-2f)
+        assertEquals(expectedBr.y, mappedBr.y, 1e-2f)
+        assertEquals(expectedBl.x, mappedBl.x, 1e-2f)
+        assertEquals(expectedBl.y, mappedBl.y, 1e-2f)
+    }
 }
 
 

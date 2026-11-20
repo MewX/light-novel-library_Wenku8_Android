@@ -1,9 +1,12 @@
 package org.mewx.wenku8.ui.bookshelf
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.EnterExitState
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionLayout
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.getValue
@@ -619,16 +622,27 @@ class Bookshelf3dShelfSectionTest {
                                     }
                                 }
                             } else {
+                                val enterSlant by transition.animateFloat(
+                                    label = "test_detail_enter_slant",
+                                ) { state ->
+                                    if (state == EnterExitState.PreEnter) 1f else 0f
+                                }
                                 Box(modifier = Modifier.size(412.dp, 820.dp)) {
                                     Box(
                                         modifier = Modifier
-                                            .size(width = 132.dp, height = 198.dp)
+                                            .size(width = 116.dp, height = 164.dp)
                                             .wenku8SharedNovelCover(
-                                                origin = Wenku8SharedElementKeys.NOVEL_BOOKSHELF_CARD_ORIGIN,
+                                                origin = Wenku8SharedElementKeys.NOVEL_BOOKSHELF_3D_ORIGIN,
                                                 aid = activeDetailAid,
-                                                clipShape = RoundedCornerShape(14.dp),
+                                                clipShape = null,
                                             ),
-                                    )
+                                    ) {
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxSize()
+                                                .bookshelf3dCoverPerspectiveMorph(enterSlant),
+                                        )
+                                    }
                                 }
                             }
                         }

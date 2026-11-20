@@ -105,9 +105,13 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.animation.EnterExitState
+import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.BitmapImage
 import coil3.compose.AsyncImage
@@ -129,15 +133,19 @@ import org.mewx.wenku8.data.repository.NovelDetailRepository
 import org.mewx.wenku8.data.repository.NovelDetailSnapshot
 import org.mewx.wenku8.data.repository.VolumeAccordionModel
 import org.mewx.wenku8.domain.model.DiscoveryNovelCardItem
+import org.mewx.wenku8.ui.bookshelf.Bookshelf3dGeometry
+import org.mewx.wenku8.ui.bookshelf.bookshelf3dCoverPerspectiveMorph
 import org.mewx.wenku8.ui.components.ActionTooltipBox
 import org.mewx.wenku8.ui.components.TooltipIconButton
 import org.mewx.wenku8.ui.discovery.bookStatusLeadingIcon
 import org.mewx.wenku8.ui.discovery.formatBookStatusLabel
 import org.mewx.wenku8.ui.theme.CoverThemeEngine
 import org.mewx.wenku8.ui.theme.LocalEinkMode
+import org.mewx.wenku8.ui.theme.LocalWenku8SharedTransition
 import org.mewx.wenku8.ui.theme.Wenku8SharedElementKeys
 import org.mewx.wenku8.ui.theme.Wenku8ThemeMode
 import org.mewx.wenku8.ui.theme.einkHairlineBorder
+import org.mewx.wenku8.ui.theme.expressiveSharedFloatSpec
 import org.mewx.wenku8.ui.theme.wenku8SharedNovelCover
 import org.mewx.wenku8.ui.theme.wenku8SharedNovelTitle
 import java.util.Locale
@@ -981,7 +989,7 @@ fun NovelDetailScreen(
     }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
+@OptIn(ExperimentalLayoutApi::class, ExperimentalSharedTransitionApi::class)
 @Composable
 private fun NovelHeroHeaderCard(
     aid: Int,
@@ -1024,56 +1032,82 @@ private fun NovelHeroHeaderCard(
             horizontalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             val heroCoverShape = MaterialTheme.shapes.medium
-            Surface(
-                shape = heroCoverShape,
-                color = MaterialTheme.colorScheme.surfaceContainerHighest,
-                tonalElevation = if (isEinkMode) 0.dp else 4.dp,
+            val isFrom3dShelf = sharedTransitionOrigin == Wenku8SharedElementKeys.NOVEL_BOOKSHELF_3D_ORIGIN
+            val sharedCtx = LocalWenku8SharedTransition.current
+            val enterSlantedFraction = if (isFrom3dShelf && sharedCtx != null && !isEinkMode) {
+                val animatedSlant by sharedCtx.animatedVisibilityScope.transition.animateFloat(
+                    transitionSpec = { expressiveSharedFloatSpec(isEinkMode = false) },
+                    label = "detail_cover_3d_enter_slant",
+                ) { enterExitState ->
+                    if (enterExitState == EnterExitState.PreEnter) 1f else 0f
+                }
+                animatedSlant
+            } else {
+                0f
+            }
+            val effectiveCoverShape = if (isFrom3dShelf && enterSlantedFraction > 0.001f) {
+                RoundedCornerShape(
+                    Bookshelf3dGeometry.interpolatedCoverCornerDp(enterSlantedFraction).dp,
+                )
+            } else {
+                heroCoverShape
+            }
+            Box(
                 modifier = Modifier
                     .width(116.dp)
                     .height(164.dp)
                     .wenku8SharedNovelCover(
                         origin = sharedTransitionOrigin,
                         aid = aid,
-                        clipShape = heroCoverShape,
-                    )
-                    .einkHairlineBorder(heroCoverShape),
+                        clipShape = if (isFrom3dShelf) null else heroCoverShape,
+                    ),
             ) {
-                if (coverUrl.isNotBlank()) {
-                    val coverRequest = WenkuImageRequests.rememberCoverImageRequest(
-                        aid = aid,
-                        coverUrl = coverUrl,
-                        enableCrossfade = false,
-                    )
-                    AsyncImage(
-                        model = coverRequest,
-                        contentDescription = title,
-                        contentScale = ContentScale.Crop,
-                        onSuccess = { success ->
-                            val bmp = (success.result.image as? BitmapImage)?.bitmap
-                            if (bmp != null) {
-                                onCoverSeedExtracted(CoverThemeEngine.extractSeedColorFromBitmap(bmp))
+                Surface(
+                    shape = effectiveCoverShape,
+                    color = MaterialTheme.colorScheme.surfaceContainerHighest,
+                    tonalElevation = if (isEinkMode) 0.dp else 4.dp,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .bookshelf3dCoverPerspectiveMorph(slantedFraction = enterSlantedFraction)
+                        .einkHairlineBorder(effectiveCoverShape),
+                ) {
+                    if (coverUrl.isNotBlank()) {
+                        val coverRequest = WenkuImageRequests.rememberCoverImageRequest(
+                            aid = aid,
+                            coverUrl = coverUrl,
+                            enableCrossfade = false,
+                        )
+                        AsyncImage(
+                            model = coverRequest,
+                            contentDescription = title,
+                            contentScale = ContentScale.Crop,
+                            onSuccess = { success ->
+                                val bmp = (success.result.image as? BitmapImage)?.bitmap
+                                if (bmp != null) {
+                                    onCoverSeedExtracted(CoverThemeEngine.extractSeedColorFromBitmap(bmp))
+                                }
+                            },
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    } else {
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Icon(
+                                    imageVector = Icons.Outlined.AutoStories,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(36.dp),
+                                )
+                                Spacer(modifier = Modifier.height(6.dp))
+                                Text(
+                                    text = "#$aid",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
                             }
-                        },
-                        modifier = Modifier.fillMaxSize(),
-                    )
-                } else {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Icon(
-                                imageVector = Icons.Outlined.AutoStories,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(36.dp),
-                            )
-                            Spacer(modifier = Modifier.height(6.dp))
-                            Text(
-                                text = "#$aid",
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
                         }
                     }
                 }

@@ -567,6 +567,51 @@ object Bookshelf3dGeometry {
             bottom = visualTop + localArtHeight,
         )
     }
+
+    /**
+     * Horizontal perspective foreshortening factor for a cover morphing between flat upright
+     * (`slantedFraction = 0f` -> `1f`) and the isometric 3D cover face (`slantedFraction = 1f` -> `DEPTH_X`).
+     */
+    fun interpolatedCoverScaleX(slantedFraction: Float): Float {
+        val t = slantedFraction.coerceIn(0f, 1f)
+        return 1f + (DEPTH_X - 1f) * t
+    }
+
+    /**
+     * Builds the centered 2D affine matrix that maps an un-foreshortened cover rect of width
+     * `overlayWidthPx / interpolatedCoverScaleX(slantedFraction)` into `[0, overlayWidthPx]` while
+     * smoothly applying centered vertical isometric shear (`0` at `slantedFraction = 0f`, exact
+     * `coverMatrix` slope at `slantedFraction = 1f`).
+     */
+    fun buildInterpolatedCoverMorphMatrix(
+        overlayWidthPx: Float,
+        slantedFraction: Float,
+    ): Matrix {
+        val t = slantedFraction.coerceIn(0f, 1f)
+        val sx = interpolatedCoverScaleX(t)
+        val sy = DEPTH_Y * t
+        val unforeshortenedWidth = overlayWidthPx / sx
+        return buildAffine2dMatrix(
+            scaleX = sx,
+            skewX = 0f,
+            transX = 0f,
+            skewY = sy,
+            scaleY = 1f,
+            transY = -unforeshortenedWidth * 0.5f * sy,
+        )
+    }
+
+    /**
+     * Smoothly interpolates cover corner radius between Detail hero (`12.dp`) and 3D shelf (`3.dp`).
+     */
+    fun interpolatedCoverCornerDp(
+        slantedFraction: Float,
+        flatCornerDp: Float = 12f,
+        slantedCornerDp: Float = 3f,
+    ): Float {
+        val t = slantedFraction.coerceIn(0f, 1f)
+        return flatCornerDp + (slantedCornerDp - flatCornerDp) * t
+    }
 }
 
 /**

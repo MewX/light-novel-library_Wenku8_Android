@@ -682,7 +682,7 @@ fun BookshelfScreen(
                                             bookshelfRepository.clearUnreadUpdateBadge(item.aid)
                                         }
                                         val cardItem = item.toDiscoveryCardItem()
-                                        val origin = Wenku8SharedElementKeys.NOVEL_BOOKSHELF_CARD_ORIGIN
+                                        val origin = Wenku8SharedElementKeys.NOVEL_BOOKSHELF_3D_ORIGIN
                                         onNovelClickedWithOrigin?.invoke(cardItem, origin)
                                             ?: onNovelClicked(cardItem)
                                     }

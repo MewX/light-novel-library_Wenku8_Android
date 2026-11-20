@@ -24,8 +24,11 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.LayoutDirection
 
 /**
  * Shared-element & screen-transition motion engine for Wenku8 `:app-v2` (Material 3 Expressive).
@@ -38,9 +41,10 @@ import androidx.compose.ui.unit.IntOffset
  *    search container on `书架` seamlessly morph their bounds and shape into `UnifiedSearchScreen`'s
  *    `OutlinedTextField` on open and collapse smoothly back on return.
  * 2. **Novel Cover & Title Morphing**: Tapping a novel card in Discovery (`最新` / `排行`),
- *    `书架` (`继续阅读` carousel, Grid, or Detail List), `UnifiedSearchScreen`, or `ReadingFootprintScreen`
- *    morphs the 2:3 book cover and title directly into `NovelDetailScreen`'s editorial hero card,
- *    using unique origin-scoped keys so visible duplicate covers never clash.
+ *    `书架` (`继续阅读` carousel, Grid, Detail List, or 3D Spine), `UnifiedSearchScreen`, or
+ *    `ReadingFootprintScreen` morphs the 2:3 book cover and title directly into
+ *    `NovelDetailScreen`'s editorial hero card, using unique origin-scoped keys so visible
+ *    duplicate covers never clash.
  * 3. **Hierarchical Screen & Tab Transitions**: Full-screen sub-destinations (`NovelDetailScreen`,
  *    `UnifiedSearchScreen`, `ReadingFootprintScreen`, `ReviewListScreen`, `ReviewThreadScreen`,
  *    `UnifiedReaderScreen`, `NetworkDiagnosticsScreen`) use M3e `MotionScheme` spatial slide + fade
@@ -53,6 +57,7 @@ object Wenku8SharedElementKeys {
     const val NOVEL_DEFAULT_ORIGIN = "feed"
     const val NOVEL_BOOKSHELF_CAROUSEL_ORIGIN = "shelf_carousel"
     const val NOVEL_BOOKSHELF_CARD_ORIGIN = "shelf_card"
+    const val NOVEL_BOOKSHELF_3D_ORIGIN = "shelf_3d"
     const val NOVEL_SEARCH_LOCAL_ORIGIN = "search_local"
     const val NOVEL_SEARCH_ONLINE_ORIGIN = "search_online"
     const val NOVEL_FOOTPRINT_HISTORY_ORIGIN = "footprint_history"
@@ -128,13 +133,17 @@ fun Modifier.wenku8SharedSearchBarBounds(
 /**
  * Applies `sharedElement` geometry morphing to a 2:3 Light Novel cover image container between
  * feed/shelf/search/history cards and `NovelDetailScreen`'s hero cover.
+ *
+ * When [clipShape] is `null` (used by 3D bookshelf sheared cover morphs), overlay clipping is
+ * disabled so sheared parallelogram corners extending outside the axis-aligned rect are never
+ * chopped off while the inner content applies its own sheared corner clip.
  */
 @OptIn(ExperimentalSharedTransitionApi::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun Modifier.wenku8SharedNovelCover(
     origin: String,
     aid: Int,
-    clipShape: Shape,
+    clipShape: Shape?,
     enabled: Boolean = true,
     sharedContentState: SharedTransitionScope.SharedContentState? = null,
 ): Modifier {
@@ -145,13 +154,24 @@ fun Modifier.wenku8SharedNovelCover(
         val state = sharedContentState ?: rememberSharedContentState(
             key = Wenku8SharedElementKeys.novelCoverKey(origin, aid),
         )
+        val overlayClip = if (clipShape != null) OverlayClip(clipShape) else UnclippedOverlayClip
         this@wenku8SharedNovelCover.sharedElement(
             sharedContentState = state,
             animatedVisibilityScope = sharedCtx.animatedVisibilityScope,
             boundsTransform = { _, _ -> boundsTransformSpec },
-            clipInOverlayDuringTransition = OverlayClip(clipShape),
+            clipInOverlayDuringTransition = overlayClip,
         )
     }
+}
+
+@OptIn(ExperimentalSharedTransitionApi::class)
+private val UnclippedOverlayClip = object : SharedTransitionScope.OverlayClip {
+    override fun getClipPath(
+        sharedContentState: SharedTransitionScope.SharedContentState,
+        bounds: Rect,
+        layoutDirection: LayoutDirection,
+        density: Density,
+    ): Path? = null
 }
 
 /**
@@ -180,14 +200,27 @@ fun Modifier.wenku8SharedNovelTitle(
     }
 }
 
+internal const val WENKU8_SHARED_SPRING_DAMPING = 0.88f
+internal const val WENKU8_SHARED_SPRING_STIFFNESS = 380f
+
+internal fun expressiveSharedFloatSpec(isEinkMode: Boolean = false): FiniteAnimationSpec<Float> =
+    if (isEinkMode) {
+        snap()
+    } else {
+        spring(
+            dampingRatio = WENKU8_SHARED_SPRING_DAMPING,
+            stiffness = WENKU8_SHARED_SPRING_STIFFNESS,
+        )
+    }
+
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun rememberExpressiveBoundsSpec(): FiniteAnimationSpec<Rect> {
     if (LocalEinkMode.current) return snap()
     // Material 3 Expressive spatial spring with zero-bounce precision for crisp cover & searchbox morphs.
     return spring(
-        dampingRatio = 0.88f,
-        stiffness = 380f,
+        dampingRatio = WENKU8_SHARED_SPRING_DAMPING,
+        stiffness = WENKU8_SHARED_SPRING_STIFFNESS,
     )
 }
 
