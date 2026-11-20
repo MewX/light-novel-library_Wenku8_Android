@@ -16,6 +16,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -52,6 +53,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.PrimaryScrollableTabRow
 import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
@@ -72,6 +74,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -555,12 +558,19 @@ fun ReadingFootprintScreen(
                     },
                 )
 
-                PrimaryTabRow(selectedTabIndex = selectedTab.ordinal) {
+                val fontScale = LocalDensity.current.fontScale
+                val tabsContent: @Composable () -> Unit = {
                     Tab(
                         selected = selectedTab == ReadingFootprintTab.STATS,
                         onClick = { selectedTab = ReadingFootprintTab.STATS },
                         icon = { Icon(imageVector = Icons.Outlined.Insights, contentDescription = null) },
-                        text = { Text(text = stringResource(R.string.footprint_tab_stats)) },
+                        text = {
+                            Text(
+                                text = stringResource(R.string.footprint_tab_stats),
+                                maxLines = 1,
+                                softWrap = false,
+                            )
+                        },
                         modifier = Modifier.testTag(ReadingFootprintTestTags.TAB_STATS),
                     )
                     Tab(
@@ -570,6 +580,8 @@ fun ReadingFootprintScreen(
                         text = {
                             Text(
                                 text = "${stringResource(R.string.footprint_tab_history)} (${recentHistory.size})",
+                                maxLines = 1,
+                                softWrap = false,
                             )
                         },
                         modifier = Modifier.testTag(ReadingFootprintTestTags.TAB_HISTORY),
@@ -581,10 +593,27 @@ fun ReadingFootprintScreen(
                         text = {
                             Text(
                                 text = "${stringResource(R.string.footprint_tab_bookmarks)} (${allBookmarks.size})",
+                                maxLines = 1,
+                                softWrap = false,
                             )
                         },
                         modifier = Modifier.testTag(ReadingFootprintTestTags.TAB_BOOKMARKS),
                     )
+                }
+
+                BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+                    if (maxWidth < 400.dp || fontScale > 1.05f) {
+                        PrimaryScrollableTabRow(
+                            selectedTabIndex = selectedTab.ordinal,
+                            edgePadding = 16.dp,
+                            tabs = tabsContent,
+                        )
+                    } else {
+                        PrimaryTabRow(
+                            selectedTabIndex = selectedTab.ordinal,
+                            tabs = tabsContent,
+                        )
+                    }
                 }
             }
         },

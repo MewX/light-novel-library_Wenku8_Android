@@ -9,6 +9,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -17,9 +19,11 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -48,6 +52,8 @@ import androidx.compose.material.icons.outlined.SystemUpdateAlt
 import androidx.compose.material.icons.outlined.VerticalAlignTop
 import androidx.compose.material.icons.outlined.ViewWeek
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.AppBarOverflowIndicator
+import androidx.compose.material3.AppBarRow
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -64,6 +70,9 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.LinearWavyProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -95,6 +104,7 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -120,6 +130,7 @@ import org.mewx.wenku8.data.repository.CloudBookshelfSyncOutcome
 import org.mewx.wenku8.domain.model.DiscoveryNovelCardItem
 import org.mewx.wenku8.ui.components.ActionTooltipBox
 import org.mewx.wenku8.ui.components.TooltipIconButton
+import org.mewx.wenku8.ui.components.horizontalScrollFadeEdge
 import org.mewx.wenku8.ui.discovery.BookStatusBadge
 import org.mewx.wenku8.ui.discovery.DiscoveryTestTags
 import org.mewx.wenku8.ui.discovery.formatBookStatusLabel
@@ -451,7 +462,12 @@ fun BookshelfScreen(
             .background(MaterialTheme.colorScheme.background)
             .testTag(BookshelfTestTags.SCREEN),
     ) {
-        val gridColumnCount = max(3, (maxWidth / 128.dp).toInt())
+        val gridColumnCount = if (maxWidth < 340.dp) {
+            2
+        } else {
+            max(3, (maxWidth / 128.dp).toInt())
+        }
+        val isCompactListCover = maxWidth < 340.dp
         val availableContentWidth = (maxWidth - 32.dp).coerceAtLeast(240.dp)
         val availableViewportHeight = maxHeight
 
@@ -635,6 +651,7 @@ fun BookshelfScreen(
                                 item = item,
                                 isSelected = item.aid in selectedAidSet,
                                 isEinkMode = isEinkMode,
+                                compactCover = isCompactListCover,
                                 onClick = {
                                     if (isMultiSelectActive) {
                                         toggleSelection(item.aid)
@@ -925,6 +942,7 @@ private fun BookshelfSearchBarRow(
                     )
                 }
             }
+            Spacer(modifier = Modifier.width(4.dp))
             FilledTonalButton(
                 onClick = onOpenOnlineSearch,
                 contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
@@ -935,6 +953,8 @@ private fun BookshelfSearchBarRow(
                 Text(
                     text = stringResource(R.string.bookshelf_online_search_button),
                     style = MaterialTheme.typography.labelLarge,
+                    maxLines = 1,
+                    softWrap = false,
                 )
             }
         }
@@ -966,12 +986,15 @@ private fun BookshelfHeaderSection(
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Text(
                 text = stringResource(R.string.bookshelf_count_title_format, totalShelfCount),
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f),
             )
 
@@ -994,6 +1017,7 @@ private fun BookshelfHeaderSection(
                             Text(
                                 text = cloudSyncLabel,
                                 maxLines = 1,
+                                softWrap = false,
                             )
                         }
                     },
@@ -1079,83 +1103,152 @@ private fun BookshelfHeaderSection(
             }
         }
 
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
+        val fontScale = LocalDensity.current.fontScale
+        BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+            // Inside the 16dp horizontal LazyColumn padding, a normal 412dp phone has 380dp inner
+            // width where all 3 labeled FilterChips + the sort button fit cleanly. Narrow phones
+            // (<= 396dp outer / < 368dp inner) or enlarged fonts switch ONLY the view-mode toggle
+            // to compact icon-only segmented buttons so labels never clip mid-character.
+            val useIconOnlyViewMode = maxWidth < 368.dp || fontScale > 1.05f
+
             Row(
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                BookshelfViewMode.entries.forEach { mode ->
-                    val labelRes = when (mode) {
-                        BookshelfViewMode.GRID -> R.string.bookshelf_view_grid
-                        BookshelfViewMode.DETAIL_LIST -> R.string.bookshelf_view_list
-                        BookshelfViewMode.SPINE_3D -> R.string.bookshelf_view_spine
-                    }
-                    val icon = when (mode) {
-                        BookshelfViewMode.GRID -> Icons.Outlined.GridView
-                        BookshelfViewMode.DETAIL_LIST -> Icons.AutoMirrored.Outlined.ViewList
-                        BookshelfViewMode.SPINE_3D -> Icons.Outlined.ViewWeek
-                    }
-                    FilterChip(
-                        selected = viewMode == mode,
-                        onClick = { onViewModeSelected(mode) },
-                        label = { Text(text = stringResource(labelRes), maxLines = 1) },
-                        leadingIcon = {
-                            Icon(
-                                imageVector = icon,
-                                contentDescription = null,
-                                modifier = Modifier.size(16.dp),
+                if (useIconOnlyViewMode) {
+                    SingleChoiceSegmentedButtonRow(
+                        modifier = Modifier.width(138.dp),
+                    ) {
+                        BookshelfViewMode.entries.forEachIndexed { index, mode ->
+                            val label = stringResource(
+                                when (mode) {
+                                    BookshelfViewMode.GRID -> R.string.bookshelf_view_grid
+                                    BookshelfViewMode.DETAIL_LIST -> R.string.bookshelf_view_list
+                                    BookshelfViewMode.SPINE_3D -> R.string.bookshelf_view_spine
+                                },
                             )
+                            val icon = when (mode) {
+                                BookshelfViewMode.GRID -> Icons.Outlined.GridView
+                                BookshelfViewMode.DETAIL_LIST -> Icons.AutoMirrored.Outlined.ViewList
+                                BookshelfViewMode.SPINE_3D -> Icons.Outlined.ViewWeek
+                            }
+                            SegmentedButton(
+                                selected = viewMode == mode,
+                                onClick = { onViewModeSelected(mode) },
+                                shape = SegmentedButtonDefaults.itemShape(
+                                    index = index,
+                                    count = BookshelfViewMode.entries.size,
+                                ),
+                                icon = {},
+                                contentPadding = PaddingValues(horizontal = 0.dp),
+                                modifier = Modifier.testTag(
+                                    BookshelfTestTags.VIEW_MODE_CHIP_PREFIX + mode.name,
+                                ),
+                            ) {
+                                ActionTooltipBox(tooltipText = label) {
+                                    Icon(
+                                        imageVector = icon,
+                                        contentDescription = label,
+                                        modifier = Modifier.size(18.dp),
+                                    )
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        modifier = Modifier.weight(1f),
+                    ) {
+                        BookshelfViewMode.entries.forEach { mode ->
+                            val labelRes = when (mode) {
+                                BookshelfViewMode.GRID -> R.string.bookshelf_view_grid
+                                BookshelfViewMode.DETAIL_LIST -> R.string.bookshelf_view_list
+                                BookshelfViewMode.SPINE_3D -> R.string.bookshelf_view_spine
+                            }
+                            val icon = when (mode) {
+                                BookshelfViewMode.GRID -> Icons.Outlined.GridView
+                                BookshelfViewMode.DETAIL_LIST -> Icons.AutoMirrored.Outlined.ViewList
+                                BookshelfViewMode.SPINE_3D -> Icons.Outlined.ViewWeek
+                            }
+                            FilterChip(
+                                selected = viewMode == mode,
+                                onClick = { onViewModeSelected(mode) },
+                                label = {
+                                    Text(
+                                        text = stringResource(labelRes),
+                                        maxLines = 1,
+                                        softWrap = false,
+                                    )
+                                },
+                                leadingIcon = {
+                                    Icon(
+                                        imageVector = icon,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(16.dp),
+                                    )
+                                },
+                                modifier = Modifier.testTag(
+                                    BookshelfTestTags.VIEW_MODE_CHIP_PREFIX + mode.name,
+                                ),
+                            )
+                        }
+                    }
+                }
+
+                Box(
+                    modifier = if (useIconOnlyViewMode) Modifier.weight(1f) else Modifier,
+                    contentAlignment = Alignment.CenterEnd,
+                ) {
+                    val activeSortLabel = sortModeLabel(sortMode)
+                    TextButton(
+                        onClick = { onShowSortMenuChange(true) },
+                        contentPadding = if (useIconOnlyViewMode) {
+                            PaddingValues(horizontal = 8.dp, vertical = 6.dp)
+                        } else {
+                            PaddingValues(horizontal = 12.dp, vertical = 8.dp)
                         },
-                        modifier = Modifier.testTag(BookshelfTestTags.VIEW_MODE_CHIP_PREFIX + mode.name),
-                    )
-                }
-            }
-
-            Box {
-                val activeSortLabel = sortModeLabel(sortMode)
-                TextButton(
-                    onClick = { onShowSortMenuChange(true) },
-                    modifier = Modifier
-                        .minimumInteractiveComponentSize()
-                        .testTag(BookshelfTestTags.SORT_MODE_BUTTON),
-                ) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Outlined.Sort,
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp),
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(
-                        text = activeSortLabel,
-                        style = MaterialTheme.typography.labelLarge,
-                        maxLines = 1,
-                    )
-                }
-
-                DropdownMenu(
-                    expanded = showSortMenu,
-                    onDismissRequest = { onShowSortMenuChange(false) },
-                ) {
-                    BookshelfSortMode.entries.forEach { candidate ->
-                        DropdownMenuItem(
-                            text = { Text(text = sortModeLabel(candidate)) },
-                            trailingIcon = if (candidate == sortMode) {
-                                { Icon(imageVector = Icons.Outlined.Check, contentDescription = null) }
-                            } else {
-                                null
-                            },
-                            onClick = {
-                                onShowSortMenuChange(false)
-                                onSortModeSelected(candidate)
-                            },
-                            modifier = Modifier.testTag(
-                                BookshelfTestTags.SORT_MODE_ITEM_PREFIX + candidate.name,
-                            ),
+                        modifier = Modifier
+                            .minimumInteractiveComponentSize()
+                            .testTag(BookshelfTestTags.SORT_MODE_BUTTON),
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Outlined.Sort,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp),
                         )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = activeSortLabel,
+                            style = MaterialTheme.typography.labelLarge,
+                            maxLines = 1,
+                            softWrap = false,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+
+                    DropdownMenu(
+                        expanded = showSortMenu,
+                        onDismissRequest = { onShowSortMenuChange(false) },
+                    ) {
+                        BookshelfSortMode.entries.forEach { candidate ->
+                            DropdownMenuItem(
+                                text = { Text(text = sortModeLabel(candidate)) },
+                                trailingIcon = if (candidate == sortMode) {
+                                    { Icon(imageVector = Icons.Outlined.Check, contentDescription = null) }
+                                } else {
+                                    null
+                                },
+                                onClick = {
+                                    onShowSortMenuChange(false)
+                                    onSortModeSelected(candidate)
+                                },
+                                modifier = Modifier.testTag(
+                                    BookshelfTestTags.SORT_MODE_ITEM_PREFIX + candidate.name,
+                                ),
+                            )
+                        }
                     }
                 }
             }
@@ -1171,7 +1264,9 @@ private fun ContinueReadingCarouselSection(
 ) {
     val layoutDirection = LocalLayoutDirection.current
     val isEinkMode = LocalEinkMode.current
+    val fontScale = LocalDensity.current.fontScale
     val carouselCardShape = MaterialTheme.shapes.medium
+    val cardHeight = 146.dp * fontScale.coerceIn(1f, 1.3f)
 
     Column(
         modifier = Modifier.fillMaxWidth(),
@@ -1186,12 +1281,13 @@ private fun ContinueReadingCarouselSection(
 
         if (items.size == 1) {
             val singleItem = items.first()
-            Box(
+            BoxWithConstraints(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(146.dp)
+                    .height(cardHeight)
                     .testTag(BookshelfTestTags.CONTINUE_READING_CAROUSEL),
             ) {
+                val isNarrowCard = maxWidth < 332.dp
                 Card(
                     onClick = { onCardClick(singleItem) },
                     colors = CardDefaults.cardColors(
@@ -1211,6 +1307,7 @@ private fun ContinueReadingCarouselSection(
                         item = singleItem,
                         carouselCardShape = carouselCardShape,
                         isMostlyExpanded = true,
+                        isNarrowCard = isNarrowCard,
                         onContinueReadingClick = onContinueReadingClick,
                         modifier = Modifier.fillMaxSize(),
                     )
@@ -1222,17 +1319,21 @@ private fun ContinueReadingCarouselSection(
             BoxWithConstraints(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(146.dp),
+                    .height(cardHeight),
             ) {
+                val isNarrowCarousel = maxWidth < 332.dp
                 val evenSplitWidth =
                     (maxWidth - itemSpacing * (items.size - 1).coerceAtLeast(0)) / items.size.coerceAtLeast(1)
-                val preferredItemWidth = maxOf(284.dp, evenSplitWidth)
+                val preferredItemWidth = maxOf(
+                    if (isNarrowCarousel) 244.dp else 284.dp,
+                    evenSplitWidth,
+                )
 
                 HorizontalMultiBrowseCarousel(
                     state = carouselState,
                     preferredItemWidth = preferredItemWidth,
                     itemSpacing = itemSpacing,
-                    minSmallItemWidth = 56.dp,
+                    minSmallItemWidth = if (isNarrowCarousel) 44.dp else 56.dp,
                     maxSmallItemWidth = 104.dp,
                     modifier = Modifier
                         .fillMaxSize()
@@ -1268,6 +1369,7 @@ private fun ContinueReadingCarouselSection(
                             item = item,
                             carouselCardShape = carouselCardShape,
                             isMostlyExpanded = isMostlyExpanded,
+                            isNarrowCard = isNarrowCarousel,
                             onContinueReadingClick = onContinueReadingClick,
                             modifier = Modifier
                                 .fillMaxSize()
@@ -1297,6 +1399,7 @@ private fun ContinueReadingCardBody(
     isMostlyExpanded: Boolean,
     onContinueReadingClick: (BookshelfItemModel) -> Unit,
     modifier: Modifier = Modifier,
+    isNarrowCard: Boolean = false,
 ) {
     Row(
         modifier = modifier,
@@ -1342,7 +1445,10 @@ private fun ContinueReadingCardBody(
             modifier = Modifier
                 .weight(1f)
                 .fillMaxHeight()
-                .padding(horizontal = 14.dp, vertical = 12.dp),
+                .padding(
+                    horizontal = if (isNarrowCard) 10.dp else 14.dp,
+                    vertical = if (isNarrowCard) 10.dp else 12.dp,
+                ),
             verticalArrangement = Arrangement.SpaceBetween,
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
@@ -1394,6 +1500,8 @@ private fun ContinueReadingCardBody(
                         ),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        softWrap = false,
                     )
                 }
 
@@ -1401,7 +1509,7 @@ private fun ContinueReadingCardBody(
                     onClick = { onContinueReadingClick(item) },
                     contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
                     modifier = Modifier
-                        .height(34.dp)
+                        .heightIn(min = 34.dp)
                         .testTag(BookshelfTestTags.CONTINUE_READING_BUTTON_PREFIX + item.aid),
                 ) {
                     Icon(
@@ -1414,6 +1522,8 @@ private fun ContinueReadingCardBody(
                         text = stringResource(R.string.bookshelf_continue_reading_action),
                         style = MaterialTheme.typography.labelMedium,
                         maxLines = 1,
+                        softWrap = false,
+                        overflow = TextOverflow.Ellipsis,
                     )
                 }
             }
@@ -1430,15 +1540,31 @@ private fun BookshelfFilterChipRail(
     tags: List<String>,
     onSelectFilter: (BookshelfFilter) -> Unit,
 ) {
+    val chipListState = rememberLazyListState()
+    val isEinkMode = LocalEinkMode.current
     LazyRow(
-        modifier = Modifier.fillMaxWidth(),
+        state = chipListState,
+        modifier = Modifier
+            .fillMaxWidth()
+            .horizontalScrollFadeEdge(
+                listState = chipListState,
+                fadeColor = MaterialTheme.colorScheme.background,
+                isEink = isEinkMode,
+                einkIndicatorColor = MaterialTheme.colorScheme.outlineVariant,
+            ),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         item(key = "chip_all") {
             FilterChip(
                 selected = activeFilter == BookshelfFilter.All,
                 onClick = { onSelectFilter(BookshelfFilter.All) },
-                label = { Text(text = stringResource(R.string.bookshelf_filter_all)) },
+                label = {
+                    Text(
+                        text = stringResource(R.string.bookshelf_filter_all),
+                        maxLines = 1,
+                        softWrap = false,
+                    )
+                },
                 modifier = Modifier.testTag(BookshelfTestTags.FILTER_CHIP_ALL),
             )
         }
@@ -1448,7 +1574,13 @@ private fun BookshelfFilterChipRail(
             FilterChip(
                 selected = activeFilter == BookshelfFilter.HasNewChapters,
                 onClick = { onSelectFilter(BookshelfFilter.HasNewChapters) },
-                label = { Text(text = labelText) },
+                label = {
+                    Text(
+                        text = labelText,
+                        maxLines = 1,
+                        softWrap = false,
+                    )
+                },
                 modifier = Modifier.testTag(BookshelfTestTags.FILTER_CHIP_NEW_CHAPTERS),
             )
         }
@@ -1456,7 +1588,13 @@ private fun BookshelfFilterChipRail(
             FilterChip(
                 selected = activeFilter == BookshelfFilter.CachedOffline,
                 onClick = { onSelectFilter(BookshelfFilter.CachedOffline) },
-                label = { Text(text = stringResource(R.string.bookshelf_filter_cached)) },
+                label = {
+                    Text(
+                        text = stringResource(R.string.bookshelf_filter_cached),
+                        maxLines = 1,
+                        softWrap = false,
+                    )
+                },
                 modifier = Modifier.testTag(BookshelfTestTags.FILTER_CHIP_CACHED),
             )
         }
@@ -1471,7 +1609,13 @@ private fun BookshelfFilterChipRail(
                         modifier = Modifier.size(16.dp),
                     )
                 },
-                label = { Text(text = stringResource(R.string.bookshelf_filter_serializing)) },
+                label = {
+                    Text(
+                        text = stringResource(R.string.bookshelf_filter_serializing),
+                        maxLines = 1,
+                        softWrap = false,
+                    )
+                },
                 modifier = Modifier.testTag(BookshelfTestTags.FILTER_CHIP_SERIALIZING),
             )
         }
@@ -1486,7 +1630,13 @@ private fun BookshelfFilterChipRail(
                         modifier = Modifier.size(16.dp),
                     )
                 },
-                label = { Text(text = stringResource(R.string.bookshelf_filter_completed)) },
+                label = {
+                    Text(
+                        text = stringResource(R.string.bookshelf_filter_completed),
+                        maxLines = 1,
+                        softWrap = false,
+                    )
+                },
                 modifier = Modifier.testTag(BookshelfTestTags.FILTER_CHIP_COMPLETED),
             )
         }
@@ -1499,7 +1649,15 @@ private fun BookshelfFilterChipRail(
             FilterChip(
                 selected = activeFilter == target,
                 onClick = { onSelectFilter(target) },
-                label = { Text(text = category) },
+                label = {
+                    Text(
+                        text = category,
+                        maxLines = 1,
+                        softWrap = false,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.widthIn(max = 180.dp),
+                    )
+                },
                 modifier = Modifier.testTag(BookshelfTestTags.FILTER_CHIP_CATEGORY_PREFIX + category),
             )
         }
@@ -1512,7 +1670,15 @@ private fun BookshelfFilterChipRail(
             FilterChip(
                 selected = activeFilter == target,
                 onClick = { onSelectFilter(target) },
-                label = { Text(text = press) },
+                label = {
+                    Text(
+                        text = press,
+                        maxLines = 1,
+                        softWrap = false,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.widthIn(max = 180.dp),
+                    )
+                },
                 modifier = Modifier.testTag(BookshelfTestTags.FILTER_CHIP_IMPRINT_PREFIX + press),
             )
         }
@@ -1525,7 +1691,15 @@ private fun BookshelfFilterChipRail(
             FilterChip(
                 selected = activeFilter == target,
                 onClick = { onSelectFilter(target) },
-                label = { Text(text = "#$tag") },
+                label = {
+                    Text(
+                        text = "#$tag",
+                        maxLines = 1,
+                        softWrap = false,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.widthIn(max = 180.dp),
+                    )
+                },
                 modifier = Modifier.testTag(BookshelfTestTags.FILTER_CHIP_TAG_PREFIX + tag),
             )
         }
@@ -1603,7 +1777,7 @@ private fun BookshelfGridItemCard(
                     NewChapterPillBadge(
                         aid = item.aid,
                         modifier = Modifier
-                            .align(Alignment.TopStart)
+                            .align(Alignment.BottomStart)
                             .padding(6.dp),
                     )
                 }
@@ -1653,6 +1827,7 @@ private fun BookshelfDetailListCard(
     item: BookshelfItemModel,
     isSelected: Boolean,
     isEinkMode: Boolean,
+    compactCover: Boolean = false,
     onClick: () -> Unit,
     onLongClick: () -> Unit,
 ) {
@@ -1683,12 +1858,12 @@ private fun BookshelfDetailListCard(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(12.dp),
-            horizontalArrangement = Arrangement.spacedBy(14.dp),
+            horizontalArrangement = Arrangement.spacedBy(if (compactCover) 10.dp else 14.dp),
         ) {
             val detailCoverShape = MaterialTheme.shapes.small
             Box(
                 modifier = Modifier
-                    .width(76.dp)
+                    .width(if (compactCover) 64.dp else 76.dp)
                     .aspectRatio(0.71f)
                     .wenku8SharedNovelCover(
                         origin = Wenku8SharedElementKeys.NOVEL_BOOKSHELF_CARD_ORIGIN,
@@ -1819,6 +1994,8 @@ private fun BookshelfDetailListCard(
                         text = cacheLabel,
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.primary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                     )
                 }
 
@@ -1884,6 +2061,7 @@ internal fun BookshelfItemProgressIndicator(
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
+                softWrap = false,
                 modifier = Modifier.testTag(BookshelfTestTags.READING_PROGRESS_PERCENT_PREFIX + item.aid),
             )
         }
@@ -1916,6 +2094,8 @@ internal fun NewChapterPillBadge(
             text = stringResource(R.string.bookshelf_badge_new_chapter),
             style = MaterialTheme.typography.labelSmall,
             fontWeight = FontWeight.SemiBold,
+            maxLines = 1,
+            softWrap = false,
             modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
         )
     }
@@ -1951,6 +2131,8 @@ private fun BookshelfMultiSelectFloatingToolbar(
                 text = stringResource(R.string.bookshelf_batch_selected_count_format, selectedCount),
                 style = MaterialTheme.typography.labelMedium,
                 fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                softWrap = false,
                 modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
             )
         }
@@ -1964,67 +2146,153 @@ private fun BookshelfMultiSelectFloatingToolbar(
                 .testTag(BookshelfTestTags.MULTI_SELECT_TOOLBAR),
         ) {
             val selectAllLabel = stringResource(R.string.bookshelf_batch_select_all)
-            TooltipIconButton(
-                tooltipText = selectAllLabel,
-                onClick = onSelectAll,
-                anchorPosition = TooltipAnchorPosition.Above,
-                modifier = Modifier.testTag(BookshelfTestTags.BATCH_SELECT_ALL),
-            ) {
-                Icon(
-                    imageVector = Icons.Outlined.SelectAll,
-                    contentDescription = selectAllLabel,
-                )
-            }
             val smartUpdateLabel = stringResource(R.string.bookshelf_smart_update_action)
-            TooltipIconButton(
-                tooltipText = smartUpdateLabel,
-                onClick = onSmartUpdateSelected,
-                enabled = !isSyncOrUpdateRunning,
-                anchorPosition = TooltipAnchorPosition.Above,
-                modifier = Modifier.testTag(BookshelfTestTags.BATCH_SMART_UPDATE),
-            ) {
-                Icon(
-                    imageVector = Icons.Outlined.SystemUpdateAlt,
-                    contentDescription = smartUpdateLabel,
-                )
-            }
             val pinTopLabel = stringResource(R.string.bookshelf_batch_pin_top)
-            TooltipIconButton(
-                tooltipText = pinTopLabel,
-                onClick = onPinToTopSelected,
-                anchorPosition = TooltipAnchorPosition.Above,
-                modifier = Modifier.testTag(BookshelfTestTags.BATCH_PIN_TOP),
-            ) {
-                Icon(
-                    imageVector = Icons.Outlined.VerticalAlignTop,
-                    contentDescription = pinTopLabel,
-                )
-            }
             val clearCacheLabel = stringResource(R.string.bookshelf_batch_clear_cache)
-            TooltipIconButton(
-                tooltipText = clearCacheLabel,
-                onClick = onClearCacheSelected,
-                anchorPosition = TooltipAnchorPosition.Above,
-                modifier = Modifier.testTag(BookshelfTestTags.BATCH_CLEAR_CACHE),
-            ) {
-                Icon(
-                    imageVector = Icons.Outlined.CleaningServices,
-                    contentDescription = clearCacheLabel,
-                )
-            }
             val removeLabel = stringResource(R.string.bookshelf_batch_remove)
-            TooltipIconButton(
-                tooltipText = removeLabel,
-                onClick = onRemoveSelected,
-                anchorPosition = TooltipAnchorPosition.Above,
-                modifier = Modifier.testTag(BookshelfTestTags.BATCH_REMOVE),
+            val doneLabel = stringResource(R.string.bookshelf_batch_done)
+
+            // AppBarRow renders all 5 batch actions directly on normal widths (0 overflow button),
+            // and automatically folds trailing actions into an overflow menu on ultra-narrow panes
+            // while keeping the "Done" exit button pinned outside.
+            AppBarRow(
+                modifier = Modifier.weight(1f, fill = false),
+                overflowIndicator = { menuState -> AppBarOverflowIndicator(menuState) },
             ) {
-                Icon(
-                    imageVector = Icons.Outlined.DeleteOutline,
-                    contentDescription = removeLabel,
+                customItem(
+                    appbarContent = {
+                        TooltipIconButton(
+                            tooltipText = selectAllLabel,
+                            onClick = onSelectAll,
+                            anchorPosition = TooltipAnchorPosition.Above,
+                            modifier = Modifier.testTag(BookshelfTestTags.BATCH_SELECT_ALL),
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.SelectAll,
+                                contentDescription = selectAllLabel,
+                            )
+                        }
+                    },
+                    menuContent = { state ->
+                        DropdownMenuItem(
+                            text = { Text(selectAllLabel) },
+                            leadingIcon = { Icon(Icons.Outlined.SelectAll, contentDescription = null) },
+                            onClick = {
+                                state.dismiss()
+                                onSelectAll()
+                            },
+                            modifier = Modifier.testTag(BookshelfTestTags.BATCH_SELECT_ALL),
+                        )
+                    },
+                )
+                customItem(
+                    appbarContent = {
+                        TooltipIconButton(
+                            tooltipText = smartUpdateLabel,
+                            onClick = onSmartUpdateSelected,
+                            enabled = !isSyncOrUpdateRunning,
+                            anchorPosition = TooltipAnchorPosition.Above,
+                            modifier = Modifier.testTag(BookshelfTestTags.BATCH_SMART_UPDATE),
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.SystemUpdateAlt,
+                                contentDescription = smartUpdateLabel,
+                            )
+                        }
+                    },
+                    menuContent = { state ->
+                        DropdownMenuItem(
+                            text = { Text(smartUpdateLabel) },
+                            leadingIcon = { Icon(Icons.Outlined.SystemUpdateAlt, contentDescription = null) },
+                            enabled = !isSyncOrUpdateRunning,
+                            onClick = {
+                                state.dismiss()
+                                onSmartUpdateSelected()
+                            },
+                            modifier = Modifier.testTag(BookshelfTestTags.BATCH_SMART_UPDATE),
+                        )
+                    },
+                )
+                customItem(
+                    appbarContent = {
+                        TooltipIconButton(
+                            tooltipText = pinTopLabel,
+                            onClick = onPinToTopSelected,
+                            anchorPosition = TooltipAnchorPosition.Above,
+                            modifier = Modifier.testTag(BookshelfTestTags.BATCH_PIN_TOP),
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.VerticalAlignTop,
+                                contentDescription = pinTopLabel,
+                            )
+                        }
+                    },
+                    menuContent = { state ->
+                        DropdownMenuItem(
+                            text = { Text(pinTopLabel) },
+                            leadingIcon = { Icon(Icons.Outlined.VerticalAlignTop, contentDescription = null) },
+                            onClick = {
+                                state.dismiss()
+                                onPinToTopSelected()
+                            },
+                            modifier = Modifier.testTag(BookshelfTestTags.BATCH_PIN_TOP),
+                        )
+                    },
+                )
+                customItem(
+                    appbarContent = {
+                        TooltipIconButton(
+                            tooltipText = clearCacheLabel,
+                            onClick = onClearCacheSelected,
+                            anchorPosition = TooltipAnchorPosition.Above,
+                            modifier = Modifier.testTag(BookshelfTestTags.BATCH_CLEAR_CACHE),
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.CleaningServices,
+                                contentDescription = clearCacheLabel,
+                            )
+                        }
+                    },
+                    menuContent = { state ->
+                        DropdownMenuItem(
+                            text = { Text(clearCacheLabel) },
+                            leadingIcon = { Icon(Icons.Outlined.CleaningServices, contentDescription = null) },
+                            onClick = {
+                                state.dismiss()
+                                onClearCacheSelected()
+                            },
+                            modifier = Modifier.testTag(BookshelfTestTags.BATCH_CLEAR_CACHE),
+                        )
+                    },
+                )
+                customItem(
+                    appbarContent = {
+                        TooltipIconButton(
+                            tooltipText = removeLabel,
+                            onClick = onRemoveSelected,
+                            anchorPosition = TooltipAnchorPosition.Above,
+                            modifier = Modifier.testTag(BookshelfTestTags.BATCH_REMOVE),
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.DeleteOutline,
+                                contentDescription = removeLabel,
+                            )
+                        }
+                    },
+                    menuContent = { state ->
+                        DropdownMenuItem(
+                            text = { Text(removeLabel) },
+                            leadingIcon = { Icon(Icons.Outlined.DeleteOutline, contentDescription = null) },
+                            onClick = {
+                                state.dismiss()
+                                onRemoveSelected()
+                            },
+                            modifier = Modifier.testTag(BookshelfTestTags.BATCH_REMOVE),
+                        )
+                    },
                 )
             }
-            val doneLabel = stringResource(R.string.bookshelf_batch_done)
+
             TooltipIconButton(
                 tooltipText = doneLabel,
                 onClick = onDone,
@@ -2040,6 +2308,7 @@ private fun BookshelfMultiSelectFloatingToolbar(
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun EmptyBookshelfCard(
     isSyncOrUpdateRunning: Boolean,
@@ -2081,10 +2350,14 @@ private fun EmptyBookshelfCard(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
             )
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
                 FilledTonalButton(
                     onClick = onCloudSyncClick,
                     enabled = !isSyncOrUpdateRunning,
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
                 ) {
                     Icon(
                         imageVector = Icons.Outlined.CloudSync,
@@ -2092,16 +2365,27 @@ private fun EmptyBookshelfCard(
                         modifier = Modifier.size(18.dp),
                     )
                     Spacer(modifier = Modifier.width(6.dp))
-                    Text(text = stringResource(R.string.bookshelf_cloud_sync_action))
+                    Text(
+                        text = stringResource(R.string.bookshelf_cloud_sync_action),
+                        maxLines = 1,
+                        softWrap = false,
+                    )
                 }
-                Button(onClick = onOpenOnlineSearch) {
+                Button(
+                    onClick = onOpenOnlineSearch,
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                ) {
                     Icon(
                         imageVector = Icons.Outlined.Search,
                         contentDescription = null,
                         modifier = Modifier.size(18.dp),
                     )
                     Spacer(modifier = Modifier.width(6.dp))
-                    Text(text = stringResource(R.string.bookshelf_online_search_button))
+                    Text(
+                        text = stringResource(R.string.bookshelf_online_search_button),
+                        maxLines = 1,
+                        softWrap = false,
+                    )
                 }
             }
         }
