@@ -239,6 +239,7 @@ internal fun Bookshelf3dShelfSection(
                 focusedIndex = focusedIndex,
                 metrics = metrics,
                 selectedAidSet = selectedAidSet,
+                isScrubbing = isScrubbing,
                 isEinkMode = isEinkMode,
                 onDragFocusDelta = { deltaFocus ->
                     val currentItems = latestItems
@@ -357,6 +358,7 @@ private fun Bookshelf3dStage(
     focusedIndex: Int,
     metrics: Bookshelf3dMetrics,
     selectedAidSet: Set<Int>,
+    isScrubbing: Boolean,
     isEinkMode: Boolean,
     onDragFocusDelta: (Float) -> Unit,
     onFlingReleased: (velocityPxPerSec: Float, pitchPx: Float) -> Unit,
@@ -371,20 +373,14 @@ private fun Bookshelf3dStage(
 
     val spineMatrix = remember { Bookshelf3dGeometry.buildLocalSpineMatrix() }
     val coverMatrix = remember { Bookshelf3dGeometry.buildLocalCoverMatrix() }
+    val reusableShadowPath = remember { Path() }
 
-    val visibleRange = Bookshelf3dGeometry.computeVisibleIndexRange(
+    val visiblePoses = Bookshelf3dGeometry.computeVisiblePosesPx(
         itemCount = items.size,
         focus = focusOffset,
         metrics = metrics,
+        density = densityFactor,
     )
-    val visiblePoses = visibleRange.map { idx ->
-        Bookshelf3dGeometry.computeBookPosePx(
-            index = idx,
-            focus = focusOffset,
-            metrics = metrics,
-            density = densityFactor,
-        )
-    }
 
     val latestPoses by rememberUpdatedState(visiblePoses)
     val latestPitchPx by rememberUpdatedState(pitchPx)
@@ -406,6 +402,9 @@ private fun Bookshelf3dStage(
         Color.Black.copy(alpha = 0.36f)
     } else {
         colorScheme.onSurface.copy(alpha = 0.13f)
+    }
+    val shadowGradientColors = remember(shadowBaseColor) {
+        listOf(shadowBaseColor, Color.Transparent)
     }
 
     Box(
@@ -440,24 +439,28 @@ private fun Bookshelf3dStage(
         // Layer 1: Angled floor cast shadows & subtle shelf rail baseline
         Canvas(modifier = Modifier.fillMaxSize()) {
             if (!isEinkMode) {
-                visiblePoses.forEach { pose ->
-                    val poly = pose.floorShadowPolygon
+                for (poseIdx in visiblePoses.indices) {
+                    val poly = visiblePoses[poseIdx].floorShadowPolygon
                     if (poly.size >= 4) {
-                        val path = Path().apply {
-                            moveTo(poly[0].x, poly[0].y)
-                            for (i in 1 until poly.size) {
-                                lineTo(poly[i].x, poly[i].y)
-                            }
-                            close()
+                        reusableShadowPath.rewind()
+                        var minX = poly[0].x
+                        var maxX = minX
+                        var minY = poly[0].y
+                        var maxY = minY
+                        reusableShadowPath.moveTo(minX, minY)
+                        for (i in 1 until poly.size) {
+                            val pt = poly[i]
+                            reusableShadowPath.lineTo(pt.x, pt.y)
+                            if (pt.x < minX) minX = pt.x
+                            if (pt.x > maxX) maxX = pt.x
+                            if (pt.y < minY) minY = pt.y
+                            if (pt.y > maxY) maxY = pt.y
                         }
-                        val minX = poly.minOf { it.x }
-                        val maxX = poly.maxOf { it.x }
-                        val minY = poly.minOf { it.y }
-                        val maxY = poly.maxOf { it.y }
+                        reusableShadowPath.close()
                         drawPath(
-                            path = path,
+                            path = reusableShadowPath,
                             brush = Brush.linearGradient(
-                                colors = listOf(shadowBaseColor, Color.Transparent),
+                                colors = shadowGradientColors,
                                 start = Offset(maxX, minY),
                                 end = Offset(minX, maxY),
                             ),
@@ -488,7 +491,12 @@ private fun Bookshelf3dStage(
                     spineMatrix = spineMatrix,
                     coverMatrix = coverMatrix,
                     isFocused = pose.index == focusedIndex,
-                    shouldLoadCover = abs(pose.index - focusedIndex) <= Bookshelf3dGeometry.COVER_LOAD_RADIUS,
+                    shouldLoadCover = Bookshelf3dGeometry.shouldLoadBookCover(
+                        index = pose.index,
+                        focusedIndex = focusedIndex,
+                        itemCount = items.size,
+                        isScrubbing = isScrubbing,
+                    ),
                     isSelected = item.aid in selectedAidSet,
                     isDark = isDark,
                     isEinkMode = isEinkMode,
@@ -620,6 +628,10 @@ private fun Bookshelf3dBookVolume(
     } else {
         colorScheme.outline.copy(alpha = 0.18f)
     }
+    val capPath = remember { Path() }
+    val capGradientColors = remember(capStartColor, capEndColor) {
+        listOf(capStartColor, capEndColor)
+    }
 
     // 1. Projected Cover Face
     Box(
@@ -651,20 +663,19 @@ private fun Bookshelf3dBookVolume(
     // 2. Top Page-Edge Cap (parallelogram sharing vertices with both spine & cover)
     Canvas(modifier = Modifier.fillMaxSize()) {
         val quad = pose.topCapQuad
-        val path = Path().apply {
-            moveTo(quad[0].x, quad[0].y)
-            lineTo(quad[1].x, quad[1].y)
-            lineTo(quad[2].x, quad[2].y)
-            lineTo(quad[3].x, quad[3].y)
-            close()
-        }
+        capPath.rewind()
+        capPath.moveTo(quad[0].x, quad[0].y)
+        capPath.lineTo(quad[1].x, quad[1].y)
+        capPath.lineTo(quad[2].x, quad[2].y)
+        capPath.lineTo(quad[3].x, quad[3].y)
+        capPath.close()
         if (isEinkMode) {
-            drawPath(path = path, color = capStartColor)
+            drawPath(path = capPath, color = capStartColor)
         } else {
             drawPath(
-                path = path,
+                path = capPath,
                 brush = Brush.linearGradient(
-                    colors = listOf(capStartColor, capEndColor),
+                    colors = capGradientColors,
                     start = quad[0],
                     end = quad[2],
                 ),
@@ -672,7 +683,8 @@ private fun Bookshelf3dBookVolume(
         }
 
         // Subtle inner paper-page edge lines along the depth axis
-        for (step in listOf(0.35f, 0.68f)) {
+        for (stepIdx in TOP_CAP_PAGE_LINE_STEPS.indices) {
+            val step = TOP_CAP_PAGE_LINE_STEPS[stepIdx]
             val startPt = Offset(
                 x = quad[0].x + (quad[1].x - quad[0].x) * step,
                 y = quad[0].y + (quad[1].y - quad[0].y) * step,
@@ -690,9 +702,9 @@ private fun Bookshelf3dBookVolume(
         }
 
         drawPath(
-            path = path,
+            path = capPath,
             color = if (isSelected) colorScheme.primary else capStrokeColor,
-            style = Stroke(width = if (isSelected) 2.2f else 1f),
+            style = if (isSelected) CAP_STROKE_SELECTED else CAP_STROKE_NORMAL,
         )
     }
 
@@ -722,6 +734,11 @@ private fun Bookshelf3dBookVolume(
     }
 }
 
+private val TOP_CAP_PAGE_LINE_STEPS = floatArrayOf(0.35f, 0.68f)
+private val CAP_STROKE_NORMAL = Stroke(width = 1f)
+private val CAP_STROKE_SELECTED = Stroke(width = 2.2f)
+private val COVER_CLIP_SHAPE = RoundedCornerShape(3.dp)
+
 @Composable
 private fun Bookshelf3dCoverFace(
     item: BookshelfItemModel,
@@ -735,7 +752,7 @@ private fun Bookshelf3dCoverFace(
     isSelected: Boolean,
     isEinkMode: Boolean,
 ) {
-    val coverClipShape = RoundedCornerShape(3.dp)
+    val coverClipShape = COVER_CLIP_SHAPE
     Box(
         modifier = Modifier
             .fillMaxSize()

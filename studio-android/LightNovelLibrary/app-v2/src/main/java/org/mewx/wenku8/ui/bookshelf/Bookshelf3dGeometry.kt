@@ -43,7 +43,35 @@ object Bookshelf3dGeometry {
     const val WIDE_LAYOUT_MIN_WIDTH_DP: Float = 720f
     const val WIDE_LAYOUT_MIN_HEIGHT_DP: Float = 300f
     const val COMPACT_HEIGHT_THRESHOLD_DP: Float = 480f
-    const val COVER_LOAD_RADIUS: Int = 3
+
+    /**
+     * Visibility-aware cover-loading window around `focusedIndex`:
+     * - Left-of-focus books (`delta <= -2`) have their cover face completely occluded by the books
+     *   in front of them, so only `delta == -1` is preloaded for smooth right-swipe transitions.
+     * - Right-of-focus books expose narrow cover slices up to `delta == +2` (and the very last book
+     *   on the shelf exposes its entire right cover up to `+4`).
+     */
+    const val COVER_LOAD_LEFT_RADIUS: Int = 1
+    const val COVER_LOAD_RIGHT_RADIUS: Int = 2
+    const val COVER_LOAD_LAST_ITEM_RIGHT_RADIUS: Int = 4
+
+    /**
+     * Returns `true` only when the book at [index] has a visible or immediately adjacent cover face
+     * and the user is not rapidly scrubbing the fast scrollbar (preventing Coil bitmap decode churn
+     * across dozens of intermediate books during fast scrubbing).
+     */
+    fun shouldLoadBookCover(
+        index: Int,
+        focusedIndex: Int,
+        itemCount: Int,
+        isScrubbing: Boolean,
+    ): Boolean {
+        if (itemCount <= 0 || index !in 0 until itemCount) return false
+        if (isScrubbing) return false
+        val delta = index - focusedIndex
+        if (delta in -COVER_LOAD_LEFT_RADIUS..COVER_LOAD_RIGHT_RADIUS) return true
+        return index == itemCount - 1 && delta in 0..COVER_LOAD_LAST_ITEM_RIGHT_RADIUS
+    }
 
     /**
      * Computes responsive dp-space metrics for the 3D bookshelf given the available container size.
@@ -135,6 +163,36 @@ object Bookshelf3dGeometry {
         val start = (center - metrics.maxVisibleSideSlots).coerceAtLeast(0)
         val end = (center + metrics.maxVisibleSideSlots).coerceAtMost(itemCount - 1)
         return start..end
+    }
+
+    /**
+     * Computes exact pixel-space poses strictly culled to books intersecting the stage viewport,
+     * avoiding composing off-screen 3D volumes that would otherwise be clipped away.
+     */
+    fun computeVisiblePosesPx(
+        itemCount: Int,
+        focus: Float,
+        metrics: Bookshelf3dMetrics,
+        density: Float,
+    ): List<Bookshelf3dBookPose> {
+        val range = computeVisibleIndexRange(itemCount, focus, metrics)
+        if (range.isEmpty()) return emptyList()
+        val scale = density.coerceAtLeast(0.5f)
+        val stageWidthPx = metrics.stageWidthDp * scale
+        val marginPx = 2f * scale
+        val result = ArrayList<Bookshelf3dBookPose>(range.count())
+        for (idx in range) {
+            val pose = computeBookPosePx(
+                index = idx,
+                focus = focus,
+                metrics = metrics,
+                density = scale,
+            )
+            if (pose.solidBounds.right >= -marginPx && pose.solidBounds.left <= stageWidthPx + marginPx) {
+                result.add(pose)
+            }
+        }
+        return result
     }
 
     /**

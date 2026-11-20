@@ -790,12 +790,16 @@ class BookshelfScreenAndSyncTest {
         composeTestRule.onNodeWithTag(BookshelfTestTags.CLEAR_LOCAL_SEARCH_BUTTON).performClick()
         composeTestRule.waitForIdle()
 
-        // 4. Switch across DETAIL_LIST and SPINE_3D view modes
+        // 4. Switch across DETAIL_LIST and SPINE_3D view modes (3D view is never loaded in GRID/DETAIL_LIST)
+        composeTestRule.onNodeWithTag(BookshelfTestTags.SPINE_3D_CONTAINER).assertDoesNotExist()
+        composeTestRule.onNodeWithTag(BookshelfTestTags.SPINE_3D_STAGE).assertDoesNotExist()
+
         composeTestRule.onNodeWithTag(
             BookshelfTestTags.VIEW_MODE_CHIP_PREFIX + BookshelfViewMode.DETAIL_LIST.name,
         ).performClick()
         composeTestRule.waitForIdle()
         assertEquals(BookshelfViewMode.DETAIL_LIST, activeViewMode)
+        composeTestRule.onNodeWithTag(BookshelfTestTags.SPINE_3D_CONTAINER).assertDoesNotExist()
         composeTestRule.onNodeWithTag(BookshelfTestTags.BOOK_CARD_PREFIX + 5).assertIsDisplayed()
         composeTestRule.onNodeWithTag(
             org.mewx.wenku8.ui.discovery.DiscoveryTestTags.BOOK_STATUS_BADGE_PREFIX + 5,
@@ -807,6 +811,8 @@ class BookshelfScreenAndSyncTest {
         ).performClick()
         composeTestRule.waitForIdle()
         assertEquals(BookshelfViewMode.SPINE_3D, activeViewMode)
+        composeTestRule.onNodeWithTag(BookshelfTestTags.SPINE_3D_CONTAINER).assertIsDisplayed()
+        composeTestRule.onNodeWithTag(BookshelfTestTags.SPINE_3D_STAGE).assertIsDisplayed()
         composeTestRule.onNodeWithTag(BookshelfTestTags.BOOK_CARD_PREFIX + 5).assertIsDisplayed()
 
         // 5. Long-press multi-select summons HorizontalFloatingToolbar; long-pressing each small
@@ -848,6 +854,15 @@ class BookshelfScreenAndSyncTest {
 
         val remainingAids = database.novelDao().getBookshelfNovelsSnapshot().map { it.aid }
         assertEquals(listOf(5), remainingAids)
+
+        // 6. Switching away from SPINE_3D back to GRID immediately disposes the 3D view tree
+        composeTestRule.onNodeWithTag(
+            BookshelfTestTags.VIEW_MODE_CHIP_PREFIX + BookshelfViewMode.GRID.name,
+        ).performClick()
+        composeTestRule.waitForIdle()
+        assertEquals(BookshelfViewMode.GRID, activeViewMode)
+        composeTestRule.onNodeWithTag(BookshelfTestTags.SPINE_3D_CONTAINER).assertDoesNotExist()
+        composeTestRule.onNodeWithTag(BookshelfTestTags.SPINE_3D_STAGE).assertDoesNotExist()
     }
 
     @Test

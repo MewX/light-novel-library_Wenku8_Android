@@ -182,7 +182,7 @@ class Bookshelf3dGeometryTest {
     }
 
     @Test
-    fun visibleIndexRange_cullsLargeLibraryToConstantWindow() {
+    fun visibleIndexRangeAndPoses_cullLargeLibraryStrictlyToViewport() {
         val metrics = Bookshelf3dGeometry.computeMetrics(availableWidthDp = 412f, availableHeightDp = 892f)
         val range = Bookshelf3dGeometry.computeVisibleIndexRange(
             itemCount = 200,
@@ -192,8 +192,53 @@ class Bookshelf3dGeometryTest {
         assertTrue("Visible range should stay bounded (was ${range.count()})", range.count() <= 35)
         assertTrue(100 in range)
 
+        val density = 2f
+        val stageW = metrics.stageWidthDp * density
+        val poses = Bookshelf3dGeometry.computeVisiblePosesPx(
+            itemCount = 200,
+            focus = 100f,
+            metrics = metrics,
+            density = density,
+        )
+        assertTrue("Viewport culling should drop off-screen books (${poses.size} < ${range.count()})", poses.size < range.count())
+        assertTrue("Focused book must always be included", poses.any { it.index == 100 })
+        poses.forEach { pose ->
+            assertTrue("Culled pose ${pose.index} right edge must enter viewport", pose.solidBounds.right >= -4f)
+            assertTrue("Culled pose ${pose.index} left edge must enter viewport", pose.solidBounds.left <= stageW + 4f)
+        }
+
         assertTrue(Bookshelf3dGeometry.computeVisibleIndexRange(0, 0f, metrics).isEmpty())
+        assertTrue(Bookshelf3dGeometry.computeVisiblePosesPx(0, 0f, metrics, density).isEmpty())
         assertEquals(0..0, Bookshelf3dGeometry.computeVisibleIndexRange(1, 0f, metrics))
+    }
+
+    @Test
+    fun shouldLoadBookCover_limitsActiveCoversToVisibleWindowAndPausesWhileScrubbing() {
+        val total = 50
+        val focus = 20
+
+        // Rapid fast-scroller scrubbing suspends cover loading completely to avoid bitmap churn
+        for (i in 0 until total) {
+            assertFalse(
+                "Expected cover loading paused during scrubbing at index=$i",
+                Bookshelf3dGeometry.shouldLoadBookCover(i, focus, total, isScrubbing = true),
+            )
+        }
+
+        // Settled browsing loads at most [-1..+2] = 4 covers in the middle of the shelf
+        val loadedMiddle = (0 until total).filter {
+            Bookshelf3dGeometry.shouldLoadBookCover(it, focus, total, isScrubbing = false)
+        }
+        assertEquals(listOf(19, 20, 21, 22), loadedMiddle)
+
+        // Near the end of the shelf, the exposed last book cover (index 49) is also eligible within +4
+        assertTrue(Bookshelf3dGeometry.shouldLoadBookCover(49, focusedIndex = 45, itemCount = total, isScrubbing = false))
+        assertFalse(Bookshelf3dGeometry.shouldLoadBookCover(49, focusedIndex = 44, itemCount = total, isScrubbing = false))
+
+        // Out-of-bounds & empty guards
+        assertFalse(Bookshelf3dGeometry.shouldLoadBookCover(0, 0, itemCount = 0, isScrubbing = false))
+        assertFalse(Bookshelf3dGeometry.shouldLoadBookCover(-1, 0, itemCount = total, isScrubbing = false))
+        assertFalse(Bookshelf3dGeometry.shouldLoadBookCover(total, 0, itemCount = total, isScrubbing = false))
     }
 
     @Test
