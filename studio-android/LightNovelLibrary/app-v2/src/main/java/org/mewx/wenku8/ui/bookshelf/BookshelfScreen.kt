@@ -4,7 +4,6 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -92,7 +91,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
@@ -106,7 +104,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
 import kotlinx.coroutines.launch
@@ -453,18 +450,12 @@ fun BookshelfScreen(
             .testTag(BookshelfTestTags.SCREEN),
     ) {
         val gridColumnCount = max(3, (maxWidth / 128.dp).toInt())
-        val spineColumnCount = max(5, (maxWidth / 64.dp).toInt())
+        val availableContentWidth = (maxWidth - 32.dp).coerceAtLeast(240.dp)
+        val availableViewportHeight = maxHeight
 
         val gridRows = remember(displayedItems, gridColumnCount, viewMode) {
             if (viewMode == BookshelfViewMode.GRID) {
                 displayedItems.chunked(gridColumnCount)
-            } else {
-                emptyList()
-            }
-        }
-        val spineRows = remember(displayedItems, spineColumnCount, viewMode) {
-            if (viewMode == BookshelfViewMode.SPINE_3D) {
-                displayedItems.chunked(spineColumnCount)
             } else {
                 emptyList()
             }
@@ -660,14 +651,13 @@ fun BookshelfScreen(
                     }
 
                     BookshelfViewMode.SPINE_3D -> {
-                        items(
-                            items = spineRows,
-                            key = { row -> "spine_row_" + row.joinToString("_") { it.aid.toString() } },
-                        ) { rowItems ->
-                            BookshelfSpineShelfRow(
-                                rowItems = rowItems,
-                                totalSlots = spineColumnCount,
+                        item(key = "spine_3d_shelf_section") {
+                            Bookshelf3dShelfSection(
+                                items = displayedItems,
+                                availableWidth = availableContentWidth,
+                                availableHeight = availableViewportHeight,
                                 selectedAidSet = selectedAidSet,
+                                isMultiSelectActive = isMultiSelectActive,
                                 isEinkMode = isEinkMode,
                                 onItemClick = { item ->
                                     if (isMultiSelectActive) {
@@ -683,6 +673,7 @@ fun BookshelfScreen(
                                     }
                                 },
                                 onItemLongClick = { item -> toggleSelection(item.aid) },
+                                onContinueReadingClick = onContinueReadingClicked,
                             )
                         }
                     }
@@ -1823,137 +1814,6 @@ private fun BookshelfDetailListCard(
                 )
             }
         }
-    }
-}
-
-@OptIn(ExperimentalFoundationApi::class)
-@Composable
-private fun BookshelfSpineShelfRow(
-    rowItems: List<BookshelfItemModel>,
-    totalSlots: Int,
-    selectedAidSet: Set<Int>,
-    isEinkMode: Boolean,
-    onItemClick: (BookshelfItemModel) -> Unit,
-    onItemLongClick: (BookshelfItemModel) -> Unit,
-) {
-    Column(modifier = Modifier.fillMaxWidth()) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(176.dp)
-                .padding(horizontal = 4.dp),
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-            verticalAlignment = Alignment.Bottom,
-        ) {
-            rowItems.forEach { item ->
-                val isSelected = item.aid in selectedAidSet
-                val spineTone = if (isEinkMode) {
-                    MaterialTheme.colorScheme.surface
-                } else {
-                    val palette = listOf(
-                        MaterialTheme.colorScheme.primaryContainer,
-                        MaterialTheme.colorScheme.secondaryContainer,
-                        MaterialTheme.colorScheme.tertiaryContainer,
-                        MaterialTheme.colorScheme.surfaceContainerHighest,
-                    )
-                    palette[kotlin.math.abs(item.aid) % palette.size]
-                }
-                val contentTone = if (isEinkMode) {
-                    MaterialTheme.colorScheme.onSurface
-                } else {
-                    MaterialTheme.colorScheme.onSecondaryContainer
-                }
-                val verticalChars = remember(item.novel.title) {
-                    item.novel.title
-                        .take(9)
-                        .toCharArray()
-                        .joinToString("\n")
-                }
-
-                val spineShape = MaterialTheme.shapes.small
-                Surface(
-                    color = spineTone,
-                    contentColor = contentTone,
-                    shape = spineShape,
-                    border = if (isSelected) {
-                        BorderStroke(2.dp, MaterialTheme.colorScheme.primary)
-                    } else {
-                        BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
-                    },
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxHeight(if (item.aid % 2 == 0) 0.96f else 1.0f)
-                        .wenku8SharedNovelCover(
-                            origin = Wenku8SharedElementKeys.NOVEL_BOOKSHELF_CARD_ORIGIN,
-                            aid = item.aid,
-                            clipShape = spineShape,
-                        )
-                        .clip(spineShape)
-                        .combinedClickable(
-                            onClick = { onItemClick(item) },
-                            onLongClick = { onItemLongClick(item) },
-                        )
-                        .einkHairlineBorder(spineShape)
-                        .testTag(BookshelfTestTags.BOOK_CARD_PREFIX + item.aid),
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(vertical = 8.dp, horizontal = 4.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.SpaceBetween,
-                    ) {
-                        if (item.novel.hasUnreadUpdate) {
-                            Box(
-                                modifier = Modifier
-                                    .size(8.dp)
-                                    .clip(CircleShape)
-                                    .background(MaterialTheme.colorScheme.error)
-                                    .testTag(BookshelfTestTags.NEW_CHAPTER_BADGE_PREFIX + item.aid),
-                            )
-                        } else {
-                            Spacer(modifier = Modifier.height(8.dp))
-                        }
-
-                        Text(
-                            text = verticalChars,
-                            style = MaterialTheme.typography.labelMedium.copy(
-                                lineHeight = 14.sp,
-                                fontWeight = FontWeight.SemiBold,
-                            ),
-                            textAlign = TextAlign.Center,
-                            maxLines = 9,
-                            overflow = TextOverflow.Clip,
-                        )
-
-                        BookshelfItemProgressIndicator(
-                            item = item,
-                            isEinkMode = isEinkMode,
-                            showPercentageLabel = false,
-                        )
-                    }
-                }
-            }
-            repeat(totalSlots - rowItems.size) {
-                Spacer(modifier = Modifier.weight(1f))
-            }
-        }
-
-        // Tactile shelf plank ledge beneath the row of vertical spines
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(8.dp)
-                .clip(MaterialTheme.shapes.extraSmall)
-                .background(
-                    if (isEinkMode) {
-                        Color.Black
-                    } else {
-                        MaterialTheme.colorScheme.surfaceContainerHighest
-                    },
-                )
-                .border(1.dp, MaterialTheme.colorScheme.outlineVariant, MaterialTheme.shapes.extraSmall),
-        )
     }
 }
 
