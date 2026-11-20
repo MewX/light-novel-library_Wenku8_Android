@@ -138,6 +138,7 @@ object ProfileStudioTestTags {
     const val OPEN_LICENSE_BUTTON = "profile_open_license_button"
     const val OPEN_ABOUT_BUTTON = "profile_open_about_button"
     const val ABOUT_VERSION_TAP_TARGET = "profile_about_version_tap_target"
+    const val ABOUT_CHANNEL_TEXT = "profile_about_channel_text"
     const val ABOUT_HOMEPAGE_LINK = "profile_about_homepage_link"
     const val ABOUT_EASTER_EGG_TEXT = "profile_about_easter_egg_text"
 }
@@ -558,6 +559,8 @@ fun ProfileAndStudioScreen(
             AboutAndLicenseSection(
                 serverNoticeAndUpdateRepository = serverNoticeAndUpdateRepository,
                 appUpdateUiState = appUpdateUiState,
+                isPlayStoreChannel = appUpdateCoordinator?.isPlayStoreChannel
+                    ?: (BuildConfig.DISTRIBUTION_CHANNEL == "playstore"),
                 onManualCheckForUpdate = {
                     coroutineScope.launch {
                         appUpdateCoordinator?.checkForUpdate(isUserInitiated = true)
@@ -1525,6 +1528,7 @@ private fun StorageAndBackupStudioCard(
 private fun AboutAndLicenseSection(
     serverNoticeAndUpdateRepository: ServerNoticeAndUpdateRepository?,
     appUpdateUiState: AppUpdateUiState? = null,
+    isPlayStoreChannel: Boolean = BuildConfig.DISTRIBUTION_CHANNEL == "playstore",
     onManualCheckForUpdate: () -> Unit = {},
     onCompleteAppUpdate: () -> Unit = {},
     onOpenLicense: () -> Unit,
@@ -1536,6 +1540,7 @@ private fun AboutAndLicenseSection(
                 uiState = appUpdateUiState,
                 onCheckForUpdate = onManualCheckForUpdate,
                 onCompleteUpdate = onCompleteAppUpdate,
+                isPlayStoreChannel = isPlayStoreChannel,
             )
         } else if (serverNoticeAndUpdateRepository != null) {
             AppUpdateCheckCard(
@@ -1728,6 +1733,19 @@ private fun AboutWenkuDialog(onDismiss: () -> Unit) {
                             .clickable { versionTapCount++ }
                             .padding(vertical = 6.dp)
                             .testTag(ProfileStudioTestTags.ABOUT_VERSION_TAP_TARGET),
+                    )
+
+                    Text(
+                        text = stringResource(
+                            R.string.about_channel_format,
+                            distributionChannelLabel(),
+                        ),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag(ProfileStudioTestTags.ABOUT_CHANNEL_TEXT),
                     )
 
                     if (versionTapCount >= 5) {

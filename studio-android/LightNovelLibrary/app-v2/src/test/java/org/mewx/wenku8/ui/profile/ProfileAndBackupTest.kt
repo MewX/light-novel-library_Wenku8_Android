@@ -605,11 +605,18 @@ class ProfileAndBackupTest {
             composeTestRule.onNodeWithText("Jetpack Compose", substring = true).assertIsDisplayed()
             composeTestRule.onNodeWithText("关闭").performClick()
 
-            // 6. About dialog matches v1 info & credits + 5-tap version Easter egg
+            // 6. About dialog matches v1 info & credits + distribution channel + 5-tap version Easter egg
             composeTestRule.onNodeWithTag(ProfileStudioTestTags.OPEN_ABOUT_BUTTON).performClick()
             composeTestRule.onNodeWithText(
                 "版本：${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
             ).assertIsDisplayed()
+            val expectedChannel = if (BuildConfig.DISTRIBUTION_CHANNEL == "playstore") {
+                "Google Play"
+            } else {
+                "APK直装版"
+            }
+            composeTestRule.onNodeWithTag(ProfileStudioTestTags.ABOUT_CHANNEL_TEXT).assertIsDisplayed()
+            composeTestRule.onNodeWithText("发行渠道：$expectedChannel").assertIsDisplayed()
             composeTestRule.onNodeWithTag(ProfileStudioTestTags.ABOUT_HOMEPAGE_LINK).assertIsDisplayed()
             composeTestRule.onNodeWithText("QQ交流群: 2166068158")
                 .performScrollTo()

@@ -46,6 +46,7 @@ class AppUpdateUiIntegrationTest {
     @Test
     fun appUpdateCheckCardRendersAllStatesAndInvokesChannelActions() {
         var currentState by mutableStateOf<AppUpdateUiState>(AppUpdateUiState.Idle)
+        var isPlayChannel by mutableStateOf(false)
         var checkClicks = 0
         var completeClicks = 0
         var playFallbackClicks = 0
@@ -57,13 +58,22 @@ class AppUpdateUiIntegrationTest {
                     uiState = currentState,
                     onCheckForUpdate = { checkClicks++ },
                     onCompleteUpdate = { completeClicks++ },
+                    isPlayStoreChannel = isPlayChannel,
                     onOpenDownloadUrl = { openedUrls.add(it) },
                     onOpenPlayStoreFallback = { playFallbackClicks++ },
                 )
             }
         }
 
-        // Idle -> button triggers check
+        // Idle -> displays version + channel subtitle (APK直装版 vs Google Play) and triggers check
+        composeRule.onNodeWithText(
+            "v${org.mewx.wenku8.BuildConfig.VERSION_NAME} (Build ${org.mewx.wenku8.BuildConfig.VERSION_CODE}) · APK直装版",
+        ).assertIsDisplayed()
+        isPlayChannel = true
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText(
+            "v${org.mewx.wenku8.BuildConfig.VERSION_NAME} (Build ${org.mewx.wenku8.BuildConfig.VERSION_CODE}) · Google Play",
+        ).assertIsDisplayed()
         composeRule.onNodeWithTag(ProfileAccountTestTags.CHECK_UPDATE_BUTTON).performClick()
         assertEquals(1, checkClicks)
 

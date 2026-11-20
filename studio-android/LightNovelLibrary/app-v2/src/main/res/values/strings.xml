@@ -189,6 +189,9 @@
     <string name="auth_error_network">登录失败，无法连接服务器或服务繁忙</string>
 
     <string name="update_action_check">检查应用更新</string>
+    <string name="distribution_channel_playstore">Google Play</string>
+    <string name="distribution_channel_direct">APK直装版</string>
+    <string name="update_idle_channel_format">v%1$s (Build %2$d) · %3$s</string>
     <string name="update_checking">正在检查新版本…</string>
     <string name="update_up_to_date_format">当前已是最新版本 (Build %1$d)</string>
     <string name="update_available_title">发现新版本</string>
@@ -272,6 +275,7 @@
     <string name="profile_about_dialog_title">关于轻小说文库</string>
     <string name="about_wenku8_title">轻小说文库 (Wenku8.com)</string>
     <string name="about_version_format">版本：%1$s (%2$d)</string>
+    <string name="about_channel_format">发行渠道：%1$s</string>
     <string name="about_project_homepage">项目主页: https://wenku8.app</string>
     <string name="about_no_duty">所有数据来自于互联网，开发者、设计师、客服均与网站无任何关系，而且本项目完全免费，完整源代码均开放，纯凭兴趣做的app，仅供大家学习安卓应用程序制作之法，如有侵犯您的权益，请务必邮件联系，保证12小时内回复，app内会做屏蔽。</string>
     <string name="about_qq_group">QQ交流群: 2166068158</string>

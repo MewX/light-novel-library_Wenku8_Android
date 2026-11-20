@@ -83,6 +83,7 @@ import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import coil3.request.crossfade
 import kotlinx.coroutines.launch
+import org.mewx.wenku8.BuildConfig
 import org.mewx.wenku8.R
 import org.mewx.wenku8.data.repository.AccountSessionState
 import org.mewx.wenku8.data.repository.AppVersionCheckResult
@@ -1015,6 +1016,17 @@ fun AppUpdateCheckCard(
     }
 }
 
+@Composable
+internal fun distributionChannelLabel(
+    isPlayStoreChannel: Boolean = BuildConfig.DISTRIBUTION_CHANNEL == "playstore",
+): String = stringResource(
+    if (isPlayStoreChannel) {
+        R.string.distribution_channel_playstore
+    } else {
+        R.string.distribution_channel_direct
+    },
+)
+
 /**
  * Channel-aware update card driven by [AppUpdateUiState] (`playstore` Flexible In-App Updates
  * vs `default` external release-page updates).
@@ -1025,6 +1037,7 @@ fun AppUpdateCheckCard(
     onCheckForUpdate: () -> Unit,
     onCompleteUpdate: () -> Unit,
     modifier: Modifier = Modifier,
+    isPlayStoreChannel: Boolean = BuildConfig.DISTRIBUTION_CHANNEL == "playstore",
     onOpenDownloadUrl: ((String) -> Unit)? = null,
     onOpenPlayStoreFallback: (() -> Unit)? = null,
 ) {
@@ -1032,9 +1045,15 @@ fun AppUpdateCheckCard(
     val isEink = LocalEinkMode.current
     val isHighlighted = uiState is AppUpdateUiState.UpdateAvailable ||
         uiState is AppUpdateUiState.ReadyToInstall
+    val channelLabel = distributionChannelLabel(isPlayStoreChannel)
 
-    val statusLine: String? = when (uiState) {
-        AppUpdateUiState.Idle -> null
+    val statusLine: String = when (uiState) {
+        AppUpdateUiState.Idle -> stringResource(
+            R.string.update_idle_channel_format,
+            BuildConfig.VERSION_NAME,
+            BuildConfig.VERSION_CODE,
+            channelLabel,
+        )
         AppUpdateUiState.Checking -> stringResource(R.string.update_checking)
         is AppUpdateUiState.UpToDate -> stringResource(
             R.string.update_up_to_date_format,
@@ -1103,18 +1122,16 @@ fun AppUpdateCheckCard(
                             MaterialTheme.colorScheme.onSurface
                         },
                     )
-                    statusLine?.let { line ->
-                        Spacer(modifier = Modifier.height(2.dp))
-                        Text(
-                            text = line,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = if (isHighlighted && !isEink) {
-                                MaterialTheme.colorScheme.onSecondaryContainer
-                            } else {
-                                MaterialTheme.colorScheme.onSurfaceVariant
-                            },
-                        )
-                    }
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = statusLine,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (isHighlighted && !isEink) {
+                            MaterialTheme.colorScheme.onSecondaryContainer
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        },
+                    )
                 }
                 Spacer(modifier = Modifier.width(8.dp))
                 when (uiState) {
