@@ -6,8 +6,10 @@ import android.content.Context
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -27,7 +29,9 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.Reply
@@ -43,11 +47,13 @@ import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.ExtendedFloatingActionButton
+import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -79,6 +85,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.semantics
@@ -99,7 +106,9 @@ import org.mewx.wenku8.data.repository.ReviewSubmitOutcome
 import org.mewx.wenku8.data.repository.ReviewThreadCardItem
 import org.mewx.wenku8.data.repository.ReviewsRepository
 import org.mewx.wenku8.data.repository.UserSessionRepository
+import org.mewx.wenku8.ui.components.ActionTooltipBox
 import org.mewx.wenku8.ui.components.TooltipIconButton
+import org.mewx.wenku8.ui.components.horizontalScrollFadeEdge
 import org.mewx.wenku8.ui.theme.LocalEinkMode
 import org.mewx.wenku8.ui.theme.einkHairlineBorder
 
@@ -834,24 +843,30 @@ private fun NewReviewThreadBottomSheet(
                 .fillMaxWidth()
                 .navigationBarsPadding()
                 .imePadding()
+                .verticalScroll(rememberScrollState())
                 .padding(horizontal = 20.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 Text(
                     text = stringResource(R.string.review_new_thread_sheet_title),
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.SemiBold,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
                 )
                 if (draftSavedVisible) {
                     Text(
                         text = stringResource(R.string.review_draft_autosaved_hint),
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.primary,
+                        maxLines = 1,
+                        softWrap = false,
                         modifier = Modifier.testTag(ReviewScreensTestTags.COMPOSER_DRAFT_SAVED_BADGE),
                     )
                 }
@@ -873,6 +888,8 @@ private fun NewReviewThreadBottomSheet(
                             R.string.review_title_field_label,
                             liveValidation.minRequiredChars,
                         ),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                     )
                 },
                 singleLine = true,
@@ -893,6 +910,8 @@ private fun NewReviewThreadBottomSheet(
                             R.string.review_content_field_label,
                             liveValidation.minRequiredChars,
                         ),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                     )
                 },
                 minLines = 4,
@@ -960,7 +979,11 @@ private fun NewReviewThreadBottomSheet(
                     modifier = Modifier.size(18.dp),
                 )
                 Spacer(modifier = Modifier.width(8.dp))
-                Text(text = stringResource(R.string.review_submit_thread_action))
+                Text(
+                    text = stringResource(R.string.review_submit_thread_action),
+                    maxLines = 1,
+                    softWrap = false,
+                )
             }
 
             Spacer(modifier = Modifier.height(8.dp))
@@ -979,6 +1002,7 @@ private fun StickyReplyComposerBar(
     onRequestLogin: () -> Unit,
     onSubmitReply: () -> Unit,
 ) {
+    val fontScale = LocalDensity.current.fontScale
     Surface(
         color = MaterialTheme.colorScheme.surfaceContainerLow,
         tonalElevation = 2.dp,
@@ -997,58 +1021,125 @@ private fun StickyReplyComposerBar(
             if (!canAttemptPosting) {
                 ReviewLoginPromptBanner(onRequestLogin = onRequestLogin)
             } else {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    OutlinedTextField(
-                        value = replyContent,
-                        onValueChange = onReplyContentChange,
-                        placeholder = {
-                            Text(
-                                text = stringResource(
-                                    R.string.review_reply_field_placeholder,
-                                    validation.minRequiredChars,
-                                ),
-                            )
-                        },
-                        maxLines = 4,
-                        modifier = Modifier
-                            .weight(1f)
-                            .testTag(ReviewScreensTestTags.REVIEW_REPLY_INPUT),
-                    )
-                    Button(
-                        onClick = onSubmitReply,
-                        enabled = validation.canSubmit && !isSubmitting,
-                        modifier = Modifier.testTag(ReviewScreensTestTags.REVIEW_REPLY_SUBMIT_BUTTON),
-                    ) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Outlined.Send,
-                            contentDescription = stringResource(R.string.review_submit_reply_action),
-                            modifier = Modifier.size(18.dp),
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(text = stringResource(R.string.review_submit_reply_action))
-                    }
-                }
+                BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+                    val useCompactComposer = maxWidth < 348.dp || fontScale > 1.1f
+                    val useScrollableChips = maxWidth < 348.dp || fontScale > 1.05f
+                    val sendLabel = stringResource(R.string.review_submit_reply_action)
 
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                ) {
-                    Box(modifier = Modifier.weight(1f)) {
-                        ReviewValidationChipsRow(validation = validation)
-                    }
-                    if (draftSavedVisible) {
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = stringResource(R.string.review_draft_autosaved_hint),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.testTag(ReviewScreensTestTags.COMPOSER_DRAFT_SAVED_BADGE),
-                        )
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            OutlinedTextField(
+                                value = replyContent,
+                                onValueChange = onReplyContentChange,
+                                placeholder = {
+                                    Text(
+                                        text = stringResource(
+                                            R.string.review_reply_field_placeholder,
+                                            validation.minRequiredChars,
+                                        ),
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                },
+                                maxLines = 4,
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .testTag(ReviewScreensTestTags.REVIEW_REPLY_INPUT),
+                            )
+                            if (useCompactComposer) {
+                                ActionTooltipBox(tooltipText = sendLabel) {
+                                    FilledIconButton(
+                                        onClick = onSubmitReply,
+                                        enabled = validation.canSubmit && !isSubmitting,
+                                        modifier = Modifier
+                                            .size(48.dp)
+                                            .testTag(ReviewScreensTestTags.REVIEW_REPLY_SUBMIT_BUTTON),
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.AutoMirrored.Outlined.Send,
+                                            contentDescription = sendLabel,
+                                            modifier = Modifier.size(20.dp),
+                                        )
+                                    }
+                                }
+                            } else {
+                                Button(
+                                    onClick = onSubmitReply,
+                                    enabled = validation.canSubmit && !isSubmitting,
+                                    modifier = Modifier.testTag(ReviewScreensTestTags.REVIEW_REPLY_SUBMIT_BUTTON),
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.AutoMirrored.Outlined.Send,
+                                        contentDescription = sendLabel,
+                                        modifier = Modifier.size(18.dp),
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        text = sendLabel,
+                                        maxLines = 1,
+                                        softWrap = false,
+                                    )
+                                }
+                            }
+                        }
+
+                        if (useScrollableChips) {
+                            val chipsScrollState = rememberScrollState()
+                            val isEink = LocalEinkMode.current
+                            val fadeColor = MaterialTheme.colorScheme.surfaceContainerLow
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .horizontalScrollFadeEdge(
+                                        scrollState = chipsScrollState,
+                                        fadeColor = fadeColor,
+                                        isEink = isEink,
+                                    )
+                                    .horizontalScroll(chipsScrollState),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            ) {
+                                ReviewValidationChipsContent(validation = validation)
+                                if (draftSavedVisible) {
+                                    Text(
+                                        text = stringResource(R.string.review_draft_autosaved_hint),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.primary,
+                                        maxLines = 1,
+                                        softWrap = false,
+                                        modifier = Modifier.testTag(ReviewScreensTestTags.COMPOSER_DRAFT_SAVED_BADGE),
+                                    )
+                                }
+                            }
+                        } else {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                            ) {
+                                Box(modifier = Modifier.weight(1f)) {
+                                    ReviewValidationChipsRow(validation = validation)
+                                }
+                                if (draftSavedVisible) {
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = stringResource(R.string.review_draft_autosaved_hint),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.primary,
+                                        maxLines = 1,
+                                        softWrap = false,
+                                        modifier = Modifier.testTag(ReviewScreensTestTags.COMPOSER_DRAFT_SAVED_BADGE),
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -1079,6 +1170,7 @@ private fun ReviewLoginPromptBanner(onRequestLogin: () -> Unit) {
             Spacer(modifier = Modifier.width(12.dp))
             FilledTonalButton(
                 onClick = onRequestLogin,
+                contentPadding = ButtonDefaults.ButtonWithIconContentPadding,
                 modifier = Modifier.testTag(ReviewScreensTestTags.COMPOSER_LOGIN_BUTTON),
             ) {
                 Icon(
@@ -1087,7 +1179,11 @@ private fun ReviewLoginPromptBanner(onRequestLogin: () -> Unit) {
                     modifier = Modifier.size(16.dp),
                 )
                 Spacer(modifier = Modifier.width(6.dp))
-                Text(text = stringResource(R.string.review_login_action))
+                Text(
+                    text = stringResource(R.string.review_login_action),
+                    maxLines = 1,
+                    softWrap = false,
+                )
             }
         }
     }
@@ -1100,40 +1196,45 @@ private fun ReviewValidationChipsRow(validation: ReviewComposerValidation) {
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        StatusPillChip(
-            text = if (validation.lengthSatisfied) {
-                stringResource(R.string.review_chip_length_ok_format, validation.minRequiredChars)
-            } else {
-                stringResource(R.string.review_chip_length_pending_format, validation.minRequiredChars)
-            },
-            isPositive = validation.lengthSatisfied,
-            isError = false,
-            testTag = ReviewScreensTestTags.COMPOSER_CHIP_LENGTH,
-        )
-
-        val badWord = validation.detectedBadWord
-        StatusPillChip(
-            text = if (badWord == null) {
-                stringResource(R.string.review_chip_bad_word_ok)
-            } else {
-                stringResource(R.string.review_chip_bad_word_found_format, badWord)
-            },
-            isPositive = badWord == null,
-            isError = badWord != null,
-            testTag = ReviewScreensTestTags.COMPOSER_CHIP_BAD_WORD,
-        )
-
-        StatusPillChip(
-            text = if (validation.cooldownReady) {
-                stringResource(R.string.review_chip_cooldown_ok)
-            } else {
-                stringResource(R.string.review_chip_cooldown_wait_format, validation.cooldownRemainingSeconds)
-            },
-            isPositive = validation.cooldownReady,
-            isError = false,
-            testTag = ReviewScreensTestTags.COMPOSER_CHIP_COOLDOWN,
-        )
+        ReviewValidationChipsContent(validation = validation)
     }
+}
+
+@Composable
+private fun ReviewValidationChipsContent(validation: ReviewComposerValidation) {
+    StatusPillChip(
+        text = if (validation.lengthSatisfied) {
+            stringResource(R.string.review_chip_length_ok_format, validation.minRequiredChars)
+        } else {
+            stringResource(R.string.review_chip_length_pending_format, validation.minRequiredChars)
+        },
+        isPositive = validation.lengthSatisfied,
+        isError = false,
+        testTag = ReviewScreensTestTags.COMPOSER_CHIP_LENGTH,
+    )
+
+    val badWord = validation.detectedBadWord
+    StatusPillChip(
+        text = if (badWord == null) {
+            stringResource(R.string.review_chip_bad_word_ok)
+        } else {
+            stringResource(R.string.review_chip_bad_word_found_format, badWord)
+        },
+        isPositive = badWord == null,
+        isError = badWord != null,
+        testTag = ReviewScreensTestTags.COMPOSER_CHIP_BAD_WORD,
+    )
+
+    StatusPillChip(
+        text = if (validation.cooldownReady) {
+            stringResource(R.string.review_chip_cooldown_ok)
+        } else {
+            stringResource(R.string.review_chip_cooldown_wait_format, validation.cooldownRemainingSeconds)
+        },
+        isPositive = validation.cooldownReady,
+        isError = false,
+        testTag = ReviewScreensTestTags.COMPOSER_CHIP_COOLDOWN,
+    )
 }
 
 @Composable
@@ -1166,6 +1267,8 @@ private fun StatusPillChip(
         Text(
             text = text,
             style = MaterialTheme.typography.labelMedium,
+            maxLines = 1,
+            softWrap = false,
             modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
         )
     }
@@ -1218,9 +1321,11 @@ private fun ReviewThreadSummaryCard(
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
                         )
                     }
                 }
+                Spacer(modifier = Modifier.width(8.dp))
                 Surface(
                     color = MaterialTheme.colorScheme.tertiaryContainer,
                     contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
@@ -1240,6 +1345,8 @@ private fun ReviewThreadSummaryCard(
                         Text(
                             text = stringResource(R.string.review_reply_count_format, thread.replyCount),
                             style = MaterialTheme.typography.labelMedium,
+                            maxLines = 1,
+                            softWrap = false,
                         )
                     }
                 }
@@ -1303,9 +1410,12 @@ private fun ReviewReplyFloorCard(
                             text = floor.replyTimeFormatted,
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
                         )
                     }
                 }
+                Spacer(modifier = Modifier.width(8.dp))
                 Surface(
                     color = if (floor.isOriginalPosterFloor) {
                         MaterialTheme.colorScheme.primaryContainer
@@ -1328,6 +1438,8 @@ private fun ReviewReplyFloorCard(
                         },
                         style = MaterialTheme.typography.labelMedium,
                         fontWeight = if (floor.isOriginalPosterFloor) FontWeight.SemiBold else FontWeight.Normal,
+                        maxLines = 1,
+                        softWrap = false,
                         modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
                     )
                 }
@@ -1354,7 +1466,13 @@ private fun ReviewReplyFloorCard(
             ) {
                 AssistChip(
                     onClick = onCopyContent,
-                    label = { Text(text = stringResource(R.string.review_copy_action)) },
+                    label = {
+                        Text(
+                            text = stringResource(R.string.review_copy_action),
+                            maxLines = 1,
+                            softWrap = false,
+                        )
+                    },
                     leadingIcon = {
                         Icon(
                             imageVector = Icons.Outlined.ContentCopy,
@@ -1374,6 +1492,8 @@ private fun ReviewReplyFloorCard(
                                 R.string.review_quote_floor_format,
                                 floor.floorNumber,
                             ),
+                            maxLines = 1,
+                            softWrap = false,
                         )
                     },
                     leadingIcon = {
@@ -1498,7 +1618,11 @@ private fun ReviewErrorStateCard(
             }
 
             if (errorType == ReviewLoadErrorType.NETWORK_OR_SERVER) {
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    itemVerticalAlignment = Alignment.CenterVertically,
+                ) {
                     FilledTonalButton(onClick = onRetry) {
                         Icon(
                             imageVector = Icons.Outlined.Refresh,
