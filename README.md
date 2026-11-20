@@ -220,14 +220,17 @@ cd studio-android/LightNovelLibrary
    - **`screenshots/v1/`**：`1.x`（Material Design 1）历史版本截图归档。
    - **`screenshots/v0/`**：`0.5.2.x` 早期典藏版历史截图归档。
 4. **`graph-source/`** —— 品牌图标、轻小说文库高清重绘 Logo、Google Play 徽章及早期 Fireworks 制图源文件。
-5. **`eclipse-android/` & `eclipse-android-old/`** —— 2014 年早期 `0.5.1`（Eclipse ADT）与 `0.5.2.1` 典藏版历史源码归档。
+5. **[`previous_versions/`](previous_versions/README.md)** —— 历代历史版本完整源码归档（各目录均附有独立 `README.md` 说明）：
+   - **[`previous_versions/v0.5.1.0030/`](previous_versions/v0.5.1.0030/README.md)**：2014 年初代 Eclipse ADT 源码归档（原 `eclipse-android/`）。
+   - **[`previous_versions/v0.5.2.1/`](previous_versions/v0.5.2.1/README.md)**：`0.5.2.1` 典藏版 Android Studio 源码归档（原 `eclipse-android-old/`，已移除历史 `build/` 中间文件）。
+   - **[`previous_versions/v1.30/`](previous_versions/v1.30/README.md)**：`master` 分支 `1.x` 经典版最终工程快照（独立保留 `master` 对应版本的 `api/` Git submodule）。
 
 ---
 
 # <a id="v1-archive"></a>1.x 与 0.5.2.1 历史版本归档
 
 > [!NOTE]
-> 以下内容完整保留自 `1.x`（2015 Material Design 1 版）与 `0.5.2.1` 典藏版的原始开源文档，图片与设计稿路径已同步更新至 `screenshots/v1/`、`screenshots/v0/`、`docs/designs/v1/` 与 `app-v1/`，供查阅项目十年演进历程参考。
+> 以下内容完整保留自 `1.x`（2015 Material Design 1 版）与 `0.5.2.1` 典藏版的原始开源文档，源码、图片与设计稿路径已同步更新至 `previous_versions/`、`screenshots/v1/`、`screenshots/v0/`、`docs/designs/v1/` 与 `app-v1/`，供查阅项目十年演进历程参考。
 
 
 <a id="foreword"></a>写在前面
@@ -256,7 +259,7 @@ Material Design风格的`轻小说文库`App**完全**开源了！想实践Mater
 
 ## <a id="app-1.x-info"></a>1.x 版本
 
-经典的 `Material Design 1` 风格 App，设计图纸已归档至 `docs/designs/v1/`，工程模块位于 `studio-android/LightNovelLibrary/app-v1/`。
+经典的 `Material Design 1` 风格 App，设计图纸已归档至 `docs/designs/v1/`；`v1.30` 完整独立工程快照归档于 [`previous_versions/v1.30/`](previous_versions/v1.30/README.md)（含锁定版本的 `api/` 子模块），同时主工程中也保留了可独立编译的 `studio-android/LightNovelLibrary/app-v1/` 模块。
 
 三方库的引用全部采用Gradle dependency，在混淆方面会直接忽略，加密强度低，不过开发起来各种方便~
 
@@ -371,7 +374,7 @@ Material Design风格的`轻小说文库`App**完全**开源了！想实践Mater
 
 ### <a id="app-1.x-source"></a>源代码结构
 
-    studio-android/LightNovelLibrary/app/src/main
+    previous_versions/v1.30/app/src/main
     |   AndroidManifest.xml
     |
     +---assets/fonts
@@ -477,7 +480,7 @@ Material Design风格的`轻小说文库`App**完全**开源了！想实践Mater
 
 ## <a id="app-0520"></a>0.5.2.1 典藏版
 
-老版的App，启动和运行方面都比`MD`版本流畅，针对旧机型维护。`Eclipse`版本源码见`eclipse-android/`目录（非最新），`Android Studio`版本源码见`eclipse-android-old/`目录（典藏版最新），老版的图片资源都是用Fireworks做的，源文件见`graph-source/`目录。
+老版的App，启动和运行方面都比`MD`版本流畅，针对旧机型维护。`Eclipse`版本源码见[`previous_versions/v0.5.1.0030/`](previous_versions/v0.5.1.0030/README.md)目录（非最新），`Android Studio`版本源码见[`previous_versions/v0.5.2.1/`](previous_versions/v0.5.2.1/README.md)目录（典藏版最新），老版的图片资源都是用Fireworks做的，源文件见`graph-source/`目录。
 
 ### <a id="app-0520-preview"></a>预览图
 
@@ -492,7 +495,7 @@ Material Design风格的`轻小说文库`App**完全**开源了！想实践Mater
 
 这边引入了不少三方库，但是方法笨拙，主要采用复制、合并源代码的方式，所以文件目录会比较乱。但是加密强度高 \_(:3」∠)\_ 以后做商业软件还是建议这样操作，虽然麻烦，但是混淆之后烦的要命~
 
-    eclipse-android-old\LightNovelLibrary\src
+    previous_versions\v0.5.2.1\LightNovelLibrary\src
     +---com
     |   +---davemorrissey
     |   |   \---labs
