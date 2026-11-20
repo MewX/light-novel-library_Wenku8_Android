@@ -6,12 +6,15 @@
     android:background="@drawable/widget_continue_reading_bg"
     android:gravity="center_vertical"
     android:orientation="horizontal"
-    android:padding="14dp">
+    android:paddingStart="12dp"
+    android:paddingTop="10dp"
+    android:paddingEnd="12dp"
+    android:paddingBottom="10dp">
 
     <ImageView
         android:id="@+id/widget_cover_image"
-        android:layout_width="62dp"
-        android:layout_height="88dp"
+        android:layout_width="56dp"
+        android:layout_height="80dp"
         android:background="@drawable/widget_cover_placeholder_bg"
         android:contentDescription="@string/widget_continue_reading_label"
         android:scaleType="centerCrop"
@@ -20,7 +23,7 @@
     <LinearLayout
         android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:layout_marginStart="14dp"
+        android:layout_marginStart="12dp"
         android:layout_weight="1"
         android:orientation="vertical">
 
@@ -29,6 +32,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:ellipsize="end"
+            android:includeFontPadding="false"
             android:maxLines="1"
             android:text="@string/widget_continue_badge"
             android:textColor="@color/widget_badge_accent"
@@ -41,6 +45,7 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="3dp"
             android:ellipsize="end"
+            android:includeFontPadding="false"
             android:maxLines="1"
             android:text="@string/widget_continue_empty_title"
             android:textColor="@color/widget_text_primary"
@@ -53,6 +58,7 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="2dp"
             android:ellipsize="end"
+            android:includeFontPadding="false"
             android:maxLines="1"
             android:text="@string/widget_continue_empty_subtitle"
             android:textColor="@color/widget_text_secondary"
@@ -70,7 +76,7 @@
                 style="?android:attr/progressBarStyleHorizontal"
                 android:layout_width="0dp"
                 android:layout_height="6dp"
-                android:layout_marginEnd="10dp"
+                android:layout_marginEnd="8dp"
                 android:layout_weight="1"
                 android:max="1000"
                 android:progress="0" />
@@ -80,9 +86,12 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:background="@drawable/widget_continue_pill_bg"
-                android:paddingStart="12dp"
+                android:ellipsize="end"
+                android:includeFontPadding="false"
+                android:maxLines="1"
+                android:paddingStart="10dp"
                 android:paddingTop="5dp"
-                android:paddingEnd="12dp"
+                android:paddingEnd="10dp"
                 android:paddingBottom="5dp"
                 android:text="@string/widget_continue_action_open_shelf"
                 android:textColor="@color/widget_cta_text"

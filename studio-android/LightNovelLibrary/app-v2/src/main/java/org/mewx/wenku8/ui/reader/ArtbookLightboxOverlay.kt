@@ -124,6 +124,7 @@ import org.mewx.wenku8.data.media.OfflineFirstWenkuImageFetcher
 import org.mewx.wenku8.data.media.WenkuImageRequests
 import org.mewx.wenku8.data.remote.parser.WenkuXmlParsers
 import org.mewx.wenku8.ui.components.TooltipIconButton
+import org.mewx.wenku8.ui.components.horizontalScrollFadeEdge
 import org.mewx.wenku8.ui.theme.LocalEinkMode
 import java.io.File
 import java.io.FileInputStream
@@ -801,6 +802,9 @@ fun ArtbookLightboxOverlay(
                                 text = pageIndicatorLabel,
                                 style = MaterialTheme.typography.labelSmall,
                                 color = Color(0xFFB8C0CC),
+                                maxLines = 1,
+                                softWrap = false,
+                                overflow = TextOverflow.Ellipsis,
                                 modifier = Modifier.testTag(ArtbookTestTags.PAGE_INDICATOR),
                             )
                         }
@@ -876,11 +880,17 @@ fun ArtbookLightboxOverlay(
                         onPreviousChapter != null ||
                         onNextChapter != null
                     if (showActionChipRow) {
+                        val chipRowScrollState = rememberScrollState()
                         Row(
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .horizontalScroll(rememberScrollState())
+                                .horizontalScrollFadeEdge(
+                                    scrollState = chipRowScrollState,
+                                    fadeColor = Color(0xD914171F),
+                                    isEink = isEinkMode,
+                                )
+                                .horizontalScroll(chipRowScrollState)
                                 .padding(horizontal = 8.dp, vertical = 2.dp),
                         ) {
                             if (isTemporaryPeek) {
@@ -894,7 +904,13 @@ fun ArtbookLightboxOverlay(
                                             modifier = Modifier.size(16.dp),
                                         )
                                     },
-                                    label = { Text(stringResource(R.string.artbook_action_return_to_reading)) },
+                                    label = {
+                                        Text(
+                                            text = stringResource(R.string.artbook_action_return_to_reading),
+                                            maxLines = 1,
+                                            softWrap = false,
+                                        )
+                                    },
                                     colors = artbookChipColors(),
                                     modifier = Modifier.testTag(ArtbookTestTags.RETURN_TO_READING_CHIP),
                                 )
@@ -911,7 +927,13 @@ fun ArtbookLightboxOverlay(
                                             modifier = Modifier.size(16.dp),
                                         )
                                     },
-                                    label = { Text("小说阅读") },
+                                    label = {
+                                        Text(
+                                            text = "小说阅读",
+                                            maxLines = 1,
+                                            softWrap = false,
+                                        )
+                                    },
                                     colors = artbookChipColors(),
                                     modifier = Modifier.testTag(ArtbookTestTags.READER_MODE_CHIP),
                                 )
@@ -928,7 +950,13 @@ fun ArtbookLightboxOverlay(
                                             modifier = Modifier.size(16.dp),
                                         )
                                     },
-                                    label = { Text("跨页拼合") },
+                                    label = {
+                                        Text(
+                                            text = "跨页拼合",
+                                            maxLines = 1,
+                                            softWrap = false,
+                                        )
+                                    },
                                     colors = artbookChipColors(),
                                     modifier = Modifier.testTag(ArtbookTestTags.SPREAD_TOGGLE_CHIP),
                                 )
@@ -937,7 +965,13 @@ fun ArtbookLightboxOverlay(
                                     FilterChip(
                                         selected = isFirstPageSolo,
                                         onClick = { isFirstPageSolo = !isFirstPageSolo },
-                                        label = { Text("首张单页") },
+                                        label = {
+                                            Text(
+                                                text = "首张单页",
+                                                maxLines = 1,
+                                                softWrap = false,
+                                            )
+                                        },
                                         colors = artbookChipColors(),
                                         modifier = Modifier.testTag(ArtbookTestTags.SPREAD_OFFSET_CHIP),
                                     )
@@ -951,7 +985,13 @@ fun ArtbookLightboxOverlay(
                                                 modifier = Modifier.size(16.dp),
                                             )
                                         },
-                                        label = { Text(if (isRtlSpread) "右起日漫 (RTL)" else "左起 (LTR)") },
+                                        label = {
+                                            Text(
+                                                text = if (isRtlSpread) "右起日漫 (RTL)" else "左起 (LTR)",
+                                                maxLines = 1,
+                                                softWrap = false,
+                                            )
+                                        },
                                         colors = artbookChipColors(),
                                         modifier = Modifier.testTag(ArtbookTestTags.DIRECTION_TOGGLE_CHIP),
                                     )
@@ -969,7 +1009,13 @@ fun ArtbookLightboxOverlay(
                                             modifier = Modifier.size(16.dp),
                                         )
                                     },
-                                    label = { Text("上一章") },
+                                    label = {
+                                        Text(
+                                            text = "上一章",
+                                            maxLines = 1,
+                                            softWrap = false,
+                                        )
+                                    },
                                     colors = artbookChipColors(),
                                     modifier = Modifier.testTag(ArtbookTestTags.PREV_CHAPTER_CHIP),
                                 )
@@ -986,7 +1032,13 @@ fun ArtbookLightboxOverlay(
                                             modifier = Modifier.size(16.dp),
                                         )
                                     },
-                                    label = { Text("下一章") },
+                                    label = {
+                                        Text(
+                                            text = "下一章",
+                                            maxLines = 1,
+                                            softWrap = false,
+                                        )
+                                    },
                                     colors = artbookChipColors(),
                                     modifier = Modifier.testTag(ArtbookTestTags.NEXT_CHAPTER_CHIP),
                                 )

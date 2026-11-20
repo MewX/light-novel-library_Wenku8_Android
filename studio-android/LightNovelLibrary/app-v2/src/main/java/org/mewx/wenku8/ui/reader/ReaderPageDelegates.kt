@@ -21,6 +21,8 @@ import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -900,7 +902,7 @@ internal fun buildWenku8WebChapterUrl(aid: Int, cid: Int): String? {
     return "https://www.wenku8.net/novel/${aid / 1000}/$aid/$cid.htm"
 }
 
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@OptIn(ExperimentalMaterial3ExpressiveApi::class, ExperimentalLayoutApi::class)
 @Composable
 private fun ReaderResolvedPageSurface(
     resolution: VirtualPageResolution,
@@ -936,7 +938,7 @@ private fun ReaderResolvedPageSurface(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(32.dp)
+                    .padding(24.dp)
                     .testTag(ReaderTestTags.LOADING_SLOT),
                 contentAlignment = Alignment.Center,
             ) {
@@ -951,6 +953,7 @@ private fun ReaderResolvedPageSurface(
                         text = "正在排版：${slot.chapter.chapterTitle}",
                         color = palette.secondaryInkColor,
                         style = MaterialTheme.typography.bodyMedium,
+                        textAlign = TextAlign.Center,
                     )
                 }
             }
@@ -965,7 +968,7 @@ private fun ReaderResolvedPageSurface(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(32.dp)
+                    .padding(24.dp)
                     .testTag(ReaderTestTags.ERROR_SLOT),
                 contentAlignment = Alignment.Center,
             ) {
@@ -986,23 +989,42 @@ private fun ReaderResolvedPageSurface(
                         style = MaterialTheme.typography.bodyMedium,
                         textAlign = TextAlign.Center,
                     )
-                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
                         if (webChapterUrl != null) {
                             Button(
                                 onClick = { onOpenChapterInBrowser(webChapterUrl) },
                                 modifier = Modifier.testTag(ReaderTestTags.ERROR_OPEN_WEB_BUTTON),
                             ) {
-                                Text("网页端阅读")
+                                Text(
+                                    text = "网页端阅读",
+                                    maxLines = 1,
+                                    softWrap = false,
+                                )
                             }
                             OutlinedButton(onClick = { onRetryFailedSlot(slot.chapter.cid) }) {
-                                Text("重试加载")
+                                Text(
+                                    text = "重试加载",
+                                    maxLines = 1,
+                                    softWrap = false,
+                                )
                             }
                         } else {
                             Button(onClick = { onRetryFailedSlot(slot.chapter.cid) }) {
-                                Text("重试加载")
+                                Text(
+                                    text = "重试加载",
+                                    maxLines = 1,
+                                    softWrap = false,
+                                )
                             }
                             OutlinedButton(onClick = onOpenNetworkDiagnostics) {
-                                Text("网络检测")
+                                Text(
+                                    text = "网络检测",
+                                    maxLines = 1,
+                                    softWrap = false,
+                                )
                             }
                         }
                     }
@@ -1565,7 +1587,12 @@ private fun ContinuousScrollReaderDelegate(
                         onClick = onRequestPrevChapter,
                         modifier = Modifier.fillMaxWidth(),
                     ) {
-                        Text("▲ 上一章：${snapshot.prevSlot.chapter.chapterTitle}")
+                        Text(
+                            text = "▲ 上一章：${snapshot.prevSlot.chapter.chapterTitle}",
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                            textAlign = TextAlign.Center,
+                        )
                     }
                 }
             }
@@ -1712,7 +1739,12 @@ private fun ContinuousScrollReaderDelegate(
                             .fillMaxWidth()
                             .padding(top = 12.dp),
                     ) {
-                        Text("下一章：${snapshot.nextSlot.chapter.chapterTitle} ▼")
+                        Text(
+                            text = "下一章：${snapshot.nextSlot.chapter.chapterTitle} ▼",
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                            textAlign = TextAlign.Center,
+                        )
                     }
                 }
             }

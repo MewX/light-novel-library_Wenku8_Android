@@ -24,7 +24,10 @@ import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -54,6 +57,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -105,6 +109,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
@@ -998,6 +1003,14 @@ private fun Bookshelf3dCoverFace(
     isSelected: Boolean,
     isEinkMode: Boolean,
 ) {
+    val baseDensity = LocalDensity.current
+    val cappedDensity = remember(baseDensity) {
+        Density(
+            density = baseDensity.density,
+            fontScale = baseDensity.fontScale.coerceAtMost(1.1f),
+        )
+    }
+    CompositionLocalProvider(LocalDensity provides cappedDensity) {
     val coverClipShape = COVER_CLIP_SHAPE
     val labelColor = if (isContinueReading && !isEinkMode) {
         MaterialTheme.colorScheme.onTertiaryContainer
@@ -1133,6 +1146,7 @@ private fun Bookshelf3dCoverFace(
             )
         }
     }
+    }
 }
 
 @Composable
@@ -1147,6 +1161,14 @@ private fun Bookshelf3dSpineFace(
     isSelected: Boolean,
     isEinkMode: Boolean,
 ) {
+    val baseDensity = LocalDensity.current
+    val cappedDensity = remember(baseDensity) {
+        Density(
+            density = baseDensity.density,
+            fontScale = baseDensity.fontScale.coerceAtMost(1.1f),
+        )
+    }
+    CompositionLocalProvider(LocalDensity provides cappedDensity) {
     val activeAccent = when {
         isSelected -> MaterialTheme.colorScheme.primary
         isContinueReading && !isEinkMode -> MaterialTheme.colorScheme.tertiary
@@ -1271,6 +1293,7 @@ private fun Bookshelf3dSpineFace(
                     .background(Color.White.copy(alpha = 0.14f)),
             )
         }
+    }
     }
 }
 
@@ -1448,185 +1471,193 @@ internal fun Bookshelf3dFastScroller(
             }
         }
 
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
-        ) {
-            if (itemCount > 1) {
-                val prevLabel = stringResource(R.string.bookshelf_spine3d_prev_book)
-                TooltipIconButton(
-                    tooltipText = prevLabel,
-                    onClick = { onStepDelta(-1) },
-                    enabled = focusedIndex > 0,
-                    modifier = Modifier.testTag(BookshelfTestTags.SPINE_3D_PREV_BUTTON),
-                ) {
-                    Icon(
-                        imageVector = Icons.Outlined.ChevronLeft,
-                        contentDescription = prevLabel,
-                    )
-                }
+        val fontScale = LocalDensity.current.fontScale
+        BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+            val useCompactScroller = maxWidth < 340.dp || fontScale > 1.1f
+            val stepButtonModifier = if (useCompactScroller) Modifier.size(36.dp) else Modifier
+            val counterHorizontalPadding = if (useCompactScroller) 8.dp else 10.dp
 
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(36.dp)
-                        .onSizeChanged { trackWidthPx = it.width.coerceAtLeast(1) }
-                        .pointerInput(itemCount) {
-                            detectTapGestures { offset ->
-                                val targetFraction = (offset.x / trackWidthPx.toFloat()).coerceIn(0f, 1f)
-                                latestOnTapJumpFraction(targetFraction)
-                            }
-                        }
-                        .pointerInput(itemCount) {
-                            detectHorizontalDragGestures(
-                                onDragStart = { startOffset ->
-                                    val targetFraction = (startOffset.x / trackWidthPx.toFloat()).coerceIn(0f, 1f)
-                                    latestOnScrubStart(targetFraction)
-                                },
-                                onHorizontalDrag = { change, _ ->
-                                    change.consume()
-                                    val targetFraction = (change.position.x / trackWidthPx.toFloat()).coerceIn(0f, 1f)
-                                    latestOnScrubMove(targetFraction)
-                                },
-                                onDragEnd = { latestOnScrubEnd() },
-                                onDragCancel = { latestOnScrubEnd() },
-                            )
-                        }
-                        .semantics {
-                            contentDescription = scrollerDesc
-                            progressBarRangeInfo = ProgressBarRangeInfo(
-                                current = fraction,
-                                range = 0f..1f,
-                                steps = (itemCount - 2).coerceAtLeast(0),
-                            )
-                            setProgress { target ->
-                                latestOnTapJumpFraction(target.coerceIn(0f, 1f))
-                                true
-                            }
-                        }
-                        .testTag(BookshelfTestTags.SPINE_3D_FAST_SCROLLER_TRACK),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Canvas(modifier = Modifier.fillMaxSize()) {
-                        val thumbWidth = (if (isScrubbing && !isEinkMode) 30.dp else 24.dp).toPx()
-                        val thumbHeight = (if (isScrubbing && !isEinkMode) 18.dp else 14.dp).toPx()
-                        val trackHeight = 6.dp.toPx()
-                        val halfThumb = thumbWidth / 2f
-                        val usableWidth = (size.width - thumbWidth).coerceAtLeast(1f)
-                        val centerY = size.height / 2f
-                        val thumbCenterX = halfThumb + usableWidth * fraction
-
-                        // Background track pill
-                        drawRoundRect(
-                            color = trackColor,
-                            topLeft = Offset(halfThumb, centerY - trackHeight / 2f),
-                            size = Size(usableWidth, trackHeight),
-                            cornerRadius = CornerRadius(trackHeight / 2f, trackHeight / 2f),
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(if (useCompactScroller) 2.dp else 4.dp),
+            ) {
+                if (itemCount > 1) {
+                    val prevLabel = stringResource(R.string.bookshelf_spine3d_prev_book)
+                    TooltipIconButton(
+                        tooltipText = prevLabel,
+                        onClick = { onStepDelta(-1) },
+                        enabled = focusedIndex > 0,
+                        modifier = stepButtonModifier.testTag(BookshelfTestTags.SPINE_3D_PREV_BUTTON),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.ChevronLeft,
+                            contentDescription = prevLabel,
                         )
-                        if (isEinkMode) {
+                    }
+
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(36.dp)
+                            .onSizeChanged { trackWidthPx = it.width.coerceAtLeast(1) }
+                            .pointerInput(itemCount) {
+                                detectTapGestures { offset ->
+                                    val targetFraction = (offset.x / trackWidthPx.toFloat()).coerceIn(0f, 1f)
+                                    latestOnTapJumpFraction(targetFraction)
+                                }
+                            }
+                            .pointerInput(itemCount) {
+                                detectHorizontalDragGestures(
+                                    onDragStart = { startOffset ->
+                                        val targetFraction = (startOffset.x / trackWidthPx.toFloat()).coerceIn(0f, 1f)
+                                        latestOnScrubStart(targetFraction)
+                                    },
+                                    onHorizontalDrag = { change, _ ->
+                                        change.consume()
+                                        val targetFraction = (change.position.x / trackWidthPx.toFloat()).coerceIn(0f, 1f)
+                                        latestOnScrubMove(targetFraction)
+                                    },
+                                    onDragEnd = { latestOnScrubEnd() },
+                                    onDragCancel = { latestOnScrubEnd() },
+                                )
+                            }
+                            .semantics {
+                                contentDescription = scrollerDesc
+                                progressBarRangeInfo = ProgressBarRangeInfo(
+                                    current = fraction,
+                                    range = 0f..1f,
+                                    steps = (itemCount - 2).coerceAtLeast(0),
+                                )
+                                setProgress { target ->
+                                    latestOnTapJumpFraction(target.coerceIn(0f, 1f))
+                                    true
+                                }
+                            }
+                            .testTag(BookshelfTestTags.SPINE_3D_FAST_SCROLLER_TRACK),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Canvas(modifier = Modifier.fillMaxSize()) {
+                            val thumbWidth = (if (isScrubbing && !isEinkMode) 30.dp else 24.dp).toPx()
+                            val thumbHeight = (if (isScrubbing && !isEinkMode) 18.dp else 14.dp).toPx()
+                            val trackHeight = 6.dp.toPx()
+                            val halfThumb = thumbWidth / 2f
+                            val usableWidth = (size.width - thumbWidth).coerceAtLeast(1f)
+                            val centerY = size.height / 2f
+                            val thumbCenterX = halfThumb + usableWidth * fraction
+
+                            // Background track pill
                             drawRoundRect(
-                                color = trackOutlineColor,
+                                color = trackColor,
                                 topLeft = Offset(halfThumb, centerY - trackHeight / 2f),
                                 size = Size(usableWidth, trackHeight),
                                 cornerRadius = CornerRadius(trackHeight / 2f, trackHeight / 2f),
-                                style = Stroke(width = 1.dp.toPx()),
                             )
-                        }
+                            if (isEinkMode) {
+                                drawRoundRect(
+                                    color = trackOutlineColor,
+                                    topLeft = Offset(halfThumb, centerY - trackHeight / 2f),
+                                    size = Size(usableWidth, trackHeight),
+                                    cornerRadius = CornerRadius(trackHeight / 2f, trackHeight / 2f),
+                                    style = Stroke(width = 1.dp.toPx()),
+                                )
+                            }
 
-                        // Leading Continue Reading highlight zone on the track
-                        if (continueReadingCount > 0 && itemCount > 1) {
-                            val endFraction = ((continueReadingCount - 1).coerceAtLeast(0).toFloat() / (itemCount - 1))
-                                .coerceIn(0f, 1f)
-                            val zoneWidth = (usableWidth * endFraction).coerceAtLeast(trackHeight)
-                            drawRoundRect(
-                                color = continueZoneColor,
-                                topLeft = Offset(halfThumb, centerY - trackHeight / 2f),
-                                size = Size(zoneWidth, trackHeight),
-                                cornerRadius = CornerRadius(trackHeight / 2f, trackHeight / 2f),
-                            )
-                        }
+                            // Leading Continue Reading highlight zone on the track
+                            if (continueReadingCount > 0 && itemCount > 1) {
+                                val endFraction = ((continueReadingCount - 1).coerceAtLeast(0).toFloat() / (itemCount - 1))
+                                    .coerceIn(0f, 1f)
+                                val zoneWidth = (usableWidth * endFraction).coerceAtLeast(trackHeight)
+                                drawRoundRect(
+                                    color = continueZoneColor,
+                                    topLeft = Offset(halfThumb, centerY - trackHeight / 2f),
+                                    size = Size(zoneWidth, trackHeight),
+                                    cornerRadius = CornerRadius(trackHeight / 2f, trackHeight / 2f),
+                                )
+                            }
 
-                        // Active filled segment
-                        val activeWidth = (thumbCenterX - halfThumb).coerceAtLeast(0f)
-                        if (activeWidth > 0f) {
-                            drawRoundRect(
-                                color = activeTrackColor,
-                                topLeft = Offset(halfThumb, centerY - trackHeight / 2f),
-                                size = Size(activeWidth, trackHeight),
-                                cornerRadius = CornerRadius(trackHeight / 2f, trackHeight / 2f),
-                            )
-                        }
+                            // Active filled segment
+                            val activeWidth = (thumbCenterX - halfThumb).coerceAtLeast(0f)
+                            if (activeWidth > 0f) {
+                                drawRoundRect(
+                                    color = activeTrackColor,
+                                    topLeft = Offset(halfThumb, centerY - trackHeight / 2f),
+                                    size = Size(activeWidth, trackHeight),
+                                    cornerRadius = CornerRadius(trackHeight / 2f, trackHeight / 2f),
+                                )
+                            }
 
-                        // Subtle book-position ticks for small-to-medium shelves
-                        if (itemCount in 2..20) {
-                            val tickRadius = 1.5.dp.toPx()
-                            for (i in 0 until itemCount) {
-                                val tickX = halfThumb + usableWidth * (i.toFloat() / (itemCount - 1))
-                                if (abs(tickX - thumbCenterX) > halfThumb + 2f) {
-                                    val isContinueTick = i < continueReadingCount
-                                    drawCircle(
-                                        color = if (isContinueTick) continueTickColor else tickColor,
-                                        radius = if (isContinueTick) tickRadius * 1.25f else tickRadius,
-                                        center = Offset(tickX, centerY),
-                                    )
+                            // Subtle book-position ticks for small-to-medium shelves
+                            if (itemCount in 2..20) {
+                                val tickRadius = 1.5.dp.toPx()
+                                for (i in 0 until itemCount) {
+                                    val tickX = halfThumb + usableWidth * (i.toFloat() / (itemCount - 1))
+                                    if (abs(tickX - thumbCenterX) > halfThumb + 2f) {
+                                        val isContinueTick = i < continueReadingCount
+                                        drawCircle(
+                                            color = if (isContinueTick) continueTickColor else tickColor,
+                                            radius = if (isContinueTick) tickRadius * 1.25f else tickRadius,
+                                            center = Offset(tickX, centerY),
+                                        )
+                                    }
                                 }
                             }
+
+                            // Tactile pill thumb
+                            drawRoundRect(
+                                color = thumbColor,
+                                topLeft = Offset(thumbCenterX - halfThumb, centerY - thumbHeight / 2f),
+                                size = Size(thumbWidth, thumbHeight),
+                                cornerRadius = CornerRadius(thumbHeight / 2f, thumbHeight / 2f),
+                            )
+
+                            // Center grip line on thumb
+                            val gripHalfHeight = thumbHeight * 0.24f
+                            drawLine(
+                                color = thumbGripColor,
+                                start = Offset(thumbCenterX, centerY - gripHalfHeight),
+                                end = Offset(thumbCenterX, centerY + gripHalfHeight),
+                                strokeWidth = 1.6.dp.toPx(),
+                            )
                         }
+                    }
 
-                        // Tactile pill thumb
-                        drawRoundRect(
-                            color = thumbColor,
-                            topLeft = Offset(thumbCenterX - halfThumb, centerY - thumbHeight / 2f),
-                            size = Size(thumbWidth, thumbHeight),
-                            cornerRadius = CornerRadius(thumbHeight / 2f, thumbHeight / 2f),
-                        )
-
-                        // Center grip line on thumb
-                        val gripHalfHeight = thumbHeight * 0.24f
-                        drawLine(
-                            color = thumbGripColor,
-                            start = Offset(thumbCenterX, centerY - gripHalfHeight),
-                            end = Offset(thumbCenterX, centerY + gripHalfHeight),
-                            strokeWidth = 1.6.dp.toPx(),
+                    val nextLabel = stringResource(R.string.bookshelf_spine3d_next_book)
+                    TooltipIconButton(
+                        tooltipText = nextLabel,
+                        onClick = { onStepDelta(1) },
+                        enabled = focusedIndex < itemCount - 1,
+                        modifier = stepButtonModifier.testTag(BookshelfTestTags.SPINE_3D_NEXT_BUTTON),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.ChevronRight,
+                            contentDescription = nextLabel,
                         )
                     }
+                } else {
+                    Spacer(modifier = Modifier.weight(1f))
                 }
 
-                val nextLabel = stringResource(R.string.bookshelf_spine3d_next_book)
-                TooltipIconButton(
-                    tooltipText = nextLabel,
-                    onClick = { onStepDelta(1) },
-                    enabled = focusedIndex < itemCount - 1,
-                    modifier = Modifier.testTag(BookshelfTestTags.SPINE_3D_NEXT_BUTTON),
+                Surface(
+                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    shape = CircleShape,
+                    modifier = Modifier
+                        .einkHairlineBorder(CircleShape)
+                        .semantics(mergeDescendants = true) { contentDescription = indexAccessibilityDesc }
+                        .testTag(BookshelfTestTags.SPINE_3D_INDEX_COUNTER),
                 ) {
-                    Icon(
-                        imageVector = Icons.Outlined.ChevronRight,
-                        contentDescription = nextLabel,
+                    Text(
+                        text = counterLabel,
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontFamily = FontFamily.Monospace,
+                            fontWeight = FontWeight.SemiBold,
+                        ),
+                        maxLines = 1,
+                        softWrap = false,
+                        modifier = Modifier.padding(horizontal = counterHorizontalPadding, vertical = 4.dp),
                     )
                 }
-            } else {
-                Spacer(modifier = Modifier.weight(1f))
-            }
-
-            Surface(
-                color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                shape = CircleShape,
-                modifier = Modifier
-                    .einkHairlineBorder(CircleShape)
-                    .semantics(mergeDescendants = true) { contentDescription = indexAccessibilityDesc }
-                    .testTag(BookshelfTestTags.SPINE_3D_INDEX_COUNTER),
-            ) {
-                Text(
-                    text = counterLabel,
-                    style = MaterialTheme.typography.labelSmall.copy(
-                        fontFamily = FontFamily.Monospace,
-                        fontWeight = FontWeight.SemiBold,
-                    ),
-                    maxLines = 1,
-                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-                )
             }
         }
     }
@@ -1660,6 +1691,7 @@ private fun ContinueReadingSpineBadge(
             style = MaterialTheme.typography.labelSmall,
             fontWeight = FontWeight.SemiBold,
             maxLines = 1,
+            softWrap = false,
             modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
         )
     }
@@ -1669,7 +1701,7 @@ private fun ContinueReadingSpineBadge(
  * Compact & Medium screen spotlight card below the 3D bookshelf showing the focused book's title,
  * metadata, reading progress, unread badge, and quick action button.
  */
-@OptIn(ExperimentalFoundationApi::class)
+@OptIn(ExperimentalFoundationApi::class, ExperimentalLayoutApi::class)
 @Composable
 private fun Bookshelf3dCompactSpotlightCard(
     item: BookshelfItemModel,
@@ -1691,6 +1723,7 @@ private fun Bookshelf3dCompactSpotlightCard(
     }
     val cardShape = MaterialTheme.shapes.large
     val digits = if (totalCount >= 100) 3 else 2
+    val fontScale = LocalDensity.current.fontScale
     Card(
         colors = CardDefaults.cardColors(containerColor = containerColor),
         shape = cardShape,
@@ -1711,157 +1744,221 @@ private fun Bookshelf3dCompactSpotlightCard(
             .einkHairlineBorder(cardShape)
             .testTag(BookshelfTestTags.SPINE_3D_SPOTLIGHT_CARD),
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 14.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+        BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+            val useTwoRowHeader = maxWidth < 330.dp || fontScale > 1.1f
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 14.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                Text(
-                    text = "#${shelfOrderNumber.toString().padStart(digits, '0')}",
-                    style = MaterialTheme.typography.labelMedium.copy(
-                        fontFamily = FontFamily.Monospace,
-                        fontWeight = FontWeight.Bold,
-                    ),
-                    color = if (isContinueReading && !isEinkMode) {
-                        MaterialTheme.colorScheme.tertiary
-                    } else {
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                    },
-                    maxLines = 1,
-                )
-                Text(
-                    text = item.novel.title,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier
-                        .weight(1f)
-                        .wenku8SharedNovelTitle(
-                            origin = Wenku8SharedElementKeys.NOVEL_BOOKSHELF_3D_ORIGIN,
-                            aid = item.aid,
-                        ),
-                )
-                if (isContinueReading) {
-                    ContinueReadingSpineBadge(isEinkMode = isEinkMode)
-                }
-                if (item.novel.hasUnreadUpdate) {
-                    NewChapterPillBadge(aid = item.aid)
-                }
-                if (isSelected) {
-                    Icon(
-                        imageVector = Icons.Filled.CheckCircle,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(20.dp),
-                    )
-                }
-            }
-
-            val metaParts = buildList {
-                if (item.novel.author.isNotBlank()) add(item.novel.author)
-                if (item.novel.pressId.isNotBlank()) add(item.novel.pressId)
-            }
-            if (metaParts.isNotEmpty() || item.novel.bookStatus.isNotBlank()) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                ) {
-                    if (metaParts.isNotEmpty()) {
-                        Text(
-                            text = metaParts.joinToString(" · "),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.weight(1f, fill = false),
-                        )
-                    }
-                    BookStatusBadge(
-                        rawStatus = item.novel.bookStatus,
-                        modifier = Modifier.testTag(
-                            DiscoveryTestTags.BOOK_STATUS_BADGE_PREFIX + item.aid,
-                        ),
-                    )
-                }
-            }
-
-            val progressLabel = item.readingProgress?.let { prog ->
-                "${prog.volumeTitle} · ${prog.chapterTitle}".trim(' ', '·')
-            }?.takeIf { it.isNotBlank() }
-                ?: item.novel.latestSectionName.takeIf { it.isNotBlank() }
-                ?: stringResource(R.string.bookshelf_spine3d_not_started)
-
-            Text(
-                text = progressLabel,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-
-            BookshelfItemProgressIndicator(
-                item = item,
-                isEinkMode = isEinkMode,
-            )
-
-            if (!isMultiSelectActive) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                ) {
-                    if (item.cachedChapterCount > 0) {
-                        val cacheLabel = if (item.totalChapterCount > 0) {
-                            stringResource(
-                                R.string.bookshelf_cached_ratio_format,
-                                item.cachedChapterCount,
-                                item.totalChapterCount,
+                if (useTwoRowHeader) {
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
+                        FlowRow(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalArrangement = Arrangement.spacedBy(4.dp),
+                            itemVerticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                text = "#${shelfOrderNumber.toString().padStart(digits, '0')}",
+                                style = MaterialTheme.typography.labelMedium.copy(
+                                    fontFamily = FontFamily.Monospace,
+                                    fontWeight = FontWeight.Bold,
+                                ),
+                                color = if (isContinueReading && !isEinkMode) {
+                                    MaterialTheme.colorScheme.tertiary
+                                } else {
+                                    MaterialTheme.colorScheme.onSurfaceVariant
+                                },
+                                maxLines = 1,
+                                softWrap = false,
                             )
-                        } else {
-                            stringResource(R.string.bookshelf_cached_count_format, item.cachedChapterCount)
+                            if (isContinueReading) {
+                                ContinueReadingSpineBadge(isEinkMode = isEinkMode)
+                            }
+                            if (item.novel.hasUnreadUpdate) {
+                                NewChapterPillBadge(aid = item.aid)
+                            }
+                            if (isSelected) {
+                                Icon(
+                                    imageVector = Icons.Filled.CheckCircle,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(20.dp),
+                                )
+                            }
                         }
                         Text(
-                            text = cacheLabel,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.primary,
+                            text = item.novel.title,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .wenku8SharedNovelTitle(
+                                    origin = Wenku8SharedElementKeys.NOVEL_BOOKSHELF_3D_ORIGIN,
+                                    aid = item.aid,
+                                ),
                         )
-                    } else {
-                        Spacer(modifier = Modifier.width(1.dp))
                     }
-
-                    val hasProgress = item.readingProgress != null
-                    FilledTonalButton(
-                        onClick = if (hasProgress) onContinueReading else onClick,
-                        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
-                        modifier = Modifier.testTag(BookshelfTestTags.SPINE_3D_PRIMARY_ACTION),
+                } else {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
-                        Icon(
-                            imageVector = if (hasProgress) {
-                                Icons.Outlined.PlayArrow
-                            } else {
-                                Icons.AutoMirrored.Outlined.ArrowForward
-                            },
-                            contentDescription = null,
-                            modifier = Modifier.size(16.dp),
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
                         Text(
-                            text = stringResource(
-                                if (hasProgress) {
-                                    R.string.bookshelf_continue_reading_action
-                                } else {
-                                    R.string.bookshelf_spine3d_open_detail
-                                },
+                            text = "#${shelfOrderNumber.toString().padStart(digits, '0')}",
+                            style = MaterialTheme.typography.labelMedium.copy(
+                                fontFamily = FontFamily.Monospace,
+                                fontWeight = FontWeight.Bold,
                             ),
-                            style = MaterialTheme.typography.labelLarge,
+                            color = if (isContinueReading && !isEinkMode) {
+                                MaterialTheme.colorScheme.tertiary
+                            } else {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            },
+                            maxLines = 1,
                         )
+                        Text(
+                            text = item.novel.title,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier
+                                .weight(1f)
+                                .wenku8SharedNovelTitle(
+                                    origin = Wenku8SharedElementKeys.NOVEL_BOOKSHELF_3D_ORIGIN,
+                                    aid = item.aid,
+                                ),
+                        )
+                        if (isContinueReading) {
+                            ContinueReadingSpineBadge(isEinkMode = isEinkMode)
+                        }
+                        if (item.novel.hasUnreadUpdate) {
+                            NewChapterPillBadge(aid = item.aid)
+                        }
+                        if (isSelected) {
+                            Icon(
+                                imageVector = Icons.Filled.CheckCircle,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(20.dp),
+                            )
+                        }
+                    }
+                }
+
+                val metaParts = buildList {
+                    if (item.novel.author.isNotBlank()) add(item.novel.author)
+                    if (item.novel.pressId.isNotBlank()) add(item.novel.pressId)
+                }
+                if (metaParts.isNotEmpty() || item.novel.bookStatus.isNotBlank()) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        if (metaParts.isNotEmpty()) {
+                            Text(
+                                text = metaParts.joinToString(" · "),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f, fill = false),
+                            )
+                        }
+                        BookStatusBadge(
+                            rawStatus = item.novel.bookStatus,
+                            modifier = Modifier.testTag(
+                                DiscoveryTestTags.BOOK_STATUS_BADGE_PREFIX + item.aid,
+                            ),
+                        )
+                    }
+                }
+
+                val progressLabel = item.readingProgress?.let { prog ->
+                    "${prog.volumeTitle} · ${prog.chapterTitle}".trim(' ', '·')
+                }?.takeIf { it.isNotBlank() }
+                    ?: item.novel.latestSectionName.takeIf { it.isNotBlank() }
+                    ?: stringResource(R.string.bookshelf_spine3d_not_started)
+
+                Text(
+                    text = progressLabel,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+
+                BookshelfItemProgressIndicator(
+                    item = item,
+                    isEinkMode = isEinkMode,
+                )
+
+                if (!isMultiSelectActive) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        if (item.cachedChapterCount > 0) {
+                            val cacheLabel = if (item.totalChapterCount > 0) {
+                                stringResource(
+                                    R.string.bookshelf_cached_ratio_format,
+                                    item.cachedChapterCount,
+                                    item.totalChapterCount,
+                                )
+                            } else {
+                                stringResource(R.string.bookshelf_cached_count_format, item.cachedChapterCount)
+                            }
+                            Text(
+                                text = cacheLabel,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.primary,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f),
+                            )
+                        } else {
+                            Spacer(modifier = Modifier.weight(1f))
+                        }
+
+                        val hasProgress = item.readingProgress != null
+                        FilledTonalButton(
+                            onClick = if (hasProgress) onContinueReading else onClick,
+                            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
+                            modifier = Modifier.testTag(BookshelfTestTags.SPINE_3D_PRIMARY_ACTION),
+                        ) {
+                            Icon(
+                                imageVector = if (hasProgress) {
+                                    Icons.Outlined.PlayArrow
+                                } else {
+                                    Icons.AutoMirrored.Outlined.ArrowForward
+                                },
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp),
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = stringResource(
+                                    if (hasProgress) {
+                                        R.string.bookshelf_continue_reading_action
+                                    } else {
+                                        R.string.bookshelf_spine3d_open_detail
+                                    },
+                                ),
+                                style = MaterialTheme.typography.labelLarge,
+                                maxLines = 1,
+                                softWrap = false,
+                            )
+                        }
                     }
                 }
             }
@@ -1937,7 +2034,7 @@ private fun Bookshelf3dWideSpotlightPanel(
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     Text(
                         text = "#${targetOrderNumber.toString().padStart(digits, '0')} / ${totalCount.toString().padStart(digits, '0')} · WK-${target.aid.toString().padStart(5, '0')}",
@@ -1949,6 +2046,9 @@ private fun Bookshelf3dWideSpotlightPanel(
                         } else {
                             MaterialTheme.colorScheme.onSurfaceVariant
                         },
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f),
                     )
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
@@ -2079,6 +2179,8 @@ private fun Bookshelf3dWideSpotlightPanel(
                                         R.string.bookshelf_spine3d_open_detail
                                     },
                                 ),
+                                maxLines = 1,
+                                softWrap = false,
                             )
                         }
                         if (target.cachedChapterCount > 0) {
@@ -2095,6 +2197,9 @@ private fun Bookshelf3dWideSpotlightPanel(
                                 text = cacheLabel,
                                 style = MaterialTheme.typography.labelMedium,
                                 color = MaterialTheme.colorScheme.primary,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f, fill = false),
                             )
                         }
                     }

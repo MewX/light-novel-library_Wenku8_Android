@@ -11,22 +11,29 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.ContentCopy
@@ -63,17 +70,23 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -247,12 +260,22 @@ fun NetworkDiagnosticsScreen(
             )
         },
     ) { innerPadding ->
+        val density = LocalDensity.current
+        val initialScreenWidthDp = LocalConfiguration.current.screenWidthDp.dp
+        var listWidthDp by remember(initialScreenWidthDp) { mutableStateOf(initialScreenWidthDp) }
+        val horizontalPadding = if (listWidthDp < 360.dp) 16.dp else 20.dp
+
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
+                .onSizeChanged { size ->
+                    if (size.width > 0) {
+                        listWidthDp = with(density) { size.width.toDp() }
+                    }
+                }
                 .testTag(NetworkDiagnosticsTestTags.CONTENT_LIST),
-            contentPadding = PaddingValues(horizontal = 20.dp, vertical = 16.dp),
+            contentPadding = PaddingValues(horizontal = horizontalPadding, vertical = 16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             item(key = "network_and_auto_routing_card") {
@@ -393,6 +416,8 @@ private fun DiagnosticsTopBar(
             Text(
                 text = stringResource(R.string.diag_title),
                 style = MaterialTheme.typography.titleLarge,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f),
             )
             if (finishedReport != null) {
@@ -835,11 +860,7 @@ private fun FinishedSummaryContent(
     onRetest: () -> Unit,
 ) {
     val summary = report.summary
-    val minMaxFormatted = if (summary.minFullResponseMs == null || summary.maxFullResponseMs == null) {
-        "—"
-    } else {
-        "${summary.minFullResponseMs} ms / ${summary.maxFullResponseMs} ms"
-    }
+    val fontScale = LocalDensity.current.fontScale
 
     Text(
         text = "${formatStopReasonHeadline(report.stopReason)} · ${report.baselineNetwork.wireTransportLabel()} · ${report.profileName}",
@@ -848,45 +869,81 @@ private fun FinishedSummaryContent(
     )
     Spacer(modifier = Modifier.height(12.dp))
 
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        MetricTile(
-            label = stringResource(R.string.diag_metric_success_attempts),
-            value = stringResource(
-                R.string.diag_metric_success_value_format,
-                summary.succeededCount,
-                summary.attemptedCount,
-            ),
-            valueTestTag = NetworkDiagnosticsTestTags.METRIC_SUCCESS_VALUE,
-            modifier = Modifier.weight(1f),
-        )
-        MetricTile(
-            label = stringResource(R.string.diag_metric_median_full),
-            value = DiagnosticsReport.formatNullableMillisForUi(summary.medianFullResponseMs),
-            valueTestTag = NetworkDiagnosticsTestTags.METRIC_MEDIAN_FULL_VALUE,
-            modifier = Modifier.weight(1f),
-        )
-    }
+    BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+        val isCompactMetrics = maxWidth < 316.dp || fontScale > 1.1f
+        val tilePadding = if (isCompactMetrics) 10.dp else 14.dp
+        val minMaxFormatted = if (summary.minFullResponseMs == null || summary.maxFullResponseMs == null) {
+            "—"
+        } else if (isCompactMetrics) {
+            "${summary.minFullResponseMs} / ${summary.maxFullResponseMs} ms"
+        } else {
+            "${summary.minFullResponseMs} ms / ${summary.maxFullResponseMs} ms"
+        }
 
-    Spacer(modifier = Modifier.height(12.dp))
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        MetricTile(
-            label = stringResource(R.string.diag_metric_median_headers),
-            value = DiagnosticsReport.formatNullableMillisForUi(summary.medianHeadersStartMs),
-            valueTestTag = NetworkDiagnosticsTestTags.METRIC_MEDIAN_HEADERS_VALUE,
-            modifier = Modifier.weight(1f),
-        )
-        MetricTile(
-            label = stringResource(R.string.diag_metric_min_max),
-            value = minMaxFormatted,
-            valueTestTag = NetworkDiagnosticsTestTags.METRIC_MIN_MAX_VALUE,
-            modifier = Modifier.weight(1f),
-        )
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(IntrinsicSize.Min),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                MetricTile(
+                    label = stringResource(R.string.diag_metric_success_attempts),
+                    value = stringResource(
+                        R.string.diag_metric_success_value_format,
+                        summary.succeededCount,
+                        summary.attemptedCount,
+                    ),
+                    valueTestTag = NetworkDiagnosticsTestTags.METRIC_SUCCESS_VALUE,
+                    contentPadding = tilePadding,
+                    isCompact = isCompactMetrics,
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight(),
+                )
+                MetricTile(
+                    label = stringResource(R.string.diag_metric_median_full),
+                    value = DiagnosticsReport.formatNullableMillisForUi(summary.medianFullResponseMs),
+                    valueTestTag = NetworkDiagnosticsTestTags.METRIC_MEDIAN_FULL_VALUE,
+                    contentPadding = tilePadding,
+                    isCompact = isCompactMetrics,
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight(),
+                )
+            }
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(IntrinsicSize.Min),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                MetricTile(
+                    label = stringResource(R.string.diag_metric_median_headers),
+                    value = DiagnosticsReport.formatNullableMillisForUi(summary.medianHeadersStartMs),
+                    valueTestTag = NetworkDiagnosticsTestTags.METRIC_MEDIAN_HEADERS_VALUE,
+                    contentPadding = tilePadding,
+                    isCompact = isCompactMetrics,
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight(),
+                )
+                MetricTile(
+                    label = stringResource(R.string.diag_metric_min_max),
+                    value = minMaxFormatted,
+                    valueTestTag = NetworkDiagnosticsTestTags.METRIC_MIN_MAX_VALUE,
+                    contentPadding = tilePadding,
+                    isCompact = isCompactMetrics,
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight(),
+                )
+            }
+        }
     }
 
     Spacer(modifier = Modifier.height(14.dp))
@@ -935,6 +992,8 @@ private fun MetricTile(
     label: String,
     value: String,
     valueTestTag: String,
+    contentPadding: Dp = 14.dp,
+    isCompact: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     Surface(
@@ -942,16 +1001,22 @@ private fun MetricTile(
         shape = MaterialTheme.shapes.medium,
         modifier = modifier.einkHairlineBorder(MaterialTheme.shapes.medium),
     ) {
-        Column(modifier = Modifier.padding(14.dp)) {
+        Column(modifier = Modifier.padding(contentPadding)) {
             Text(
                 text = label,
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
             )
             Spacer(modifier = Modifier.height(6.dp))
             Text(
                 text = value,
-                style = MaterialTheme.typography.titleMedium,
+                style = if (isCompact) {
+                    MaterialTheme.typography.titleSmall
+                } else {
+                    MaterialTheme.typography.titleMedium
+                },
                 fontWeight = FontWeight.SemiBold,
                 fontFamily = FontFamily.Monospace,
                 modifier = Modifier.testTag(valueTestTag),
@@ -992,6 +1057,7 @@ private fun SampleDetailsExpandableHeader(
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun SampleTelemetryRow(sample: ProbeSampleResult) {
     val badgeText = when {
@@ -1048,14 +1114,19 @@ private fun SampleTelemetryRow(sample: ProbeSampleResult) {
             .testTag(NetworkDiagnosticsTestTags.SAMPLE_ROW_PREFIX + sample.sampleIndex),
     ) {
         Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+                itemVerticalAlignment = Alignment.CenterVertically,
+            ) {
                 Text(
                     text = indexLabel,
                     style = MaterialTheme.typography.labelLarge,
                     fontFamily = FontFamily.Monospace,
                     fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    softWrap = false,
                 )
-                Spacer(modifier = Modifier.width(8.dp))
                 Surface(
                     color = badgeContainerColor,
                     contentColor = badgeContentColor,
@@ -1065,10 +1136,11 @@ private fun SampleTelemetryRow(sample: ProbeSampleResult) {
                     Text(
                         text = badgeText,
                         style = MaterialTheme.typography.labelSmall,
+                        maxLines = 1,
+                        softWrap = false,
                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
                     )
                 }
-                Spacer(modifier = Modifier.width(10.dp))
                 Text(
                     text = primaryTimingText,
                     style = MaterialTheme.typography.bodySmall,
@@ -1229,6 +1301,9 @@ private fun PreSharePrivacySheet(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .navigationBarsPadding()
+                .imePadding()
                 .padding(horizontal = 24.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
@@ -1273,7 +1348,13 @@ private fun PreSharePrivacySheet(
             OutlinedTextField(
                 value = userNote,
                 onValueChange = onUserNoteChanged,
-                label = { Text(text = stringResource(R.string.diag_share_note_label)) },
+                label = {
+                    Text(
+                        text = stringResource(R.string.diag_share_note_label),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                },
                 singleLine = true,
                 modifier = Modifier
                     .fillMaxWidth()

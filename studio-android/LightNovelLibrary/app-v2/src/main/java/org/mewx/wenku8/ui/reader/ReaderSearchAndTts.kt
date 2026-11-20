@@ -8,6 +8,7 @@ import android.speech.tts.UtteranceProgressListener
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -53,6 +54,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
@@ -82,6 +84,7 @@ import org.mewx.wenku8.reader.engine.ChapterBlock
 import org.mewx.wenku8.reader.engine.ChapterTextMatch
 import org.mewx.wenku8.reader.engine.WenkuChapterParser
 import org.mewx.wenku8.ui.components.TooltipIconButton
+import org.mewx.wenku8.ui.components.horizontalScrollFadeEdge
 import org.mewx.wenku8.ui.theme.LocalEinkMode
 import org.mewx.wenku8.ui.theme.einkHairlineBorder
 import java.util.Locale
@@ -300,7 +303,13 @@ fun ReaderInBookSearchSheet(
                 value = query,
                 onValueChange = { query = it },
                 singleLine = true,
-                placeholder = { Text("输入台词、人名或关键词…") },
+                placeholder = {
+                    Text(
+                        text = "输入台词、人名或关键词…",
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                },
                 leadingIcon = {
                     Icon(
                         imageVector = Icons.Outlined.Search,
@@ -328,21 +337,42 @@ fun ReaderInBookSearchSheet(
 
             Spacer(modifier = Modifier.height(8.dp))
 
+            val scopeScrollState = rememberScrollState()
+            val isEinkMode = LocalEinkMode.current
             Row(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScrollFadeEdge(
+                        scrollState = scopeScrollState,
+                        fadeColor = MaterialTheme.colorScheme.surfaceContainerLow,
+                        isEink = isEinkMode,
+                    )
+                    .horizontalScroll(scopeScrollState),
             ) {
                 FilterChip(
                     selected = searchScope == ReaderSearchScope.CURRENT_CHAPTER,
                     onClick = { searchScope = ReaderSearchScope.CURRENT_CHAPTER },
-                    label = { Text("当前章节") },
+                    label = {
+                        Text(
+                            text = "当前章节",
+                            maxLines = 1,
+                            softWrap = false,
+                        )
+                    },
                     modifier = Modifier.testTag(ReaderTestTags.SEARCH_SCOPE_CURRENT_CHIP),
                 )
                 FilterChip(
                     selected = searchScope == ReaderSearchScope.ALL_CACHED_CHAPTERS,
                     onClick = { searchScope = ReaderSearchScope.ALL_CACHED_CHAPTERS },
-                    label = { Text("已缓存全书 ($cachedTotalForDisplay 章)") },
+                    label = {
+                        Text(
+                            text = "已缓存全书 ($cachedTotalForDisplay 章)",
+                            maxLines = 1,
+                            softWrap = false,
+                        )
+                    },
                     modifier = Modifier.testTag(ReaderTestTags.SEARCH_SCOPE_CACHED_CHIP),
                 )
             }
@@ -967,81 +997,106 @@ fun ReaderTtsFloatingBar(
                 }
             }
 
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .horizontalScroll(rememberScrollState()),
-            ) {
-                AssistChip(
-                    onClick = onCycleSpeechRate,
-                    label = { Text("${state.speechRate}x") },
-                    modifier = Modifier.testTag(ReaderTestTags.TTS_RATE_CHIP),
-                )
-
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    val prevLabel = stringResource(R.string.reader_tts_prev_sentence)
-                    TooltipIconButton(
-                        tooltipText = prevLabel,
-                        enabled = state.totalUtterances > 0 && state.activeUtteranceIndex > 0,
-                        onClick = onSkipPrevious,
-                        anchorPosition = TooltipAnchorPosition.Above,
-                        modifier = Modifier.testTag(ReaderTestTags.TTS_PREV_BUTTON),
-                    ) {
-                        Icon(
-                            imageVector = Icons.Outlined.SkipPrevious,
-                            contentDescription = prevLabel,
-                        )
-                    }
-                    val playPauseLabel = if (state.isSpeaking) {
-                        stringResource(R.string.reader_tts_pause)
-                    } else {
-                        stringResource(R.string.reader_tts_resume)
-                    }
-                    TooltipIconButton(
-                        tooltipText = playPauseLabel,
-                        enabled = state.totalUtterances > 0,
-                        onClick = onTogglePlayPause,
-                        anchorPosition = TooltipAnchorPosition.Above,
-                        modifier = Modifier.testTag(ReaderTestTags.TTS_PLAY_PAUSE_BUTTON),
-                    ) {
-                        Icon(
-                            imageVector = if (state.isSpeaking) {
-                                Icons.Outlined.Pause
-                            } else {
-                                Icons.Outlined.PlayArrow
-                            },
-                            contentDescription = playPauseLabel,
-                        )
-                    }
-                    val nextLabel = stringResource(R.string.reader_tts_next_sentence)
-                    TooltipIconButton(
-                        tooltipText = nextLabel,
-                        enabled = state.totalUtterances > 0 &&
-                            state.activeUtteranceIndex < state.totalUtterances - 1,
-                        onClick = onSkipNext,
-                        anchorPosition = TooltipAnchorPosition.Above,
-                        modifier = Modifier.testTag(ReaderTestTags.TTS_NEXT_BUTTON),
-                    ) {
-                        Icon(
-                            imageVector = Icons.Outlined.SkipNext,
-                            contentDescription = nextLabel,
-                        )
-                    }
+            val controlsScrollState = rememberScrollState()
+            val surfaceColor = MaterialTheme.colorScheme.surfaceContainerHigh.copy(
+                alpha = if (isEinkMode) 1f else 0.96f,
+            )
+            val fontScale = LocalDensity.current.fontScale
+            BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+                val useCompactTtsControls = maxWidth < 312.dp || fontScale > 1.1f
+                val iconButtonSizeModifier = if (useCompactTtsControls) {
+                    Modifier.size(40.dp)
+                } else {
+                    Modifier
                 }
 
-                val stopLabel = stringResource(R.string.reader_tts_stop)
-                TooltipIconButton(
-                    tooltipText = stopLabel,
-                    onClick = onStopAndDismiss,
-                    anchorPosition = TooltipAnchorPosition.Above,
-                    modifier = Modifier.testTag(ReaderTestTags.TTS_STOP_BUTTON),
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScrollFadeEdge(
+                            scrollState = controlsScrollState,
+                            fadeColor = surfaceColor,
+                            isEink = isEinkMode,
+                        )
+                        .horizontalScroll(controlsScrollState),
                 ) {
-                    Icon(
-                        imageVector = Icons.Outlined.Close,
-                        contentDescription = stopLabel,
+                    AssistChip(
+                        onClick = onCycleSpeechRate,
+                        label = {
+                            Text(
+                                text = "${state.speechRate}x",
+                                maxLines = 1,
+                                softWrap = false,
+                            )
+                        },
+                        modifier = Modifier.testTag(ReaderTestTags.TTS_RATE_CHIP),
                     )
+
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        val prevLabel = stringResource(R.string.reader_tts_prev_sentence)
+                        TooltipIconButton(
+                            tooltipText = prevLabel,
+                            enabled = state.totalUtterances > 0 && state.activeUtteranceIndex > 0,
+                            onClick = onSkipPrevious,
+                            anchorPosition = TooltipAnchorPosition.Above,
+                            modifier = iconButtonSizeModifier.testTag(ReaderTestTags.TTS_PREV_BUTTON),
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.SkipPrevious,
+                                contentDescription = prevLabel,
+                            )
+                        }
+                        val playPauseLabel = if (state.isSpeaking) {
+                            stringResource(R.string.reader_tts_pause)
+                        } else {
+                            stringResource(R.string.reader_tts_resume)
+                        }
+                        TooltipIconButton(
+                            tooltipText = playPauseLabel,
+                            enabled = state.totalUtterances > 0,
+                            onClick = onTogglePlayPause,
+                            anchorPosition = TooltipAnchorPosition.Above,
+                            modifier = iconButtonSizeModifier.testTag(ReaderTestTags.TTS_PLAY_PAUSE_BUTTON),
+                        ) {
+                            Icon(
+                                imageVector = if (state.isSpeaking) {
+                                    Icons.Outlined.Pause
+                                } else {
+                                    Icons.Outlined.PlayArrow
+                                },
+                                contentDescription = playPauseLabel,
+                            )
+                        }
+                        val nextLabel = stringResource(R.string.reader_tts_next_sentence)
+                        TooltipIconButton(
+                            tooltipText = nextLabel,
+                            enabled = state.totalUtterances > 0 &&
+                                state.activeUtteranceIndex < state.totalUtterances - 1,
+                            onClick = onSkipNext,
+                            anchorPosition = TooltipAnchorPosition.Above,
+                            modifier = iconButtonSizeModifier.testTag(ReaderTestTags.TTS_NEXT_BUTTON),
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.SkipNext,
+                                contentDescription = nextLabel,
+                            )
+                        }
+                    }
+
+                    val stopLabel = stringResource(R.string.reader_tts_stop)
+                    TooltipIconButton(
+                        tooltipText = stopLabel,
+                        onClick = onStopAndDismiss,
+                        anchorPosition = TooltipAnchorPosition.Above,
+                        modifier = iconButtonSizeModifier.testTag(ReaderTestTags.TTS_STOP_BUTTON),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.Close,
+                            contentDescription = stopLabel,
+                        )
+                    }
                 }
             }
         }

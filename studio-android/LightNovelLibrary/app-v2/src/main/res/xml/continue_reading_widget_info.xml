@@ -4,6 +4,8 @@
     android:initialLayout="@layout/widget_continue_reading"
     android:minWidth="250dp"
     android:minHeight="110dp"
+    android:minResizeWidth="220dp"
+    android:minResizeHeight="110dp"
     android:previewLayout="@layout/widget_continue_reading"
     android:resizeMode="horizontal|vertical"
     android:targetCellWidth="4"
