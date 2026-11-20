@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -154,6 +155,7 @@ fun BookStatusBadge(
                 text = displayBookStatus,
                 style = MaterialTheme.typography.labelSmall,
                 maxLines = 1,
+                softWrap = false,
                 overflow = TextOverflow.Ellipsis,
             )
         }
@@ -240,173 +242,191 @@ fun DiscoveryNovelCard(
             .testTag(DiscoveryTestTags.NOVEL_CARD_PREFIX + item.aid)
             .einkHairlineBorder(MaterialTheme.shapes.large),
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(14.dp),
-            horizontalArrangement = Arrangement.spacedBy(14.dp),
-            verticalAlignment = Alignment.Top,
-        ) {
-            // 2:3 Light Novel Book Cover with Offline-First Coil 3 + Shared-Element Morph
-            Box(
+        BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+            val useCompactCover = maxWidth < 320.dp
+            val coverWidth = if (useCompactCover) 68.dp else 76.dp
+            val coverHeight = if (useCompactCover) 98.dp else 110.dp
+            val contentPadding = if (useCompactCover) 12.dp else 14.dp
+            val contentGap = if (useCompactCover) 10.dp else 14.dp
+
+            Row(
                 modifier = Modifier
-                    .size(width = 76.dp, height = 110.dp)
-                    .wenku8SharedNovelCover(
-                        origin = sharedTransitionOrigin,
-                        aid = item.aid,
-                        clipShape = coverShape,
-                    )
-                    .clip(coverShape)
-                    .background(MaterialTheme.colorScheme.surfaceContainerHighest)
-                    .einkHairlineBorder(coverShape),
-                contentAlignment = Alignment.Center,
+                    .fillMaxWidth()
+                    .padding(contentPadding),
+                horizontalArrangement = Arrangement.spacedBy(contentGap),
+                verticalAlignment = Alignment.Top,
             ) {
-                Icon(
-                    imageVector = Icons.Outlined.AutoStories,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f),
-                    modifier = Modifier.size(26.dp),
-                )
-                if (item.coverUrl.isNotBlank()) {
-                    AsyncImage(
-                        model = WenkuImageRequests.rememberCoverImageRequest(
+                // 2:3 Light Novel Book Cover with Offline-First Coil 3 + Shared-Element Morph
+                Box(
+                    modifier = Modifier
+                        .size(width = coverWidth, height = coverHeight)
+                        .wenku8SharedNovelCover(
+                            origin = sharedTransitionOrigin,
                             aid = item.aid,
-                            coverUrl = item.coverUrl,
-                            enableCrossfade = false,
-                        ),
-                        contentDescription = item.title,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize(),
-                    )
-                }
-                if (rankNumber != null) {
-                    val isTopThree = rankNumber <= 3
-                    Surface(
-                        color = if (isTopThree) {
-                            MaterialTheme.colorScheme.primary
-                        } else {
-                            MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.92f)
-                        },
-                        contentColor = if (isTopThree) {
-                            MaterialTheme.colorScheme.onPrimary
-                        } else {
-                            MaterialTheme.colorScheme.onSurface
-                        },
-                        shape = MaterialTheme.shapes.small,
-                        modifier = Modifier
-                            .align(Alignment.TopStart)
-                            .padding(4.dp)
-                            .einkHairlineBorder(MaterialTheme.shapes.small),
-                    ) {
-                        Text(
-                            text = "#$rankNumber",
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                            clipShape = coverShape,
                         )
-                    }
-                }
-            }
-
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(5.dp),
-            ) {
-                Text(
-                    text = item.title,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.wenku8SharedNovelTitle(
-                        origin = sharedTransitionOrigin,
-                        aid = item.aid,
-                    ),
-                )
-
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        .clip(coverShape)
+                        .background(MaterialTheme.colorScheme.surfaceContainerHighest)
+                        .einkHairlineBorder(coverShape),
+                    contentAlignment = Alignment.Center,
                 ) {
-                    if (item.author.isNotBlank()) {
-                        Text(
-                            text = item.author,
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.primary,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.weight(1f, fill = false),
+                    Icon(
+                        imageVector = Icons.Outlined.AutoStories,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f),
+                        modifier = Modifier.size(26.dp),
+                    )
+                    if (item.coverUrl.isNotBlank()) {
+                        AsyncImage(
+                            model = WenkuImageRequests.rememberCoverImageRequest(
+                                aid = item.aid,
+                                coverUrl = item.coverUrl,
+                                enableCrossfade = false,
+                            ),
+                            contentDescription = item.title,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize(),
                         )
                     }
-                    BookStatusBadge(
-                        rawStatus = item.bookStatus,
-                        modifier = Modifier.testTag(DiscoveryTestTags.BOOK_STATUS_BADGE_PREFIX + item.aid),
-                    )
-                    if (item.inLocalBookshelf) {
+                    if (rankNumber != null) {
+                        val isTopThree = rankNumber <= 3
                         Surface(
-                            color = MaterialTheme.colorScheme.tertiaryContainer,
-                            contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
-                            shape = MaterialTheme.shapes.extraSmall,
-                            modifier = Modifier.einkHairlineBorder(MaterialTheme.shapes.extraSmall),
+                            color = if (isTopThree) {
+                                MaterialTheme.colorScheme.primary
+                            } else {
+                                MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.92f)
+                            },
+                            contentColor = if (isTopThree) {
+                                MaterialTheme.colorScheme.onPrimary
+                            } else {
+                                MaterialTheme.colorScheme.onSurface
+                            },
+                            shape = MaterialTheme.shapes.small,
+                            modifier = Modifier
+                                .align(Alignment.TopStart)
+                                .padding(4.dp)
+                                .einkHairlineBorder(MaterialTheme.shapes.small),
                         ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(3.dp),
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Outlined.BookmarkAdded,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(12.dp),
-                                )
-                                Text(
-                                    text = stringResource(R.string.badge_in_bookshelf),
-                                    style = MaterialTheme.typography.labelSmall,
-                                )
-                            }
-                        }
-                    }
-                }
-
-                if (item.tags.isNotEmpty() || item.lastUpdate.isNotBlank()) {
-                    FlowRow(
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        verticalArrangement = Arrangement.spacedBy(4.dp),
-                    ) {
-                        item.tags.take(3).forEach { tag ->
-                            Surface(
-                                color = MaterialTheme.colorScheme.surfaceContainerHighest,
-                                contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                                shape = MaterialTheme.shapes.extraSmall,
-                                modifier = Modifier.einkHairlineBorder(MaterialTheme.shapes.extraSmall),
-                            ) {
-                                Text(
-                                    text = tag,
-                                    style = MaterialTheme.typography.labelSmall,
-                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                                )
-                            }
-                        }
-                        if (item.lastUpdate.isNotBlank()) {
                             Text(
-                                text = item.lastUpdate,
+                                text = "#$rankNumber",
                                 style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(vertical = 2.dp),
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 1,
+                                softWrap = false,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
                             )
                         }
                     }
                 }
 
-                if (item.introShort.isNotBlank()) {
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(5.dp),
+                ) {
                     Text(
-                        text = item.introShort,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        text = item.title,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.wenku8SharedNovelTitle(
+                            origin = sharedTransitionOrigin,
+                            aid = item.aid,
+                        ),
                     )
+
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                        itemVerticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        if (item.author.isNotBlank()) {
+                            Text(
+                                text = item.author,
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.primary,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                        BookStatusBadge(
+                            rawStatus = item.bookStatus,
+                            modifier = Modifier.testTag(DiscoveryTestTags.BOOK_STATUS_BADGE_PREFIX + item.aid),
+                        )
+                        if (item.inLocalBookshelf) {
+                            Surface(
+                                color = MaterialTheme.colorScheme.tertiaryContainer,
+                                contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
+                                shape = MaterialTheme.shapes.extraSmall,
+                                modifier = Modifier.einkHairlineBorder(MaterialTheme.shapes.extraSmall),
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(3.dp),
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Outlined.BookmarkAdded,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(12.dp),
+                                    )
+                                    Text(
+                                        text = stringResource(R.string.badge_in_bookshelf),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        maxLines = 1,
+                                        softWrap = false,
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    if (item.tags.isNotEmpty() || item.lastUpdate.isNotBlank()) {
+                        FlowRow(
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalArrangement = Arrangement.spacedBy(4.dp),
+                            itemVerticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            item.tags.take(3).forEach { tag ->
+                                Surface(
+                                    color = MaterialTheme.colorScheme.surfaceContainerHighest,
+                                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    shape = MaterialTheme.shapes.extraSmall,
+                                    modifier = Modifier.einkHairlineBorder(MaterialTheme.shapes.extraSmall),
+                                ) {
+                                    Text(
+                                        text = tag,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        maxLines = 1,
+                                        softWrap = false,
+                                        overflow = TextOverflow.Ellipsis,
+                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                    )
+                                }
+                            }
+                            if (item.lastUpdate.isNotBlank()) {
+                                Text(
+                                    text = item.lastUpdate,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 1,
+                                    softWrap = false,
+                                    modifier = Modifier.padding(vertical = 2.dp),
+                                )
+                            }
+                        }
+                    }
+
+                    if (item.introShort.isNotBlank()) {
+                        Text(
+                            text = item.introShort,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
                 }
             }
         }
@@ -755,6 +775,7 @@ fun DiscoveryFeedErrorCard(
             FlowRow(
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
+                itemVerticalAlignment = Alignment.CenterVertically,
             ) {
                 FilledTonalButton(
                     onClick = onRetry,

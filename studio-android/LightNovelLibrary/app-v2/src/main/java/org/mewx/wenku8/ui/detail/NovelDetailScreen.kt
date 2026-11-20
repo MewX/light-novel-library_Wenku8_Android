@@ -10,6 +10,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -99,6 +100,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.semantics
@@ -1024,215 +1026,239 @@ private fun NovelHeroHeaderCard(
             .fillMaxWidth()
             .einkHairlineBorder(MaterialTheme.shapes.large),
     ) {
-        Row(
+        BoxWithConstraints(
             modifier = Modifier
                 .fillMaxWidth()
                 .background(Brush.verticalGradient(gradientColors))
                 .padding(16.dp),
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            val heroCoverShape = MaterialTheme.shapes.medium
-            val isFrom3dShelf = sharedTransitionOrigin == Wenku8SharedElementKeys.NOVEL_BOOKSHELF_3D_ORIGIN
-            val sharedCtx = LocalWenku8SharedTransition.current
-            val enterSlantedFractionState = if (isFrom3dShelf && sharedCtx != null && !isEinkMode) {
-                sharedCtx.animatedVisibilityScope.transition.animateFloat(
-                    transitionSpec = { expressiveSharedFloatSpec(isEinkMode = false) },
-                    label = "detail_cover_3d_enter_slant",
-                ) { enterExitState ->
-                    if (enterExitState == EnterExitState.PreEnter) 1f else 0f
-                }
-            } else {
-                null
-            }
-            val enterSlantedFractionProvider: () -> Float = remember(enterSlantedFractionState) {
-                { enterSlantedFractionState?.value ?: 0f }
-            }
-            val enterSlantedValue = enterSlantedFractionState?.value ?: 0f
-            val effectiveCoverShape = if (isFrom3dShelf && enterSlantedValue > 0.001f) {
-                RoundedCornerShape(
-                    Bookshelf3dGeometry.interpolatedCoverCornerDp(enterSlantedValue).dp,
-                )
-            } else {
-                heroCoverShape
-            }
-            Box(
-                modifier = Modifier
-                    .width(116.dp)
-                    .height(164.dp)
-                    .wenku8SharedNovelCover(
-                        origin = sharedTransitionOrigin,
-                        aid = aid,
-                        clipShape = if (isFrom3dShelf) null else heroCoverShape,
-                    ),
-            ) {
-                Surface(
-                    shape = effectiveCoverShape,
-                    color = MaterialTheme.colorScheme.surfaceContainerHighest,
-                    tonalElevation = if (isEinkMode) 0.dp else 4.dp,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .bookshelf3dCoverPerspectiveMorph(
-                            enabled = isFrom3dShelf && !isEinkMode,
-                            slantedFractionProvider = enterSlantedFractionProvider,
-                        )
-                        .einkHairlineBorder(effectiveCoverShape),
+            // Inside 16dp outer LazyColumn padding + 16dp inner card padding:
+            // 412dp phone -> maxWidth = 348dp (normal); <= 360dp phone -> maxWidth <= 296dp (narrow).
+            val isNarrowHero = maxWidth < 312.dp
+            val coverWidth = if (isNarrowHero) 96.dp else 116.dp
+            val coverHeight = if (isNarrowHero) 136.dp else 164.dp
+            val heroTagFlowRow: @Composable () -> Unit = {
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
-                    if (coverUrl.isNotBlank()) {
-                        val coverRequest = WenkuImageRequests.rememberCoverImageRequest(
-                            aid = aid,
-                            coverUrl = coverUrl,
-                            enableCrossfade = false,
-                        )
-                        AsyncImage(
-                            model = coverRequest,
-                            contentDescription = title,
-                            contentScale = ContentScale.Crop,
-                            onSuccess = { success ->
-                                val bmp = (success.result.image as? BitmapImage)?.bitmap
-                                if (bmp != null) {
-                                    onCoverSeedExtracted(CoverThemeEngine.extractSeedColorFromBitmap(bmp))
-                                }
-                            },
-                            modifier = Modifier.fillMaxSize(),
-                        )
-                    } else {
-                        Box(
-                            modifier = Modifier.fillMaxSize(),
-                            contentAlignment = Alignment.Center,
+                    tags.forEach { tag ->
+                        Surface(
+                            color = MaterialTheme.colorScheme.primaryContainer,
+                            contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                            shape = MaterialTheme.shapes.small,
+                            modifier = Modifier
+                                .clip(MaterialTheme.shapes.small)
+                                .clickable { onTagClicked(tag) }
+                                .einkHairlineBorder(MaterialTheme.shapes.small)
+                                .testTag(NovelDetailTestTags.TAG_CHIP_PREFIX + tag),
                         ) {
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Icon(
-                                    imageVector = Icons.Outlined.AutoStories,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(36.dp),
-                                )
-                                Spacer(modifier = Modifier.height(6.dp))
-                                Text(
-                                    text = "#$aid",
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            }
+                            Text(
+                                text = "#$tag",
+                                style = MaterialTheme.typography.labelMedium,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                            )
                         }
                     }
                 }
             }
 
             Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(6.dp),
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                val pressId = novel?.pressId.orEmpty()
-                val displayBookStatus = formatBookStatusLabel(
-                    rawStatus = novel?.bookStatus.orEmpty(),
-                    appLanguage = appLanguage,
-                )
-                if (pressId.isNotBlank() || displayBookStatus.isNotBlank()) {
-                    FlowRow(
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        verticalArrangement = Arrangement.spacedBy(4.dp),
-                    ) {
-                        if (pressId.isNotBlank()) {
-                            BadgePill(
-                                text = pressId,
-                                containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
-                                contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(if (isNarrowHero) 12.dp else 16.dp),
+                ) {
+                    val heroCoverShape = MaterialTheme.shapes.medium
+                    val isFrom3dShelf = sharedTransitionOrigin == Wenku8SharedElementKeys.NOVEL_BOOKSHELF_3D_ORIGIN
+                    val sharedCtx = LocalWenku8SharedTransition.current
+                    val enterSlantedFractionState = if (isFrom3dShelf && sharedCtx != null && !isEinkMode) {
+                        sharedCtx.animatedVisibilityScope.transition.animateFloat(
+                            transitionSpec = { expressiveSharedFloatSpec(isEinkMode = false) },
+                            label = "detail_cover_3d_enter_slant",
+                        ) { enterExitState ->
+                            if (enterExitState == EnterExitState.PreEnter) 1f else 0f
                         }
-                        if (displayBookStatus.isNotBlank()) {
-                            BadgePill(
-                                text = displayBookStatus,
-                                containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                                contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-                                leadingIcon = bookStatusLeadingIcon(displayBookStatus),
-                                modifier = Modifier.testTag(NovelDetailTestTags.BOOK_STATUS_BADGE),
-                            )
-                        }
+                    } else {
+                        null
                     }
-                }
-
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 3,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier
-                        .wenku8SharedNovelTitle(
-                            origin = sharedTransitionOrigin,
-                            aid = aid,
+                    val enterSlantedFractionProvider: () -> Float = remember(enterSlantedFractionState) {
+                        { enterSlantedFractionState?.value ?: 0f }
+                    }
+                    val enterSlantedValue = enterSlantedFractionState?.value ?: 0f
+                    val effectiveCoverShape = if (isFrom3dShelf && enterSlantedValue > 0.001f) {
+                        RoundedCornerShape(
+                            Bookshelf3dGeometry.interpolatedCoverCornerDp(enterSlantedValue).dp,
                         )
-                        .clip(MaterialTheme.shapes.small)
-                        .clickable(onClick = onTitleClicked)
-                        .padding(vertical = 2.dp)
-                        .testTag(NovelDetailTestTags.NOVEL_TITLE_TEXT),
-                )
-
-                if (author.isNotBlank()) {
-                    Surface(
-                        color = Color.Transparent,
-                        shape = MaterialTheme.shapes.small,
+                    } else {
+                        heroCoverShape
+                    }
+                    Box(
                         modifier = Modifier
-                            .clip(MaterialTheme.shapes.small)
-                            .clickable(onClick = onAuthorClicked)
-                            .testTag(NovelDetailTestTags.AUTHOR_TRIGGER),
+                            .width(coverWidth)
+                            .height(coverHeight)
+                            .wenku8SharedNovelCover(
+                                origin = sharedTransitionOrigin,
+                                aid = aid,
+                                clipShape = if (isFrom3dShelf) null else heroCoverShape,
+                            ),
                     ) {
-                        Text(
-                            text = "${stringResource(R.string.detail_author_prefix_format, author)} ›",
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.Medium,
-                            color = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.padding(vertical = 2.dp),
-                        )
-                    }
-                }
-
-                val lengthChars = novel?.bookLength ?: 0
-                val lastUpdate = novel?.lastUpdate.orEmpty()
-                val metaParts = buildList {
-                    if (lengthChars >= 10_000) {
-                        add(stringResource(R.string.detail_word_count_wan_format, lengthChars / 10_000f))
-                    } else if (lengthChars > 0) {
-                        add(stringResource(R.string.detail_word_count_char_format, lengthChars))
-                    }
-                    if (lastUpdate.isNotBlank()) {
-                        add(stringResource(R.string.detail_last_update_format, lastUpdate))
-                    }
-                }
-                if (metaParts.isNotEmpty()) {
-                    Text(
-                        text = metaParts.joinToString(" · "),
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-
-                if (tags.isNotEmpty()) {
-                    FlowRow(
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        verticalArrangement = Arrangement.spacedBy(6.dp),
-                    ) {
-                        tags.forEach { tag ->
-                            Surface(
-                                color = MaterialTheme.colorScheme.primaryContainer,
-                                contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                                shape = MaterialTheme.shapes.small,
-                                modifier = Modifier
-                                    .clip(MaterialTheme.shapes.small)
-                                    .clickable { onTagClicked(tag) }
-                                    .einkHairlineBorder(MaterialTheme.shapes.small)
-                                    .testTag(NovelDetailTestTags.TAG_CHIP_PREFIX + tag),
-                            ) {
-                                Text(
-                                    text = "#$tag",
-                                    style = MaterialTheme.typography.labelMedium,
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                        Surface(
+                            shape = effectiveCoverShape,
+                            color = MaterialTheme.colorScheme.surfaceContainerHighest,
+                            tonalElevation = if (isEinkMode) 0.dp else 4.dp,
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .bookshelf3dCoverPerspectiveMorph(
+                                    enabled = isFrom3dShelf && !isEinkMode,
+                                    slantedFractionProvider = enterSlantedFractionProvider,
                                 )
+                                .einkHairlineBorder(effectiveCoverShape),
+                        ) {
+                            if (coverUrl.isNotBlank()) {
+                                val coverRequest = WenkuImageRequests.rememberCoverImageRequest(
+                                    aid = aid,
+                                    coverUrl = coverUrl,
+                                    enableCrossfade = false,
+                                )
+                                AsyncImage(
+                                    model = coverRequest,
+                                    contentDescription = title,
+                                    contentScale = ContentScale.Crop,
+                                    onSuccess = { success ->
+                                        val bmp = (success.result.image as? BitmapImage)?.bitmap
+                                        if (bmp != null) {
+                                            onCoverSeedExtracted(CoverThemeEngine.extractSeedColorFromBitmap(bmp))
+                                        }
+                                    },
+                                    modifier = Modifier.fillMaxSize(),
+                                )
+                            } else {
+                                Box(
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentAlignment = Alignment.Center,
+                                ) {
+                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                        Icon(
+                                            imageVector = Icons.Outlined.AutoStories,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.size(36.dp),
+                                        )
+                                        Spacer(modifier = Modifier.height(6.dp))
+                                        Text(
+                                            text = "#$aid",
+                                            style = MaterialTheme.typography.labelMedium,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
+                                    }
+                                }
                             }
                         }
                     }
+
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        val pressId = novel?.pressId.orEmpty()
+                        val displayBookStatus = formatBookStatusLabel(
+                            rawStatus = novel?.bookStatus.orEmpty(),
+                            appLanguage = appLanguage,
+                        )
+                        if (pressId.isNotBlank() || displayBookStatus.isNotBlank()) {
+                            FlowRow(
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                verticalArrangement = Arrangement.spacedBy(4.dp),
+                            ) {
+                                if (pressId.isNotBlank()) {
+                                    BadgePill(
+                                        text = pressId,
+                                        containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                                        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                                if (displayBookStatus.isNotBlank()) {
+                                    BadgePill(
+                                        text = displayBookStatus,
+                                        containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                                        leadingIcon = bookStatusLeadingIcon(displayBookStatus),
+                                        modifier = Modifier.testTag(NovelDetailTestTags.BOOK_STATUS_BADGE),
+                                    )
+                                }
+                            }
+                        }
+
+                        Text(
+                            text = title,
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            maxLines = 3,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier
+                                .wenku8SharedNovelTitle(
+                                    origin = sharedTransitionOrigin,
+                                    aid = aid,
+                                )
+                                .clip(MaterialTheme.shapes.small)
+                                .clickable(onClick = onTitleClicked)
+                                .padding(vertical = 2.dp)
+                                .testTag(NovelDetailTestTags.NOVEL_TITLE_TEXT),
+                        )
+
+                        if (author.isNotBlank()) {
+                            Surface(
+                                color = Color.Transparent,
+                                shape = MaterialTheme.shapes.small,
+                                modifier = Modifier
+                                    .clip(MaterialTheme.shapes.small)
+                                    .clickable(onClick = onAuthorClicked)
+                                    .testTag(NovelDetailTestTags.AUTHOR_TRIGGER),
+                            ) {
+                                Text(
+                                    text = "${stringResource(R.string.detail_author_prefix_format, author)} ›",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.Medium,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.padding(vertical = 2.dp),
+                                )
+                            }
+                        }
+
+                        val lengthChars = novel?.bookLength ?: 0
+                        val lastUpdate = novel?.lastUpdate.orEmpty()
+                        val metaParts = buildList {
+                            if (lengthChars >= 10_000) {
+                                add(stringResource(R.string.detail_word_count_wan_format, lengthChars / 10_000f))
+                            } else if (lengthChars > 0) {
+                                add(stringResource(R.string.detail_word_count_char_format, lengthChars))
+                            }
+                            if (lastUpdate.isNotBlank()) {
+                                add(stringResource(R.string.detail_last_update_format, lastUpdate))
+                            }
+                        }
+                        if (metaParts.isNotEmpty()) {
+                            Text(
+                                text = metaParts.joinToString(" · "),
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+
+                        if (!isNarrowHero && tags.isNotEmpty()) {
+                            heroTagFlowRow()
+                        }
+                    }
+                }
+
+                if (isNarrowHero && tags.isNotEmpty()) {
+                    heroTagFlowRow()
                 }
             }
         }
@@ -1246,6 +1272,17 @@ private fun NovelStatsStrip(novel: NovelEntity?) {
     val pushCount = formatCompactCount(novel?.pushCount ?: 0)
     val favCount = formatCompactCount(novel?.favCount ?: 0)
     val latestChapter = novel?.latestSectionName?.ifBlank { "—" } ?: "—"
+    val totalHitsLabel = if (dayHits > 0) {
+        "${stringResource(R.string.detail_stat_total_hits)} (${
+            stringResource(R.string.detail_stat_day_hits_format, dayHits)
+        })"
+    } else {
+        stringResource(R.string.detail_stat_total_hits)
+    }
+    val pushLabel = stringResource(R.string.detail_stat_push_count)
+    val favLabel = stringResource(R.string.detail_stat_fav_count)
+    val latestLabel = stringResource(R.string.detail_stat_latest_chapter)
+    val fontScale = LocalDensity.current.fontScale
 
     Card(
         colors = CardDefaults.cardColors(
@@ -1256,38 +1293,77 @@ private fun NovelStatsStrip(novel: NovelEntity?) {
             .fillMaxWidth()
             .einkHairlineBorder(MaterialTheme.shapes.medium),
     ) {
-        Row(
+        BoxWithConstraints(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 10.dp, vertical = 12.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            StatCell(
-                label = if (dayHits > 0) {
-                    "${stringResource(R.string.detail_stat_total_hits)} (${
-                        stringResource(R.string.detail_stat_day_hits_format, dayHits)
-                    })"
-                } else {
-                    stringResource(R.string.detail_stat_total_hits)
-                },
-                value = totalHits,
-                modifier = Modifier.weight(1f),
-            )
-            StatCell(
-                label = stringResource(R.string.detail_stat_push_count),
-                value = pushCount,
-                modifier = Modifier.weight(0.85f),
-            )
-            StatCell(
-                label = stringResource(R.string.detail_stat_fav_count),
-                value = favCount,
-                modifier = Modifier.weight(0.85f),
-            )
-            StatCell(
-                label = stringResource(R.string.detail_stat_latest_chapter),
-                value = latestChapter,
-                modifier = Modifier.weight(1.3f),
-            )
+            if (maxWidth < 332.dp || fontScale > 1.1f) {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        StatCell(
+                            label = totalHitsLabel,
+                            value = totalHits,
+                            modifier = Modifier.weight(1f),
+                        )
+                        StatCell(
+                            label = pushLabel,
+                            value = pushCount,
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                    HorizontalDivider(
+                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        StatCell(
+                            label = favLabel,
+                            value = favCount,
+                            modifier = Modifier.weight(1f),
+                        )
+                        StatCell(
+                            label = latestLabel,
+                            value = latestChapter,
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                }
+            } else {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    StatCell(
+                        label = totalHitsLabel,
+                        value = totalHits,
+                        modifier = Modifier.weight(1f),
+                    )
+                    StatCell(
+                        label = pushLabel,
+                        value = pushCount,
+                        modifier = Modifier.weight(0.85f),
+                    )
+                    StatCell(
+                        label = favLabel,
+                        value = favCount,
+                        modifier = Modifier.weight(0.85f),
+                    )
+                    StatCell(
+                        label = latestLabel,
+                        value = latestChapter,
+                        modifier = Modifier.weight(1.3f),
+                    )
+                }
+            }
         }
     }
 }
@@ -1421,107 +1497,206 @@ private fun NovelActionDeck(
             }
         }
 
-        // Balanced 3-Button Secondary Action Row
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        // Balanced 3-Button Secondary Action Row: normal screens keep inline icon+label buttons;
+        // small/narrow screens or enlarged fonts switch to 3-column icon-above-label tonal tiles.
+        val fontScale = LocalDensity.current.fontScale
+        val shelfLabel = stringResource(
+            if (inBookshelf) R.string.detail_shelf_added else R.string.detail_shelf_add,
+        )
+        val shelfIcon = if (inBookshelf) Icons.Outlined.BookmarkAdded else Icons.Outlined.BookmarkAdd
+        val downloadIcon = if (snapshot.totalCachedChapters > 0 &&
+            snapshot.totalCachedChapters >= snapshot.totalChapters &&
+            snapshot.totalChapters > 0
         ) {
-            if (inBookshelf) {
-                FilledTonalButton(
-                    onClick = onToggleBookshelf,
-                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 8.dp),
-                    modifier = Modifier
-                        .weight(1f)
-                        .minimumInteractiveComponentSize()
-                        .testTag(NovelDetailTestTags.SHELF_TOGGLE_BUTTON),
+            Icons.Outlined.DownloadDone
+        } else {
+            Icons.Outlined.Download
+        }
+        val downloadLabel = if (activeDownload != null && activeDownload.totalChapters > 0) {
+            "${activeDownload.completedChapters}/${activeDownload.totalChapters}"
+        } else {
+            stringResource(R.string.detail_action_download)
+        }
+        val reviewsLabel = stringResource(R.string.detail_action_reviews)
+
+        BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+            val useCompactStackedTiles = maxWidth < 348.dp || fontScale > 1.05f
+
+            if (useCompactStackedTiles) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    Icon(
-                        imageVector = Icons.Outlined.BookmarkAdded,
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp),
+                    CompactStackedActionTile(
+                        icon = shelfIcon,
+                        label = shelfLabel,
+                        isPrimarySelected = inBookshelf,
+                        onClick = onToggleBookshelf,
+                        modifier = Modifier
+                            .weight(1f)
+                            .testTag(NovelDetailTestTags.SHELF_TOGGLE_BUTTON),
                     )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(
-                        text = stringResource(R.string.detail_shelf_added),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
+                    CompactStackedActionTile(
+                        icon = downloadIcon,
+                        label = downloadLabel,
+                        isPrimarySelected = false,
+                        onClick = onOpenDownloader,
+                        modifier = Modifier
+                            .weight(1f)
+                            .testTag(NovelDetailTestTags.DOWNLOAD_OPEN_BUTTON),
+                    )
+                    CompactStackedActionTile(
+                        icon = Icons.AutoMirrored.Outlined.Chat,
+                        label = reviewsLabel,
+                        isPrimarySelected = false,
+                        onClick = onOpenReviews,
+                        modifier = Modifier
+                            .weight(1f)
+                            .testTag(NovelDetailTestTags.REVIEWS_OPEN_BUTTON),
                     )
                 }
             } else {
-                OutlinedButton(
-                    onClick = onToggleBookshelf,
-                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 8.dp),
-                    modifier = Modifier
-                        .weight(1f)
-                        .minimumInteractiveComponentSize()
-                        .testTag(NovelDetailTestTags.SHELF_TOGGLE_BUTTON),
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    Icon(
-                        imageVector = Icons.Outlined.BookmarkAdd,
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp),
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(
-                        text = stringResource(R.string.detail_shelf_add),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
+                    if (inBookshelf) {
+                        FilledTonalButton(
+                            onClick = onToggleBookshelf,
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 8.dp),
+                            modifier = Modifier
+                                .weight(1f)
+                                .minimumInteractiveComponentSize()
+                                .testTag(NovelDetailTestTags.SHELF_TOGGLE_BUTTON),
+                        ) {
+                            Icon(
+                                imageVector = shelfIcon,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp),
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = shelfLabel,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                    } else {
+                        OutlinedButton(
+                            onClick = onToggleBookshelf,
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 8.dp),
+                            modifier = Modifier
+                                .weight(1f)
+                                .minimumInteractiveComponentSize()
+                                .testTag(NovelDetailTestTags.SHELF_TOGGLE_BUTTON),
+                        ) {
+                            Icon(
+                                imageVector = shelfIcon,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp),
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = shelfLabel,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                    }
+
+                    OutlinedButton(
+                        onClick = onOpenDownloader,
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 8.dp),
+                        modifier = Modifier
+                            .weight(1f)
+                            .minimumInteractiveComponentSize()
+                            .testTag(NovelDetailTestTags.DOWNLOAD_OPEN_BUTTON),
+                    ) {
+                        Icon(
+                            imageVector = downloadIcon,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp),
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = downloadLabel,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+
+                    OutlinedButton(
+                        onClick = onOpenReviews,
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 8.dp),
+                        modifier = Modifier
+                            .weight(1f)
+                            .minimumInteractiveComponentSize()
+                            .testTag(NovelDetailTestTags.REVIEWS_OPEN_BUTTON),
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Outlined.Chat,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp),
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = reviewsLabel,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
                 }
             }
+        }
+    }
+}
 
-            OutlinedButton(
-                onClick = onOpenDownloader,
-                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 8.dp),
-                modifier = Modifier
-                    .weight(1f)
-                    .minimumInteractiveComponentSize()
-                    .testTag(NovelDetailTestTags.DOWNLOAD_OPEN_BUTTON),
-            ) {
-                Icon(
-                    imageVector = if (snapshot.totalCachedChapters > 0 &&
-                        snapshot.totalCachedChapters >= snapshot.totalChapters &&
-                        snapshot.totalChapters > 0
-                    ) {
-                        Icons.Outlined.DownloadDone
-                    } else {
-                        Icons.Outlined.Download
-                    },
-                    contentDescription = null,
-                    modifier = Modifier.size(18.dp),
-                )
-                Spacer(modifier = Modifier.width(4.dp))
-                Text(
-                    text = if (activeDownload != null && activeDownload.totalChapters > 0) {
-                        "${activeDownload.completedChapters}/${activeDownload.totalChapters}"
-                    } else {
-                        stringResource(R.string.detail_action_download)
-                    },
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
+@Composable
+private fun CompactStackedActionTile(
+    icon: ImageVector,
+    label: String,
+    isPrimarySelected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val tileShape = MaterialTheme.shapes.medium
+    val tileContent: @Composable () -> Unit = {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                modifier = Modifier.size(20.dp),
+            )
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelMedium,
+                maxLines = 1,
+                softWrap = false,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
 
-            OutlinedButton(
-                onClick = onOpenReviews,
-                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 8.dp),
-                modifier = Modifier
-                    .weight(1f)
-                    .minimumInteractiveComponentSize()
-                    .testTag(NovelDetailTestTags.REVIEWS_OPEN_BUTTON),
-            ) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Outlined.Chat,
-                    contentDescription = null,
-                    modifier = Modifier.size(18.dp),
-                )
-                Spacer(modifier = Modifier.width(4.dp))
-                Text(
-                    text = stringResource(R.string.detail_action_reviews),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
+    if (isPrimarySelected) {
+        FilledTonalButton(
+            onClick = onClick,
+            shape = tileShape,
+            contentPadding = PaddingValues(horizontal = 6.dp, vertical = 10.dp),
+            modifier = modifier.minimumInteractiveComponentSize(),
+        ) {
+            tileContent()
+        }
+    } else {
+        OutlinedButton(
+            onClick = onClick,
+            shape = tileShape,
+            contentPadding = PaddingValues(horizontal = 6.dp, vertical = 10.dp),
+            modifier = modifier.minimumInteractiveComponentSize(),
+        ) {
+            tileContent()
         }
     }
 }
@@ -1551,6 +1726,7 @@ private fun ActiveNovelDownloadCard(
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 Text(
                     text = stringResource(
@@ -1560,15 +1736,20 @@ private fun ActiveNovelDownloadCard(
                         progress.currentChapterTitle.ifBlank { "…" },
                     ),
                     style = MaterialTheme.typography.labelLarge,
-                    maxLines = 1,
+                    maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f),
                 )
                 TextButton(
                     onClick = onCancel,
+                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
                     modifier = Modifier.testTag(NovelDetailTestTags.CANCEL_DOWNLOAD_BUTTON),
                 ) {
-                    Text(text = stringResource(R.string.download_cancel_action))
+                    Text(
+                        text = stringResource(R.string.download_cancel_action),
+                        maxLines = 1,
+                        softWrap = false,
+                    )
                 }
             }
 
@@ -1668,55 +1849,131 @@ private fun VolumeDirectoryHeader(
     onSearchQueryChange: (String) -> Unit,
     onToggleReverseOrder: () -> Unit,
 ) {
+    val fontScale = LocalDensity.current.fontScale
     Column(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                text = stringResource(R.string.detail_toc_header_format, volumeCount),
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-                modifier = Modifier.weight(1f),
-            )
-
-            FilterChip(
-                selected = isSearchVisible,
-                onClick = onToggleSearch,
-                label = { Text(text = stringResource(R.string.detail_toc_search_action)) },
-                leadingIcon = {
-                    Icon(
-                        imageVector = Icons.Outlined.Search,
-                        contentDescription = null,
-                        modifier = Modifier.size(16.dp),
-                    )
-                },
-                modifier = Modifier.testTag(NovelDetailTestTags.TOC_SEARCH_TOGGLE),
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-            AssistChip(
-                onClick = onToggleReverseOrder,
-                label = {
+        BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+            val useStackedActions = maxWidth < 348.dp || fontScale > 1.05f
+            if (useStackedActions) {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
                     Text(
-                        text = if (isReverseOrder) {
-                            stringResource(R.string.detail_toc_order_desc)
-                        } else {
-                            stringResource(R.string.detail_toc_order_asc)
+                        text = stringResource(R.string.detail_toc_header_format, volumeCount),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp),
+                        itemVerticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        FilterChip(
+                            selected = isSearchVisible,
+                            onClick = onToggleSearch,
+                            label = {
+                                Text(
+                                    text = stringResource(R.string.detail_toc_search_action),
+                                    maxLines = 1,
+                                    softWrap = false,
+                                )
+                            },
+                            leadingIcon = {
+                                Icon(
+                                    imageVector = Icons.Outlined.Search,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp),
+                                )
+                            },
+                            modifier = Modifier.testTag(NovelDetailTestTags.TOC_SEARCH_TOGGLE),
+                        )
+                        AssistChip(
+                            onClick = onToggleReverseOrder,
+                            label = {
+                                Text(
+                                    text = if (isReverseOrder) {
+                                        stringResource(R.string.detail_toc_order_desc)
+                                    } else {
+                                        stringResource(R.string.detail_toc_order_asc)
+                                    },
+                                    maxLines = 1,
+                                    softWrap = false,
+                                )
+                            },
+                            leadingIcon = {
+                                Icon(
+                                    imageVector = Icons.Outlined.SwapVert,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp),
+                                )
+                            },
+                            modifier = Modifier.testTag(NovelDetailTestTags.TOC_ORDER_TOGGLE),
+                        )
+                    }
+                }
+            } else {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = stringResource(R.string.detail_toc_header_format, volumeCount),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f),
+                    )
+
+                    FilterChip(
+                        selected = isSearchVisible,
+                        onClick = onToggleSearch,
+                        label = {
+                            Text(
+                                text = stringResource(R.string.detail_toc_search_action),
+                                maxLines = 1,
+                                softWrap = false,
+                            )
                         },
+                        leadingIcon = {
+                            Icon(
+                                imageVector = Icons.Outlined.Search,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp),
+                            )
+                        },
+                        modifier = Modifier.testTag(NovelDetailTestTags.TOC_SEARCH_TOGGLE),
                     )
-                },
-                leadingIcon = {
-                    Icon(
-                        imageVector = Icons.Outlined.SwapVert,
-                        contentDescription = null,
-                        modifier = Modifier.size(16.dp),
+                    Spacer(modifier = Modifier.width(8.dp))
+                    AssistChip(
+                        onClick = onToggleReverseOrder,
+                        label = {
+                            Text(
+                                text = if (isReverseOrder) {
+                                    stringResource(R.string.detail_toc_order_desc)
+                                } else {
+                                    stringResource(R.string.detail_toc_order_asc)
+                                },
+                                maxLines = 1,
+                                softWrap = false,
+                            )
+                        },
+                        leadingIcon = {
+                            Icon(
+                                imageVector = Icons.Outlined.SwapVert,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp),
+                            )
+                        },
+                        modifier = Modifier.testTag(NovelDetailTestTags.TOC_ORDER_TOGGLE),
                     )
-                },
-                modifier = Modifier.testTag(NovelDetailTestTags.TOC_ORDER_TOGGLE),
-            )
+                }
+            }
         }
 
         if (isSearchVisible) {
@@ -1724,7 +1981,13 @@ private fun VolumeDirectoryHeader(
                 value = searchQuery,
                 onValueChange = onSearchQueryChange,
                 singleLine = true,
-                placeholder = { Text(text = stringResource(R.string.detail_toc_search_placeholder)) },
+                placeholder = {
+                    Text(
+                        text = stringResource(R.string.detail_toc_search_placeholder),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                },
                 leadingIcon = { Icon(Icons.Outlined.Search, contentDescription = null) },
                 trailingIcon = {
                     if (searchQuery.isNotEmpty()) {
@@ -1745,6 +2008,7 @@ private fun VolumeDirectoryHeader(
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun VolumeAccordionCard(
     volume: VolumeAccordionModel,
@@ -1753,6 +2017,7 @@ private fun VolumeAccordionCard(
     onToggleExpand: () -> Unit,
     onChapterClicked: (ChapterRowModel) -> Unit,
 ) {
+    val fontScale = LocalDensity.current.fontScale
     Card(
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
@@ -1762,120 +2027,222 @@ private fun VolumeAccordionCard(
             .fillMaxWidth()
             .einkHairlineBorder(MaterialTheme.shapes.medium),
     ) {
-        Column(modifier = Modifier.fillMaxWidth()) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = 48.dp)
-                    .clickable(onClick = onToggleExpand)
-                    .padding(horizontal = 14.dp, vertical = 12.dp)
-                    .testTag(NovelDetailTestTags.VOLUME_HEADER_PREFIX + volume.vid),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                Text(
-                    text = volume.volumeTitle,
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f),
-                )
-
-                if (volume.containsReadingProgress) {
-                    BadgePill(
-                        text = stringResource(R.string.detail_volume_last_read_badge),
-                        containerColor = MaterialTheme.colorScheme.primaryContainer,
-                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                    )
-                }
-                if (volume.cachedChapterCount > 0) {
-                    BadgePill(
-                        text = stringResource(
-                            R.string.detail_volume_cached_ratio_format,
-                            volume.cachedChapterCount,
-                            volume.totalChapterCount,
-                        ),
-                        containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-                    )
-                }
-
-                Icon(
-                    imageVector = if (isExpanded) Icons.Outlined.ExpandLess else Icons.Outlined.ExpandMore,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-
-            if (isExpanded && volume.chapters.isNotEmpty()) {
-                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                volume.chapters.forEachIndexed { index, chapter ->
-                    if (index > 0) {
-                        HorizontalDivider(
-                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f),
-                            modifier = Modifier.padding(horizontal = 14.dp),
-                        )
-                    }
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { onChapterClicked(chapter) }
-                            .padding(horizontal = 16.dp, vertical = 12.dp)
-                            .testTag(NovelDetailTestTags.CHAPTER_ROW_PREFIX + chapter.cid),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        if (chapter.isIllustrationChapter) {
-                            Icon(
-                                imageVector = Icons.Outlined.Image,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.tertiary,
-                                modifier = Modifier.size(18.dp),
+        BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+            val useStackedBadges = maxWidth < 348.dp || fontScale > 1.05f
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 48.dp)
+                        .clickable(onClick = onToggleExpand)
+                        .padding(horizontal = 14.dp, vertical = 12.dp)
+                        .testTag(NovelDetailTestTags.VOLUME_HEADER_PREFIX + volume.vid),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    if (useStackedBadges) {
+                        Column(
+                            modifier = Modifier.weight(1f),
+                            verticalArrangement = Arrangement.spacedBy(6.dp),
+                        ) {
+                            Text(
+                                text = volume.volumeTitle,
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis,
                             )
+                            if (volume.containsReadingProgress || volume.cachedChapterCount > 0) {
+                                FlowRow(
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                                ) {
+                                    if (volume.containsReadingProgress) {
+                                        BadgePill(
+                                            text = stringResource(R.string.detail_volume_last_read_badge),
+                                            containerColor = MaterialTheme.colorScheme.primaryContainer,
+                                            contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                                        )
+                                    }
+                                    if (volume.cachedChapterCount > 0) {
+                                        BadgePill(
+                                            text = stringResource(
+                                                R.string.detail_volume_cached_ratio_format,
+                                                volume.cachedChapterCount,
+                                                volume.totalChapterCount,
+                                            ),
+                                            containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                                            contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                                        )
+                                    }
+                                }
+                            }
                         }
+                    } else {
                         Text(
-                            text = chapter.chapterTitle,
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = if (chapter.isCurrentReadingChapter) {
-                                FontWeight.SemiBold
-                            } else {
-                                FontWeight.Normal
-                            },
-                            color = if (chapter.isCurrentReadingChapter) {
-                                MaterialTheme.colorScheme.primary
-                            } else {
-                                MaterialTheme.colorScheme.onSurface
-                            },
-                            maxLines = 2,
+                            text = volume.volumeTitle,
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.weight(1f),
                         )
 
-                        if (chapter.isCurrentReadingChapter) {
+                        if (volume.containsReadingProgress) {
                             BadgePill(
-                                text = stringResource(
-                                    R.string.detail_chapter_reading_now_format,
-                                    readingProgressPercent,
-                                ),
+                                text = stringResource(R.string.detail_volume_last_read_badge),
                                 containerColor = MaterialTheme.colorScheme.primaryContainer,
                                 contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
                             )
-                        } else if (chapter.isIllustrationChapter) {
-                            BadgePill(
-                                text = stringResource(R.string.detail_chapter_illustration_badge),
-                                containerColor = MaterialTheme.colorScheme.tertiaryContainer,
-                                contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
-                            )
                         }
-
-                        if (chapter.isCached) {
+                        if (volume.cachedChapterCount > 0) {
                             BadgePill(
-                                text = stringResource(R.string.detail_chapter_cached_badge),
+                                text = stringResource(
+                                    R.string.detail_volume_cached_ratio_format,
+                                    volume.cachedChapterCount,
+                                    volume.totalChapterCount,
+                                ),
                                 containerColor = MaterialTheme.colorScheme.secondaryContainer,
                                 contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
                             )
+                        }
+                    }
+
+                    Icon(
+                        imageVector = if (isExpanded) Icons.Outlined.ExpandLess else Icons.Outlined.ExpandMore,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+
+                if (isExpanded && volume.chapters.isNotEmpty()) {
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                    volume.chapters.forEachIndexed { index, chapter ->
+                        if (index > 0) {
+                            HorizontalDivider(
+                                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f),
+                                modifier = Modifier.padding(horizontal = 14.dp),
+                            )
+                        }
+                        val hasChapterBadges = chapter.isCurrentReadingChapter ||
+                            chapter.isIllustrationChapter ||
+                            chapter.isCached
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { onChapterClicked(chapter) }
+                                .padding(horizontal = 16.dp, vertical = 12.dp)
+                                .testTag(NovelDetailTestTags.CHAPTER_ROW_PREFIX + chapter.cid),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            if (chapter.isIllustrationChapter) {
+                                Icon(
+                                    imageVector = Icons.Outlined.Image,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.tertiary,
+                                    modifier = Modifier.size(18.dp),
+                                )
+                            }
+                            if (useStackedBadges) {
+                                Column(
+                                    modifier = Modifier.weight(1f),
+                                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                                ) {
+                                    Text(
+                                        text = chapter.chapterTitle,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = if (chapter.isCurrentReadingChapter) {
+                                            FontWeight.SemiBold
+                                        } else {
+                                            FontWeight.Normal
+                                        },
+                                        color = if (chapter.isCurrentReadingChapter) {
+                                            MaterialTheme.colorScheme.primary
+                                        } else {
+                                            MaterialTheme.colorScheme.onSurface
+                                        },
+                                        maxLines = 2,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                    if (hasChapterBadges) {
+                                        FlowRow(
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                            verticalArrangement = Arrangement.spacedBy(4.dp),
+                                        ) {
+                                            if (chapter.isCurrentReadingChapter) {
+                                                BadgePill(
+                                                    text = stringResource(
+                                                        R.string.detail_chapter_reading_now_format,
+                                                        readingProgressPercent,
+                                                    ),
+                                                    containerColor = MaterialTheme.colorScheme.primaryContainer,
+                                                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                                                )
+                                            } else if (chapter.isIllustrationChapter) {
+                                                BadgePill(
+                                                    text = stringResource(R.string.detail_chapter_illustration_badge),
+                                                    containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+                                                    contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
+                                                )
+                                            }
+
+                                            if (chapter.isCached) {
+                                                BadgePill(
+                                                    text = stringResource(R.string.detail_chapter_cached_badge),
+                                                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                                                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            } else {
+                                Text(
+                                    text = chapter.chapterTitle,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = if (chapter.isCurrentReadingChapter) {
+                                        FontWeight.SemiBold
+                                    } else {
+                                        FontWeight.Normal
+                                    },
+                                    color = if (chapter.isCurrentReadingChapter) {
+                                        MaterialTheme.colorScheme.primary
+                                    } else {
+                                        MaterialTheme.colorScheme.onSurface
+                                    },
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.weight(1f),
+                                )
+
+                                if (chapter.isCurrentReadingChapter) {
+                                    BadgePill(
+                                        text = stringResource(
+                                            R.string.detail_chapter_reading_now_format,
+                                            readingProgressPercent,
+                                        ),
+                                        containerColor = MaterialTheme.colorScheme.primaryContainer,
+                                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                                    )
+                                } else if (chapter.isIllustrationChapter) {
+                                    BadgePill(
+                                        text = stringResource(R.string.detail_chapter_illustration_badge),
+                                        containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+                                        contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
+                                    )
+                                }
+
+                                if (chapter.isCached) {
+                                    BadgePill(
+                                        text = stringResource(R.string.detail_chapter_cached_badge),
+                                        containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                                    )
+                                }
+                            }
                         }
                     }
                 }
@@ -2004,6 +2371,7 @@ private fun NovelDownloaderBottomSheet(
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
                             Text(
                                 text = stringResource(R.string.download_select_volumes_overwrite_toggle),
@@ -2047,9 +2415,9 @@ private fun NovelDownloaderBottomSheet(
                             .padding(horizontal = 8.dp, vertical = 6.dp)
                             .testTag(NovelDetailTestTags.DOWNLOAD_VOLUME_CHECK_PREFIX + volume.vid),
                         verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
                         Checkbox(checked = checked, onCheckedChange = null)
-                        Spacer(modifier = Modifier.width(8.dp))
                         Text(
                             text = volume.volumeTitle,
                             style = MaterialTheme.typography.bodyMedium,
@@ -2061,6 +2429,8 @@ private fun NovelDownloaderBottomSheet(
                             text = "${volume.cachedChapterCount}/${volume.totalChapterCount}",
                             style = MaterialTheme.typography.labelMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            softWrap = false,
                         )
                     }
                 }
@@ -2121,6 +2491,7 @@ private fun BadgePill(
                 text = text,
                 style = MaterialTheme.typography.labelSmall,
                 maxLines = 1,
+                softWrap = false,
                 overflow = TextOverflow.Ellipsis,
             )
         }

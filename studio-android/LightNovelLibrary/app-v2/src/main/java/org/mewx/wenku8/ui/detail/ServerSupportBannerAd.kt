@@ -10,6 +10,7 @@ import android.view.ViewGroup
 import androidx.activity.ComponentActivity
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
@@ -164,6 +165,7 @@ class NovelDetailBannerAdHolder internal constructor(
 
     internal var lastFailureAtMonoMs: Long = 0L
     internal var loadInProgress: Boolean = false
+    internal var loadedWidthDp: Int = 0
 
     val shouldRenderVisibleCard: Boolean
         get() = phase == BannerAdLoadPhase.Loaded || phase == BannerAdLoadPhase.StaticPreview
@@ -199,6 +201,7 @@ class NovelDetailBannerAdHolder internal constructor(
 
     internal fun destroy() {
         loadInProgress = false
+        loadedWidthDp = 0
         val existing = adView
         adView = null
         if (existing != null) {
@@ -359,6 +362,14 @@ fun rememberNovelDetailBannerAdHolder(
         if (!isOnline || !isGmsReady || !enableLiveAdViewInflation) {
             return@LaunchedEffect
         }
+        val needsNarrowReload = holder.adView != null &&
+            holder.loadedWidthDp >= 320 &&
+            availableWidthDp < 320 &&
+            !holder.loadInProgress
+        if (needsNarrowReload) {
+            holder.destroy()
+            holder.phase = BannerAdLoadPhase.Loading
+        }
         if (holder.phase != BannerAdLoadPhase.Loading || holder.loadInProgress || holder.adView != null) {
             return@LaunchedEffect
         }
@@ -410,6 +421,7 @@ private suspend fun startHolderBannerLoad(
 
         holder.destroy()
         holder.loadInProgress = true
+        holder.loadedWidthDp = availableWidthDp
         val nextAdView = runCatching {
             AdView(hostContext).apply {
                 setAdSize(resolvedAdSize)
@@ -440,6 +452,7 @@ private suspend fun startHolderBannerLoad(
             }
         }.getOrElse {
             holder.loadInProgress = false
+            holder.loadedWidthDp = 0
             holder.lastFailureAtMonoMs = SystemClock.elapsedRealtime()
             holder.phase = BannerAdLoadPhase.Failed
             null
@@ -527,6 +540,8 @@ fun ServerSupportBannerAd(
         return
     }
 
+    val context = LocalContext.current
+    val hostActivity = remember(context) { context.findHostActivity() }
     val liveAdView = holder.adView
     Card(
         colors = CardDefaults.cardColors(
@@ -550,13 +565,31 @@ fun ServerSupportBannerAd(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(horizontal = 12.dp),
             )
-            Box(
+            BoxWithConstraints(
                 modifier = Modifier
                     .fillMaxWidth()
                     .heightIn(min = ServerSupportAdConstants.RESERVED_BANNER_SLOT_HEIGHT)
                     .testTag(NovelDetailTestTags.SERVER_SUPPORT_AD_SLOT),
                 contentAlignment = Alignment.Center,
             ) {
+                val slotWidthDp = maxWidth.value.toInt()
+                LaunchedEffect(holder, slotWidthDp, liveAdView) {
+                    if (
+                        liveAdView != null &&
+                        slotWidthDp in 160 until 320 &&
+                        holder.loadedWidthDp >= 320 &&
+                        !holder.loadInProgress
+                    ) {
+                        holder.destroy()
+                        holder.phase = BannerAdLoadPhase.Loading
+                        startHolderBannerLoad(
+                            holder = holder,
+                            context = context,
+                            hostContext = hostActivity ?: context,
+                            availableWidthDp = slotWidthDp,
+                        )
+                    }
+                }
                 if (liveAdView != null) {
                     AndroidView(
                         factory = {
