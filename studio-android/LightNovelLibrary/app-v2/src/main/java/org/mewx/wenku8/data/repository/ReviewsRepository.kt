@@ -215,6 +215,7 @@ class ReviewsRepository(
             WenkuApiResult.ApiNotConfigured -> WenkuApiResult.ApiNotConfigured
             is WenkuApiResult.NetworkError -> result
             is WenkuApiResult.ServerErrorCode -> result
+            WenkuApiResult.EmptyResponse -> WenkuApiResult.EmptyResponse
             is WenkuApiResult.ParseError -> result
         }
     }
@@ -252,6 +253,7 @@ class ReviewsRepository(
             WenkuApiResult.ApiNotConfigured -> WenkuApiResult.ApiNotConfigured
             is WenkuApiResult.NetworkError -> result
             is WenkuApiResult.ServerErrorCode -> result
+            WenkuApiResult.EmptyResponse -> WenkuApiResult.EmptyResponse
             is WenkuApiResult.ParseError -> result
         }
     }
@@ -457,6 +459,10 @@ class ReviewsRepository(
 
             is WenkuApiResult.NetworkError -> {
                 ReviewSubmitOutcome.NetworkOrServerError(debugDetail = result.debugDetail)
+            }
+
+            WenkuApiResult.EmptyResponse -> {
+                ReviewSubmitOutcome.NetworkOrServerError(debugDetail = "empty_response")
             }
 
             is WenkuApiResult.ParseError -> {

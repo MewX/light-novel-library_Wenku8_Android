@@ -30,6 +30,7 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
@@ -216,6 +217,28 @@ class NovelDetailAndDownloadTest {
         assertNotNull(preservedProgress)
         assertEquals(102, preservedProgress?.cid)
         assertEquals(420, preservedProgress?.progressPermille)
+    }
+
+    @Test
+    fun downloadRepository_skipsEmptyAndBomBlankChaptersWithoutCachingAndReportsPartialFailure() = runBlocking {
+        fakeGateway.customChapterResults[101] = WenkuApiResult.EmptyResponse
+        fakeGateway.customChapterResults[201] = WenkuApiResult.Success("\uFEFF \u3000\r\n")
+
+        val outcome = downloadRepository.executeDownload(
+            NovelDownloadRequest(
+                aid = 5,
+                appLanguage = Wenku8API.AppLanguage.SC,
+                mode = NovelDownloadMode.UNCACHED_ONLY,
+            ),
+        )
+
+        assertEquals(NovelDownloadRunState.PARTIAL_FAILURE, outcome.state)
+        assertEquals(1, outcome.downloadedChapters)
+        assertEquals(2, outcome.failedChapters)
+        assertEquals(3, outcome.totalTargetChapters)
+        assertNull(database.chapterContentDao().getChapterHeader(101))
+        assertNotNull(database.chapterContentDao().getChapterHeader(102))
+        assertNull(database.chapterContentDao().getChapterHeader(201))
     }
 
     @Test
@@ -791,6 +814,7 @@ private class FakeDetailAndDownloadGateway : WenkuCatalogGateway {
     var introRequestCount: Int = 0
     var tocRequestCount: Int = 0
     val requestedChapterCids = mutableListOf<Int>()
+    val customChapterResults = mutableMapOf<Int, WenkuApiResult<String>>()
 
     override fun resolveCoverUrl(aid: Int): String = coverUrlForBinaryTest
 
@@ -907,6 +931,7 @@ private class FakeDetailAndDownloadGateway : WenkuCatalogGateway {
     ): WenkuApiResult<String> {
         if (simulateNetworkOffline) return WenkuApiResult.NetworkError("offline")
         requestedChapterCids.add(cid)
+        customChapterResults[cid]?.let { return it }
         val body = if (cid == 102) {
             "${chapterTextPrefix}第一卷插图\n<!--image-->http://pic.wenku8.cn/pictures/0/5/102/999.jpg<!--image-->"
         } else {

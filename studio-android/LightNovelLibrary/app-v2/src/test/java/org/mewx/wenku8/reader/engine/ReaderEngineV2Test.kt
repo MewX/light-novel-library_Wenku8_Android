@@ -11,6 +11,7 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -29,6 +30,7 @@ import org.mewx.wenku8.data.remote.parser.ParsedNovelListPage
 import org.mewx.wenku8.data.repository.NovelTocSyncRepository
 import org.mewx.wenku8.data.repository.ParsedChapterToc
 import org.mewx.wenku8.data.repository.ParsedVolumeToc
+import org.mewx.wenku8.ui.reader.buildWenku8WebChapterUrl
 import org.mewx.wenku8.util.DigestUtils
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
@@ -642,6 +644,157 @@ class ReaderEngineV2Test {
         buffer.close()
     }
 
+    @Test
+    fun chapterWindowBuffer_mapsEmptyServerResponseWithoutCachingAllowsSwipingPastAndRetry(): Unit = runBlocking {
+        val aid = 4358
+        database.novelDao().upsertNovel(
+            NovelEntity(aid = aid, title = "魔法使之夜 小说", author = "奈须蘑菇"),
+        )
+        tocSyncRepository.syncNovelIndexAtomically(
+            aid = aid,
+            language = Wenku8API.AppLanguage.SC,
+            requestStartedAtMs = 4_000L,
+            parsedVolumes = listOf(
+                ParsedVolumeToc(
+                    vid = 183107,
+                    volumeTitle = "第三卷 下",
+                    chapters = listOf(
+                        ParsedChapterToc(cid = 183108, chapterTitle = "8.5 鸭内基事件"),
+                        ParsedChapterToc(cid = 183223, chapterTitle = "9 橙色的魔法使"),
+                    ),
+                ),
+            ),
+        )
+
+        fakeGateway.chapterResults[183108] = WenkuApiResult.EmptyResponse
+        fakeGateway.remoteChapters[183223] = buildMultiPageChapter("第三卷 下", "9 橙色的魔法使", paragraphCount = 6)
+
+        val buffer = ChapterWindowBuffer(
+            aid = aid,
+            appLanguageProvider = { Wenku8API.AppLanguage.SC },
+            tocDao = database.tocDao(),
+            chapterContentDao = database.chapterContentDao(),
+            catalogGateway = fakeGateway,
+            novelTocSyncRepository = tocSyncRepository,
+            paginator = StaticLayoutPaginator(lineBreaker = DeterministicCellLineBreaker),
+            scope = testScope,
+            ioDispatcher = Dispatchers.Unconfined,
+            computeDispatcher = Dispatchers.Unconfined,
+        )
+
+        val config = ReaderLayoutConfig(
+            viewportWidthPx = 380,
+            viewportHeightPx = 640,
+            fontSizePx = 22f,
+            lineDistancePx = 10f,
+            paragraphDistancePx = 16f,
+            pageEdgeDistancePx = 20f,
+        )
+
+        val opened = buffer.openChapter(cid = 183108, layoutConfig = config)
+        val errSlot = opened.currentSlot as? ChapterWindowSlot.Error
+        assertNotNull("Expected Error slot for 0-byte upstream chapter", errSlot)
+        assertEquals(ChapterLoadErrorKind.EMPTY_SERVER_CONTENT, errSlot!!.kind)
+        assertEquals(ChapterWindowBuffer.EMPTY_CHAPTER_CONTENT_MESSAGE, errSlot.message)
+        assertFalse(errSlot.message.contains("数据校验异常"))
+        assertNull(
+            "Empty upstream chapter must never be persisted to Room cache",
+            database.chapterContentDao().getChapterHeader(183108),
+        )
+        // Next chapter (`183223`) must still be prefetched and loaded so reader can swipe past seamlessly.
+        assertTrue(opened.nextSlot is ChapterWindowSlot.Loaded)
+        assertEquals(183223, opened.nextSlot?.chapter?.cid)
+
+        // Swiping forward into nextSlot (`virtualPageIndex = 1`) moves cleanly onto chapter 183223.
+        val swipedNext = buffer.onVirtualPageSettled(
+            virtualPageIndex = 1,
+            expectedCoordinateRevision = opened.coordinateRevision,
+        )
+        assertEquals(183223, swipedNext.activeChapter?.cid)
+        assertTrue(swipedNext.currentSlot is ChapterWindowSlot.Loaded)
+
+        // Re-opening 183108 and retrying once upstream starts returning valid prose recovers & caches cleanly.
+        val reopened = buffer.openChapter(cid = 183108, layoutConfig = config)
+        assertTrue(reopened.currentSlot is ChapterWindowSlot.Error)
+        fakeGateway.chapterResults.remove(183108)
+        fakeGateway.remoteChapters[183108] = buildMultiPageChapter("第三卷 下", "8.5 鸭内基事件", paragraphCount = 4)
+
+        val retried = buffer.retrySlot(183108)
+        assertTrue(retried.currentSlot is ChapterWindowSlot.Loaded)
+        assertNotNull(database.chapterContentDao().getChapterHeader(183108))
+
+        buffer.close()
+    }
+
+    @Test
+    fun chapterWindowBuffer_distinguishesErrorKindsAndBuildsWenku8WebChapterUrl(): Unit = runBlocking {
+        val aid = 4358
+        database.novelDao().upsertNovel(NovelEntity(aid = aid, title = "魔法使之夜 小说"))
+        tocSyncRepository.syncNovelIndexAtomically(
+            aid = aid,
+            language = Wenku8API.AppLanguage.SC,
+            requestStartedAtMs = 5_000L,
+            parsedVolumes = listOf(
+                ParsedVolumeToc(
+                    vid = 183107,
+                    volumeTitle = "第三卷 下",
+                    chapters = listOf(
+                        ParsedChapterToc(cid = 183108, chapterTitle = "8.5 鸭内基事件"),
+                    ),
+                ),
+            ),
+        )
+
+        val config = ReaderLayoutConfig(
+            viewportWidthPx = 380,
+            viewportHeightPx = 640,
+            fontSizePx = 22f,
+            lineDistancePx = 10f,
+            paragraphDistancePx = 16f,
+            pageEdgeDistancePx = 20f,
+        )
+
+        val cases = listOf(
+            WenkuApiResult.Success("\uFEFF \u3000\r\n") to ChapterLoadErrorKind.EMPTY_SERVER_CONTENT,
+            WenkuApiResult.ParseError("<html>bad</html>") to ChapterLoadErrorKind.PARSE_ERROR,
+            WenkuApiResult.NetworkError("timeout") to ChapterLoadErrorKind.NETWORK_UNAVAILABLE,
+            WenkuApiResult.ServerErrorCode(4) to ChapterLoadErrorKind.SERVER_ERROR,
+            WenkuApiResult.ApiNotConfigured to ChapterLoadErrorKind.API_NOT_CONFIGURED,
+        )
+
+        for ((apiResult, expectedKind) in cases) {
+            fakeGateway.chapterResults[183108] = apiResult
+            val buffer = ChapterWindowBuffer(
+                aid = aid,
+                appLanguageProvider = { Wenku8API.AppLanguage.SC },
+                tocDao = database.tocDao(),
+                chapterContentDao = database.chapterContentDao(),
+                catalogGateway = fakeGateway,
+                novelTocSyncRepository = tocSyncRepository,
+                paginator = StaticLayoutPaginator(lineBreaker = DeterministicCellLineBreaker),
+                scope = testScope,
+                ioDispatcher = Dispatchers.Unconfined,
+                computeDispatcher = Dispatchers.Unconfined,
+            )
+            val snap = buffer.openChapter(cid = 183108, layoutConfig = config)
+            val slot = snap.currentSlot as ChapterWindowSlot.Error
+            assertEquals("Mismatch for $apiResult", expectedKind, slot.kind)
+            assertNull(database.chapterContentDao().getChapterHeader(183108))
+            buffer.close()
+        }
+
+        assertEquals(
+            "https://www.wenku8.net/novel/4/4358/183108.htm",
+            buildWenku8WebChapterUrl(aid = 4358, cid = 183108),
+        )
+        assertEquals(
+            "https://www.wenku8.net/novel/0/93/100.htm",
+            buildWenku8WebChapterUrl(aid = 93, cid = 100),
+        )
+        assertNull(buildWenku8WebChapterUrl(aid = 0, cid = 183108))
+        assertNull(buildWenku8WebChapterUrl(aid = 4358, cid = -1))
+    }
+
     private fun buildMultiPageChapter(
         volumeTitle: String,
         chapterTitle: String,
@@ -656,6 +809,7 @@ class ReaderEngineV2Test {
 
 private class FakeReaderEngineGateway : WenkuCatalogGateway {
     override val isApiConfigured: Boolean = true
+    val chapterResults = HashMap<Int, WenkuApiResult<String>>()
     val remoteChapters = HashMap<Int, String>()
     val requestedCids = ArrayList<Int>()
 
@@ -701,6 +855,7 @@ private class FakeReaderEngineGateway : WenkuCatalogGateway {
         appLanguage: Wenku8API.AppLanguage,
     ): WenkuApiResult<String> {
         requestedCids.add(cid)
+        chapterResults[cid]?.let { return it }
         val content = remoteChapters[cid]
         return if (content != null) {
             WenkuApiResult.Success(content)

@@ -25,6 +25,7 @@ import org.mewx.wenku8.data.local.db.entity.ChapterContentEntity
 import org.mewx.wenku8.data.local.db.entity.ChapterEntity
 import org.mewx.wenku8.data.remote.api.WenkuApiResult
 import org.mewx.wenku8.data.remote.api.WenkuCatalogGateway
+import org.mewx.wenku8.data.remote.api.isEffectivelyBlankWenkuText
 import org.mewx.wenku8.data.remote.parser.WenkuXmlParsers
 import org.mewx.wenku8.data.repository.NovelTocSyncRepository
 import org.mewx.wenku8.util.DigestUtils
@@ -65,10 +66,25 @@ sealed interface ChapterWindowSlot {
     data class Error(
         override val chapter: OrderedChapterWithVolume,
         val message: String,
+        val kind: ChapterLoadErrorKind = ChapterLoadErrorKind.GENERIC,
     ) : ChapterWindowSlot {
         override val virtualPageCount: Int = 1
     }
 }
+
+enum class ChapterLoadErrorKind {
+    GENERIC,
+    EMPTY_SERVER_CONTENT,
+    NETWORK_UNAVAILABLE,
+    SERVER_ERROR,
+    PARSE_ERROR,
+    API_NOT_CONFIGURED,
+}
+
+internal class ChapterLoadFailureException(
+    val kind: ChapterLoadErrorKind,
+    override val message: String,
+) : IllegalStateException(message)
 
 /**
  * Maps a continuous virtual Pager index (`0 until totalVirtualPages`) to its owning chapter slot
@@ -798,6 +814,8 @@ class ChapterWindowBuffer(
                     return ChapterWindowSlot.Error(
                         chapter = chapterMeta,
                         message = error.message ?: "章节加载失败",
+                        kind = (error as? ChapterLoadFailureException)?.kind
+                            ?: ChapterLoadErrorKind.GENERIC,
                     )
                 }
             }
@@ -875,8 +893,8 @@ class ChapterWindowBuffer(
         chapterMeta: OrderedChapterWithVolume,
     ): Result<String> = withContext(ioDispatcher) {
         val localText = chapterContentDao.loadChapterTextSafely(chapterMeta.cid)
-        if (!localText.isNullOrBlank()) {
-            return@withContext Result.success(localText)
+        if (!localText.isEffectivelyBlankWenkuText()) {
+            return@withContext Result.success(localText!!)
         }
 
         val activeLang = appLanguageProvider()
@@ -889,8 +907,13 @@ class ChapterWindowBuffer(
         ) {
             is WenkuApiResult.Success -> {
                 val rawText = remote.data
-                if (rawText.isBlank()) {
-                    Result.failure(IllegalStateException("服务器返回空白章节内容"))
+                if (rawText.isEffectivelyBlankWenkuText()) {
+                    Result.failure(
+                        ChapterLoadFailureException(
+                            kind = ChapterLoadErrorKind.EMPTY_SERVER_CONTENT,
+                            message = EMPTY_CHAPTER_CONTENT_MESSAGE,
+                        ),
+                    )
                 } else {
                     // Cache into Room `chapter_contents` (with pre-indexed image URLs) so offline
                     // re-opens and backward swipes are instant.
@@ -914,20 +937,39 @@ class ChapterWindowBuffer(
                 }
             }
 
+            WenkuApiResult.EmptyResponse -> Result.failure(
+                ChapterLoadFailureException(
+                    kind = ChapterLoadErrorKind.EMPTY_SERVER_CONTENT,
+                    message = EMPTY_CHAPTER_CONTENT_MESSAGE,
+                ),
+            )
+
             WenkuApiResult.ApiNotConfigured -> Result.failure(
-                IllegalStateException("当前为未配置 API 的离线构建，且本地尚未缓存该章节"),
+                ChapterLoadFailureException(
+                    kind = ChapterLoadErrorKind.API_NOT_CONFIGURED,
+                    message = "当前为未配置 API 的离线构建，且本地尚未缓存该章节",
+                ),
             )
 
             is WenkuApiResult.NetworkError -> Result.failure(
-                IllegalStateException("网络连接不可用，无法加载章节 #${chapterMeta.cid}"),
+                ChapterLoadFailureException(
+                    kind = ChapterLoadErrorKind.NETWORK_UNAVAILABLE,
+                    message = "网络连接不可用，无法加载章节 #${chapterMeta.cid}",
+                ),
             )
 
             is WenkuApiResult.ServerErrorCode -> Result.failure(
-                IllegalStateException("服务器错误码 (${remote.numericCode})"),
+                ChapterLoadFailureException(
+                    kind = ChapterLoadErrorKind.SERVER_ERROR,
+                    message = "服务器错误码 (${remote.numericCode})",
+                ),
             )
 
             is WenkuApiResult.ParseError -> Result.failure(
-                IllegalStateException("章节数据校验异常"),
+                ChapterLoadFailureException(
+                    kind = ChapterLoadErrorKind.PARSE_ERROR,
+                    message = "章节数据校验异常",
+                ),
             )
         }
     }
@@ -1016,5 +1058,7 @@ class ChapterWindowBuffer(
     companion object {
         const val PREFETCH_THRESHOLD_RATIO = 0.70f
         private const val MAX_CACHED_AST_CHAPTERS = 6
+        const val EMPTY_CHAPTER_CONTENT_MESSAGE =
+            "源站接口返回空白章节内容，该章节正文在轻小说文库 API 端暂不可用，可稍后重试或通过网页端阅读。"
     }
 }

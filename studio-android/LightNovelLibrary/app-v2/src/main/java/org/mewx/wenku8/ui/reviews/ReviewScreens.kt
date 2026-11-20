@@ -210,6 +210,7 @@ fun ReviewListScreen(
             }
             is WenkuApiResult.NetworkError,
             is WenkuApiResult.ServerErrorCode,
+            WenkuApiResult.EmptyResponse,
             is WenkuApiResult.ParseError,
             -> {
                 errorType = ReviewLoadErrorType.NETWORK_OR_SERVER
@@ -538,6 +539,7 @@ fun ReviewThreadScreen(
             }
             is WenkuApiResult.NetworkError,
             is WenkuApiResult.ServerErrorCode,
+            WenkuApiResult.EmptyResponse,
             is WenkuApiResult.ParseError,
             -> {
                 errorType = ReviewLoadErrorType.NETWORK_OR_SERVER

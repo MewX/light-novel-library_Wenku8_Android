@@ -667,7 +667,9 @@ class DiscoveryRepository(
             is WenkuApiResult.ApiNotConfigured -> DiscoveryFeedErrorKind.API_NOT_CONFIGURED to null
             is WenkuApiResult.NetworkError -> DiscoveryFeedErrorKind.NETWORK_UNREACHABLE to null
             is WenkuApiResult.ServerErrorCode -> DiscoveryFeedErrorKind.SERVER_ERROR to numericCode
-            is WenkuApiResult.ParseError -> DiscoveryFeedErrorKind.PARSE_FAILURE to null
+            WenkuApiResult.EmptyResponse,
+            is WenkuApiResult.ParseError,
+            -> DiscoveryFeedErrorKind.PARSE_FAILURE to null
             is WenkuApiResult.Success -> DiscoveryFeedErrorKind.PARSE_FAILURE to null
         }
     }

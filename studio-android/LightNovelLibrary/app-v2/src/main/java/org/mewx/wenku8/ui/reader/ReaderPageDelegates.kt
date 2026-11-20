@@ -85,6 +85,7 @@ import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
@@ -99,6 +100,7 @@ import coil3.compose.AsyncImage
 import kotlinx.coroutines.flow.distinctUntilChanged
 import org.mewx.wenku8.data.media.WenkuImageRequests
 import org.mewx.wenku8.reader.engine.ChapterBlock
+import org.mewx.wenku8.reader.engine.ChapterLoadErrorKind
 import org.mewx.wenku8.reader.engine.ChapterWindowSlot
 import org.mewx.wenku8.reader.engine.ReaderPage
 import org.mewx.wenku8.reader.engine.ReaderPageElement
@@ -429,6 +431,7 @@ fun ReaderViewportHost(
     onRequestPrevChapterInContinuousMode: () -> Unit,
     onRetryFailedSlot: (cid: Int) -> Unit,
     onOpenNetworkDiagnostics: () -> Unit,
+    onOpenChapterInBrowser: (url: String) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val isEink = LocalEinkMode.current
@@ -618,6 +621,7 @@ fun ReaderViewportHost(
                     onRequestPrevChapter = onRequestPrevChapterInContinuousMode,
                     onRetryFailedSlot = onRetryFailedSlot,
                     onOpenNetworkDiagnostics = onOpenNetworkDiagnostics,
+                    onOpenChapterInBrowser = onOpenChapterInBrowser,
                 )
             }
 
@@ -675,6 +679,7 @@ fun ReaderViewportHost(
                                 onIllustrationClicked = onIllustrationClicked,
                                 onRetryFailedSlot = onRetryFailedSlot,
                                 onOpenNetworkDiagnostics = onOpenNetworkDiagnostics,
+                                onOpenChapterInBrowser = onOpenChapterInBrowser,
                             )
                         }
                     }
@@ -890,6 +895,11 @@ half4 main(float2 fragCoord) {
 }
 """
 
+internal fun buildWenku8WebChapterUrl(aid: Int, cid: Int): String? {
+    if (aid <= 0 || cid <= 0) return null
+    return "https://www.wenku8.net/novel/${aid / 1000}/$aid/$cid.htm"
+}
+
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun ReaderResolvedPageSurface(
@@ -901,6 +911,7 @@ private fun ReaderResolvedPageSurface(
     onIllustrationClicked: (imageUrl: String, imageIndexInChapter: Int) -> Unit,
     onRetryFailedSlot: (cid: Int) -> Unit,
     onOpenNetworkDiagnostics: () -> Unit,
+    onOpenChapterInBrowser: (url: String) -> Unit = {},
 ) {
     when (val slot = resolution.slot) {
         is ChapterWindowSlot.Loaded -> {
@@ -946,6 +957,11 @@ private fun ReaderResolvedPageSurface(
         }
 
         is ChapterWindowSlot.Error -> {
+            val webChapterUrl = if (slot.kind == ChapterLoadErrorKind.EMPTY_SERVER_CONTENT) {
+                buildWenku8WebChapterUrl(aid = slot.chapter.aid, cid = slot.chapter.cid)
+            } else {
+                null
+            }
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -962,18 +978,32 @@ private fun ReaderResolvedPageSurface(
                         color = palette.primaryInkColor,
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold,
+                        textAlign = TextAlign.Center,
                     )
                     Text(
                         text = slot.message,
                         color = palette.secondaryInkColor,
                         style = MaterialTheme.typography.bodyMedium,
+                        textAlign = TextAlign.Center,
                     )
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Button(onClick = { onRetryFailedSlot(slot.chapter.cid) }) {
-                            Text("重试加载")
-                        }
-                        OutlinedButton(onClick = onOpenNetworkDiagnostics) {
-                            Text("网络检测")
+                        if (webChapterUrl != null) {
+                            Button(
+                                onClick = { onOpenChapterInBrowser(webChapterUrl) },
+                                modifier = Modifier.testTag(ReaderTestTags.ERROR_OPEN_WEB_BUTTON),
+                            ) {
+                                Text("网页端阅读")
+                            }
+                            OutlinedButton(onClick = { onRetryFailedSlot(slot.chapter.cid) }) {
+                                Text("重试加载")
+                            }
+                        } else {
+                            Button(onClick = { onRetryFailedSlot(slot.chapter.cid) }) {
+                                Text("重试加载")
+                            }
+                            OutlinedButton(onClick = onOpenNetworkDiagnostics) {
+                                Text("网络检测")
+                            }
                         }
                     }
                 }
@@ -1411,6 +1441,7 @@ private fun ContinuousScrollReaderDelegate(
     onRequestPrevChapter: () -> Unit,
     onRetryFailedSlot: (cid: Int) -> Unit,
     onOpenNetworkDiagnostics: () -> Unit,
+    onOpenChapterInBrowser: (url: String) -> Unit = {},
 ) {
     val currentSlot = snapshot.currentSlot
     if (currentSlot !is ChapterWindowSlot.Loaded) {
@@ -1425,6 +1456,7 @@ private fun ContinuousScrollReaderDelegate(
                 onIllustrationClicked = onIllustrationClicked,
                 onRetryFailedSlot = onRetryFailedSlot,
                 onOpenNetworkDiagnostics = onOpenNetworkDiagnostics,
+                onOpenChapterInBrowser = onOpenChapterInBrowser,
             )
         }
         return

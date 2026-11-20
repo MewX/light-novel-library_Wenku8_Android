@@ -194,6 +194,7 @@ class AppContainer(context: Context) {
                     WenkuApiResult.ApiNotConfigured -> Result.failure(IllegalStateException("此版本不支持实际接口检测"))
                     is WenkuApiResult.NetworkError -> Result.failure(IllegalStateException(res.debugDetail ?: "network_error"))
                     is WenkuApiResult.ServerErrorCode -> Result.failure(IllegalStateException("server_code_${res.numericCode}"))
+                    WenkuApiResult.EmptyResponse -> Result.failure(IllegalStateException("empty_response"))
                     is WenkuApiResult.ParseError -> Result.failure(IllegalStateException("parse_error"))
                 }
             }

@@ -684,6 +684,107 @@ class NetworkTransportAndProbeTest {
         assertEquals(1, dispatchedEvictCount)
     }
 
+    @Test
+    fun relayHttpTransportHandlesZeroByteAndEmptyGzipBodiesWithoutTrippingFallback() = runBlocking {
+        MockWebServer().use { server ->
+            server.start(InetAddress.getByName("127.0.0.1"), 0)
+            val port = server.port
+
+            val cookieMemory = object : WenkuSessionCookieStore {
+                override fun getPhpSessionId(): String = ""
+                override fun setPhpSessionId(sessionId: String) = Unit
+            }
+            val fakeSystemDns = Dns { host ->
+                if (host == "wenku8-relay.mewx.org") {
+                    listOf(
+                        InetAddress.getByAddress(
+                            host,
+                            IpLiteralParser.parseNumericIpBytes("127.0.0.1", requirePublicUnicast = false)!!,
+                        ),
+                    )
+                } else {
+                    throw UnknownHostException(host)
+                }
+            }
+
+            var fallbackCount = 0
+            val pinnedCandidate = PinnedRelayCandidate(
+                candidateId = "cf-loopback",
+                relayHost = "wenku8-relay.mewx.org",
+                rawIpBytes = IpLiteralParser.parseNumericIpBytes("127.0.0.1", requirePublicUnicast = false)!!,
+            )
+            val routeProvider = object : RelayRouteProvider {
+                override fun currentRouteForHost(host: String): ActiveRelayRoute {
+                    return ActiveRelayRoute(generationId = 1L, pinnedCandidate = pinnedCandidate)
+                }
+
+                override fun fallbackRouteAfterCandidateFailure(
+                    failedGenerationId: Long,
+                    failedCandidateId: String,
+                    failureBeforeSend: Boolean,
+                ): ActiveRelayRoute {
+                    fallbackCount += 1
+                    return ActiveRelayRoute(generationId = 2L, pinnedCandidate = null)
+                }
+            }
+
+            val transport = RelayHttpTransport(
+                routeProvider = routeProvider,
+                sessionCookieStore = cookieMemory,
+                systemDns = fakeSystemDns,
+                endpointConfiguredResolver = { true },
+                allowedRelayHostsProvider = { setOf("wenku8-relay.mewx.org") },
+            )
+
+            val endpointUrl = "http://wenku8-relay.mewx.org:$port/"
+            val params = ContentValues().apply {
+                put("action", "book")
+                put("do", "text")
+                put("aid", "4358")
+                put("cid", "183108")
+            }
+
+            // 1. Upstream HTTP 200 with 0-byte body (exact relay behavior for aid=4358 cid=183108)
+            server.enqueue(
+                MockResponse.Builder()
+                    .code(200)
+                    .body(Buffer())
+                    .build(),
+            )
+            val plainEmpty = transport.postForm(endpointUrl, params, isIdempotentReadOnly = true)
+            assertNotNull("HTTP 200 with 0 bytes must return empty ByteArray, not null", plainEmpty)
+            assertEquals(0, plainEmpty!!.size)
+            assertEquals(0, fallbackCount)
+
+            // 2. HTTP 200 with Content-Encoding: gzip and a truly 0-byte raw stream (must NOT throw EOFException)
+            server.enqueue(
+                MockResponse.Builder()
+                    .code(200)
+                    .addHeader("Content-Encoding", "gzip")
+                    .body(Buffer())
+                    .build(),
+            )
+            val emptyRawGzip = transport.postForm(endpointUrl, params, isIdempotentReadOnly = true)
+            assertNotNull("Zero-byte stream with Content-Encoding: gzip must return empty ByteArray", emptyRawGzip)
+            assertEquals(0, emptyRawGzip!!.size)
+            assertEquals(0, fallbackCount)
+
+            // 3. HTTP 200 with Content-Encoding: gzip and a valid gzip-compressed empty string
+            server.enqueue(
+                MockResponse.Builder()
+                    .code(200)
+                    .addHeader("Content-Encoding", "gzip")
+                    .body(Buffer().write(gzipUtf8("")))
+                    .build(),
+            )
+            val validEmptyGzip = transport.postForm(endpointUrl, params, isIdempotentReadOnly = true)
+            assertNotNull("Valid empty gzip payload must decode to empty ByteArray", validEmptyGzip)
+            assertEquals(0, validEmptyGzip!!.size)
+            assertEquals(0, fallbackCount)
+            assertEquals(3, server.requestCount)
+        }
+    }
+
     private fun gzipUtf8(text: String): ByteArray {
         val raw = ByteArrayOutputStream()
         GZIPOutputStream(raw).use { gzip ->

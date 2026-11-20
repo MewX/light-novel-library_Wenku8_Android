@@ -29,6 +29,7 @@ import org.mewx.wenku8.data.remote.parser.ParsedCloudBookshelfEntry
 import org.mewx.wenku8.data.remote.parser.ParsedNovelFullMeta
 import org.mewx.wenku8.data.remote.parser.ParsedNovelListItem
 import org.mewx.wenku8.data.remote.parser.ParsedNovelListPage
+import org.mewx.wenku8.data.remote.parser.WenkuXmlParsers
 import org.mewx.wenku8.data.remote.transport.WenkuTransport
 import org.mewx.wenku8.domain.model.DiscoveryFeedErrorKind
 import org.mewx.wenku8.domain.model.LatestFeedCategory
@@ -389,6 +390,187 @@ class DiscoveryRepositoryAndApiClientTest {
             assertEquals(20, recentHistory.size)
             assertEquals("query-25", recentHistory.first())
         }
+    }
+
+    @Test
+    fun wenkuApiClientClassifiesEmptyNullHtmlNumericAndValidChapterResponses() = runTest {
+        var nextPayloadBytes: ByteArray? = null
+        val fakeTransport = object : WenkuTransport {
+            override val isEndpointConfigured: Boolean = true
+            override suspend fun postForm(endpointUrl: String, formParams: ContentValues): ByteArray? = nextPayloadBytes
+        }
+        val jvmParamsFactory = object : org.mewx.wenku8.data.remote.api.WenkuParamsFactory {
+            override fun baseUrlOrUnknown(): String = "https://relay.example.test/api.php"
+            override fun resolveCoverUrl(aid: Int): String = "https://img.example.test/$aid.jpg"
+            override fun novelListWithInfo(
+                sortedBy: Wenku8API.NovelSortedBy,
+                page: Int,
+                lang: Wenku8API.AppLanguage,
+            ): ContentValues = ContentValues()
+            override fun searchByNovelName(query: String, lang: Wenku8API.AppLanguage): ContentValues = ContentValues()
+            override fun searchByAuthorName(query: String, lang: Wenku8API.AppLanguage): ContentValues = ContentValues()
+            override fun novelShortInfo(aid: Int, lang: Wenku8API.AppLanguage): ContentValues = ContentValues()
+            override fun novelFullMeta(aid: Int, lang: Wenku8API.AppLanguage): ContentValues = ContentValues()
+            override fun novelFullIntro(aid: Int, lang: Wenku8API.AppLanguage): ContentValues = ContentValues()
+            override fun novelIndex(aid: Int, lang: Wenku8API.AppLanguage): ContentValues = ContentValues()
+            override fun novelContent(aid: Int, cid: Int, lang: Wenku8API.AppLanguage): ContentValues = ContentValues()
+            override fun bookshelfListParams(lang: Wenku8API.AppLanguage): ContentValues = ContentValues()
+        }
+        val client = WenkuApiClient(transport = fakeTransport, paramsFactory = jvmParamsFactory)
+
+        // 1. Upstream HTTP 200 with 0 bytes (reproduces aid=4358, cid=183108)
+        nextPayloadBytes = ByteArray(0)
+        assertEquals(
+            WenkuApiResult.EmptyResponse,
+            client.fetchChapterContent(aid = 4358, cid = 183108, appLanguage = Wenku8API.AppLanguage.SC),
+        )
+
+        // 2. UTF-8 BOM + ASCII/ideographic whitespace only -> EmptyResponse
+        nextPayloadBytes = "\uFEFF \u3000\r\n\t ".toByteArray(Charsets.UTF_8)
+        assertEquals(
+            WenkuApiResult.EmptyResponse,
+            client.fetchChapterContent(aid = 4358, cid = 183108, appLanguage = Wenku8API.AppLanguage.SC),
+        )
+
+        // 3. Wenku8 literal "null" sentinel for missing chapters/intros -> EmptyResponse
+        nextPayloadBytes = "null".toByteArray(Charsets.UTF_8)
+        assertEquals(
+            WenkuApiResult.EmptyResponse,
+            client.fetchChapterContent(aid = 4358, cid = 183107, appLanguage = Wenku8API.AppLanguage.SC),
+        )
+        nextPayloadBytes = "  NULL \r\n".toByteArray(Charsets.UTF_8)
+        assertEquals(
+            WenkuApiResult.EmptyResponse,
+            client.fetchNovelFullIntro(aid = 4358, appLanguage = Wenku8API.AppLanguage.SC),
+        )
+
+        // 4. HTML gateway/welcome/WAF error pages -> ParseError (never cached as novel prose)
+        nextPayloadBytes = "<html><body><h1>Welcome</h1></body></html>".toByteArray(Charsets.UTF_8)
+        assertTrue(
+            client.fetchChapterContent(aid = 4358, cid = 183108, appLanguage = Wenku8API.AppLanguage.SC)
+                is WenkuApiResult.ParseError,
+        )
+        nextPayloadBytes = "\uFEFF  <!DOCTYPE html><html><title>Just a moment...</title></html>".toByteArray(Charsets.UTF_8)
+        assertTrue(
+            client.fetchChapterContent(aid = 4358, cid = 183108, appLanguage = Wenku8API.AppLanguage.SC)
+                is WenkuApiResult.ParseError,
+        )
+
+        // 5. Numeric error code -> ServerErrorCode
+        nextPayloadBytes = "4".toByteArray(Charsets.UTF_8)
+        assertEquals(
+            WenkuApiResult.ServerErrorCode(4),
+            client.fetchChapterContent(aid = 4358, cid = 183108, appLanguage = Wenku8API.AppLanguage.SC),
+        )
+
+        // 6. Transport failure (null bytes) -> NetworkError
+        nextPayloadBytes = null
+        assertTrue(
+            client.fetchChapterContent(aid = 4358, cid = 183108, appLanguage = Wenku8API.AppLanguage.SC)
+                is WenkuApiResult.NetworkError,
+        )
+
+        // 7. Valid chapter prose and valid intro -> Success
+        val validBody = "第三卷 下 9 橙色的魔法使\r\n\r\n　　三咲市的暮色沉入丘陵之中。"
+        nextPayloadBytes = validBody.toByteArray(Charsets.UTF_8)
+        assertEquals(
+            WenkuApiResult.Success(validBody),
+            client.fetchChapterContent(aid = 4358, cid = 183223, appLanguage = Wenku8API.AppLanguage.SC),
+        )
+        val validIntro = "1980年代后半，正是繁华与活力的时代的末期。"
+        nextPayloadBytes = validIntro.toByteArray(Charsets.UTF_8)
+        assertEquals(
+            WenkuApiResult.Success(validIntro),
+            client.fetchNovelFullIntro(aid = 4358, appLanguage = Wenku8API.AppLanguage.SC),
+        )
+    }
+
+    @Test
+    fun wenkuXmlParsersParseRealAid4358MetadataBookInfoAndVolumeToc() {
+        val metaXml = """
+            <?xml version="1.0" encoding="utf-8"?>
+            <metadata>
+            <data name="Title" aid="4358"><![CDATA[魔法使之夜 小说]]></data>
+            <data name="Author" value="奈须蘑菇"/>
+            <data name="DayHitsCount" value="823"/>
+            <data name="TotalHitsCount" value="32778"/>
+            <data name="PushCount" value="183"/>
+            <data name="FavCount" value="2525"/>
+            <data name="PressId" value="讲谈社" sid="11"/>
+            <data name="BookStatus" value="连载中"/>
+            <data name="BookLength" value="402379"/>
+            <data name="LastUpdate" value="2026-11-20"/>
+            <data name="Tags" value="校园 奇幻 魔法 战斗 恋爱"/>
+            <data name="LatestSection" cid="183630"><![CDATA[第三卷 下 11 青色的魔法]]></data>
+            </metadata>
+        """.trimIndent()
+
+        val bookInfoXml = """
+            <?xml version="1.0" encoding="utf-8"?>
+            <metadata>
+            <data name="Title" aid="4358"><![CDATA[魔法使之夜 小说]]></data>
+            <data name="Author" value="奈须蘑菇"/>
+            <data name="BookStatus" value="连载中"/>
+            <data name="LastUpdate" value="2026-11-20"/>
+            <data name="Tags" value="校园 奇幻 魔法 战斗 恋爱"/>
+            <data name="IntroPreview"><![CDATA[1980年代后半，正是繁华与活力的时代的末期。在...]]></data>
+            </metadata>
+        """.trimIndent()
+
+        val listXml = """
+            <?xml version="1.0" encoding="utf-8"?>
+            <package>
+            <volume vid="178541"><![CDATA[第一卷 上]]>
+            <chapter cid="178542"><![CDATA[0 Avenue cafe（街边咖啡馆）]]></chapter>
+            <chapter cid="178543"><![CDATA[1 不普通的人]]></chapter>
+            <chapter cid="178544"><![CDATA[2 昨天，有过这样一件事]]></chapter>
+            <chapter cid="178545"><![CDATA[2.5 此前的故事]]></chapter>
+            <chapter cid="178546"><![CDATA[3 那一夜]]></chapter>
+            <chapter cid="178547"><![CDATA[4 苍崎青子，其二]]></chapter>
+            <chapter cid="178548"><![CDATA[5 魔法使之夜 前篇]]></chapter>
+            <chapter cid="178549"><![CDATA[插图]]></chapter>
+            </volume>
+            <volume vid="181295"><![CDATA[第二卷 中]]>
+            <chapter cid="181296"><![CDATA[5 魔法使之夜 后篇①]]></chapter>
+            <chapter cid="181297"><![CDATA[5 魔法使之夜 后篇②]]></chapter>
+            <chapter cid="181298"><![CDATA[6 比狗还简单]]></chapter>
+            <chapter cid="181299"><![CDATA[7 哪有这种荒唐事啊 前篇]]></chapter>
+            <chapter cid="181300"><![CDATA[7.5 玛莎]]></chapter>
+            <chapter cid="181301"><![CDATA[8 真有这种荒唐事吗？后篇]]></chapter>
+            <chapter cid="181302"><![CDATA[7.8 白板革命]]></chapter>
+            <chapter cid="181303"><![CDATA[插图]]></chapter>
+            </volume>
+            <volume vid="183107"><![CDATA[第三卷 下]]>
+            <chapter cid="183108"><![CDATA[8.5 鸭内基事件]]></chapter>
+            <chapter cid="183223"><![CDATA[9 橙色的魔法使]]></chapter>
+            <chapter cid="183290"><![CDATA[10 对月咆哮]]></chapter>
+            <chapter cid="183630"><![CDATA[11 青色的魔法]]></chapter>
+            </volume>
+            </package>
+        """.trimIndent()
+
+        val meta = WenkuXmlParsers.parseNovelFullMeta(metaXml)
+        assertTrue(meta != null)
+        assertEquals(4358, meta!!.aid)
+        assertEquals("魔法使之夜 小说", meta.title)
+        assertEquals("奈须蘑菇", meta.author)
+        assertEquals(183630, meta.latestSectionCid)
+
+        val shortInfo = WenkuXmlParsers.parseNovelShortInfoUpdate(bookInfoXml)
+        assertTrue(shortInfo != null)
+        assertEquals(4358, shortInfo!!.aid)
+        assertEquals("魔法使之夜 小说", shortInfo.title)
+
+        val volumes = WenkuXmlParsers.parseVolumeTocList(listXml)
+        assertEquals(3, volumes.size)
+        assertEquals(20, volumes.sumOf { it.chapters.size })
+        val volume3 = volumes[2]
+        assertEquals(183107, volume3.vid)
+        assertEquals("第三卷 下", volume3.volumeTitle)
+        assertEquals(183108, volume3.chapters[0].cid)
+        assertEquals("8.5 鸭内基事件", volume3.chapters[0].chapterTitle)
+        assertEquals(183223, volume3.chapters[1].cid)
+        assertEquals("9 橙色的魔法使", volume3.chapters[1].chapterTitle)
     }
 
     private class FakeCatalogGateway : WenkuCatalogGateway {

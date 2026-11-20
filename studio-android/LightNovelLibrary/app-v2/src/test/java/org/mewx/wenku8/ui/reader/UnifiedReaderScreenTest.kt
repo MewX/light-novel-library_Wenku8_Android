@@ -19,7 +19,9 @@ import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.unit.dp
@@ -55,6 +57,7 @@ import org.mewx.wenku8.data.remote.parser.ParsedNovelListPage
 import org.mewx.wenku8.data.repository.NovelTocSyncRepository
 import org.mewx.wenku8.data.repository.ParsedChapterToc
 import org.mewx.wenku8.data.repository.ParsedVolumeToc
+import org.mewx.wenku8.reader.engine.ChapterWindowBuffer
 import org.mewx.wenku8.reader.engine.DeterministicCellLineBreaker
 import org.mewx.wenku8.reader.model.ReaderPageTurnMode
 import org.mewx.wenku8.reader.model.ReaderPaperPreset
@@ -1102,10 +1105,159 @@ class UnifiedReaderScreenTest {
         composeTestRule.waitForIdle()
         composeTestRule.onNodeWithTag("${ReaderTestTags.PAGE_CANVAS_PREFIX}CURRENT_3").assertIsDisplayed()
     }
+
+    @Test
+    fun unifiedReaderScreen_emptyServerChapterShowsClearMessageAndOpensWebReaderUrl() {
+        runBlocking {
+            database.novelDao().upsertNovel(
+                NovelEntity(aid = 4358, title = "魔法使之夜 小说", author = "奈须蘑菇"),
+            )
+            tocSyncRepository.syncNovelIndexAtomically(
+                aid = 4358,
+                language = Wenku8API.AppLanguage.SC,
+                requestStartedAtMs = 6_000L,
+                parsedVolumes = listOf(
+                    ParsedVolumeToc(
+                        vid = 183107,
+                        volumeTitle = "第三卷 下",
+                        chapters = listOf(
+                            ParsedChapterToc(cid = 183108, chapterTitle = "8.5 鸭内基事件"),
+                            ParsedChapterToc(cid = 183223, chapterTitle = "9 橙色的魔法使"),
+                        ),
+                    ),
+                ),
+            )
+        }
+        fakeGateway.customChapterResults[183108] = WenkuApiResult.EmptyResponse
+        fakeGateway.customChapterResults[183223] = WenkuApiResult.Success(
+            "第三卷 下 9 橙色的魔法使\n\n　　三咲市的暮色沉入丘陵之中。",
+        )
+
+        val openedUrls = mutableListOf<String>()
+        var currentPrefs by mutableStateOf(Wenku8UserPreferences())
+
+        composeTestRule.setContent {
+            Wenku8ExpressiveTheme(themeMode = Wenku8ThemeMode.ARCHIVAL_DAY) {
+                UnifiedReaderScreen(
+                    launchRequest = ReaderLaunchRequest(
+                        aid = 4358,
+                        vid = 183107,
+                        cid = 183108,
+                        novelTitle = "魔法使之夜 小说",
+                        volumeTitle = "第三卷 下",
+                        chapterTitle = "8.5 鸭内基事件",
+                    ),
+                    database = database,
+                    catalogGateway = fakeGateway,
+                    novelTocSyncRepository = tocSyncRepository,
+                    preferences = currentPrefs,
+                    onReaderTypographyChanged = { _, _, _, _ -> },
+                    onNavigateBack = {},
+                    onOpenExternalUrl = { openedUrls.add(it) },
+                    lineBreaker = DeterministicCellLineBreaker,
+                    ioDispatcher = Dispatchers.Main.immediate,
+                    computeDispatcher = Dispatchers.Main.immediate,
+                )
+            }
+        }
+
+        composeTestRule.waitUntil(5_000) {
+            composeTestRule
+                .onAllNodesWithTag(ReaderTestTags.ERROR_SLOT)
+                .fetchSemanticsNodes()
+                .isNotEmpty()
+        }
+
+        composeTestRule.onNodeWithTag(ReaderTestTags.ERROR_SLOT).assertIsDisplayed()
+        composeTestRule.onNodeWithText("8.5 鸭内基事件").assertIsDisplayed()
+        composeTestRule.onNodeWithText(ChapterWindowBuffer.EMPTY_CHAPTER_CONTENT_MESSAGE).assertIsDisplayed()
+        composeTestRule.onNodeWithText("重试加载").assertIsDisplayed()
+        composeTestRule.onNodeWithTag(ReaderTestTags.ERROR_OPEN_WEB_BUTTON).assertIsDisplayed()
+        composeTestRule.onAllNodesWithText("网络检测").assertCountEquals(0)
+        composeTestRule.onAllNodesWithText("章节数据校验异常").assertCountEquals(0)
+
+        composeTestRule.onNodeWithTag(ReaderTestTags.ERROR_OPEN_WEB_BUTTON).performClick()
+        assertEquals(listOf("https://www.wenku8.net/novel/4/4358/183108.htm"), openedUrls)
+
+        // Switching to continuous scroll mode must also forward onOpenChapterInBrowser cleanly.
+        currentPrefs = currentPrefs.copy(readerPageTurnMode = ReaderPageTurnMode.CONTINUOUS_SCROLL)
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag(ReaderTestTags.ERROR_OPEN_WEB_BUTTON).performClick()
+        assertEquals(
+            listOf(
+                "https://www.wenku8.net/novel/4/4358/183108.htm",
+                "https://www.wenku8.net/novel/4/4358/183108.htm",
+            ),
+            openedUrls,
+        )
+    }
+
+    @Test
+    fun unifiedReaderScreen_parseErrorShowsDataValidationMessageAndNetworkDiagnostics() {
+        runBlocking {
+            database.novelDao().upsertNovel(
+                NovelEntity(aid = 4358, title = "魔法使之夜 小说", author = "奈须蘑菇"),
+            )
+            tocSyncRepository.syncNovelIndexAtomically(
+                aid = 4358,
+                language = Wenku8API.AppLanguage.SC,
+                requestStartedAtMs = 6_100L,
+                parsedVolumes = listOf(
+                    ParsedVolumeToc(
+                        vid = 183107,
+                        volumeTitle = "第三卷 下",
+                        chapters = listOf(
+                            ParsedChapterToc(cid = 183108, chapterTitle = "8.5 鸭内基事件"),
+                        ),
+                    ),
+                ),
+            )
+        }
+        fakeGateway.customChapterResults[183108] = WenkuApiResult.ParseError("<html>Welcome</html>")
+
+        var diagnosticsClicks = 0
+        composeTestRule.setContent {
+            Wenku8ExpressiveTheme(themeMode = Wenku8ThemeMode.ARCHIVAL_DAY) {
+                UnifiedReaderScreen(
+                    launchRequest = ReaderLaunchRequest(
+                        aid = 4358,
+                        vid = 183107,
+                        cid = 183108,
+                        novelTitle = "魔法使之夜 小说",
+                        volumeTitle = "第三卷 下",
+                        chapterTitle = "8.5 鸭内基事件",
+                    ),
+                    database = database,
+                    catalogGateway = fakeGateway,
+                    novelTocSyncRepository = tocSyncRepository,
+                    preferences = Wenku8UserPreferences(),
+                    onReaderTypographyChanged = { _, _, _, _ -> },
+                    onNavigateBack = {},
+                    onOpenNetworkDiagnostics = { diagnosticsClicks += 1 },
+                    lineBreaker = DeterministicCellLineBreaker,
+                    ioDispatcher = Dispatchers.Main.immediate,
+                    computeDispatcher = Dispatchers.Main.immediate,
+                )
+            }
+        }
+
+        composeTestRule.waitUntil(5_000) {
+            composeTestRule
+                .onAllNodesWithTag(ReaderTestTags.ERROR_SLOT)
+                .fetchSemanticsNodes()
+                .isNotEmpty()
+        }
+
+        composeTestRule.onNodeWithText("章节数据校验异常").assertIsDisplayed()
+        composeTestRule.onAllNodesWithTag(ReaderTestTags.ERROR_OPEN_WEB_BUTTON).assertCountEquals(0)
+        composeTestRule.onNodeWithText("网络检测").assertIsDisplayed().performClick()
+        assertEquals(1, diagnosticsClicks)
+    }
 }
 
 private class FakeUnifiedReaderGateway : WenkuCatalogGateway {
     override val isApiConfigured: Boolean = true
+    val customChapterResults = mutableMapOf<Int, WenkuApiResult<String>>()
     val gatedChapterResponses = mutableMapOf<Int, CompletableDeferred<String>>()
     val fetchCountByCid = mutableMapOf<Int, Int>()
 
@@ -1151,6 +1303,7 @@ private class FakeUnifiedReaderGateway : WenkuCatalogGateway {
         appLanguage: Wenku8API.AppLanguage,
     ): WenkuApiResult<String> {
         fetchCountByCid[cid] = (fetchCountByCid[cid] ?: 0) + 1
+        customChapterResults[cid]?.let { return it }
         val gate = gatedChapterResponses[cid] ?: return WenkuApiResult.ApiNotConfigured
         return WenkuApiResult.Success(gate.await())
     }

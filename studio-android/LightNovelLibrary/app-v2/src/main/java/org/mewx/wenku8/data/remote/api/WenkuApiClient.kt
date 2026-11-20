@@ -33,6 +33,12 @@ sealed interface WenkuApiResult<out T> {
      */
     data class ServerErrorCode(val numericCode: Int) : WenkuApiResult<Nothing>
 
+    /**
+     * Returned when HTTP 200 succeeded with an empty/blank body (or literal `"null"` for
+     * `do=text`/`do=intro`), e.g. when Wenku8's upstream API fails to output a chapter's body.
+     */
+    data object EmptyResponse : WenkuApiResult<Nothing>
+
     /** Returned when HTTP 200 returned unexpected HTML/XML that failed validation. */
     data class ParseError(val rawPreview: String = "") : WenkuApiResult<Nothing>
 }
@@ -366,7 +372,11 @@ class WenkuApiClient(
         val params = paramsFactory.novelFullIntro(aid, appLanguage)
             ?: return WenkuApiResult.ApiNotConfigured
 
-        return executeRawTextRequest(params, isIdempotentReadOnly = true)
+        return executeRawTextRequest(
+            formParams = params,
+            isIdempotentReadOnly = true,
+            rejectNullLiteral = true,
+        )
     }
 
     override suspend fun fetchNovelVolumeToc(
@@ -391,7 +401,11 @@ class WenkuApiClient(
         val params = paramsFactory.novelContent(aid, cid, appLanguage)
             ?: return WenkuApiResult.ApiNotConfigured
 
-        return executeRawTextRequest(params, isIdempotentReadOnly = true)
+        return executeRawTextRequest(
+            formParams = params,
+            isIdempotentReadOnly = true,
+            rejectNullLiteral = true,
+        )
     }
 
     override suspend fun fetchCloudBookshelf(
@@ -417,6 +431,7 @@ class WenkuApiClient(
             WenkuApiResult.ApiNotConfigured -> richResult
             is WenkuApiResult.NetworkError -> aidResult
             is WenkuApiResult.ServerErrorCode -> aidResult
+            WenkuApiResult.EmptyResponse -> richResult
             is WenkuApiResult.ParseError -> richResult
         }
     }
@@ -560,6 +575,7 @@ class WenkuApiClient(
     private suspend fun executeRawTextRequest(
         formParams: ContentValues,
         isIdempotentReadOnly: Boolean = true,
+        rejectNullLiteral: Boolean = false,
     ): WenkuApiResult<String> {
         val endpointUrl = paramsFactory.baseUrlOrUnknown()
         if (!transport.isEndpointConfigured ||
@@ -576,9 +592,12 @@ class WenkuApiClient(
         ) ?: return WenkuApiResult.NetworkError()
 
         val rawText = String(responseBytes, StandardCharsets.UTF_8)
-        val trimmed = rawText.trim()
+        val trimmed = rawText.trim { it.isWhitespace() || it == '\uFEFF' }
         if (trimmed.isEmpty()) {
-            return WenkuApiResult.ParseError("")
+            return WenkuApiResult.EmptyResponse
+        }
+        if (rejectNullLiteral && trimmed.equals("null", ignoreCase = true)) {
+            return WenkuApiResult.EmptyResponse
         }
 
         val shortNumericError = trimmed.takeIf { it.length <= 4 }?.toIntOrNull()
@@ -586,6 +605,15 @@ class WenkuApiClient(
             return WenkuApiResult.ServerErrorCode(shortNumericError)
         }
 
+        if (trimmed.startsWith("<!doctype html", ignoreCase = true) ||
+            trimmed.startsWith("<html", ignoreCase = true)
+        ) {
+            return WenkuApiResult.ParseError(trimmed.take(120))
+        }
+
         return WenkuApiResult.Success(rawText)
     }
 }
+
+internal fun String?.isEffectivelyBlankWenkuText(): Boolean =
+    this == null || trim { it.isWhitespace() || it == '\uFEFF' }.isEmpty()

@@ -26,6 +26,7 @@ import org.mewx.wenku8.data.local.db.entity.NovelEntity
 import org.mewx.wenku8.data.local.db.entity.ReadingProgressEntity
 import org.mewx.wenku8.data.remote.api.WenkuApiResult
 import org.mewx.wenku8.data.remote.api.WenkuCatalogGateway
+import org.mewx.wenku8.data.remote.api.isEffectivelyBlankWenkuText
 import org.mewx.wenku8.data.remote.parser.ParsedCloudBookshelfEntry
 import org.mewx.wenku8.data.remote.parser.WenkuXmlParsers
 import org.mewx.wenku8.util.DigestUtils
@@ -533,6 +534,9 @@ class BookshelfRepository(
                     is WenkuApiResult.NetworkError -> {
                         return@withContext CloudBookshelfSyncOutcome.NetworkOrServerError(debugDetail = cloudResult.debugDetail)
                     }
+                    WenkuApiResult.EmptyResponse -> {
+                        return@withContext CloudBookshelfSyncOutcome.NetworkOrServerError(debugDetail = "empty_response")
+                    }
                     is WenkuApiResult.ParseError -> {
                         return@withContext CloudBookshelfSyncOutcome.NetworkOrServerError(debugDetail = cloudResult.rawPreview)
                     }
@@ -566,6 +570,10 @@ class BookshelfRepository(
 
                         is WenkuApiResult.NetworkError -> {
                             return@withContext CloudBookshelfSyncOutcome.NetworkOrServerError(debugDetail = verifyAidList.debugDetail)
+                        }
+
+                        WenkuApiResult.EmptyResponse -> {
+                            return@withContext CloudBookshelfSyncOutcome.NetworkOrServerError(debugDetail = "empty_response")
                         }
 
                         is WenkuApiResult.ParseError -> {
@@ -839,7 +847,7 @@ class BookshelfRepository(
                                     val stillOnShelf = database.novelDao().getNovelByAid(aid)?.inBookshelf == true
                                     if (!stillOnShelf) break
                                     val contentRes = catalogGateway.fetchChapterContent(aid, cid, appLanguage)
-                                    if (contentRes is WenkuApiResult.Success) {
+                                    if (contentRes is WenkuApiResult.Success && !contentRes.data.isEffectivelyBlankWenkuText()) {
                                         val text = contentRes.data
                                         val imageUrls = WenkuXmlParsers.extractChapterImageUrls(text)
                                         val jsonUrls = JSONArray(imageUrls).toString()

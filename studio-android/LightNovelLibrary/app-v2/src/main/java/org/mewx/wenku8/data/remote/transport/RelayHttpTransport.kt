@@ -586,7 +586,14 @@ class RelayHttpTransport(
         val contentEncoding = response.header("Content-Encoding")?.lowercase(Locale.ROOT).orEmpty()
         val rawStream = response.body.byteStream()
         val effectiveStream = if (contentEncoding.contains("gzip")) {
-            GZIPInputStream(BufferedInputStream(rawStream))
+            val buffered = BufferedInputStream(rawStream)
+            buffered.mark(1)
+            if (buffered.read() == -1) {
+                buffered.close()
+                return ByteArray(0)
+            }
+            buffered.reset()
+            GZIPInputStream(buffered)
         } else {
             rawStream
         }

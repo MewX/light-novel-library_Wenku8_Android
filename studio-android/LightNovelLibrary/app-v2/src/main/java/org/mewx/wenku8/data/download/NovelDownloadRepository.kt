@@ -33,6 +33,7 @@ import org.mewx.wenku8.data.media.OfflineFirstWenkuImageFetcher
 import org.mewx.wenku8.data.media.WenkuImageRequests
 import org.mewx.wenku8.data.local.db.entity.NovelEntity
 import org.mewx.wenku8.data.remote.api.WenkuApiResult
+import org.mewx.wenku8.data.remote.api.isEffectivelyBlankWenkuText
 import org.mewx.wenku8.data.remote.api.WenkuCatalogGateway
 import org.mewx.wenku8.data.remote.parser.WenkuXmlParsers
 import org.mewx.wenku8.data.repository.NovelTocSyncRepository
@@ -301,7 +302,7 @@ class NovelDownloadRepository(
                         cid = chapter.cid,
                         appLanguage = request.appLanguage,
                     )
-                    if (contentResult is WenkuApiResult.Success && contentResult.data.isNotBlank()) {
+                    if (contentResult is WenkuApiResult.Success && !contentResult.data.isEffectivelyBlankWenkuText()) {
                         val rawChapterText = contentResult.data
                         val extractedImageUrls = WenkuXmlParsers.extractChapterImageUrls(rawChapterText)
                         val encodedUrlsJson = Json.encodeToString(extractedImageUrls)

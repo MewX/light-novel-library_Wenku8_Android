@@ -172,6 +172,7 @@ import org.mewx.wenku8.reader.model.ReaderPaperPreset
 import org.mewx.wenku8.ui.components.ActionTooltipBox
 import org.mewx.wenku8.ui.components.TooltipIconButton
 import org.mewx.wenku8.ui.detail.ReaderLaunchRequest
+import org.mewx.wenku8.ui.profile.openSafeBrowserUrl
 import org.mewx.wenku8.ui.theme.LocalEinkMode
 import org.mewx.wenku8.ui.theme.Wenku8ThemeMode
 import org.mewx.wenku8.ui.theme.einkHairlineBorder
@@ -188,6 +189,7 @@ object ReaderTestTags {
     const val INLINE_IMAGE_PREFIX = "reader_inline_image_"
     const val LOADING_SLOT = "reader_loading_slot"
     const val ERROR_SLOT = "reader_error_slot"
+    const val ERROR_OPEN_WEB_BUTTON = "reader_error_open_web_button"
     const val HUD_TOP_BAR = "reader_hud_top_bar"
     const val HUD_BACK_BUTTON = "reader_hud_back_button"
     const val HUD_BOOKMARK_TOGGLE = "reader_hud_bookmark_toggle"
@@ -364,6 +366,7 @@ fun UnifiedReaderScreen(
         clickedIndex: Int,
     ) -> Unit = { _, _, _ -> },
     onOpenNetworkDiagnostics: () -> Unit = {},
+    onOpenExternalUrl: ((String) -> Unit)? = null,
     onNavigateBack: () -> Unit,
     lineBreaker: ParagraphLineBreaker = AndroidStaticLayoutLineBreaker,
     speechEngineAdapter: SpeechEngineAdapter? = null,
@@ -1734,6 +1737,13 @@ fun UnifiedReaderScreen(
                 coroutineScope.launch { windowBuffer.retrySlot(failedCid) }
             },
             onOpenNetworkDiagnostics = onOpenNetworkDiagnostics,
+            onOpenChapterInBrowser = { url ->
+                if (onOpenExternalUrl != null) {
+                    onOpenExternalUrl(url)
+                } else {
+                    openSafeBrowserUrl(context, url)
+                }
+            },
             modifier = Modifier.windowInsetsPadding(WindowInsets.displayCutout),
         )
 
