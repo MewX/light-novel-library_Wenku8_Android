@@ -39,6 +39,7 @@ import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -47,6 +48,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
@@ -63,11 +65,14 @@ import androidx.compose.material.icons.outlined.NetworkCheck
 import androidx.compose.material.icons.outlined.PhotoLibrary
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.TextFields
+import androidx.compose.material3.AppBarOverflowIndicator
+import androidx.compose.material3.AppBarRow
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilterChip
@@ -108,6 +113,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
@@ -117,6 +123,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -171,6 +178,7 @@ import org.mewx.wenku8.reader.model.ReaderPageTurnMode
 import org.mewx.wenku8.reader.model.ReaderPaperPreset
 import org.mewx.wenku8.ui.components.ActionTooltipBox
 import org.mewx.wenku8.ui.components.TooltipIconButton
+import org.mewx.wenku8.ui.components.horizontalScrollFadeEdge
 import org.mewx.wenku8.ui.detail.ReaderLaunchRequest
 import org.mewx.wenku8.ui.profile.openSafeBrowserUrl
 import org.mewx.wenku8.ui.theme.LocalEinkMode
@@ -912,6 +920,10 @@ fun UnifiedReaderScreen(
             preferences.readerPageTurnMode,
         ) {
             with(density) {
+                val dynamicEdgeReservePx = maxOf(
+                    26.dp.toPx(),
+                    11.sp.toPx() * 1.4f + 10.dp.toPx(),
+                )
                 ReaderLayoutConfig(
                     viewportWidthPx = viewportWidthPx,
                     viewportHeightPx = viewportHeightPx,
@@ -919,8 +931,8 @@ fun UnifiedReaderScreen(
                     lineDistancePx = liveLineDistanceDp.dp.toPx(),
                     paragraphDistancePx = liveParagraphDistanceDp.dp.toPx(),
                     pageEdgeDistancePx = livePageEdgeDistanceDp.dp.toPx(),
-                    headerReservePx = 26.dp.toPx(),
-                    footerReservePx = 26.dp.toPx(),
+                    headerReservePx = dynamicEdgeReservePx,
+                    footerReservePx = dynamicEdgeReservePx,
                     typeface = palette.customTypeface,
                     isVerticalBunkobon = preferences.readerPageTurnMode == ReaderPageTurnMode.VERTICAL_BUNKOBON,
                 )
@@ -1789,160 +1801,85 @@ fun UnifiedReaderScreen(
                     .einkHairlineBorder(MaterialTheme.shapes.extraSmall)
                     .testTag(ReaderTestTags.HUD_TOP_BAR),
             ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
+                BoxWithConstraints(
                     modifier = Modifier
                         .statusBarsPadding()
                         .fillMaxWidth()
                         .padding(horizontal = 8.dp, vertical = 6.dp),
                 ) {
-                    val backLabel = stringResource(R.string.action_back)
-                    TooltipIconButton(
-                        tooltipText = backLabel,
-                        onClick = onNavigateBack,
-                        modifier = Modifier.testTag(ReaderTestTags.HUD_BACK_BUTTON),
-                    ) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Outlined.ArrowBack,
-                            contentDescription = backLabel,
-                        )
-                    }
+                    // Reserve 48dp for the back button and >= 112dp for the title/subtitle column
+                    // so AppBarRow folds overflow actions cleanly into the `...` menu on narrow
+                    // screens while showing all actions directly when everything fits.
+                    val maxActionsWidth = (maxWidth - 48.dp - 112.dp).coerceAtLeast(48.dp)
 
-                    Column(
-                        modifier = Modifier
-                            .weight(1f)
-                            .padding(horizontal = 4.dp),
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth(),
                     ) {
-                        Text(
-                            text = launchRequest.novelTitle,
-                            style = MaterialTheme.typography.titleSmall,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            fontWeight = FontWeight.SemiBold,
-                        )
-                        val chapterSubtitle = snapshot.activeChapter?.let {
-                            "${it.volumeTitle} · ${it.chapterTitle}".trim(' ', '·')
-                        } ?: launchRequest.chapterTitle
-                        Text(
-                            text = chapterSubtitle,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
+                        val backLabel = stringResource(R.string.action_back)
+                        TooltipIconButton(
+                            tooltipText = backLabel,
+                            onClick = onNavigateBack,
+                            modifier = Modifier.testTag(ReaderTestTags.HUD_BACK_BUTTON),
+                        ) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Outlined.ArrowBack,
+                                contentDescription = backLabel,
+                            )
+                        }
 
-                    if (currentIllustrations.isNotEmpty()) {
-                        AssistChip(
-                            onClick = {
-                                val curImgIdx = snapshot.activeReaderPage?.elements?.firstNotNullOfOrNull { el ->
-                                    (el as? ReaderPageElement.ImageSlot)?.imageIndexInChapter
-                                } ?: 0
-                                isHudVisible = false
-                                openArtbookGallery(
-                                    cid = snapshot.activeChapter?.cid ?: launchRequest.cid,
-                                    chapterTitle = snapshot.activeChapter?.chapterTitle ?: launchRequest.chapterTitle,
-                                    urls = currentIllustrations,
-                                    clickedIdx = curImgIdx,
-                                )
-                            },
-                            leadingIcon = {
-                                Icon(
-                                    imageVector = Icons.Outlined.Collections,
-                                    contentDescription = null,
-                                )
-                            },
-                            label = { Text("插图 (${currentIllustrations.size})") },
+                        Column(
                             modifier = Modifier
-                                .padding(end = 2.dp)
-                                .testTag(ReaderTestTags.HUD_VIEW_ILLUSTRATIONS_CHIP),
-                        )
-                    }
+                                .weight(1f)
+                                .padding(horizontal = 4.dp),
+                        ) {
+                            Text(
+                                text = launchRequest.novelTitle,
+                                style = MaterialTheme.typography.titleSmall,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                fontWeight = FontWeight.SemiBold,
+                            )
+                            val chapterSubtitle = snapshot.activeChapter?.let {
+                                "${it.volumeTitle} · ${it.chapterTitle}".trim(' ', '·')
+                            } ?: launchRequest.chapterTitle
+                            Text(
+                                text = chapterSubtitle,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
 
-                    if (sameVolumeIllustrationChapters.isNotEmpty()) {
+                        val openCurrentIllustrations = {
+                            val curImgIdx = snapshot.activeReaderPage?.elements?.firstNotNullOfOrNull { el ->
+                                (el as? ReaderPageElement.ImageSlot)?.imageIndexInChapter
+                            } ?: 0
+                            isHudVisible = false
+                            openArtbookGallery(
+                                cid = snapshot.activeChapter?.cid ?: launchRequest.cid,
+                                chapterTitle = snapshot.activeChapter?.chapterTitle ?: launchRequest.chapterTitle,
+                                urls = currentIllustrations,
+                                clickedIdx = curImgIdx,
+                            )
+                        }
                         val peekLabel = stringResource(R.string.reader_action_peek_volume_illustrations)
                         val peekTooltip = stringResource(R.string.reader_action_peek_volume_illustrations_tooltip)
                         val peekLoadingLabel = stringResource(R.string.reader_peek_volume_illustrations_loading)
-                        if (currentIllustrations.isEmpty()) {
-                            ActionTooltipBox(tooltipText = peekTooltip) {
-                                AssistChip(
-                                    onClick = { openSameVolumeIllustrationsPeek() },
-                                    enabled = !isPeekingVolumeIllustrationsLoading,
-                                    leadingIcon = {
-                                        if (isPeekingVolumeIllustrationsLoading) {
-                                            CircularProgressIndicator(
-                                                strokeWidth = 2.dp,
-                                                modifier = Modifier.size(16.dp),
-                                            )
-                                        } else {
-                                            Icon(
-                                                imageVector = Icons.Outlined.PhotoLibrary,
-                                                contentDescription = null,
-                                                modifier = Modifier.size(18.dp),
-                                            )
-                                        }
-                                    },
-                                    label = {
-                                        Text(
-                                            text = if (isPeekingVolumeIllustrationsLoading) {
-                                                peekLoadingLabel
-                                            } else {
-                                                peekLabel
-                                            },
-                                        )
-                                    },
-                                    modifier = Modifier
-                                        .padding(end = 2.dp)
-                                        .testTag(ReaderTestTags.HUD_PEEK_VOLUME_ILLUSTRATIONS_BUTTON),
-                                )
-                            }
+                        val searchInBookLabel = stringResource(R.string.reader_action_search_in_book)
+                        val bookmarkToggleLabel = if (currentChapterBookmark != null) {
+                            stringResource(R.string.reader_action_remove_bookmark)
                         } else {
-                            TooltipIconButton(
-                                tooltipText = peekTooltip,
-                                enabled = !isPeekingVolumeIllustrationsLoading,
-                                onClick = { openSameVolumeIllustrationsPeek() },
-                                modifier = Modifier.testTag(ReaderTestTags.HUD_PEEK_VOLUME_ILLUSTRATIONS_BUTTON),
-                            ) {
-                                if (isPeekingVolumeIllustrationsLoading) {
-                                    CircularProgressIndicator(
-                                        strokeWidth = 2.dp,
-                                        modifier = Modifier.size(18.dp),
-                                    )
-                                } else {
-                                    Icon(
-                                        imageVector = Icons.Outlined.PhotoLibrary,
-                                        contentDescription = peekLabel,
-                                    )
-                                }
-                            }
+                            stringResource(R.string.reader_action_add_bookmark)
                         }
-                    }
-
-                    val searchInBookLabel = stringResource(R.string.reader_action_search_in_book)
-                    TooltipIconButton(
-                        tooltipText = searchInBookLabel,
-                        onClick = { isSearchSheetOpen = true },
-                        modifier = Modifier.testTag(ReaderTestTags.HUD_SEARCH_BUTTON),
-                    ) {
-                        Icon(
-                            imageVector = Icons.Outlined.Search,
-                            contentDescription = searchInBookLabel,
-                        )
-                    }
-
-                    val bookmarkToggleLabel = if (currentChapterBookmark != null) {
-                        stringResource(R.string.reader_action_remove_bookmark)
-                    } else {
-                        stringResource(R.string.reader_action_add_bookmark)
-                    }
-                    TooltipIconButton(
-                        tooltipText = bookmarkToggleLabel,
-                        onClick = {
-                            val curChapter = snapshot.activeChapter ?: return@TooltipIconButton
+                        val networkDiagLabel = stringResource(R.string.reader_action_network_diagnostics)
+                        val onToggleBookmark: () -> Unit = toggleBookmark@{
+                            val curChapter = snapshot.activeChapter ?: return@toggleBookmark
                             val curPage = snapshot.activeReaderPage
                             val isScrollMode =
                                 preferences.readerPageTurnMode == ReaderPageTurnMode.CONTINUOUS_SCROLL
-                            if (!isScrollMode && curPage == null) return@TooltipIconButton
+                            if (!isScrollMode && curPage == null) return@toggleBookmark
                             coroutineScope.launch {
                                 if (currentChapterBookmark != null) {
                                     val removedNote = currentChapterBookmark
@@ -2029,33 +1966,270 @@ fun UnifiedReaderScreen(
                                     snackbarHostState.showSnackbar("已添加书签")
                                 }
                             }
-                        },
-                        modifier = Modifier.testTag(ReaderTestTags.HUD_BOOKMARK_TOGGLE),
-                    ) {
-                        Icon(
-                            imageVector = if (currentChapterBookmark != null) {
-                                Icons.Outlined.Bookmark
-                            } else {
-                                Icons.Outlined.BookmarkBorder
-                            },
-                            contentDescription = bookmarkToggleLabel,
-                            tint = if (currentChapterBookmark != null) {
-                                MaterialTheme.colorScheme.primary
-                            } else {
-                                MaterialTheme.colorScheme.onSurface
-                            },
-                        )
-                    }
+                        }
 
-                    val networkDiagLabel = stringResource(R.string.reader_action_network_diagnostics)
-                    TooltipIconButton(
-                        tooltipText = networkDiagLabel,
-                        onClick = onOpenNetworkDiagnostics,
-                    ) {
-                        Icon(
-                            imageVector = Icons.Outlined.NetworkCheck,
-                            contentDescription = networkDiagLabel,
-                        )
+                        AppBarRow(
+                            modifier = Modifier.widthIn(max = maxActionsWidth),
+                            overflowIndicator = { menuState ->
+                                Box(
+                                    modifier = Modifier.heightIn(min = 48.dp),
+                                    contentAlignment = Alignment.Center,
+                                ) {
+                                    AppBarOverflowIndicator(menuState)
+                                }
+                            },
+                        ) {
+                            if (currentIllustrations.isNotEmpty()) {
+                                val illustrationsLabel = "插图 (${currentIllustrations.size})"
+                                customItem(
+                                    appbarContent = {
+                                        Box(
+                                            modifier = Modifier.heightIn(min = 48.dp),
+                                            contentAlignment = Alignment.Center,
+                                        ) {
+                                            AssistChip(
+                                                onClick = openCurrentIllustrations,
+                                                leadingIcon = {
+                                                    Icon(
+                                                        imageVector = Icons.Outlined.Collections,
+                                                        contentDescription = null,
+                                                    )
+                                                },
+                                                label = {
+                                                    Text(
+                                                        text = illustrationsLabel,
+                                                        maxLines = 1,
+                                                        softWrap = false,
+                                                    )
+                                                },
+                                                modifier = Modifier
+                                                    .padding(end = 2.dp)
+                                                    .testTag(ReaderTestTags.HUD_VIEW_ILLUSTRATIONS_CHIP),
+                                            )
+                                        }
+                                    },
+                                    menuContent = { state ->
+                                        DropdownMenuItem(
+                                            text = { Text(illustrationsLabel) },
+                                            leadingIcon = {
+                                                Icon(Icons.Outlined.Collections, contentDescription = null)
+                                            },
+                                            onClick = {
+                                                state.dismiss()
+                                                openCurrentIllustrations()
+                                            },
+                                            modifier = Modifier.testTag(ReaderTestTags.HUD_VIEW_ILLUSTRATIONS_CHIP),
+                                        )
+                                    },
+                                )
+                            }
+
+                            if (sameVolumeIllustrationChapters.isNotEmpty()) {
+                                customItem(
+                                    appbarContent = {
+                                        Box(
+                                            modifier = Modifier.heightIn(min = 48.dp),
+                                            contentAlignment = Alignment.Center,
+                                        ) {
+                                            if (currentIllustrations.isEmpty()) {
+                                                ActionTooltipBox(tooltipText = peekTooltip) {
+                                                    AssistChip(
+                                                        onClick = { openSameVolumeIllustrationsPeek() },
+                                                        enabled = !isPeekingVolumeIllustrationsLoading,
+                                                        leadingIcon = {
+                                                            if (isPeekingVolumeIllustrationsLoading) {
+                                                                CircularProgressIndicator(
+                                                                    strokeWidth = 2.dp,
+                                                                    modifier = Modifier.size(16.dp),
+                                                                )
+                                                            } else {
+                                                                Icon(
+                                                                    imageVector = Icons.Outlined.PhotoLibrary,
+                                                                    contentDescription = null,
+                                                                    modifier = Modifier.size(18.dp),
+                                                                )
+                                                            }
+                                                        },
+                                                        label = {
+                                                            Text(
+                                                                text = if (isPeekingVolumeIllustrationsLoading) {
+                                                                    peekLoadingLabel
+                                                                } else {
+                                                                    peekLabel
+                                                                },
+                                                                maxLines = 1,
+                                                                softWrap = false,
+                                                            )
+                                                        },
+                                                        modifier = Modifier
+                                                            .padding(end = 2.dp)
+                                                            .testTag(ReaderTestTags.HUD_PEEK_VOLUME_ILLUSTRATIONS_BUTTON),
+                                                    )
+                                                }
+                                            } else {
+                                                TooltipIconButton(
+                                                    tooltipText = peekTooltip,
+                                                    enabled = !isPeekingVolumeIllustrationsLoading,
+                                                    onClick = { openSameVolumeIllustrationsPeek() },
+                                                    modifier = Modifier.testTag(
+                                                        ReaderTestTags.HUD_PEEK_VOLUME_ILLUSTRATIONS_BUTTON,
+                                                    ),
+                                                ) {
+                                                    if (isPeekingVolumeIllustrationsLoading) {
+                                                        CircularProgressIndicator(
+                                                            strokeWidth = 2.dp,
+                                                            modifier = Modifier.size(18.dp),
+                                                        )
+                                                    } else {
+                                                        Icon(
+                                                            imageVector = Icons.Outlined.PhotoLibrary,
+                                                            contentDescription = peekLabel,
+                                                        )
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    },
+                                    menuContent = { state ->
+                                        DropdownMenuItem(
+                                            text = {
+                                                Text(
+                                                    if (isPeekingVolumeIllustrationsLoading) {
+                                                        peekLoadingLabel
+                                                    } else {
+                                                        peekLabel
+                                                    },
+                                                )
+                                            },
+                                            leadingIcon = {
+                                                Icon(Icons.Outlined.PhotoLibrary, contentDescription = null)
+                                            },
+                                            enabled = !isPeekingVolumeIllustrationsLoading,
+                                            onClick = {
+                                                state.dismiss()
+                                                openSameVolumeIllustrationsPeek()
+                                            },
+                                            modifier = Modifier.testTag(
+                                                ReaderTestTags.HUD_PEEK_VOLUME_ILLUSTRATIONS_BUTTON,
+                                            ),
+                                        )
+                                    },
+                                )
+                            }
+
+                            customItem(
+                                appbarContent = {
+                                    Box(
+                                        modifier = Modifier.heightIn(min = 48.dp),
+                                        contentAlignment = Alignment.Center,
+                                    ) {
+                                        TooltipIconButton(
+                                            tooltipText = searchInBookLabel,
+                                            onClick = { isSearchSheetOpen = true },
+                                            modifier = Modifier.testTag(ReaderTestTags.HUD_SEARCH_BUTTON),
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Outlined.Search,
+                                                contentDescription = searchInBookLabel,
+                                            )
+                                        }
+                                    }
+                                },
+                                menuContent = { state ->
+                                    DropdownMenuItem(
+                                        text = { Text(searchInBookLabel) },
+                                        leadingIcon = {
+                                            Icon(Icons.Outlined.Search, contentDescription = null)
+                                        },
+                                        onClick = {
+                                            state.dismiss()
+                                            isSearchSheetOpen = true
+                                        },
+                                        modifier = Modifier.testTag(ReaderTestTags.HUD_SEARCH_BUTTON),
+                                    )
+                                },
+                            )
+
+                            customItem(
+                                appbarContent = {
+                                    Box(
+                                        modifier = Modifier.heightIn(min = 48.dp),
+                                        contentAlignment = Alignment.Center,
+                                    ) {
+                                        TooltipIconButton(
+                                            tooltipText = bookmarkToggleLabel,
+                                            onClick = onToggleBookmark,
+                                            modifier = Modifier.testTag(ReaderTestTags.HUD_BOOKMARK_TOGGLE),
+                                        ) {
+                                            Icon(
+                                                imageVector = if (currentChapterBookmark != null) {
+                                                    Icons.Outlined.Bookmark
+                                                } else {
+                                                    Icons.Outlined.BookmarkBorder
+                                                },
+                                                contentDescription = bookmarkToggleLabel,
+                                                tint = if (currentChapterBookmark != null) {
+                                                    MaterialTheme.colorScheme.primary
+                                                } else {
+                                                    MaterialTheme.colorScheme.onSurface
+                                                },
+                                            )
+                                        }
+                                    }
+                                },
+                                menuContent = { state ->
+                                    DropdownMenuItem(
+                                        text = { Text(bookmarkToggleLabel) },
+                                        leadingIcon = {
+                                            Icon(
+                                                imageVector = if (currentChapterBookmark != null) {
+                                                    Icons.Outlined.Bookmark
+                                                } else {
+                                                    Icons.Outlined.BookmarkBorder
+                                                },
+                                                contentDescription = null,
+                                            )
+                                        },
+                                        onClick = {
+                                            state.dismiss()
+                                            onToggleBookmark()
+                                        },
+                                        modifier = Modifier.testTag(ReaderTestTags.HUD_BOOKMARK_TOGGLE),
+                                    )
+                                },
+                            )
+
+                            customItem(
+                                appbarContent = {
+                                    Box(
+                                        modifier = Modifier.heightIn(min = 48.dp),
+                                        contentAlignment = Alignment.Center,
+                                    ) {
+                                        TooltipIconButton(
+                                            tooltipText = networkDiagLabel,
+                                            onClick = onOpenNetworkDiagnostics,
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Outlined.NetworkCheck,
+                                                contentDescription = networkDiagLabel,
+                                            )
+                                        }
+                                    }
+                                },
+                                menuContent = { state ->
+                                    DropdownMenuItem(
+                                        text = { Text(networkDiagLabel) },
+                                        leadingIcon = {
+                                            Icon(Icons.Outlined.NetworkCheck, contentDescription = null)
+                                        },
+                                        onClick = {
+                                            state.dismiss()
+                                            onOpenNetworkDiagnostics()
+                                        },
+                                    )
+                                },
+                            )
+                        }
                     }
                 }
             }
@@ -2226,6 +2400,138 @@ fun UnifiedReaderScreen(
                 )
             } else if (isHudVisible) {
                 // Chapter Scrubber Card + M3e HorizontalFloatingToolbar
+                val isContinuousScrollMode =
+                    preferences.readerPageTurnMode == ReaderPageTurnMode.CONTINUOUS_SCROLL
+                val scrollBlocks = activeChapterAst?.blocks.orEmpty()
+                val totalBlocks = scrollBlocks.size.coerceAtLeast(1)
+                val curBlockPos = scrollBlocks
+                    .indexOfFirst { it.blockIndex >= continuousScrollAnchor.paragraphIndex }
+                    .let { if (it >= 0) it else 0 }
+                var scrubBlockPreviewPos by remember(curBlockPos, totalBlocks) {
+                    mutableFloatStateOf(curBlockPos.toFloat())
+                }
+                val previewPosInt = scrubBlockPreviewPos.roundToInt().coerceIn(0, totalBlocks - 1)
+                val previewPct = if (totalBlocks <= 1) {
+                    100
+                } else {
+                    ((previewPosInt.toFloat() / (totalBlocks - 1).toFloat()) * 100f)
+                        .roundToInt()
+                        .coerceIn(0, 100)
+                }
+
+                val totalPagesInCur = snapshot.currentPageCount.coerceAtLeast(1)
+                val curPageZeroBased = snapshot.activePageIndexInCurrentChapter
+                var scrubPreviewIndex by remember(curPageZeroBased, totalPagesInCur) {
+                    mutableFloatStateOf(curPageZeroBased.toFloat())
+                }
+
+                val scrubberCaption = if (isContinuousScrollMode) {
+                    "阅读进度 $previewPct% (${previewPosInt + 1} / $totalBlocks 段)"
+                } else {
+                    "第 ${scrubPreviewIndex.roundToInt() + 1} / $totalPagesInCur 页"
+                }
+
+                val scrubberSlider: @Composable (Modifier) -> Unit = { sliderModifier ->
+                    if (isContinuousScrollMode) {
+                        Slider(
+                            value = scrubBlockPreviewPos,
+                            enabled = totalBlocks > 1,
+                            valueRange = 0f..(totalBlocks - 1).coerceAtLeast(1).toFloat(),
+                            onValueChange = { raw ->
+                                scrubBlockPreviewPos = raw
+                            },
+                            onValueChangeFinished = {
+                                val targetPos = scrubBlockPreviewPos.roundToInt()
+                                    .coerceIn(0, totalBlocks - 1)
+                                val targetBlock = scrollBlocks.getOrNull(targetPos)
+                                if (targetBlock != null && targetPos != curBlockPos) {
+                                    activeFocalHighlight = null
+                                    val prevChapter = snapshot.activeChapter
+                                    if (prevChapter != null) {
+                                        undoJumpState = ReaderUndoJumpState(
+                                            cid = prevChapter.cid,
+                                            pageIndexOneBased = snapshot.activePageIndexInCurrentChapter + 1,
+                                            anchor = continuousScrollAnchor,
+                                            createdAtElapsedMs = SystemClock.elapsedRealtime(),
+                                        )
+                                    }
+                                    val permille = if (totalBlocks <= 1) {
+                                        1000
+                                    } else {
+                                        ((targetPos.toFloat() / (totalBlocks - 1).toFloat()) * 1000f)
+                                            .roundToInt()
+                                            .coerceIn(0, 1000)
+                                    }
+                                    val targetAnchor = ReadingAnchor(
+                                        paragraphIndex = targetBlock.blockIndex,
+                                        charOffset = 0,
+                                        progressPermille = permille,
+                                    )
+                                    continuousScrollAnchor = targetAnchor
+                                    continuousScrollProgress = permille / 1000f
+                                    dispatchContinuousScrollJump(
+                                        cid = activeChapterAst?.cid ?: launchRequest.cid,
+                                        paragraphIndex = targetBlock.blockIndex,
+                                        animated = false,
+                                    )
+                                    coroutineScope.launch {
+                                        windowBuffer.syncActiveAnchorInCurrentChapter(targetAnchor)
+                                        snapshot.activeChapter?.let { ch ->
+                                            persistReadingProgress(ch, targetAnchor)
+                                        }
+                                    }
+                                }
+                            },
+                            modifier = sliderModifier.testTag(ReaderTestTags.HUD_SCRUBBER_SLIDER),
+                        )
+                    } else {
+                        Slider(
+                            value = scrubPreviewIndex,
+                            enabled = totalPagesInCur > 1,
+                            valueRange = 0f..(totalPagesInCur - 1).coerceAtLeast(1).toFloat(),
+                            onValueChange = { raw ->
+                                scrubPreviewIndex = raw
+                            },
+                            onValueChangeFinished = {
+                                val targetLocalPage = scrubPreviewIndex.roundToInt()
+                                    .coerceIn(0, totalPagesInCur - 1)
+                                if (targetLocalPage != curPageZeroBased) {
+                                    activeFocalHighlight = null
+                                    val prevChapter = snapshot.activeChapter
+                                    val prevPage = snapshot.activeReaderPage
+                                    if (prevChapter != null && prevPage != null) {
+                                        undoJumpState = ReaderUndoJumpState(
+                                            cid = prevChapter.cid,
+                                            pageIndexOneBased = curPageZeroBased + 1,
+                                            anchor = prevPage.toBookmarkOrProgressAnchor(),
+                                            createdAtElapsedMs = SystemClock.elapsedRealtime(),
+                                        )
+                                    }
+                                    val originRevision = snapshot.coordinateRevision
+                                    val targetVirtual = snapshot.prevPageCount + targetLocalPage
+                                    coroutineScope.launch {
+                                        inFlightStepRef[0] = null
+                                        interruptedStepRef[0] = null
+                                        stepAnimationJob?.cancel()
+                                        programmaticSnapCount += 1
+                                        try {
+                                            pagerState.scrollToPage(targetVirtual)
+                                        } finally {
+                                            programmaticSnapCount -= 1
+                                        }
+                                        windowBuffer.onVirtualPageSettled(
+                                            virtualPageIndex = targetVirtual,
+                                            expectedCoordinateRevision = originRevision,
+                                        )
+                                    }
+                                }
+                            },
+                            modifier = sliderModifier.testTag(ReaderTestTags.HUD_SCRUBBER_SLIDER),
+                        )
+                    }
+                }
+
+                val hudFontScale = LocalDensity.current.fontScale
                 Card(
                     colors = CardDefaults.cardColors(
                         containerColor = MaterialTheme.colorScheme.surfaceContainerHigh.copy(
@@ -2238,248 +2544,286 @@ fun UnifiedReaderScreen(
                         .padding(bottom = 10.dp)
                         .einkHairlineBorder(MaterialTheme.shapes.large),
                 ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 8.dp, vertical = 4.dp),
-                    ) {
-                        TextButton(
-                            enabled = snapshot.prevSlot != null,
-                            onClick = {
-                                snapshot.prevSlot?.chapter?.cid?.let { jumpToChapterWithUndo(it) }
-                            },
-                            modifier = Modifier.testTag(ReaderTestTags.HUD_PREV_CHAPTER_BUTTON),
-                        ) {
-                            Text("上一章")
+                    BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+                        val useStackedScrubberCaption = maxWidth < 360.dp || hudFontScale > 1.1f
+                        val chapterButtonPadding = if (useStackedScrubberCaption) {
+                            PaddingValues(horizontal = 6.dp, vertical = 4.dp)
+                        } else {
+                            PaddingValues(horizontal = 12.dp, vertical = 8.dp)
                         }
 
-                        if (preferences.readerPageTurnMode == ReaderPageTurnMode.CONTINUOUS_SCROLL) {
-                            val scrollBlocks = activeChapterAst?.blocks.orEmpty()
-                            val totalBlocks = scrollBlocks.size.coerceAtLeast(1)
-                            val curBlockPos = scrollBlocks
-                                .indexOfFirst { it.blockIndex >= continuousScrollAnchor.paragraphIndex }
-                                .let { if (it >= 0) it else 0 }
-                            var scrubBlockPreviewPos by remember(curBlockPos, totalBlocks) {
-                                mutableFloatStateOf(curBlockPos.toFloat())
-                            }
-                            val previewPosInt = scrubBlockPreviewPos.roundToInt().coerceIn(0, totalBlocks - 1)
-                            val previewPct = if (totalBlocks <= 1) {
-                                100
-                            } else {
-                                ((previewPosInt.toFloat() / (totalBlocks - 1).toFloat()) * 100f)
-                                    .roundToInt()
-                                    .coerceIn(0, 100)
-                            }
-
+                        if (useStackedScrubberCaption) {
                             Column(
                                 horizontalAlignment = Alignment.CenterHorizontally,
-                                modifier = Modifier.weight(1f),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 6.dp, vertical = 4.dp),
                             ) {
                                 Text(
-                                    text = "阅读进度 $previewPct% (${previewPosInt + 1} / $totalBlocks 段)",
+                                    text = scrubberCaption,
                                     style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.padding(top = 2.dp),
                                 )
-                                Slider(
-                                    value = scrubBlockPreviewPos,
-                                    enabled = totalBlocks > 1,
-                                    valueRange = 0f..(totalBlocks - 1).coerceAtLeast(1).toFloat(),
-                                    onValueChange = { raw ->
-                                        scrubBlockPreviewPos = raw
-                                    },
-                                    onValueChangeFinished = {
-                                        val targetPos = scrubBlockPreviewPos.roundToInt()
-                                            .coerceIn(0, totalBlocks - 1)
-                                        val targetBlock = scrollBlocks.getOrNull(targetPos)
-                                        if (targetBlock != null && targetPos != curBlockPos) {
-                                            activeFocalHighlight = null
-                                            val prevChapter = snapshot.activeChapter
-                                            if (prevChapter != null) {
-                                                undoJumpState = ReaderUndoJumpState(
-                                                    cid = prevChapter.cid,
-                                                    pageIndexOneBased = snapshot.activePageIndexInCurrentChapter + 1,
-                                                    anchor = continuousScrollAnchor,
-                                                    createdAtElapsedMs = SystemClock.elapsedRealtime(),
-                                                )
-                                            }
-                                            val permille = if (totalBlocks <= 1) {
-                                                1000
-                                            } else {
-                                                ((targetPos.toFloat() / (totalBlocks - 1).toFloat()) * 1000f)
-                                                    .roundToInt()
-                                                    .coerceIn(0, 1000)
-                                            }
-                                            val targetAnchor = ReadingAnchor(
-                                                paragraphIndex = targetBlock.blockIndex,
-                                                charOffset = 0,
-                                                progressPermille = permille,
-                                            )
-                                            continuousScrollAnchor = targetAnchor
-                                            continuousScrollProgress = permille / 1000f
-                                            dispatchContinuousScrollJump(
-                                                cid = activeChapterAst?.cid ?: launchRequest.cid,
-                                                paragraphIndex = targetBlock.blockIndex,
-                                                animated = false,
-                                            )
-                                            coroutineScope.launch {
-                                                windowBuffer.syncActiveAnchorInCurrentChapter(targetAnchor)
-                                                snapshot.activeChapter?.let { ch ->
-                                                    persistReadingProgress(ch, targetAnchor)
-                                                }
-                                            }
-                                        }
-                                    },
-                                    modifier = Modifier.testTag(ReaderTestTags.HUD_SCRUBBER_SLIDER),
-                                )
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.fillMaxWidth(),
+                                ) {
+                                    TextButton(
+                                        enabled = snapshot.prevSlot != null,
+                                        onClick = {
+                                            snapshot.prevSlot?.chapter?.cid?.let { jumpToChapterWithUndo(it) }
+                                        },
+                                        contentPadding = chapterButtonPadding,
+                                        modifier = Modifier.testTag(ReaderTestTags.HUD_PREV_CHAPTER_BUTTON),
+                                    ) {
+                                        Text("上一章", maxLines = 1, softWrap = false)
+                                    }
+                                    scrubberSlider(Modifier.weight(1f))
+                                    TextButton(
+                                        enabled = snapshot.nextSlot != null,
+                                        onClick = {
+                                            snapshot.nextSlot?.chapter?.cid?.let { jumpToChapterWithUndo(it) }
+                                        },
+                                        contentPadding = chapterButtonPadding,
+                                        modifier = Modifier.testTag(ReaderTestTags.HUD_NEXT_CHAPTER_BUTTON),
+                                    ) {
+                                        Text("下一章", maxLines = 1, softWrap = false)
+                                    }
+                                }
                             }
                         } else {
-                            val totalPagesInCur = snapshot.currentPageCount.coerceAtLeast(1)
-                            val curPageZeroBased = snapshot.activePageIndexInCurrentChapter
-                            var scrubPreviewIndex by remember(curPageZeroBased, totalPagesInCur) {
-                                mutableFloatStateOf(curPageZeroBased.toFloat())
-                            }
-
-                            Column(
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                modifier = Modifier.weight(1f),
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 8.dp, vertical = 4.dp),
                             ) {
-                                Text(
-                                    text = "第 ${scrubPreviewIndex.roundToInt() + 1} / $totalPagesInCur 页",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                                Slider(
-                                    value = scrubPreviewIndex,
-                                    enabled = totalPagesInCur > 1,
-                                    valueRange = 0f..(totalPagesInCur - 1).coerceAtLeast(1).toFloat(),
-                                    onValueChange = { raw ->
-                                        scrubPreviewIndex = raw
+                                TextButton(
+                                    enabled = snapshot.prevSlot != null,
+                                    onClick = {
+                                        snapshot.prevSlot?.chapter?.cid?.let { jumpToChapterWithUndo(it) }
                                     },
-                                    onValueChangeFinished = {
-                                        val targetLocalPage = scrubPreviewIndex.roundToInt()
-                                            .coerceIn(0, totalPagesInCur - 1)
-                                        if (targetLocalPage != curPageZeroBased) {
-                                            activeFocalHighlight = null
-                                            val prevChapter = snapshot.activeChapter
-                                            val prevPage = snapshot.activeReaderPage
-                                            if (prevChapter != null && prevPage != null) {
-                                                undoJumpState = ReaderUndoJumpState(
-                                                    cid = prevChapter.cid,
-                                                    pageIndexOneBased = curPageZeroBased + 1,
-                                                    anchor = prevPage.toBookmarkOrProgressAnchor(),
-                                                    createdAtElapsedMs = SystemClock.elapsedRealtime(),
-                                                )
-                                            }
-                                            val originRevision = snapshot.coordinateRevision
-                                            val targetVirtual = snapshot.prevPageCount + targetLocalPage
-                                            coroutineScope.launch {
-                                                inFlightStepRef[0] = null
-                                                interruptedStepRef[0] = null
-                                                stepAnimationJob?.cancel()
-                                                programmaticSnapCount += 1
-                                                try {
-                                                    pagerState.scrollToPage(targetVirtual)
-                                                } finally {
-                                                    programmaticSnapCount -= 1
-                                                }
-                                                windowBuffer.onVirtualPageSettled(
-                                                    virtualPageIndex = targetVirtual,
-                                                    expectedCoordinateRevision = originRevision,
-                                                )
-                                            }
-                                        }
+                                    contentPadding = chapterButtonPadding,
+                                    modifier = Modifier.testTag(ReaderTestTags.HUD_PREV_CHAPTER_BUTTON),
+                                ) {
+                                    Text("上一章", maxLines = 1, softWrap = false)
+                                }
+                                Column(
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    modifier = Modifier.weight(1f),
+                                ) {
+                                    Text(
+                                        text = scrubberCaption,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                    scrubberSlider(Modifier)
+                                }
+                                TextButton(
+                                    enabled = snapshot.nextSlot != null,
+                                    onClick = {
+                                        snapshot.nextSlot?.chapter?.cid?.let { jumpToChapterWithUndo(it) }
                                     },
-                                    modifier = Modifier.testTag(ReaderTestTags.HUD_SCRUBBER_SLIDER),
-                                )
+                                    contentPadding = chapterButtonPadding,
+                                    modifier = Modifier.testTag(ReaderTestTags.HUD_NEXT_CHAPTER_BUTTON),
+                                ) {
+                                    Text("下一章", maxLines = 1, softWrap = false)
+                                }
                             }
-                        }
-
-                        TextButton(
-                            enabled = snapshot.nextSlot != null,
-                            onClick = {
-                                snapshot.nextSlot?.chapter?.cid?.let { jumpToChapterWithUndo(it) }
-                            },
-                            modifier = Modifier.testTag(ReaderTestTags.HUD_NEXT_CHAPTER_BUTTON),
-                        ) {
-                            Text("下一章")
                         }
                     }
                 }
 
+                val onTtsToolbarClick = {
+                    if (ttsUiState.isSessionOpen) {
+                        ttsController.togglePlayPause(latestAppLang)
+                    } else {
+                        val ast = activeChapterAst
+                        if (ast != null) {
+                            val startBlock =
+                                if (preferences.readerPageTurnMode == ReaderPageTurnMode.CONTINUOUS_SCROLL) {
+                                    continuousScrollAnchor.paragraphIndex
+                                } else {
+                                    snapshot.activeReaderPage?.startAnchor?.paragraphIndex ?: 0
+                                }
+                            isHudVisible = false
+                            ttsController.startChapter(
+                                ast = ast,
+                                startFromBlockIndex = startBlock,
+                                appLanguage = latestAppLang,
+                            )
+                        }
+                    }
+                }
+                val isCurrentlyNight = effectivePaperPreset.isDark
+                val onToggleDayNight = {
+                    val nextPreset = if (isCurrentlyNight) {
+                        preferences.lastDayPaperPreset.takeIf { !it.isDark }
+                            ?: ReaderPaperPreset.PARCHMENT
+                    } else {
+                        ReaderPaperPreset.CARBON_NIGHT
+                    }
+                    applyPaperPresetAndSyncGlobalTheme(nextPreset)
+                }
+                val ttsLabel = if (ttsUiState.isSpeaking) "朗读中" else "朗读"
+                val dayNightIcon = if (isCurrentlyNight) Icons.Outlined.LightMode else Icons.Outlined.DarkMode
+                val dayNightLabel = if (isCurrentlyNight) "日间" else "夜间"
+
                 HorizontalFloatingToolbar(
                     expanded = true,
                     colors = FloatingToolbarDefaults.standardFloatingToolbarColors(),
-                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
                     modifier = Modifier
                         .einkHairlineBorder(FloatingToolbarDefaults.ContainerShape)
                         .testTag(ReaderTestTags.HUD_FLOATING_TOOLBAR),
                 ) {
-                    ReaderToolbarActionButton(
-                        icon = Icons.AutoMirrored.Outlined.FormatListBulleted,
-                        label = "目录",
-                        tag = ReaderTestTags.ACTION_TOC,
-                        onClick = { isTocSheetOpen = true },
-                    )
-                    ReaderToolbarActionButton(
-                        icon = Icons.Outlined.TextFields,
-                        label = "排版",
-                        tag = ReaderTestTags.ACTION_TYPOGRAPHY,
-                        onClick = { isTypographyPanelOpen = true },
-                    )
-                    ReaderToolbarActionButton(
-                        icon = Icons.Outlined.AutoStories,
-                        label = "模式",
-                        tag = ReaderTestTags.ACTION_PAGE_MODE,
-                        onClick = { isPageModeSheetOpen = true },
-                    )
-                    ReaderToolbarActionButton(
-                        icon = Icons.Outlined.BookmarkBorder,
-                        label = "书签",
-                        tag = ReaderTestTags.ACTION_BOOKMARKS,
-                        onClick = { isBookmarksSheetOpen = true },
-                    )
-                    ReaderToolbarActionButton(
-                        icon = Icons.Outlined.GraphicEq,
-                        label = if (ttsUiState.isSpeaking) "朗读中" else "朗读",
-                        tag = ReaderTestTags.ACTION_TTS,
-                        onClick = {
-                            if (ttsUiState.isSessionOpen) {
-                                ttsController.togglePlayPause(latestAppLang)
-                            } else {
-                                val ast = activeChapterAst
-                                if (ast != null) {
-                                    val startBlock =
-                                        if (preferences.readerPageTurnMode == ReaderPageTurnMode.CONTINUOUS_SCROLL) {
-                                            continuousScrollAnchor.paragraphIndex
-                                        } else {
-                                            snapshot.activeReaderPage?.startAnchor?.paragraphIndex ?: 0
-                                        }
-                                    isHudVisible = false
-                                    ttsController.startChapter(
-                                        ast = ast,
-                                        startFromBlockIndex = startBlock,
-                                        appLanguage = latestAppLang,
-                                    )
-                                }
+                    AppBarRow(
+                        overflowIndicator = { menuState ->
+                            Box(
+                                modifier = Modifier.heightIn(min = 48.dp),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                AppBarOverflowIndicator(menuState)
                             }
                         },
-                    )
-                    val isCurrentlyNight = effectivePaperPreset.isDark
-                    ReaderToolbarActionButton(
-                        icon = if (isCurrentlyNight) Icons.Outlined.LightMode else Icons.Outlined.DarkMode,
-                        label = if (isCurrentlyNight) "日间" else "夜间",
-                        tag = ReaderTestTags.ACTION_DAY_NIGHT,
-                        onClick = {
-                            val nextPreset = if (isCurrentlyNight) {
-                                preferences.lastDayPaperPreset.takeIf { !it.isDark }
-                                    ?: ReaderPaperPreset.PARCHMENT
-                            } else {
-                                ReaderPaperPreset.CARBON_NIGHT
-                            }
-                            applyPaperPresetAndSyncGlobalTheme(nextPreset)
-                        },
-                    )
+                    ) {
+                        customItem(
+                            appbarContent = {
+                                ReaderToolbarActionButton(
+                                    icon = Icons.AutoMirrored.Outlined.FormatListBulleted,
+                                    label = "目录",
+                                    tag = ReaderTestTags.ACTION_TOC,
+                                    onClick = { isTocSheetOpen = true },
+                                )
+                            },
+                            menuContent = { state ->
+                                DropdownMenuItem(
+                                    text = { Text("目录") },
+                                    leadingIcon = {
+                                        Icon(
+                                            Icons.AutoMirrored.Outlined.FormatListBulleted,
+                                            contentDescription = null,
+                                        )
+                                    },
+                                    onClick = {
+                                        state.dismiss()
+                                        isTocSheetOpen = true
+                                    },
+                                    modifier = Modifier.testTag(ReaderTestTags.ACTION_TOC),
+                                )
+                            },
+                        )
+                        customItem(
+                            appbarContent = {
+                                ReaderToolbarActionButton(
+                                    icon = Icons.Outlined.TextFields,
+                                    label = "排版",
+                                    tag = ReaderTestTags.ACTION_TYPOGRAPHY,
+                                    onClick = { isTypographyPanelOpen = true },
+                                )
+                            },
+                            menuContent = { state ->
+                                DropdownMenuItem(
+                                    text = { Text("排版") },
+                                    leadingIcon = { Icon(Icons.Outlined.TextFields, contentDescription = null) },
+                                    onClick = {
+                                        state.dismiss()
+                                        isTypographyPanelOpen = true
+                                    },
+                                    modifier = Modifier.testTag(ReaderTestTags.ACTION_TYPOGRAPHY),
+                                )
+                            },
+                        )
+                        customItem(
+                            appbarContent = {
+                                ReaderToolbarActionButton(
+                                    icon = Icons.Outlined.AutoStories,
+                                    label = "模式",
+                                    tag = ReaderTestTags.ACTION_PAGE_MODE,
+                                    onClick = { isPageModeSheetOpen = true },
+                                )
+                            },
+                            menuContent = { state ->
+                                DropdownMenuItem(
+                                    text = { Text("模式") },
+                                    leadingIcon = { Icon(Icons.Outlined.AutoStories, contentDescription = null) },
+                                    onClick = {
+                                        state.dismiss()
+                                        isPageModeSheetOpen = true
+                                    },
+                                    modifier = Modifier.testTag(ReaderTestTags.ACTION_PAGE_MODE),
+                                )
+                            },
+                        )
+                        customItem(
+                            appbarContent = {
+                                ReaderToolbarActionButton(
+                                    icon = Icons.Outlined.BookmarkBorder,
+                                    label = "书签",
+                                    tag = ReaderTestTags.ACTION_BOOKMARKS,
+                                    onClick = { isBookmarksSheetOpen = true },
+                                )
+                            },
+                            menuContent = { state ->
+                                DropdownMenuItem(
+                                    text = { Text("书签") },
+                                    leadingIcon = { Icon(Icons.Outlined.BookmarkBorder, contentDescription = null) },
+                                    onClick = {
+                                        state.dismiss()
+                                        isBookmarksSheetOpen = true
+                                    },
+                                    modifier = Modifier.testTag(ReaderTestTags.ACTION_BOOKMARKS),
+                                )
+                            },
+                        )
+                        customItem(
+                            appbarContent = {
+                                ReaderToolbarActionButton(
+                                    icon = Icons.Outlined.GraphicEq,
+                                    label = ttsLabel,
+                                    tag = ReaderTestTags.ACTION_TTS,
+                                    onClick = onTtsToolbarClick,
+                                )
+                            },
+                            menuContent = { state ->
+                                DropdownMenuItem(
+                                    text = { Text(ttsLabel) },
+                                    leadingIcon = { Icon(Icons.Outlined.GraphicEq, contentDescription = null) },
+                                    onClick = {
+                                        state.dismiss()
+                                        onTtsToolbarClick()
+                                    },
+                                    modifier = Modifier.testTag(ReaderTestTags.ACTION_TTS),
+                                )
+                            },
+                        )
+                        customItem(
+                            appbarContent = {
+                                ReaderToolbarActionButton(
+                                    icon = dayNightIcon,
+                                    label = dayNightLabel,
+                                    tag = ReaderTestTags.ACTION_DAY_NIGHT,
+                                    onClick = onToggleDayNight,
+                                )
+                            },
+                            menuContent = { state ->
+                                DropdownMenuItem(
+                                    text = { Text(dayNightLabel) },
+                                    leadingIcon = { Icon(dayNightIcon, contentDescription = null) },
+                                    onClick = {
+                                        state.dismiss()
+                                        onToggleDayNight()
+                                    },
+                                    modifier = Modifier.testTag(ReaderTestTags.ACTION_DAY_NIGHT),
+                                )
+                            },
+                        )
+                    }
                 }
             }
         }
@@ -2578,6 +2922,8 @@ fun UnifiedReaderScreen(
                                         text = entry.chapterTitle,
                                         style = MaterialTheme.typography.bodyMedium,
                                         fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Normal,
+                                        maxLines = 2,
+                                        overflow = TextOverflow.Ellipsis,
                                         modifier = Modifier.weight(1f),
                                     )
                                     if (entry.isIllustrationChapter) {
@@ -2585,6 +2931,8 @@ fun UnifiedReaderScreen(
                                             text = stringResource(R.string.reader_toc_illustration_badge),
                                             style = MaterialTheme.typography.labelSmall,
                                             color = MaterialTheme.colorScheme.tertiary,
+                                            maxLines = 1,
+                                            softWrap = false,
                                             modifier = Modifier.padding(start = 8.dp),
                                         )
                                     }
@@ -2593,6 +2941,8 @@ fun UnifiedReaderScreen(
                                             text = stringResource(R.string.reader_toc_cached_badge),
                                             style = MaterialTheme.typography.labelSmall,
                                             color = MaterialTheme.colorScheme.primary,
+                                            maxLines = 1,
+                                            softWrap = false,
                                             modifier = Modifier.padding(start = 8.dp),
                                         )
                                     }
@@ -2612,6 +2962,7 @@ fun UnifiedReaderScreen(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
+                        .verticalScroll(rememberScrollState())
                         .padding(horizontal = 16.dp, vertical = 8.dp),
                     verticalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
@@ -2660,7 +3011,7 @@ fun UnifiedReaderScreen(
                             ) {
                                 RadioButton(selected = selected, onClick = null)
                                 Spacer(modifier = Modifier.width(10.dp))
-                                Column {
+                                Column(modifier = Modifier.weight(1f)) {
                                     Text(
                                         text = mode.displayTitle,
                                         style = MaterialTheme.typography.bodyLarge,
@@ -2920,15 +3271,29 @@ private fun ReaderToolbarActionButton(
     tag: String,
     onClick: () -> Unit,
 ) {
-    TextButton(
-        onClick = onClick,
-        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
-        modifier = Modifier.testTag(tag),
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+        modifier = Modifier
+            .widthIn(min = 48.dp)
+            .heightIn(min = 48.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .clickable(role = Role.Button, onClick = onClick)
+            .padding(horizontal = 6.dp, vertical = 4.dp)
+            .testTag(tag),
     ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Icon(imageVector = icon, contentDescription = label)
-            Text(text = label, style = MaterialTheme.typography.labelSmall)
-        }
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            modifier = Modifier.size(22.dp),
+        )
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            maxLines = 1,
+            softWrap = false,
+            overflow = TextOverflow.Ellipsis,
+        )
     }
 }
 
@@ -3047,17 +3412,24 @@ private fun ReaderTypographyReflowOverlay(
                 )
 
                 // Paper preset swatches
+                val paperScrollState = rememberScrollState()
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .horizontalScroll(rememberScrollState()),
+                        .horizontalScrollFadeEdge(
+                            scrollState = paperScrollState,
+                            fadeColor = containerColor,
+                            isEink = isEinkMode,
+                            einkIndicatorColor = MaterialTheme.colorScheme.outlineVariant,
+                        )
+                        .horizontalScroll(paperScrollState),
                 ) {
                     ReaderPaperPreset.entries.forEach { preset ->
                         FilterChip(
                             selected = selectedPaperPreset == preset,
                             onClick = { onSelectPaperPreset(preset) },
-                            label = { Text(preset.displayTitle) },
+                            label = { Text(preset.displayTitle, maxLines = 1, softWrap = false) },
                             modifier = Modifier.testTag("${ReaderTestTags.PAPER_PRESET_CHIP_PREFIX}${preset.name}"),
                         )
                     }
@@ -3094,21 +3466,40 @@ private fun ReaderTypographyReflowOverlay(
                     style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+                val fontScrollState = rememberScrollState()
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .horizontalScroll(rememberScrollState()),
+                        .horizontalScrollFadeEdge(
+                            scrollState = fontScrollState,
+                            fadeColor = containerColor,
+                            isEink = isEinkMode,
+                            einkIndicatorColor = MaterialTheme.colorScheme.outlineVariant,
+                        )
+                        .horizontalScroll(fontScrollState),
                 ) {
                     FilterChip(
                         selected = !isBuiltinSerifFont && !hasCustomFont,
                         onClick = onResetCustomFont,
-                        label = { Text(stringResource(R.string.profile_reader_font_default)) },
+                        label = {
+                            Text(
+                                text = stringResource(R.string.profile_reader_font_default),
+                                maxLines = 1,
+                                softWrap = false,
+                            )
+                        },
                     )
                     FilterChip(
                         selected = isBuiltinSerifFont,
                         onClick = onSelectBuiltinSerifFont,
-                        label = { Text(stringResource(R.string.profile_reader_font_serif)) },
+                        label = {
+                            Text(
+                                text = stringResource(R.string.profile_reader_font_serif),
+                                maxLines = 1,
+                                softWrap = false,
+                            )
+                        },
                     )
                     FilterChip(
                         selected = hasCustomFont,
@@ -3116,13 +3507,15 @@ private fun ReaderTypographyReflowOverlay(
                         onClick = onPickCustomFont,
                         label = {
                             Text(
-                                stringResource(
+                                text = stringResource(
                                     if (hasCustomFont) {
                                         R.string.profile_reader_font_custom_active
                                     } else {
                                         R.string.profile_reader_font_pick
                                     },
                                 ),
+                                maxLines = 1,
+                                softWrap = false,
                             )
                         },
                     )
@@ -3130,18 +3523,27 @@ private fun ReaderTypographyReflowOverlay(
 
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     OutlinedButton(
                         enabled = canImportCustomAssets,
                         onClick = onPickCustomBackground,
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
                         modifier = Modifier.weight(1f),
                     ) {
-                        Text(if (hasCustomDayBackground) "更换日间背景图" else "自定义日间背景")
+                        Text(
+                            text = if (hasCustomDayBackground) "更换日间背景图" else "自定义日间背景",
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
                     }
                     if (hasCustomDayBackground) {
-                        TextButton(onClick = onResetCustomBackground) {
-                            Text("清除背景")
+                        TextButton(
+                            onClick = onResetCustomBackground,
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
+                        ) {
+                            Text("清除背景", maxLines = 1, softWrap = false)
                         }
                     }
                 }
@@ -3188,33 +3590,54 @@ private fun TypographySliderRow(
     Column(modifier = Modifier.fillMaxWidth()) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
             modifier = Modifier.fillMaxWidth(),
         ) {
             Text(
                 text = label,
                 style = MaterialTheme.typography.labelLarge,
                 fontWeight = if (isCapsuleMode) FontWeight.Bold else FontWeight.Normal,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
             )
             if (!isCapsuleMode) {
-                Row {
-                    TextButton(
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    IconButton(
                         enabled = value > min,
                         onClick = {
                             onValueChange((value - 1).coerceAtLeast(min))
                             onValueChangeFinished()
                         },
+                        modifier = Modifier.size(38.dp),
                     ) {
-                        Text("−")
+                        Text(
+                            text = "−",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = if (value > min) {
+                                MaterialTheme.colorScheme.primary
+                            } else {
+                                MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                            },
+                        )
                     }
-                    TextButton(
+                    IconButton(
                         enabled = value < max,
                         onClick = {
                             onValueChange((value + 1).coerceAtMost(max))
                             onValueChangeFinished()
                         },
+                        modifier = Modifier.size(38.dp),
                     ) {
-                        Text("+")
+                        Text(
+                            text = "+",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = if (value < max) {
+                                MaterialTheme.colorScheme.primary
+                            } else {
+                                MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                            },
+                        )
                     }
                 }
             }
@@ -3239,6 +3662,7 @@ private fun ReaderToggleSettingRow(
 ) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
         modifier = Modifier.fillMaxWidth(),
     ) {
         Column(modifier = Modifier.weight(1f)) {
