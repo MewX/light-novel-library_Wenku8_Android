@@ -369,6 +369,12 @@
     <string name="bookshelf_sync_failed">雲端書架同步未完成，請檢查網絡連線</string>
     <string name="bookshelf_smart_update_done_format">智慧更新完成：已重新整理 %1$d 部作品（新增快取 %2$d 章）</string>
     <string name="bookshelf_cache_cleared_snackbar">已清理所選作品的離線章節快取</string>
+    <string name="bookshelf_spine3d_prev_book">上一本</string>
+    <string name="bookshelf_spine3d_next_book">下一本</string>
+    <string name="bookshelf_spine3d_fast_scroller_desc">快速滑動瀏覽書架</string>
+    <string name="bookshelf_spine3d_open_detail">查看詳情</string>
+    <string name="bookshelf_spine3d_not_started">尚未開始閱讀</string>
+    <string name="bookshelf_spine3d_index_desc_format">第 %1$d 本，共 %2$d 本</string>
 
     <string name="detail_top_bar_title_format">作品詳情 · #%1$d</string>
     <string name="detail_action_share">分享作品</string>

@@ -178,6 +178,17 @@ object BookshelfTestTags {
     const val CONFIRM_REMOVE_BUTTON = "bookshelf_confirm_remove_button"
     const val EMPTY_SHELF_STATE = "bookshelf_empty_shelf_state"
     const val EMPTY_FILTER_STATE = "bookshelf_empty_filter_state"
+    const val SPINE_3D_CONTAINER = "bookshelf_spine3d_container"
+    const val SPINE_3D_STAGE = "bookshelf_spine3d_stage"
+    const val SPINE_3D_FAST_SCROLLER = "bookshelf_spine3d_fast_scroller"
+    const val SPINE_3D_FAST_SCROLLER_TRACK = "bookshelf_spine3d_fast_scroller_track"
+    const val SPINE_3D_SCRUB_PREVIEW = "bookshelf_spine3d_scrub_preview"
+    const val SPINE_3D_PREV_BUTTON = "bookshelf_spine3d_prev_button"
+    const val SPINE_3D_NEXT_BUTTON = "bookshelf_spine3d_next_button"
+    const val SPINE_3D_INDEX_COUNTER = "bookshelf_spine3d_index_counter"
+    const val SPINE_3D_SPOTLIGHT_CARD = "bookshelf_spine3d_spotlight_card"
+    const val SPINE_3D_WIDE_PANEL = "bookshelf_spine3d_wide_panel"
+    const val SPINE_3D_PRIMARY_ACTION = "bookshelf_spine3d_primary_action"
 }
 
 /**
@@ -1955,7 +1966,7 @@ private fun BookshelfSpineShelfRow(
  */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-private fun BookshelfItemProgressIndicator(
+internal fun BookshelfItemProgressIndicator(
     item: BookshelfItemModel,
     isEinkMode: Boolean,
     showPercentageLabel: Boolean = true,
@@ -2014,7 +2025,7 @@ private fun BookshelfItemProgressIndicator(
 }
 
 @Composable
-private fun NewChapterPillBadge(
+internal fun NewChapterPillBadge(
     aid: Int,
     modifier: Modifier = Modifier,
 ) {
