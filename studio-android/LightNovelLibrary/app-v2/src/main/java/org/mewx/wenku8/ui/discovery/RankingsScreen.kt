@@ -1,15 +1,20 @@
 package org.mewx.wenku8.ui.discovery
 
 import androidx.annotation.StringRes
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
@@ -25,6 +30,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
@@ -38,6 +44,7 @@ import org.mewx.wenku8.domain.model.DiscoveryNovelCardItem
 import org.mewx.wenku8.domain.model.RankingMetric
 import org.mewx.wenku8.domain.model.RankingPeriod
 import org.mewx.wenku8.domain.model.resolveRankingSortedBy
+import org.mewx.wenku8.ui.components.horizontalScrollFadeEdge
 import org.mewx.wenku8.ui.theme.LocalEinkMode
 
 /**
@@ -112,57 +119,151 @@ fun RankingsScreen(
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
         )
 
-        SingleChoiceSegmentedButtonRow(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 4.dp),
-        ) {
+        val fontScale = LocalDensity.current.fontScale
+        val fadeColor = MaterialTheme.colorScheme.background
+        val einkIndicatorColor = MaterialTheme.colorScheme.outline
+
+        BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+            val useScrollableMetrics = maxWidth < 384.dp || fontScale > 1.05f
             val metrics = RankingMetric.entries
-            metrics.forEachIndexed { index, metric ->
-                SegmentedButton(
-                    selected = metric == selectedMetric,
-                    onClick = {
-                        if (metric == selectedMetric) {
-                            scrollActiveRankingToTop()
-                        } else {
-                            selectedMetric = metric
-                            discoveryRepository.activeRankingMetric = metric
-                        }
-                    },
-                    shape = SegmentedButtonDefaults.itemShape(index = index, count = metrics.size),
-                    label = {
-                        Text(
-                            text = stringResource(metric.labelResId()),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
+            if (useScrollableMetrics) {
+                val metricScrollState = rememberScrollState()
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScrollFadeEdge(
+                            scrollState = metricScrollState,
+                            fadeColor = fadeColor,
+                            isEink = isEink,
+                            einkIndicatorColor = einkIndicatorColor,
                         )
-                    },
-                    modifier = Modifier.testTag(DiscoveryTestTags.RANKING_METRIC_PREFIX + metric.name),
-                )
+                        .horizontalScroll(metricScrollState)
+                        .padding(horizontal = 16.dp, vertical = 4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    metrics.forEach { metric ->
+                        FilterChip(
+                            selected = metric == selectedMetric,
+                            onClick = {
+                                if (metric == selectedMetric) {
+                                    scrollActiveRankingToTop()
+                                } else {
+                                    selectedMetric = metric
+                                    discoveryRepository.activeRankingMetric = metric
+                                }
+                            },
+                            label = {
+                                Text(
+                                    text = stringResource(metric.labelResId()),
+                                    maxLines = 1,
+                                    softWrap = false,
+                                )
+                            },
+                            modifier = Modifier.testTag(DiscoveryTestTags.RANKING_METRIC_PREFIX + metric.name),
+                        )
+                    }
+                }
+            } else {
+                SingleChoiceSegmentedButtonRow(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 4.dp),
+                ) {
+                    metrics.forEachIndexed { index, metric ->
+                        SegmentedButton(
+                            selected = metric == selectedMetric,
+                            onClick = {
+                                if (metric == selectedMetric) {
+                                    scrollActiveRankingToTop()
+                                } else {
+                                    selectedMetric = metric
+                                    discoveryRepository.activeRankingMetric = metric
+                                }
+                            },
+                            shape = SegmentedButtonDefaults.itemShape(index = index, count = metrics.size),
+                            label = {
+                                Text(
+                                    text = stringResource(metric.labelResId()),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            },
+                            modifier = Modifier.testTag(DiscoveryTestTags.RANKING_METRIC_PREFIX + metric.name),
+                        )
+                    }
+                }
             }
         }
 
         if (selectedMetric.supportsTimePeriod) {
-            FlowRow(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 4.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                RankingPeriod.entries.forEach { period ->
-                    FilterChip(
-                        selected = period == selectedPeriod,
-                        onClick = {
-                            if (period == selectedPeriod) {
-                                scrollActiveRankingToTop()
-                            } else {
-                                selectedPeriod = period
-                                discoveryRepository.activeRankingPeriod = period
-                            }
-                        },
-                        label = { Text(text = stringResource(period.labelResId())) },
-                        modifier = Modifier.testTag(DiscoveryTestTags.RANKING_PERIOD_PREFIX + period.name),
-                    )
+            BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+                val useScrollablePeriods = maxWidth < 360.dp || fontScale > 1.1f
+                if (useScrollablePeriods) {
+                    val periodScrollState = rememberScrollState()
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScrollFadeEdge(
+                                scrollState = periodScrollState,
+                                fadeColor = fadeColor,
+                                isEink = isEink,
+                                einkIndicatorColor = einkIndicatorColor,
+                            )
+                            .horizontalScroll(periodScrollState)
+                            .padding(horizontal = 16.dp, vertical = 4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        RankingPeriod.entries.forEach { period ->
+                            FilterChip(
+                                selected = period == selectedPeriod,
+                                onClick = {
+                                    if (period == selectedPeriod) {
+                                        scrollActiveRankingToTop()
+                                    } else {
+                                        selectedPeriod = period
+                                        discoveryRepository.activeRankingPeriod = period
+                                    }
+                                },
+                                label = {
+                                    Text(
+                                        text = stringResource(period.labelResId()),
+                                        maxLines = 1,
+                                        softWrap = false,
+                                    )
+                                },
+                                modifier = Modifier.testTag(DiscoveryTestTags.RANKING_PERIOD_PREFIX + period.name),
+                            )
+                        }
+                    }
+                } else {
+                    FlowRow(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        RankingPeriod.entries.forEach { period ->
+                            FilterChip(
+                                selected = period == selectedPeriod,
+                                onClick = {
+                                    if (period == selectedPeriod) {
+                                        scrollActiveRankingToTop()
+                                    } else {
+                                        selectedPeriod = period
+                                        discoveryRepository.activeRankingPeriod = period
+                                    }
+                                },
+                                label = {
+                                    Text(
+                                        text = stringResource(period.labelResId()),
+                                        maxLines = 1,
+                                        softWrap = false,
+                                    )
+                                },
+                                modifier = Modifier.testTag(DiscoveryTestTags.RANKING_PERIOD_PREFIX + period.name),
+                            )
+                        }
+                    }
                 }
             }
         }

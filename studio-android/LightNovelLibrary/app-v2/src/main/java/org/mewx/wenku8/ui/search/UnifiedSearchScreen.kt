@@ -2,8 +2,10 @@ package org.mewx.wenku8.ui.search
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -21,6 +23,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -34,6 +37,8 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.FilledTonalIconButton
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -61,6 +66,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -76,7 +82,9 @@ import org.mewx.wenku8.data.repository.DiscoveryRepository
 import org.mewx.wenku8.domain.model.DiscoveryNovelCardItem
 import org.mewx.wenku8.domain.model.OnlineSearchExecutionState
 import org.mewx.wenku8.domain.model.UnifiedSearchMode
+import org.mewx.wenku8.ui.components.ActionTooltipBox
 import org.mewx.wenku8.ui.components.TooltipIconButton
+import org.mewx.wenku8.ui.components.horizontalScrollFadeEdge
 import org.mewx.wenku8.ui.discovery.DiscoveryFeedErrorCard
 import org.mewx.wenku8.ui.discovery.DiscoveryNovelCard
 import org.mewx.wenku8.ui.theme.LocalEinkMode
@@ -212,116 +220,200 @@ fun UnifiedSearchScreen(
                     .padding(horizontal = 16.dp, vertical = 12.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
+                val fontScale = LocalDensity.current.fontScale
+                val fadeColor = MaterialTheme.colorScheme.background
+                val einkIndicatorColor = MaterialTheme.colorScheme.outline
+
+                BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+                    val useCompactSearchBar = maxWidth < 352.dp || fontScale > 1.1f
                     val backLabel = stringResource(R.string.action_back)
-                    TooltipIconButton(
-                        tooltipText = backLabel,
-                        onClick = onNavigateBack,
-                        modifier = Modifier.testTag(UnifiedSearchTestTags.BACK_BUTTON),
-                    ) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Outlined.ArrowBack,
-                            contentDescription = backLabel,
-                        )
-                    }
-
+                    val searchSubmitLabel = stringResource(R.string.search_action_submit)
                     val searchFieldShape = MaterialTheme.shapes.extraLarge
-                    OutlinedTextField(
-                        value = queryText,
-                        onValueChange = { queryText = it },
-                        placeholder = {
-                            Text(
-                                text = stringResource(R.string.search_input_placeholder),
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                        },
-                        leadingIcon = {
-                            Icon(
-                                imageVector = Icons.Outlined.Search,
-                                contentDescription = null,
-                            )
-                        },
-                        trailingIcon = {
-                            if (queryText.isNotEmpty()) {
-                                val clearLabel = stringResource(R.string.action_clear)
-                                TooltipIconButton(
-                                    tooltipText = clearLabel,
-                                    onClick = {
-                                        queryText = ""
-                                        showDirectAidValidationError = false
-                                    },
-                                    modifier = Modifier.testTag(UnifiedSearchTestTags.CLEAR_QUERY_BUTTON),
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Outlined.Close,
-                                        contentDescription = clearLabel,
-                                    )
-                                }
-                            }
-                        },
-                        singleLine = true,
-                        shape = searchFieldShape,
-                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                        keyboardActions = KeyboardActions(
-                            onSearch = { triggerOnlineSearch() },
-                        ),
-                        modifier = Modifier
-                            .weight(1f)
-                            .wenku8SharedSearchBarBounds(
-                                origin = searchBarSharedOrigin,
-                                clipShape = searchFieldShape,
-                            )
-                            .focusRequester(focusRequester)
-                            .testTag(UnifiedSearchTestTags.QUERY_INPUT),
-                    )
 
-                    Button(
-                        onClick = { triggerOnlineSearch() },
-                        enabled = queryText.isNotBlank(),
-                        modifier = Modifier.testTag(UnifiedSearchTestTags.SUBMIT_BUTTON),
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
-                        Text(
-                            text = stringResource(R.string.search_action_submit),
-                            maxLines = 1,
-                        )
-                    }
-                }
-
-                // Search Scope Connected Segmented Row: 按小说标题 · 按作者名称 · AID 编号直达
-                SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-                    val modes = UnifiedSearchMode.entries
-                    modes.forEachIndexed { index, mode ->
-                        val labelText = when (mode) {
-                            UnifiedSearchMode.NOVEL_TITLE -> stringResource(R.string.search_mode_title)
-                            UnifiedSearchMode.AUTHOR_NAME -> stringResource(R.string.search_mode_author)
-                            UnifiedSearchMode.DIRECT_AID -> stringResource(R.string.search_mode_direct_aid)
+                        if (!useCompactSearchBar) {
+                            TooltipIconButton(
+                                tooltipText = backLabel,
+                                onClick = onNavigateBack,
+                                modifier = Modifier.testTag(UnifiedSearchTestTags.BACK_BUTTON),
+                            ) {
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Outlined.ArrowBack,
+                                    contentDescription = backLabel,
+                                )
+                            }
                         }
-                        SegmentedButton(
-                            selected = mode == selectedMode,
-                            onClick = {
-                                selectedMode = mode
-                                showDirectAidValidationError = false
-                            },
-                            shape = SegmentedButtonDefaults.itemShape(
-                                index = index,
-                                count = modes.size,
-                            ),
-                            label = {
+
+                        OutlinedTextField(
+                            value = queryText,
+                            onValueChange = { queryText = it },
+                            placeholder = {
                                 Text(
-                                    text = labelText,
+                                    text = stringResource(R.string.search_input_placeholder),
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
                                 )
                             },
-                            modifier = Modifier.testTag(
-                                UnifiedSearchTestTags.MODE_BUTTON_PREFIX + mode.name,
+                            leadingIcon = {
+                                if (useCompactSearchBar) {
+                                    TooltipIconButton(
+                                        tooltipText = backLabel,
+                                        onClick = onNavigateBack,
+                                        modifier = Modifier.testTag(UnifiedSearchTestTags.BACK_BUTTON),
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.AutoMirrored.Outlined.ArrowBack,
+                                            contentDescription = backLabel,
+                                        )
+                                    }
+                                } else {
+                                    Icon(
+                                        imageVector = Icons.Outlined.Search,
+                                        contentDescription = null,
+                                    )
+                                }
+                            },
+                            trailingIcon = {
+                                if (queryText.isNotEmpty()) {
+                                    val clearLabel = stringResource(R.string.action_clear)
+                                    TooltipIconButton(
+                                        tooltipText = clearLabel,
+                                        onClick = {
+                                            queryText = ""
+                                            showDirectAidValidationError = false
+                                        },
+                                        modifier = Modifier.testTag(UnifiedSearchTestTags.CLEAR_QUERY_BUTTON),
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Outlined.Close,
+                                            contentDescription = clearLabel,
+                                        )
+                                    }
+                                }
+                            },
+                            singleLine = true,
+                            shape = searchFieldShape,
+                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                            keyboardActions = KeyboardActions(
+                                onSearch = { triggerOnlineSearch() },
                             ),
+                            modifier = Modifier
+                                .weight(1f)
+                                .wenku8SharedSearchBarBounds(
+                                    origin = searchBarSharedOrigin,
+                                    clipShape = searchFieldShape,
+                                )
+                                .focusRequester(focusRequester)
+                                .testTag(UnifiedSearchTestTags.QUERY_INPUT),
                         )
+
+                        if (useCompactSearchBar) {
+                            ActionTooltipBox(tooltipText = searchSubmitLabel) {
+                                FilledTonalIconButton(
+                                    onClick = { triggerOnlineSearch() },
+                                    enabled = queryText.isNotBlank(),
+                                    modifier = Modifier.testTag(UnifiedSearchTestTags.SUBMIT_BUTTON),
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Outlined.Search,
+                                        contentDescription = searchSubmitLabel,
+                                    )
+                                }
+                            }
+                        } else {
+                            Button(
+                                onClick = { triggerOnlineSearch() },
+                                enabled = queryText.isNotBlank(),
+                                modifier = Modifier.testTag(UnifiedSearchTestTags.SUBMIT_BUTTON),
+                            ) {
+                                Text(
+                                    text = searchSubmitLabel,
+                                    maxLines = 1,
+                                    softWrap = false,
+                                )
+                            }
+                        }
+                    }
+                }
+
+                // Search Scope selector: Segmented row on normal widths; horizontal scrollable chips on narrow screens
+                BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+                    val useScrollableScopes = maxWidth < 380.dp || fontScale > 1.05f
+                    val modes = UnifiedSearchMode.entries
+                    if (useScrollableScopes) {
+                        val scopeScrollState = rememberScrollState()
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .horizontalScrollFadeEdge(
+                                    scrollState = scopeScrollState,
+                                    fadeColor = fadeColor,
+                                    isEink = isEink,
+                                    einkIndicatorColor = einkIndicatorColor,
+                                )
+                                .horizontalScroll(scopeScrollState),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            modes.forEach { mode ->
+                                val labelText = when (mode) {
+                                    UnifiedSearchMode.NOVEL_TITLE -> stringResource(R.string.search_mode_title)
+                                    UnifiedSearchMode.AUTHOR_NAME -> stringResource(R.string.search_mode_author)
+                                    UnifiedSearchMode.DIRECT_AID -> stringResource(R.string.search_mode_direct_aid)
+                                }
+                                FilterChip(
+                                    selected = mode == selectedMode,
+                                    onClick = {
+                                        selectedMode = mode
+                                        showDirectAidValidationError = false
+                                    },
+                                    label = {
+                                        Text(
+                                            text = labelText,
+                                            maxLines = 1,
+                                            softWrap = false,
+                                        )
+                                    },
+                                    modifier = Modifier.testTag(
+                                        UnifiedSearchTestTags.MODE_BUTTON_PREFIX + mode.name,
+                                    ),
+                                )
+                            }
+                        }
+                    } else {
+                        SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                            modes.forEachIndexed { index, mode ->
+                                val labelText = when (mode) {
+                                    UnifiedSearchMode.NOVEL_TITLE -> stringResource(R.string.search_mode_title)
+                                    UnifiedSearchMode.AUTHOR_NAME -> stringResource(R.string.search_mode_author)
+                                    UnifiedSearchMode.DIRECT_AID -> stringResource(R.string.search_mode_direct_aid)
+                                }
+                                SegmentedButton(
+                                    selected = mode == selectedMode,
+                                    onClick = {
+                                        selectedMode = mode
+                                        showDirectAidValidationError = false
+                                    },
+                                    shape = SegmentedButtonDefaults.itemShape(
+                                        index = index,
+                                        count = modes.size,
+                                    ),
+                                    label = {
+                                        Text(
+                                            text = labelText,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                        )
+                                    },
+                                    modifier = Modifier.testTag(
+                                        UnifiedSearchTestTags.MODE_BUTTON_PREFIX + mode.name,
+                                    ),
+                                )
+                            }
+                        }
                     }
                 }
 
@@ -414,9 +506,10 @@ fun UnifiedSearchScreen(
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
                                     verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                                 ) {
                                     Row(
+                                        modifier = Modifier.weight(1f),
                                         verticalAlignment = Alignment.CenterVertically,
                                         horizontalArrangement = Arrangement.spacedBy(6.dp),
                                     ) {
@@ -430,6 +523,8 @@ fun UnifiedSearchScreen(
                                             text = stringResource(R.string.search_history_section),
                                             style = MaterialTheme.typography.titleSmall,
                                             fontWeight = FontWeight.SemiBold,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
                                             modifier = Modifier.testTag(
                                                 UnifiedSearchTestTags.HISTORY_SECTION_HEADER,
                                             ),
@@ -446,7 +541,11 @@ fun UnifiedSearchScreen(
                                             UnifiedSearchTestTags.CLEAR_HISTORY_BUTTON,
                                         ),
                                     ) {
-                                        Text(text = stringResource(R.string.action_clear))
+                                        Text(
+                                            text = stringResource(R.string.action_clear),
+                                            maxLines = 1,
+                                            softWrap = false,
+                                        )
                                     }
                                 }
 
@@ -484,7 +583,7 @@ fun UnifiedSearchScreen(
                                                         }
                                                     },
                                                     modifier = Modifier
-                                                        .size(20.dp)
+                                                        .size(28.dp)
                                                         .testTag(
                                                             UnifiedSearchTestTags.DELETE_HISTORY_PREFIX + historyQuery,
                                                         ),
@@ -492,7 +591,7 @@ fun UnifiedSearchScreen(
                                                     Icon(
                                                         imageVector = Icons.Outlined.Close,
                                                         contentDescription = stringResource(R.string.action_clear),
-                                                        modifier = Modifier.size(14.dp),
+                                                        modifier = Modifier.size(16.dp),
                                                     )
                                                 }
                                             },
@@ -643,9 +742,14 @@ private fun CooldownQueuedCard(
                 )
                 FilledTonalButton(
                     onClick = onCancel,
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
                     modifier = Modifier.testTag(UnifiedSearchTestTags.CANCEL_COOLDOWN_BUTTON),
                 ) {
-                    Text(text = stringResource(R.string.action_cancel))
+                    Text(
+                        text = stringResource(R.string.action_cancel),
+                        maxLines = 1,
+                        softWrap = false,
+                    )
                 }
             }
 

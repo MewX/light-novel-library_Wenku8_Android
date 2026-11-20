@@ -1,11 +1,13 @@
 package org.mewx.wenku8.ui.discovery
 
 import androidx.annotation.StringRes
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.PrimaryScrollableTabRow
 import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
@@ -20,8 +22,10 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.launch
@@ -88,26 +92,48 @@ fun LatestScreen(
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
         )
 
-        PrimaryTabRow(
-            selectedTabIndex = selectedCategory.ordinal,
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            LatestFeedCategory.entries.forEach { category ->
-                Tab(
-                    selected = category == selectedCategory,
-                    onClick = {
-                        if (category == selectedCategory) {
-                            val targetSort = activeSortedBy
-                            coroutineScope.launch {
-                                feedScrollHolder.scrollToTop(targetSort, isEink)
+        val fontScale = LocalDensity.current.fontScale
+        BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+            val useScrollableTabs = maxWidth < 360.dp || fontScale > 1.15f
+            val tabContent: @Composable () -> Unit = {
+                LatestFeedCategory.entries.forEach { category ->
+                    Tab(
+                        selected = category == selectedCategory,
+                        onClick = {
+                            if (category == selectedCategory) {
+                                val targetSort = activeSortedBy
+                                coroutineScope.launch {
+                                    feedScrollHolder.scrollToTop(targetSort, isEink)
+                                }
+                            } else {
+                                selectedCategory = category
+                                discoveryRepository.activeLatestCategory = category
                             }
-                        } else {
-                            selectedCategory = category
-                            discoveryRepository.activeLatestCategory = category
-                        }
-                    },
-                    text = { Text(text = stringResource(category.labelResId())) },
-                    modifier = Modifier.testTag(DiscoveryTestTags.LATEST_TAB_PREFIX + category.name),
+                        },
+                        text = {
+                            Text(
+                                text = stringResource(category.labelResId()),
+                                maxLines = 1,
+                                softWrap = false,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        },
+                        modifier = Modifier.testTag(DiscoveryTestTags.LATEST_TAB_PREFIX + category.name),
+                    )
+                }
+            }
+            if (useScrollableTabs) {
+                PrimaryScrollableTabRow(
+                    selectedTabIndex = selectedCategory.ordinal,
+                    edgePadding = 16.dp,
+                    modifier = Modifier.fillMaxWidth(),
+                    tabs = tabContent,
+                )
+            } else {
+                PrimaryTabRow(
+                    selectedTabIndex = selectedCategory.ordinal,
+                    modifier = Modifier.fillMaxWidth(),
+                    tabs = tabContent,
                 )
             }
         }

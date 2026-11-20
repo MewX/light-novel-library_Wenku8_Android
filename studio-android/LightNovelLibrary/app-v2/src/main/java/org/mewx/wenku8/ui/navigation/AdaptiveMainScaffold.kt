@@ -26,11 +26,13 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.width
@@ -81,6 +83,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -156,6 +159,7 @@ object MainScaffoldTestTags {
 
 private val MediumWindowWidthBreakpoint = 600.dp
 private val ExpandedWindowWidthBreakpoint = 840.dp
+private val TwoPaneDetailWindowWidthBreakpoint = 960.dp
 
 @OptIn(ExperimentalSharedTransitionApi::class)
 private sealed interface ScaffoldSceneState {
@@ -587,7 +591,7 @@ fun AdaptiveMainScaffold(
         val isCompactWidth = maxWidth < MediumWindowWidthBreakpoint
         val isExpandedRailWidth = maxWidth >= ExpandedWindowWidthBreakpoint
         val isEink = LocalEinkMode.current
-        val showTwoPaneExpandedDetail = isExpandedRailWidth &&
+        val showTwoPaneExpandedDetail = maxWidth >= TwoPaneDetailWindowWidthBreakpoint &&
             !isSearchStudioOpen &&
             activeDetailNovelAid > 0 &&
             novelDetailRepository != null &&
@@ -838,7 +842,13 @@ fun AdaptiveMainScaffold(
                                                             navIcon()
                                                         }
                                                     },
-                                                    label = { Text(text = labelText) },
+                                                    label = {
+                                                        Text(
+                                                            text = labelText,
+                                                            maxLines = 1,
+                                                            overflow = TextOverflow.Ellipsis,
+                                                        )
+                                                    },
                                                     modifier = Modifier.testTag(
                                                         MainScaffoldTestTags.NAV_ITEM_PREFIX + destination.routeKey,
                                                     ),
@@ -917,13 +927,21 @@ fun AdaptiveMainScaffold(
                                     }
                                 }
                             } else {
+                                val shouldExpandRail = isExpandedRailWidth && !showTwoPaneExpandedDetail
                                 val railState = rememberWideNavigationRailState(
-                                    initialValue = if (isExpandedRailWidth) {
+                                    initialValue = if (shouldExpandRail) {
                                         WideNavigationRailValue.Expanded
                                     } else {
                                         WideNavigationRailValue.Collapsed
                                     },
                                 )
+                                LaunchedEffect(shouldExpandRail) {
+                                    if (shouldExpandRail) {
+                                        railState.expand()
+                                    } else {
+                                        railState.collapse()
+                                    }
+                                }
                                 Row(modifier = Modifier.fillMaxSize()) {
                                     WideNavigationRail(
                                         state = railState,
@@ -936,7 +954,7 @@ fun AdaptiveMainScaffold(
                                             val isSelected = destination == selectedDestination
                                             val labelText = stringResource(destination.labelResId)
                                             WideNavigationRailItem(
-                                                railExpanded = isExpandedRailWidth,
+                                                railExpanded = railState.targetValue == WideNavigationRailValue.Expanded,
                                                 selected = isSelected,
                                                 onClick = {
                                                     if (destination == selectedDestination) {
@@ -983,7 +1001,13 @@ fun AdaptiveMainScaffold(
                                                         navIcon()
                                                     }
                                                 },
-                                                label = { Text(text = labelText) },
+                                                label = {
+                                                    Text(
+                                                        text = labelText,
+                                                        maxLines = 1,
+                                                        overflow = TextOverflow.Ellipsis,
+                                                    )
+                                                },
                                                 modifier = Modifier.testTag(
                                                     MainScaffoldTestTags.NAV_ITEM_PREFIX + destination.routeKey,
                                                 ),
@@ -993,7 +1017,9 @@ fun AdaptiveMainScaffold(
 
                                     Scaffold(
                                         modifier = Modifier.weight(if (showTwoPaneExpandedDetail) 0.44f else 1f),
-                                        contentWindowInsets = WindowInsets.safeDrawing,
+                                        contentWindowInsets = WindowInsets.safeDrawing.only(
+                                            WindowInsetsSides.Top + WindowInsetsSides.Bottom + WindowInsetsSides.End,
+                                        ),
                                     ) { innerPadding ->
                                         AnimatedContent(
                                             targetState = selectedDestination,
