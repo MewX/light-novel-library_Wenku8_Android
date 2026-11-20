@@ -55,7 +55,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -285,19 +284,6 @@ internal fun Bookshelf3dShelfSection(
                         animateFocusTo(target)
                     }
                 },
-                onEinkSwipeStep = { totalDragPx, velocityPxPerSec, pitchPx ->
-                    val currentEntries = latestEntries
-                    if (currentEntries.size > 1) {
-                        val target = Bookshelf3dSnapPhysics.computeDiscreteStepTargetIndex(
-                            currentIndex = focusAnimatable.value.roundToInt(),
-                            totalDragPx = totalDragPx,
-                            velocityPxPerSec = velocityPxPerSec,
-                            stepThresholdPx = pitchPx * 0.65f,
-                            itemCount = currentEntries.size,
-                        )
-                        animateFocusTo(target)
-                    }
-                },
                 onBookTap = handleBookTap,
                 onBookLongPress = { index ->
                     latestEntries.getOrNull(index)?.item?.let { latestOnItemLongClick(it) }
@@ -410,7 +396,6 @@ private fun Bookshelf3dStage(
     isEinkMode: Boolean,
     onDragFocusDelta: (Float) -> Unit,
     onFlingReleased: (velocityPxPerSec: Float, pitchPx: Float) -> Unit,
-    onEinkSwipeStep: (totalDragPx: Float, velocityPxPerSec: Float, pitchPx: Float) -> Unit,
     onBookTap: (Int) -> Unit,
     onBookLongPress: (Int) -> Unit,
 ) {
@@ -434,20 +419,13 @@ private fun Bookshelf3dStage(
 
     val latestPoses by rememberUpdatedState(visiblePoses)
     val latestPitchPx by rememberUpdatedState(pitchPx)
-    val latestIsEinkMode by rememberUpdatedState(isEinkMode)
     val latestOnDragFocusDelta by rememberUpdatedState(onDragFocusDelta)
     val latestOnFlingReleased by rememberUpdatedState(onFlingReleased)
-    val latestOnEinkSwipeStep by rememberUpdatedState(onEinkSwipeStep)
     val latestOnBookTap by rememberUpdatedState(onBookTap)
     val latestOnBookLongPress by rememberUpdatedState(onBookLongPress)
 
-    var einkDragAccumulatedPx by remember { mutableFloatStateOf(0f) }
-
     val draggableState = rememberDraggableState { deltaPx ->
-        if (latestIsEinkMode) {
-            // Accumulate swipe distance without mid-gesture repaints on E-Ink panels.
-            einkDragAccumulatedPx += deltaPx
-        } else if (latestPitchPx > 0f) {
+        if (latestPitchPx > 0f) {
             // Dragging finger LEFT (deltaPx < 0) advances to higher indices (+deltaFocus).
             latestOnDragFocusDelta(-deltaPx / latestPitchPx)
         }
@@ -473,15 +451,8 @@ private fun Bookshelf3dStage(
                 state = draggableState,
                 orientation = Orientation.Horizontal,
                 enabled = entries.size > 1,
-                onDragStarted = { einkDragAccumulatedPx = 0f },
                 onDragStopped = { velocityPxPerSec ->
-                    if (latestIsEinkMode) {
-                        val totalDrag = einkDragAccumulatedPx
-                        einkDragAccumulatedPx = 0f
-                        latestOnEinkSwipeStep(totalDrag, velocityPxPerSec, latestPitchPx)
-                    } else {
-                        latestOnFlingReleased(velocityPxPerSec, latestPitchPx)
-                    }
+                    latestOnFlingReleased(velocityPxPerSec, latestPitchPx)
                 },
             )
             .pointerInput(entries.size) {

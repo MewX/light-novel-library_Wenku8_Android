@@ -501,8 +501,8 @@ class Bookshelf3dShelfSectionTest {
     }
 
     @Test
-    fun einkMode_swipesStepExactlyOneBookAtATimeInPlace_andFastScrubberQuantizesDiscretely() {
-        val items = sampleItems(8)
+    fun einkMode_continuousStageDragStepsDiscretelyAcrossBooks_andFastScrubberQuantizes() {
+        val items = sampleItems(12)
         val openedAids = mutableListOf<Int>()
 
         composeRule.setContent {
@@ -524,35 +524,36 @@ class Bookshelf3dShelfSectionTest {
         }
         composeRule.waitForIdle()
 
-        composeRule.onNodeWithTag(BookshelfTestTags.SPINE_3D_INDEX_COUNTER).assertTextContains("01 / 08")
+        composeRule.onNodeWithTag(BookshelfTestTags.SPINE_3D_INDEX_COUNTER).assertTextContains("01 / 12")
 
-        // 1. A full swipeLeft on the 3D stage in E-Ink mode steps strictly +1 book (no inertia fling)
+        // 1. A continuous swipeLeft across the book spines in E-Ink mode advances smoothly across
+        // multiple books (not locked to 1 book per gesture) while snapping discretely with no 3D tween
         composeRule.onNodeWithTag(BookshelfTestTags.SPINE_3D_STAGE).performTouchInput {
             swipeLeft()
         }
         composeRule.waitForIdle()
-        composeRule.onNodeWithTag(BookshelfTestTags.SPINE_3D_INDEX_COUNTER).assertTextContains("02 / 08")
+        val afterSwipeLeftText = composeRule.onNodeWithTag(BookshelfTestTags.SPINE_3D_INDEX_COUNTER)
+            .fetchSemanticsNode()
+            .config
+            .toString()
+        assertTrue(
+            "Expected continuous E-Ink swipeLeft to advance multiple books past 02 / 12 (counter=$afterSwipeLeftText)",
+            !afterSwipeLeftText.contains("01 / 12") && !afterSwipeLeftText.contains("02 / 12"),
+        )
 
-        // 2. A second swipeLeft steps strictly +1 again -> 03 / 08
-        composeRule.onNodeWithTag(BookshelfTestTags.SPINE_3D_STAGE).performTouchInput {
-            swipeLeft()
-        }
-        composeRule.waitForIdle()
-        composeRule.onNodeWithTag(BookshelfTestTags.SPINE_3D_INDEX_COUNTER).assertTextContains("03 / 08")
-
-        // 3. A swipeRight retreats strictly -1 -> 02 / 08
+        // 2. Swiping right glides continuously back toward the beginning
         composeRule.onNodeWithTag(BookshelfTestTags.SPINE_3D_STAGE).performTouchInput {
             swipeRight()
         }
         composeRule.waitForIdle()
-        composeRule.onNodeWithTag(BookshelfTestTags.SPINE_3D_INDEX_COUNTER).assertTextContains("02 / 08")
+        composeRule.onNodeWithTag(BookshelfTestTags.SPINE_3D_INDEX_COUNTER).assertTextContains("01 / 12")
 
-        // 4. Tapping the popped-up focused book (aid=1002) opens it immediately
-        composeRule.onNodeWithTag(BookshelfTestTags.BOOK_CARD_PREFIX + 1002).performClick()
+        // 3. Tapping the popped-up focused book (aid=1001) opens it immediately
+        composeRule.onNodeWithTag(BookshelfTestTags.BOOK_CARD_PREFIX + 1001).performClick()
         composeRule.waitForIdle()
-        assertEquals(listOf(1002), openedAids)
+        assertEquals(listOf(1001), openedAids)
 
-        // 5. Dragging the fast scrollbar in E-Ink mode quantizes to discrete integer books cleanly
+        // 4. Dragging the fast scrollbar in E-Ink mode quantizes to discrete integer books cleanly
         composeRule.onNodeWithTag(BookshelfTestTags.SPINE_3D_FAST_SCROLLER_TRACK).performTouchInput {
             down(Offset(width * 0.2f, centerY))
             moveTo(Offset(width * 0.52f, centerY))
@@ -568,7 +569,8 @@ class Bookshelf3dShelfSectionTest {
         }
         composeRule.waitForIdle()
         composeRule.onNodeWithTag(BookshelfTestTags.SPINE_3D_SCRUB_PREVIEW).assertDoesNotExist()
-        composeRule.onNodeWithTag(BookshelfTestTags.SPINE_3D_INDEX_COUNTER).assertTextContains("07 / 08")
+        composeRule.onNodeWithTag(BookshelfTestTags.SPINE_3D_INDEX_COUNTER).assertTextContains("10 / 12")
     }
 }
+
 

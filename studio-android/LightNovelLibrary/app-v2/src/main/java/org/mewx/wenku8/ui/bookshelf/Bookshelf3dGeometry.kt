@@ -616,34 +616,6 @@ object Bookshelf3dSnapPhysics {
     }
 
     /**
-     * Computes a discrete single-book target index `[0..itemCount - 1]` for E-Ink mode swipes:
-     * each horizontal swipe shifts by at most 1 book in place with zero multi-book inertia fling.
-     *
-     * Sign convention matches natural touch scrolling:
-     * - Swiping finger LEFT (`totalDragPx < 0` or `velocityPxPerSec < 0`) advances `+1`.
-     * - Swiping finger RIGHT (`totalDragPx > 0` or `velocityPxPerSec > 0`) retreats `-1`.
-     */
-    fun computeDiscreteStepTargetIndex(
-        currentIndex: Int,
-        totalDragPx: Float,
-        velocityPxPerSec: Float,
-        stepThresholdPx: Float,
-        itemCount: Int,
-        minFlickVelocityPxPerSec: Float = 120f,
-    ): Int {
-        if (itemCount <= 1) return 0
-        val clampedCurrent = currentIndex.coerceIn(0, itemCount - 1)
-        val threshold = stepThresholdPx.coerceAtLeast(1f)
-        val deltaStep = when {
-            totalDragPx <= -threshold -> 1
-            totalDragPx >= threshold -> -1
-            abs(velocityPxPerSec) >= minFlickVelocityPxPerSec -> if (velocityPxPerSec < 0f) 1 else -1
-            else -> 0
-        }
-        return (clampedCurrent + deltaStep).coerceIn(0, itemCount - 1)
-    }
-
-    /**
      * Maps a normalized scrub fraction `[0f..1f]` on the fast scrollbar to a continuous focus value
      * in `[0f..(itemCount - 1).toFloat()]`.
      */
