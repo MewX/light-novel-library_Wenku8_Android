@@ -17,8 +17,8 @@ android {
         // requires minSdk 24 (Android 7.0 Nougat) per AndroidX's 2026 baseline.
         minSdkVersion rootProject.minSdkVersion
         targetSdkVersion rootProject.targetSdkVersion
-        versionCode 104
-        versionName "2.0.4"
+        versionCode 105
+        versionName "2.0.5"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
