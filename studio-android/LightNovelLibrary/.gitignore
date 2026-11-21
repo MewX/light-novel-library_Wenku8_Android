@@ -7,6 +7,7 @@
 /build
 /skills/
 .kotlin/
+app*/default/
 
 # distributions
 baidu/
