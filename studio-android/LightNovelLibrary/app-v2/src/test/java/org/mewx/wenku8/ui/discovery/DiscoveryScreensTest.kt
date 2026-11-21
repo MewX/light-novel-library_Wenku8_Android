@@ -14,6 +14,9 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToIndex
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipeLeft
+import androidx.compose.ui.test.swipeRight
 import androidx.compose.ui.unit.dp
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
@@ -154,6 +157,111 @@ class DiscoveryScreensTest {
         composeTestRule.onNodeWithText("向森之魔物献上花束").assertIsDisplayed()
         composeTestRule.onNodeWithTag("${DiscoveryTestTags.NOVEL_CARD_PREFIX}1306").performClick()
         assertEquals(1306, clickedAid)
+        assertTrue(
+            "Jumping from RECENT_UPDATES to COMPLETED_GEMS must not spuriously fetch NEW_ARRIVALS",
+            Wenku8API.NovelSortedBy.postDate !in gateway.requestedSorts,
+        )
+    }
+
+    @Test
+    fun latestScreenSupportsHorizontalSwipeBetweenThreeTabsAndPreservesScrollPosition() {
+        fun sampleNovel(aid: Int, title: String) = ParsedNovelListItem(
+            aid = aid,
+            title = title,
+            author = "作者$aid",
+            bookStatus = "连载中",
+            lastUpdate = "2026-11-21",
+            tagsCsv = "奇幻 冒险",
+            introShort = "作品简介 $aid",
+        )
+
+        val gateway = FakeDiscoveryGateway().apply {
+            pagesBySort[Wenku8API.NovelSortedBy.lastUpdate] = WenkuApiResult.Success(
+                ParsedNovelListPage(
+                    totalPages = 3,
+                    items = (1..15).map { idx -> sampleNovel(aid = 5000 + idx, title = "最近更新-$idx") },
+                ),
+            )
+            pagesBySort[Wenku8API.NovelSortedBy.postDate] = WenkuApiResult.Success(
+                ParsedNovelListPage(
+                    totalPages = 3,
+                    items = (1..15).map { idx -> sampleNovel(aid = 6000 + idx, title = "最新入库-$idx") },
+                ),
+            )
+            pagesBySort[Wenku8API.NovelSortedBy.fullFlag] = WenkuApiResult.Success(
+                ParsedNovelListPage(
+                    totalPages = 3,
+                    items = (1..15).map { idx -> sampleNovel(aid = 7000 + idx, title = "完结精品-$idx") },
+                ),
+            )
+        }
+
+        val repository = DiscoveryRepository(database = database, apiClient = gateway)
+
+        composeTestRule.setContent {
+            Box(modifier = Modifier.size(width = 412.dp, height = 892.dp)) {
+                Wenku8ExpressiveTheme(themeMode = Wenku8ThemeMode.ARCHIVAL_DAY) {
+                    LatestScreen(
+                        discoveryRepository = repository,
+                        appLanguage = Wenku8API.AppLanguage.SC,
+                        onOpenSearch = {},
+                        onNovelClicked = {},
+                        onOpenNetworkDiagnostics = {},
+                    )
+                }
+            }
+        }
+
+        composeTestRule.waitForIdle()
+        composeTestRule
+            .onNodeWithTag(DiscoveryTestTags.LATEST_TAB_PREFIX + LatestFeedCategory.RECENT_UPDATES.name)
+            .assertIsSelected()
+        composeTestRule.onNodeWithText("最近更新-1").assertIsDisplayed()
+
+        // Scroll 最近更新 down before swiping away
+        composeTestRule.onNodeWithTag(DiscoveryTestTags.FEED_LIST).performScrollToIndex(7)
+        composeTestRule.waitForIdle()
+        val savedRecentScroll = repository.getFeedScrollPosition(Wenku8API.NovelSortedBy.lastUpdate)
+        assertTrue(
+            "Expected lastUpdate scroll index > 0, got $savedRecentScroll",
+            savedRecentScroll.firstVisibleItemIndex >= 4,
+        )
+
+        // Swipe left: 最近更新 -> 最新入库
+        composeTestRule.onNodeWithTag(DiscoveryTestTags.FEED_LIST).performTouchInput { swipeLeft() }
+        composeTestRule.waitForIdle()
+        composeTestRule
+            .onNodeWithTag(DiscoveryTestTags.LATEST_TAB_PREFIX + LatestFeedCategory.NEW_ARRIVALS.name)
+            .assertIsSelected()
+        assertEquals(LatestFeedCategory.NEW_ARRIVALS, repository.activeLatestCategory)
+        composeTestRule.onNodeWithText("最新入库-1").assertIsDisplayed()
+
+        // Swipe left again: 最新入库 -> 完结精品
+        composeTestRule.onNodeWithTag(DiscoveryTestTags.FEED_LIST).performTouchInput { swipeLeft() }
+        composeTestRule.waitForIdle()
+        composeTestRule
+            .onNodeWithTag(DiscoveryTestTags.LATEST_TAB_PREFIX + LatestFeedCategory.COMPLETED_GEMS.name)
+            .assertIsSelected()
+        assertEquals(LatestFeedCategory.COMPLETED_GEMS, repository.activeLatestCategory)
+        composeTestRule.onNodeWithText("完结精品-1").assertIsDisplayed()
+
+        // Swipe right twice back to 最近更新 and confirm scroll position was preserved
+        composeTestRule.onNodeWithTag(DiscoveryTestTags.FEED_LIST).performTouchInput { swipeRight() }
+        composeTestRule.waitForIdle()
+        composeTestRule
+            .onNodeWithTag(DiscoveryTestTags.LATEST_TAB_PREFIX + LatestFeedCategory.NEW_ARRIVALS.name)
+            .assertIsSelected()
+
+        composeTestRule.onNodeWithTag(DiscoveryTestTags.FEED_LIST).performTouchInput { swipeRight() }
+        composeTestRule.waitForIdle()
+        composeTestRule
+            .onNodeWithTag(DiscoveryTestTags.LATEST_TAB_PREFIX + LatestFeedCategory.RECENT_UPDATES.name)
+            .assertIsSelected()
+        assertEquals(LatestFeedCategory.RECENT_UPDATES, repository.activeLatestCategory)
+        assertEquals(
+            savedRecentScroll,
+            repository.getFeedScrollPosition(Wenku8API.NovelSortedBy.lastUpdate),
+        )
     }
 
     @Test
@@ -432,6 +540,7 @@ class DiscoveryScreensTest {
     private class FakeDiscoveryGateway : WenkuCatalogGateway {
         override val isApiConfigured: Boolean = true
         val pagesBySort = mutableMapOf<Wenku8API.NovelSortedBy, WenkuApiResult<ParsedNovelListPage>>()
+        val requestedSorts = mutableListOf<Wenku8API.NovelSortedBy>()
 
         override fun resolveCoverUrl(aid: Int): String = ""
 
@@ -440,6 +549,7 @@ class DiscoveryScreensTest {
             pageNumber: Int,
             appLanguage: Wenku8API.AppLanguage,
         ): WenkuApiResult<ParsedNovelListPage> {
+            requestedSorts.add(sortedBy)
             return pagesBySort[sortedBy] ?: WenkuApiResult.NetworkError("unmapped sort")
         }
 
