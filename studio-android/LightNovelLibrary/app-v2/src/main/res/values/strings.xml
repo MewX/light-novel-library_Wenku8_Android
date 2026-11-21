@@ -151,6 +151,8 @@
 
     <!-- Account Session, NoticeString & App Version Check (P3.1) -->
     <string name="notice_card_title">文库公告</string>
+    <string name="notice_action_expand">展开全文</string>
+    <string name="notice_action_collapse">收起</string>
 
     <string name="auth_card_title_signed_out">文库账号</string>
     <string name="auth_card_subtitle_signed_out">登录后可同步云端书架、发表书评并领取每日签到积分</string>

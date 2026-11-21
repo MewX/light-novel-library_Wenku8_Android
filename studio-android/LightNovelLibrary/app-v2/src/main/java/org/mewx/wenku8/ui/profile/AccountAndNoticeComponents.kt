@@ -7,8 +7,10 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import android.widget.Toast
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -41,6 +43,8 @@ import androidx.compose.material.icons.outlined.Campaign
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.CloudOff
 import androidx.compose.material.icons.outlined.EventAvailable
+import androidx.compose.material.icons.outlined.ExpandLess
+import androidx.compose.material.icons.outlined.ExpandMore
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.SystemUpdateAlt
 import androidx.compose.material.icons.outlined.Visibility
@@ -57,6 +61,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.LinearWavyProgressIndicator
+import androidx.compose.material3.LocalMinimumInteractiveComponentSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
@@ -66,6 +71,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -110,6 +116,8 @@ import java.io.File
 /** Semantic test tags for `P3.1` Account, `NoticeString`, and App Version Check UI. */
 object ProfileAccountTestTags {
     const val SERVER_NOTICE_BANNER = "profile_server_notice_banner"
+    const val SERVER_NOTICE_EXPAND_TOGGLE = "profile_server_notice_expand_toggle"
+    const val SERVER_NOTICE_LINK_PREFIX = "profile_server_notice_link_"
     const val ACCOUNT_PROFILE_CARD = "profile_account_card"
     const val OPEN_LOGIN_SHEET_BUTTON = "profile_open_login_sheet"
     const val OPEN_REGISTER_DIALOG_BUTTON = "profile_open_register_dialog"
@@ -134,9 +142,12 @@ object ProfileAccountTestTags {
     const val UPDATE_DOWNLOAD_PROGRESS = "profile_update_download_progress"
 }
 
+private const val SERVER_NOTICE_COLLAPSED_MAX_LINES = 4
+
 /**
  * Persistent M3e tonal announcement card rendering `Wenku8API.NoticeString` (`notice_sc` /
- * `notice_tc` + `saves/notice.wk8`), including safe clickable `<a href>` action chips.
+ * `notice_tc` + `saves/notice.wk8`), including compact clickable `<a href>` action chips and
+ * progressive disclosure when the body exceeds 4 lines.
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -146,6 +157,9 @@ fun ServerNoticeBannerCard(
     onExternalUrlClicked: ((String) -> Unit)? = null,
 ) {
     val context = LocalContext.current
+    val isEink = LocalEinkMode.current
+    var isBodyExpanded by rememberSaveable(notice.plainDisplayText) { mutableStateOf(false) }
+    var hasBodyOverflow by remember(notice.plainDisplayText) { mutableStateOf(false) }
 
     Card(
         colors = CardDefaults.cardColors(
@@ -158,7 +172,11 @@ fun ServerNoticeBannerCard(
             .testTag(ProfileAccountTestTags.SERVER_NOTICE_BANNER)
             .einkHairlineBorder(MaterialTheme.shapes.large),
     ) {
-        Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp)) {
+        Column(
+            modifier = Modifier
+                .then(if (isEink) Modifier else Modifier.animateContentSize())
+                .padding(horizontal = 16.dp, vertical = 14.dp),
+        ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.fillMaxWidth(),
@@ -181,39 +199,89 @@ fun ServerNoticeBannerCard(
                 Text(
                     text = notice.plainDisplayText,
                     style = MaterialTheme.typography.bodyMedium,
+                    maxLines = if (isBodyExpanded) Int.MAX_VALUE else SERVER_NOTICE_COLLAPSED_MAX_LINES,
+                    overflow = TextOverflow.Ellipsis,
+                    onTextLayout = { layoutResult ->
+                        if (!isBodyExpanded) {
+                            hasBodyOverflow = layoutResult.hasVisualOverflow
+                        }
+                    },
                 )
+                if (hasBodyOverflow || isBodyExpanded) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .clip(MaterialTheme.shapes.small)
+                            .clickable { isBodyExpanded = !isBodyExpanded }
+                            .padding(horizontal = 4.dp, vertical = 2.dp)
+                            .testTag(ProfileAccountTestTags.SERVER_NOTICE_EXPAND_TOGGLE),
+                    ) {
+                        Text(
+                            text = stringResource(
+                                if (isBodyExpanded) {
+                                    R.string.notice_action_collapse
+                                } else {
+                                    R.string.notice_action_expand
+                                },
+                            ),
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                        Spacer(modifier = Modifier.width(2.dp))
+                        Icon(
+                            imageVector = if (isBodyExpanded) {
+                                Icons.Outlined.ExpandLess
+                            } else {
+                                Icons.Outlined.ExpandMore
+                            },
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(16.dp),
+                        )
+                    }
+                }
             }
 
             if (notice.links.isNotEmpty()) {
-                Spacer(modifier = Modifier.height(10.dp))
-                FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    notice.links.forEach { link ->
-                        AssistChip(
-                            onClick = {
-                                if (onExternalUrlClicked != null) {
-                                    onExternalUrlClicked(link.url)
-                                } else {
-                                    openSafeBrowserUrl(context, link.url)
-                                }
-                            },
-                            label = {
-                                Text(
-                                    text = link.label,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                )
-                            },
-                            trailingIcon = {
-                                Icon(
-                                    imageVector = Icons.AutoMirrored.Outlined.OpenInNew,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(16.dp),
-                                )
-                            },
-                        )
+                Spacer(modifier = Modifier.height(8.dp))
+                // Opt out of AssistChip's 48dp invisible vertical touch-padding expansion inside FlowRow
+                // so wrapped multi-row announcement links stay visually compact (6dp gap instead of ~24dp).
+                CompositionLocalProvider(LocalMinimumInteractiveComponentSize provides Dp.Unspecified) {
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        notice.links.forEachIndexed { index, link ->
+                            AssistChip(
+                                onClick = {
+                                    if (onExternalUrlClicked != null) {
+                                        onExternalUrlClicked(link.url)
+                                    } else {
+                                        openSafeBrowserUrl(context, link.url)
+                                    }
+                                },
+                                label = {
+                                    Text(
+                                        text = link.label,
+                                        style = MaterialTheme.typography.labelMedium,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                },
+                                trailingIcon = {
+                                    Icon(
+                                        imageVector = Icons.AutoMirrored.Outlined.OpenInNew,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(14.dp),
+                                    )
+                                },
+                                modifier = Modifier.testTag(
+                                    ProfileAccountTestTags.SERVER_NOTICE_LINK_PREFIX + index,
+                                ),
+                            )
+                        }
                     }
                 }
             }

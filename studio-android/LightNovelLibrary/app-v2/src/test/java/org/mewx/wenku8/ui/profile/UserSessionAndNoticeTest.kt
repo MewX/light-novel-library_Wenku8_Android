@@ -1,7 +1,9 @@
 package org.mewx.wenku8.ui.profile
 
 import android.content.ContentValues
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.getValue
@@ -10,6 +12,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
@@ -18,6 +21,8 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextReplacement
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.height
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -40,6 +45,8 @@ import org.mewx.wenku8.data.repository.AppVersionCheckResult
 import org.mewx.wenku8.data.repository.DailySignOutcome
 import org.mewx.wenku8.data.repository.DailySignStatus
 import org.mewx.wenku8.data.repository.LoginOutcome
+import org.mewx.wenku8.data.repository.NoticeActionLink
+import org.mewx.wenku8.data.repository.ParsedServerNotice
 import org.mewx.wenku8.data.repository.ServerNoticeAndUpdateRepository
 import org.mewx.wenku8.data.repository.StoredAccountCredentials
 import org.mewx.wenku8.data.repository.UserSessionRepository
@@ -636,6 +643,79 @@ class UserSessionAndNoticeTest {
                 (invalid as DailySignOutcome.NetworkOrServerError).errorCode,
             )
         }
+    }
+
+    @Test
+    fun serverNoticeBannerCard_rendersCompactMultiRowLinksAndExpandsLongBody() {
+        val longBody = (1..8).joinToString("\n") { line ->
+            "第 $line 行文库服务器公告：欢迎使用全新 Material 3 Expressive 客户端阅读轻小说。"
+        }
+        val notice = ParsedServerNotice(
+            rawHtml = longBody,
+            plainDisplayText = longBody,
+            links = listOf(
+                NoticeActionLink(label = "更新日志与说明", url = "https://wenku8.app/changelog"),
+                NoticeActionLink(label = "服务器状态监控", url = "https://wenku8.app/status"),
+                NoticeActionLink(label = "常见问题解答", url = "https://wenku8.app/faq"),
+                NoticeActionLink(label = "开源项目主页", url = "https://github.com/MewX/light-novel-library_Wenku8_Android"),
+            ),
+            contentHash = "notice_compact_test_hash",
+        )
+        val clickedUrls = mutableListOf<String>()
+
+        composeRule.setContent {
+            Box(modifier = Modifier.size(width = 360.dp, height = 800.dp)) {
+                Wenku8ExpressiveTheme(themeMode = Wenku8ThemeMode.ARCHIVAL_DAY) {
+                    ServerNoticeBannerCard(
+                        notice = notice,
+                        onExternalUrlClicked = { clickedUrls.add(it) },
+                    )
+                }
+            }
+        }
+        composeRule.waitForIdle()
+
+        // 1. Multi-row links stay compact vertically (gap between wrapped rows <= 10dp, not 24dp+)
+        val firstRowChipBounds = composeRule
+            .onNodeWithTag(ProfileAccountTestTags.SERVER_NOTICE_LINK_PREFIX + "0")
+            .assertIsDisplayed()
+            .getUnclippedBoundsInRoot()
+        val wrappedChipBounds = (1 until notice.links.size)
+            .map { index ->
+                composeRule
+                    .onNodeWithTag(ProfileAccountTestTags.SERVER_NOTICE_LINK_PREFIX + index)
+                    .assertIsDisplayed()
+                    .getUnclippedBoundsInRoot()
+            }
+            .firstOrNull { it.top > firstRowChipBounds.bottom }
+        assertNotNull("Expected links to wrap onto a second row at 360dp width", wrappedChipBounds)
+        val verticalGapDp = wrappedChipBounds!!.top - firstRowChipBounds.bottom
+        assertTrue(
+            "Expected compact multi-row link vertical gap <= 10dp, got $verticalGapDp",
+            verticalGapDp <= 10.dp,
+        )
+
+        composeRule.onNodeWithTag(ProfileAccountTestTags.SERVER_NOTICE_LINK_PREFIX + "2").performClick()
+        assertEquals(listOf("https://wenku8.app/faq"), clickedUrls)
+
+        // 2. Long body (> 4 lines) collapses initially and expands on toggle click
+        val collapsedBannerHeight = composeRule
+            .onNodeWithTag(ProfileAccountTestTags.SERVER_NOTICE_BANNER)
+            .getUnclippedBoundsInRoot()
+            .height
+        composeRule.onNodeWithTag(ProfileAccountTestTags.SERVER_NOTICE_EXPAND_TOGGLE)
+            .assertIsDisplayed()
+            .performClick()
+        composeRule.waitForIdle()
+        val expandedBannerHeight = composeRule
+            .onNodeWithTag(ProfileAccountTestTags.SERVER_NOTICE_BANNER)
+            .getUnclippedBoundsInRoot()
+            .height
+        assertTrue(
+            "Expected notice banner to grow when expanded ($expandedBannerHeight > $collapsedBannerHeight)",
+            expandedBannerHeight > collapsedBannerHeight,
+        )
+        composeRule.onNodeWithText("收起").assertIsDisplayed()
     }
 
     private class FakeAccountTransport(

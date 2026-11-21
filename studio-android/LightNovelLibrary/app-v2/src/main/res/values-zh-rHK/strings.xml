@@ -151,6 +151,8 @@
 
     <!-- Account Session, NoticeString & App Version Check (P3.1) -->
     <string name="notice_card_title">文庫公告</string>
+    <string name="notice_action_expand">展開全文</string>
+    <string name="notice_action_collapse">收起</string>
 
     <string name="auth_card_title_signed_out">文庫帳號</string>
     <string name="auth_card_subtitle_signed_out">登入後可同步雲端書架、發表書評並領取每日簽到積分</string>
