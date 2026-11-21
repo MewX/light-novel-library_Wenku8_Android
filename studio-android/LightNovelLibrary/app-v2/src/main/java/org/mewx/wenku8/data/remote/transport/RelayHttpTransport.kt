@@ -198,7 +198,7 @@ class RelayHttpTransport(
                 null
             }
             return buildSet {
-                add("wenku8-android.mewx.org")
+                add("mewx-android.wenku8.app")
                 add("wenku8-relay.mewx.org")
                 if (!dynamicHost.isNullOrBlank() && !isDirectWenkuOriginOrCdnHost(dynamicHost)) {
                     add(dynamicHost)

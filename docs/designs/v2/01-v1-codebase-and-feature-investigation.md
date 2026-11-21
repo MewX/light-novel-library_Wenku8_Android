@@ -160,10 +160,10 @@ flowchart TD
 
 ### 4.1 Relay Protocol & `:api` Module (`relay-versioning-and-reuse.md`)
 
-- **Current Transport**: HTTP POST (`gzip`, `Cookie: PHPSESSID=...`) to `https://wenku8-relay.mewx.org/` (`Client API v1`) and `https://wenku8-android.mewx.org/` (`Client API v2`).
+- **Current Transport**: HTTP POST (`gzip`, `Cookie: PHPSESSID=...`) to `https://wenku8-relay.mewx.org/` (`Client API v1`) and `https://mewx-android.wenku8.app/` (`Client API v2`).
 - **Split Architecture**:
   - `Client API v1` (`https://wenku8-relay.mewx.org` `POST /`): Legacy form/Base64/HMAC envelope (`libcpp.so` `getMagicVersionCpp`), transitioning to list-only operations (`articlelist`, `novellist`, `mewx_articlelist`).
-  - `Client API v2` (`https://wenku8-android.mewx.org` `POST /v2/api` & `POST /v2/auth/*`): Attested installation envelope (`WK8-AUTH-1`) for non-list operations, backed by Android hardware key attestation and Chinese OEM compatibility handling.
+  - `Client API v2` (`https://mewx-android.wenku8.app` `POST /v2/api` & `POST /v2/auth/*`): Attested installation envelope (`WK8-AUTH-1`) for non-list operations, backed by Android hardware key attestation and Chinese OEM compatibility handling.
 - **Encoding Quirks**:
   - Review thread creation (`getCommentNewThreadParams`) and replies (`getCommentReplyParams`) require **GBK URL-encoding** wrapped in Base64, plus client-side `Wenku8API.searchBadWords()` validation.
   - Simplified/Traditional Chinese (`AppLanguage.SC` `t=0` vs `TC` `t=1`) is requested directly from the server API.

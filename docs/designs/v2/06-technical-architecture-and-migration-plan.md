@@ -23,7 +23,7 @@ flowchart TB
         RoomDB["Room SQLite (`wenku8_v2.db` WAL)\nAll Metadata + User Anchors + Offline CHAPTER_CONTENTS (Doc 09)"]
         Migrator["LegacyV1InternalStorageMigrator\nSeamless Play Store Upgrade from filesDir/saves/ + SAF Importer"]
         Prefs["Preferences DataStore\nsettings.preferences_pb (100% v1.31 Parity+) · network_routing_local.preferences_pb"]
-        Transport["OkHttp Base -> RelayHttpTransport + OkHttpProbeTransport\nScoped to wenku8-relay.mewx.org & wenku8-android.mewx.org ONLY"]
+        Transport["OkHttp Base -> RelayHttpTransport + OkHttpProbeTransport\nScoped to wenku8-relay.mewx.org & mewx-android.wenku8.app ONLY"]
         API[":api / :api-stub Module\nWenku8API · LightUserSession (cert.wk8) · TokenManager (libcpp.so)"]
     end
 

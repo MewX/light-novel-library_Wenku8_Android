@@ -65,7 +65,7 @@ sealed interface AutoRoutingModeState {
  * ### Routing Lifecycle & Safety Model
  * 1. **Relay-Only Scope & Default-First Safety**:
  *    Pinned candidate IPs apply **exclusively** to our Cloudflare relay service (`wenku8-relay.mewx.org`,
- *    `wenku8-android.mewx.org`). Direct Wenku8 website/image CDNs (`*.wenku8.com`, `pic.wenku8.com`,
+ *    `mewx-android.wenku8.app`). Direct Wenku8 website/image CDNs (`*.wenku8.com`, `pic.wenku8.com`,
  *    `*.wenku8.net`, `*.wenku8.cn`, `wenku8.mewx.org`) always use Default System DNS.
  * 2. **Automatic Good-IP Recording & Toggle-to-Use ([discoverAndRecordPreferredCandidate])**:
  *    - Running manual Quick Check automatically screens & verifies a healthy Cloudflare candidate IP

@@ -635,7 +635,7 @@ class NetworkTransportAndProbeTest {
             plain500Server.start(InetAddress.getByName("127.0.0.1"), 0)
             val plainEndpoint = (
                 DiagnosticsEndpointConfig.parseAndValidate(
-                    rawBaseUrl = "http://wenku8-android.mewx.org:${plain500Server.port}/",
+                    rawBaseUrl = "http://mewx-android.wenku8.app:${plain500Server.port}/",
                     allowCleartextForLocalTests = true,
                 ) as DiagnosticsEndpointResolution.Available
                 ).endpoint

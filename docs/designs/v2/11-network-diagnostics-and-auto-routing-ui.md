@@ -47,7 +47,7 @@ flowchart TB
     end
 
     subgraph Upstreams["Upstream Domains"]
-        RelayHosts["Configured Relay Worker Hostnames ONLY\nwenku8-relay.mewx.org (v1) · wenku8-android.mewx.org (v2)"]
+        RelayHosts["Configured Relay Worker Hostnames ONLY\nwenku8-relay.mewx.org (v1) · mewx-android.wenku8.app (v2)"]
         Gateway["Shipped Non-CF HTTPS Service Ingress (fallbackEndpointIds)\nAvailability Fallback Only (When Shipped & Enabled)"]
         DirectCDNs["Unrelated Static & Direct Wenku8 CDNs\nwenku8.mewx.org · img.wenku8.com · avatar.wenku8.com · pic.wenku8.cn"]
     end
@@ -73,7 +73,7 @@ flowchart TB
 ### 2.1 Six Core Architectural Invariants (Aligned with `network-connectivity-and-routing-design.md`)
 
 1. **Strict Relay-Hostname Isolation & SNI Preservation**:
-   - Candidate-IP overrides apply **exclusively** to explicitly configured relay Worker hostnames (`wenku8-relay.mewx.org` and `wenku8-android.mewx.org`, matched against the manifest's `hostname`). Static blog/notice checks (`wenku8.mewx.org`), independent manifest origins, and direct image CDNs (`img.wenku8.com`, `avatar.wenku8.com`, `pic.wenku8.cn` via Coil 3) **always** use `Dns.SYSTEM`.
+   - Candidate-IP overrides apply **exclusively** to explicitly configured relay Worker hostnames (`wenku8-relay.mewx.org` and `mewx-android.wenku8.app`, matched against the manifest's `hostname`). Static blog/notice checks (`wenku8.mewx.org`), independent manifest origins, and direct image CDNs (`img.wenku8.com`, `avatar.wenku8.com`, `pic.wenku8.cn` via Coil 3) **always** use `Dns.SYSTEM`.
    - **Never rewrite URLs to `https://<IP>/` or touch server DNS**: A pure-Kotlin/Java **`IpLiteralParser`** validates public IPv4/IPv6 literals into `byte[4]` / `byte[16]` (rejecting hostnames, CIDRs, ports, private/reserved/scoped ranges) and constructs `InetAddress.getByAddress(relayHostname, rawBytes)` in `0 ms` without calling OS `getaddrinfo`, preserving plaintext TLS SNI (`server_name`), X.509 SAN hostname verification, and HTTP/2 `:authority`!
    - **Proxy Respect**: `EventListener.connectStart(call, inetSocketAddress, proxy)` inspects the actual `java.net.Proxy` on every connection; whenever `proxy.type() != Proxy.Type.DIRECT`, direct candidate selection is marked unavailable rather than bypassing the user's proxy or misattributing proxy latency.
 2. **Deterministic `OkHttpProbeTransport` & `Accept-Encoding: identity`**:

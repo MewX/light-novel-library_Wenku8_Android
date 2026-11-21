@@ -60,7 +60,7 @@ class DohTxtSubnetRoutingAndLiveServiceTest {
         ).endpoint
 
     private val androidEndpoint = (
-        DiagnosticsEndpointConfig.parseAndValidate("https://wenku8-android.mewx.org/")
+        DiagnosticsEndpointConfig.parseAndValidate("https://mewx-android.wenku8.app/")
             as DiagnosticsEndpointResolution.Available
         ).endpoint
 
@@ -480,7 +480,7 @@ class DohTxtSubnetRoutingAndLiveServiceTest {
     /**
      * Real-service end-to-end verification against live domestic DoH (`223.5.5.5`, `1.12.12.12`),
      * `_network_cfg.wenku8.app`, and live Cloudflare Workers (`wenku8-relay.mewx.org` &
-     * `wenku8-android.mewx.org` `/__diagnostics/latency`).
+     * `mewx-android.wenku8.app` `/__diagnostics/latency`).
      *
      * Opt-in via `-Dwenku8.liveNetworkTest=true` so offline CI builds remain hermetic.
      */
@@ -655,7 +655,7 @@ class DohTxtSubnetRoutingAndLiveServiceTest {
                 "medianMs=${winningState.medianLatencyMs}, manifest=${winningState.manifestRevision}",
         )
 
-        // Verify the exact winning sampled IP also authenticates cleanly against the second relay hostname (`wenku8-android.mewx.org`)!
+        // Verify the exact winning sampled IP also authenticates cleanly against the second relay hostname (`mewx-android.wenku8.app`)!
         val realProbeTransport = OkHttpProbeTransport(
             baseOkHttpClient = sharedClient,
             monotonicClockMillis = realMonotonicMs,
@@ -674,7 +674,7 @@ class DohTxtSubnetRoutingAndLiveServiceTest {
             sampleIndex = 1,
         )
         assertTrue(
-            "Winning sampled IP ${winningCandidate.ipLiteral} must also serve https://wenku8-android.mewx.org/__diagnostics/latency",
+            "Winning sampled IP ${winningCandidate.ipLiteral} must also serve https://mewx-android.wenku8.app/__diagnostics/latency",
             androidVerifySample.succeeded &&
                 androidVerifySample.serverPayload?.schema == OkHttpProbeTransport.PROBE_SCHEMA_V1,
         )

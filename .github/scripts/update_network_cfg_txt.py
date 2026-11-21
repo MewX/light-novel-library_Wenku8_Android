@@ -74,7 +74,7 @@ from typing import Dict, List, Optional, Sequence, Set, Tuple, Union
 DEFAULT_RECORD_NAME = "_network_cfg.wenku8.app"
 ALLOWED_ZONE_SUFFIX = ".wenku8.app"
 PRIMARY_RELAY_HOST = "wenku8-relay.mewx.org"
-SECONDARY_RELAY_HOST = "wenku8-android.mewx.org"
+SECONDARY_RELAY_HOST = "mewx-android.wenku8.app"
 RELAY_HOSTS = (PRIMARY_RELAY_HOST, SECONDARY_RELAY_HOST)
 
 TXT_SCHEMA_V1 = "wk8-txt-v1"
@@ -1012,7 +1012,7 @@ def curate_verified_subnets(
             f"{MIN_REQUIRED_IPV4_SUBNETS}, probed {probed_count}); aborting DNS update."
         )
 
-    # Spot-check secondary relay hostname (`wenku8-android.mewx.org`) on the first verified subnet
+    # Spot-check secondary relay hostname (`mewx-android.wenku8.app`) on the first verified subnet
     first_ip = str(ipaddress.IPv4Network(verified_v4[0], strict=True).network_address + 1)
     if not probe_ip_for_host(first_ip, SECONDARY_RELAY_HOST):
         raise RuntimeError(
