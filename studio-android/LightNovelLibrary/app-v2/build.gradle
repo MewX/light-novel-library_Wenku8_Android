@@ -16,8 +16,8 @@ android {
         // requires minSdk 24 (Android 7.0 Nougat) per AndroidX's 2026 baseline.
         minSdkVersion 24
         targetSdkVersion rootProject.targetSdkVersion
-        versionCode 103
-        versionName "2.0.3"
+        versionCode 104
+        versionName "2.0.4"
         // TODO(v2.0-release): Register "2.0" in :api (native-lib.cpp / TokenManager) and
         // wenku8-relay (v1_crypto.ts ALLOWED_SECURE_PREFIXES), then update this from "1.31" to "2.0".
         buildConfigField "String", "API_PROTOCOL_VERSION", "\"1.31\""
