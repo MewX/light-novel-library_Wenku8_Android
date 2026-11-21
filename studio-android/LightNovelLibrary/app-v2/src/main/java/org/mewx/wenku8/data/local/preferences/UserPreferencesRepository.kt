@@ -43,12 +43,13 @@ import java.io.IOException
  *   dynamic color), [defaultHomeDestination] (`LATEST` default / `BOOKSHELF`), [bookshelfViewMode],
  *   [bookshelfSortMode], [readerPageTurnMode], [readerColumnMode], [readerPaperPreset],
  *   [readerKeepScreenOn], [readerEdgeBrightnessDragEnabled], [volumeKeyPagingEnabled],
- *   [autoOptimizeConnectionEnabled], and [legacyV1InternalMigrationVersion].
+ *   [autoOptimizeConnectionEnabled], [conciseModeEnabled], and [legacyV1InternalMigrationVersion].
  */
 data class Wenku8UserPreferences(
     val appLanguage: Wenku8API.AppLanguage = Wenku8API.AppLanguage.SC,
     val themeMode: Wenku8ThemeMode = Wenku8ThemeMode.CLASSIC_BLUE,
     val einkModeEnabled: Boolean = false,
+    val conciseModeEnabled: Boolean = false,
     val defaultHomeDestination: DefaultHomeDestination = DefaultHomeDestination.LATEST,
     val bookshelfViewMode: BookshelfViewMode = BookshelfViewMode.GRID,
     val bookshelfSortMode: BookshelfSortMode = BookshelfSortMode.MANUAL_ORDER,
@@ -209,6 +210,12 @@ class UserPreferencesRepository(
             if (!enabled && prefs[Keys.THEME_MODE] == Wenku8ThemeMode.E_INK.name) {
                 prefs[Keys.THEME_MODE] = Wenku8ThemeMode.CLASSIC_BLUE.name
             }
+        }
+    }
+
+    suspend fun setConciseModeEnabled(enabled: Boolean) {
+        dataStore.edit { prefs ->
+            prefs[Keys.CONCISE_MODE_ENABLED] = enabled
         }
     }
 
@@ -417,6 +424,7 @@ class UserPreferencesRepository(
             prefs[Keys.APP_LANGUAGE] = imported.appLanguage.name
             prefs[Keys.THEME_MODE] = imported.themeMode.name
             prefs[Keys.EINK_MODE_ENABLED] = imported.einkModeEnabled
+            prefs[Keys.CONCISE_MODE_ENABLED] = imported.conciseModeEnabled
             prefs[Keys.DEFAULT_HOME_DESTINATION] = imported.defaultHomeDestination.name
             prefs[Keys.BOOKSHELF_VIEW_MODE] = imported.bookshelfViewMode.name
             prefs[Keys.BOOKSHELF_SORT_MODE] = imported.bookshelfSortMode.name
@@ -497,6 +505,7 @@ class UserPreferencesRepository(
             appLanguage = language,
             themeMode = themeMode,
             einkModeEnabled = einkEnabled,
+            conciseModeEnabled = prefs[Keys.CONCISE_MODE_ENABLED] ?: false,
             defaultHomeDestination = defaultHome,
             bookshelfViewMode = bookshelfView,
             bookshelfSortMode = bookshelfSort,
@@ -547,6 +556,7 @@ class UserPreferencesRepository(
         val APP_LANGUAGE = stringPreferencesKey("app_language")
         val THEME_MODE = stringPreferencesKey("theme_mode")
         val EINK_MODE_ENABLED = booleanPreferencesKey("eink_mode_enabled")
+        val CONCISE_MODE_ENABLED = booleanPreferencesKey("concise_mode_enabled")
         val DEFAULT_HOME_DESTINATION = stringPreferencesKey("default_home_destination")
         val BOOKSHELF_VIEW_MODE = stringPreferencesKey("bookshelf_view_mode")
         val BOOKSHELF_SORT_MODE = stringPreferencesKey("bookshelf_sort_mode")

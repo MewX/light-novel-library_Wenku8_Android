@@ -36,3 +36,14 @@ enum class Wenku8ThemeMode(@param:StringRes val displayNameResId: Int) {
  * 3. Default the Reader page-turn engine to instant zero-frame-interpolation cuts (`NONE`).
  */
 val LocalEinkMode = staticCompositionLocalOf { false }
+
+/**
+ * CompositionLocal advertising whether Concise Mode is active.
+ *
+ * Contract: downstream components may inspect `LocalConciseMode.current` to hide secondary
+ * controls (filter chip rails, sync/refresh header actions), skip purely decorative modules
+ * entirely (no composition, hence no cover-image requests), and tighten list spacing so each
+ * screen fits more content. Unlike [LocalEinkMode], it never alters theme colors, shapes,
+ * or motion.
+ */
+val LocalConciseMode = staticCompositionLocalOf { false }

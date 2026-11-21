@@ -233,6 +233,8 @@
     <string name="profile_lang_tc">繁體中文</string>
     <string name="profile_eink_switch">墨水屏高對比模式</string>
     <string name="profile_eink_subtitle">啟用 1dp 實體邊框並關閉過渡動畫，適配電子紙重新整理</string>
+    <string name="profile_concise_switch">簡潔模式</string>
+    <string name="profile_concise_subtitle">隱藏次要控制項與裝飾模組並收緊間距，單一畫面顯示更多內容</string>
 
     <string name="profile_reader_studio_title">閱讀器預設排版與互動</string>
     <string name="profile_reader_preview_sample">\u3000\u3000「奇諾，人類真是一種不可思議的生物呢。」艾爾梅斯靜靜地說道。\n\u3000\u3000「怎麼突然這麼說？」奇諾一邊檢查著摩托車的儀表，一邊隨口應道。\n\u3000\u3000微風拂過曠野，遠方的城牆在晨光裡漸漸顯出輪廓。</string>

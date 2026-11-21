@@ -100,6 +100,7 @@ object ProfileStudioTestTags {
     const val LANG_CHIP_SC = "profile_lang_chip_sc"
     const val LANG_CHIP_TC = "profile_lang_chip_tc"
     const val EINK_SWITCH = "profile_eink_switch"
+    const val CONCISE_SWITCH = "profile_concise_switch"
     const val TYPOGRAPHY_PREVIEW_BOX = "profile_typography_preview_box"
     const val FONT_SIZE_SLIDER = "profile_font_size_slider"
     const val LINE_DIST_SLIDER = "profile_line_dist_slider"
@@ -166,6 +167,7 @@ fun ProfileAndStudioScreen(
     onOpenNetworkDiagnostics: () -> Unit = {},
     onAppLanguageSelected: (Wenku8API.AppLanguage) -> Unit = {},
     onEinkModeChanged: (Boolean) -> Unit = {},
+    onConciseModeChanged: (Boolean) -> Unit = {},
     onReaderTypographyChanged: (
         fontSizeSp: Int,
         lineDistanceDp: Int,
@@ -208,6 +210,7 @@ fun ProfileAndStudioScreen(
             onDefaultHomeSelected = onDefaultHomeSelected,
             onAppLanguageSelected = onAppLanguageSelected,
             onEinkModeChanged = onEinkModeChanged,
+            onConciseModeChanged = onConciseModeChanged,
             onReaderTypographyChanged = onReaderTypographyChanged,
             onReaderCustomFontPathChanged = onReaderCustomFontPathChanged,
             onReaderCustomBackgroundPathChanged = onReaderCustomBackgroundPathChanged,

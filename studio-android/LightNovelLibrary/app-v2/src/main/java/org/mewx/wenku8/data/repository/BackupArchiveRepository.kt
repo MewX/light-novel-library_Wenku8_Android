@@ -687,6 +687,7 @@ class BackupArchiveRepository(
             put("appLanguage", prefs.appLanguage.name)
             put("themeMode", prefs.themeMode.name)
             put("einkModeEnabled", prefs.einkModeEnabled)
+            put("conciseModeEnabled", prefs.conciseModeEnabled)
             put("defaultHomeDestination", prefs.defaultHomeDestination.name)
             put("bookshelfViewMode", prefs.bookshelfViewMode.name)
             put("bookshelfSortMode", prefs.bookshelfSortMode.name)
@@ -750,6 +751,7 @@ class BackupArchiveRepository(
             appLanguage = lang,
             themeMode = theme,
             einkModeEnabled = obj.optBoolean("einkModeEnabled", theme == Wenku8ThemeMode.E_INK),
+            conciseModeEnabled = obj.optBoolean("conciseModeEnabled", false),
             defaultHomeDestination = home,
             bookshelfViewMode = shelfView,
             bookshelfSortMode = shelfSort,

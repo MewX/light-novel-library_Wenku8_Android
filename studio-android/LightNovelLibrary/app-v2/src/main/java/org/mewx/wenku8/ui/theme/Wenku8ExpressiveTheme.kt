@@ -95,11 +95,14 @@ object EinkZeroMotionScheme : MotionScheme {
  * @param themeMode Selected theme preset (defaults to [Wenku8ThemeMode.CLASSIC_BLUE]).
  * @param einkModeOverride Explicit legacy `eink_mode` setting toggle; forces E-Ink monochrome & zero-motion
  *   even when [themeMode] is set to another preset.
+ * @param conciseModeEnabled Explicit concise-mode setting toggle; advertised via [LocalConciseMode]
+ *   without altering colors, shapes, or motion.
  */
 @Composable
 fun Wenku8ExpressiveTheme(
     themeMode: Wenku8ThemeMode = Wenku8ThemeMode.CLASSIC_BLUE,
     einkModeOverride: Boolean = false,
+    conciseModeEnabled: Boolean = false,
     content: @Composable () -> Unit,
 ) {
     val isEinkActive = einkModeOverride || themeMode == Wenku8ThemeMode.E_INK
@@ -151,7 +154,10 @@ fun Wenku8ExpressiveTheme(
         MotionScheme.expressive()
     }
 
-    CompositionLocalProvider(LocalEinkMode provides isEinkActive) {
+    CompositionLocalProvider(
+        LocalEinkMode provides isEinkActive,
+        LocalConciseMode provides conciseModeEnabled,
+    ) {
         MaterialExpressiveTheme(
             colorScheme = resolvedColorScheme,
             motionScheme = resolvedMotionScheme,

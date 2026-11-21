@@ -46,6 +46,7 @@ import androidx.compose.material.icons.outlined.Email
 import androidx.compose.material.icons.outlined.FolderOpen
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Unarchive
+import androidx.compose.material.icons.outlined.ViewStream
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -431,6 +432,7 @@ fun ProfileSettingsSubscreen(
     onDefaultHomeSelected: (DefaultHomeDestination) -> Unit,
     onAppLanguageSelected: (Wenku8API.AppLanguage) -> Unit,
     onEinkModeChanged: (Boolean) -> Unit,
+    onConciseModeChanged: (Boolean) -> Unit,
     onReaderTypographyChanged: (
         fontSizeSp: Int,
         lineDistanceDp: Int,
@@ -499,6 +501,7 @@ fun ProfileSettingsSubscreen(
                         onAppLanguageSelected = onAppLanguageSelected,
                         onThemeModeSelected = onThemeModeSelected,
                         onEinkModeChanged = onEinkModeChanged,
+                        onConciseModeChanged = onConciseModeChanged,
                         modifier = containerModifier,
                     )
                 }
@@ -549,6 +552,7 @@ private fun AppearanceSettingsBody(
     onAppLanguageSelected: (Wenku8API.AppLanguage) -> Unit,
     onThemeModeSelected: (Wenku8ThemeMode) -> Unit,
     onEinkModeChanged: (Boolean) -> Unit,
+    onConciseModeChanged: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     LazyColumn(
@@ -667,6 +671,19 @@ private fun AppearanceSettingsBody(
                 checked = preferences.einkModeEnabled,
                 onCheckedChange = onEinkModeChanged,
                 switchTestTag = ProfileStudioTestTags.EINK_SWITCH,
+            )
+        }
+
+        item(key = "appearance_concise_switch") {
+            ProfileSegmentedSwitchRow(
+                index = 0,
+                count = 1,
+                icon = Icons.Outlined.ViewStream,
+                title = stringResource(R.string.profile_concise_switch),
+                subtitle = stringResource(R.string.profile_concise_subtitle),
+                checked = preferences.conciseModeEnabled,
+                onCheckedChange = onConciseModeChanged,
+                switchTestTag = ProfileStudioTestTags.CONCISE_SWITCH,
             )
         }
     }

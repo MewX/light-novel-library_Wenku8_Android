@@ -12,11 +12,21 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
+import org.junit.runner.RunWith
 import org.mewx.wenku8.api.Wenku8API
 import org.mewx.wenku8.ui.navigation.DefaultHomeDestination
 import org.mewx.wenku8.ui.theme.Wenku8ThemeMode
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
 
+/**
+ * Robolectric (sdk 34) is required so DataStore routes atomic writes through `Api26Impl.move`
+ * (`Files.move`), whose replace-on-existing semantics also work on Windows dev machines; the
+ * plain-JVM path (`File.renameTo`) cannot replace an existing file on Windows.
+ */
 @OptIn(ExperimentalCoroutinesApi::class)
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [34])
 class UserPreferencesRepositoryTest {
 
     @get:Rule
@@ -40,6 +50,7 @@ class UserPreferencesRepositoryTest {
         assertEquals(DefaultHomeDestination.LATEST, defaults.defaultHomeDestination)
         assertEquals(Wenku8ThemeMode.CLASSIC_BLUE, defaults.themeMode)
         assertFalse(defaults.einkModeEnabled)
+        assertFalse(defaults.conciseModeEnabled)
         assertEquals(18, defaults.readerFontSizeSp)
         assertEquals(16, defaults.readerLineDistanceDp)
         assertEquals(20, defaults.readerParagraphDistanceDp)
@@ -176,6 +187,36 @@ class UserPreferencesRepositoryTest {
         val backToBlue = repository.preferencesFlow.first()
         assertEquals(Wenku8ThemeMode.CLASSIC_BLUE, backToBlue.themeMode)
         assertEquals(org.mewx.wenku8.reader.model.ReaderPaperPreset.EYE_CARE_GREEN, backToBlue.readerPaperPreset)
+    }
+
+    @Test
+    fun conciseModeToggleRoundTripsThroughDataStore() = runTest(UnconfinedTestDispatcher()) {
+        val repository = createRepository(this)
+        assertFalse(repository.preferencesFlow.first().conciseModeEnabled)
+
+        repository.setConciseModeEnabled(true)
+        assertTrue(repository.preferencesFlow.first().conciseModeEnabled)
+
+        repository.setConciseModeEnabled(false)
+        assertFalse(repository.preferencesFlow.first().conciseModeEnabled)
+    }
+
+    @Test
+    fun conciseModeSurvivesPortablePreferenceImportExport() = runTest(UnconfinedTestDispatcher()) {
+        val repository = createRepository(this)
+        repository.setConciseModeEnabled(true)
+
+        val snapshot = repository.preferencesFlow.first()
+        assertTrue(snapshot.conciseModeEnabled)
+
+        // Simulate an exported archive importing the same snapshot back into a fresh store.
+        repository.applyImportedPortablePreferences(snapshot)
+        assertTrue(repository.preferencesFlow.first().conciseModeEnabled)
+
+        repository.applyImportedPortablePreferences(
+            snapshot.copy(conciseModeEnabled = false),
+        )
+        assertFalse(repository.preferencesFlow.first().conciseModeEnabled)
     }
 
     @Test
