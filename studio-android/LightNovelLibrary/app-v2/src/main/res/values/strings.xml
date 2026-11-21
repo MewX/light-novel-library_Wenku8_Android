@@ -293,6 +293,33 @@
     <string name="about_ack_aaassseee">Jack Liu &lt;https://github.com/aaassseee&gt;</string>
     <string name="about_ack_zero">ZERO (原界面设计) &lt;78283358@qq.com&gt;</string>
     <string name="about_ack_qituji">妻兔姬 (原反馈协助) &lt;1270263248@qq.com&gt;</string>
+
+    <!-- Profile MD3e Segmented List & Drill-Down Subscreens -->
+    <string name="profile_group_reading_preferences">偏好与阅读</string>
+    <string name="profile_group_connection_data">连接与数据</string>
+    <string name="profile_group_app_support">应用与支持</string>
+    <string name="profile_summary_eink_on">墨水屏</string>
+    <string name="profile_summary_volume_paging_on">音量键翻页开</string>
+    <string name="profile_summary_volume_paging_off">音量键翻页关</string>
+    <string name="profile_summary_reader_format">%1$d sp · %2$s · %3$s</string>
+    <string name="profile_summary_storage_default">快速/深度缓存清理 · .wk8backup 备份 · 旧版迁移</string>
+    <string name="profile_summary_about_format">v%1$s · 问题反馈 · 开源许可</string>
+    <string name="profile_summary_network_ip_format">优选 %1$s (%2$d ms)</string>
+    <string name="profile_summary_network_recorded_format">已记录 %1$s (%2$d ms)</string>
+    <string name="profile_reader_typography_sliders_title">字号与间距</string>
+    <string name="profile_reader_assets_section_title">字体、纸张与翻页</string>
+    <string name="profile_reader_volume_paging_desc">阅读正文时使用设备音量上下键翻页</string>
+    <string name="profile_storage_cache_section">缓存清理</string>
+    <string name="profile_storage_backup_section">备份与迁移</string>
+    <string name="profile_backup_export_desc">导出书架、进度、书签或离线章节归档</string>
+    <string name="profile_backup_import_desc">从 .wk8backup.zip 智能合并本地数据</string>
+    <string name="profile_legacy_saf_import_desc">选择旧版 saves 目录迁移藏书与离线章节</string>
+    <string name="profile_about_feedback_section">反馈与社区</string>
+    <string name="profile_about_info_section">版本与声明</string>
+    <string name="profile_report_bug_github_desc">前往 GitHub Issues 提交缺陷或功能建议</string>
+    <string name="profile_feedback_email_desc">通过邮件发送附带版本与设备信息的反馈</string>
+    <string name="profile_license_desc">查看开源协议与第三方依赖致谢</string>
+    <string name="profile_about_desc_format">当前版本 %1$s (%2$d) · %3$s</string>
     <string name="profile_about_easter_egg">✨ 旅途愉快！愿每一本轻小说都为你留下一段奇诺般的风景 (5/5)</string>
 
     <string name="review_list_title">书评讨论</string>

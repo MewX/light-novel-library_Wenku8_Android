@@ -154,6 +154,15 @@ object ProfileStudioTestTags {
     const val ABOUT_CHANNEL_TEXT = "profile_about_channel_text"
     const val ABOUT_HOMEPAGE_LINK = "profile_about_homepage_link"
     const val ABOUT_EASTER_EGG_TEXT = "profile_about_easter_egg_text"
+    const val SUBSCREEN_ROOT = "profile_settings_subscreen_root"
+    const val SUBSCREEN_LIST = "profile_settings_subscreen_list"
+    const val SUBSCREEN_BACK_BUTTON = "profile_settings_subscreen_back"
+    const val ENTRY_APPEARANCE = "profile_entry_appearance"
+    const val ENTRY_READER_TYPOGRAPHY = "profile_entry_reader_typography"
+    const val ENTRY_NETWORK = "profile_entry_network"
+    const val ENTRY_STORAGE = "profile_entry_storage"
+    const val ENTRY_UPDATE = "profile_entry_update"
+    const val ENTRY_ABOUT = "profile_entry_about"
 }
 
 /**
