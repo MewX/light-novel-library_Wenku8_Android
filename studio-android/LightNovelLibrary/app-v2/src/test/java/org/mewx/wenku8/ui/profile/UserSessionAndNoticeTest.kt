@@ -37,7 +37,8 @@ import org.junit.runner.RunWith
 import org.mewx.wenku8.api.Wenku8API
 import org.mewx.wenku8.api.Wenku8Error
 import org.mewx.wenku8.data.remote.parser.WenkuXmlParsers
-import org.mewx.wenku8.data.remote.transport.NativeLightUserSessionCookieStore
+import org.mewx.wenku8.data.remote.transport.InMemorySessionCookieStore
+import org.mewx.wenku8.data.remote.transport.RelayPostResult
 import org.mewx.wenku8.data.remote.transport.WenkuTransport
 import org.mewx.wenku8.data.repository.AccountAuthGateway
 import org.mewx.wenku8.data.repository.AccountSessionState
@@ -279,11 +280,12 @@ class UserSessionAndNoticeTest {
         assertFalse(certFile.exists())
         assertFalse(avatarFile.exists())
 
-        // NativeLightUserSessionCookieStore local clear suppresses stale session until fresh Set-Cookie
-        NativeLightUserSessionCookieStore.setPhpSessionId("sess_abc")
-        assertEquals("sess_abc", NativeLightUserSessionCookieStore.getPhpSessionId())
-        NativeLightUserSessionCookieStore.clearPhpSessionId()
-        assertEquals("", NativeLightUserSessionCookieStore.getPhpSessionId())
+        // InMemorySessionCookieStore local clear suppresses stale session until fresh Set-Cookie
+        val cookieStore = InMemorySessionCookieStore()
+        cookieStore.setPhpSessionId("sess_abc")
+        assertEquals("sess_abc", cookieStore.getPhpSessionId())
+        cookieStore.clearPhpSessionId()
+        assertEquals("", cookieStore.getPhpSessionId())
     }
 
     @Test
@@ -725,14 +727,20 @@ class UserSessionAndNoticeTest {
         var clearSessionCookieCalls: Int = 0
         override val isEndpointConfigured: Boolean = true
 
-        override suspend fun postForm(endpointUrl: String, formParams: ContentValues): ByteArray? =
-            onPost(formParams)
-
-        override suspend fun postForm(
-            endpointUrl: String,
-            formParams: ContentValues,
+        override suspend fun postSealedAction(
+            rawActionQuery: String,
             isIdempotentReadOnly: Boolean,
-        ): ByteArray? = onPost(formParams)
+        ): RelayPostResult {
+            val cv = ContentValues()
+            for (pair in rawActionQuery.split('&')) {
+                val eq = pair.indexOf('=')
+                if (eq > 0) {
+                    cv.put(pair.substring(0, eq), pair.substring(eq + 1))
+                }
+            }
+            val bytes = onPost(cv)
+            return if (bytes != null) RelayPostResult.Success(bytes) else RelayPostResult.NetworkFailure("null")
+        }
 
         override suspend fun getBytes(url: String): ByteArray? = onGet(url)
 
@@ -743,24 +751,19 @@ class UserSessionAndNoticeTest {
 
     private class FakeAccountAuthGateway : AccountAuthGateway {
         override val isAuthConfigured: Boolean = true
-        override val baseUrlOrEmpty: String = "https://wenku8-relay.mewx.org/android.php"
+        override val baseUrlOrEmpty: String = "https://wenku8-relay.mewx.org/v2/api"
         override val registerUrlOrEmpty: String = "https://www.wenku8.net/register.php"
 
-        override fun loginParams(identifier: String, password: String): ContentValues =
-            ContentValues().apply {
-                put("op", if (identifier.contains('@')) "login_email" else "login")
-                put("id", identifier)
-                put("pwd", password)
-            }
+        override fun loginQuery(identifier: String, password: String): String {
+            val op = if (identifier.contains('@')) "login_email" else "login"
+            return "op=$op&id=$identifier&pwd=$password"
+        }
 
-        override fun logoutParams(): ContentValues =
-            ContentValues().apply { put("op", "logout") }
+        override fun logoutQuery(): String = "op=logout"
 
-        override fun userInfoParams(): ContentValues =
-            ContentValues().apply { put("op", "userinfo") }
+        override fun userInfoQuery(): String = "op=userinfo"
 
-        override fun userSignParams(): ContentValues =
-            ContentValues().apply { put("op", "sign") }
+        override fun userSignQuery(): String = "op=sign"
 
         override fun avatarUrlForUid(uid: Int): String =
             if (uid > 0) "https://img.wenku8.com/avatar/$uid.jpg" else ""

@@ -8,6 +8,7 @@ android {
     namespace 'org.mewx.wenku8'
     compileSdkVersion rootProject.targetSdkVersion
     buildToolsVersion rootProject.buildToolsVersion
+    ndkVersion '30.0.16248370'
 
     defaultConfig {
         // Production package ID matching v1 on Google Play Store for seamless in-place upgrades.

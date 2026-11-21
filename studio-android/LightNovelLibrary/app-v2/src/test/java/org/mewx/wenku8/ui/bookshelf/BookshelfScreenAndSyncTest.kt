@@ -442,39 +442,35 @@ class BookshelfScreenAndSyncTest {
         // Part A: Verify WenkuApiClient.fetchCloudBookshelf falls back to `do=list` when rich XML breaks
         val transport = object : WenkuTransport {
             override val isEndpointConfigured: Boolean = true
-            override suspend fun postForm(
-                endpointUrl: String,
-                formParams: ContentValues,
-            ): ByteArray {
-                return if (formParams.getAsString("do") == "list") {
+            override suspend fun postSealedAction(
+                rawActionQuery: String,
+                isIdempotentReadOnly: Boolean,
+            ): org.mewx.wenku8.data.remote.transport.RelayPostResult {
+                val payload = if (rawActionQuery.contains("do=list")) {
                     """<?xml version="1.0" encoding="utf-8"?><metadata><package aid="101"/><package aid="202"/></metadata>"""
                         .toByteArray(StandardCharsets.UTF_8)
                 } else {
                     // Malformed rich XML (unescaped raw '<' / broken tag)
                     "<package><item aid=\"101\"><name>Broken <Unclosed".toByteArray(StandardCharsets.UTF_8)
                 }
+                return org.mewx.wenku8.data.remote.transport.RelayPostResult.Success(payload)
             }
             override suspend fun getBytes(url: String): ByteArray? = null
             override fun clearSessionCookie() = Unit
         }
         val paramsFactory = object : WenkuParamsFactory {
-            override fun baseUrlOrUnknown(): String = "https://relay.example.test/android.php"
+            override fun baseUrlOrUnknown(): String = "https://relay.example.test/v2/api"
             override fun resolveCoverUrl(aid: Int): String = ""
-            override fun novelListWithInfo(sortedBy: Wenku8API.NovelSortedBy, page: Int, lang: Wenku8API.AppLanguage): ContentValues? = null
-            override fun searchByNovelName(query: String, lang: Wenku8API.AppLanguage): ContentValues? = null
-            override fun searchByAuthorName(query: String, lang: Wenku8API.AppLanguage): ContentValues? = null
-            override fun novelShortInfo(aid: Int, lang: Wenku8API.AppLanguage): ContentValues? = null
-            override fun novelFullMeta(aid: Int, lang: Wenku8API.AppLanguage): ContentValues? = null
-            override fun novelFullIntro(aid: Int, lang: Wenku8API.AppLanguage): ContentValues? = null
-            override fun novelIndex(aid: Int, lang: Wenku8API.AppLanguage): ContentValues? = null
-            override fun novelContent(aid: Int, cid: Int, lang: Wenku8API.AppLanguage): ContentValues? = null
-            override fun bookshelfListParams(lang: Wenku8API.AppLanguage): ContentValues = ContentValues().apply {
-                put("action", "bookcase")
-            }
-            override fun bookshelfListAidParams(lang: Wenku8API.AppLanguage): ContentValues = ContentValues().apply {
-                put("action", "bookcase")
-                put("do", "list")
-            }
+            override fun novelListWithInfoQuery(sortedBy: Wenku8API.NovelSortedBy, page: Int, lang: Wenku8API.AppLanguage): String? = null
+            override fun searchByNovelNameQuery(query: String, lang: Wenku8API.AppLanguage): String? = null
+            override fun searchByAuthorNameQuery(query: String, lang: Wenku8API.AppLanguage): String? = null
+            override fun novelShortInfoQuery(aid: Int, lang: Wenku8API.AppLanguage): String? = null
+            override fun novelFullMetaQuery(aid: Int, lang: Wenku8API.AppLanguage): String? = null
+            override fun novelFullIntroQuery(aid: Int, lang: Wenku8API.AppLanguage): String? = null
+            override fun novelIndexQuery(aid: Int, lang: Wenku8API.AppLanguage): String? = null
+            override fun novelContentQuery(aid: Int, cid: Int, lang: Wenku8API.AppLanguage): String? = null
+            override fun bookshelfListQuery(lang: Wenku8API.AppLanguage): String = "action=bookcase"
+            override fun bookshelfListAidQuery(lang: Wenku8API.AppLanguage): String = "action=bookcase&do=list"
         }
         val apiClient = WenkuApiClient(transport = transport, paramsFactory = paramsFactory)
         val fallbackRes = apiClient.fetchCloudBookshelf(Wenku8API.AppLanguage.SC)
@@ -1710,18 +1706,17 @@ class BookshelfScreenAndSyncTest {
         var activeServerUsername: String = "alice"
         var loginCallCount: Int = 0
 
-        override suspend fun postForm(
-            endpointUrl: String,
-            formParams: ContentValues,
-        ): ByteArray {
-            val action = formParams.getAsString("action")
-            return when (action) {
-                "login" -> {
+        override suspend fun postSealedAction(
+            rawActionQuery: String,
+            isIdempotentReadOnly: Boolean,
+        ): org.mewx.wenku8.data.remote.transport.RelayPostResult {
+            val payload = when (rawActionQuery) {
+                "action=login" -> {
                     loginCallCount++
                     "1".toByteArray(StandardCharsets.UTF_8)
                 }
-                "logout" -> "1".toByteArray(StandardCharsets.UTF_8)
-                "userinfo" -> """
+                "action=logout" -> "1".toByteArray(StandardCharsets.UTF_8)
+                "action=userinfo" -> """
                     <?xml version="1.0" encoding="utf-8"?>
                     <metadata>
                         <item name="uid">100</item>
@@ -1734,6 +1729,7 @@ class BookshelfScreenAndSyncTest {
                 """.trimIndent().toByteArray(StandardCharsets.UTF_8)
                 else -> "1".toByteArray(StandardCharsets.UTF_8)
             }
+            return org.mewx.wenku8.data.remote.transport.RelayPostResult.Success(payload)
         }
 
         override suspend fun getBytes(url: String): ByteArray? = null
@@ -1744,20 +1740,13 @@ class BookshelfScreenAndSyncTest {
         private val transport: FakeAccountSwitchTransport,
     ) : AccountAuthGateway {
         override val isAuthConfigured: Boolean = true
-        override val baseUrlOrEmpty: String = "https://relay.example.test/android.php"
+        override val baseUrlOrEmpty: String = "https://relay.example.test/v2/api"
         override val registerUrlOrEmpty: String = ""
 
-        override fun loginParams(identifier: String, password: String): ContentValues =
-            ContentValues().apply { put("action", "login") }
-
-        override fun logoutParams(): ContentValues =
-            ContentValues().apply { put("action", "logout") }
-
-        override fun userInfoParams(): ContentValues =
-            ContentValues().apply { put("action", "userinfo") }
-
-        override fun userSignParams(): ContentValues =
-            ContentValues().apply { put("action", "sign") }
+        override fun loginQuery(identifier: String, password: String): String = "action=login"
+        override fun logoutQuery(): String = "action=logout"
+        override fun userInfoQuery(): String = "action=userinfo"
+        override fun userSignQuery(): String = "action=sign"
 
         override fun avatarUrlForUid(uid: Int): String = ""
 

@@ -22,9 +22,11 @@ import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.mewx.wenku8.api.SealedRequest
 import org.mewx.wenku8.data.remote.transport.ActiveRelayRoute
 import org.mewx.wenku8.data.remote.transport.PinnedRelayCandidate
 import org.mewx.wenku8.data.remote.transport.RelayHttpTransport
+import org.mewx.wenku8.data.remote.transport.RelayPostResult
 import org.mewx.wenku8.data.remote.transport.RelayRouteProvider
 import org.mewx.wenku8.data.remote.transport.WenkuSessionCookieStore
 import org.robolectric.RobolectricTestRunner
@@ -361,19 +363,28 @@ class NetworkTransportAndProbeTest {
                     }
                 }
 
+                val endpointUrl = "http://wenku8-relay.mewx.org:$sharedPort/v2/api"
+                var sealCounter = 0
+                val sealedCookies = mutableListOf<String?>()
                 val transport = RelayHttpTransport(
                     routeProvider = routeControllerStub,
                     sessionCookieStore = cookieMemory,
                     systemDns = fakeSystemDns,
                     endpointConfiguredResolver = { true },
                     allowedRelayHostsProvider = { setOf("wenku8-relay.mewx.org") },
+                    requestSealer = { rawAction, cookieHeader ->
+                        sealCounter += 1
+                        sealedCookies += cookieHeader
+                        SealedRequest(
+                            endpointUrl,
+                            "application/octet-stream",
+                            mapOf("X-WK8-Proto" to "2"),
+                            "ENV:$sealCounter:$rawAction".toByteArray(StandardCharsets.UTF_8),
+                        )
+                    },
                 )
 
-                val endpointUrl = "http://wenku8-relay.mewx.org:$sharedPort/"
-                val params = ContentValues().apply {
-                    put("action", "book")
-                    put("aid", "1306")
-                }
+                val rawQuery = "action=book&aid=1306"
 
                 // 1. Default route: gzipped response + Set-Cookie PHPSESSID round-trip
                 val gzippedPayload = gzipUtf8("<metadata>ok-gzip</metadata>")
@@ -386,18 +397,27 @@ class NetworkTransportAndProbeTest {
                         .build(),
                 )
 
-                val res1 = transport.postForm(endpointUrl, params, isIdempotentReadOnly = true)
-                assertEquals("<metadata>ok-gzip</metadata>", String(res1!!, StandardCharsets.UTF_8))
+                val res1 = transport.postSealedAction(rawQuery, isIdempotentReadOnly = true)
+                assertTrue(res1 is RelayPostResult.Success)
+                assertEquals(
+                    "<metadata>ok-gzip</metadata>",
+                    String((res1 as RelayPostResult.Success).bodyBytes, StandardCharsets.UTF_8),
+                )
                 assertEquals("sess_abc_999", cookieMemory.session)
                 val poolGen1 = transport.activeConnectionPoolForTesting()
                 assertNotNull(poolGen1)
 
                 val recorded1 = primaryServer.takeRequest()
-                assertTrue(recorded1.body?.utf8().orEmpty().startsWith("&"))
+                assertEquals("/v2/api", recorded1.target)
+                assertEquals("2", recorded1.headers["X-WK8-Proto"])
+                assertTrue(recorded1.headers["Content-Type"].orEmpty().startsWith("application/octet-stream"))
+                assertEquals("ENV:1:$rawQuery", recorded1.body?.utf8())
                 assertNull(recorded1.headers["Cookie"])
+                assertNull(sealedCookies[0])
 
                 // 2. Pre-send failure on unbound candidate 127.0.0.3 (connection refused BEFORE requestHeadersStart):
-                //    Even a NON-idempotent mutation (`isIdempotentReadOnly = false`) safely falls back once!
+                //    Even a NON-idempotent mutation (`isIdempotentReadOnly = false`) safely falls back once
+                //    and mints a FRESH sealed envelope!
                 currentGeneration.set(2L)
                 activePinned = PinnedRelayCandidate(
                     candidateId = "cf-dead-presend",
@@ -411,18 +431,21 @@ class NetworkTransportAndProbeTest {
                         .build(),
                 )
 
-                val mutationPreSendFallback = transport.postForm(
-                    endpointUrl = endpointUrl,
-                    formParams = params,
+                val mutationPreSendFallback = transport.postSealedAction(
+                    rawActionQuery = rawQuery,
                     isIdempotentReadOnly = false,
                 )
-                assertEquals("1", String(mutationPreSendFallback!!, StandardCharsets.UTF_8))
+                assertTrue(mutationPreSendFallback is RelayPostResult.Success)
+                assertEquals("1", String((mutationPreSendFallback as RelayPostResult.Success).bodyBytes, StandardCharsets.UTF_8))
                 assertEquals(1, fallbackCount)
+                assertEquals("Retry must mint a fresh envelope", 3, sealCounter)
                 val poolAfterFallback = transport.activeConnectionPoolForTesting()
                 assertNotSame(poolGen1, poolAfterFallback)
 
                 val recorded2 = primaryServer.takeRequest()
                 assertEquals("PHPSESSID=sess_abc_999", recorded2.headers["Cookie"])
+                assertEquals("PHPSESSID=sess_abc_999", sealedCookies.last())
+                assertEquals("ENV:3:$rawQuery", recorded2.body?.utf8())
 
                 // 3. Post-send failure (`onResponseStart(CloseSocket)` AFTER requestHeadersStart):
                 //    3a. Mutation (`isIdempotentReadOnly = false`) MUST NOT replay on primaryServer!
@@ -438,12 +461,14 @@ class NetworkTransportAndProbeTest {
                         .build(),
                 )
                 val primaryCountBeforeMutationDrop = primaryServer.requestCount
-                val mutationDroppedResult = transport.postForm(
-                    endpointUrl = endpointUrl,
-                    formParams = params,
+                val mutationDroppedResult = transport.postSealedAction(
+                    rawActionQuery = rawQuery,
                     isIdempotentReadOnly = false,
                 )
-                assertNull("Ambiguous post-send mutation must never replay", mutationDroppedResult)
+                assertTrue(
+                    "Ambiguous post-send mutation must never replay",
+                    mutationDroppedResult is RelayPostResult.NetworkFailure,
+                )
                 assertEquals(primaryCountBeforeMutationDrop, primaryServer.requestCount)
                 assertNull("Failed candidate must still be revoked for subsequent calls", activePinned)
 
@@ -465,14 +490,14 @@ class NetworkTransportAndProbeTest {
                         .body("<result>replayed-readonly-ok</result>")
                         .build(),
                 )
-                val readOnlyReplayResult = transport.postForm(
-                    endpointUrl = endpointUrl,
-                    formParams = params,
+                val readOnlyReplayResult = transport.postSealedAction(
+                    rawActionQuery = rawQuery,
                     isIdempotentReadOnly = true,
                 )
+                assertTrue(readOnlyReplayResult is RelayPostResult.Success)
                 assertEquals(
                     "<result>replayed-readonly-ok</result>",
-                    String(readOnlyReplayResult!!, StandardCharsets.UTF_8),
+                    String((readOnlyReplayResult as RelayPostResult.Success).bodyBytes, StandardCharsets.UTF_8),
                 )
 
                 // 4. HTTP 500 application error on pinned candidate: does NOT rotate candidate IP or replay!
@@ -489,12 +514,11 @@ class NetworkTransportAndProbeTest {
                         .body("upstream error")
                         .build(),
                 )
-                val http500Result = transport.postForm(
-                    endpointUrl = endpointUrl,
-                    formParams = params,
+                val http500Result = transport.postSealedAction(
+                    rawActionQuery = rawQuery,
                     isIdempotentReadOnly = true,
                 )
-                assertNull(http500Result)
+                assertTrue(http500Result is RelayPostResult.NetworkFailure)
                 assertEquals("HTTP 500 must not trigger candidate rotation", fallbacksBefore500, fallbackCount)
                 assertEquals("cf-http-500", activePinned?.candidateId)
             }
@@ -728,21 +752,24 @@ class NetworkTransportAndProbeTest {
                 }
             }
 
+            val endpointUrl = "http://wenku8-relay.mewx.org:$port/v2/api"
             val transport = RelayHttpTransport(
                 routeProvider = routeProvider,
                 sessionCookieStore = cookieMemory,
                 systemDns = fakeSystemDns,
                 endpointConfiguredResolver = { true },
                 allowedRelayHostsProvider = { setOf("wenku8-relay.mewx.org") },
+                requestSealer = { rawAction, _ ->
+                    SealedRequest(
+                        endpointUrl,
+                        "application/octet-stream",
+                        mapOf("X-WK8-Proto" to "2"),
+                        rawAction.toByteArray(StandardCharsets.UTF_8),
+                    )
+                },
             )
 
-            val endpointUrl = "http://wenku8-relay.mewx.org:$port/"
-            val params = ContentValues().apply {
-                put("action", "book")
-                put("do", "text")
-                put("aid", "4358")
-                put("cid", "183108")
-            }
+            val rawQuery = "action=book&do=text&aid=4358&cid=183108"
 
             // 1. Upstream HTTP 200 with 0-byte body (exact relay behavior for aid=4358 cid=183108)
             server.enqueue(
@@ -751,9 +778,9 @@ class NetworkTransportAndProbeTest {
                     .body(Buffer())
                     .build(),
             )
-            val plainEmpty = transport.postForm(endpointUrl, params, isIdempotentReadOnly = true)
-            assertNotNull("HTTP 200 with 0 bytes must return empty ByteArray, not null", plainEmpty)
-            assertEquals(0, plainEmpty!!.size)
+            val plainEmpty = transport.postSealedAction(rawQuery, isIdempotentReadOnly = true)
+            assertTrue("HTTP 200 with 0 bytes must return Success(empty)", plainEmpty is RelayPostResult.Success)
+            assertEquals(0, (plainEmpty as RelayPostResult.Success).bodyBytes.size)
             assertEquals(0, fallbackCount)
 
             // 2. HTTP 200 with Content-Encoding: gzip and a truly 0-byte raw stream (must NOT throw EOFException)
@@ -764,9 +791,9 @@ class NetworkTransportAndProbeTest {
                     .body(Buffer())
                     .build(),
             )
-            val emptyRawGzip = transport.postForm(endpointUrl, params, isIdempotentReadOnly = true)
-            assertNotNull("Zero-byte stream with Content-Encoding: gzip must return empty ByteArray", emptyRawGzip)
-            assertEquals(0, emptyRawGzip!!.size)
+            val emptyRawGzip = transport.postSealedAction(rawQuery, isIdempotentReadOnly = true)
+            assertTrue("Zero-byte stream with Content-Encoding: gzip must return Success(empty)", emptyRawGzip is RelayPostResult.Success)
+            assertEquals(0, (emptyRawGzip as RelayPostResult.Success).bodyBytes.size)
             assertEquals(0, fallbackCount)
 
             // 3. HTTP 200 with Content-Encoding: gzip and a valid gzip-compressed empty string
@@ -777,11 +804,156 @@ class NetworkTransportAndProbeTest {
                     .body(Buffer().write(gzipUtf8("")))
                     .build(),
             )
-            val validEmptyGzip = transport.postForm(endpointUrl, params, isIdempotentReadOnly = true)
-            assertNotNull("Valid empty gzip payload must decode to empty ByteArray", validEmptyGzip)
-            assertEquals(0, validEmptyGzip!!.size)
+            val validEmptyGzip = transport.postSealedAction(rawQuery, isIdempotentReadOnly = true)
+            assertTrue("Valid empty gzip payload must decode to Success(empty)", validEmptyGzip is RelayPostResult.Success)
+            assertEquals(0, (validEmptyGzip as RelayPostResult.Success).bodyBytes.size)
             assertEquals(0, fallbackCount)
             assertEquals(3, server.requestCount)
+        }
+    }
+
+    @Test
+    fun relayHttpTransportHandlesClockSkewRetry426UpgradeRequired403SoftHintAndNoRedirects(): Unit = runBlocking {
+        MockWebServer().use { server ->
+            server.start(InetAddress.getByName("127.0.0.1"), 0)
+            val endpointUrl = "http://wenku8-relay.mewx.org:${server.port}/v2/api"
+
+            val fakeSystemDns = Dns { host ->
+                if (host == "wenku8-relay.mewx.org") {
+                    listOf(
+                        InetAddress.getByAddress(
+                            host,
+                            IpLiteralParser.parseNumericIpBytes("127.0.0.1", requirePublicUnicast = false)!!,
+                        ),
+                    )
+                } else {
+                    throw UnknownHostException(host)
+                }
+            }
+
+            var fallbackCount = 0
+            val pinnedCandidate = PinnedRelayCandidate(
+                candidateId = "cf-control-check",
+                relayHost = "wenku8-relay.mewx.org",
+                rawIpBytes = IpLiteralParser.parseNumericIpBytes("127.0.0.1", requirePublicUnicast = false)!!,
+            )
+            val routeProvider = object : RelayRouteProvider {
+                override fun currentRouteForHost(host: String): ActiveRelayRoute =
+                    ActiveRelayRoute(generationId = 1L, pinnedCandidate = pinnedCandidate)
+
+                override fun fallbackRouteAfterCandidateFailure(
+                    failedGenerationId: Long,
+                    failedCandidateId: String,
+                    failureBeforeSend: Boolean,
+                ): ActiveRelayRoute {
+                    fallbackCount += 1
+                    return ActiveRelayRoute(generationId = 2L, pinnedCandidate = null)
+                }
+            }
+
+            var sealAttempt = 0
+            val syncedServerTimes = mutableListOf<Long>()
+            val upgradeSignals = mutableListOf<Pair<Int?, String?>>()
+            val softHints = mutableListOf<Int?>()
+
+            val transport = RelayHttpTransport(
+                routeProvider = routeProvider,
+                sessionCookieStore = org.mewx.wenku8.data.remote.transport.InMemorySessionCookieStore(),
+                systemDns = fakeSystemDns,
+                endpointConfiguredResolver = { true },
+                allowedRelayHostsProvider = { setOf("wenku8-relay.mewx.org") },
+                requestSealer = { rawAction, _ ->
+                    sealAttempt += 1
+                    SealedRequest(
+                        endpointUrl,
+                        "application/octet-stream",
+                        mapOf("X-WK8-Proto" to "2"),
+                        "ATTEMPT#$sealAttempt:$rawAction".toByteArray(StandardCharsets.UTF_8),
+                    )
+                },
+                serverClockOffsetUpdater = { syncedServerTimes += it },
+                onUpgradeRequired = { minCode, minName -> upgradeSignals += (minCode to minName) },
+                onSoftUpdateHint = { minCode -> softHints += minCode },
+            )
+
+            // 1. 401 CLOCK_SKEW self-heals by syncing serverTimeMs and retrying ONCE with a fresh sealed envelope
+            server.enqueue(
+                MockResponse.Builder()
+                    .code(401)
+                    .body("""{"error":"CLOCK_SKEW","serverTimeMs":1780000001234}""")
+                    .build(),
+            )
+            server.enqueue(
+                MockResponse.Builder()
+                    .code(200)
+                    .addHeader("X-WK8-Update-Hint", "1")
+                    .addHeader("X-WK8-Min-Version", "108")
+                    .body("<ok>healed</ok>")
+                    .build(),
+            )
+            val skewRes = transport.postSealedAction("action=book&aid=1", isIdempotentReadOnly = false)
+            assertTrue(skewRes is RelayPostResult.Success)
+            assertEquals("<ok>healed</ok>", String((skewRes as RelayPostResult.Success).bodyBytes, StandardCharsets.UTF_8))
+            assertEquals(listOf(1780000001234L), syncedServerTimes)
+            assertEquals(listOf<Int?>(108), softHints)
+            assertEquals("Clock-skew retry must not rotate candidate IP", 0, fallbackCount)
+            val reqA = server.takeRequest()
+            val reqB = server.takeRequest()
+            assertEquals("ATTEMPT#1:action=book&aid=1", reqA.body?.utf8())
+            assertEquals("ATTEMPT#2:action=book&aid=1", reqB.body?.utf8())
+
+            // 2. Two consecutive 401 CLOCK_SKEW responses stop after bounded 1 retry -> AuthRejected
+            server.enqueue(
+                MockResponse.Builder()
+                    .code(401)
+                    .body("""{"error":"CLOCK_SKEW","serverTimeMs":1780000009999}""")
+                    .build(),
+            )
+            server.enqueue(
+                MockResponse.Builder()
+                    .code(401)
+                    .body("""{"error":"CLOCK_SKEW","serverTimeMs":1780000010000}""")
+                    .build(),
+            )
+            val boundedSkew = transport.postSealedAction("action=book&aid=2", isIdempotentReadOnly = true)
+            assertEquals(RelayPostResult.AuthRejected, boundedSkew)
+            assertEquals(0, fallbackCount)
+            server.takeRequest()
+            server.takeRequest()
+
+            // 3. HTTP 426 Upgrade Required -> invokes callback, returns UpgradeRequired, NEVER rotates or retries
+            server.enqueue(
+                MockResponse.Builder()
+                    .code(426)
+                    .body("""{"error":"SCHEME_RETIRED","minVersionCode":105,"minVersionName":"2.0.5"}""")
+                    .build(),
+            )
+            val upgradeRes = transport.postSealedAction("action=book&aid=3", isIdempotentReadOnly = true)
+            assertEquals(RelayPostResult.UpgradeRequired(105, "2.0.5"), upgradeRes)
+            assertEquals(listOf(105 to "2.0.5"), upgradeSignals)
+            assertEquals("HTTP 426 must never trigger candidate IP rotation", 0, fallbackCount)
+            server.takeRequest()
+
+            // 4. HTTP 403 Forbidden -> AuthRejected without candidate rotation
+            server.enqueue(MockResponse.Builder().code(403).body("""{"error":"AUTH_FAILED"}""").build())
+            assertEquals(
+                RelayPostResult.AuthRejected,
+                transport.postSealedAction("action=book&aid=4", isIdempotentReadOnly = true),
+            )
+            assertEquals(0, fallbackCount)
+            server.takeRequest()
+
+            // 5. HTTP 302 Redirect -> followRedirects(false) refuses to leak sealed body/cookie to Location target
+            server.enqueue(
+                MockResponse.Builder()
+                    .code(302)
+                    .addHeader("Location", "http://127.0.0.1:${server.port}/evil")
+                    .build(),
+            )
+            val redirectRes = transport.postSealedAction("action=book&aid=5", isIdempotentReadOnly = true)
+            assertTrue(redirectRes is RelayPostResult.NetworkFailure)
+            assertEquals(0, fallbackCount)
+            server.takeRequest()
         }
     }
 

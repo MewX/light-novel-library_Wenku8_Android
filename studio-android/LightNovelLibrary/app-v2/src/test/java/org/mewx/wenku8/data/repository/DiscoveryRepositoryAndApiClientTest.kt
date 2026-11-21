@@ -89,29 +89,34 @@ class DiscoveryRepositoryAndApiClientTest {
             override val isEndpointConfigured: Boolean
                 get() = transportConfigured
 
-            override suspend fun postForm(endpointUrl: String, formParams: ContentValues): ByteArray? {
-                return nextPayloadBytes
+            override suspend fun postSealedAction(
+                rawActionQuery: String,
+                isIdempotentReadOnly: Boolean,
+            ): org.mewx.wenku8.data.remote.transport.RelayPostResult {
+                val bytes = nextPayloadBytes
+                return if (bytes != null) {
+                    org.mewx.wenku8.data.remote.transport.RelayPostResult.Success(bytes)
+                } else {
+                    org.mewx.wenku8.data.remote.transport.RelayPostResult.NetworkFailure("null")
+                }
             }
         }
         val jvmParamsFactory = object : org.mewx.wenku8.data.remote.api.WenkuParamsFactory {
             override fun baseUrlOrUnknown(): String = activeEndpoint
             override fun resolveCoverUrl(aid: Int): String = "https://img.example.test/$aid.jpg"
-            override fun novelListWithInfo(
+            override fun novelListWithInfoQuery(
                 sortedBy: Wenku8API.NovelSortedBy,
                 page: Int,
                 lang: Wenku8API.AppLanguage,
-            ): ContentValues = ContentValues().apply {
-                put("sort", sortedBy.name)
-                put("page", page)
-            }
-            override fun searchByNovelName(query: String, lang: Wenku8API.AppLanguage): ContentValues = ContentValues()
-            override fun searchByAuthorName(query: String, lang: Wenku8API.AppLanguage): ContentValues = ContentValues()
-            override fun novelShortInfo(aid: Int, lang: Wenku8API.AppLanguage): ContentValues = ContentValues()
-            override fun novelFullMeta(aid: Int, lang: Wenku8API.AppLanguage): ContentValues = ContentValues()
-            override fun novelFullIntro(aid: Int, lang: Wenku8API.AppLanguage): ContentValues = ContentValues()
-            override fun novelIndex(aid: Int, lang: Wenku8API.AppLanguage): ContentValues = ContentValues()
-            override fun novelContent(aid: Int, cid: Int, lang: Wenku8API.AppLanguage): ContentValues = ContentValues()
-            override fun bookshelfListParams(lang: Wenku8API.AppLanguage): ContentValues = ContentValues()
+            ): String = "action=novellist&sort=${sortedBy.name}&page=$page"
+            override fun searchByNovelNameQuery(query: String, lang: Wenku8API.AppLanguage): String = "action=search"
+            override fun searchByAuthorNameQuery(query: String, lang: Wenku8API.AppLanguage): String = "action=search"
+            override fun novelShortInfoQuery(aid: Int, lang: Wenku8API.AppLanguage): String = "action=book&do=meta"
+            override fun novelFullMetaQuery(aid: Int, lang: Wenku8API.AppLanguage): String = "action=book&do=meta"
+            override fun novelFullIntroQuery(aid: Int, lang: Wenku8API.AppLanguage): String = "action=book&do=intro"
+            override fun novelIndexQuery(aid: Int, lang: Wenku8API.AppLanguage): String = "action=book&do=list"
+            override fun novelContentQuery(aid: Int, cid: Int, lang: Wenku8API.AppLanguage): String = "action=book&do=text"
+            override fun bookshelfListQuery(lang: Wenku8API.AppLanguage): String = "action=bookcase"
         }
 
         // Also verify NativeWenkuParamsFactory never crashes on host JVM (with or without :api-stub).
@@ -395,28 +400,53 @@ class DiscoveryRepositoryAndApiClientTest {
     @Test
     fun wenkuApiClientClassifiesEmptyNullHtmlNumericAndValidChapterResponses() = runTest {
         var nextPayloadBytes: ByteArray? = null
+        var nextOverrideResult: org.mewx.wenku8.data.remote.transport.RelayPostResult? = null
         val fakeTransport = object : WenkuTransport {
             override val isEndpointConfigured: Boolean = true
-            override suspend fun postForm(endpointUrl: String, formParams: ContentValues): ByteArray? = nextPayloadBytes
+            override suspend fun postSealedAction(
+                rawActionQuery: String,
+                isIdempotentReadOnly: Boolean,
+            ): org.mewx.wenku8.data.remote.transport.RelayPostResult {
+                nextOverrideResult?.let { return it }
+                val bytes = nextPayloadBytes
+                return if (bytes != null) {
+                    org.mewx.wenku8.data.remote.transport.RelayPostResult.Success(bytes)
+                } else {
+                    org.mewx.wenku8.data.remote.transport.RelayPostResult.NetworkFailure("null")
+                }
+            }
         }
         val jvmParamsFactory = object : org.mewx.wenku8.data.remote.api.WenkuParamsFactory {
-            override fun baseUrlOrUnknown(): String = "https://relay.example.test/api.php"
+            override fun baseUrlOrUnknown(): String = "https://relay.example.test/v2/api"
             override fun resolveCoverUrl(aid: Int): String = "https://img.example.test/$aid.jpg"
-            override fun novelListWithInfo(
+            override fun novelListWithInfoQuery(
                 sortedBy: Wenku8API.NovelSortedBy,
                 page: Int,
                 lang: Wenku8API.AppLanguage,
-            ): ContentValues = ContentValues()
-            override fun searchByNovelName(query: String, lang: Wenku8API.AppLanguage): ContentValues = ContentValues()
-            override fun searchByAuthorName(query: String, lang: Wenku8API.AppLanguage): ContentValues = ContentValues()
-            override fun novelShortInfo(aid: Int, lang: Wenku8API.AppLanguage): ContentValues = ContentValues()
-            override fun novelFullMeta(aid: Int, lang: Wenku8API.AppLanguage): ContentValues = ContentValues()
-            override fun novelFullIntro(aid: Int, lang: Wenku8API.AppLanguage): ContentValues = ContentValues()
-            override fun novelIndex(aid: Int, lang: Wenku8API.AppLanguage): ContentValues = ContentValues()
-            override fun novelContent(aid: Int, cid: Int, lang: Wenku8API.AppLanguage): ContentValues = ContentValues()
-            override fun bookshelfListParams(lang: Wenku8API.AppLanguage): ContentValues = ContentValues()
+            ): String = "action=novellist"
+            override fun searchByNovelNameQuery(query: String, lang: Wenku8API.AppLanguage): String = "action=search"
+            override fun searchByAuthorNameQuery(query: String, lang: Wenku8API.AppLanguage): String = "action=search"
+            override fun novelShortInfoQuery(aid: Int, lang: Wenku8API.AppLanguage): String = "action=book&do=meta"
+            override fun novelFullMetaQuery(aid: Int, lang: Wenku8API.AppLanguage): String = "action=book&do=meta"
+            override fun novelFullIntroQuery(aid: Int, lang: Wenku8API.AppLanguage): String = "action=book&do=intro"
+            override fun novelIndexQuery(aid: Int, lang: Wenku8API.AppLanguage): String = "action=book&do=list"
+            override fun novelContentQuery(aid: Int, cid: Int, lang: Wenku8API.AppLanguage): String = "action=book&do=text"
+            override fun bookshelfListQuery(lang: Wenku8API.AppLanguage): String = "action=bookcase"
         }
         val client = WenkuApiClient(transport = fakeTransport, paramsFactory = jvmParamsFactory)
+
+        // 0. Server 426 UpgradeRequired and 403 AuthRejected propagate cleanly
+        nextOverrideResult = org.mewx.wenku8.data.remote.transport.RelayPostResult.UpgradeRequired(105, "2.0.5")
+        assertEquals(
+            WenkuApiResult.UpgradeRequired(105, "2.0.5"),
+            client.fetchChapterContent(aid = 4358, cid = 183108, appLanguage = Wenku8API.AppLanguage.SC),
+        )
+        nextOverrideResult = org.mewx.wenku8.data.remote.transport.RelayPostResult.AuthRejected
+        assertEquals(
+            WenkuApiResult.AuthRejected,
+            client.fetchChapterContent(aid = 4358, cid = 183108, appLanguage = Wenku8API.AppLanguage.SC),
+        )
+        nextOverrideResult = null
 
         // 1. Upstream HTTP 200 with 0 bytes (reproduces aid=4358, cid=183108)
         nextPayloadBytes = ByteArray(0)

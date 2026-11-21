@@ -823,9 +823,12 @@ class ProfileAndBackupTest {
                 // 2. Destination device is actively signed in as "bob"!
                 val bobTransport = object : WenkuTransport {
                     override val isEndpointConfigured: Boolean = true
-                    override suspend fun postForm(endpointUrl: String, formParams: ContentValues): ByteArray {
-                        return when (formParams.getAsString("action")) {
-                            "userinfo" -> """
+                    override suspend fun postSealedAction(
+                        rawActionQuery: String,
+                        isIdempotentReadOnly: Boolean,
+                    ): org.mewx.wenku8.data.remote.transport.RelayPostResult {
+                        val payload = when (rawActionQuery) {
+                            "action=userinfo" -> """
                                 <?xml version="1.0" encoding="utf-8"?>
                                 <metadata>
                                     <item name="uid">202</item>
@@ -838,22 +841,19 @@ class ProfileAndBackupTest {
                             """.trimIndent().toByteArray(StandardCharsets.UTF_8)
                             else -> "1".toByteArray(StandardCharsets.UTF_8)
                         }
+                        return org.mewx.wenku8.data.remote.transport.RelayPostResult.Success(payload)
                     }
                     override suspend fun getBytes(url: String): ByteArray? = byteArrayOf(7, 8, 9)
                     override fun clearSessionCookie() = Unit
                 }
                 val bobAuthGateway = object : AccountAuthGateway {
                     override val isAuthConfigured: Boolean = true
-                    override val baseUrlOrEmpty: String = "https://relay.example.test/android.php"
+                    override val baseUrlOrEmpty: String = "https://relay.example.test/v2/api"
                     override val registerUrlOrEmpty: String = ""
-                    override fun loginParams(identifier: String, password: String): ContentValues =
-                        ContentValues().apply { put("action", "login") }
-                    override fun logoutParams(): ContentValues =
-                        ContentValues().apply { put("action", "logout") }
-                    override fun userInfoParams(): ContentValues =
-                        ContentValues().apply { put("action", "userinfo") }
-                    override fun userSignParams(): ContentValues =
-                        ContentValues().apply { put("action", "sign") }
+                    override fun loginQuery(identifier: String, password: String): String = "action=login"
+                    override fun logoutQuery(): String = "action=logout"
+                    override fun userInfoQuery(): String = "action=userinfo"
+                    override fun userSignQuery(): String = "action=sign"
                     override fun avatarUrlForUid(uid: Int): String = "https://img.example.test/bob.jpg"
                     override fun mapServerErrorCode(rawCode: Int): Wenku8Error.ErrorCode =
                         Wenku8Error.ErrorCode.SYSTEM_1_SUCCEEDED

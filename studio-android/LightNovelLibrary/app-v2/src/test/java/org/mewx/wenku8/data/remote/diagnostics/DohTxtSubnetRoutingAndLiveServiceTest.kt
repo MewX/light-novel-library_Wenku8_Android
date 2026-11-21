@@ -724,19 +724,26 @@ class DohTxtSubnetRoutingAndLiveServiceTest {
             },
             systemDns = Dns.SYSTEM,
             endpointConfiguredResolver = { true },
+            requestSealer = { _, _ ->
+                org.mewx.wenku8.api.SealedRequest(
+                    "https://wenku8-relay.mewx.org/v2/api",
+                    "application/octet-stream",
+                    mapOf("X-WK8-Proto" to "2"),
+                    byteArrayOf(0x01),
+                )
+            },
             monotonicClockMillis = realMonotonicMs,
             connectTimeoutMillis = 1_200L,
             readTimeoutMillis = 5_000L,
             totalPostDeadlineMillis = 9_000L,
         )
 
-        // Send a benign form POST to live https://wenku8-relay.mewx.org/ (without valid encrypted `request` param,
+        // Send a benign sealed POST to live https://wenku8-relay.mewx.org/ (without valid envelope,
         // the live Worker returns HTTP 400/403/200 over real TLS after falling back from dead 192.0.2.9 -> real Dns.SYSTEM).
         // Because `fallbackTriggered` only fires when attempt #1 fails pre-send AND attempt #2 is executed on `Dns.SYSTEM`,
         // we also verify a real `GET` / probe on `Dns.SYSTEM` succeeds!
-        liveRelayTransport.postForm(
-            endpointUrl = "https://wenku8-relay.mewx.org/",
-            formParams = ContentValues().apply { put("ping", "1") },
+        liveRelayTransport.postSealedAction(
+            rawActionQuery = "ping=1",
             isIdempotentReadOnly = true,
         )
         assertTrue(

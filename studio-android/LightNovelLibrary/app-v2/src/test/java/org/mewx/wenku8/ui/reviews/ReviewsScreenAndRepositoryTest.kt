@@ -157,27 +157,30 @@ class ReviewsScreenAndRepositoryTest {
         var loginCallCount = 0
         val fakeTransport = object : WenkuTransport {
             override val isEndpointConfigured: Boolean = true
-            override suspend fun postForm(
-                endpointUrl: String,
-                formParams: ContentValues,
-            ): ByteArray? {
-                val action = formParams.getAsString("action")
-                return when (action) {
-                    "login" -> {
+            override suspend fun postSealedAction(
+                rawActionQuery: String,
+                isIdempotentReadOnly: Boolean,
+            ): org.mewx.wenku8.data.remote.transport.RelayPostResult {
+                return when (rawActionQuery) {
+                    "action=login" -> {
                         loginCallCount++
-                        "1".toByteArray(StandardCharsets.UTF_8)
+                        org.mewx.wenku8.data.remote.transport.RelayPostResult.Success(
+                            "1".toByteArray(StandardCharsets.UTF_8),
+                        )
                     }
-                    "userinfo" -> """
-                        <metadata>
-                          <item name="uname">kino</item>
-                          <item name="nickname">奇诺</item>
-                          <item name="uid" value="12345"/>
-                          <item name="score" value="200"/>
-                          <item name="experience" value="500"/>
-                          <item name="rank">轻国骑士</item>
-                        </metadata>
-                    """.trimIndent().toByteArray(StandardCharsets.UTF_8)
-                    else -> null
+                    "action=userinfo" -> org.mewx.wenku8.data.remote.transport.RelayPostResult.Success(
+                        """
+                            <metadata>
+                              <item name="uname">kino</item>
+                              <item name="nickname">奇诺</item>
+                              <item name="uid" value="12345"/>
+                              <item name="score" value="200"/>
+                              <item name="experience" value="500"/>
+                              <item name="rank">轻国骑士</item>
+                            </metadata>
+                        """.trimIndent().toByteArray(StandardCharsets.UTF_8),
+                    )
+                    else -> org.mewx.wenku8.data.remote.transport.RelayPostResult.NetworkFailure("unknown")
                 }
             }
 
@@ -185,13 +188,12 @@ class ReviewsScreenAndRepositoryTest {
         }
         val fakeAuthGateway = object : AccountAuthGateway {
             override val isAuthConfigured: Boolean = true
-            override val baseUrlOrEmpty: String = "https://relay.example/api.php"
+            override val baseUrlOrEmpty: String = "https://relay.example/v2/api"
             override val registerUrlOrEmpty: String = ""
-            override fun loginParams(identifier: String, password: String) =
-                ContentValues().apply { put("action", "login") }
-            override fun logoutParams(): ContentValues? = null
-            override fun userInfoParams() = ContentValues().apply { put("action", "userinfo") }
-            override fun userSignParams(): ContentValues? = null
+            override fun loginQuery(identifier: String, password: String): String = "action=login"
+            override fun logoutQuery(): String? = null
+            override fun userInfoQuery(): String = "action=userinfo"
+            override fun userSignQuery(): String? = null
             override fun avatarUrlForUid(uid: Int): String = ""
             override fun mapServerErrorCode(rawCode: Int): Wenku8Error.ErrorCode =
                 if (rawCode == 1) Wenku8Error.ErrorCode.SYSTEM_1_SUCCEEDED else Wenku8Error.ErrorCode.ERROR_DEFAULT

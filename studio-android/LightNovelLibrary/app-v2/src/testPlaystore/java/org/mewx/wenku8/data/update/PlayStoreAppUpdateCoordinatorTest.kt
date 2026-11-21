@@ -226,6 +226,40 @@ class PlayStoreAppUpdateCoordinatorTest {
         assertNull(coordinator.pendingAutoPrompt.value)
     }
 
+    @Test
+    fun serverUpgradeRequiredAndSoftHintEmitPlayOnlyStateWithZeroExternalUrls() =
+        runTest(UnconfinedTestDispatcher()) {
+            val fakeManager = FakeAppUpdateManager(ApplicationProvider.getApplicationContext())
+            val prefsRepo = createPrefs(this, "play_server_signals")
+            val coordinator = PlayStoreAppUpdateCoordinator(
+                appUpdateManager = fakeManager,
+                userPreferencesRepository = prefsRepo,
+                currentVersionCode = 101,
+            )
+
+            // Soft hint raises profile badge without mutating Play-authoritative uiState or popping dialog
+            coordinator.onServerUpdateHint(minVersionCode = 104)
+            assertTrue(coordinator.showProfileUpdateBadge.value)
+            assertEquals(AppUpdateUiState.Idle, coordinator.uiState.value)
+            assertNull(coordinator.pendingAutoPrompt.value)
+
+            // Hard HTTP 426 emits Play-only UpdateAvailable + RequiredUpgradeDialog with zero external APK URL
+            coordinator.onServerUpgradeRequired(minVersionCode = 105, minVersionName = "2.0.5")
+            assertTrue(coordinator.showProfileUpdateBadge.value)
+            val state = coordinator.uiState.value as AppUpdateUiState.UpdateAvailable
+            assertEquals(105, state.targetVersionCode)
+            assertTrue(state.isPlayStoreManaged)
+            assertNull(state.downloadPageUrl)
+            val prompt = coordinator.pendingAutoPrompt.value as AppUpdateAutoPrompt.RequiredUpgradeDialog
+            assertEquals(101, prompt.currentVersionCode)
+            assertEquals(105, prompt.targetVersionCode)
+            assertEquals("2.0.5", prompt.minVersionName)
+            assertTrue(prompt.isPlayStoreChannel)
+            assertNull(prompt.downloadPageUrl)
+
+            coordinator.dispose()
+        }
+
     private class FailingAppUpdateManager : AppUpdateManager {
         override fun getAppUpdateInfo(): Task<AppUpdateInfo> =
             Tasks.forException(IllegalStateException("Play Store unavailable"))

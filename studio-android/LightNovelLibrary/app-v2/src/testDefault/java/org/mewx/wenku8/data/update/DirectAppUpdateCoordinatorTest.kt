@@ -162,11 +162,51 @@ class DirectAppUpdateCoordinatorTest {
             )
         }
 
+    @Test
+    fun serverUpgradeRequiredAndSoftHintUpdateStateAndDirectChannelPrompt() =
+        runTest(UnconfinedTestDispatcher()) {
+            val transport = FakeVersionTransport { null }
+            val noticeRepo = ServerNoticeAndUpdateRepository(
+                transport = transport,
+                assetRootsProvider = { emptyList() },
+                ioDispatcher = UnconfinedTestDispatcher(),
+            )
+            val prefsRepo = createPrefs(this, "direct_server_signals")
+            val coordinator = DirectAppUpdateCoordinator(
+                serverNoticeAndUpdateRepository = noticeRepo,
+                userPreferencesRepository = prefsRepo,
+                currentVersionCode = 101,
+            )
+
+            // Soft hint raises profile badge + UpdateAvailable without blocking auto-prompt dialog
+            coordinator.onServerUpdateHint(minVersionCode = 104)
+            assertTrue(coordinator.showProfileUpdateBadge.value)
+            val softState = coordinator.uiState.value as AppUpdateUiState.UpdateAvailable
+            assertEquals(104, softState.targetVersionCode)
+            assertFalse(softState.isPlayStoreManaged)
+            assertEquals(ServerNoticeAndUpdateRepository.BLOG_DOWNLOAD_URL, softState.downloadPageUrl)
+            assertNull(coordinator.pendingAutoPrompt.value)
+
+            // Hard HTTP 426 Upgrade Required emits channel-aware RequiredUpgradeDialog
+            coordinator.onServerUpgradeRequired(minVersionCode = 105, minVersionName = "2.0.5")
+            assertTrue(coordinator.showProfileUpdateBadge.value)
+            val requiredPrompt = coordinator.pendingAutoPrompt.value as AppUpdateAutoPrompt.RequiredUpgradeDialog
+            assertEquals(101, requiredPrompt.currentVersionCode)
+            assertEquals(105, requiredPrompt.targetVersionCode)
+            assertEquals("2.0.5", requiredPrompt.minVersionName)
+            assertFalse(requiredPrompt.isPlayStoreChannel)
+            assertEquals(ServerNoticeAndUpdateRepository.BLOG_DOWNLOAD_URL, requiredPrompt.downloadPageUrl)
+        }
+
     private class FakeVersionTransport(
         private val onGetVersion: () -> ByteArray?,
     ) : WenkuTransport {
         override val isEndpointConfigured: Boolean = true
-        override suspend fun postForm(endpointUrl: String, formParams: ContentValues): ByteArray? = null
+        override suspend fun postSealedAction(
+            rawActionQuery: String,
+            isIdempotentReadOnly: Boolean,
+        ): org.mewx.wenku8.data.remote.transport.RelayPostResult =
+            org.mewx.wenku8.data.remote.transport.RelayPostResult.NetworkFailure("unused")
         override suspend fun getBytes(url: String): ByteArray? =
             if (url == ServerNoticeAndUpdateRepository.VERSION_CHECK_URL) onGetVersion() else null
         override fun clearSessionCookie() = Unit
