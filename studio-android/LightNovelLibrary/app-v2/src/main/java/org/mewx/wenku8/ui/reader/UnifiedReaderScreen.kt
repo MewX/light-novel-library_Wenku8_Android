@@ -40,7 +40,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -127,8 +126,6 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.IntOffset
-import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.view.WindowCompat
@@ -1692,8 +1689,7 @@ fun UnifiedReaderScreen(
             contentHighlight = contentHighlight,
             continuousScrollJumpCommand = continuousScrollJumpCommand,
             parchmentAssets = parchmentAssets,
-            cutoutOffsetPx = IntOffset(safeLeftPx, safeTopPx),
-            fullContainerSizePx = IntSize(constraints.maxWidth, constraints.maxHeight),
+            contentSafeInsets = cutoutInsets,
             onTapZoneAction = { action ->
                 if (isTypographyPanelOpen) {
                     interruptedStepRef[0] = null
@@ -1770,7 +1766,6 @@ fun UnifiedReaderScreen(
                     openSafeBrowserUrl(context, url)
                 }
             },
-            modifier = Modifier.windowInsetsPadding(WindowInsets.displayCutout),
         )
 
         // Floating brightness indicator pill (`24..72dp` left-edge drag feedback).

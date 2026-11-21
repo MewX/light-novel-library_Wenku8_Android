@@ -30,13 +30,16 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -79,9 +82,7 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.ShaderBrush
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.DrawScope
-import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
-import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
@@ -409,8 +410,6 @@ fun rememberReaderParchmentAssets(enabled: Boolean): ReaderParchmentBackgroundAs
 internal fun DrawScope.drawReaderPaperBackground(
     paperBackground: Color,
     parchmentAssets: ReaderParchmentBackgroundAssets?,
-    cutoutOffsetPx: IntOffset = IntOffset.Zero,
-    fullContainerSizePx: IntSize? = null,
 ) {
     drawRect(color = paperBackground)
     if (parchmentAssets == null) return
@@ -419,32 +418,15 @@ internal fun DrawScope.drawReaderPaperBackground(
     val heightPx = size.height.roundToInt()
     if (widthPx <= 0 || heightPx <= 0) return
 
-    val offsetX = cutoutOffsetPx.x.toFloat()
-    val offsetY = cutoutOffsetPx.y.toFloat()
-    if (offsetX == 0f && offsetY == 0f) {
-        drawRect(brush = parchmentAssets.tileShaderBrush)
-    } else {
-        translate(left = -offsetX, top = -offsetY) {
-            drawRect(
-                brush = parchmentAssets.tileShaderBrush,
-                topLeft = Offset(offsetX, offsetY),
-                size = size,
-            )
-        }
-    }
+    drawRect(brush = parchmentAssets.tileShaderBrush)
 
     val edgeBitmap = parchmentAssets.edgeVignetteBitmap ?: return
-    val targetSize = fullContainerSizePx
-        ?.takeIf { it.width > 0 && it.height > 0 }
-        ?: IntSize(widthPx, heightPx)
-    clipRect {
-        drawImage(
-            image = edgeBitmap,
-            dstOffset = IntOffset(-cutoutOffsetPx.x, -cutoutOffsetPx.y),
-            dstSize = targetSize,
-            filterQuality = FilterQuality.Low,
-        )
-    }
+    drawImage(
+        image = edgeBitmap,
+        dstOffset = IntOffset.Zero,
+        dstSize = IntSize(widthPx, heightPx),
+        filterQuality = FilterQuality.Low,
+    )
 }
 
 /**
@@ -553,6 +535,10 @@ fun resolveReaderVisualPalette(
 
 /**
  * Hosts the active page-turning delegate (`1` through `6`) over [ReaderWindowSnapshot].
+ *
+ * The pager and page-turn transition layer span full edge-to-edge (including the top status bar
+ * and display cutout) so cover-slide shadows and simulation curls never clip at the status bar,
+ * while [contentSafeInsets] keeps all text, captions, and illustrations cleanly outside cutouts.
  */
 @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -569,8 +555,7 @@ fun ReaderViewportHost(
     contentHighlight: ReaderContentHighlight = ReaderContentHighlight(),
     continuousScrollJumpCommand: ContinuousScrollJumpCommand? = null,
     parchmentAssets: ReaderParchmentBackgroundAssets? = null,
-    cutoutOffsetPx: IntOffset = IntOffset.Zero,
-    fullContainerSizePx: IntSize? = null,
+    contentSafeInsets: WindowInsets = WindowInsets.displayCutout,
     onTapZoneAction: (ReaderTapZoneAction) -> Unit,
     onBrightnessDragDelta: (Float) -> Unit,
     onIllustrationClicked: (imageUrl: String, imageIndexInChapter: Int) -> Unit,
@@ -615,8 +600,6 @@ fun ReaderViewportHost(
                     drawReaderPaperBackground(
                         paperBackground = palette.backgroundColor,
                         parchmentAssets = activeParchmentAssets,
-                        cutoutOffsetPx = cutoutOffsetPx,
-                        fullContainerSizePx = fullContainerSizePx,
                     )
                 }
             }
@@ -777,6 +760,7 @@ fun ReaderViewportHost(
                     clockLabel = clockLabel,
                     contentHighlight = contentHighlight,
                     jumpCommand = continuousScrollJumpCommand,
+                    contentSafeInsets = contentSafeInsets,
                     fontSizeSp = fontSizeSp,
                     lineDistanceDp = lineDistanceDp,
                     paragraphDistanceDp = paragraphDistanceDp,
@@ -835,22 +819,26 @@ fun ReaderViewportHost(
                                 paperBackground = palette.backgroundColor,
                                 hasCustomDayWallpaper = palette.customDayBackgroundFile != null,
                                 parchmentAssets = activeParchmentAssets,
-                                cutoutOffsetPx = cutoutOffsetPx,
-                                fullContainerSizePx = fullContainerSizePx,
                             ),
                     ) {
                         if (resolution != null) {
-                            ReaderResolvedPageSurface(
-                                resolution = resolution,
-                                palette = palette,
-                                clockLabel = clockLabel,
-                                contentHighlight = contentHighlight,
-                                isActiveViewportPage = isActiveViewportPage,
-                                onIllustrationClicked = onIllustrationClicked,
-                                onRetryFailedSlot = onRetryFailedSlot,
-                                onOpenNetworkDiagnostics = onOpenNetworkDiagnostics,
-                                onOpenChapterInBrowser = onOpenChapterInBrowser,
-                            )
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .windowInsetsPadding(contentSafeInsets),
+                            ) {
+                                ReaderResolvedPageSurface(
+                                    resolution = resolution,
+                                    palette = palette,
+                                    clockLabel = clockLabel,
+                                    contentHighlight = contentHighlight,
+                                    isActiveViewportPage = isActiveViewportPage,
+                                    onIllustrationClicked = onIllustrationClicked,
+                                    onRetryFailedSlot = onRetryFailedSlot,
+                                    onOpenNetworkDiagnostics = onOpenNetworkDiagnostics,
+                                    onOpenChapterInBrowser = onOpenChapterInBrowser,
+                                )
+                            }
                         }
                     }
                 }
@@ -871,8 +859,6 @@ private fun Modifier.applyPageTurnTransition(
     paperBackground: Color,
     hasCustomDayWallpaper: Boolean,
     parchmentAssets: ReaderParchmentBackgroundAssets?,
-    cutoutOffsetPx: IntOffset,
-    fullContainerSizePx: IntSize?,
 ): Modifier {
     return when (mode) {
         ReaderPageTurnMode.COVER_SLIDE -> {
@@ -896,8 +882,6 @@ private fun Modifier.applyPageTurnTransition(
                         drawReaderPaperBackground(
                             paperBackground = paperBackground,
                             parchmentAssets = parchmentAssets,
-                            cutoutOffsetPx = cutoutOffsetPx,
-                            fullContainerSizePx = fullContainerSizePx,
                         )
                     }
                     drawContent()
@@ -946,8 +930,6 @@ private fun Modifier.applyPageTurnTransition(
                             drawReaderPaperBackground(
                                 paperBackground = paperBackground,
                                 parchmentAssets = parchmentAssets,
-                                cutoutOffsetPx = cutoutOffsetPx,
-                                fullContainerSizePx = fullContainerSizePx,
                             )
                         }
                         drawContent()
@@ -964,8 +946,6 @@ private fun Modifier.applyPageTurnTransition(
                             drawReaderPaperBackground(
                                 paperBackground = paperBackground,
                                 parchmentAssets = parchmentAssets,
-                                cutoutOffsetPx = cutoutOffsetPx,
-                                fullContainerSizePx = fullContainerSizePx,
                             )
                         }
                         drawContent()
@@ -991,8 +971,6 @@ private fun Modifier.applyPageTurnTransition(
                     drawReaderPaperBackground(
                         paperBackground = paperBackground,
                         parchmentAssets = parchmentAssets,
-                        cutoutOffsetPx = cutoutOffsetPx,
-                        fullContainerSizePx = fullContainerSizePx,
                     )
                 }
                 drawContent()
@@ -1643,6 +1621,7 @@ private fun ContinuousScrollReaderDelegate(
     clockLabel: String,
     contentHighlight: ReaderContentHighlight,
     jumpCommand: ContinuousScrollJumpCommand?,
+    contentSafeInsets: WindowInsets,
     fontSizeSp: Int,
     lineDistanceDp: Int,
     paragraphDistanceDp: Int,
@@ -1660,17 +1639,23 @@ private fun ContinuousScrollReaderDelegate(
     if (currentSlot !is ChapterWindowSlot.Loaded) {
         val fallbackRes = snapshot.resolveVirtualPage(snapshot.activeVirtualPageIndex)
         if (fallbackRes != null) {
-            ReaderResolvedPageSurface(
-                resolution = fallbackRes,
-                palette = palette,
-                clockLabel = clockLabel,
-                contentHighlight = contentHighlight,
-                isActiveViewportPage = true,
-                onIllustrationClicked = onIllustrationClicked,
-                onRetryFailedSlot = onRetryFailedSlot,
-                onOpenNetworkDiagnostics = onOpenNetworkDiagnostics,
-                onOpenChapterInBrowser = onOpenChapterInBrowser,
-            )
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .windowInsetsPadding(contentSafeInsets),
+            ) {
+                ReaderResolvedPageSurface(
+                    resolution = fallbackRes,
+                    palette = palette,
+                    clockLabel = clockLabel,
+                    contentHighlight = contentHighlight,
+                    isActiveViewportPage = true,
+                    onIllustrationClicked = onIllustrationClicked,
+                    onRetryFailedSlot = onRetryFailedSlot,
+                    onOpenNetworkDiagnostics = onOpenNetworkDiagnostics,
+                    onOpenChapterInBrowser = onOpenChapterInBrowser,
+                )
+            }
         }
         return
     }
@@ -1755,7 +1740,11 @@ private fun ContinuousScrollReaderDelegate(
     }
     val progressPercent = ((currentBlockPosAndProgress.second * 100f).roundToInt()).coerceIn(0, 100)
 
-    Box(modifier = Modifier.fillMaxSize()) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .windowInsetsPadding(contentSafeInsets),
+    ) {
         LazyColumn(
             state = listState,
             contentPadding = PaddingValues(

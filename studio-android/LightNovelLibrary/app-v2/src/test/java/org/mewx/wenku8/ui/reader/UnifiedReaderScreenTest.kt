@@ -4,6 +4,8 @@ import android.app.Activity
 import android.content.ContextWrapper
 import android.content.Intent
 import android.view.KeyEvent as AndroidKeyEvent
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
@@ -17,6 +19,7 @@ import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.click
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
@@ -44,6 +47,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.mewx.wenku8.api.Wenku8API
 import org.mewx.wenku8.data.local.db.Wenku8Database
+import org.mewx.wenku8.data.local.db.dao.OrderedChapterWithVolume
 import org.mewx.wenku8.data.local.db.entity.ChapterContentEntity
 import org.mewx.wenku8.data.local.db.entity.NovelEntity
 import org.mewx.wenku8.data.local.preferences.Wenku8UserPreferences
@@ -58,7 +62,12 @@ import org.mewx.wenku8.data.repository.NovelTocSyncRepository
 import org.mewx.wenku8.data.repository.ParsedChapterToc
 import org.mewx.wenku8.data.repository.ParsedVolumeToc
 import org.mewx.wenku8.reader.engine.ChapterWindowBuffer
+import org.mewx.wenku8.reader.engine.ChapterWindowSlot
 import org.mewx.wenku8.reader.engine.DeterministicCellLineBreaker
+import org.mewx.wenku8.reader.engine.ReaderLayoutConfig
+import org.mewx.wenku8.reader.engine.ReaderWindowSnapshot
+import org.mewx.wenku8.reader.engine.StaticLayoutPaginator
+import org.mewx.wenku8.reader.engine.WenkuChapterParser
 import org.mewx.wenku8.reader.model.ReaderPageTurnMode
 import org.mewx.wenku8.reader.model.ReaderPaperPreset
 import org.mewx.wenku8.ui.detail.ReaderLaunchRequest
@@ -1314,6 +1323,117 @@ class UnifiedReaderScreenTest {
         val assets = ReaderParchmentAssetCache.load(context = context, density = 2.75f)
         assertNotNull("Expected app-v1 parchment paper tile to decode cleanly", assets)
         assertNotNull("Expected app-v1 parchment edge vignette to decode cleanly", assets?.edgeVignetteBitmap)
+    }
+
+    @Test
+    fun readerViewportHost_extendsPageTurnLayerThroughDisplayCutoutWhileKeepingTextInset() {
+        val chapter = OrderedChapterWithVolume(
+            aid = 1587,
+            vid = 501,
+            volumeOrder = 0,
+            volumeTitle = "第一卷",
+            cid = 6001,
+            chapterOrder = 0,
+            chapterTitle = "第一章 序章",
+            isIllustrationChapter = false,
+        )
+        val rawBody = buildString {
+            appendLine("第一卷 第一章 序章")
+            repeat(18) { idx ->
+                appendLine("　　这是第${idx + 1}段正文，用于验证顶部状态栏挖孔区域保留完整翻页阴影且正文严格避让。")
+            }
+        }
+        val ast = WenkuChapterParser.parse(
+            rawChapterText = rawBody,
+            aid = chapter.aid,
+            vid = chapter.vid,
+            cid = chapter.cid,
+            volumeTitle = chapter.volumeTitle,
+            chapterTitle = chapter.chapterTitle,
+        )
+        val config = ReaderLayoutConfig(
+            viewportWidthPx = 412,
+            viewportHeightPx = 844,
+            fontSizePx = 18f,
+            lineDistancePx = 10f,
+            paragraphDistancePx = 12f,
+            pageEdgeDistancePx = 16f,
+        )
+        val layout = StaticLayoutPaginator(DeterministicCellLineBreaker).paginate(ast, config)
+        val snapshot = ReaderWindowSnapshot(
+            aid = chapter.aid,
+            orderedToc = listOf(chapter),
+            currentTocIndex = 0,
+            currentSlot = ChapterWindowSlot.Loaded(chapter = chapter, layout = layout),
+            layoutConfig = config,
+            activeVirtualPageIndex = 0,
+        )
+        val palette = resolveReaderVisualPalette(
+            paperPreset = ReaderPaperPreset.PARCHMENT,
+            isEinkMode = false,
+            customBackgroundPath = "",
+            customFontPath = "",
+        )
+        val simulatedTopCutout = 48.dp
+        var mode by mutableStateOf(ReaderPageTurnMode.COVER_SLIDE)
+
+        composeTestRule.setContent {
+            Wenku8ExpressiveTheme(themeMode = Wenku8ThemeMode.ARCHIVAL_DAY) {
+                val pagerState = rememberPagerState(initialPage = 0) { snapshot.totalVirtualPages.coerceAtLeast(1) }
+                ReaderViewportHost(
+                    pageTurnMode = mode,
+                    snapshot = snapshot,
+                    pagerState = pagerState,
+                    palette = palette,
+                    fontSizeSp = 18,
+                    lineDistanceDp = 10,
+                    paragraphDistanceDp = 12,
+                    pageEdgeDistanceDp = 16,
+                    leftEdgeBrightnessDragEnabled = true,
+                    contentSafeInsets = WindowInsets(top = simulatedTopCutout),
+                    onTapZoneAction = {},
+                    onBrightnessDragDelta = {},
+                    onIllustrationClicked = { _, _ -> },
+                    onContinuousScrollAnchorChanged = { _, _ -> },
+                    onRequestNextChapterInContinuousMode = {},
+                    onRequestPrevChapterInContinuousMode = {},
+                    onRetryFailedSlot = {},
+                    onOpenNetworkDiagnostics = {},
+                )
+            }
+        }
+
+        composeTestRule.waitForIdle()
+
+        // Paged mode: viewport & HorizontalPager (which hosts page-turn shadow/curl) start at y=0,
+        // while the page text/header/footer canvas is inset cleanly by the 48.dp top cutout.
+        val viewportBounds = composeTestRule
+            .onNodeWithTag(ReaderTestTags.VIEWPORT_CONTAINER)
+            .getUnclippedBoundsInRoot()
+        val pagerBounds = composeTestRule
+            .onNodeWithTag(ReaderTestTags.PAGED_HORIZONTAL_PAGER)
+            .getUnclippedBoundsInRoot()
+        val pageCanvasBounds = composeTestRule
+            .onNodeWithTag("${ReaderTestTags.PAGE_CANVAS_PREFIX}CURRENT_0")
+            .getUnclippedBoundsInRoot()
+
+        assertEquals(0f, viewportBounds.top.value, 0.5f)
+        assertEquals(0f, pagerBounds.top.value, 0.5f)
+        assertEquals(viewportBounds.bottom.value, pagerBounds.bottom.value, 0.5f)
+        assertEquals(simulatedTopCutout.value, pageCanvasBounds.top.value, 1f)
+
+        // Continuous scroll mode: background container still starts at y=0 while the scroll list stays inset.
+        mode = ReaderPageTurnMode.CONTINUOUS_SCROLL
+        composeTestRule.waitForIdle()
+
+        val scrollViewportBounds = composeTestRule
+            .onNodeWithTag(ReaderTestTags.VIEWPORT_CONTAINER)
+            .getUnclippedBoundsInRoot()
+        val scrollListBounds = composeTestRule
+            .onNodeWithTag(ReaderTestTags.CONTINUOUS_SCROLL_LIST)
+            .getUnclippedBoundsInRoot()
+        assertEquals(0f, scrollViewportBounds.top.value, 0.5f)
+        assertEquals(simulatedTopCutout.value, scrollListBounds.top.value, 1f)
     }
 }
 
