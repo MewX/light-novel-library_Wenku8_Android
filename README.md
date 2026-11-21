@@ -195,13 +195,10 @@ studio-android/LightNovelLibrary/app-v2/src/main/java/org/mewx/wenku8
 cd studio-android/LightNovelLibrary
 
 # 编译 2.0 调试版 APK
-./gradlew :app-v2:assembleAlphaDebug
+./gradlew :app-v2:assembleDefaultDebug
 
 # 运行 2.0 单元测试与 Robolectric UI 测试
-./gradlew :app-v2:testAlphaDebugUnitTest
-
-# 编译保留归档的 1.x 旧版模块（可选）
-./gradlew :app-v1:assembleAlphaDebug
+./gradlew :app-v2:testDefaultDebugUnitTest
 ```
 
 ---
@@ -210,7 +207,6 @@ cd studio-android/LightNovelLibrary
 
 1. **`studio-android/LightNovelLibrary/`** —— Android Studio 多模块主工程：
    - **`app-v2/`**：**`2.0` 正式版完整源码**（Kotlin + Jetpack Compose + Material 3 Expressive，包名 `org.mewx.wenku8`）。
-   - **`app-v1/`**：**`1.x` 经典版完整源码归档**（Java + Material Design 1，Java 命名空间已隔离至 `org.mewx.wenku8.v1`，仍可独立编译）。
    - **`api/` & `api-stub/`**：文库协议加密签名子模块及面向开源构建自动启用的兼容桩模块。
 2. **`docs/designs/`** —— 按世代划分的设计文档与视觉稿：
    - **`docs/designs/v2/`**：`2.0` 版本架构设计规范、旧版功能考古、数据库与备份协议说明及高分交互原型。
@@ -230,7 +226,7 @@ cd studio-android/LightNovelLibrary
 # <a id="v1-archive"></a>1.x 与 0.5.2.1 历史版本归档
 
 > [!NOTE]
-> 以下内容完整保留自 `1.x`（2015 Material Design 1 版）与 `0.5.2.1` 典藏版的原始开源文档，源码、图片与设计稿路径已同步更新至 `previous_versions/`、`screenshots/v1/`、`screenshots/v0/`、`docs/designs/v1/` 与 `app-v1/`，供查阅项目十年演进历程参考。
+> 以下内容完整保留自 `1.x`（2015 Material Design 1 版）与 `0.5.2.1` 典藏版的原始开源文档，源码、图片与设计稿路径已同步更新至 `previous_versions/`、`screenshots/v1/`、`screenshots/v0/` 与 `docs/designs/v1/`，供查阅项目十年演进历程参考。
 
 
 <a id="foreword"></a>写在前面
@@ -259,7 +255,7 @@ Material Design风格的`轻小说文库`App**完全**开源了！想实践Mater
 
 ## <a id="app-1.x-info"></a>1.x 版本
 
-经典的 `Material Design 1` 风格 App，设计图纸已归档至 `docs/designs/v1/`；`v1.30` 完整独立工程快照归档于 [`previous_versions/v1.30/`](previous_versions/v1.30/README.md)（含锁定版本的 `api/` 子模块），同时主工程中也保留了可独立编译的 `studio-android/LightNovelLibrary/app-v1/` 模块。
+经典的 `Material Design 1` 风格 App，设计图纸已归档至 `docs/designs/v1/`；`v1.30` 完整独立工程快照归档于 [`previous_versions/v1.30/`](previous_versions/v1.30/README.md)（含锁定版本的 `api/` 子模块）。
 
 三方库的引用全部采用Gradle dependency，在混淆方面会直接忽略，加密强度低，不过开发起来各种方便~
 

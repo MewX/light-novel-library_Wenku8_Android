@@ -44,5 +44,5 @@ This checklist captures every configuration switch required when promoting `:app
 - [x] **Flavor Simplification & CI**:
   - `:app-v2` trimmed to `default` and `playstore` product flavors (dropping `baidu` and `alpha`).
   - `.github/workflows/android-ci.yml` runs `:app-v2:jacocoDefaultDebugUnitTestReport` and `:app-v2:assembleDefault` (CI tests & builds `default` only for `:app-v2`).
-- [ ] Once `v2.0` staged rollout reaches 100% stability on Play Store:
-  - Remove `:app-v1` from `settings.gradle` (or archive under legacy tag `v1.31-final`), remove `:app-v1` jobs from `.github/workflows/android-ci.yml`, and rename `:app-v2` → `:app` if desired.
+- [x] **Legacy `:app-v1` Removal**:
+  - Removed `:app-v1` module directory and `:app-v1` from `settings.gradle`, cleaned up `:app-v1`-only buildscript plugins, and removed `:app-v1` tasks/emulator job from `.github/workflows/android-ci.yml`. *(Optional future cleanup: rename `:app-v2` → `:app` if desired.)*
