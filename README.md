@@ -6,7 +6,7 @@
 
 项目主页：[https://wenku8.app](https://wenku8.app)
 
-[<img src="graph-source/google-play-badge.png" width="200px" height="auto" alt="Google Play 下载">](https://play.google.com/store/apps/details?id=org.mewx.wenku8)
+[<img src="graph_sources/google-play-badge.png" width="200px" height="auto" alt="Google Play 下载">](https://play.google.com/store/apps/details?id=org.mewx.wenku8)
 
 如果您想打赏我用爱发电的代码，可以点击这个链接帮我充电 ❤️：
 [!["充电按钮"](https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png)](https://www.buymeacoffee.com/mewx)
@@ -219,7 +219,7 @@ cd studio-android/LightNovelLibrary
    - **`screenshots/v2/`**：`2.0` 版本 Google Pixel 8 实机高清截图与缩略图。
    - **`screenshots/v1/`**：`1.x`（Material Design 1）历史版本截图归档。
    - **`screenshots/v0/`**：`0.5.2.x` 早期典藏版历史截图归档。
-4. **`graph-source/`** —— 品牌图标、轻小说文库高清重绘 Logo、Google Play 徽章及早期 Fireworks 制图源文件。
+4. **`graph_sources/`** —— 品牌图标、轻小说文库高清重绘 Logo、Google Play 徽章及早期 Fireworks 制图源文件。
 5. **[`previous_versions/`](previous_versions/README.md)** —— 历代历史版本完整源码归档（各目录均附有独立 `README.md` 说明）：
    - **[`previous_versions/v0.5.1.0030/`](previous_versions/v0.5.1.0030/README.md)**：2014 年初代 Eclipse ADT 源码归档（原 `eclipse-android/`）。
    - **[`previous_versions/v0.5.2.1/`](previous_versions/v0.5.2.1/README.md)**：`0.5.2.1` 典藏版 Android Studio 源码归档（原 `eclipse-android-old/`，已移除历史 `build/` 中间文件）。
@@ -480,7 +480,7 @@ Material Design风格的`轻小说文库`App**完全**开源了！想实践Mater
 
 ## <a id="app-0520"></a>0.5.2.1 典藏版
 
-老版的App，启动和运行方面都比`MD`版本流畅，针对旧机型维护。`Eclipse`版本源码见[`previous_versions/v0.5.1.0030/`](previous_versions/v0.5.1.0030/README.md)目录（非最新），`Android Studio`版本源码见[`previous_versions/v0.5.2.1/`](previous_versions/v0.5.2.1/README.md)目录（典藏版最新），老版的图片资源都是用Fireworks做的，源文件见`graph-source/`目录。
+老版的App，启动和运行方面都比`MD`版本流畅，针对旧机型维护。`Eclipse`版本源码见[`previous_versions/v0.5.1.0030/`](previous_versions/v0.5.1.0030/README.md)目录（非最新），`Android Studio`版本源码见[`previous_versions/v0.5.2.1/`](previous_versions/v0.5.2.1/README.md)目录（典藏版最新），老版的图片资源都是用Fireworks做的，源文件见`graph_sources/`目录。
 
 ### <a id="app-0520-preview"></a>预览图
 
