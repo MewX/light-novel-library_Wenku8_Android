@@ -13,7 +13,7 @@ import org.mewx.wenku8.ui.detail.ServerSupportAdInitializer
  *
  * Implements Coil 3 [SingletonImageLoader.Factory] so every `AsyncImage` checks permanent offline
  * illustrations (`filesDir/saves/imgs/` & `filesDir/imgs/`) before touching OkHttp, initializes
- * `:api`'s protocol version token, and schedules background `v1.31 -> v2.0` internal-storage
+ * `:api`'s native request-sealing engine, and schedules background `v1.31 -> v2.0` internal-storage
  * migration off the main thread on first upgrade launch.
  */
 class Wenku8V2Application : Application(), SingletonImageLoader.Factory {
