@@ -8,6 +8,7 @@ import android.graphics.Color as AndroidColor
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.longClick
@@ -58,6 +59,7 @@ import org.mewx.wenku8.data.repository.NovelDetailRepository
 import org.mewx.wenku8.data.repository.NovelTocSyncRepository
 import org.mewx.wenku8.data.repository.ParsedChapterToc
 import org.mewx.wenku8.data.repository.ParsedVolumeToc
+import org.mewx.wenku8.ui.reader.ArtbookTestTags
 import org.mewx.wenku8.ui.theme.CoverThemeEngine
 import org.mewx.wenku8.ui.theme.Wenku8ColorSchemes
 import org.mewx.wenku8.ui.theme.Wenku8ExpressiveTheme
@@ -66,6 +68,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows
 import org.robolectric.annotation.Config
 import java.io.File
+import java.io.FileOutputStream
 import java.nio.file.Files
 import java.util.Locale
 import java.util.concurrent.Executor
@@ -798,6 +801,110 @@ class NovelDetailAndDownloadTest {
         composeTestRule.waitForIdle()
         composeTestRule.onNodeWithTag(NovelDetailTestTags.SERVER_SUPPORT_AD_CARD)
             .assertIsDisplayed()
+    }
+
+    @Test
+    fun coverImageTap_opensSingleImageArtbookLightbox_andDismissesCleanly() {
+        val coverFile = File(tempAssetRoot, "cover_5.jpg")
+        val bmp = Bitmap.createBitmap(200, 280, Bitmap.Config.ARGB_8888).apply {
+            eraseColor(AndroidColor.rgb(64, 128, 200))
+        }
+        FileOutputStream(coverFile).use { out ->
+            bmp.compress(Bitmap.CompressFormat.JPEG, 90, out)
+        }
+        bmp.recycle()
+
+        val testCoverUrl = "https://img.wenku8.com/image/0/5/5s.jpg"
+        fakeGateway.coverUrlForBinaryTest = testCoverUrl
+        runBlocking {
+            detailRepository.refreshNovelDetail(5, Wenku8API.AppLanguage.SC)
+        }
+
+        composeTestRule.setContent {
+            Wenku8ExpressiveTheme(themeMode = Wenku8ThemeMode.ARCHIVAL_DAY) {
+                NovelDetailScreen(
+                    aid = 5,
+                    novelDetailRepository = detailRepository,
+                    bookshelfRepository = bookshelfRepository,
+                    novelDownloadRepository = downloadRepository,
+                    appLanguage = Wenku8API.AppLanguage.SC,
+                    themeMode = Wenku8ThemeMode.ARCHIVAL_DAY,
+                    coverLightboxImageFileResolver = { url ->
+                        if (url == testCoverUrl) coverFile else null
+                    },
+                    enableLiveAdViewInflation = false,
+                )
+            }
+        }
+        composeTestRule.waitForIdle()
+
+        // Lightbox is closed initially
+        composeTestRule.onNodeWithTag(ArtbookTestTags.OVERLAY).assertDoesNotExist()
+
+        // Tap the cover image -> opens single-image ArtbookLightboxOverlay
+        composeTestRule.onNodeWithTag(NovelDetailTestTags.COVER_IMAGE_TRIGGER)
+            .assertIsDisplayed()
+            .performClick()
+        composeTestRule.waitForIdle()
+
+        composeTestRule.onNodeWithTag(ArtbookTestTags.OVERLAY).assertIsDisplayed()
+        composeTestRule.onNodeWithTag(ArtbookTestTags.PAGE_INDICATOR).assertTextEquals("封面")
+        composeTestRule.onNodeWithTag(ArtbookTestTags.ROTATE_BUTTON).assertIsDisplayed()
+        composeTestRule.onNodeWithTag(ArtbookTestTags.SAVE_BUTTON).assertIsDisplayed()
+        composeTestRule.onNodeWithTag(ArtbookTestTags.SHARE_BUTTON).assertIsDisplayed()
+
+        // Multi-page / reader-only controls must stay hidden for single cover preview
+        composeTestRule.onNodeWithTag(ArtbookTestTags.SPREAD_TOGGLE_CHIP).assertDoesNotExist()
+        composeTestRule.onNodeWithTag(ArtbookTestTags.CAROUSEL).assertDoesNotExist()
+        composeTestRule.onNodeWithTag(ArtbookTestTags.READER_MODE_CHIP).assertDoesNotExist()
+        composeTestRule.onNodeWithTag(ArtbookTestTags.PREV_CHAPTER_CHIP).assertDoesNotExist()
+        composeTestRule.onNodeWithTag(ArtbookTestTags.NEXT_CHAPTER_CHIP).assertDoesNotExist()
+
+        // Close button dismisses back to NovelDetailScreen
+        composeTestRule.onNodeWithTag(ArtbookTestTags.CLOSE_BUTTON).performClick()
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag(ArtbookTestTags.OVERLAY).assertDoesNotExist()
+    }
+
+    @Test
+    fun coverImageTap_delegatesToHostCoverLightboxCallback_whenProvided() {
+        val testCoverUrl = "https://img.wenku8.com/image/0/5/5s.jpg"
+        fakeGateway.coverUrlForBinaryTest = testCoverUrl
+        runBlocking {
+            detailRepository.refreshNovelDetail(5, Wenku8API.AppLanguage.SC)
+        }
+
+        var capturedTitle = ""
+        var capturedUrl = ""
+
+        composeTestRule.setContent {
+            Wenku8ExpressiveTheme(themeMode = Wenku8ThemeMode.ARCHIVAL_DAY) {
+                NovelDetailScreen(
+                    aid = 5,
+                    novelDetailRepository = detailRepository,
+                    bookshelfRepository = bookshelfRepository,
+                    novelDownloadRepository = downloadRepository,
+                    appLanguage = Wenku8API.AppLanguage.SC,
+                    themeMode = Wenku8ThemeMode.ARCHIVAL_DAY,
+                    onOpenCoverLightbox = { title, url ->
+                        capturedTitle = title
+                        capturedUrl = url
+                    },
+                    enableLiveAdViewInflation = false,
+                )
+            }
+        }
+        composeTestRule.waitForIdle()
+
+        composeTestRule.onNodeWithTag(NovelDetailTestTags.COVER_IMAGE_TRIGGER)
+            .assertIsDisplayed()
+            .performClick()
+        composeTestRule.waitForIdle()
+
+        assertEquals("狼与香辛料", capturedTitle)
+        assertEquals(testCoverUrl, capturedUrl)
+        // Host owns the full-screen overlay so inline overlay stays closed
+        composeTestRule.onNodeWithTag(ArtbookTestTags.OVERLAY).assertDoesNotExist()
     }
 }
 

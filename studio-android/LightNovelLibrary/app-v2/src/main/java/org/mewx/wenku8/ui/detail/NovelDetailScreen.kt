@@ -141,6 +141,7 @@ import org.mewx.wenku8.ui.components.ActionTooltipBox
 import org.mewx.wenku8.ui.components.TooltipIconButton
 import org.mewx.wenku8.ui.discovery.bookStatusLeadingIcon
 import org.mewx.wenku8.ui.discovery.formatBookStatusLabel
+import org.mewx.wenku8.ui.reader.ArtbookLightboxOverlay
 import org.mewx.wenku8.ui.theme.CoverThemeEngine
 import org.mewx.wenku8.ui.theme.LocalEinkMode
 import org.mewx.wenku8.ui.theme.LocalWenku8SharedTransition
@@ -150,6 +151,7 @@ import org.mewx.wenku8.ui.theme.einkHairlineBorder
 import org.mewx.wenku8.ui.theme.expressiveSharedFloatSpec
 import org.mewx.wenku8.ui.theme.wenku8SharedNovelCover
 import org.mewx.wenku8.ui.theme.wenku8SharedNovelTitle
+import java.io.File
 import java.util.Locale
 
 object NovelDetailTestTags {
@@ -157,6 +159,7 @@ object NovelDetailTestTags {
     const val BACK_BUTTON = "novel_detail_back_button"
     const val SHARE_BUTTON = "novel_detail_share_button"
     const val REFRESH_BUTTON = "novel_detail_refresh_button"
+    const val COVER_IMAGE_TRIGGER = "novel_detail_cover_image_trigger"
     const val NOVEL_TITLE_TEXT = "novel_detail_title_text"
     const val BOOK_STATUS_BADGE = "novel_detail_book_status_badge"
     const val TITLE_DIALOG = "novel_detail_title_dialog"
@@ -232,6 +235,8 @@ fun NovelDetailScreen(
     onOpenReviews: (aid: Int, novelTitle: String) -> Unit = { _, _ -> },
     onAuthorClicked: (String) -> Unit = {},
     onTagClicked: (String) -> Unit = {},
+    onOpenCoverLightbox: ((title: String, coverUrl: String) -> Unit)? = null,
+    coverLightboxImageFileResolver: (suspend (String) -> File?)? = null,
     isNetworkAvailableForAdOverride: Boolean? = null,
     isGmsAvailableForAdOverride: Boolean? = null,
     enableLiveAdViewInflation: Boolean = true,
@@ -295,6 +300,7 @@ fun NovelDetailScreen(
     var chapterFilterQuery by rememberSaveable(aid) { mutableStateOf("") }
     var isReverseVolumeOrder by rememberSaveable(aid) { mutableStateOf(false) }
     var isDownloaderSheetOpen by rememberSaveable(aid) { mutableStateOf(false) }
+    var showInlineCoverLightbox by rememberSaveable(aid) { mutableStateOf(false) }
 
     // Auto-expand either the volume containing reading progress or the first volume on the very
     // first frame `volumes` arrives so there is never a 1-frame collapsed-then-pop-open flash.
@@ -493,16 +499,19 @@ fun NovelDetailScreen(
         }
     }
 
+    val effectiveCoverUrl = snapshot.coverUrl.ifBlank { initialCoverUrl }
+
     MaterialTheme(
         colorScheme = effectiveScheme,
         typography = MaterialTheme.typography,
         shapes = MaterialTheme.shapes,
     ) {
-        Scaffold(
-            modifier = modifier
-                .fillMaxSize()
-                .testTag(NovelDetailTestTags.SCREEN_ROOT),
-            contentWindowInsets = WindowInsets.safeDrawing,
+        Box(modifier = modifier.fillMaxSize()) {
+            Scaffold(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .testTag(NovelDetailTestTags.SCREEN_ROOT),
+                contentWindowInsets = WindowInsets.safeDrawing,
             snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
             topBar = {
                 TopAppBar(
@@ -626,13 +635,22 @@ fun NovelDetailScreen(
                             author = displayAuthor,
                             novel = snapshot.novel,
                             appLanguage = appLanguage,
-                            coverUrl = snapshot.coverUrl.ifBlank { initialCoverUrl },
+                            coverUrl = effectiveCoverUrl,
                             tags = snapshot.tags,
                             isEinkMode = isEinkMode,
                             sharedTransitionOrigin = sharedTransitionOrigin,
                             onCoverSeedExtracted = { extracted ->
                                 CoverThemeEngine.recordExtractedSeedColor(aid, extracted)
                                 coverSeedColor = extracted
+                            },
+                            onCoverClicked = {
+                                if (effectiveCoverUrl.isNotBlank()) {
+                                    if (onOpenCoverLightbox != null) {
+                                        onOpenCoverLightbox(displayTitle, effectiveCoverUrl)
+                                    } else {
+                                        showInlineCoverLightbox = true
+                                    }
+                                }
                             },
                             onTitleClicked = { showFullTitleDialog = true },
                             onAuthorClicked = {
@@ -988,6 +1006,21 @@ fun NovelDetailScreen(
                 },
             )
         }
+
+            if (showInlineCoverLightbox && effectiveCoverUrl.isNotBlank()) {
+                ArtbookLightboxOverlay(
+                    novelTitle = displayTitle,
+                    chapterTitle = displayTitle,
+                    imageUrls = listOf(effectiveCoverUrl),
+                    subtitleOverride = stringResource(R.string.detail_cover_lightbox_subtitle),
+                    isSingleImagePreview = true,
+                    saveFileNameSuffix = "cover",
+                    imageFileResolver = coverLightboxImageFileResolver,
+                    onDismiss = { showInlineCoverLightbox = false },
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
+        }
     }
 }
 
@@ -1004,6 +1037,7 @@ private fun NovelHeroHeaderCard(
     isEinkMode: Boolean,
     sharedTransitionOrigin: String,
     onCoverSeedExtracted: (Color) -> Unit,
+    onCoverClicked: () -> Unit,
     onTitleClicked: () -> Unit,
     onAuthorClicked: () -> Unit,
     onTagClicked: (String) -> Unit,
@@ -1119,42 +1153,54 @@ private fun NovelHeroHeaderCard(
                                 )
                                 .einkHairlineBorder(effectiveCoverShape),
                         ) {
-                            if (coverUrl.isNotBlank()) {
-                                val coverRequest = WenkuImageRequests.rememberCoverImageRequest(
-                                    aid = aid,
-                                    coverUrl = coverUrl,
-                                    enableCrossfade = false,
-                                )
-                                AsyncImage(
-                                    model = coverRequest,
-                                    contentDescription = title,
-                                    contentScale = ContentScale.Crop,
-                                    onSuccess = { success ->
-                                        val bmp = (success.result.image as? BitmapImage)?.bitmap
-                                        if (bmp != null) {
-                                            onCoverSeedExtracted(CoverThemeEngine.extractSeedColorFromBitmap(bmp))
+                            val viewCoverLabel = stringResource(R.string.detail_cover_view_action)
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .testTag(NovelDetailTestTags.COVER_IMAGE_TRIGGER)
+                                    .clickable(
+                                        enabled = coverUrl.isNotBlank(),
+                                        onClickLabel = viewCoverLabel,
+                                        onClick = onCoverClicked,
+                                    ),
+                            ) {
+                                if (coverUrl.isNotBlank()) {
+                                    val coverRequest = WenkuImageRequests.rememberCoverImageRequest(
+                                        aid = aid,
+                                        coverUrl = coverUrl,
+                                        enableCrossfade = false,
+                                    )
+                                    AsyncImage(
+                                        model = coverRequest,
+                                        contentDescription = title,
+                                        contentScale = ContentScale.Crop,
+                                        onSuccess = { success ->
+                                            val bmp = (success.result.image as? BitmapImage)?.bitmap
+                                            if (bmp != null) {
+                                                onCoverSeedExtracted(CoverThemeEngine.extractSeedColorFromBitmap(bmp))
+                                            }
+                                        },
+                                        modifier = Modifier.fillMaxSize(),
+                                    )
+                                } else {
+                                    Box(
+                                        modifier = Modifier.fillMaxSize(),
+                                        contentAlignment = Alignment.Center,
+                                    ) {
+                                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                            Icon(
+                                                imageVector = Icons.Outlined.AutoStories,
+                                                contentDescription = null,
+                                                tint = MaterialTheme.colorScheme.primary,
+                                                modifier = Modifier.size(36.dp),
+                                            )
+                                            Spacer(modifier = Modifier.height(6.dp))
+                                            Text(
+                                                text = "#$aid",
+                                                style = MaterialTheme.typography.labelMedium,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            )
                                         }
-                                    },
-                                    modifier = Modifier.fillMaxSize(),
-                                )
-                            } else {
-                                Box(
-                                    modifier = Modifier.fillMaxSize(),
-                                    contentAlignment = Alignment.Center,
-                                ) {
-                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                        Icon(
-                                            imageVector = Icons.Outlined.AutoStories,
-                                            contentDescription = null,
-                                            tint = MaterialTheme.colorScheme.primary,
-                                            modifier = Modifier.size(36.dp),
-                                        )
-                                        Spacer(modifier = Modifier.height(6.dp))
-                                        Text(
-                                            text = "#$aid",
-                                            style = MaterialTheme.typography.labelMedium,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        )
                                     }
                                 }
                             }

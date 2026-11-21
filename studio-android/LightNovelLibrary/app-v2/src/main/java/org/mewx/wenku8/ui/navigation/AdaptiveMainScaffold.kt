@@ -137,6 +137,7 @@ import org.mewx.wenku8.ui.profile.ReadingFootprintTab
 import org.mewx.wenku8.ui.profile.ServerUpgradeRequiredDialog
 import org.mewx.wenku8.ui.profile.openPlayStoreListing
 import org.mewx.wenku8.ui.profile.openSafeBrowserUrl
+import org.mewx.wenku8.ui.reader.ArtbookLightboxOverlay
 import org.mewx.wenku8.ui.reader.UnifiedReaderScreen
 import org.mewx.wenku8.ui.reviews.ReviewListScreen
 import org.mewx.wenku8.ui.reviews.ReviewThreadScreen
@@ -415,10 +416,25 @@ fun AdaptiveMainScaffold(
     var homeTabReselectCounter by androidx.compose.runtime.remember {
         mutableIntStateOf(0)
     }
+    var activeCoverLightboxTitle by rememberSaveable {
+        mutableStateOf("")
+    }
+    var activeCoverLightboxUrl by rememberSaveable {
+        mutableStateOf("")
+    }
+
+    val handleOpenCoverLightbox: (String, String) -> Unit = { title, coverUrl ->
+        if (coverUrl.isNotBlank()) {
+            activeCoverLightboxTitle = title
+            activeCoverLightboxUrl = coverUrl
+        }
+    }
 
     val handleOpenReader: (ReaderLaunchRequest) -> Unit = { request ->
         onOpenReader(request)
         if (database != null && catalogGateway != null && novelTocSyncRepository != null) {
+            activeCoverLightboxUrl = ""
+            activeCoverLightboxTitle = ""
             activeReaderRequest = request
         }
     }
@@ -463,6 +479,8 @@ fun AdaptiveMainScaffold(
             activeReviewsAid = 0
             activeReviewThread = null
             isLoginBottomSheetOpen = false
+            activeCoverLightboxUrl = ""
+            activeCoverLightboxTitle = ""
 
             if (novelDetailRepository != null &&
                 bookshelfRepository != null &&
@@ -1176,6 +1194,7 @@ fun AdaptiveMainScaffold(
                                                 onTagClicked = { tag ->
                                                     handleOpenSearchWithSeed(tag, UnifiedSearchMode.NOVEL_TITLE)
                                                 },
+                                                onOpenCoverLightbox = handleOpenCoverLightbox,
                                                 modifier = Modifier.fillMaxSize(),
                                             )
                                         }
@@ -1285,6 +1304,7 @@ fun AdaptiveMainScaffold(
                                     onTagClicked = { tag ->
                                         handleOpenSearchWithSeed(tag, UnifiedSearchMode.NOVEL_TITLE)
                                     },
+                                    onOpenCoverLightbox = handleOpenCoverLightbox,
                                 )
                             }
                         }
@@ -1467,6 +1487,22 @@ fun AdaptiveMainScaffold(
             Snackbar(
                 snackbarData = snackbarData,
                 modifier = Modifier.einkHairlineBorder(MaterialTheme.shapes.small),
+            )
+        }
+
+        if (activeCoverLightboxUrl.isNotBlank()) {
+            ArtbookLightboxOverlay(
+                novelTitle = activeCoverLightboxTitle,
+                chapterTitle = activeCoverLightboxTitle,
+                imageUrls = listOf(activeCoverLightboxUrl),
+                subtitleOverride = stringResource(R.string.detail_cover_lightbox_subtitle),
+                isSingleImagePreview = true,
+                saveFileNameSuffix = "cover",
+                onDismiss = {
+                    activeCoverLightboxUrl = ""
+                    activeCoverLightboxTitle = ""
+                },
+                modifier = Modifier.fillMaxSize(),
             )
         }
     }

@@ -573,6 +573,9 @@ fun ArtbookLightboxOverlay(
     initialImageIndex: Int = 0,
     isAutoEnteredIllustrationChapter: Boolean = false,
     isTemporaryPeek: Boolean = false,
+    subtitleOverride: String? = null,
+    isSingleImagePreview: Boolean = false,
+    saveFileNameSuffix: String? = null,
     onPrimaryImageIndexChanged: ((Int) -> Unit)? = null,
     onSwitchToNovelReadingMode: ((currentImageIndex: Int) -> Unit)? = null,
     onPreviousChapter: (() -> Unit)? = null,
@@ -591,7 +594,10 @@ fun ArtbookLightboxOverlay(
     val coroutineScope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
     val effectiveAssetRoots = remember(context, assetSearchRoots) {
-        assetSearchRoots ?: listOf(context.filesDir)
+        assetSearchRoots ?: (context.applicationContext as? Wenku8V2Application)
+            ?.appContainer
+            ?.resolveLocalAssetRoots()
+            ?: listOf(context.filesDir)
     }
 
     val effectiveFileResolver: suspend (String) -> File? = remember(
@@ -768,6 +774,7 @@ fun ArtbookLightboxOverlay(
                         val closeOrBackLabel = when {
                             isTemporaryPeek -> stringResource(R.string.artbook_action_return_to_reading)
                             isAutoEnteredIllustrationChapter -> stringResource(R.string.action_back)
+                            isSingleImagePreview -> stringResource(R.string.artbook_action_close_image)
                             else -> stringResource(R.string.artbook_action_close)
                         }
                         TooltipIconButton(
@@ -799,7 +806,7 @@ fun ArtbookLightboxOverlay(
                                 fontWeight = FontWeight.SemiBold,
                             )
                             Text(
-                                text = pageIndicatorLabel,
+                                text = subtitleOverride?.takeIf { it.isNotBlank() } ?: pageIndicatorLabel,
                                 style = MaterialTheme.typography.labelSmall,
                                 color = Color(0xFFB8C0CC),
                                 maxLines = 1,
@@ -821,7 +828,15 @@ fun ArtbookLightboxOverlay(
                             )
                         }
 
-                        val saveLabel = stringResource(R.string.artbook_action_save)
+                        val saveLabel = stringResource(
+                            if (isSingleImagePreview) {
+                                R.string.artbook_action_save_image
+                            } else {
+                                R.string.artbook_action_save
+                            },
+                        )
+                        val saveSuccessSnackbar = stringResource(R.string.artbook_save_success_snackbar)
+                        val saveFailedSnackbar = stringResource(R.string.artbook_save_failed_snackbar)
                         TooltipIconButton(
                             tooltipText = saveLabel,
                             onClick = {
@@ -833,9 +848,10 @@ fun ArtbookLightboxOverlay(
                                         rotationQuarterTurns = rotationQuarterTurns,
                                         imageFileResolver = effectiveFileResolver,
                                         ioDispatcher = ioDispatcher,
+                                        fileNameSuffixOverride = saveFileNameSuffix,
                                     )
                                     snackbarHostState.showSnackbar(
-                                        if (savedOk) "已保存至相册 Pictures/Wenku8" else "保存插图失败，请重试",
+                                        if (savedOk) saveSuccessSnackbar else saveFailedSnackbar,
                                     )
                                 }
                             },
@@ -847,7 +863,14 @@ fun ArtbookLightboxOverlay(
                             )
                         }
 
-                        val shareLabel = stringResource(R.string.artbook_action_share)
+                        val shareLabel = stringResource(
+                            if (isSingleImagePreview) {
+                                R.string.artbook_action_share_image
+                            } else {
+                                R.string.artbook_action_share
+                            },
+                        )
+                        val shareFailedSnackbar = stringResource(R.string.artbook_share_failed_snackbar)
                         TooltipIconButton(
                             tooltipText = shareLabel,
                             onClick = {
@@ -859,9 +882,11 @@ fun ArtbookLightboxOverlay(
                                         rotationQuarterTurns = rotationQuarterTurns,
                                         imageFileResolver = effectiveFileResolver,
                                         ioDispatcher = ioDispatcher,
+                                        chooserTitle = shareLabel,
+                                        fileNameTag = saveFileNameSuffix,
                                     )
                                     if (!sharedOk) {
-                                        snackbarHostState.showSnackbar("准备分享文件失败，请重试")
+                                        snackbarHostState.showSnackbar(shareFailedSnackbar)
                                     }
                                 }
                             },
@@ -1241,7 +1266,7 @@ private fun ArtbookEntryViewport(
         }
         if (loadFailed || srcL == null) {
             Text(
-                text = "插图加载失败，请检查网络连接",
+                text = stringResource(R.string.artbook_image_load_failed),
                 color = Color(0xFFD0D6E0),
                 style = MaterialTheme.typography.bodyMedium,
             )
@@ -1613,6 +1638,7 @@ internal suspend fun saveArtbookEntryToMediaStore(
     rotationQuarterTurns: Int,
     imageFileResolver: suspend (String) -> File?,
     ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+    fileNameSuffixOverride: String? = null,
 ): Boolean = withContext(ioDispatcher) {
     val tempExport = File(context.cacheDir, "artbook_share/save_tmp_${System.currentTimeMillis()}.jpg")
     try {
@@ -1626,7 +1652,11 @@ internal suspend fun saveArtbookEntryToMediaStore(
         if (!ok) return@withContext false
 
         val sanitizedTitle = novelTitle.replace(Regex("[^\\p{L}\\p{N}_-]+"), "_").take(24).ifBlank { "wenku8" }
-        val pageSuffix = when (entry) {
+        val sanitizedSuffix = fileNameSuffixOverride
+            ?.replace(Regex("[^\\p{L}\\p{N}_-]+"), "_")
+            ?.take(24)
+            ?.ifBlank { null }
+        val pageSuffix = sanitizedSuffix ?: when (entry) {
             is ArtbookEntry.Single -> "p${entry.primaryImageIndex + 1}"
             is ArtbookEntry.DoubleSpread -> "spread_${entry.primaryImageIndex + 1}_${entry.secondaryImageIndex + 1}"
         }
@@ -1677,6 +1707,8 @@ internal suspend fun shareArtbookEntryViaFileProvider(
     rotationQuarterTurns: Int,
     imageFileResolver: suspend (String) -> File?,
     ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+    chooserTitle: String? = null,
+    fileNameTag: String? = null,
 ): Boolean {
     val shareDir = File(context.cacheDir, "artbook_share")
     // Opportunistically clean share files older than 24h so cache never accumulates.
@@ -1686,7 +1718,12 @@ internal suspend fun shareArtbookEntryViaFileProvider(
             if (f.lastModified() < cutoff) f.delete()
         }
     }
-    val shareFile = File(shareDir, "wenku8_illustration_${System.currentTimeMillis()}.jpg")
+    val safeTag = fileNameTag
+        ?.replace(Regex("[^\\p{L}\\p{N}_-]+"), "_")
+        ?.take(24)
+        ?.ifBlank { null }
+        ?: "illustration"
+    val shareFile = File(shareDir, "wenku8_${safeTag}_${System.currentTimeMillis()}.jpg")
     val exported = exportArtbookEntryToJpegFile(
         targetFile = shareFile,
         entry = entry,
@@ -1707,7 +1744,9 @@ internal suspend fun shareArtbookEntryViaFileProvider(
             }
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
-        val chooser = Intent.createChooser(sendIntent, "分享插图").apply {
+        val effectiveChooserTitle = chooserTitle?.takeIf { it.isNotBlank() }
+            ?: context.getString(R.string.artbook_action_share)
+        val chooser = Intent.createChooser(sendIntent, effectiveChooserTitle).apply {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
         context.startActivity(chooser)
