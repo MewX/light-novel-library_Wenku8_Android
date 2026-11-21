@@ -130,6 +130,8 @@ import org.mewx.wenku8.ui.discovery.RankingsScreen
 import org.mewx.wenku8.ui.profile.AccountLoginBottomSheet
 import org.mewx.wenku8.ui.profile.DirectUpdateAvailableDialog
 import org.mewx.wenku8.ui.profile.ProfileAndStudioScreen
+import org.mewx.wenku8.ui.profile.ProfileSettingsSection
+import org.mewx.wenku8.ui.profile.ProfileSettingsSubscreen
 import org.mewx.wenku8.ui.profile.ReadingFootprintScreen
 import org.mewx.wenku8.ui.profile.ReadingFootprintTab
 import org.mewx.wenku8.ui.profile.openSafeBrowserUrl
@@ -184,6 +186,12 @@ private sealed interface ScaffoldSceneState {
         override val depth: Int = 1
     }
 
+    data class ProfileSettings(
+        val section: ProfileSettingsSection,
+    ) : ScaffoldSceneState {
+        override val depth: Int = 1
+    }
+
     data class CompactNovelDetail(
         val aid: Int,
         val sharedOrigin: String,
@@ -223,6 +231,7 @@ private fun ScaffoldSceneState.saveableKey(): String = when (this) {
         "scene_search_${sessionId}_${initialMode.name}_${searchBarOrigin}_$initialQuery"
     }
     is ScaffoldSceneState.ReadingFootprint -> "scene_footprint_${initialTab.name}"
+    is ScaffoldSceneState.ProfileSettings -> "scene_profile_settings_${section.name}"
     is ScaffoldSceneState.CompactNovelDetail -> "scene_detail_${aid}_$sharedOrigin"
     is ScaffoldSceneState.ReviewList -> "scene_review_list_${aid}_$novelTitle"
     is ScaffoldSceneState.ReviewThread -> "scene_review_thread_${aid}_${thread.rid}"
@@ -398,6 +407,9 @@ fun AdaptiveMainScaffold(
     var activeFootprintTab by rememberSaveable {
         mutableStateOf<ReadingFootprintTab?>(null)
     }
+    var activeProfileSettingsSection by rememberSaveable {
+        mutableStateOf<ProfileSettingsSection?>(null)
+    }
     var homeTabReselectCounter by androidx.compose.runtime.remember {
         mutableIntStateOf(0)
     }
@@ -438,6 +450,12 @@ fun AdaptiveMainScaffold(
                 )
             }
             activeFootprintTab = null
+            activeProfileSettingsSection?.let { section ->
+                sceneSaveableStateHolder.removeState(
+                    ScaffoldSceneState.ProfileSettings(section).saveableKey(),
+                )
+            }
+            activeProfileSettingsSection = null
             isNetworkDiagnosticsOpen = false
             activeReaderRequest = null
             activeReviewsAid = 0
@@ -635,6 +653,9 @@ fun AdaptiveMainScaffold(
             }
             activeFootprintTab != null && database != null -> {
                 ScaffoldSceneState.ReadingFootprint(activeFootprintTab!!)
+            }
+            activeProfileSettingsSection != null -> {
+                ScaffoldSceneState.ProfileSettings(activeProfileSettingsSection!!)
             }
             isSearchStudioOpen && discoveryRepository != null -> {
                 ScaffoldSceneState.SearchStudio(
@@ -917,6 +938,9 @@ fun AdaptiveMainScaffold(
                                                 onOpenSearchWithSeed = handleOpenSearchWithSeed,
                                                 onOpenLoginSheet = { isLoginBottomSheetOpen = true },
                                                 onOpenReadingFootprint = { tab -> activeFootprintTab = tab },
+                                                onOpenProfileSettingsSection = { section ->
+                                                    activeProfileSettingsSection = section
+                                                },
                                                 onNovelClicked = handleNovelClicked,
                                                 onNovelClickedWithOrigin = handleNovelClickedWithOrigin,
                                                 onContinueReadingClicked = handleContinueReadingClicked,
@@ -1081,6 +1105,9 @@ fun AdaptiveMainScaffold(
                                                     onOpenSearchWithSeed = handleOpenSearchWithSeed,
                                                     onOpenLoginSheet = { isLoginBottomSheetOpen = true },
                                                     onOpenReadingFootprint = { tab -> activeFootprintTab = tab },
+                                                    onOpenProfileSettingsSection = { section ->
+                                                        activeProfileSettingsSection = section
+                                                    },
                                                     onNovelClicked = handleNovelClicked,
                                                     onNovelClickedWithOrigin = handleNovelClickedWithOrigin,
                                                     onContinueReadingClicked = handleContinueReadingClicked,
@@ -1198,6 +1225,30 @@ fun AdaptiveMainScaffold(
                                     },
                                 )
                             }
+                        }
+
+                        is ScaffoldSceneState.ProfileSettings -> {
+                            ProfileSettingsSubscreen(
+                                section = scene.section,
+                                preferences = effectivePreferences,
+                                onNavigateBack = {
+                                    sceneSaveableStateHolder.removeState(scene.saveableKey())
+                                    activeProfileSettingsSection = null
+                                },
+                                onThemeModeSelected = onThemeModeSelected,
+                                onDefaultHomeSelected = onDefaultHomeSelected,
+                                onAppLanguageSelected = onAppLanguageSelected,
+                                onEinkModeChanged = onEinkModeChanged,
+                                onReaderTypographyChanged = onReaderTypographyChanged,
+                                onReaderCustomFontPathChanged = onReaderCustomFontPathChanged,
+                                onReaderCustomBackgroundPathChanged = onReaderCustomBackgroundPathChanged,
+                                onVolumeKeyPagingChanged = onVolumeKeyPagingChanged,
+                                storageAndCacheRepository = storageAndCacheRepository,
+                                backupArchiveRepository = backupArchiveRepository,
+                                legacyV1StorageMigrator = legacyV1StorageMigrator,
+                                isPlayStoreChannel = appUpdateCoordinator?.isPlayStoreChannel
+                                    ?: (org.mewx.wenku8.BuildConfig.DISTRIBUTION_CHANNEL == "playstore"),
+                            )
                         }
 
                         is ScaffoldSceneState.CompactNovelDetail -> {
@@ -1430,6 +1481,7 @@ private fun MainDestinationBody(
     onOpenSearchWithSeed: (String, UnifiedSearchMode) -> Unit,
     onOpenLoginSheet: () -> Unit,
     onOpenReadingFootprint: (ReadingFootprintTab) -> Unit,
+    onOpenProfileSettingsSection: (ProfileSettingsSection) -> Unit,
     onNovelClicked: (DiscoveryNovelCardItem) -> Unit,
     onNovelClickedWithOrigin: (DiscoveryNovelCardItem, String) -> Unit,
     onContinueReadingClicked: (BookshelfItemModel) -> Unit,
@@ -1587,6 +1639,8 @@ private fun MainDestinationBody(
             backupArchiveRepository = backupArchiveRepository,
             legacyV1StorageMigrator = legacyV1StorageMigrator,
             onOpenLoginSheet = onOpenLoginSheet,
+            onOpenSettingsSection = onOpenProfileSettingsSection,
+            reselectScrollToTopTrigger = reselectScrollToTopTrigger,
             modifier = Modifier
                 .fillMaxSize()
                 .padding(contentPadding)

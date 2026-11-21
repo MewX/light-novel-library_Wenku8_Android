@@ -9,10 +9,12 @@ import android.content.ContextWrapper
 import android.content.Intent
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasTestTag
@@ -23,6 +25,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToNode
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.room.Room
@@ -78,8 +81,12 @@ import org.mewx.wenku8.data.repository.ParsedVolumeToc
 import org.mewx.wenku8.data.repository.StorageAndCacheRepository
 import org.mewx.wenku8.data.repository.StoredAccountCredentials
 import org.mewx.wenku8.data.repository.AccountSessionState
+import org.mewx.wenku8.data.remote.diagnostics.AutoRoutingModeState
 import org.mewx.wenku8.data.repository.UserSessionRepository
+import org.mewx.wenku8.ui.navigation.AdaptiveMainScaffold
 import org.mewx.wenku8.ui.navigation.DefaultHomeDestination
+import org.mewx.wenku8.ui.navigation.MainScaffoldTestTags
+import org.mewx.wenku8.ui.navigation.TopLevelDestination
 import org.mewx.wenku8.ui.theme.Wenku8ExpressiveTheme
 import org.mewx.wenku8.ui.theme.Wenku8ThemeMode
 import org.robolectric.RobolectricTestRunner
@@ -521,8 +528,14 @@ class ProfileAndBackupTest {
                             totalReadingSeconds = 7200L, // 120 minutes
                             totalCharactersRead = 25_000L, // 2.5w
                             totalBookmarkNoteCount = 3,
+                            onAutoOptimizeConnectionChanged = { enabled ->
+                                prefsState = prefsState.copy(autoOptimizeConnectionEnabled = enabled)
+                            },
                             onOpenNetworkDiagnostics = { diagnosticsOpened++ },
                             onAppLanguageSelected = { prefsState = prefsState.copy(appLanguage = it) },
+                            onEinkModeChanged = { enabled ->
+                                prefsState = prefsState.copy(einkModeEnabled = enabled)
+                            },
                             onReaderTypographyChanged = { size, line, para, edge ->
                                 prefsState = prefsState.copy(
                                     readerFontSizeSp = size,
@@ -543,52 +556,79 @@ class ProfileAndBackupTest {
             composeTestRule.onNodeWithText("个人主页头图壁纸").assertDoesNotExist()
             composeTestRule.onNodeWithText("系统壁纸动态取色 (Material You)").assertDoesNotExist()
 
-            // 1. Reading footprint summary visible
+            // 1. Reading footprint summary & MD3e segmented group headers visible on Hub
             composeTestRule.onNodeWithText("120 分钟").assertIsDisplayed()
             composeTestRule.onNodeWithText("2.5w").assertIsDisplayed()
+            composeTestRule.onNodeWithText("偏好与阅读").assertIsDisplayed()
+            composeTestRule.onNodeWithText("22 sp · 系统无衬线 · 音量键翻页开").assertIsDisplayed()
 
-            // 2. Network diagnostics shortcut works
+            // 2. Network master-switch split row: body opens diagnostics, trailing switch toggles auto-optimize
             composeTestRule.onNodeWithTag(ProfileStudioTestTags.LIST)
-                .performScrollToNode(hasTestTag(ProfileStudioTestTags.OPEN_DIAGNOSTICS_BUTTON))
+                .performScrollToNode(hasTestTag(ProfileStudioTestTags.ENTRY_NETWORK))
             composeTestRule.onNodeWithTag(ProfileStudioTestTags.OPEN_DIAGNOSTICS_BUTTON).performClick()
             assertEquals(1, diagnosticsOpened)
+            val initialAutoOpt = prefsState.autoOptimizeConnectionEnabled
+            composeTestRule.onNodeWithTag(ProfileStudioTestTags.AUTO_ROUTING_SWITCH).performClick()
+            composeTestRule.waitForIdle()
+            assertEquals(!initialAutoOpt, prefsState.autoOptimizeConnectionEnabled)
 
-            // 3. Language switch, multi-paragraph spacing live preview, & Typography reset
+            // 3. Appearance subscreen: language switch updates preference and live Hub summary
             composeTestRule.onNodeWithTag(ProfileStudioTestTags.LIST)
-                .performScrollToNode(hasTestTag(ProfileStudioTestTags.LANG_CHIP_TC))
+                .performScrollToNode(hasTestTag(ProfileStudioTestTags.ENTRY_APPEARANCE))
+            composeTestRule.onNodeWithTag(ProfileStudioTestTags.ENTRY_APPEARANCE).performClick()
+            composeTestRule.onNodeWithTag(ProfileStudioTestTags.SUBSCREEN_ROOT).assertIsDisplayed()
             composeTestRule.onNodeWithTag(ProfileStudioTestTags.LANG_CHIP_TC).performClick()
             assertEquals(Wenku8API.AppLanguage.TC, prefsState.appLanguage)
-
+            composeTestRule.onNodeWithTag(ProfileStudioTestTags.SUBSCREEN_BACK_BUTTON).performClick()
+            composeTestRule.waitForIdle()
             composeTestRule.onNodeWithTag(ProfileStudioTestTags.LIST)
-                .performScrollToNode(hasTestTag(ProfileStudioTestTags.TYPOGRAPHY_PREVIEW_BOX))
+                .performScrollToNode(hasTestTag(ProfileStudioTestTags.ENTRY_APPEARANCE))
+            composeTestRule.onNodeWithText("繁體中文", substring = true).assertIsDisplayed()
+
+            // 4. Reader typography subscreen: pinned live multi-paragraph preview & typography reset
+            composeTestRule.onNodeWithTag(ProfileStudioTestTags.LIST)
+                .performScrollToNode(hasTestTag(ProfileStudioTestTags.ENTRY_READER_TYPOGRAPHY))
+            composeTestRule.onNodeWithTag(ProfileStudioTestTags.ENTRY_READER_TYPOGRAPHY).performClick()
+            composeTestRule.onNodeWithTag(ProfileStudioTestTags.TYPOGRAPHY_PREVIEW_BOX).assertIsDisplayed()
             prefsState = prefsState.copy(readerParagraphDistanceDp = 0)
             composeTestRule.waitForIdle()
             val zeroParaHeight = composeTestRule
                 .onNodeWithTag(ProfileStudioTestTags.TYPOGRAPHY_PREVIEW_BOX)
                 .fetchSemanticsNode()
-                .boundsInRoot
+                .size
                 .height
             prefsState = prefsState.copy(readerParagraphDistanceDp = 40)
             composeTestRule.waitForIdle()
             val wideParaHeight = composeTestRule
                 .onNodeWithTag(ProfileStudioTestTags.TYPOGRAPHY_PREVIEW_BOX)
                 .fetchSemanticsNode()
-                .boundsInRoot
+                .size
                 .height
             assertTrue(
                 "Multi-paragraph preview height must grow when paragraph spacing increases ($wideParaHeight > $zeroParaHeight)",
                 wideParaHeight > zeroParaHeight,
             )
 
-            composeTestRule.onNodeWithTag(ProfileStudioTestTags.LIST)
+            composeTestRule.onNodeWithTag(ProfileStudioTestTags.SUBSCREEN_LIST)
                 .performScrollToNode(hasTestTag(ProfileStudioTestTags.RESET_TYPOGRAPHY_BUTTON))
             composeTestRule.onNodeWithText("字号大小：22 sp").assertIsDisplayed()
             composeTestRule.onNodeWithTag(ProfileStudioTestTags.RESET_TYPOGRAPHY_BUTTON).performClick()
             composeTestRule.waitForIdle()
             assertEquals(Wenku8UserPreferences.DEFAULT_READER_FONT_SIZE_SP, prefsState.readerFontSizeSp)
-
-            // 4. Fast Clean executes and renders completion banner
+            composeTestRule.onNodeWithTag(ProfileStudioTestTags.SUBSCREEN_BACK_BUTTON).performClick()
+            composeTestRule.waitForIdle()
             composeTestRule.onNodeWithTag(ProfileStudioTestTags.LIST)
+                .performScrollToNode(hasTestTag(ProfileStudioTestTags.ENTRY_READER_TYPOGRAPHY))
+            composeTestRule.onNodeWithText(
+                "${Wenku8UserPreferences.DEFAULT_READER_FONT_SIZE_SP} sp",
+                substring = true,
+            ).assertIsDisplayed()
+
+            // 5. Storage subscreen: Fast Clean executes and renders completion banner
+            composeTestRule.onNodeWithTag(ProfileStudioTestTags.LIST)
+                .performScrollToNode(hasTestTag(ProfileStudioTestTags.ENTRY_STORAGE))
+            composeTestRule.onNodeWithTag(ProfileStudioTestTags.ENTRY_STORAGE).performClick()
+            composeTestRule.onNodeWithTag(ProfileStudioTestTags.SUBSCREEN_LIST)
                 .performScrollToNode(hasTestTag(ProfileStudioTestTags.FAST_CLEAN_BUTTON))
             composeTestRule.onNodeWithTag(ProfileStudioTestTags.FAST_CLEAN_BUTTON).performClick()
             composeTestRule.waitUntil(timeoutMillis = 5_000L) {
@@ -598,12 +638,17 @@ class ProfileAndBackupTest {
                         .fetchSemanticsNodes()
                         .isNotEmpty()
             }
-            composeTestRule.onNodeWithTag(ProfileStudioTestTags.LIST)
+            composeTestRule.onNodeWithTag(ProfileStudioTestTags.SUBSCREEN_LIST)
                 .performScrollToNode(hasTestTag(ProfileStudioTestTags.STORAGE_STATUS_BANNER))
             composeTestRule.onNodeWithTag(ProfileStudioTestTags.STORAGE_STATUS_BANNER).assertIsDisplayed()
+            composeTestRule.onNodeWithTag(ProfileStudioTestTags.SUBSCREEN_BACK_BUTTON).performClick()
+            composeTestRule.waitForIdle()
 
-            // 5. Open-Source License dialog displays regenerated R.raw.license content + git.io link
+            // 6. About & Feedback subscreen: Open-Source License dialog + About dialog with 5-tap Easter egg
             composeTestRule.onNodeWithTag(ProfileStudioTestTags.LIST)
+                .performScrollToNode(hasTestTag(ProfileStudioTestTags.ENTRY_ABOUT))
+            composeTestRule.onNodeWithTag(ProfileStudioTestTags.ENTRY_ABOUT).performClick()
+            composeTestRule.onNodeWithTag(ProfileStudioTestTags.SUBSCREEN_LIST)
                 .performScrollToNode(hasTestTag(ProfileStudioTestTags.OPEN_LICENSE_BUTTON))
             composeTestRule.onNodeWithTag(ProfileStudioTestTags.OPEN_LICENSE_BUTTON).performClick()
             composeTestRule.onNodeWithText("开源许可与版权声明").assertIsDisplayed()
@@ -611,7 +656,6 @@ class ProfileAndBackupTest {
             composeTestRule.onNodeWithText("Jetpack Compose", substring = true).assertIsDisplayed()
             composeTestRule.onNodeWithText("关闭").performClick()
 
-            // 6. About dialog matches v1 info & credits + distribution channel + 5-tap version Easter egg
             composeTestRule.onNodeWithTag(ProfileStudioTestTags.OPEN_ABOUT_BUTTON).performClick()
             composeTestRule.onNodeWithText(
                 "版本：${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
@@ -1036,8 +1080,14 @@ class ProfileAndBackupTest {
             }
         }
 
-        // 1. GitHub Issues button opens https://github.com/MewX/light-novel-library_Wenku8_Android/issues
+        // 0. Open About & Feedback subscreen from Tab 4 segmented list
         composeTestRule.onNodeWithTag(ProfileStudioTestTags.LIST)
+            .performScrollToNode(hasTestTag(ProfileStudioTestTags.ENTRY_ABOUT))
+        composeTestRule.onNodeWithTag(ProfileStudioTestTags.ENTRY_ABOUT).performClick()
+        composeTestRule.onNodeWithTag(ProfileStudioTestTags.SUBSCREEN_ROOT).assertIsDisplayed()
+
+        // 1. GitHub Issues button opens https://github.com/MewX/light-novel-library_Wenku8_Android/issues
+        composeTestRule.onNodeWithTag(ProfileStudioTestTags.SUBSCREEN_LIST)
             .performScrollToNode(hasTestTag(ProfileStudioTestTags.REPORT_BUG_GITHUB_BUTTON))
         composeTestRule.onNodeWithTag(ProfileStudioTestTags.REPORT_BUG_GITHUB_BUTTON)
             .assertIsDisplayed()
@@ -1049,7 +1099,7 @@ class ProfileAndBackupTest {
         assertEquals(GITHUB_ISSUES_URL, githubIntent.dataString)
 
         // 2. Email feedback button opens default email client for wenku8@mewx.org with version info
-        composeTestRule.onNodeWithTag(ProfileStudioTestTags.LIST)
+        composeTestRule.onNodeWithTag(ProfileStudioTestTags.SUBSCREEN_LIST)
             .performScrollToNode(hasTestTag(ProfileStudioTestTags.FEEDBACK_EMAIL_BUTTON))
         composeTestRule.onNodeWithTag(ProfileStudioTestTags.FEEDBACK_EMAIL_BUTTON)
             .assertIsDisplayed()
@@ -1089,6 +1139,121 @@ class ProfileAndBackupTest {
         assertEquals("Google Pixel 8", formatDeviceModel("Google", "Pixel 8"))
         assertEquals("Pixel 8", formatDeviceModel("Pixel", "Pixel 8"))
         assertEquals("Unknown", formatDeviceModel("", ""))
+    }
+
+    @Test
+    fun profileSegmentedSummariesReflectLiveRoutingAndPreferencesOnNarrowScreens() {
+        val optimizedRouting = AutoRoutingModeState.OptimizedRouteActive(
+            candidateId = "cf-nrt",
+            manifestRevision = "rev-1",
+            medianLatencyMs = 38L,
+            controlMedianLatencyMs = 70L,
+            reductionPercent = 45,
+            confirmedSampleCount = 4,
+            promotedOnReliability = false,
+            selectedIpLiteral = "104.16.1.2",
+            ingressColo = "NRT",
+        )
+        val customPrefs = Wenku8UserPreferences(
+            appLanguage = Wenku8API.AppLanguage.TC,
+            themeMode = Wenku8ThemeMode.ARCHIVAL_DAY,
+            einkModeEnabled = true,
+            defaultHomeDestination = DefaultHomeDestination.BOOKSHELF,
+            readerFontSizeSp = 24,
+            readerCustomFontPath = Wenku8UserPreferences.BUILTIN_SERIF_FONT_TOKEN,
+            volumeKeyPagingEnabled = true,
+            autoOptimizeConnectionEnabled = true,
+        )
+
+        composeTestRule.setContent {
+            val baseDensity = LocalDensity.current
+            CompositionLocalProvider(
+                LocalDensity provides Density(density = baseDensity.density, fontScale = 1.3f),
+            ) {
+                Box(modifier = Modifier.size(width = 320.dp, height = 760.dp)) {
+                    Wenku8ExpressiveTheme(
+                        themeMode = customPrefs.themeMode,
+                        einkModeOverride = customPrefs.einkModeEnabled,
+                    ) {
+                        ProfileAndStudioScreen(
+                            preferences = customPrefs,
+                            onThemeModeSelected = {},
+                            onDefaultHomeSelected = {},
+                            autoRoutingState = optimizedRouting,
+                            modifier = Modifier.composeTestTagForLazyList(),
+                        )
+                    }
+                }
+            }
+        }
+
+        val rootBounds = composeTestRule
+            .onNodeWithTag(ProfileStudioTestTags.LIST)
+            .fetchSemanticsNode()
+            .boundsInRoot
+
+        composeTestRule.onNodeWithTag(ProfileStudioTestTags.LIST)
+            .performScrollToNode(hasTestTag(ProfileStudioTestTags.ENTRY_APPEARANCE))
+        composeTestRule.onNodeWithText("墨水屏", substring = true).assertIsDisplayed()
+        composeTestRule.onNodeWithText("24 sp · 系统衬线 · 音量键翻页开").assertIsDisplayed()
+
+        composeTestRule.onNodeWithTag(ProfileStudioTestTags.LIST)
+            .performScrollToNode(hasTestTag(ProfileStudioTestTags.ENTRY_NETWORK))
+        composeTestRule.onNodeWithText("优选 104.16.1.2 (38 ms) · NRT").assertIsDisplayed()
+        val networkRowBounds = composeTestRule
+            .onNodeWithTag(ProfileStudioTestTags.ENTRY_NETWORK)
+            .fetchSemanticsNode()
+            .boundsInRoot
+        assertTrue(
+            "Segmented network row must stay inside 320dp viewport (${networkRowBounds.right} <= ${rootBounds.right + 1f})",
+            networkRowBounds.right <= rootBounds.right + 1f,
+        )
+    }
+
+    @Test
+    fun adaptiveMainScaffoldRoutesProfileSettingsSubscreenAndReturnsToProfileTab() {
+        var prefs by mutableStateOf(Wenku8UserPreferences())
+
+        composeTestRule.setContent {
+            Box(modifier = Modifier.size(width = 412.dp, height = 892.dp)) {
+                Wenku8ExpressiveTheme(themeMode = prefs.themeMode) {
+                    AdaptiveMainScaffold(
+                        preferredHomeDestination = prefs.defaultHomeDestination,
+                        isNetworkAvailableOnColdStart = true,
+                        currentThemeMode = prefs.themeMode,
+                        userPreferences = prefs,
+                        onThemeModeSelected = { prefs = prefs.copy(themeMode = it) },
+                        onDefaultHomeSelected = { prefs = prefs.copy(defaultHomeDestination = it) },
+                        onAppLanguageSelected = { prefs = prefs.copy(appLanguage = it) },
+                        onEinkModeChanged = { prefs = prefs.copy(einkModeEnabled = it) },
+                    )
+                }
+            }
+        }
+
+        // Navigate to Tab 4 · 我的
+        composeTestRule
+            .onNodeWithTag(MainScaffoldTestTags.NAV_ITEM_PREFIX + TopLevelDestination.PROFILE.routeKey)
+            .performClick()
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag(MainScaffoldTestTags.COMPACT_SHORT_NAV_BAR).assertIsDisplayed()
+
+        // Drill into Appearance subscreen via AdaptiveMainScaffold scene transition
+        composeTestRule.onNodeWithTag(ProfileStudioTestTags.ENTRY_APPEARANCE).performClick()
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag(ProfileStudioTestTags.SUBSCREEN_ROOT).assertIsDisplayed()
+        composeTestRule.onNodeWithTag(MainScaffoldTestTags.COMPACT_SHORT_NAV_BAR).assertDoesNotExist()
+
+        // Toggle language inside hosted subscreen and navigate back to Tab 4
+        composeTestRule.onNodeWithTag(ProfileStudioTestTags.LANG_CHIP_TC).performClick()
+        assertEquals(Wenku8API.AppLanguage.TC, prefs.appLanguage)
+        composeTestRule.onNodeWithTag(ProfileStudioTestTags.SUBSCREEN_BACK_BUTTON).performClick()
+        composeTestRule.waitForIdle()
+
+        // Bottom bar and Profile Hub return with updated live summary
+        composeTestRule.onNodeWithTag(MainScaffoldTestTags.COMPACT_SHORT_NAV_BAR).assertIsDisplayed()
+        composeTestRule.onNodeWithTag(ProfileStudioTestTags.ENTRY_APPEARANCE).assertIsDisplayed()
+        composeTestRule.onNodeWithText("繁體中文", substring = true).assertIsDisplayed()
     }
 
     private fun Modifier.composeTestTagForLazyList(): Modifier =
