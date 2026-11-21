@@ -1,7 +1,7 @@
 package org.mewx.wenku8.data.remote.diagnostics
 
 import org.mewx.wenku8.api.Wenku8API
-import org.mewx.wenku8.data.remote.transport.LegacyLightNetworkTransport
+import org.mewx.wenku8.data.remote.transport.WenkuTransport
 import java.net.URI
 import java.util.Locale
 
@@ -69,7 +69,7 @@ object DiagnosticsEndpointConfig {
     ): DiagnosticsEndpointResolution {
         val trimmed = rawBaseUrl?.trim().orEmpty()
         if (trimmed.isEmpty() ||
-            trimmed.equals(LegacyLightNetworkTransport.UNKNOWN_ENDPOINT_SENTINEL, ignoreCase = true)
+            trimmed.equals(WenkuTransport.UNKNOWN_ENDPOINT_SENTINEL, ignoreCase = true)
         ) {
             return DiagnosticsEndpointResolution.Unavailable(
                 EndpointUnavailableReason.API_STUB_UNCONFIGURED,

@@ -210,6 +210,10 @@
     <string name="update_play_check_failed">無法連線 Google Play 檢查更新</string>
     <string name="update_action_open_play_store">前往 Google Play</string>
     <string name="update_badge_content_desc">有可用的應用程式更新</string>
+    <string name="update_required_title">目前版本過舊，需要更新</string>
+    <string name="update_required_body_with_version_format">目前應用程式版本已不再支援線上請求，請更新至 %1$s 及以上版本。已快取的本地書籍仍可繼續離線閱讀。</string>
+    <string name="update_required_body_generic">目前應用程式版本已不再支援線上請求，請更新至最新版本。已快取的本地書籍仍可繼續離線閱讀。</string>
+    <string name="update_required_continue_offline">繼續離線閱讀</string>
 
     <!-- Profile & Studio Screen (P3.2 — 100% v1.31 Settings + .wk8backup.zip) -->
     <string name="profile_footprint_title">閱讀足跡與書籤</string>

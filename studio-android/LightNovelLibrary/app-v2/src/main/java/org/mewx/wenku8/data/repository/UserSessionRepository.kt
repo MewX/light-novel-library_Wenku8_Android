@@ -1,6 +1,5 @@
 package org.mewx.wenku8.data.repository
 
-import android.content.ContentValues
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -14,7 +13,7 @@ import org.mewx.wenku8.api.Wenku8Error
 import org.mewx.wenku8.network.LightUserSession
 import org.mewx.wenku8.data.remote.parser.ParsedUserInfo
 import org.mewx.wenku8.data.remote.parser.WenkuXmlParsers
-import org.mewx.wenku8.data.remote.transport.LegacyLightNetworkTransport
+import org.mewx.wenku8.data.remote.transport.RelayPostResult
 import org.mewx.wenku8.data.remote.transport.WenkuTransport
 import java.io.File
 import java.nio.charset.StandardCharsets
@@ -86,10 +85,10 @@ interface AccountAuthGateway {
     val baseUrlOrEmpty: String
     val registerUrlOrEmpty: String
 
-    fun loginParams(identifier: String, password: String): ContentValues?
-    fun logoutParams(): ContentValues?
-    fun userInfoParams(): ContentValues?
-    fun userSignParams(): ContentValues?
+    fun loginQuery(identifier: String, password: String): String?
+    fun logoutQuery(): String?
+    fun userInfoQuery(): String?
+    fun userSignQuery(): String?
     fun avatarUrlForUid(uid: Int): String
     fun mapServerErrorCode(rawCode: Int): Wenku8Error.ErrorCode
 
@@ -104,17 +103,16 @@ object NativeAccountAuthGateway : AccountAuthGateway {
     override val isAuthConfigured: Boolean
         get() = safeCall(false) {
             val base = Wenku8API.BASE_URL.orEmpty()
-            val probeParams = Wenku8API.getUserInfoParams()
+            val probeQuery = Wenku8API.buildUserInfoQuery()
             base.isNotBlank() &&
-                base != LegacyLightNetworkTransport.UNKNOWN_ENDPOINT_SENTINEL &&
-                probeParams != null &&
-                probeParams.size() > 0
+                base != WenkuTransport.UNKNOWN_ENDPOINT_SENTINEL &&
+                probeQuery.isNotBlank()
         }
 
     override val baseUrlOrEmpty: String
         get() = safeCall("") {
             val raw = Wenku8API.BASE_URL.orEmpty().trim()
-            if (raw.isEmpty() || raw.equals(LegacyLightNetworkTransport.UNKNOWN_ENDPOINT_SENTINEL, ignoreCase = true)) {
+            if (raw.isEmpty() || raw.equals(WenkuTransport.UNKNOWN_ENDPOINT_SENTINEL, ignoreCase = true)) {
                 ""
             } else {
                 raw
@@ -127,28 +125,28 @@ object NativeAccountAuthGateway : AccountAuthGateway {
             if (raw.isEmpty() || raw.equals(Wenku8API.UNKNOWN, ignoreCase = true)) "" else raw
         }
 
-    override fun loginParams(identifier: String, password: String): ContentValues? =
+    override fun loginQuery(identifier: String, password: String): String? =
         safeCall(null) {
             if (identifier.contains('@')) {
-                Wenku8API.getUserLoginEmailParams(identifier, password)
+                Wenku8API.buildUserLoginEmailQuery(identifier, password)
             } else {
-                Wenku8API.getUserLoginParams(identifier, password)
-            }?.takeIf { it.size() > 0 }
+                Wenku8API.buildUserLoginQuery(identifier, password)
+            }.takeIf { it.isNotBlank() }
         }
 
-    override fun logoutParams(): ContentValues? =
+    override fun logoutQuery(): String? =
         safeCall(null) {
-            Wenku8API.getUserLogoutParams()?.takeIf { it.size() > 0 }
+            Wenku8API.buildUserLogoutQuery().takeIf { it.isNotBlank() }
         }
 
-    override fun userInfoParams(): ContentValues? =
+    override fun userInfoQuery(): String? =
         safeCall(null) {
-            Wenku8API.getUserInfoParams()?.takeIf { it.size() > 0 }
+            Wenku8API.buildUserInfoQuery().takeIf { it.isNotBlank() }
         }
 
-    override fun userSignParams(): ContentValues? =
+    override fun userSignQuery(): String? =
         safeCall(null) {
-            Wenku8API.getUserSignParams()?.takeIf { it.size() > 0 }
+            Wenku8API.buildUserSignQuery().takeIf { it.isNotBlank() }
         }
 
     override fun avatarUrlForUid(uid: Int): String =
@@ -618,13 +616,11 @@ class UserSessionRepository(
      */
     suspend fun logout() = withContext(ioDispatcher) {
         authMutex.withLock {
-            val endpointUrl = authGateway.baseUrlOrEmpty
-            if (isAuthSupported && endpointUrl.isNotEmpty()) {
-                authGateway.logoutParams()?.let { params ->
+            if (isAuthSupported) {
+                authGateway.logoutQuery()?.let { query ->
                     runCatching {
-                        transport.postForm(
-                            endpointUrl = endpointUrl,
-                            formParams = params,
+                        transport.postSealedAction(
+                            rawActionQuery = query,
                             isIdempotentReadOnly = false,
                         )
                     }
@@ -712,30 +708,34 @@ class UserSessionRepository(
         identifier: String,
         password: String,
     ): Wenku8Error.ErrorCode {
-        val endpointUrl = authGateway.baseUrlOrEmpty.takeIf { it.isNotEmpty() }
-            ?: return Wenku8Error.ErrorCode.NETWORK_ERROR
-        val params = authGateway.loginParams(identifier, password)
+        val query = authGateway.loginQuery(identifier, password)
             ?: return Wenku8Error.ErrorCode.PARAM_COUNT_NOT_MATCHED
-        val bytes = transport.postForm(
-            endpointUrl = endpointUrl,
-            formParams = params,
-            isIdempotentReadOnly = false,
-        ) ?: return Wenku8Error.ErrorCode.NETWORK_ERROR
+        val bytes = when (
+            val result = transport.postSealedAction(
+                rawActionQuery = query,
+                isIdempotentReadOnly = false,
+            )
+        ) {
+            is RelayPostResult.Success -> result.bodyBytes
+            else -> return Wenku8Error.ErrorCode.NETWORK_ERROR
+        }
         val rawBody = String(bytes, StandardCharsets.UTF_8).trim()
         val numeric = rawBody.toIntOrNull() ?: return Wenku8Error.ErrorCode.RETURNED_VALUE_EXCEPTION
         return authGateway.mapServerErrorCode(numeric)
     }
 
     private suspend fun executeSignRequestLocked(): SignServerResponse {
-        val endpointUrl = authGateway.baseUrlOrEmpty.takeIf { it.isNotEmpty() }
-            ?: return SignServerResponse.Failure(Wenku8Error.ErrorCode.NETWORK_ERROR)
-        val params = authGateway.userSignParams()
+        val query = authGateway.userSignQuery()
             ?: return SignServerResponse.Failure(Wenku8Error.ErrorCode.PARAM_COUNT_NOT_MATCHED)
-        val bytes = transport.postForm(
-            endpointUrl = endpointUrl,
-            formParams = params,
-            isIdempotentReadOnly = false,
-        ) ?: return SignServerResponse.Failure(Wenku8Error.ErrorCode.NETWORK_ERROR)
+        val bytes = when (
+            val result = transport.postSealedAction(
+                rawActionQuery = query,
+                isIdempotentReadOnly = false,
+            )
+        ) {
+            is RelayPostResult.Success -> result.bodyBytes
+            else -> return SignServerResponse.Failure(Wenku8Error.ErrorCode.NETWORK_ERROR)
+        }
         val rawBody = String(bytes, StandardCharsets.UTF_8)
         return parseSignResponseBody(rawBody, authGateway::mapServerErrorCode)
     }
@@ -743,13 +743,11 @@ class UserSessionRepository(
     private suspend fun fetchUserInfoAndAvatarLocked(
         allowSingleRelogin: Boolean,
     ): Pair<ParsedUserInfo?, File?> {
-        val endpointUrl = authGateway.baseUrlOrEmpty.takeIf { it.isNotEmpty() } ?: return null to null
-        val infoParams = authGateway.userInfoParams() ?: return null to null
-        var rawBytes = transport.postForm(
-            endpointUrl = endpointUrl,
-            formParams = infoParams,
+        val infoQuery = authGateway.userInfoQuery() ?: return null to null
+        var rawBytes = (transport.postSealedAction(
+            rawActionQuery = infoQuery,
             isIdempotentReadOnly = true,
-        ) ?: return null to null
+        ) as? RelayPostResult.Success)?.bodyBytes ?: return null to null
         var xmlOrCode = String(rawBytes, StandardCharsets.UTF_8).trim()
 
         val initialNumeric = xmlOrCode.toIntOrNull()
@@ -760,11 +758,10 @@ class UserSessionRepository(
                 if (creds != null) {
                     val relogin = executeLoginCallLocked(creds.identifier, creds.password)
                     if (relogin == Wenku8Error.ErrorCode.SYSTEM_1_SUCCEEDED) {
-                        rawBytes = transport.postForm(
-                            endpointUrl = endpointUrl,
-                            formParams = infoParams,
+                        rawBytes = (transport.postSealedAction(
+                            rawActionQuery = infoQuery,
                             isIdempotentReadOnly = true,
-                        ) ?: return null to null
+                        ) as? RelayPostResult.Success)?.bodyBytes ?: return null to null
                         xmlOrCode = String(rawBytes, StandardCharsets.UTF_8).trim()
                     } else {
                         if (relogin == Wenku8Error.ErrorCode.SYSTEM_2_ERROR_USERNAME ||

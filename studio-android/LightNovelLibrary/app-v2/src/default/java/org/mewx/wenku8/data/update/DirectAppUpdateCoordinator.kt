@@ -121,5 +121,38 @@ class DirectAppUpdateCoordinator(
         _showProfileUpdateBadge.value = false
     }
 
+    override fun onServerUpgradeRequired(minVersionCode: Int?, minVersionName: String?) {
+        val targetCode = (minVersionCode ?: (currentVersionCode + 1)).coerceAtLeast(currentVersionCode + 1)
+        _showProfileUpdateBadge.value = true
+        _uiState.value = AppUpdateUiState.UpdateAvailable(
+            currentVersionCode = currentVersionCode,
+            targetVersionCode = targetCode,
+            isPlayStoreManaged = false,
+            downloadPageUrl = ServerNoticeAndUpdateRepository.BLOG_DOWNLOAD_URL,
+        )
+        if (_pendingAutoPrompt.value !is AppUpdateAutoPrompt.RequiredUpgradeDialog) {
+            _pendingAutoPrompt.value = AppUpdateAutoPrompt.RequiredUpgradeDialog(
+                currentVersionCode = currentVersionCode,
+                targetVersionCode = targetCode,
+                minVersionName = minVersionName,
+                isPlayStoreChannel = false,
+                downloadPageUrl = ServerNoticeAndUpdateRepository.BLOG_DOWNLOAD_URL,
+            )
+        }
+    }
+
+    override fun onServerUpdateHint(minVersionCode: Int?) {
+        _showProfileUpdateBadge.value = true
+        if (_uiState.value is AppUpdateUiState.Idle || _uiState.value is AppUpdateUiState.UpToDate) {
+            val targetCode = (minVersionCode ?: (currentVersionCode + 1)).coerceAtLeast(currentVersionCode + 1)
+            _uiState.value = AppUpdateUiState.UpdateAvailable(
+                currentVersionCode = currentVersionCode,
+                targetVersionCode = targetCode,
+                isPlayStoreManaged = false,
+                downloadPageUrl = ServerNoticeAndUpdateRepository.BLOG_DOWNLOAD_URL,
+            )
+        }
+    }
+
     override fun dispose() = Unit
 }

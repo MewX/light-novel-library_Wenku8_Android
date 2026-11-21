@@ -161,10 +161,25 @@ class AppContainer(context: Context) {
         }
     }
 
+    private val hasTriggeredSoftUpdateHintCheck = java.util.concurrent.atomic.AtomicBoolean(false)
+
     val wenkuTransport: WenkuTransport by lazy {
         RelayHttpTransport(
             baseOkHttpClient = sharedBaseOkHttpClient,
             routeProvider = relayRouteController,
+            onUpgradeRequired = { minVersionCode, minVersionName ->
+                appUpdateCoordinator.onServerUpgradeRequired(minVersionCode, minVersionName)
+            },
+            onSoftUpdateHint = { minVersionCode ->
+                appUpdateCoordinator.onServerUpdateHint(minVersionCode)
+                if (hasTriggeredSoftUpdateHintCheck.compareAndSet(false, true)) {
+                    applicationScope.launch {
+                        runCatching {
+                            appUpdateCoordinator.checkForUpdate(isUserInitiated = false)
+                        }
+                    }
+                }
+            },
         )
     }
 
@@ -192,6 +207,8 @@ class AppContainer(context: Context) {
                 ) {
                     is WenkuApiResult.Success -> Result.success((SystemClock.elapsedRealtime() - startMs).coerceAtLeast(0L))
                     WenkuApiResult.ApiNotConfigured -> Result.failure(IllegalStateException("此版本不支持实际接口检测"))
+                    is WenkuApiResult.UpgradeRequired -> Result.failure(IllegalStateException("upgrade_required_426"))
+                    WenkuApiResult.AuthRejected -> Result.failure(IllegalStateException("auth_rejected_403"))
                     is WenkuApiResult.NetworkError -> Result.failure(IllegalStateException(res.debugDetail ?: "network_error"))
                     is WenkuApiResult.ServerErrorCode -> Result.failure(IllegalStateException("server_code_${res.numericCode}"))
                     WenkuApiResult.EmptyResponse -> Result.failure(IllegalStateException("empty_response"))

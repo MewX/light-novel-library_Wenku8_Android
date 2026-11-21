@@ -1,47 +1,66 @@
 package org.mewx.wenku8.data.remote.transport
 
-import android.content.ContentValues
-import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
-import org.mewx.wenku8.api.Wenku8API
-import org.mewx.wenku8.network.LightNetwork
+/**
+ * Typed result of a sealed `WK8-RNE-1` POST request against `/v2/api`.
+ */
+sealed interface RelayPostResult {
+    /** HTTP 200 with decoded UTF-8/binary response body. */
+    data class Success(val bodyBytes: ByteArray) : RelayPostResult {
+        override fun equals(other: Any?): Boolean {
+            if (this === other) return true
+            if (other !is Success) return false
+            return bodyBytes.contentEquals(other.bodyBytes)
+        }
+
+        override fun hashCode(): Int = bodyBytes.contentHashCode()
+    }
+
+    /** HTTP 426 Upgrade Required (`SCHEME_RETIRED` or `VERSION_TOO_OLD`). Never retried. */
+    data class UpgradeRequired(
+        val minVersionCode: Int? = null,
+        val minVersionName: String? = null,
+    ) : RelayPostResult
+
+    /** HTTP 403 Forbidden (or non-clock-skew 401) — request rejected by server policy/auth. */
+    data object AuthRejected : RelayPostResult
+
+    /** HTTP 429 Too Many Requests. Never retried or rotated. */
+    data object RateLimited : RelayPostResult
+
+    /** Transport I/O failure, timeout, non-200 server error, or unavailable native sealer. */
+    data class NetworkFailure(val debugDetail: String? = null) : RelayPostResult
+}
 
 /**
- * Pluggable HTTP form-POST transport boundary for Wenku8 `:api` calls.
+ * Pluggable HTTP transport boundary for Wenku8 `:app-v2` calls.
  *
- * - In Phase 1, [LegacyLightNetworkTransport] delegates to `:api`'s [LightNetwork] on [Dispatchers.IO].
- * - In Phase 2 (`P2.1`/`P2.2`), `RelayHttpTransport` replaces this default implementation behind
- *   the exact same interface so OkHttp connection pooling, `EventListener` telemetry, and
- *   `"自动优化连接"` candidate-IP routing transparently power all repositories without modifying `:api`.
+ * All relay API actions route uniformly through [postSealedAction] (`POST /v2/api` sealed via
+ * `:api`'s `WK8-RNE-1` native envelope), while [getBytes] handles direct unauthenticated GETs
+ * (covers, illustrations, server notices, and direct-channel version metadata).
  */
 interface WenkuTransport {
     /**
-     * True when the compiled `:api` module provides a real relay/origin endpoint rather than
-     * `:api-stub`'s `"Unknown"` placeholder (and native JNI is available in the current runtime).
+     * True when the compiled `:api` module provides a real relay endpoint rather than
+     * `:api-stub`'s `"Unknown"` placeholder.
      */
     val isEndpointConfigured: Boolean
 
     /**
-     * Executes a form-encoded POST against [endpointUrl] with [formParams], returning the raw
-     * UTF-8/binary payload bytes on HTTP 200 or `null` when unreachable / unconfigured.
+     * Seals [rawActionQuery] (binding the active `PHPSESSID` cookie header if present) and POSTs
+     * the binary envelope to `/v2/api`.
+     *
+     * Audited read-only calls may pass `isIdempotentReadOnly = true` to permit at-most-once
+     * post-send fallback replay when a pinned candidate IP fails mid-flight. Every retry mints a
+     * fresh sealed envelope with a new nonce and timestamp.
      */
-    suspend fun postForm(endpointUrl: String, formParams: ContentValues): ByteArray?
-
-    /**
-     * Overload allowing audited read-only operations to opt into at-most-once post-send fallback
-     * replay when a pinned candidate route fails mid-flight. Unknown or mutating calls default to
-     * `isIdempotentReadOnly = false` (never replayed once `requestHeadersStart` has fired).
-     */
-    suspend fun postForm(
-        endpointUrl: String,
-        formParams: ContentValues,
-        isIdempotentReadOnly: Boolean,
-    ): ByteArray? = postForm(endpointUrl, formParams)
+    suspend fun postSealedAction(
+        rawActionQuery: String,
+        isIdempotentReadOnly: Boolean = false,
+    ): RelayPostResult
 
     /**
      * Fetches raw HTTP 200 payload bytes via GET (used for server notices, version checks, and
-     * account avatars) without attaching session cookies to third-party or CDN hosts.
+     * account avatars / cover images) without attaching session cookies to third-party or CDN hosts.
      */
     suspend fun getBytes(url: String): ByteArray? = null
 
@@ -50,56 +69,6 @@ interface WenkuTransport {
      * leaks a prior session token onto subsequent requests.
      */
     fun clearSessionCookie() {}
-}
-
-/**
- * Default Phase 1 transport backed by `:api`'s [LightNetwork.LightHttpPostConnection].
- *
- * Guards both `:api-stub`'s `"Unknown"` sentinel and host-JVM `UnsatisfiedLinkError` /
- * `NoClassDefFoundError` (when running Robolectric unit tests on Linux where Android Bionic
- * `libcpp.so` cannot be loaded) so unit and UI tests reach offline states cleanly without crashing.
- */
-class LegacyLightNetworkTransport(
-    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
-) : WenkuTransport {
-
-    override val isEndpointConfigured: Boolean
-        get() = try {
-            val baseUrl = Wenku8API.BASE_URL
-            !baseUrl.isNullOrBlank() && baseUrl != UNKNOWN_ENDPOINT_SENTINEL
-        } catch (_: LinkageError) {
-            false
-        }
-
-    override suspend fun postForm(endpointUrl: String, formParams: ContentValues): ByteArray? {
-        if (endpointUrl.isBlank() || endpointUrl == UNKNOWN_ENDPOINT_SENTINEL) {
-            return null
-        }
-        return withContext(ioDispatcher) {
-            try {
-                LightNetwork.LightHttpPostConnection(endpointUrl, formParams)
-            } catch (_: LinkageError) {
-                null
-            } catch (_: Exception) {
-                null
-            }
-        }
-    }
-
-    override suspend fun getBytes(url: String): ByteArray? {
-        if (url.isBlank() || url.equals(UNKNOWN_ENDPOINT_SENTINEL, ignoreCase = true)) {
-            return null
-        }
-        return withContext(ioDispatcher) {
-            try {
-                LightNetwork.LightHttpDownload(url)
-            } catch (_: LinkageError) {
-                null
-            } catch (_: Exception) {
-                null
-            }
-        }
-    }
 
     companion object {
         const val UNKNOWN_ENDPOINT_SENTINEL: String = "Unknown"

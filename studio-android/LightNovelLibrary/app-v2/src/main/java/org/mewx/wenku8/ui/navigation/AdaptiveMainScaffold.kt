@@ -134,6 +134,8 @@ import org.mewx.wenku8.ui.profile.ProfileSettingsSection
 import org.mewx.wenku8.ui.profile.ProfileSettingsSubscreen
 import org.mewx.wenku8.ui.profile.ReadingFootprintScreen
 import org.mewx.wenku8.ui.profile.ReadingFootprintTab
+import org.mewx.wenku8.ui.profile.ServerUpgradeRequiredDialog
+import org.mewx.wenku8.ui.profile.openPlayStoreListing
 import org.mewx.wenku8.ui.profile.openSafeBrowserUrl
 import org.mewx.wenku8.ui.reader.UnifiedReaderScreen
 import org.mewx.wenku8.ui.reviews.ReviewListScreen
@@ -1411,6 +1413,40 @@ fun AdaptiveMainScaffold(
                         onOpenDirectUpdateUrl(url)
                     } else {
                         openSafeBrowserUrl(scaffoldContext, url)
+                    }
+                },
+            )
+        }
+
+        if (activeScene !is ScaffoldSceneState.Reader &&
+            pendingAutoUpdatePrompt is AppUpdateAutoPrompt.RequiredUpgradeDialog &&
+            appUpdateCoordinator != null
+        ) {
+            ServerUpgradeRequiredDialog(
+                minVersionName = pendingAutoUpdatePrompt.minVersionName,
+                targetVersionCode = pendingAutoUpdatePrompt.targetVersionCode,
+                isPlayStoreChannel = pendingAutoUpdatePrompt.isPlayStoreChannel,
+                downloadPageUrl = pendingAutoUpdatePrompt.downloadPageUrl,
+                onDismiss = {
+                    scaffoldCoroutineScope.launch {
+                        appUpdateCoordinator.dismissAutoPrompt(suppressForThisVersion = false)
+                    }
+                },
+                onUpgradeAction = {
+                    scaffoldCoroutineScope.launch {
+                        appUpdateCoordinator.dismissAutoPrompt(suppressForThisVersion = false)
+                    }
+                    if (pendingAutoUpdatePrompt.isPlayStoreChannel) {
+                        openPlayStoreListing(scaffoldContext)
+                    } else {
+                        val url = pendingAutoUpdatePrompt.downloadPageUrl.orEmpty()
+                        if (url.isNotBlank()) {
+                            if (onOpenDirectUpdateUrl != null) {
+                                onOpenDirectUpdateUrl(url)
+                            } else {
+                                openSafeBrowserUrl(scaffoldContext, url)
+                            }
+                        }
                     }
                 },
             )

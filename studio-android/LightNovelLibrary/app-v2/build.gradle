@@ -18,9 +18,6 @@ android {
         targetSdkVersion rootProject.targetSdkVersion
         versionCode 104
         versionName "2.0.4"
-        // TODO(v2.0-release): Register "2.0" in :api (native-lib.cpp / TokenManager) and
-        // wenku8-relay (v1_crypto.ts ALLOWED_SECURE_PREFIXES), then update this from "1.31" to "2.0".
-        buildConfigField "String", "API_PROTOCOL_VERSION", "\"1.31\""
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -51,6 +48,9 @@ android {
             manifestPlaceholders = [ADMOB_APP_ID: "ca-app-pub-7333757578973883~9635263460"]
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
             ndk {
+                // Package full unstripped symbols in AAB BUNDLE-METADATA for Play Console
+                // crash symbolication while still shipping stripped .so binaries inside the APK.
+                debugSymbolLevel 'FULL'
                 abiFilters 'armeabi-v7a', 'arm64-v8a', 'x86', 'x86_64'
             }
         }

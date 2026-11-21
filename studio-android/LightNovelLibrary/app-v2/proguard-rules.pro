@@ -1,10 +1,7 @@
 # Wenku8 v2 (:app-v2) R8 / ProGuard rules
 -keepattributes SourceFile,LineNumberTable
 
-# Keep shared :api classes & enum names intact across reflection/JNI boundaries.
--keep class org.mewx.wenku8.api.** { *; }
--keep class org.mewx.wenku8.network.** { *; }
--keep class org.mewx.wenku8.service.** { *; }
+# Private :api JNI bridge keep rules are supplied exclusively by :api/consumer-rules.pro.
 
 # Keep Kotlinx Serialization runtime & generated serializers.
 -keep class kotlinx.serialization.** { *; }

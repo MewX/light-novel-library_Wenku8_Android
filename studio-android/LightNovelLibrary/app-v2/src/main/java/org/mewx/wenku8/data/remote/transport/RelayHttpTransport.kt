@@ -1,11 +1,15 @@
 package org.mewx.wenku8.data.remote.transport
 
-import android.content.ContentValues
 import android.os.SystemClock
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.intOrNull
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.longOrNull
 import okhttp3.Call
 import okhttp3.Callback
 import okhttp3.ConnectionPool
@@ -19,15 +23,14 @@ import okhttp3.Protocol
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.Response
+import org.mewx.wenku8.api.SealedRequest
 import org.mewx.wenku8.api.Wenku8API
-import org.mewx.wenku8.network.LightUserSession
 import org.mewx.wenku8.data.remote.diagnostics.DiagnosticsEndpointConfig
 import org.mewx.wenku8.data.remote.diagnostics.DiagnosticsEndpointResolution
 import org.mewx.wenku8.data.remote.diagnostics.OkHttpProbeTransport
 import java.io.BufferedInputStream
 import java.io.ByteArrayOutputStream
 import java.io.IOException
-import java.net.InetAddress
 import java.net.InetSocketAddress
 import java.net.Proxy
 import java.net.URI
@@ -53,8 +56,7 @@ data class ActiveRelayRoute(
 )
 
 /**
- * Narrow routing hook consumed by [RelayHttpTransport] (`P2.1`) and implemented by
- * `RelayRouteController` (`P2.2`).
+ * Narrow routing hook consumed by [RelayHttpTransport] and implemented by `RelayRouteController`.
  */
 interface RelayRouteProvider {
     fun currentRouteForHost(host: String): ActiveRelayRoute
@@ -89,8 +91,7 @@ object DefaultSystemDnsRouteProvider : RelayRouteProvider {
 }
 
 /**
- * Abstracts `LightUserSession` `PHPSESSID` cookie state so JVM `MockWebServer` tests run cleanly
- * while production requests stay 100% synchronized with `:api`'s [LightUserSession].
+ * Abstracts `PHPSESSID` session cookie state for sealed `/v2/api` requests.
  */
 interface WenkuSessionCookieStore {
     fun getPhpSessionId(): String
@@ -98,86 +99,66 @@ interface WenkuSessionCookieStore {
     fun clearPhpSessionId() {}
 }
 
-object NativeLightUserSessionCookieStore : WenkuSessionCookieStore {
-    /**
-     * `LightUserSession.setSession("")` ignores empty strings (`if (s != null && !s.isEmpty())`),
-     * so we track an explicit local clear flag on logout and only re-enable reading `PHPSESSID`
-     * once a fresh `Set-Cookie: PHPSESSID=...` arrives via [setPhpSessionId].
-     */
-    @Volatile
-    private var clearedLocally: Boolean = false
+/**
+ * Thread-safe, pure-Kotlin in-memory `PHPSESSID` store (never logs session tokens to logcat).
+ */
+class InMemorySessionCookieStore : WenkuSessionCookieStore {
+    private val lock = Any()
 
     @Volatile
-    private var localSessionOverride: String? = null
+    private var sessionId: String = ""
 
-    override fun getPhpSessionId(): String {
-        if (clearedLocally) return ""
-        localSessionOverride?.let { if (it.isNotEmpty()) return it }
-        return try {
-            LightUserSession.getSession().orEmpty()
-        } catch (_: LinkageError) {
-            ""
-        } catch (_: UnsupportedOperationException) {
-            ""
-        }
-    }
+    override fun getPhpSessionId(): String = sessionId
 
     override fun setPhpSessionId(sessionId: String) {
-        if (sessionId.isBlank()) return
-        clearedLocally = false
-        localSessionOverride = sessionId
-        try {
-            LightUserSession.setSession(sessionId)
-        } catch (_: LinkageError) {
-            // Ignored on host JVM without JNI
-        } catch (_: UnsupportedOperationException) {
-            // Ignored on api-stub
+        val trimmed = sessionId.trim()
+        if (trimmed.isEmpty()) return
+        synchronized(lock) {
+            this.sessionId = trimmed
         }
     }
 
     override fun clearPhpSessionId() {
-        clearedLocally = true
-        localSessionOverride = null
+        synchronized(lock) {
+            sessionId = ""
+        }
     }
 }
 
 /**
- * Production OkHttp 5 transport implementing [WenkuTransport] with dynamic candidate-IP routing
- * and automatic System-DNS fallback.
- *
- * ### Transport & Security Invariants
- * - **Full TLS SNI & Certificate Pinning to Relay Domain**:
- *   Even when [RelayRouteProvider] supplies a [PinnedRelayCandidate], the HTTP request URL and
- *   `Host` header remain `https://wenku8-relay.mewx.org/...` (or `wenku8-android.mewx.org`). Only
- *   the socket-level DNS lookup is overridden via `PinnedHostIpDns` (`InetAddress.getByAddress`),
- *   so TLS 1.3 SNI and X.509 certificate hostname verification are **never weakened**.
- * - **Per-Generation `ConnectionPool` & Warm HTTP/2 Handoff**:
- *   Maintains one dedicated `OkHttpClient` + `ConnectionPool` per route `generationId` (`fastFallback(true)`
- *   Happy Eyeballs on Default System DNS; `fastFallback(false)` + value-equal `PinnedHostIpDns` on
- *   pinned candidate routes so warm HTTP/2 sockets validated by `RelayRouteController` are reused
- *   without an extra TCP+TLS handshake) and safely evicts retired pools once in-flight calls finish.
- * - **Safe Pre-Send Automatic Fallback vs Post-Send Non-Replay**:
- *   Tracks exact byte transmission via `EventListener.requestHeadersStart`:
- *   1. If a pinned candidate IP fails *before* any HTTP request bytes leave the device (TCP connect
- *      timeout, RST, or TLS handshake failure), calls [RelayRouteProvider.fallbackRouteAfterCandidateFailure]
- *      (`failureBeforeSend = true`) to quarantine the broken IP and **transparently retries once**
- *      on Default System DNS within the remaining `10s` total POST deadline.
- *   2. If a failure occurs *after* request headers started transmitting (`failureBeforeSend = false`),
- *      revokes the pinned route for future calls without replaying potentially non-idempotent POST
- *      actions (such as login, bookshelf mutation, or review posting).
- * - **Legacy Wire & Session Compatibility**:
- *   Preserves `LightNetwork.LightHttpPostConnection`'s exact `&k=v` form encoding, transparent gzip
- *   handling, and `PHPSESSID` synchronization with `:api`'s [LightUserSession].
+ * Production OkHttp 5 transport implementing [WenkuTransport] with `WK8-RNE-1` per-attempt request
+ * sealing, dynamic candidate-IP routing, automatic System-DNS fallback, bounded `401 CLOCK_SKEW`
+ * self-healing, and `426 Upgrade Required` / `X-WK8-Update-Hint` signaling.
  */
 class RelayHttpTransport(
     private val baseOkHttpClient: OkHttpClient = OkHttpProbeTransport.defaultSharedBaseOkHttpClient(),
     private val routeProvider: RelayRouteProvider = DefaultSystemDnsRouteProvider,
-    private val sessionCookieStore: WenkuSessionCookieStore = NativeLightUserSessionCookieStore,
+    private val sessionCookieStore: WenkuSessionCookieStore = InMemorySessionCookieStore(),
     private val systemDns: Dns = Dns.SYSTEM,
     private val endpointConfiguredResolver: () -> Boolean = {
         DiagnosticsEndpointConfig.resolveFromCompiledApi() is DiagnosticsEndpointResolution.Available
     },
     private val allowedRelayHostsProvider: () -> Set<String> = { defaultAllowedRelayHosts() },
+    private val requestSealer: (rawActionQuery: String, exactCookieHeader: String?) -> SealedRequest? = { action, cookie ->
+        try {
+            Wenku8API.sealV2Request(action, cookie)
+        } catch (_: LinkageError) {
+            null
+        } catch (_: UnsupportedOperationException) {
+            null
+        }
+    },
+    private val serverClockOffsetUpdater: (Long) -> Unit = { serverTimeMs ->
+        try {
+            Wenku8API.updateServerClockOffset(serverTimeMs)
+        } catch (_: LinkageError) {
+            // Ignored on host JVM without JNI
+        } catch (_: UnsupportedOperationException) {
+            // Ignored on api-stub
+        }
+    },
+    private val onUpgradeRequired: (minVersionCode: Int?, minVersionName: String?) -> Unit = { _, _ -> },
+    private val onSoftUpdateHint: (minVersionCode: Int?) -> Unit = {},
     private val monotonicClockMillis: () -> Long = { SystemClock.elapsedRealtime() },
     private val connectTimeoutMillis: Long = 3_000L,
     private val readTimeoutMillis: Long = 5_000L,
@@ -186,8 +167,11 @@ class RelayHttpTransport(
 ) : WenkuTransport {
 
     companion object {
-        private val FORM_MEDIA_TYPE = "application/x-www-form-urlencoded".toMediaType()
         private const val MIN_REMAINING_BUDGET_FOR_FALLBACK_MS: Long = 350L
+        private const val MAX_CONTROL_JSON_BYTES: Int = 4096
+        private const val HEADER_UPDATE_HINT = "X-WK8-Update-Hint"
+        private const val HEADER_MIN_VERSION = "X-WK8-Min-Version"
+        private val lenientJson = Json { ignoreUnknownKeys = true }
 
         /**
          * Returns `true` when [host] belongs to Wenku8's direct website / image CDN origins
@@ -214,24 +198,12 @@ class RelayHttpTransport(
                 null
             }
             return buildSet {
-                add("wenku8-relay.mewx.org")
                 add("wenku8-android.mewx.org")
+                add("wenku8-relay.mewx.org")
                 if (!dynamicHost.isNullOrBlank() && !isDirectWenkuOriginOrCdnHost(dynamicHost)) {
                     add(dynamicHost)
                 }
             }
-        }
-
-        internal fun encodeFormBodyBytes(values: ContentValues): ByteArray {
-            // Preserves LightNetwork.LightHttpPostConnection's exact `&k1=v1&k2=v2` wire format.
-            val sb = StringBuilder()
-            for (key in values.keySet()) {
-                val rawVal = values.get(key)
-                if (rawVal is String) {
-                    sb.append('&').append(key).append('=').append(rawVal)
-                }
-            }
-            return sb.toString().toByteArray(StandardCharsets.UTF_8)
         }
 
         internal fun extractPhpSessionId(setCookieHeaders: List<String>): String? {
@@ -251,6 +223,32 @@ class RelayHttpTransport(
                 }
             }
             return null
+        }
+
+        internal fun parseClockSkewServerTimeMs(rawBody: String): Long? {
+            val trimmed = rawBody.trim()
+            if (trimmed.isEmpty() || !trimmed.startsWith("{")) return null
+            return try {
+                val obj = lenientJson.parseToJsonElement(trimmed).jsonObject
+                val error = obj["error"]?.jsonPrimitive?.content
+                if (error != "CLOCK_SKEW") return null
+                obj["serverTimeMs"]?.jsonPrimitive?.longOrNull?.takeIf { it > 0L }
+            } catch (_: Exception) {
+                null
+            }
+        }
+
+        internal fun parseUpgradeRequiredPayload(rawBody: String): Pair<Int?, String?> {
+            val trimmed = rawBody.trim()
+            if (trimmed.isEmpty() || !trimmed.startsWith("{")) return null to null
+            return try {
+                val obj = lenientJson.parseToJsonElement(trimmed).jsonObject
+                val minCode = obj["minVersionCode"]?.jsonPrimitive?.intOrNull?.takeIf { it > 0 }
+                val minName = obj["minVersionName"]?.jsonPrimitive?.content?.trim()?.takeIf { it.isNotEmpty() }
+                minCode to minName
+            } catch (_: Exception) {
+                null to null
+            }
         }
     }
 
@@ -287,39 +285,29 @@ class RelayHttpTransport(
     override val isEndpointConfigured: Boolean
         get() = endpointConfiguredResolver()
 
-    override suspend fun postForm(endpointUrl: String, formParams: ContentValues): ByteArray? {
-        return postForm(
-            endpointUrl = endpointUrl,
-            formParams = formParams,
-            isIdempotentReadOnly = false,
-        )
-    }
-
-    override suspend fun postForm(
-        endpointUrl: String,
-        formParams: ContentValues,
+    override suspend fun postSealedAction(
+        rawActionQuery: String,
         isIdempotentReadOnly: Boolean,
-    ): ByteArray? {
-        if (endpointUrl.isBlank() ||
-            endpointUrl.equals(LegacyLightNetworkTransport.UNKNOWN_ENDPOINT_SENTINEL, ignoreCase = true)
-        ) {
-            return null
+    ): RelayPostResult {
+        if (rawActionQuery.isBlank()) {
+            return RelayPostResult.NetworkFailure("empty_action_query")
         }
 
-        val targetHost = try {
-            URI(endpointUrl).host?.trim()?.trimEnd('.')?.lowercase(Locale.ROOT)
-        } catch (_: Exception) {
-            null
-        } ?: return null
-
-        val requestBodyBytes = encodeFormBodyBytes(formParams)
         val overallStartedAtMs = monotonicClockMillis()
-        val isScopedRelayHost =
-            !isDirectWenkuOriginOrCdnHost(targetHost) && allowedRelayHostsProvider().contains(targetHost)
-
         routeProvider.onForegroundCallStarted()
         return try {
             withContext(ioDispatcher) {
+                val firstSealed = sealForCurrentSession(rawActionQuery)
+                    ?: return@withContext RelayPostResult.NetworkFailure("sealing_unavailable")
+
+                val targetHost = try {
+                    URI(firstSealed.endpointUrl).host?.trim()?.trimEnd('.')?.lowercase(Locale.ROOT)
+                } catch (_: Exception) {
+                    null
+                } ?: return@withContext RelayPostResult.NetworkFailure("invalid_endpoint_host")
+
+                val isScopedRelayHost =
+                    !isDirectWenkuOriginOrCdnHost(targetHost) && allowedRelayHostsProvider().contains(targetHost)
                 val initialRoute = if (isScopedRelayHost) {
                     routeProvider.currentRouteForHost(targetHost)
                 } else {
@@ -327,61 +315,135 @@ class RelayHttpTransport(
                 }
 
                 val firstAttempt = executeSingleAttempt(
-                    endpointUrl = endpointUrl,
-                    requestBodyBytes = requestBodyBytes,
+                    sealedPair = firstSealed,
                     route = initialRoute,
                     remainingCallBudgetMs = totalPostDeadlineMillis,
                 )
 
                 when (firstAttempt) {
-                    is AttemptOutcome.HttpSuccess -> firstAttempt.bodyBytes
+                    is AttemptOutcome.HttpSuccess -> RelayPostResult.Success(firstAttempt.bodyBytes)
 
-                    is AttemptOutcome.HttpNon200 -> {
-                        // Never rotate candidate IPs or replay on HTTP 4xx/5xx/429!
-                        null
+                    is AttemptOutcome.HttpUpgradeRequired -> {
+                        onUpgradeRequired(firstAttempt.minVersionCode, firstAttempt.minVersionName)
+                        RelayPostResult.UpgradeRequired(
+                            minVersionCode = firstAttempt.minVersionCode,
+                            minVersionName = firstAttempt.minVersionName,
+                        )
                     }
+
+                    is AttemptOutcome.HttpClockSkew -> {
+                        serverClockOffsetUpdater(firstAttempt.serverTimeMs)
+                        val remainingMs = remainingBudgetMs(overallStartedAtMs)
+                        if (remainingMs < MIN_REMAINING_BUDGET_FOR_FALLBACK_MS) {
+                            return@withContext RelayPostResult.AuthRejected
+                        }
+                        // Re-seal with updated server clock offset + fresh random nonce.
+                        val clockRetrySealed = sealForCurrentSession(rawActionQuery)
+                            ?: return@withContext RelayPostResult.NetworkFailure("sealing_unavailable")
+                        val retryAttempt = executeSingleAttempt(
+                            sealedPair = clockRetrySealed,
+                            route = initialRoute,
+                            remainingCallBudgetMs = remainingMs,
+                        )
+                        mapTerminalAttemptOutcome(retryAttempt)
+                    }
+
+                    AttemptOutcome.HttpAuthRejected -> RelayPostResult.AuthRejected
+                    AttemptOutcome.HttpRateLimited -> RelayPostResult.RateLimited
+                    is AttemptOutcome.HttpNon200 -> RelayPostResult.NetworkFailure("http_${firstAttempt.statusCode}")
 
                     is AttemptOutcome.TransportFailure -> {
                         val failedCandidate = initialRoute.pinnedCandidate
-                        if (failedCandidate == null) {
-                            return@withContext null
-                        }
+                            ?: return@withContext RelayPostResult.NetworkFailure(firstAttempt.cause.message)
 
-                        // Notify RelayRouteController to revoke/quarantine the broken candidate.
                         val fallbackRoute = routeProvider.fallbackRouteAfterCandidateFailure(
                             failedGenerationId = initialRoute.generationId,
                             failedCandidateId = failedCandidate.candidateId,
                             failureBeforeSend = !firstAttempt.didStartSendingRequest,
                         )
 
-                        // Replay policy:
-                        // - Pre-send failure (`!didStartSendingRequest`): safe to fall back once for ALL calls.
-                        // - Post-send failure (`didStartSendingRequest`): replay once ONLY if `isIdempotentReadOnly`.
                         val mayFallbackInSameCall =
                             !firstAttempt.didStartSendingRequest || isIdempotentReadOnly
                         if (!mayFallbackInSameCall) {
-                            return@withContext null
+                            return@withContext RelayPostResult.NetworkFailure(firstAttempt.cause.message)
                         }
 
-                        val elapsedMs = (monotonicClockMillis() - overallStartedAtMs).coerceAtLeast(0L)
-                        val remainingMs = totalPostDeadlineMillis - elapsedMs
+                        val remainingMs = remainingBudgetMs(overallStartedAtMs)
                         if (remainingMs < MIN_REMAINING_BUDGET_FOR_FALLBACK_MS) {
-                            return@withContext null
+                            return@withContext RelayPostResult.NetworkFailure("deadline_exhausted")
                         }
+
+                        // Always mint a fresh sealed envelope (new nonce & timestamp) for fallback retry!
+                        val fallbackSealed = sealForCurrentSession(rawActionQuery)
+                            ?: return@withContext RelayPostResult.NetworkFailure("sealing_unavailable")
 
                         val secondAttempt = executeSingleAttempt(
-                            endpointUrl = endpointUrl,
-                            requestBodyBytes = requestBodyBytes,
+                            sealedPair = fallbackSealed,
                             route = fallbackRoute,
                             remainingCallBudgetMs = remainingMs,
                         )
-                        (secondAttempt as? AttemptOutcome.HttpSuccess)?.bodyBytes
+                        if (secondAttempt is AttemptOutcome.HttpClockSkew) {
+                            serverClockOffsetUpdater(secondAttempt.serverTimeMs)
+                            val retryRemainingMs = remainingBudgetMs(overallStartedAtMs)
+                            if (retryRemainingMs >= MIN_REMAINING_BUDGET_FOR_FALLBACK_MS) {
+                                val clockRetrySealed = sealForCurrentSession(rawActionQuery)
+                                    ?: return@withContext RelayPostResult.NetworkFailure("sealing_unavailable")
+                                return@withContext mapTerminalAttemptOutcome(
+                                    executeSingleAttempt(
+                                        sealedPair = clockRetrySealed,
+                                        route = fallbackRoute,
+                                        remainingCallBudgetMs = retryRemainingMs,
+                                    ),
+                                )
+                            }
+                        }
+                        mapTerminalAttemptOutcome(secondAttempt)
                     }
                 }
             }
         } finally {
             routeProvider.onForegroundCallFinished()
         }
+    }
+
+    private fun remainingBudgetMs(overallStartedAtMs: Long): Long {
+        val elapsedMs = (monotonicClockMillis() - overallStartedAtMs).coerceAtLeast(0L)
+        return totalPostDeadlineMillis - elapsedMs
+    }
+
+    private fun mapTerminalAttemptOutcome(outcome: AttemptOutcome): RelayPostResult {
+        return when (outcome) {
+            is AttemptOutcome.HttpSuccess -> RelayPostResult.Success(outcome.bodyBytes)
+            is AttemptOutcome.HttpUpgradeRequired -> {
+                onUpgradeRequired(outcome.minVersionCode, outcome.minVersionName)
+                RelayPostResult.UpgradeRequired(outcome.minVersionCode, outcome.minVersionName)
+            }
+            is AttemptOutcome.HttpClockSkew,
+            AttemptOutcome.HttpAuthRejected,
+            -> RelayPostResult.AuthRejected
+            AttemptOutcome.HttpRateLimited -> RelayPostResult.RateLimited
+            is AttemptOutcome.HttpNon200 -> RelayPostResult.NetworkFailure("http_${outcome.statusCode}")
+            is AttemptOutcome.TransportFailure -> RelayPostResult.NetworkFailure(outcome.cause.message)
+        }
+    }
+
+    private data class SealedAttemptPayload(
+        val sealedRequest: SealedRequest,
+        val exactCookieHeader: String?,
+    ) {
+        val endpointUrl: String get() = sealedRequest.endpointUrl
+    }
+
+    private fun sealForCurrentSession(rawActionQuery: String): SealedAttemptPayload? {
+        val sessionId = sessionCookieStore.getPhpSessionId()
+        val exactCookieHeader = if (sessionId.isNotEmpty()) "PHPSESSID=$sessionId" else null
+        val sealed = requestSealer(rawActionQuery, exactCookieHeader) ?: return null
+        if (sealed.endpointUrl.isBlank() ||
+            sealed.endpointUrl.equals(WenkuTransport.UNKNOWN_ENDPOINT_SENTINEL, ignoreCase = true)
+        ) {
+            return null
+        }
+        return SealedAttemptPayload(sealedRequest = sealed, exactCookieHeader = exactCookieHeader)
     }
 
     private val cookieFreeGetClient: OkHttpClient by lazy {
@@ -397,7 +459,7 @@ class RelayHttpTransport(
     override suspend fun getBytes(url: String): ByteArray? {
         val trimmed = url.trim()
         if (trimmed.isEmpty() ||
-            trimmed.equals(LegacyLightNetworkTransport.UNKNOWN_ENDPOINT_SENTINEL, ignoreCase = true)
+            trimmed.equals(WenkuTransport.UNKNOWN_ENDPOINT_SENTINEL, ignoreCase = true)
         ) {
             return null
         }
@@ -436,6 +498,13 @@ class RelayHttpTransport(
 
     private sealed interface AttemptOutcome {
         data class HttpSuccess(val bodyBytes: ByteArray) : AttemptOutcome
+        data class HttpUpgradeRequired(
+            val minVersionCode: Int?,
+            val minVersionName: String?,
+        ) : AttemptOutcome
+        data class HttpClockSkew(val serverTimeMs: Long) : AttemptOutcome
+        data object HttpAuthRejected : AttemptOutcome
+        data object HttpRateLimited : AttemptOutcome
         data class HttpNon200(val statusCode: Int) : AttemptOutcome
         data class TransportFailure(
             val didStartSendingRequest: Boolean,
@@ -444,8 +513,7 @@ class RelayHttpTransport(
     }
 
     private suspend fun executeSingleAttempt(
-        endpointUrl: String,
-        requestBodyBytes: ByteArray,
+        sealedPair: SealedAttemptPayload,
         route: ActiveRelayRoute,
         remainingCallBudgetMs: Long,
     ): AttemptOutcome {
@@ -458,43 +526,63 @@ class RelayHttpTransport(
             .eventListener(boundaryTracker)
             .build()
 
+        val sealed = sealedPair.sealedRequest
         val requestBuilder = Request.Builder()
-            .url(endpointUrl)
+            .url(sealed.endpointUrl)
             .header("Accept-Encoding", "gzip")
-            .post(requestBodyBytes.toRequestBody(FORM_MEDIA_TYPE))
+            .post(sealed.body.toRequestBody(sealed.contentType.toMediaType()))
 
-        val sessionId = sessionCookieStore.getPhpSessionId()
-        if (sessionId.isNotEmpty()) {
-            requestBuilder.header("Cookie", "PHPSESSID=$sessionId")
+        for ((headerName, headerValue) in sealed.headers) {
+            requestBuilder.header(headerName, headerValue)
+        }
+        sealedPair.exactCookieHeader?.let { cookieHeader ->
+            requestBuilder.header("Cookie", cookieHeader)
         }
 
         val call = perAttemptClient.newCall(requestBuilder.build())
         try {
             val response = awaitCall(call)
             response.use { httpResponse ->
-                // Sync updated PHPSESSID session cookie back to LightUserSession
                 extractPhpSessionId(httpResponse.headers("Set-Cookie"))?.let { updatedSession ->
                     sessionCookieStore.setPhpSessionId(updatedSession)
                 }
 
-                if (httpResponse.code != 200) {
-                    routeProvider.onPassiveCallCompleted(
-                        generationId = route.generationId,
-                        candidateId = route.pinnedCandidate?.candidateId,
-                        succeeded = true,
-                        connectionSetupMs = boundaryTracker.connectSetupDurationMs,
-                    )
-                    return AttemptOutcome.HttpNon200(httpResponse.code)
-                }
-
-                val payloadBytes = readDecodedResponseBytes(httpResponse)
                 routeProvider.onPassiveCallCompleted(
                     generationId = route.generationId,
                     candidateId = route.pinnedCandidate?.candidateId,
                     succeeded = true,
                     connectionSetupMs = boundaryTracker.connectSetupDurationMs,
                 )
-                return AttemptOutcome.HttpSuccess(payloadBytes)
+
+                return when (httpResponse.code) {
+                    200 -> {
+                        if (httpResponse.header(HEADER_UPDATE_HINT)?.trim() == "1") {
+                            val hintMinVersion = httpResponse.header(HEADER_MIN_VERSION)?.trim()?.toIntOrNull()
+                            onSoftUpdateHint(hintMinVersion)
+                        }
+                        AttemptOutcome.HttpSuccess(readDecodedResponseBytes(httpResponse))
+                    }
+
+                    426 -> {
+                        val controlBody = readBoundedControlBody(httpResponse)
+                        val (minCode, minName) = parseUpgradeRequiredPayload(controlBody)
+                        AttemptOutcome.HttpUpgradeRequired(minCode, minName)
+                    }
+
+                    401 -> {
+                        val controlBody = readBoundedControlBody(httpResponse)
+                        val serverTimeMs = parseClockSkewServerTimeMs(controlBody)
+                        if (serverTimeMs != null) {
+                            AttemptOutcome.HttpClockSkew(serverTimeMs)
+                        } else {
+                            AttemptOutcome.HttpAuthRejected
+                        }
+                    }
+
+                    403 -> AttemptOutcome.HttpAuthRejected
+                    429 -> AttemptOutcome.HttpRateLimited
+                    else -> AttemptOutcome.HttpNon200(httpResponse.code)
+                }
             }
         } catch (cancelled: kotlinx.coroutines.CancellationException) {
             OkHttpProbeTransport.cancelCallSafely(call, baseOkHttpClient.dispatcher.executorService)
@@ -513,6 +601,15 @@ class RelayHttpTransport(
         } finally {
             entry.release()
             cleanupRetiredPools()
+        }
+    }
+
+    private fun readBoundedControlBody(response: Response): String {
+        return try {
+            val bytes = readDecodedResponseBytes(response, maxBytes = MAX_CONTROL_JSON_BYTES)
+            String(bytes, StandardCharsets.UTF_8)
+        } catch (_: Exception) {
+            ""
         }
     }
 
@@ -550,8 +647,9 @@ class RelayHttpTransport(
                 .protocols(listOf(Protocol.HTTP_2, Protocol.HTTP_1_1))
                 .fastFallback(pinned == null)
                 .retryOnConnectionFailure(false)
-                .followRedirects(pinned == null)
-                .followSslRedirects(pinned == null)
+                // Never follow HTTP redirects on sealed /v2/api POSTs (prevents Cookie/envelope exfiltration).
+                .followRedirects(false)
+                .followSslRedirects(false)
                 .connectTimeout(connectTimeoutMillis, TimeUnit.MILLISECONDS)
                 .readTimeout(readTimeoutMillis, TimeUnit.MILLISECONDS)
                 .writeTimeout(readTimeoutMillis, TimeUnit.MILLISECONDS)
@@ -582,7 +680,7 @@ class RelayHttpTransport(
         }
     }
 
-    private fun readDecodedResponseBytes(response: Response): ByteArray {
+    private fun readDecodedResponseBytes(response: Response, maxBytes: Int = Int.MAX_VALUE): ByteArray {
         val contentEncoding = response.header("Content-Encoding")?.lowercase(Locale.ROOT).orEmpty()
         val rawStream = response.body.byteStream()
         val effectiveStream = if (contentEncoding.contains("gzip")) {
@@ -600,10 +698,13 @@ class RelayHttpTransport(
         effectiveStream.use { input ->
             val out = ByteArrayOutputStream()
             val buffer = ByteArray(4096)
-            while (true) {
-                val read = input.read(buffer)
+            var total = 0
+            while (total < maxBytes) {
+                val toRead = minOf(buffer.size, maxBytes - total)
+                val read = input.read(buffer, 0, toRead)
                 if (read == -1) break
                 out.write(buffer, 0, read)
+                total += read
             }
             return out.toByteArray()
         }

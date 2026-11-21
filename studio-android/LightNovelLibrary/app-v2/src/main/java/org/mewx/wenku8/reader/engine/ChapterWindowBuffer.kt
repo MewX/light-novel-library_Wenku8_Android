@@ -951,6 +951,20 @@ class ChapterWindowBuffer(
                 ),
             )
 
+            is WenkuApiResult.UpgradeRequired -> Result.failure(
+                ChapterLoadFailureException(
+                    kind = ChapterLoadErrorKind.SERVER_ERROR,
+                    message = "当前应用版本过旧，请更新后再加载在线章节（已缓存章节仍可离线阅读）",
+                ),
+            )
+
+            WenkuApiResult.AuthRejected -> Result.failure(
+                ChapterLoadFailureException(
+                    kind = ChapterLoadErrorKind.SERVER_ERROR,
+                    message = "服务器校验失败 (403)",
+                ),
+            )
+
             is WenkuApiResult.NetworkError -> Result.failure(
                 ChapterLoadFailureException(
                     kind = ChapterLoadErrorKind.NETWORK_UNAVAILABLE,

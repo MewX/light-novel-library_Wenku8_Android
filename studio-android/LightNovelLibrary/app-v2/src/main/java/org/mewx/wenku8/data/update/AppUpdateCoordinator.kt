@@ -63,6 +63,19 @@ sealed interface AppUpdateAutoPrompt {
         override val targetVersionCode: Int,
         val downloadPageUrl: String,
     ) : AppUpdateAutoPrompt
+
+    /**
+     * Triggered when the relay responds with HTTP `426 Upgrade Required` (`SCHEME_RETIRED` or
+     * `VERSION_TOO_OLD`). Surfaces a channel-aware upgrade prompt without interrupting offline
+     * reading of already-downloaded books.
+     */
+    data class RequiredUpgradeDialog(
+        val currentVersionCode: Int,
+        override val targetVersionCode: Int,
+        val minVersionName: String? = null,
+        val isPlayStoreChannel: Boolean,
+        val downloadPageUrl: String? = null,
+    ) : AppUpdateAutoPrompt
 }
 
 /**
@@ -115,6 +128,16 @@ interface AppUpdateCoordinator {
      * Clears the Profile navigation badge once the user visits the Profile tab.
      */
     fun clearProfileUpdateBadge()
+
+    /**
+     * Called when `/v2/api` returns HTTP `426 Upgrade Required` (`SCHEME_RETIRED` / `VERSION_TOO_OLD`).
+     */
+    fun onServerUpgradeRequired(minVersionCode: Int?, minVersionName: String?) {}
+
+    /**
+     * Called when `/v2/api` returns `X-WK8-Update-Hint: 1` (deprecated encryption scheme).
+     */
+    fun onServerUpdateHint(minVersionCode: Int?) {}
 
     /**
      * Releases any platform listeners attached to the underlying update manager.

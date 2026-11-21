@@ -524,6 +524,12 @@ class BookshelfRepository(
                 var rawCloudEntries = when (cloudResult) {
                     is WenkuApiResult.Success -> cloudResult.data
                     WenkuApiResult.ApiNotConfigured -> return@withContext CloudBookshelfSyncOutcome.ApiNotConfigured
+                    is WenkuApiResult.UpgradeRequired -> {
+                        return@withContext CloudBookshelfSyncOutcome.NetworkOrServerError(debugDetail = "upgrade_required")
+                    }
+                    WenkuApiResult.AuthRejected -> {
+                        return@withContext CloudBookshelfSyncOutcome.NetworkOrServerError(debugDetail = "auth_rejected")
+                    }
                     is WenkuApiResult.ServerErrorCode -> {
                         return@withContext if (cloudResult.numericCode == SERVER_CODE_NOT_LOGGED_IN) {
                             CloudBookshelfSyncOutcome.NotLoggedIn
@@ -558,6 +564,14 @@ class BookshelfRepository(
 
                         WenkuApiResult.ApiNotConfigured -> {
                             // Unimplemented on minimal unit-test fakes -> trust `fetchCloudBookshelf`.
+                        }
+
+                        is WenkuApiResult.UpgradeRequired -> {
+                            return@withContext CloudBookshelfSyncOutcome.NetworkOrServerError(debugDetail = "upgrade_required")
+                        }
+
+                        WenkuApiResult.AuthRejected -> {
+                            return@withContext CloudBookshelfSyncOutcome.NetworkOrServerError(debugDetail = "auth_rejected")
                         }
 
                         is WenkuApiResult.ServerErrorCode -> {

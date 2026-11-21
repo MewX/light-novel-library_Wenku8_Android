@@ -665,6 +665,8 @@ class DiscoveryRepository(
     private fun WenkuApiResult<*>.toFeedError(): Pair<DiscoveryFeedErrorKind, Int?> {
         return when (this) {
             is WenkuApiResult.ApiNotConfigured -> DiscoveryFeedErrorKind.API_NOT_CONFIGURED to null
+            is WenkuApiResult.UpgradeRequired -> DiscoveryFeedErrorKind.SERVER_ERROR to 426
+            WenkuApiResult.AuthRejected -> DiscoveryFeedErrorKind.SERVER_ERROR to 403
             is WenkuApiResult.NetworkError -> DiscoveryFeedErrorKind.NETWORK_UNREACHABLE to null
             is WenkuApiResult.ServerErrorCode -> DiscoveryFeedErrorKind.SERVER_ERROR to numericCode
             WenkuApiResult.EmptyResponse,

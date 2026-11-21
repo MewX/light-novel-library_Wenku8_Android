@@ -137,6 +137,7 @@ object ProfileAccountTestTags {
 
     const val CHECK_UPDATE_BUTTON = "profile_check_update_button"
     const val UPDATE_AVAILABLE_DIALOG = "profile_update_available_dialog"
+    const val UPDATE_REQUIRED_DIALOG = "profile_update_required_dialog"
     const val UPDATE_RESTART_INSTALL_BUTTON = "profile_update_restart_install"
     const val UPDATE_PLAY_FALLBACK_BUTTON = "profile_update_play_fallback"
     const val UPDATE_DOWNLOAD_PROGRESS = "profile_update_download_progress"
@@ -1519,6 +1520,53 @@ fun DirectUpdateAvailableDialog(
         dismissButton = {
             TextButton(onClick = onDismiss) {
                 Text(text = dismissLabel)
+            }
+        },
+    )
+}
+
+/**
+ * Channel-aware dialog surfaced when `/v2/api` returns HTTP `426 Upgrade Required`
+ * (`SCHEME_RETIRED` or `VERSION_TOO_OLD`). Preserves offline reading via the dismiss button.
+ */
+@Composable
+fun ServerUpgradeRequiredDialog(
+    minVersionName: String?,
+    targetVersionCode: Int,
+    isPlayStoreChannel: Boolean,
+    downloadPageUrl: String?,
+    onDismiss: () -> Unit,
+    onUpgradeAction: () -> Unit,
+) {
+    val versionLabel = minVersionName?.takeIf { it.isNotBlank() }
+        ?: if (targetVersionCode > 0) "Build $targetVersionCode" else null
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        modifier = Modifier.testTag(ProfileAccountTestTags.UPDATE_REQUIRED_DIALOG),
+        title = { Text(text = stringResource(R.string.update_required_title)) },
+        text = {
+            Text(
+                text = if (versionLabel != null) {
+                    stringResource(R.string.update_required_body_with_version_format, versionLabel)
+                } else {
+                    stringResource(R.string.update_required_body_generic)
+                },
+            )
+        },
+        confirmButton = {
+            Button(onClick = onUpgradeAction) {
+                Text(
+                    text = if (isPlayStoreChannel) {
+                        stringResource(R.string.update_action_open_play_store)
+                    } else {
+                        stringResource(R.string.update_action_download)
+                    },
+                )
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(text = stringResource(R.string.update_required_continue_offline))
             }
         },
     )

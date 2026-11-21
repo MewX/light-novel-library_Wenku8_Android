@@ -246,6 +246,33 @@ class PlayStoreAppUpdateCoordinator(
         _showProfileUpdateBadge.value = false
     }
 
+    override fun onServerUpgradeRequired(minVersionCode: Int?, minVersionName: String?) {
+        val targetCode = (minVersionCode ?: (currentVersionCode + 1)).coerceAtLeast(currentVersionCode + 1)
+        _showProfileUpdateBadge.value = true
+        val current = _uiState.value
+        if (current !is AppUpdateUiState.Downloading && current !is AppUpdateUiState.ReadyToInstall) {
+            _uiState.value = AppUpdateUiState.UpdateAvailable(
+                currentVersionCode = currentVersionCode,
+                targetVersionCode = targetCode,
+                isPlayStoreManaged = true,
+                downloadPageUrl = null,
+            )
+        }
+        if (_pendingAutoPrompt.value !is AppUpdateAutoPrompt.RequiredUpgradeDialog) {
+            _pendingAutoPrompt.value = AppUpdateAutoPrompt.RequiredUpgradeDialog(
+                currentVersionCode = currentVersionCode,
+                targetVersionCode = targetCode,
+                minVersionName = minVersionName,
+                isPlayStoreChannel = true,
+                downloadPageUrl = null,
+            )
+        }
+    }
+
+    override fun onServerUpdateHint(minVersionCode: Int?) {
+        _showProfileUpdateBadge.value = true
+    }
+
     override fun dispose() {
         unregisterInstallListenerIfNeeded()
         cachedAppUpdateInfo = null

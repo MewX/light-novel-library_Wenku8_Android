@@ -213,6 +213,8 @@ class ReviewsRepository(
                 )
             }
             WenkuApiResult.ApiNotConfigured -> WenkuApiResult.ApiNotConfigured
+            is WenkuApiResult.UpgradeRequired -> result
+            WenkuApiResult.AuthRejected -> WenkuApiResult.AuthRejected
             is WenkuApiResult.NetworkError -> result
             is WenkuApiResult.ServerErrorCode -> result
             WenkuApiResult.EmptyResponse -> WenkuApiResult.EmptyResponse
@@ -251,6 +253,8 @@ class ReviewsRepository(
                 )
             }
             WenkuApiResult.ApiNotConfigured -> WenkuApiResult.ApiNotConfigured
+            is WenkuApiResult.UpgradeRequired -> result
+            WenkuApiResult.AuthRejected -> WenkuApiResult.AuthRejected
             is WenkuApiResult.NetworkError -> result
             is WenkuApiResult.ServerErrorCode -> result
             WenkuApiResult.EmptyResponse -> WenkuApiResult.EmptyResponse
@@ -447,6 +451,14 @@ class ReviewsRepository(
             }
 
             WenkuApiResult.ApiNotConfigured -> ReviewSubmitOutcome.ApiNotConfigured
+
+            is WenkuApiResult.UpgradeRequired -> {
+                ReviewSubmitOutcome.NetworkOrServerError(debugDetail = "upgrade_required")
+            }
+
+            WenkuApiResult.AuthRejected -> {
+                ReviewSubmitOutcome.NetworkOrServerError(debugDetail = "auth_rejected")
+            }
 
             is WenkuApiResult.ServerErrorCode -> when (result.numericCode) {
                 SERVER_CODE_NOT_LOGGED_IN -> ReviewSubmitOutcome.NotLoggedIn

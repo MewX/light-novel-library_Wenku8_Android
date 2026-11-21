@@ -24,9 +24,16 @@ class Wenku8V2Application : Application(), SingletonImageLoader.Factory {
     override fun onCreate() {
         super.onCreate()
         try {
-            Wenku8API.AppVer = BuildConfig.API_PROTOCOL_VERSION
+            Wenku8API.initCrypto(
+                this,
+                BuildConfig.VERSION_CODE,
+                BuildConfig.DISTRIBUTION_CHANNEL,
+                BuildConfig.DEBUG,
+            )
         } catch (_: LinkageError) {
             // Host-JVM Robolectric tests do not load Android Bionic JNI libraries.
+        } catch (_: UnsupportedOperationException) {
+            // Open-source :api-stub builds do not include private crypto.
         }
         appContainer = AppContainer(this)
         appContainer.triggerAutomaticInternalMigrationIfNeeded()

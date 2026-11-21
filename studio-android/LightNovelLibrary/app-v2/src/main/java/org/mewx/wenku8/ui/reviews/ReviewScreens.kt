@@ -217,6 +217,8 @@ fun ReviewListScreen(
             WenkuApiResult.ApiNotConfigured -> {
                 errorType = ReviewLoadErrorType.API_UNAVAILABLE
             }
+            is WenkuApiResult.UpgradeRequired,
+            WenkuApiResult.AuthRejected,
             is WenkuApiResult.NetworkError,
             is WenkuApiResult.ServerErrorCode,
             WenkuApiResult.EmptyResponse,
@@ -546,6 +548,8 @@ fun ReviewThreadScreen(
             WenkuApiResult.ApiNotConfigured -> {
                 errorType = ReviewLoadErrorType.API_UNAVAILABLE
             }
+            is WenkuApiResult.UpgradeRequired,
+            WenkuApiResult.AuthRejected,
             is WenkuApiResult.NetworkError,
             is WenkuApiResult.ServerErrorCode,
             WenkuApiResult.EmptyResponse,
