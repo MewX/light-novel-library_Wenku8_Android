@@ -4,6 +4,10 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.graphics.BitmapShader
+import android.graphics.Matrix
 import android.graphics.Paint as AndroidPaint
 import android.graphics.RuntimeShader
 import android.graphics.Shader
@@ -69,8 +73,15 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.FilterQuality
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.ShaderBrush
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
+import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
@@ -91,6 +102,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
@@ -100,6 +112,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import coil3.compose.AsyncImage
 import kotlinx.coroutines.flow.distinctUntilChanged
+import org.mewx.wenku8.R
 import org.mewx.wenku8.data.media.WenkuImageRequests
 import org.mewx.wenku8.reader.engine.ChapterBlock
 import org.mewx.wenku8.reader.engine.ChapterLoadErrorKind
@@ -119,6 +132,7 @@ import java.util.Date
 import java.util.Locale
 import kotlin.math.abs
 import kotlin.math.roundToInt
+import kotlin.random.Random
 
 /**
  * Injectable wall-clock provider for deterministic unit testing of [rememberSystemClockText].
@@ -270,6 +284,7 @@ data class ReaderVisualPalette(
     val isEinkMonochrome: Boolean,
     val customDayBackgroundFile: File?,
     val customTypeface: Typeface?,
+    val useSimulatedParchmentTexture: Boolean = false,
 ) {
     val ttsParagraphBgColor: Color
         get() = when {
@@ -305,6 +320,131 @@ data class ReaderVisualPalette(
             isDarkPalette -> Color(0xFFFFCA28)
             else -> Color(0xFFE65100)
         }
+}
+
+/**
+ * Cached app-v1 simulated parchment paper textures reused for [ReaderPaperPreset.PARCHMENT]:
+ * - [tileShaderBrush]: tiled warm paper grain (`reader_bg_yellow1` / `yellow2` / `yellow3`),
+ *   scaled by display density so the 200px nodpi tile matches app-v1's `200.dp` paper grain scale
+ *   without upscaling bitmaps in memory.
+ * - [edgeVignetteBitmap]: aged-paper border vignette (`reader_bg_yellow_edge`) with transparent center.
+ */
+data class ReaderParchmentBackgroundAssets(
+    val tileShaderBrush: ShaderBrush,
+    val edgeVignetteBitmap: ImageBitmap?,
+)
+
+internal object ReaderParchmentAssetCache {
+    internal val PARCHMENT_TILE_RES_IDS: IntArray = intArrayOf(
+        R.drawable.reader_bg_yellow1,
+        R.drawable.reader_bg_yellow2,
+        R.drawable.reader_bg_yellow3,
+    )
+
+    private val lock = Any()
+    private var selectedTileResId: Int? = null
+    private var cachedTileBitmap: Bitmap? = null
+    private var cachedEdgeBitmap: ImageBitmap? = null
+    private var edgeDecodeAttempted: Boolean = false
+
+    fun load(
+        context: Context,
+        density: Float,
+    ): ReaderParchmentBackgroundAssets? {
+        val resources = context.applicationContext?.resources ?: context.resources
+        val tileBitmap: Bitmap
+        val edgeBitmap: ImageBitmap?
+        synchronized(lock) {
+            val resId = selectedTileResId ?: PARCHMENT_TILE_RES_IDS[
+                Random.nextInt(PARCHMENT_TILE_RES_IDS.size),
+            ].also { selectedTileResId = it }
+
+            val existingTile = cachedTileBitmap?.takeUnless { it.isRecycled }
+            tileBitmap = existingTile ?: runCatching {
+                BitmapFactory.decodeResource(resources, resId)
+            }.getOrNull()?.also { cachedTileBitmap = it } ?: return null
+
+            if (!edgeDecodeAttempted) {
+                edgeDecodeAttempted = true
+                // Edge overlay is a soft vignette gradient; inSampleSize=2 keeps smooth edges at 1/4 RAM (~2 MB).
+                val edgeOptions = BitmapFactory.Options().apply {
+                    inSampleSize = 2
+                }
+                cachedEdgeBitmap = runCatching {
+                    BitmapFactory.decodeResource(
+                        resources,
+                        R.drawable.reader_bg_yellow_edge,
+                        edgeOptions,
+                    )?.asImageBitmap()
+                }.getOrNull()
+            }
+            edgeBitmap = cachedEdgeBitmap
+        }
+
+        val tileScale = density.coerceIn(1f, 3.5f)
+        val shader = BitmapShader(
+            tileBitmap,
+            Shader.TileMode.REPEAT,
+            Shader.TileMode.REPEAT,
+        ).apply {
+            setLocalMatrix(Matrix().apply { setScale(tileScale, tileScale) })
+        }
+        return ReaderParchmentBackgroundAssets(
+            tileShaderBrush = ShaderBrush(shader),
+            edgeVignetteBitmap = edgeBitmap,
+        )
+    }
+}
+
+@Composable
+fun rememberReaderParchmentAssets(enabled: Boolean): ReaderParchmentBackgroundAssets? {
+    if (!enabled) return null
+    val context = LocalContext.current
+    val density = LocalDensity.current.density
+    return remember(context, density) {
+        ReaderParchmentAssetCache.load(context = context, density = density)
+    }
+}
+
+internal fun DrawScope.drawReaderPaperBackground(
+    paperBackground: Color,
+    parchmentAssets: ReaderParchmentBackgroundAssets?,
+    cutoutOffsetPx: IntOffset = IntOffset.Zero,
+    fullContainerSizePx: IntSize? = null,
+) {
+    drawRect(color = paperBackground)
+    if (parchmentAssets == null) return
+
+    val widthPx = size.width.roundToInt()
+    val heightPx = size.height.roundToInt()
+    if (widthPx <= 0 || heightPx <= 0) return
+
+    val offsetX = cutoutOffsetPx.x.toFloat()
+    val offsetY = cutoutOffsetPx.y.toFloat()
+    if (offsetX == 0f && offsetY == 0f) {
+        drawRect(brush = parchmentAssets.tileShaderBrush)
+    } else {
+        translate(left = -offsetX, top = -offsetY) {
+            drawRect(
+                brush = parchmentAssets.tileShaderBrush,
+                topLeft = Offset(offsetX, offsetY),
+                size = size,
+            )
+        }
+    }
+
+    val edgeBitmap = parchmentAssets.edgeVignetteBitmap ?: return
+    val targetSize = fullContainerSizePx
+        ?.takeIf { it.width > 0 && it.height > 0 }
+        ?: IntSize(widthPx, heightPx)
+    clipRect {
+        drawImage(
+            image = edgeBitmap,
+            dstOffset = IntOffset(-cutoutOffsetPx.x, -cutoutOffsetPx.y),
+            dstSize = targetSize,
+            filterQuality = FilterQuality.Low,
+        )
+    }
 }
 
 /**
@@ -358,7 +498,8 @@ fun isWithinPredictiveBackSafeBrightnessStrip(
 
 /**
  * Builds the active [ReaderVisualPalette], ensuring custom day backgrounds never blind night or
- * E-Ink readers.
+ * E-Ink readers, and activating the reused app-v1 simulated parchment paper texture for
+ * [ReaderPaperPreset.PARCHMENT] whenever E-Ink mode and custom wallpapers are off.
  */
 fun resolveReaderVisualPalette(
     paperPreset: ReaderPaperPreset,
@@ -388,6 +529,7 @@ fun resolveReaderVisualPalette(
             isEinkMonochrome = true,
             customDayBackgroundFile = null,
             customTypeface = typeface,
+            useSimulatedParchmentTexture = false,
         )
     }
 
@@ -405,6 +547,7 @@ fun resolveReaderVisualPalette(
         isEinkMonochrome = false,
         customDayBackgroundFile = customBgFile,
         customTypeface = typeface,
+        useSimulatedParchmentTexture = paperPreset == ReaderPaperPreset.PARCHMENT && customBgFile == null,
     )
 }
 
@@ -425,6 +568,9 @@ fun ReaderViewportHost(
     leftEdgeBrightnessDragEnabled: Boolean,
     contentHighlight: ReaderContentHighlight = ReaderContentHighlight(),
     continuousScrollJumpCommand: ContinuousScrollJumpCommand? = null,
+    parchmentAssets: ReaderParchmentBackgroundAssets? = null,
+    cutoutOffsetPx: IntOffset = IntOffset.Zero,
+    fullContainerSizePx: IntSize? = null,
     onTapZoneAction: (ReaderTapZoneAction) -> Unit,
     onBrightnessDragDelta: (Float) -> Unit,
     onIllustrationClicked: (imageUrl: String, imageIndexInChapter: Int) -> Unit,
@@ -448,13 +594,32 @@ fun ReaderViewportHost(
     val density = LocalDensity.current
     val isRtlBunkobon = effectiveMode == ReaderPageTurnMode.VERTICAL_BUNKOBON
     val clockLabel = rememberSystemClockText()
+    val fallbackParchmentAssets = rememberReaderParchmentAssets(
+        enabled = parchmentAssets == null && palette.useSimulatedParchmentTexture,
+    )
+    val activeParchmentAssets = if (palette.useSimulatedParchmentTexture) {
+        parchmentAssets ?: fallbackParchmentAssets
+    } else {
+        null
+    }
     val latestOnTapZoneAction by rememberUpdatedState(onTapZoneAction)
     val latestOnBrightnessDragDelta by rememberUpdatedState(onBrightnessDragDelta)
 
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(palette.backgroundColor)
+            .drawBehind {
+                if (palette.customDayBackgroundFile != null) {
+                    drawRect(color = palette.backgroundColor)
+                } else {
+                    drawReaderPaperBackground(
+                        paperBackground = palette.backgroundColor,
+                        parchmentAssets = activeParchmentAssets,
+                        cutoutOffsetPx = cutoutOffsetPx,
+                        fullContainerSizePx = fullContainerSizePx,
+                    )
+                }
+            }
             .testTag(ReaderTestTags.VIEWPORT_CONTAINER)
             .pointerInput(effectiveMode, isRtlBunkobon, pagerState) {
                 if (effectiveMode != ReaderPageTurnMode.CONTINUOUS_SCROLL) {
@@ -669,6 +834,9 @@ fun ReaderViewportHost(
                                 pageOffset = pageOffset,
                                 paperBackground = palette.backgroundColor,
                                 hasCustomDayWallpaper = palette.customDayBackgroundFile != null,
+                                parchmentAssets = activeParchmentAssets,
+                                cutoutOffsetPx = cutoutOffsetPx,
+                                fullContainerSizePx = fullContainerSizePx,
                             ),
                     ) {
                         if (resolution != null) {
@@ -702,6 +870,9 @@ private fun Modifier.applyPageTurnTransition(
     pageOffset: Float,
     paperBackground: Color,
     hasCustomDayWallpaper: Boolean,
+    parchmentAssets: ReaderParchmentBackgroundAssets?,
+    cutoutOffsetPx: IntOffset,
+    fullContainerSizePx: IntSize?,
 ): Modifier {
     return when (mode) {
         ReaderPageTurnMode.COVER_SLIDE -> {
@@ -722,7 +893,12 @@ private fun Modifier.applyPageTurnTransition(
                 .drawWithContent {
                     if (abs(pageOffset) >= 0.999f) return@drawWithContent
                     if (!hasCustomDayWallpaper) {
-                        drawRect(color = paperBackground)
+                        drawReaderPaperBackground(
+                            paperBackground = paperBackground,
+                            parchmentAssets = parchmentAssets,
+                            cutoutOffsetPx = cutoutOffsetPx,
+                            fullContainerSizePx = fullContainerSizePx,
+                        )
                     }
                     drawContent()
                     // Ambient drop shadow cast by the sliding upper page's right edge onto the
@@ -767,7 +943,12 @@ private fun Modifier.applyPageTurnTransition(
                     if (abs(pageOffset) >= 0.999f) return@drawWithContent
                     if (pageOffset <= 0.002f) {
                         if (!hasCustomDayWallpaper) {
-                            drawRect(color = paperBackground)
+                            drawReaderPaperBackground(
+                                paperBackground = paperBackground,
+                                parchmentAssets = parchmentAssets,
+                                cutoutOffsetPx = cutoutOffsetPx,
+                                fullContainerSizePx = fullContainerSizePx,
+                            )
                         }
                         drawContent()
                     } else {
@@ -780,7 +961,12 @@ private fun Modifier.applyPageTurnTransition(
                         drawContext.canvas.save()
                         drawContext.canvas.clipRect(0f, 0f, foldX, size.height)
                         if (!hasCustomDayWallpaper) {
-                            drawRect(color = paperBackground)
+                            drawReaderPaperBackground(
+                                paperBackground = paperBackground,
+                                parchmentAssets = parchmentAssets,
+                                cutoutOffsetPx = cutoutOffsetPx,
+                                fullContainerSizePx = fullContainerSizePx,
+                            )
                         }
                         drawContent()
                         drawContext.canvas.restore()
@@ -802,7 +988,12 @@ private fun Modifier.applyPageTurnTransition(
         -> {
             this.drawWithContent {
                 if (!hasCustomDayWallpaper) {
-                    drawRect(color = paperBackground)
+                    drawReaderPaperBackground(
+                        paperBackground = paperBackground,
+                        parchmentAssets = parchmentAssets,
+                        cutoutOffsetPx = cutoutOffsetPx,
+                        fullContainerSizePx = fullContainerSizePx,
+                    )
                 }
                 drawContent()
             }

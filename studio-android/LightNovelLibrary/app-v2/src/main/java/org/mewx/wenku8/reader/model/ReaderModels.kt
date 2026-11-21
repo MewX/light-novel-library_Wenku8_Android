@@ -47,9 +47,9 @@ enum class ReaderPaperPreset(
     PARCHMENT(
         displayTitle = "羊皮纸",
         isDark = false,
-        backgroundArgb = 0xFFF6F1E3L,
+        backgroundArgb = 0xFFE2C7A4L,
         primaryTextArgb = 0xFF241E16L,
-        secondaryTextArgb = 0xFF6F6556L,
+        secondaryTextArgb = 0xFF574A3AL,
     ),
     PURE_WHITE(
         displayTitle = "纯白",

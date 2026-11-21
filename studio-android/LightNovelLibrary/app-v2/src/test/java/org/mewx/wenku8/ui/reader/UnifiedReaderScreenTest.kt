@@ -66,6 +66,7 @@ import org.mewx.wenku8.ui.theme.Wenku8ExpressiveTheme
 import org.mewx.wenku8.ui.theme.Wenku8ThemeMode
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import java.io.File
 import java.util.concurrent.Executor
 
 @RunWith(RobolectricTestRunner::class)
@@ -1252,6 +1253,67 @@ class UnifiedReaderScreenTest {
         composeTestRule.onAllNodesWithTag(ReaderTestTags.ERROR_OPEN_WEB_BUTTON).assertCountEquals(0)
         composeTestRule.onNodeWithText("网络检测").assertIsDisplayed().performClick()
         assertEquals(1, diagnosticsClicks)
+    }
+
+    @Test
+    fun resolveReaderVisualPalette_enablesSimulatedParchmentTextureOnlyForParchmentDayWithoutCustomBgOrEink() {
+        val parchmentDefault = resolveReaderVisualPalette(
+            paperPreset = ReaderPaperPreset.PARCHMENT,
+            isEinkMode = false,
+            customBackgroundPath = "",
+            customFontPath = "",
+        )
+        assertTrue(parchmentDefault.useSimulatedParchmentTexture)
+        assertNull(parchmentDefault.customDayBackgroundFile)
+
+        val parchmentEink = resolveReaderVisualPalette(
+            paperPreset = ReaderPaperPreset.PARCHMENT,
+            isEinkMode = true,
+            customBackgroundPath = "",
+            customFontPath = "",
+        )
+        assertFalse(parchmentEink.useSimulatedParchmentTexture)
+        assertTrue(parchmentEink.isEinkMonochrome)
+
+        val tempCustomBg = File.createTempFile("custom_day_bg_", ".jpg").apply {
+            writeBytes(byteArrayOf(1, 2, 3, 4))
+            deleteOnExit()
+        }
+        try {
+            val parchmentWithCustomBg = resolveReaderVisualPalette(
+                paperPreset = ReaderPaperPreset.PARCHMENT,
+                isEinkMode = false,
+                customBackgroundPath = tempCustomBg.absolutePath,
+                customFontPath = "",
+            )
+            assertFalse(parchmentWithCustomBg.useSimulatedParchmentTexture)
+            assertNotNull(parchmentWithCustomBg.customDayBackgroundFile)
+        } finally {
+            tempCustomBg.delete()
+        }
+
+        listOf(
+            ReaderPaperPreset.PURE_WHITE,
+            ReaderPaperPreset.EYE_CARE_GREEN,
+            ReaderPaperPreset.CARBON_NIGHT,
+            ReaderPaperPreset.PURE_AMOLED,
+        ).forEach { preset ->
+            val resolved = resolveReaderVisualPalette(
+                paperPreset = preset,
+                isEinkMode = false,
+                customBackgroundPath = "",
+                customFontPath = "",
+            )
+            assertFalse("Expected no parchment texture for $preset", resolved.useSimulatedParchmentTexture)
+        }
+    }
+
+    @Test
+    fun readerParchmentAssetCache_loadsAppV1PaperTileAndEdgeVignetteAssets() {
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        val assets = ReaderParchmentAssetCache.load(context = context, density = 2.75f)
+        assertNotNull("Expected app-v1 parchment paper tile to decode cleanly", assets)
+        assertNotNull("Expected app-v1 parchment edge vignette to decode cleanly", assets?.edgeVignetteBitmap)
     }
 }
 

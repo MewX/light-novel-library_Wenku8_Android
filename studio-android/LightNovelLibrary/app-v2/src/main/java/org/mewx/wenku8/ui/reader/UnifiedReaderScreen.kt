@@ -115,6 +115,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
@@ -126,6 +127,8 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.view.WindowCompat
@@ -518,6 +521,9 @@ fun UnifiedReaderScreen(
             customFontPath = preferences.readerCustomFontPath,
         )
     }
+    val parchmentAssets = rememberReaderParchmentAssets(
+        enabled = palette.useSimulatedParchmentTexture,
+    )
 
     val windowBuffer = remember(launchRequest.aid) {
         ChapterWindowBuffer(
@@ -898,7 +904,12 @@ fun UnifiedReaderScreen(
     BoxWithConstraints(
         modifier = modifier
             .fillMaxSize()
-            .background(palette.backgroundColor)
+            .drawBehind {
+                drawReaderPaperBackground(
+                    paperBackground = palette.backgroundColor,
+                    parchmentAssets = parchmentAssets,
+                )
+            }
             .focusRequester(focusRequester)
             .focusable()
             .onPreviewKeyEvent { keyEvent ->
@@ -1680,6 +1691,9 @@ fun UnifiedReaderScreen(
             leftEdgeBrightnessDragEnabled = preferences.readerEdgeBrightnessDragEnabled,
             contentHighlight = contentHighlight,
             continuousScrollJumpCommand = continuousScrollJumpCommand,
+            parchmentAssets = parchmentAssets,
+            cutoutOffsetPx = IntOffset(safeLeftPx, safeTopPx),
+            fullContainerSizePx = IntSize(constraints.maxWidth, constraints.maxHeight),
             onTapZoneAction = { action ->
                 if (isTypographyPanelOpen) {
                     interruptedStepRef[0] = null
