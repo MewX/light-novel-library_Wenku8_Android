@@ -13,8 +13,6 @@ buildscript {
         classpath "org.jetbrains.kotlin:compose-compiler-gradle-plugin:${kotlinVersion}"
         classpath "org.jetbrains.kotlin:kotlin-serialization:${kotlinVersion}"
         classpath "com.google.devtools.ksp:symbol-processing-gradle-plugin:${kspVersion}"
-        classpath 'com.google.gms:google-services:4.6.0'
-        classpath 'com.google.firebase:firebase-crashlytics-gradle:3.0.8'
 
         // NOTE: Do not place your application dependencies here; they belong
         // in the individual module build.gradle files
@@ -31,6 +29,6 @@ allprojects {
 ext {
     targetSdkVersion = 37
     buildToolsVersion = "37.0.0"
-    minSdkVersion = 21  // Minimum requirement for Play Store (:app-v1); :app-v2 uses minSdk 24.
+    minSdkVersion = 24  // Material 3 Expressive requires minSdk 24 (Android 7.0 Nougat).
 }
 

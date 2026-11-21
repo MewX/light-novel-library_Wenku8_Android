@@ -1,3 +1,0 @@
-<bitmap xmlns:android="http://schemas.android.com/apk/res/android"
-    android:src="@drawable/reader_bg_texture_mask"
-    android:tileMode="repeat" />
