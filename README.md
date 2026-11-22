@@ -145,10 +145,10 @@
 
 ### <a id="app-2.0-source"></a>2.0 源代码结构与架构
 
-`2.0` 主工程位于 `studio-android/LightNovelLibrary/app-v2/`，采用清晰的 **UI (Compose) -> Domain / Repository -> Local (Room + DataStore) & Remote (OkHttp + Relay + `:api`)** 分层架构：
+`2.0` 主工程位于 `LightNovelLibrary/app-v2/`，采用清晰的 **UI (Compose) -> Domain / Repository -> Local (Room + DataStore) & Remote (OkHttp + Relay + `:api`)** 分层架构：
 
 ```text
-studio-android/LightNovelLibrary/app-v2/src/main/java/org/mewx/wenku8
+LightNovelLibrary/app-v2/src/main/java/org/mewx/wenku8
 ├── MainActivity.kt                      # 单 Activity 宿主、1.x 升级迁移引导与 App Links 入口
 ├── Wenku8Application.kt                 # 应用级依赖容器、Coil 图片管线与通知渠道初始化
 ├── data/
@@ -194,7 +194,7 @@ studio-android/LightNovelLibrary/app-v2/src/main/java/org/mewx/wenku8
 出于接口密钥保护原因，官方签名协议模块 `:api` 为私有 Git 子模块；当外部贡献者在未拉取私有子模块的环境下克隆本仓库时，`settings.gradle` 会**自动无缝回退至开源桩模块 `api-stub/`**，因此无需任何私有密钥即可直接编译和运行测试：
 
 ```bash
-cd studio-android/LightNovelLibrary
+cd LightNovelLibrary
 
 # 编译 2.0 调试版 APK
 ./gradlew :app-v2:assembleDefaultDebug
@@ -207,7 +207,7 @@ cd studio-android/LightNovelLibrary
 
 ## <a id="dir-info"></a>仓库目录说明（`v0` / `v1` / `v2` 归档结构）
 
-1. **`studio-android/LightNovelLibrary/`** —— Android Studio 多模块主工程：
+1. **`LightNovelLibrary/`** —— Android Studio 多模块主工程：
    - **`app-v2/`**：**`2.0` 正式版完整源码**（Kotlin + Jetpack Compose + Material 3 Expressive，包名 `org.mewx.wenku8`）。
    - **`api/` & `api-stub/`**：文库协议加密签名子模块及面向开源构建自动启用的兼容桩模块。
 2. **`docs/designs/`** —— 按世代划分的设计文档与视觉稿：

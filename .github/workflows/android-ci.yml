@@ -11,7 +11,7 @@ on:
 
 defaults:
   run:
-    working-directory: ./studio-android/LightNovelLibrary
+    working-directory: ./LightNovelLibrary
 
 jobs:
   build-and-test:
@@ -67,7 +67,7 @@ jobs:
       with:
         name: unit-test-results
         path: |
-          studio-android/LightNovelLibrary/app-v2/build/reports/tests/
+          LightNovelLibrary/app-v2/build/reports/tests/
         if-no-files-found: ignore
 
     # Upload :app-v2 JVM coverage to Coveralls.
@@ -75,9 +75,9 @@ jobs:
     - name: Upload app-v2 JVM coverage to Coveralls
       uses: coverallsapp/github-action@v2
       with:
-        file: studio-android/LightNovelLibrary/app-v2/build/reports/jacoco/jacocoDefaultDebugUnitTestReport/jacocoDefaultDebugUnitTestReport.xml
+        file: LightNovelLibrary/app-v2/build/reports/jacoco/jacocoDefaultDebugUnitTestReport/jacocoDefaultDebugUnitTestReport.xml
         format: jacoco
-        base-path: studio-android/LightNovelLibrary/app-v2/src/main/java
+        base-path: LightNovelLibrary/app-v2/src/main/java
         flag-name: jvm-v2
         github-token: ${{ secrets.GITHUB_TOKEN }}
         fail-on-error: false
