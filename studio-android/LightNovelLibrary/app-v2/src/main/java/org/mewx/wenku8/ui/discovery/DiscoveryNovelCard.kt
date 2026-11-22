@@ -536,15 +536,14 @@ fun rememberDiscoveryFeedScrollStateHolder(
 /**
  * Policy-compliant interleaving cadence for in-feed Discovery (`最新` / `排行`) inline adaptive
  * banners:
- * - First ad appears after [FIRST_AD_AFTER_NOVEL_COUNT] novels (never above the fold at index 0).
- * - Subsequent ads appear every [REPEAT_EVERY_NOVELS] novels thereafter (#14, #24, ...).
- * - Ads are only inserted when at least one novel follows them, ensuring an inline banner never
- *   sits directly adjacent to pagination retry/loading footers or dangles at the bottom of short
- *   feeds.
+ * - Wenku8 paginates feed APIs at [ITEMS_PER_PAGE] (`10`) novels per page, so one compact inline
+ *   banner is placed right after every page boundary (`#10`, `#20`, `#30`, ...).
+ * - When an append error footer (`pagination_retry_footer`) is visible at the tail of the list,
+ *   a trailing ad at the final boundary is suppressed so an ad is never directly adjacent to the
+ *   clickable retry button.
  */
 object DiscoveryFeedAdCadence {
-    const val FIRST_AD_AFTER_NOVEL_COUNT = 4
-    const val REPEAT_EVERY_NOVELS = 10
+    const val ITEMS_PER_PAGE = 10
 }
 
 sealed interface DiscoveryFeedEntry {
@@ -561,6 +560,7 @@ sealed interface DiscoveryFeedEntry {
 fun buildDiscoveryFeedEntries(
     items: List<DiscoveryNovelCardItem>,
     adsEnabled: Boolean,
+    suppressTrailingAd: Boolean = false,
 ): List<DiscoveryFeedEntry> {
     if (items.isEmpty()) return emptyList()
     if (!adsEnabled) {
@@ -568,18 +568,15 @@ fun buildDiscoveryFeedEntries(
             DiscoveryFeedEntry.Novel(novelIndex = index, item = item)
         }
     }
-    return buildList(items.size + 4) {
+    return buildList(items.size + (items.size / DiscoveryFeedAdCadence.ITEMS_PER_PAGE)) {
         var nextSlotIndex = 0
         val lastNovelIndex = items.lastIndex
         items.forEachIndexed { novelIndex, item ->
             add(DiscoveryFeedEntry.Novel(novelIndex = novelIndex, item = item))
             val novelsShown = novelIndex + 1
-            val hasFollowingNovel = novelIndex < lastNovelIndex
-            val shouldInsertAd = hasFollowingNovel &&
-                novelsShown >= DiscoveryFeedAdCadence.FIRST_AD_AFTER_NOVEL_COUNT &&
-                (novelsShown - DiscoveryFeedAdCadence.FIRST_AD_AFTER_NOVEL_COUNT) %
-                DiscoveryFeedAdCadence.REPEAT_EVERY_NOVELS == 0
-            if (shouldInsertAd) {
+            val isPageBoundary = novelsShown % DiscoveryFeedAdCadence.ITEMS_PER_PAGE == 0
+            val isSuppressedTrailingSlot = suppressTrailingAd && novelIndex == lastNovelIndex
+            if (isPageBoundary && !isSuppressedTrailingSlot) {
                 add(DiscoveryFeedEntry.InlineAd(slotIndex = nextSlotIndex))
                 nextSlotIndex += 1
             }
@@ -612,10 +609,12 @@ fun PaginatedNovelFeedContent(
         isGmsAvailableOverride = isGmsAvailableForAdOverride,
         enableLiveAdViewInflation = enableLiveAdViewInflation,
     )
-    val feedEntries = remember(feedState.items, inlineAdPool.isAdSlotEligible) {
+    val hasAppendErrorFooter = feedState.errorKind != null && feedState.items.isNotEmpty()
+    val feedEntries = remember(feedState.items, inlineAdPool.isAdSlotEligible, hasAppendErrorFooter) {
         buildDiscoveryFeedEntries(
             items = feedState.items,
             adsEnabled = inlineAdPool.isAdSlotEligible,
+            suppressTrailingAd = hasAppendErrorFooter,
         )
     }
 

@@ -69,17 +69,21 @@ enum class InlineBannerPlacement(
     val reservedMinHeightDp: Int,
 ) {
     /** Standard full-width inline adaptive banner between Synopsis and Volume Directory. */
-    NOVEL_DETAIL_STANDARD(maxHeightDp = 120, reservedMinHeightDp = 100),
+    NOVEL_DETAIL_STANDARD(maxHeightDp = 120, reservedMinHeightDp = 64),
 
     /**
      * Larger inline adaptive banner requested as a fresh `AdView` (never resizing an existing one)
      * when returning after a qualifying long reading session (`>= 10 min`), allowing higher-eCPM
-     * `300x250` / rich inline adaptive creatives.
+     * `300x250` / rich inline adaptive creatives while hugging the actual creative height once loaded.
      */
-    NOVEL_DETAIL_POST_READING_LARGE(maxHeightDp = 250, reservedMinHeightDp = 250),
+    NOVEL_DETAIL_POST_READING_LARGE(maxHeightDp = 250, reservedMinHeightDp = 120),
 
-    /** In-feed inline adaptive banner interleaved inside Discovery (`最新` / `排行`) lists. */
-    DISCOVERY_FEED_INLINE(maxHeightDp = 120, reservedMinHeightDp = 100),
+    /**
+     * Compact in-feed inline adaptive banner placed at page boundaries (every 10 novels) inside
+     * Discovery (`最新` / `排行`) lists. Keeps `320x50` / `360x60` / `320x100` creatives eligible
+     * while reserving only `60dp` and shrinking tightly to the returned ad's exact height.
+     */
+    DISCOVERY_FEED_INLINE(maxHeightDp = 100, reservedMinHeightDp = 60),
     ;
 
     val reservedMinHeight: Dp
@@ -620,11 +624,17 @@ fun ServerSupportBannerAd(
             .testTag(cardTestTag)
             .einkHairlineBorder(cardShape),
     ) {
+        val isCompactFeedCard = holder.placement == InlineBannerPlacement.DISCOVERY_FEED_INLINE
+        val slotMinHeight = if (holder.phase == BannerAdLoadPhase.Loaded) {
+            50.dp
+        } else {
+            holder.placement.reservedMinHeight
+        }
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
+                .padding(vertical = if (isCompactFeedCard) 6.dp else 8.dp),
+            verticalArrangement = Arrangement.spacedBy(if (isCompactFeedCard) 4.dp else 6.dp),
         ) {
             Text(
                 text = stringResource(R.string.detail_ad_support_label),
@@ -635,7 +645,7 @@ fun ServerSupportBannerAd(
             BoxWithConstraints(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .heightIn(min = holder.placement.reservedMinHeight)
+                    .heightIn(min = slotMinHeight)
                     .testTag(slotTestTag),
                 contentAlignment = Alignment.Center,
             ) {

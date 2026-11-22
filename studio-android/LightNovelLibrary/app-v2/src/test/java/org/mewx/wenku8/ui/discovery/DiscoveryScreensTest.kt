@@ -545,7 +545,7 @@ class DiscoveryScreensTest {
     }
 
     @Test
-    fun buildDiscoveryFeedEntries_appliesPolicyCompliantCadenceAndNeverDanglesAtTail() {
+    fun buildDiscoveryFeedEntries_placesAdsAfterEveryPageOfTenAndSuppressesTrailingErrorSlot() {
         fun sampleItems(count: Int): List<DiscoveryNovelCardItem> = (1..count).map { idx ->
             DiscoveryNovelCardItem(
                 aid = 7000 + idx,
@@ -562,34 +562,49 @@ class DiscoveryScreensTest {
 
         assertTrue(buildDiscoveryFeedEntries(emptyList(), adsEnabled = true).isEmpty())
 
-        // Short feed of 4 novels must not dangle an ad at the very bottom
-        val fourItems = buildDiscoveryFeedEntries(sampleItems(4), adsEnabled = true)
-        assertEquals(4, fourItems.size)
-        assertTrue(fourItems.none { it is DiscoveryFeedEntry.InlineAd })
+        // Sub-page (< 10 novels) emits 0 inline ads
+        val nineItems = buildDiscoveryFeedEntries(sampleItems(9), adsEnabled = true)
+        assertEquals(9, nineItems.size)
+        assertTrue(nineItems.none { it is DiscoveryFeedEntry.InlineAd })
 
-        // 5 novels -> first ad inserted strictly between novel #4 (index 3) and novel #5 (index 4)
-        val fiveItems = buildDiscoveryFeedEntries(sampleItems(5), adsEnabled = true)
-        assertEquals(6, fiveItems.size)
-        assertEquals(DiscoveryFeedEntry.InlineAd(slotIndex = 0), fiveItems[4])
-        assertEquals(4, (fiveItems[5] as DiscoveryFeedEntry.Novel).novelIndex)
+        // Page 1 (10 novels) -> 1 ad right after #10 (index 10)
+        val tenItems = buildDiscoveryFeedEntries(sampleItems(10), adsEnabled = true)
+        assertEquals(11, tenItems.size)
+        assertEquals(DiscoveryFeedEntry.InlineAd(slotIndex = 0), tenItems[10])
 
-        // 14 novels -> still only 1 ad (after #4); no dangling ad after #14
-        val fourteenItems = buildDiscoveryFeedEntries(sampleItems(14), adsEnabled = true)
-        assertEquals(15, fourteenItems.size)
-        assertEquals(1, fourteenItems.count { it is DiscoveryFeedEntry.InlineAd })
+        // When append error footer is visible at tail, trailing ad after #10 is suppressed
+        val tenItemsWithError = buildDiscoveryFeedEntries(
+            items = sampleItems(10),
+            adsEnabled = true,
+            suppressTrailingAd = true,
+        )
+        assertEquals(10, tenItemsWithError.size)
+        assertTrue(tenItemsWithError.none { it is DiscoveryFeedEntry.InlineAd })
 
-        // 15 novels -> 2 ads: slot 0 after #4 (index 4) and slot 1 after #14 (index 15)
-        val fifteenItems = buildDiscoveryFeedEntries(sampleItems(15), adsEnabled = true)
-        assertEquals(17, fifteenItems.size)
-        assertEquals(DiscoveryFeedEntry.InlineAd(slotIndex = 0), fifteenItems[4])
-        assertEquals(DiscoveryFeedEntry.InlineAd(slotIndex = 1), fifteenItems[15])
-        assertEquals(14, (fifteenItems[16] as DiscoveryFeedEntry.Novel).novelIndex)
+        // Two full pages (20 novels) -> ads right after #10 (index 10) and #20 (index 21)
+        val twentyItems = buildDiscoveryFeedEntries(sampleItems(20), adsEnabled = true)
+        assertEquals(22, twentyItems.size)
+        assertEquals(DiscoveryFeedEntry.InlineAd(slotIndex = 0), twentyItems[10])
+        assertEquals(10, (twentyItems[11] as DiscoveryFeedEntry.Novel).novelIndex)
+        assertEquals(DiscoveryFeedEntry.InlineAd(slotIndex = 1), twentyItems[21])
 
-        // 25 novels -> 3 ads after #4, #14, #24
-        val twentyFiveItems = buildDiscoveryFeedEntries(sampleItems(25), adsEnabled = true)
-        assertEquals(28, twentyFiveItems.size)
+        // Append error after 2 pages keeps page-1 ad (#10) and suppresses only trailing #20 slot
+        val twentyItemsWithError = buildDiscoveryFeedEntries(
+            items = sampleItems(20),
+            adsEnabled = true,
+            suppressTrailingAd = true,
+        )
+        assertEquals(21, twentyItemsWithError.size)
         assertEquals(
-            listOf(0, 1, 2),
+            listOf(0),
+            twentyItemsWithError.filterIsInstance<DiscoveryFeedEntry.InlineAd>().map { it.slotIndex },
+        )
+
+        // 25 novels -> 2 ads after #10 and #20
+        val twentyFiveItems = buildDiscoveryFeedEntries(sampleItems(25), adsEnabled = true)
+        assertEquals(27, twentyFiveItems.size)
+        assertEquals(
+            listOf(0, 1),
             twentyFiveItems.filterIsInstance<DiscoveryFeedEntry.InlineAd>().map { it.slotIndex },
         )
 
@@ -631,8 +646,8 @@ class DiscoveryScreensTest {
     }
 
     @Test
-    fun rankingsScreenInlineAds_renderBetweenNovelsReserveHeightAndPreserveExactRankNumbers() {
-        val weekItems = (1..16).map { rank ->
+    fun rankingsScreenInlineAds_renderAfterEveryPageOfTenReserveCompactHeightAndPreserveExactRankNumbers() {
+        val weekItems = (1..22).map { rank ->
             val aid = 8000 + rank
             ParsedNovelListItem(
                 aid = aid,
@@ -672,8 +687,8 @@ class DiscoveryScreensTest {
         composeTestRule.onNodeWithText("#1").assertIsDisplayed()
         composeTestRule.onNodeWithText("榜单作品-1").assertIsDisplayed()
 
-        // Scroll to first inline ad (index 4, directly after #4)
-        composeTestRule.onNodeWithTag(DiscoveryTestTags.FEED_LIST).performScrollToIndex(4)
+        // Scroll to first page-end inline ad (index 10, directly after #10)
+        composeTestRule.onNodeWithTag(DiscoveryTestTags.FEED_LIST).performScrollToIndex(10)
         composeTestRule.waitForIdle()
         composeTestRule.onNodeWithTag("${DiscoveryTestTags.FEED_AD_CARD_PREFIX}0").assertIsDisplayed()
         composeTestRule
@@ -681,16 +696,16 @@ class DiscoveryScreensTest {
             .assertHeightIsAtLeast(InlineBannerPlacement.DISCOVERY_FEED_INLINE.reservedMinHeight)
         composeTestRule.onNodeWithText("广告").assertIsDisplayed()
 
-        // Novel immediately after ad slot 0 must preserve unbroken rank #5
-        composeTestRule.onNodeWithText("#5").assertIsDisplayed()
-        composeTestRule.onNodeWithText("榜单作品-5").assertIsDisplayed()
+        // Novel immediately after page-1 ad must preserve unbroken rank #11
+        composeTestRule.onNodeWithText("#11").assertIsDisplayed()
+        composeTestRule.onNodeWithText("榜单作品-11").assertIsDisplayed()
 
-        // Scroll to second inline ad (index 15, directly after #14) and verify rank #15 follows cleanly
-        composeTestRule.onNodeWithTag(DiscoveryTestTags.FEED_LIST).performScrollToIndex(15)
+        // Scroll to second page-end inline ad (index 21, directly after #20) and verify rank #21 follows cleanly
+        composeTestRule.onNodeWithTag(DiscoveryTestTags.FEED_LIST).performScrollToIndex(21)
         composeTestRule.waitForIdle()
         composeTestRule.onNodeWithTag("${DiscoveryTestTags.FEED_AD_CARD_PREFIX}1").assertIsDisplayed()
-        composeTestRule.onNodeWithText("#15").assertIsDisplayed()
-        composeTestRule.onNodeWithText("榜单作品-15").assertIsDisplayed()
+        composeTestRule.onNodeWithText("#21").assertIsDisplayed()
+        composeTestRule.onNodeWithText("榜单作品-21").assertIsDisplayed()
     }
 
     @Test

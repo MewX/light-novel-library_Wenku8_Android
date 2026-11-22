@@ -918,6 +918,10 @@ class NovelDetailAndDownloadTest {
 
     @Test
     fun serverSupportBannerAd_reservesLargerSlotHeightForPostReadingLargePlacement() {
+        assertTrue(
+            InlineBannerPlacement.NOVEL_DETAIL_POST_READING_LARGE.reservedMinHeight >
+                InlineBannerPlacement.NOVEL_DETAIL_STANDARD.reservedMinHeight,
+        )
         composeTestRule.setContent {
             Wenku8ExpressiveTheme(themeMode = Wenku8ThemeMode.ARCHIVAL_DAY) {
                 ServerSupportBannerAd(
@@ -932,7 +936,7 @@ class NovelDetailAndDownloadTest {
         composeTestRule.onNodeWithTag(NovelDetailTestTags.SERVER_SUPPORT_AD_CARD)
             .assertIsDisplayed()
         composeTestRule.onNodeWithTag(NovelDetailTestTags.SERVER_SUPPORT_AD_SLOT)
-            .assertHeightIsAtLeast(250.dp)
+            .assertHeightIsAtLeast(InlineBannerPlacement.NOVEL_DETAIL_POST_READING_LARGE.reservedMinHeight)
     }
 
     @Test
