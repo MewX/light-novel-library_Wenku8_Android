@@ -120,7 +120,10 @@ import org.mewx.wenku8.reader.model.ReaderPageTurnMode
 import org.mewx.wenku8.reader.model.ReaderPaperPreset
 import org.mewx.wenku8.ui.bookshelf.BookshelfScreen
 import org.mewx.wenku8.ui.components.TooltipIconButton
+import org.mewx.wenku8.ui.detail.InlineBannerPlacement
 import org.mewx.wenku8.ui.detail.NovelDetailScreen
+import org.mewx.wenku8.ui.detail.PostReadingAdElevationToken
+import org.mewx.wenku8.ui.detail.PostReadingAdElevationTracker
 import org.mewx.wenku8.ui.detail.ReaderLaunchRequest
 import org.mewx.wenku8.ui.diagnostics.NetworkDiagnosticsScreen
 import org.mewx.wenku8.ui.diagnostics.NetworkDiagnosticsViewModel
@@ -423,6 +426,11 @@ fun AdaptiveMainScaffold(
         mutableStateOf("")
     }
 
+    val postReadingAdTracker = remember { PostReadingAdElevationTracker() }
+    var postReadingElevationToken by remember {
+        mutableStateOf<PostReadingAdElevationToken?>(null)
+    }
+
     val handleOpenCoverLightbox: (String, String) -> Unit = { title, coverUrl ->
         if (coverUrl.isNotBlank()) {
             activeCoverLightboxTitle = title
@@ -435,6 +443,10 @@ fun AdaptiveMainScaffold(
         if (database != null && catalogGateway != null && novelTocSyncRepository != null) {
             activeCoverLightboxUrl = ""
             activeCoverLightboxTitle = ""
+            postReadingAdTracker.onReaderSessionStarted(
+                aid = request.aid,
+                nowMonoMs = SystemClock.elapsedRealtime(),
+            )
             activeReaderRequest = request
         }
     }
@@ -475,6 +487,7 @@ fun AdaptiveMainScaffold(
             }
             activeProfileSettingsSection = null
             isNetworkDiagnosticsOpen = false
+            postReadingAdTracker.resetActiveSession()
             activeReaderRequest = null
             activeReviewsAid = 0
             activeReviewThread = null
@@ -1165,6 +1178,9 @@ fun AdaptiveMainScaffold(
                                             novelDownloadRepository != null &&
                                             activeDetailNovelAid > 0
                                         ) {
+                                            val activeElevation = postReadingElevationToken?.takeIf {
+                                                it.isFreshAt(SystemClock.elapsedRealtime())
+                                            }
                                             NovelDetailScreen(
                                                 aid = activeDetailNovelAid,
                                                 novelDetailRepository = novelDetailRepository,
@@ -1179,6 +1195,9 @@ fun AdaptiveMainScaffold(
                                                 sharedTransitionOrigin = activeDetailSharedOrigin,
                                                 showBackButton = true,
                                                 onNavigateBack = {
+                                                    if (activeElevation != null) {
+                                                        postReadingElevationToken = null
+                                                    }
                                                     activeDetailNovelAid = 0
                                                     activeDetailSeedItem = null
                                                 },
@@ -1195,6 +1214,12 @@ fun AdaptiveMainScaffold(
                                                     handleOpenSearchWithSeed(tag, UnifiedSearchMode.NOVEL_TITLE)
                                                 },
                                                 onOpenCoverLightbox = handleOpenCoverLightbox,
+                                                bannerPlacement = if (activeElevation != null) {
+                                                    InlineBannerPlacement.NOVEL_DETAIL_POST_READING_LARGE
+                                                } else {
+                                                    InlineBannerPlacement.NOVEL_DETAIL_STANDARD
+                                                },
+                                                bannerRequestNonce = activeElevation?.nonce ?: 0,
                                                 modifier = Modifier.fillMaxSize(),
                                             )
                                         }
@@ -1277,6 +1302,9 @@ fun AdaptiveMainScaffold(
                                 bookshelfRepository != null &&
                                 novelDownloadRepository != null
                             ) {
+                                val activeElevation = postReadingElevationToken?.takeIf {
+                                    it.isFreshAt(SystemClock.elapsedRealtime())
+                                }
                                 NovelDetailScreen(
                                     aid = scene.aid,
                                     novelDetailRepository = novelDetailRepository,
@@ -1288,6 +1316,9 @@ fun AdaptiveMainScaffold(
                                     seedDiscoveryItem = activeDetailSeedItem?.takeIf { it.aid == scene.aid },
                                     sharedTransitionOrigin = scene.sharedOrigin,
                                     onNavigateBack = {
+                                        if (activeElevation != null) {
+                                            postReadingElevationToken = null
+                                        }
                                         sceneSaveableStateHolder.removeState(scene.saveableKey())
                                         activeDetailNovelAid = 0
                                         activeDetailSeedItem = null
@@ -1305,6 +1336,12 @@ fun AdaptiveMainScaffold(
                                         handleOpenSearchWithSeed(tag, UnifiedSearchMode.NOVEL_TITLE)
                                     },
                                     onOpenCoverLightbox = handleOpenCoverLightbox,
+                                    bannerPlacement = if (activeElevation != null) {
+                                        InlineBannerPlacement.NOVEL_DETAIL_POST_READING_LARGE
+                                    } else {
+                                        InlineBannerPlacement.NOVEL_DETAIL_STANDARD
+                                    },
+                                    bannerRequestNonce = activeElevation?.nonce ?: 0,
                                 )
                             }
                         }
@@ -1372,6 +1409,11 @@ fun AdaptiveMainScaffold(
                                     onVolumeKeyPagingChanged = onVolumeKeyPagingChanged,
                                     onOpenNetworkDiagnostics = handleOpenNetworkDiagnostics,
                                     onNavigateBack = {
+                                        postReadingAdTracker.onReaderSessionEnded(
+                                            nowMonoMs = SystemClock.elapsedRealtime(),
+                                        )?.let { elevatedToken ->
+                                            postReadingElevationToken = elevatedToken
+                                        }
                                         sceneSaveableStateHolder.removeState(scene.saveableKey())
                                         activeReaderRequest = null
                                     },

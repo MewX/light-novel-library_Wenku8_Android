@@ -820,6 +820,93 @@ class NovelDetailAndDownloadTest {
     }
 
     @Test
+    fun inlineAdaptiveBanner_resolvesPlacementSizesAndUnitsStrictlyByBuildType() {
+        for (placement in InlineBannerPlacement.entries) {
+            assertEquals(
+                listOf(ServerSupportAdConstants.DEV_TEST_BANNER_AD_UNIT_ID),
+                ServerSupportAdConstants.candidateBannerAdUnitIds(
+                    placement = placement,
+                    isDebugBuild = true,
+                ),
+            )
+            val prodUnits = ServerSupportAdConstants.candidateBannerAdUnitIds(
+                placement = placement,
+                isDebugBuild = false,
+            )
+            assertEquals(1, prodUnits.size)
+            assertFalse(prodUnits.contains(ServerSupportAdConstants.DEV_TEST_BANNER_AD_UNIT_ID))
+        }
+
+        val standardSize = resolveInlineAdaptiveBannerAdSize(
+            availableWidthDp = 380,
+            placement = InlineBannerPlacement.NOVEL_DETAIL_STANDARD,
+        )
+        val largeSize = resolveInlineAdaptiveBannerAdSize(
+            availableWidthDp = 380,
+            placement = InlineBannerPlacement.NOVEL_DETAIL_POST_READING_LARGE,
+        )
+        assertEquals(380, standardSize.width)
+        assertEquals(380, largeSize.width)
+        assertTrue(
+            "Standard inline adaptive banner should be width-clamped >= 160dp",
+            resolveInlineAdaptiveBannerAdSize(100, InlineBannerPlacement.NOVEL_DETAIL_STANDARD).width == 160,
+        )
+    }
+
+    @Test
+    fun postReadingAdElevationTracker_enforcesMinDurationCooldownAndFreshness() {
+        val tracker = PostReadingAdElevationTracker(
+            minReadingDurationMs = 15L * 60_000L,
+            cooldownMs = 30L * 60_000L,
+        )
+
+        // Short reading session (< 15 min) does not elevate
+        tracker.onReaderSessionStarted(aid = 5, nowMonoMs = 1_000L)
+        assertEquals(null, tracker.onReaderSessionEnded(nowMonoMs = 1_000L + 14L * 60_000L))
+
+        // Qualifying session (>= 15 min) elevates with nonce = 1
+        tracker.onReaderSessionStarted(aid = 5, nowMonoMs = 100_000L)
+        val firstToken = tracker.onReaderSessionEnded(nowMonoMs = 100_000L + 16L * 60_000L)
+        assertNotNull(firstToken)
+        assertEquals(1, firstToken!!.nonce)
+        assertEquals(5, firstToken.targetAid)
+        assertTrue(firstToken.isFreshAt(firstToken.issuedAtMonoMs + 5L * 60_000L))
+        assertFalse(firstToken.isFreshAt(firstToken.issuedAtMonoMs + 11L * 60_000L))
+
+        // Second long session inside 30-min cooldown is suppressed
+        val cooldownStart = firstToken.issuedAtMonoMs + 5L * 60_000L
+        tracker.onReaderSessionStarted(aid = 5, nowMonoMs = cooldownStart)
+        assertEquals(null, tracker.onReaderSessionEnded(nowMonoMs = cooldownStart + 20L * 60_000L))
+
+        // Session ending after 30-min cooldown elevates cleanly with nonce = 2
+        val postCooldownStart = firstToken.issuedAtMonoMs + 20L * 60_000L
+        tracker.onReaderSessionStarted(aid = 7, nowMonoMs = postCooldownStart)
+        val secondToken = tracker.onReaderSessionEnded(nowMonoMs = postCooldownStart + 15L * 60_000L)
+        assertNotNull(secondToken)
+        assertEquals(2, secondToken!!.nonce)
+        assertEquals(7, secondToken.targetAid)
+    }
+
+    @Test
+    fun serverSupportBannerAd_reservesLargerSlotHeightForPostReadingLargePlacement() {
+        composeTestRule.setContent {
+            Wenku8ExpressiveTheme(themeMode = Wenku8ThemeMode.ARCHIVAL_DAY) {
+                ServerSupportBannerAd(
+                    placement = InlineBannerPlacement.NOVEL_DETAIL_POST_READING_LARGE,
+                    isNetworkAvailableOverride = true,
+                    isGmsAvailableOverride = true,
+                    enableLiveAdViewInflation = false,
+                )
+            }
+        }
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag(NovelDetailTestTags.SERVER_SUPPORT_AD_CARD)
+            .assertIsDisplayed()
+        composeTestRule.onNodeWithTag(NovelDetailTestTags.SERVER_SUPPORT_AD_SLOT)
+            .assertHeightIsAtLeast(250.dp)
+    }
+
+    @Test
     fun coverImageTap_opensSingleImageArtbookLightbox_andDismissesCleanly() {
         val coverFile = File(tempAssetRoot, "cover_5.jpg")
         val bmp = Bitmap.createBitmap(200, 280, Bitmap.Config.ARGB_8888).apply {

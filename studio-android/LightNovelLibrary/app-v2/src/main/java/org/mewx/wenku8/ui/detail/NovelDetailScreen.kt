@@ -237,6 +237,8 @@ fun NovelDetailScreen(
     onTagClicked: (String) -> Unit = {},
     onOpenCoverLightbox: ((title: String, coverUrl: String) -> Unit)? = null,
     coverLightboxImageFileResolver: (suspend (String) -> File?)? = null,
+    bannerPlacement: InlineBannerPlacement = InlineBannerPlacement.NOVEL_DETAIL_STANDARD,
+    bannerRequestNonce: Int = 0,
     isNetworkAvailableForAdOverride: Boolean? = null,
     isGmsAvailableForAdOverride: Boolean? = null,
     enableLiveAdViewInflation: Boolean = true,
@@ -573,6 +575,8 @@ fun NovelDetailScreen(
         ) { innerPadding ->
             val bannerAdHolder = rememberNovelDetailBannerAdHolder(
                 aid = aid,
+                placement = bannerPlacement,
+                requestNonce = bannerRequestNonce,
                 isNetworkAvailableOverride = isNetworkAvailableForAdOverride,
                 isGmsAvailableOverride = isGmsAvailableForAdOverride,
                 enableLiveAdViewInflation = enableLiveAdViewInflation,
@@ -813,11 +817,12 @@ fun NovelDetailScreen(
                         )
                     }
 
-                    // 6. Single Server-Support Inline Banner (between Synopsis and Volume Directory)
+                    // 6. Single Inline Adaptive Banner (between Synopsis and Volume Directory)
                     if (bannerAdHolder.shouldRenderVisibleCard) {
                         item(key = "detail_server_support_ad") {
                             ServerSupportBannerAd(
                                 holder = bannerAdHolder,
+                                modifier = Modifier.padding(vertical = 4.dp),
                             )
                         }
                     }

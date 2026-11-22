@@ -28,10 +28,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
@@ -55,6 +55,36 @@ import org.mewx.wenku8.BuildConfig
 import org.mewx.wenku8.R
 import org.mewx.wenku8.ui.theme.einkHairlineBorder
 import java.util.concurrent.atomic.AtomicBoolean
+import kotlin.math.abs
+
+/**
+ * Distinct inline adaptive banner placements across the app.
+ *
+ * Each placement specifies a Google-compliant maximum height cap for
+ * [AdSize.getInlineAdaptiveBannerAdSize] and a reserved minimum slot height so the opaque card
+ * avoids layout shift while loading.
+ */
+enum class InlineBannerPlacement(
+    val maxHeightDp: Int,
+    val reservedMinHeightDp: Int,
+) {
+    /** Standard full-width inline adaptive banner between Synopsis and Volume Directory. */
+    NOVEL_DETAIL_STANDARD(maxHeightDp = 120, reservedMinHeightDp = 100),
+
+    /**
+     * Larger inline adaptive banner requested as a fresh `AdView` (never resizing an existing one)
+     * when returning after a qualifying long reading session (`>= 15 min`), allowing higher-eCPM
+     * `300x250` / rich inline adaptive creatives.
+     */
+    NOVEL_DETAIL_POST_READING_LARGE(maxHeightDp = 250, reservedMinHeightDp = 250),
+
+    /** In-feed inline adaptive banner interleaved inside Discovery (`最新` / `排行`) lists. */
+    DISCOVERY_FEED_INLINE(maxHeightDp = 120, reservedMinHeightDp = 100),
+    ;
+
+    val reservedMinHeight: Dp
+        get() = reservedMinHeightDp.dp
+}
 
 object ServerSupportAdConstants {
     /**
@@ -75,24 +105,121 @@ object ServerSupportAdConstants {
     const val DEV_TEST_BANNER_AD_UNIT_ID = "ca-app-pub-3940256099942544/6300978111"
 
     /**
-     * Production Novel Info inline banner Ad Unit ID matching [PRODUCTION_ADMOB_APP_ID]
+     * Production Novel Detail standard inline banner Ad Unit ID matching [PRODUCTION_ADMOB_APP_ID]
      * and Wenku8 v1 (`org.mewx.wenku8`), used exclusively on release builds (`!BuildConfig.DEBUG`).
      */
     const val PRODUCTION_BANNER_AD_UNIT_ID = "ca-app-pub-7333757578973883/9658350163"
 
     /**
-     * Ordered Ad Unit IDs to try:
-     * - Debug builds (`isDebugBuild = true`): strictly [DEV_TEST_BANNER_AD_UNIT_ID] only.
-     * - Release builds (`isDebugBuild = false`): strictly [PRODUCTION_BANNER_AD_UNIT_ID] only.
+     * Dedicated Ad Unit ID slot for post-reading large inline adaptive banners (`maxHeight = 250dp`).
+     * Defaults to [PRODUCTION_BANNER_AD_UNIT_ID] (which supports inline adaptive banners immediately)
+     * until a dedicated Banner Ad Unit is created in the AdMob console for independent reporting.
      */
-    fun candidateBannerAdUnitIds(isDebugBuild: Boolean = BuildConfig.DEBUG): List<String> =
+    const val PRODUCTION_POST_READING_LARGE_BANNER_AD_UNIT_ID = PRODUCTION_BANNER_AD_UNIT_ID
+
+    /**
+     * Dedicated Ad Unit ID slot for Discovery feed (`最新` / `排行`) inline adaptive banners.
+     * Defaults to [PRODUCTION_BANNER_AD_UNIT_ID] until a dedicated Banner Ad Unit is created in the
+     * AdMob console for independent CTR / viewability / eCPM tracking.
+     */
+    const val PRODUCTION_DISCOVERY_FEED_BANNER_AD_UNIT_ID = PRODUCTION_BANNER_AD_UNIT_ID
+
+    /**
+     * Ordered Ad Unit IDs to try for [placement]:
+     * - Debug builds (`isDebugBuild = true`): strictly [DEV_TEST_BANNER_AD_UNIT_ID] only.
+     * - Release builds (`isDebugBuild = false`): strictly the placement's production unit ID.
+     */
+    fun candidateBannerAdUnitIds(
+        placement: InlineBannerPlacement = InlineBannerPlacement.NOVEL_DETAIL_STANDARD,
+        isDebugBuild: Boolean = BuildConfig.DEBUG,
+    ): List<String> =
         if (isDebugBuild) {
             listOf(DEV_TEST_BANNER_AD_UNIT_ID)
         } else {
-            listOf(PRODUCTION_BANNER_AD_UNIT_ID)
+            val productionUnitId = when (placement) {
+                InlineBannerPlacement.NOVEL_DETAIL_STANDARD -> PRODUCTION_BANNER_AD_UNIT_ID
+                InlineBannerPlacement.NOVEL_DETAIL_POST_READING_LARGE ->
+                    PRODUCTION_POST_READING_LARGE_BANNER_AD_UNIT_ID
+                InlineBannerPlacement.DISCOVERY_FEED_INLINE ->
+                    PRODUCTION_DISCOVERY_FEED_BANNER_AD_UNIT_ID
+            }
+            listOf(productionUnitId)
         }
 
-    val RESERVED_BANNER_SLOT_HEIGHT = 50.dp
+    val RESERVED_BANNER_SLOT_HEIGHT = InlineBannerPlacement.NOVEL_DETAIL_STANDARD.reservedMinHeight
+
+    /** Minimum active reading duration before returning to `NovelDetailScreen` upgrades to a large banner. */
+    const val POST_READING_LARGE_AD_MIN_DURATION_MS = 15L * 60_000L
+
+    /** Cooldown between elevated post-reading large banner triggers to keep UX calm. */
+    const val POST_READING_LARGE_AD_COOLDOWN_MS = 30L * 60_000L
+
+    /** Freshness window during which a pending elevation token applies to a detail screen visit. */
+    const val POST_READING_LARGE_AD_FRESHNESS_MS = 10L * 60_000L
+}
+
+/**
+ * Immutable token emitted when a user finishes a qualifying long reading session, signalling
+ * `NovelDetailScreen` to request a fresh [InlineBannerPlacement.NOVEL_DETAIL_POST_READING_LARGE]
+ * banner rather than resizing an existing `AdView`.
+ */
+data class PostReadingAdElevationToken(
+    val nonce: Int,
+    val targetAid: Int,
+    val issuedAtMonoMs: Long,
+) {
+    fun isFreshAt(
+        nowMonoMs: Long,
+        freshnessWindowMs: Long = ServerSupportAdConstants.POST_READING_LARGE_AD_FRESHNESS_MS,
+    ): Boolean = nowMonoMs >= issuedAtMonoMs && (nowMonoMs - issuedAtMonoMs) <= freshnessWindowMs
+}
+
+/**
+ * Pure monotonic-clock tracker that determines when exiting `UnifiedReaderScreen` should elevate
+ * the subsequent `NovelDetailScreen` banner to [InlineBannerPlacement.NOVEL_DETAIL_POST_READING_LARGE].
+ */
+class PostReadingAdElevationTracker(
+    private val minReadingDurationMs: Long = ServerSupportAdConstants.POST_READING_LARGE_AD_MIN_DURATION_MS,
+    private val cooldownMs: Long = ServerSupportAdConstants.POST_READING_LARGE_AD_COOLDOWN_MS,
+) {
+    private var activeAid: Int = 0
+    private var sessionStartedAtMonoMs: Long = 0L
+    private var lastElevatedAtMonoMs: Long = Long.MIN_VALUE
+    private var nextNonce: Int = 0
+
+    fun onReaderSessionStarted(aid: Int, nowMonoMs: Long) {
+        if (aid <= 0) return
+        activeAid = aid
+        sessionStartedAtMonoMs = nowMonoMs
+    }
+
+    fun onReaderSessionEnded(nowMonoMs: Long): PostReadingAdElevationToken? {
+        val endedAid = activeAid
+        val startedAt = sessionStartedAtMonoMs
+        activeAid = 0
+        sessionStartedAtMonoMs = 0L
+        if (endedAid <= 0 || startedAt <= 0L) return null
+
+        val elapsedMs = (nowMonoMs - startedAt).coerceAtLeast(0L)
+        if (elapsedMs < minReadingDurationMs) return null
+
+        val withinCooldown = lastElevatedAtMonoMs != Long.MIN_VALUE &&
+            (nowMonoMs - lastElevatedAtMonoMs) < cooldownMs
+        if (withinCooldown) return null
+
+        lastElevatedAtMonoMs = nowMonoMs
+        nextNonce += 1
+        return PostReadingAdElevationToken(
+            nonce = nextNonce,
+            targetAid = endedAid,
+            issuedAtMonoMs = nowMonoMs,
+        )
+    }
+
+    fun resetActiveSession() {
+        activeAid = 0
+        sessionStartedAtMonoMs = 0L
+    }
 }
 
 object ServerSupportAdInitializer {
@@ -136,16 +263,17 @@ enum class BannerAdLoadPhase {
 }
 
 /**
- * Screen-scoped holder for `NovelDetailScreen`'s inline banner ad.
+ * Screen-scoped holder for an inline adaptive banner ad.
  *
- * Loads strictly on-demand inside the visible, opaque reserved card container when the detail screen
- * is actually opened (never preloaded into an off-screen/0-alpha container during cold start),
+ * Loads strictly on-demand inside the visible, opaque reserved card container once the slot is
+ * measured on screen (never preloaded into an off-screen/0-alpha container during cold start),
  * survives `LazyColumn` scrolling within the visit without re-requesting, and destroys its `AdView`
- * cleanly when leaving the screen.
+ * cleanly when leaving the screen or when a fresh placement/nonce is requested.
  */
 @Stable
 class NovelDetailBannerAdHolder internal constructor(
     initialPhase: BannerAdLoadPhase,
+    val placement: InlineBannerPlacement = InlineBannerPlacement.NOVEL_DETAIL_STANDARD,
 ) {
     var phase by mutableStateOf(initialPhase)
         internal set
@@ -155,6 +283,7 @@ class NovelDetailBannerAdHolder internal constructor(
 
     internal var loadInProgress: Boolean = false
     internal var loadedWidthDp: Int = 0
+    internal var isDisposed: Boolean = false
 
     /**
      * Render the visible, opaque reserved card during [BannerAdLoadPhase.Loading] (preventing
@@ -188,7 +317,10 @@ class NovelDetailBannerAdHolder internal constructor(
         runCatching { adView?.resume() }
     }
 
-    internal fun destroy() {
+    internal fun destroy(markDisposed: Boolean = false) {
+        if (markDisposed) {
+            isDisposed = true
+        }
         loadInProgress = false
         loadedWidthDp = 0
         val existing = adView
@@ -205,28 +337,31 @@ class NovelDetailBannerAdHolder internal constructor(
 @Composable
 fun rememberNovelDetailBannerAdHolder(
     aid: Int,
+    placement: InlineBannerPlacement = InlineBannerPlacement.NOVEL_DETAIL_STANDARD,
+    requestNonce: Int = 0,
     isNetworkAvailableOverride: Boolean? = null,
     isGmsAvailableOverride: Boolean? = null,
     enableLiveAdViewInflation: Boolean = true,
 ): NovelDetailBannerAdHolder {
     val context = LocalContext.current
-    val configuration = LocalConfiguration.current
     val lifecycleOwner = LocalLifecycleOwner.current
-    val isOnline = isNetworkAvailableOverride ?: remember(aid, context) {
+    val isOnline = isNetworkAvailableOverride ?: remember(aid, placement, requestNonce, context) {
         hasActiveInternetCapability(context)
     }
-    val isGmsReady = isGmsAvailableOverride ?: remember(aid, context) {
+    val isGmsReady = isGmsAvailableOverride ?: remember(aid, placement, requestNonce, context) {
         isGooglePlayServicesReady(context)
     }
-    val hostActivity = remember(context) { context.findHostActivity() }
 
-    val holder = remember(aid, isOnline, isGmsReady, enableLiveAdViewInflation) {
+    val holder = remember(aid, placement, requestNonce, isOnline, isGmsReady, enableLiveAdViewInflation) {
         val initialPhase = when {
             !isOnline || !isGmsReady -> BannerAdLoadPhase.Collapsed
             !enableLiveAdViewInflation -> BannerAdLoadPhase.StaticPreview
             else -> BannerAdLoadPhase.Loading
         }
-        NovelDetailBannerAdHolder(initialPhase = initialPhase)
+        NovelDetailBannerAdHolder(
+            initialPhase = initialPhase,
+            placement = placement,
+        )
     }
 
     DisposableEffect(holder, lifecycleOwner) {
@@ -240,62 +375,39 @@ fun rememberNovelDetailBannerAdHolder(
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose {
             lifecycleOwner.lifecycle.removeObserver(observer)
-            holder.destroy()
+            holder.destroy(markDisposed = true)
         }
-    }
-
-    val availableWidthDp = (configuration.screenWidthDp - 32).coerceAtLeast(160)
-
-    LaunchedEffect(holder, isOnline, isGmsReady, enableLiveAdViewInflation, availableWidthDp) {
-        if (!isOnline || !isGmsReady || !enableLiveAdViewInflation) {
-            return@LaunchedEffect
-        }
-        val needsNarrowReload = holder.adView != null &&
-            holder.loadedWidthDp >= 320 &&
-            availableWidthDp < 320 &&
-            !holder.loadInProgress
-        if (needsNarrowReload) {
-            holder.destroy()
-            holder.phase = BannerAdLoadPhase.Loading
-        }
-        if (holder.phase != BannerAdLoadPhase.Loading || holder.loadInProgress || holder.adView != null) {
-            return@LaunchedEffect
-        }
-
-        withFrameNanos { }
-        startHolderBannerLoad(
-            holder = holder,
-            context = context,
-            hostContext = hostActivity ?: context,
-            availableWidthDp = availableWidthDp,
-        )
     }
 
     return holder
 }
 
-private suspend fun startHolderBannerLoad(
+internal suspend fun startHolderBannerLoad(
     holder: NovelDetailBannerAdHolder,
     context: Context,
     hostContext: Context,
     availableWidthDp: Int,
 ) {
-    if (holder.phase != BannerAdLoadPhase.Loading || holder.loadInProgress || holder.adView != null) {
+    val safeWidthDp = availableWidthDp.coerceAtLeast(160)
+    if (holder.isDisposed || holder.phase != BannerAdLoadPhase.Loading || holder.loadInProgress || holder.adView != null) {
         return
     }
     holder.loadInProgress = true
     ServerSupportAdInitializer.ensureInitialized(context)
 
-    if (holder.phase != BannerAdLoadPhase.Loading || holder.adView != null) {
+    if (holder.isDisposed || holder.phase != BannerAdLoadPhase.Loading || holder.adView != null) {
         holder.loadInProgress = false
         return
     }
 
-    val candidateUnits = ServerSupportAdConstants.candidateBannerAdUnitIds()
-    val resolvedAdSize = resolveBannerAdSize(hostContext, availableWidthDp)
+    val candidateUnits = ServerSupportAdConstants.candidateBannerAdUnitIds(placement = holder.placement)
+    val resolvedAdSize = resolveInlineAdaptiveBannerAdSize(
+        availableWidthDp = safeWidthDp,
+        placement = holder.placement,
+    )
 
     fun tryLoadUnitAt(unitIndex: Int) {
-        if (holder.phase == BannerAdLoadPhase.Loaded) {
+        if (holder.isDisposed || holder.phase == BannerAdLoadPhase.Loaded) {
             holder.loadInProgress = false
             return
         }
@@ -308,18 +420,23 @@ private suspend fun startHolderBannerLoad(
 
         holder.destroy()
         holder.loadInProgress = true
-        holder.loadedWidthDp = availableWidthDp
+        holder.loadedWidthDp = safeWidthDp
         val nextAdView = runCatching {
             AdView(hostContext).apply {
                 setAdSize(resolvedAdSize)
                 adUnitId = adUnit
                 adListener = object : AdListener() {
                     override fun onAdLoaded() {
+                        if (holder.isDisposed) {
+                            holder.destroy(markDisposed = true)
+                            return
+                        }
                         holder.loadInProgress = false
                         holder.phase = BannerAdLoadPhase.Loaded
                     }
 
                     override fun onAdFailedToLoad(error: LoadAdError) {
+                        if (holder.isDisposed) return
                         if (unitIndex + 1 < candidateUnits.size) {
                             tryLoadUnitAt(unitIndex + 1)
                         } else {
@@ -345,12 +462,14 @@ private suspend fun startHolderBannerLoad(
 @Composable
 fun ServerSupportBannerAd(
     modifier: Modifier = Modifier,
+    placement: InlineBannerPlacement = InlineBannerPlacement.NOVEL_DETAIL_STANDARD,
     isNetworkAvailableOverride: Boolean? = null,
     isGmsAvailableOverride: Boolean? = null,
     enableLiveAdViewInflation: Boolean = true,
 ) {
     val holder = rememberNovelDetailBannerAdHolder(
         aid = 0,
+        placement = placement,
         isNetworkAvailableOverride = isNetworkAvailableOverride,
         isGmsAvailableOverride = isGmsAvailableOverride,
         enableLiveAdViewInflation = enableLiveAdViewInflation,
@@ -362,12 +481,17 @@ fun ServerSupportBannerAd(
 }
 
 /**
- * Policy-compliant, zero-CLS inline banner card rendered on-demand inside scrollable content.
+ * Policy-compliant, zero-CLS inline adaptive banner card rendered on-demand inside scrollable
+ * content. Measures the exact slot width via [BoxWithConstraints] (correctly supporting both phones
+ * and two-pane tablets) before requesting the `AdView`.
  */
 @Composable
 fun ServerSupportBannerAd(
     holder: NovelDetailBannerAdHolder,
     modifier: Modifier = Modifier,
+    cardTestTag: String = NovelDetailTestTags.SERVER_SUPPORT_AD_CARD,
+    slotTestTag: String = NovelDetailTestTags.SERVER_SUPPORT_AD_SLOT,
+    useElevatedTonalContainer: Boolean = false,
 ) {
     if (!holder.shouldRenderVisibleCard) {
         return
@@ -376,15 +500,20 @@ fun ServerSupportBannerAd(
     val context = LocalContext.current
     val hostActivity = remember(context) { context.findHostActivity() }
     val liveAdView = holder.adView
+    val cardShape = MaterialTheme.shapes.medium
     Card(
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+            containerColor = if (useElevatedTonalContainer) {
+                MaterialTheme.colorScheme.surfaceContainer
+            } else {
+                MaterialTheme.colorScheme.surfaceContainerLow
+            },
         ),
-        shape = MaterialTheme.shapes.medium,
+        shape = cardShape,
         modifier = modifier
             .fillMaxWidth()
-            .testTag(NovelDetailTestTags.SERVER_SUPPORT_AD_CARD)
-            .einkHairlineBorder(MaterialTheme.shapes.medium),
+            .testTag(cardTestTag)
+            .einkHairlineBorder(cardShape),
     ) {
         Column(
             modifier = Modifier
@@ -401,20 +530,25 @@ fun ServerSupportBannerAd(
             BoxWithConstraints(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .heightIn(min = ServerSupportAdConstants.RESERVED_BANNER_SLOT_HEIGHT)
-                    .testTag(NovelDetailTestTags.SERVER_SUPPORT_AD_SLOT),
+                    .heightIn(min = holder.placement.reservedMinHeight)
+                    .testTag(slotTestTag),
                 contentAlignment = Alignment.Center,
             ) {
-                val slotWidthDp = maxWidth.value.toInt()
-                LaunchedEffect(holder, slotWidthDp, liveAdView) {
-                    if (
-                        liveAdView != null &&
-                        slotWidthDp in 160 until 320 &&
-                        holder.loadedWidthDp >= 320 &&
+                val slotWidthDp = maxWidth.value.toInt().coerceAtLeast(160)
+                LaunchedEffect(holder, slotWidthDp) {
+                    if (holder.phase == BannerAdLoadPhase.StaticPreview || holder.phase == BannerAdLoadPhase.Collapsed || holder.phase == BannerAdLoadPhase.Failed) {
+                        return@LaunchedEffect
+                    }
+                    val needsWidthReload = holder.adView != null &&
+                        holder.loadedWidthDp > 0 &&
+                        abs(slotWidthDp - holder.loadedWidthDp) >= 48 &&
                         !holder.loadInProgress
-                    ) {
+                    if (needsWidthReload) {
                         holder.destroy()
                         holder.phase = BannerAdLoadPhase.Loading
+                    }
+                    if (holder.phase == BannerAdLoadPhase.Loading && holder.adView == null && !holder.loadInProgress) {
+                        withFrameNanos { }
                         startHolderBannerLoad(
                             holder = holder,
                             context = context,
@@ -429,11 +563,6 @@ fun ServerSupportBannerAd(
                             (liveAdView.parent as? ViewGroup)?.removeView(liveAdView)
                             liveAdView
                         },
-                        update = { view ->
-                            if (view.parent == null) {
-                                // AndroidView re-attaches the returned view automatically.
-                            }
-                        },
                         modifier = Modifier
                             .fillMaxWidth()
                             .wrapContentHeight(),
@@ -444,15 +573,15 @@ fun ServerSupportBannerAd(
     }
 }
 
-private fun resolveBannerAdSize(context: Context, availableWidthDp: Int): AdSize {
-    return if (availableWidthDp >= 320) {
-        AdSize.BANNER
-    } else {
-        AdSize.getCurrentOrientationAnchoredAdaptiveBannerAdSize(context, availableWidthDp)
-    }
+internal fun resolveInlineAdaptiveBannerAdSize(
+    availableWidthDp: Int,
+    placement: InlineBannerPlacement = InlineBannerPlacement.NOVEL_DETAIL_STANDARD,
+): AdSize {
+    val safeWidthDp = availableWidthDp.coerceAtLeast(160)
+    return AdSize.getInlineAdaptiveBannerAdSize(safeWidthDp, placement.maxHeightDp)
 }
 
-private tailrec fun Context.findHostActivity(): Activity? = when (this) {
+internal tailrec fun Context.findHostActivity(): Activity? = when (this) {
     is Activity -> this
     is ContextWrapper -> baseContext.findHostActivity()
     else -> null
