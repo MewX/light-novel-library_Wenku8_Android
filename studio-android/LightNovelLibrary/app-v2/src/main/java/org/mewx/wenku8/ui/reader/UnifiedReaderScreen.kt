@@ -1082,9 +1082,16 @@ fun UnifiedReaderScreen(
                             pageOffsetFraction = pagerState.currentPageOffsetFraction,
                         )
                         syncedSnapshotTracker.pendingPostSyncSettlePage = shiftedStepTarget
+                        syncedSnapshotTracker.pendingPostSyncShouldAnimate = false
                     } else {
                         val shiftedCurrent = (pagerState.currentPage + deltaPrev).coerceIn(0, maxPage)
-                        val keepFraction = if (pagerState.isScrollInProgress) {
+                        val wasScrolling = pagerState.isScrollInProgress
+                        val shiftedTarget = if (wasScrolling) {
+                            (pagerState.targetPage + deltaPrev).coerceIn(0, maxPage)
+                        } else {
+                            shiftedCurrent
+                        }
+                        val keepFraction = if (wasScrolling) {
                             pagerState.currentPageOffsetFraction
                         } else {
                             0f
@@ -1097,19 +1104,22 @@ fun UnifiedReaderScreen(
                                 pageOffsetFraction = keepFraction,
                             )
                         }
-                        syncedSnapshotTracker.pendingPostSyncSettlePage =
-                            if (!pagerState.isScrollInProgress &&
-                                shiftedCurrent != snapshot.activeVirtualPageIndex
-                            ) {
-                                shiftedCurrent
-                            } else {
-                                -1
-                            }
+                        val strandedNonZeroScroll = wasScrolling && kotlin.math.abs(keepFraction) > 0.0005f
+                        syncedSnapshotTracker.pendingPostSyncSettlePage = when {
+                            // `requestScrollToPage` cancels any in-flight swipe/fling (`stopScroll()`).
+                            // Always schedule a post-sync settle back to `0f` so the pager never
+                            // stays frozen at a fractional offset!
+                            strandedNonZeroScroll -> shiftedTarget
+                            !wasScrolling && shiftedCurrent != snapshot.activeVirtualPageIndex -> shiftedCurrent
+                            else -> -1
+                        }
+                        syncedSnapshotTracker.pendingPostSyncShouldAnimate = strandedNonZeroScroll
                     }
                 } else {
                     inFlightStepRef[0] = null
                     interruptedStepRef[0] = null
                     syncedSnapshotTracker.pendingPostSyncSettlePage = -1
+                    syncedSnapshotTracker.pendingPostSyncShouldAnimate = false
                     syncedSnapshotTracker.wasScrollingAtExplicitReset = pagerState.isScrollInProgress
                     val target = snapshot.activeVirtualPageIndex.coerceIn(0, maxPage)
                     if (pagerState.currentPage != target || pagerState.currentPageOffsetFraction != 0f) {
@@ -1128,23 +1138,39 @@ fun UnifiedReaderScreen(
 
             if (syncedSnapshotTracker.lastRevisionWasPrevSlotTranslationOnly) {
                 val settleTarget = syncedSnapshotTracker.pendingPostSyncSettlePage
+                val shouldAnimateSettle = syncedSnapshotTracker.pendingPostSyncShouldAnimate
                 if (settleTarget in 0..maxPage) {
                     syncedSnapshotTracker.pendingPostSyncSettlePage = -1
+                    syncedSnapshotTracker.pendingPostSyncShouldAnimate = false
+                    var settleInterrupted = false
                     if (pagerState.currentPage != settleTarget || pagerState.currentPageOffsetFraction != 0f) {
+                        val instantFlip = latestIsEinkMode ||
+                            latestPageTurnMode == ReaderPageTurnMode.EINK_INSTANT
                         programmaticSnapCount += 1
                         try {
-                            pagerState.scrollToPage(settleTarget)
+                            if (shouldAnimateSettle && !instantFlip) {
+                                try {
+                                    pagerState.animateScrollToPage(settleTarget)
+                                } catch (ce: CancellationException) {
+                                    if (!currentCoroutineContext().isActive) throw ce
+                                    settleInterrupted = true
+                                }
+                            } else {
+                                pagerState.scrollToPage(settleTarget)
+                            }
                         } finally {
                             programmaticSnapCount -= 1
                         }
                     }
-                    if (inFlightStepRef[0] == null) {
-                        interruptedStepRef[0] = null
+                    if (!settleInterrupted) {
+                        if (inFlightStepRef[0] == null) {
+                            interruptedStepRef[0] = null
+                        }
+                        windowBuffer.onVirtualPageSettled(
+                            virtualPageIndex = settleTarget,
+                            expectedCoordinateRevision = rev,
+                        )
                     }
-                    windowBuffer.onVirtualPageSettled(
-                        virtualPageIndex = settleTarget,
-                        expectedCoordinateRevision = rev,
-                    )
                 }
             } else {
                 stepAnimationJob?.cancel()
@@ -1189,29 +1215,55 @@ fun UnifiedReaderScreen(
 
         LaunchedEffect(pagerState) {
             snapshotFlow {
-                Triple(
-                    pagerState.settledPage,
-                    pagerState.isScrollInProgress,
-                    latestWindowSnapshot.coordinateRevision,
+                IdlePagerObservation(
+                    settledPage = pagerState.settledPage,
+                    currentPage = pagerState.currentPage,
+                    hasStrandedOffset = kotlin.math.abs(pagerState.currentPageOffsetFraction) > 0.0005f,
+                    isScrolling = pagerState.isScrollInProgress,
+                    coordinateRevision = latestWindowSnapshot.coordinateRevision,
                 )
             }
                 .distinctUntilChanged()
-                .collect { (settledPage, scrolling, rev) ->
+                .collect { obs ->
                     val curSnap = latestWindowSnapshot
-                    if (!scrolling &&
+                    if (!obs.isScrolling &&
                         programmaticSnapCount == 0 &&
                         inFlightStepRef[0] == null
                     ) {
                         interruptedStepRef[0] = null
+                        if (obs.hasStrandedOffset &&
+                            curSnap.totalVirtualPages > 0 &&
+                            curSnap.coordinateRevision == obs.coordinateRevision &&
+                            syncedSnapshotTracker.revision == obs.coordinateRevision
+                        ) {
+                            val snapPage = obs.currentPage.coerceIn(0, curSnap.totalVirtualPages - 1)
+                            val instantFlip = latestIsEinkMode ||
+                                latestPageTurnMode == ReaderPageTurnMode.EINK_INSTANT
+                            programmaticSnapCount += 1
+                            try {
+                                if (instantFlip) {
+                                    pagerState.scrollToPage(snapPage)
+                                } else {
+                                    try {
+                                        pagerState.animateScrollToPage(snapPage)
+                                    } catch (ce: CancellationException) {
+                                        if (!currentCoroutineContext().isActive) throw ce
+                                    }
+                                }
+                            } finally {
+                                programmaticSnapCount -= 1
+                            }
+                            return@collect
+                        }
                         if (curSnap.currentSlot != null &&
-                            curSnap.coordinateRevision == rev &&
-                            syncedSnapshotTracker.revision == rev &&
-                            pagerState.currentPage == settledPage &&
-                            settledPage != curSnap.activeVirtualPageIndex
+                            curSnap.coordinateRevision == obs.coordinateRevision &&
+                            syncedSnapshotTracker.revision == obs.coordinateRevision &&
+                            obs.currentPage == obs.settledPage &&
+                            obs.settledPage != curSnap.activeVirtualPageIndex
                         ) {
                             windowBuffer.onVirtualPageSettled(
-                                virtualPageIndex = settledPage,
-                                expectedCoordinateRevision = rev,
+                                virtualPageIndex = obs.settledPage,
+                                expectedCoordinateRevision = obs.coordinateRevision,
                             )
                         }
                     }
@@ -3705,6 +3757,15 @@ private class PagerCoordinateSyncTracker(
     var lastRevisionWasPrevSlotTranslationOnly: Boolean = false,
     var wasScrollingAtExplicitReset: Boolean = false,
     var pendingPostSyncSettlePage: Int = -1,
+    var pendingPostSyncShouldAnimate: Boolean = false,
+)
+
+private data class IdlePagerObservation(
+    val settledPage: Int,
+    val currentPage: Int,
+    val hasStrandedOffset: Boolean,
+    val isScrolling: Boolean,
+    val coordinateRevision: Long,
 )
 
 private class InFlightStepTarget(

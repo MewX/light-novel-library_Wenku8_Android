@@ -266,6 +266,38 @@ internal fun computeCoverSlideShadowSpec(
 }
 
 /**
+ * Horizontal clip interval `[leftX, rightX]` (in page-local pixels) for the revealed portion of a
+ * pinned underlying page in overlapping page-turn modes ([ReaderPageTurnMode.COVER_SLIDE] and
+ * [ReaderPageTurnMode.SIMULATION_CURL]).
+ */
+data class PageTransitionClipBounds(
+    val leftX: Float,
+    val rightX: Float,
+)
+
+/**
+ * Computes the revealed right-hand clip region for a pinned underlying incoming page
+ * (`pageOffset` in `(-0.999f, -0.001f)`) during a [ReaderPageTurnMode.COVER_SLIDE] or
+ * [ReaderPageTurnMode.SIMULATION_CURL] transition.
+ *
+ * Clipping the underlying page strictly to `[upperPageRightEdgeX, viewportWidthPx]` ensures the
+ * upper and lower pages occupy disjoint horizontal partitions and can never bleed through or
+ * overlap each other even when the upper page has a transparent canvas over a custom day wallpaper.
+ */
+internal fun computeLowerPageRevealClip(
+    pageOffset: Float,
+    viewportWidthPx: Float,
+): PageTransitionClipBounds? {
+    if (viewportWidthPx <= 0f) return null
+    if (pageOffset >= -0.001f || pageOffset <= -0.999f) return null
+    val revealLeftX = (-pageOffset * viewportWidthPx).coerceIn(0f, viewportWidthPx)
+    return PageTransitionClipBounds(
+        leftX = revealLeftX,
+        rightX = viewportWidthPx,
+    )
+}
+
+/**
  * Tap actions emitted by the 3x3 reader tap-zone matrix (`10-next-gen-reader-engine-architecture.md` §6).
  */
 enum class ReaderTapZoneAction {
@@ -805,8 +837,6 @@ fun ReaderViewportHost(
                         .testTag(ReaderTestTags.PAGED_HORIZONTAL_PAGER),
                 ) { virtualPageIndex ->
                     val resolution = snapshot.resolveVirtualPage(virtualPageIndex)
-                    val pageOffset = (pagerState.currentPage - virtualPageIndex) +
-                        pagerState.currentPageOffsetFraction
                     val isActiveViewportPage = virtualPageIndex == pagerState.currentPage
 
                     Box(
@@ -815,7 +845,10 @@ fun ReaderViewportHost(
                             .applyPageTurnTransition(
                                 mode = effectiveMode,
                                 virtualPageIndex = virtualPageIndex,
-                                pageOffset = pageOffset,
+                                pageOffsetProvider = {
+                                    (pagerState.currentPage - virtualPageIndex) +
+                                        pagerState.currentPageOffsetFraction
+                                },
                                 paperBackground = palette.backgroundColor,
                                 hasCustomDayWallpaper = palette.customDayBackgroundFile != null,
                                 parchmentAssets = activeParchmentAssets,
@@ -855,7 +888,7 @@ fun ReaderViewportHost(
 private fun Modifier.applyPageTurnTransition(
     mode: ReaderPageTurnMode,
     virtualPageIndex: Int,
-    pageOffset: Float,
+    pageOffsetProvider: () -> Float,
     paperBackground: Color,
     hasCustomDayWallpaper: Boolean,
     parchmentAssets: ReaderParchmentBackgroundAssets?,
@@ -866,9 +899,11 @@ private fun Modifier.applyPageTurnTransition(
             this
                 .zIndex(-virtualPageIndex.toFloat())
                 .graphicsLayer {
+                    val pageOffset = pageOffsetProvider()
                     // Hide idle off-stage beyondViewportPageCount neighbors so they never bleed through.
                     if (abs(pageOffset) >= 0.999f) {
                         alpha = 0f
+                        translationX = 0f
                     } else {
                         alpha = 1f
                         // `pageOffset > 0f`: outgoing upper page slides off to the left naturally.
@@ -877,35 +912,74 @@ private fun Modifier.applyPageTurnTransition(
                     }
                 }
                 .drawWithContent {
+                    val pageOffset = pageOffsetProvider()
                     if (abs(pageOffset) >= 0.999f) return@drawWithContent
-                    if (!hasCustomDayWallpaper) {
-                        drawReaderPaperBackground(
-                            paperBackground = paperBackground,
-                            parchmentAssets = parchmentAssets,
-                        )
-                    }
-                    drawContent()
-                    // Ambient drop shadow cast by the sliding upper page's right edge onto the
-                    // pinned underlying page, moving right-to-left (`size.width -> 0f`) in lockstep
-                    // with the upper page's edge!
-                    val shadowSpec = computeCoverSlideShadowSpec(
+                    val lowerRevealClip = computeLowerPageRevealClip(
                         pageOffset = pageOffset,
                         viewportWidthPx = size.width,
-                        shadowWidthPx = spineShadowWidthDp.toPx(),
                     )
-                    if (shadowSpec != null) {
-                        drawRect(
-                            brush = Brush.horizontalGradient(
-                                colors = listOf(
-                                    Color.Black.copy(alpha = shadowSpec.startAlpha),
-                                    Color.Transparent,
-                                ),
-                                startX = shadowSpec.startX,
-                                endX = shadowSpec.startX + shadowSpec.widthPx,
-                            ),
-                            topLeft = Offset(shadowSpec.startX, 0f),
-                            size = Size(shadowSpec.widthPx, size.height),
-                        )
+                    if (lowerRevealClip != null) {
+                        // Incoming pinned page (`pageOffset < 0f`): clip strictly to the revealed
+                        // right-hand strip `[upperPageRightEdgeX, width]` so the lower page can
+                        // never bleed through a transparent custom-wallpaper upper page.
+                        if (lowerRevealClip.rightX - lowerRevealClip.leftX > 0.5f) {
+                            drawContext.canvas.save()
+                            drawContext.canvas.clipRect(
+                                left = lowerRevealClip.leftX,
+                                top = 0f,
+                                right = lowerRevealClip.rightX,
+                                bottom = size.height,
+                            )
+                            if (!hasCustomDayWallpaper) {
+                                drawReaderPaperBackground(
+                                    paperBackground = paperBackground,
+                                    parchmentAssets = parchmentAssets,
+                                )
+                            }
+                            drawContent()
+                            // Ambient drop shadow cast by the sliding upper page's right edge onto
+                            // the pinned underlying page, moving right-to-left (`size.width -> 0f`)
+                            // in lockstep with the upper page's edge!
+                            val shadowSpec = computeCoverSlideShadowSpec(
+                                pageOffset = pageOffset,
+                                viewportWidthPx = size.width,
+                                shadowWidthPx = spineShadowWidthDp.toPx(),
+                            )
+                            if (shadowSpec != null) {
+                                drawRect(
+                                    brush = Brush.horizontalGradient(
+                                        colors = listOf(
+                                            Color.Black.copy(alpha = shadowSpec.startAlpha),
+                                            Color.Transparent,
+                                        ),
+                                        startX = shadowSpec.startX,
+                                        endX = shadowSpec.startX + shadowSpec.widthPx,
+                                    ),
+                                    topLeft = Offset(shadowSpec.startX, 0f),
+                                    size = Size(shadowSpec.widthPx, size.height),
+                                )
+                            }
+                            drawContext.canvas.restore()
+                        }
+                    } else {
+                        // Outgoing upper page (`pageOffset > 0f`) or settled current page.
+                        // Clip upper sliding page to its own `[0, width]` bounds so glyph overhang
+                        // never bleeds past its right edge into the revealed lower page.
+                        val clipUpperBounds = pageOffset > 0.001f
+                        if (clipUpperBounds) {
+                            drawContext.canvas.save()
+                            drawContext.canvas.clipRect(0f, 0f, size.width, size.height)
+                        }
+                        if (!hasCustomDayWallpaper) {
+                            drawReaderPaperBackground(
+                                paperBackground = paperBackground,
+                                parchmentAssets = parchmentAssets,
+                            )
+                        }
+                        drawContent()
+                        if (clipUpperBounds) {
+                            drawContext.canvas.restore()
+                        }
                     }
                 }
         }
@@ -914,8 +988,10 @@ private fun Modifier.applyPageTurnTransition(
             this
                 .zIndex(-virtualPageIndex.toFloat())
                 .graphicsLayer {
+                    val pageOffset = pageOffsetProvider()
                     if (abs(pageOffset) >= 0.999f) {
                         alpha = 0f
+                        translationX = 0f
                     } else {
                         alpha = 1f
                         // Both outgoing (`pageOffset > 0f`) and incoming (`pageOffset < 0f`) pages stay
@@ -924,15 +1000,40 @@ private fun Modifier.applyPageTurnTransition(
                     }
                 }
                 .drawWithContent {
+                    val pageOffset = pageOffsetProvider()
                     if (abs(pageOffset) >= 0.999f) return@drawWithContent
-                    if (pageOffset <= 0.002f) {
-                        if (!hasCustomDayWallpaper) {
-                            drawReaderPaperBackground(
-                                paperBackground = paperBackground,
-                                parchmentAssets = parchmentAssets,
-                            )
+                    if (pageOffset <= 0.001f) {
+                        val lowerRevealClip = computeLowerPageRevealClip(
+                            pageOffset = pageOffset,
+                            viewportWidthPx = size.width,
+                        )
+                        if (lowerRevealClip != null) {
+                            if (lowerRevealClip.rightX - lowerRevealClip.leftX > 0.5f) {
+                                drawContext.canvas.save()
+                                drawContext.canvas.clipRect(
+                                    left = lowerRevealClip.leftX,
+                                    top = 0f,
+                                    right = lowerRevealClip.rightX,
+                                    bottom = size.height,
+                                )
+                                if (!hasCustomDayWallpaper) {
+                                    drawReaderPaperBackground(
+                                        paperBackground = paperBackground,
+                                        parchmentAssets = parchmentAssets,
+                                    )
+                                }
+                                drawContent()
+                                drawContext.canvas.restore()
+                            }
+                        } else {
+                            if (!hasCustomDayWallpaper) {
+                                drawReaderPaperBackground(
+                                    paperBackground = paperBackground,
+                                    parchmentAssets = parchmentAssets,
+                                )
+                            }
+                            drawContent()
                         }
-                        drawContent()
                     } else {
                         // Outgoing curling page: clip paper & ink together to cylinder fold `foldX`
                         // so the underlying incoming page shows cleanly to the right of `foldX`!

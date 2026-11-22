@@ -3,6 +3,8 @@ package org.mewx.wenku8.ui.reader
 import android.app.Activity
 import android.content.ContextWrapper
 import android.content.Intent
+import android.graphics.Bitmap
+import android.graphics.Color as AndroidColor
 import android.view.KeyEvent as AndroidKeyEvent
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.pager.rememberPagerState
@@ -13,11 +15,13 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertTextEquals
+import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.v2.createComposeRule
@@ -64,8 +68,12 @@ import org.mewx.wenku8.data.repository.ParsedVolumeToc
 import org.mewx.wenku8.reader.engine.ChapterWindowBuffer
 import org.mewx.wenku8.reader.engine.ChapterWindowSlot
 import org.mewx.wenku8.reader.engine.DeterministicCellLineBreaker
+import org.mewx.wenku8.reader.engine.PaginatedChapterLayout
 import org.mewx.wenku8.reader.engine.ReaderLayoutConfig
+import org.mewx.wenku8.reader.engine.ReaderPage
+import org.mewx.wenku8.reader.engine.ReaderPageElement
 import org.mewx.wenku8.reader.engine.ReaderWindowSnapshot
+import org.mewx.wenku8.reader.engine.ReadingAnchor
 import org.mewx.wenku8.reader.engine.StaticLayoutPaginator
 import org.mewx.wenku8.reader.engine.WenkuChapterParser
 import org.mewx.wenku8.reader.model.ReaderPageTurnMode
@@ -1434,6 +1442,345 @@ class UnifiedReaderScreenTest {
             .getUnclippedBoundsInRoot()
         assertEquals(0f, scrollViewportBounds.top.value, 0.5f)
         assertEquals(simulatedTopCutout.value, scrollListBounds.top.value, 1f)
+    }
+
+    @Test
+    fun lowerPageRevealClip_partitionsOverlappingTransitionsWithoutOverlap() {
+        // Settled, off-stage, upper-page, and degenerate widths require no lower-page reveal clip.
+        assertNull(computeLowerPageRevealClip(pageOffset = 0f, viewportWidthPx = 1000f))
+        assertNull(computeLowerPageRevealClip(pageOffset = -1f, viewportWidthPx = 1000f))
+        assertNull(computeLowerPageRevealClip(pageOffset = -0.999f, viewportWidthPx = 1000f))
+        assertNull(computeLowerPageRevealClip(pageOffset = 0.25f, viewportWidthPx = 1000f))
+        assertNull(computeLowerPageRevealClip(pageOffset = -0.5f, viewportWidthPx = 0f))
+
+        // Issue #205 exact geometry (~3.2% left shift -> incoming pageOffset = -0.968f):
+        // lower page is clipped strictly to [968, 1000], matching the cast shadow's startX.
+        val clipNearStart = computeLowerPageRevealClip(pageOffset = -0.968f, viewportWidthPx = 1000f)
+        val shadowNearStart = computeCoverSlideShadowSpec(
+            pageOffset = -0.968f,
+            viewportWidthPx = 1000f,
+            shadowWidthPx = 24f,
+        )
+        assertNotNull(clipNearStart)
+        assertNotNull(shadowNearStart)
+        assertEquals(968f, clipNearStart!!.leftX, 0.01f)
+        assertEquals(1000f, clipNearStart.rightX, 0.01f)
+        assertEquals(shadowNearStart!!.startX, clipNearStart.leftX, 0.01f)
+
+        // Mid-turn (50%) and near-finish (90%): upper page covers [0, (1 - p) * W] and lower page
+        // is clipped to [(1 - p) * W, W], forming a strictly disjoint horizontal partition.
+        val clipMid = computeLowerPageRevealClip(pageOffset = -0.50f, viewportWidthPx = 1000f)
+        val clipLate = computeLowerPageRevealClip(pageOffset = -0.10f, viewportWidthPx = 1000f)
+        assertEquals(500f, clipMid!!.leftX, 0.01f)
+        assertEquals(1000f, clipMid.rightX, 0.01f)
+        assertEquals(100f, clipLate!!.leftX, 0.01f)
+        assertEquals(1000f, clipLate.rightX, 0.01f)
+    }
+
+    @Test
+    fun customDayWallpaper_midTurnInCoverSlideAndSimulationCurl_neverBleedsLowerPageIntoUpperRegion() {
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        val customBgFile = File.createTempFile("wenku8_issue205_custom_bg_", ".png", context.cacheDir)
+        try {
+            // Write a valid solid warm-cream custom day wallpaper image.
+            val bgBitmap = Bitmap.createBitmap(32, 32, Bitmap.Config.ARGB_8888).apply {
+                eraseColor(AndroidColor.rgb(245, 232, 210))
+            }
+            customBgFile.outputStream().use { out ->
+                bgBitmap.compress(Bitmap.CompressFormat.PNG, 100, out)
+            }
+            bgBitmap.recycle()
+
+            val chapter = OrderedChapterWithVolume(
+                aid = 2050,
+                vid = 601,
+                volumeOrder = 0,
+                volumeTitle = "第二卷",
+                cid = 6050,
+                chapterOrder = 0,
+                chapterTitle = "第六章 绯红的誓言",
+                isIllustrationChapter = false,
+            )
+            val config = ReaderLayoutConfig(
+                viewportWidthPx = 412,
+                viewportHeightPx = 892,
+                fontSizePx = 28f,
+                lineDistancePx = 10f,
+                paragraphDistancePx = 12f,
+                pageEdgeDistancePx = 16f,
+            )
+            val ast = WenkuChapterParser.parse(
+                rawChapterText = "第二卷 第六章 绯红的誓言\n　　测试正文。",
+                aid = chapter.aid,
+                vid = chapter.vid,
+                cid = chapter.cid,
+                volumeTitle = chapter.volumeTitle,
+                chapterTitle = chapter.chapterTitle,
+            )
+            // Page 0 (upper sliding page): intentionally empty so ANY dark ink in [0, 0.85 * W]
+            // can only come from illegal bleed-through of Page 1 underneath!
+            val emptyUpperPage = ReaderPage(
+                cid = chapter.cid,
+                pageIndexInChapter = 0,
+                totalPagesInChapter = 2,
+                startAnchor = ReadingAnchor(paragraphIndex = 0, charOffset = 0, progressPermille = 0),
+                endAnchor = ReadingAnchor(paragraphIndex = 0, charOffset = 0, progressPermille = 0),
+                characterCountOnPage = 0,
+                isFullBleedArtbookPage = true,
+                elements = emptyList(),
+            )
+            // Page 1 (pinned lower page): dense dark ink spanning the full viewport width.
+            val denseLowerElements = (0 until 6).map { row ->
+                val topY = 240f + row * 36f
+                ReaderPageElement.TextLine(
+                    blockIndex = 1,
+                    rawStartChar = row * 20,
+                    rawEndChar = (row + 1) * 20,
+                    text = "████████████████████████████████",
+                    xPx = 0f,
+                    topYPx = topY,
+                    baselineYPx = topY + 26f,
+                    heightPx = 32f,
+                    fontSizePx = 28f,
+                )
+            }
+            val denseLowerPage = ReaderPage(
+                cid = chapter.cid,
+                pageIndexInChapter = 1,
+                totalPagesInChapter = 2,
+                startAnchor = ReadingAnchor(paragraphIndex = 1, charOffset = 0, progressPermille = 1000),
+                endAnchor = ReadingAnchor(paragraphIndex = 1, charOffset = 120, progressPermille = 1000),
+                characterCountOnPage = 120,
+                isFullBleedArtbookPage = true,
+                elements = denseLowerElements,
+            )
+            val layout = PaginatedChapterLayout(
+                ast = ast,
+                config = config,
+                pages = listOf(emptyUpperPage, denseLowerPage),
+            )
+            val snapshot = ReaderWindowSnapshot(
+                aid = chapter.aid,
+                orderedToc = listOf(chapter),
+                currentTocIndex = 0,
+                currentSlot = ChapterWindowSlot.Loaded(chapter = chapter, layout = layout),
+                layoutConfig = config,
+                activeVirtualPageIndex = 0,
+            )
+            val palette = resolveReaderVisualPalette(
+                paperPreset = ReaderPaperPreset.PARCHMENT,
+                isEinkMode = false,
+                customBackgroundPath = customBgFile.absolutePath,
+                customFontPath = "",
+            )
+            assertNotNull(palette.customDayBackgroundFile)
+
+            var mode by mutableStateOf(ReaderPageTurnMode.COVER_SLIDE)
+            composeTestRule.setContent {
+                Wenku8ExpressiveTheme(themeMode = Wenku8ThemeMode.ARCHIVAL_DAY) {
+                    // Hold pager mid-turn at 15% forward swipe: upper Page 0 covers [0, 0.85 * W],
+                    // lower Page 1 is pinned at [0, W] and must ONLY be visible in [0.85 * W, W].
+                    val pagerState = rememberPagerState(
+                        initialPage = 0,
+                        initialPageOffsetFraction = 0.15f,
+                    ) { snapshot.totalVirtualPages }
+                    ReaderViewportHost(
+                        pageTurnMode = mode,
+                        snapshot = snapshot,
+                        pagerState = pagerState,
+                        palette = palette,
+                        fontSizeSp = 28,
+                        lineDistanceDp = 10,
+                        paragraphDistanceDp = 12,
+                        pageEdgeDistanceDp = 16,
+                        leftEdgeBrightnessDragEnabled = false,
+                        contentSafeInsets = WindowInsets(0, 0, 0, 0),
+                        onTapZoneAction = {},
+                        onBrightnessDragDelta = {},
+                        onIllustrationClicked = { _, _ -> },
+                        onContinuousScrollAnchorChanged = { _, _ -> },
+                        onRequestNextChapterInContinuousMode = {},
+                        onRequestPrevChapterInContinuousMode = {},
+                        onRetryFailedSlot = {},
+                        onOpenNetworkDiagnostics = {},
+                    )
+                }
+            }
+
+            fun countDarkInkPixels(bitmap: Bitmap, xStart: Int, xEnd: Int, yStart: Int, yEnd: Int): Int {
+                var count = 0
+                for (y in yStart until yEnd) {
+                    for (x in xStart until xEnd) {
+                        val px = bitmap.getPixel(x, y)
+                        val luma = (AndroidColor.red(px) + AndroidColor.green(px) + AndroidColor.blue(px)) / 3
+                        if (luma < 120) count++
+                    }
+                }
+                return count
+            }
+
+            for (testMode in listOf(ReaderPageTurnMode.COVER_SLIDE, ReaderPageTurnMode.SIMULATION_CURL)) {
+                mode = testMode
+                composeTestRule.waitForIdle()
+                val rendered = composeTestRule
+                    .onNodeWithTag(ReaderTestTags.VIEWPORT_CONTAINER)
+                    .captureToImage()
+                    .asAndroidBitmap()
+                val w = rendered.width
+                val h = rendered.height
+                val yStart = (240f.toInt()).coerceIn(0, h - 1)
+                val yEnd = (450f.toInt()).coerceIn(yStart + 1, h)
+                // Upper-page covered region (well left of 0.85 * W and SIMULATION_CURL crease):
+                // MUST have zero dark ink bleeding through from Page 1 underneath!
+                val upperRegionInk = countDarkInkPixels(
+                    bitmap = rendered,
+                    xStart = (w * 0.10f).toInt(),
+                    xEnd = (w * 0.65f).toInt(),
+                    yStart = yStart,
+                    yEnd = yEnd,
+                )
+                assertEquals(
+                    "Lower page ink bled through transparent custom-wallpaper upper page in $testMode!",
+                    0,
+                    upperRegionInk,
+                )
+
+                // Revealed right-hand strip [0.88 * W, 0.98 * W]: lower Page 1 MUST render cleanly!
+                val revealedStripInk = countDarkInkPixels(
+                    bitmap = rendered,
+                    xStart = (w * 0.88f).toInt(),
+                    xEnd = (w * 0.98f).toInt(),
+                    yStart = yStart,
+                    yEnd = yEnd,
+                )
+                assertTrue(
+                    "Expected revealed lower page ink in right strip for $testMode, got $revealedStripInk",
+                    revealedStripInk > 0,
+                )
+            }
+        } finally {
+            customBgFile.delete()
+        }
+    }
+
+    @Test
+    fun manualSwipe_whilePrevChapterLoads_settlesCleanlyWithoutStrandedFractionalOffset(): Unit = runBlocking {
+        database.novelDao().upsertNovel(
+            NovelEntity(
+                aid = 2305,
+                title = "手势滑页防卡顿偏移测试",
+                author = "测试作者",
+                inBookshelf = true,
+                metaSyncedAtMs = 1_000L,
+            ),
+        )
+        tocSyncRepository.syncNovelIndexAtomically(
+            aid = 2305,
+            language = Wenku8API.AppLanguage.SC,
+            requestStartedAtMs = 2_000L,
+            parsedVolumes = listOf(
+                ParsedVolumeToc(
+                    vid = 905,
+                    volumeTitle = "第一卷",
+                    chapters = listOf(
+                        ParsedChapterToc(cid = 9051, chapterTitle = "第一章 前篇"),
+                        ParsedChapterToc(cid = 9052, chapterTitle = "第二章 本篇"),
+                    ),
+                ),
+            ),
+        )
+        val ch2Body = buildString {
+            appendLine("第一卷 第二章 本篇")
+            repeat(60) { idx ->
+                appendLine("　　第二章本篇第${idx + 1}段测试正文，用于验证手势拖动期间前章加载完成不会导致页面永久停留在小数偏移。")
+            }
+        }
+        database.chapterContentDao().upsertChapterContent(
+            ChapterContentEntity(
+                cid = 9052,
+                aid = 2305,
+                contentLang = Wenku8API.AppLanguage.SC.name,
+                contentText = ch2Body,
+                byteLength = ch2Body.toByteArray().size,
+                sha256Checksum = "sha_9052",
+                downloadedAtMs = 1_700_000_000_000L,
+            ),
+        )
+
+        val prevChapterGate = CompletableDeferred<String>()
+        fakeGateway.gatedChapterResponses[9051] = prevChapterGate
+
+        composeTestRule.setContent {
+            Wenku8ExpressiveTheme(themeMode = Wenku8ThemeMode.ARCHIVAL_DAY) {
+                UnifiedReaderScreen(
+                    launchRequest = ReaderLaunchRequest(
+                        aid = 2305,
+                        vid = 905,
+                        cid = 9052,
+                        novelTitle = "手势滑页防卡顿偏移测试",
+                        volumeTitle = "第一卷",
+                        chapterTitle = "第二章 本篇",
+                    ),
+                    database = database,
+                    catalogGateway = fakeGateway,
+                    novelTocSyncRepository = tocSyncRepository,
+                    preferences = Wenku8UserPreferences(),
+                    onReaderTypographyChanged = { _, _, _, _ -> },
+                    onNavigateBack = {},
+                    lineBreaker = DeterministicCellLineBreaker,
+                    ioDispatcher = Dispatchers.Main.immediate,
+                    computeDispatcher = Dispatchers.Main.immediate,
+                )
+            }
+        }
+
+        composeTestRule.waitUntil(5_000) {
+            composeTestRule
+                .onAllNodesWithTag("${ReaderTestTags.PAGE_CANVAS_PREFIX}CURRENT_0")
+                .fetchSemanticsNodes()
+                .isNotEmpty()
+        }
+
+        composeTestRule.mainClock.autoAdvance = false
+        try {
+            // Start a small manual horizontal drag (~12% viewport width) while `prevSlot` is still loading.
+            composeTestRule.onNodeWithTag(ReaderTestTags.PAGED_HORIZONTAL_PAGER).performTouchInput {
+                down(Offset(width * 0.70f, centerY))
+                moveBy(Offset(-width * 0.12f, 0f), delayMillis = 32)
+            }
+            composeTestRule.mainClock.advanceTimeBy(32)
+
+            // `prevSlot` finishes loading mid-drag, triggering `isPrevSlotTranslationOnly` + `requestScrollToPage`!
+            val ch1LongBody = buildString {
+                appendLine("第一卷 第一章 前篇")
+                repeat(40) { idx ->
+                    appendLine("　　第一章前篇第${idx + 1}段测试正文，占满十余页从而触发大幅虚拟页码偏移。")
+                }
+            }
+            prevChapterGate.complete(ch1LongBody)
+            composeTestRule.mainClock.advanceTimeBy(32)
+
+            composeTestRule.onNodeWithTag(ReaderTestTags.PAGED_HORIZONTAL_PAGER).performTouchInput {
+                up()
+            }
+            repeat(40) {
+                composeTestRule.mainClock.advanceTimeBy(32)
+            }
+        } finally {
+            composeTestRule.mainClock.autoAdvance = true
+        }
+        composeTestRule.waitForIdle()
+
+        // The settled page canvas MUST align flush with x = 0.dp (zero stranded fractional offset)!
+        val settledBounds = composeTestRule
+            .onNodeWithTag("${ReaderTestTags.PAGE_CANVAS_PREFIX}CURRENT_0")
+            .getUnclippedBoundsInRoot()
+        assertEquals(
+            "Expected CURRENT_0 to settle flush at left=0.dp without a stranded fractional offset",
+            0f,
+            settledBounds.left.value,
+            0.5f,
+        )
     }
 }
 
