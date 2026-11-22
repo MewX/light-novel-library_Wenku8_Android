@@ -19,7 +19,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
-import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AutoStories
@@ -75,6 +75,8 @@ import org.mewx.wenku8.domain.model.DiscoveryNovelCardItem
 import org.mewx.wenku8.domain.model.FeedScrollPosition
 import org.mewx.wenku8.domain.model.PaginatedNovelFeedState
 import org.mewx.wenku8.domain.model.normalizeBookStatusText
+import org.mewx.wenku8.ui.detail.ServerSupportBannerAd
+import org.mewx.wenku8.ui.detail.rememberDiscoveryFeedInlineAdPool
 import org.mewx.wenku8.ui.theme.LocalEinkMode
 import org.mewx.wenku8.ui.theme.Wenku8SharedElementKeys
 import org.mewx.wenku8.ui.theme.einkHairlineBorder
@@ -173,6 +175,8 @@ object DiscoveryTestTags {
     const val FEED_ERROR_CARD = "discovery_feed_error_card"
     const val FEED_RETRY_BUTTON = "discovery_feed_retry_button"
     const val FEED_DIAGNOSTICS_CHIP = "discovery_feed_diagnostics_chip"
+    const val FEED_AD_CARD_PREFIX = "discovery_feed_ad_card_"
+    const val FEED_AD_SLOT_PREFIX = "discovery_feed_ad_slot_"
 }
 
 @Composable
@@ -529,6 +533,60 @@ fun rememberDiscoveryFeedScrollStateHolder(
     }
 }
 
+/**
+ * Policy-compliant interleaving cadence for in-feed Discovery (`最新` / `排行`) inline adaptive
+ * banners:
+ * - First ad appears after [FIRST_AD_AFTER_NOVEL_COUNT] novels (never above the fold at index 0).
+ * - Subsequent ads appear every [REPEAT_EVERY_NOVELS] novels thereafter (#14, #24, ...).
+ * - Ads are only inserted when at least one novel follows them, ensuring an inline banner never
+ *   sits directly adjacent to pagination retry/loading footers or dangles at the bottom of short
+ *   feeds.
+ */
+object DiscoveryFeedAdCadence {
+    const val FIRST_AD_AFTER_NOVEL_COUNT = 4
+    const val REPEAT_EVERY_NOVELS = 10
+}
+
+sealed interface DiscoveryFeedEntry {
+    data class Novel(
+        val novelIndex: Int,
+        val item: DiscoveryNovelCardItem,
+    ) : DiscoveryFeedEntry
+
+    data class InlineAd(
+        val slotIndex: Int,
+    ) : DiscoveryFeedEntry
+}
+
+fun buildDiscoveryFeedEntries(
+    items: List<DiscoveryNovelCardItem>,
+    adsEnabled: Boolean,
+): List<DiscoveryFeedEntry> {
+    if (items.isEmpty()) return emptyList()
+    if (!adsEnabled) {
+        return items.mapIndexed { index, item ->
+            DiscoveryFeedEntry.Novel(novelIndex = index, item = item)
+        }
+    }
+    return buildList(items.size + 4) {
+        var nextSlotIndex = 0
+        val lastNovelIndex = items.lastIndex
+        items.forEachIndexed { novelIndex, item ->
+            add(DiscoveryFeedEntry.Novel(novelIndex = novelIndex, item = item))
+            val novelsShown = novelIndex + 1
+            val hasFollowingNovel = novelIndex < lastNovelIndex
+            val shouldInsertAd = hasFollowingNovel &&
+                novelsShown >= DiscoveryFeedAdCadence.FIRST_AD_AFTER_NOVEL_COUNT &&
+                (novelsShown - DiscoveryFeedAdCadence.FIRST_AD_AFTER_NOVEL_COUNT) %
+                DiscoveryFeedAdCadence.REPEAT_EVERY_NOVELS == 0
+            if (shouldInsertAd) {
+                add(DiscoveryFeedEntry.InlineAd(slotIndex = nextSlotIndex))
+                nextSlotIndex += 1
+            }
+        }
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun PaginatedNovelFeedContent(
@@ -542,9 +600,24 @@ fun PaginatedNovelFeedContent(
     listState: LazyListState = rememberLazyListState(),
     onScrollPositionChanged: ((firstVisibleItemIndex: Int, firstVisibleItemScrollOffset: Int) -> Unit)? = null,
     sharedTransitionOrigin: String = Wenku8SharedElementKeys.NOVEL_DEFAULT_ORIGIN,
+    isNetworkAvailableForAdOverride: Boolean? = null,
+    isGmsAvailableForAdOverride: Boolean? = null,
+    enableLiveAdViewInflation: Boolean = true,
 ) {
     val isEink = LocalEinkMode.current
     val hasLoadedItems = feedState.items.isNotEmpty()
+    val inlineAdPool = rememberDiscoveryFeedInlineAdPool(
+        poolScopeKey = feedState.sortedBy,
+        isNetworkAvailableOverride = isNetworkAvailableForAdOverride,
+        isGmsAvailableOverride = isGmsAvailableForAdOverride,
+        enableLiveAdViewInflation = enableLiveAdViewInflation,
+    )
+    val feedEntries = remember(feedState.items, inlineAdPool.isAdSlotEligible) {
+        buildDiscoveryFeedEntries(
+            items = feedState.items,
+            adsEnabled = inlineAdPool.isAdSlotEligible,
+        )
+    }
 
     LaunchedEffect(feedState.sortedBy, listState, hasLoadedItems, onScrollPositionChanged) {
         val callback = onScrollPositionChanged ?: return@LaunchedEffect
@@ -558,13 +631,13 @@ fun PaginatedNovelFeedContent(
             }
     }
 
-    val shouldTriggerLoadMore by remember(listState, feedState.items.size, feedState.canLoadMorePages) {
+    val shouldTriggerLoadMore by remember(listState, feedEntries.size, feedState.canLoadMorePages) {
         derivedStateOf {
-            if (!feedState.canLoadMorePages || feedState.items.isEmpty()) {
+            if (!feedState.canLoadMorePages || feedEntries.isEmpty()) {
                 false
             } else {
                 val lastVisibleIndex = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
-                lastVisibleIndex >= (feedState.items.size - 3).coerceAtLeast(0)
+                lastVisibleIndex >= (feedEntries.size - 3).coerceAtLeast(0)
             }
         }
     }
@@ -634,16 +707,43 @@ fun PaginatedNovelFeedContent(
                         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
                         verticalArrangement = Arrangement.spacedBy(10.dp),
                     ) {
-                        itemsIndexed(
-                            items = feedState.items,
-                            key = { _, item -> "${feedState.sortedBy.name}_${item.aid}" },
-                        ) { index, item ->
-                            DiscoveryNovelCard(
-                                item = item,
-                                rankNumber = if (showRankNumbers) index + 1 else null,
-                                onClick = { onNovelClicked(item) },
-                                sharedTransitionOrigin = sharedTransitionOrigin,
-                            )
+                        items(
+                            items = feedEntries,
+                            key = { entry ->
+                                when (entry) {
+                                    is DiscoveryFeedEntry.Novel -> "${feedState.sortedBy.name}_${entry.item.aid}"
+                                    is DiscoveryFeedEntry.InlineAd -> "${feedState.sortedBy.name}_inline_ad_${entry.slotIndex}"
+                                }
+                            },
+                            contentType = { entry ->
+                                when (entry) {
+                                    is DiscoveryFeedEntry.Novel -> "discovery_novel"
+                                    is DiscoveryFeedEntry.InlineAd -> "discovery_inline_ad"
+                                }
+                            },
+                        ) { entry ->
+                            when (entry) {
+                                is DiscoveryFeedEntry.Novel -> {
+                                    DiscoveryNovelCard(
+                                        item = entry.item,
+                                        rankNumber = if (showRankNumbers) entry.novelIndex + 1 else null,
+                                        onClick = { onNovelClicked(entry.item) },
+                                        sharedTransitionOrigin = sharedTransitionOrigin,
+                                    )
+                                }
+
+                                is DiscoveryFeedEntry.InlineAd -> {
+                                    val slotKey = "${feedState.sortedBy.name}_slot_${entry.slotIndex}"
+                                    val slotHolder = inlineAdPool.getOrCreate(slotKey)
+                                    ServerSupportBannerAd(
+                                        holder = slotHolder,
+                                        cardTestTag = DiscoveryTestTags.FEED_AD_CARD_PREFIX + entry.slotIndex,
+                                        slotTestTag = DiscoveryTestTags.FEED_AD_SLOT_PREFIX + entry.slotIndex,
+                                        useElevatedTonalContainer = true,
+                                        modifier = Modifier.padding(vertical = 4.dp),
+                                    )
+                                }
+                            }
                         }
 
                         if (feedState.isAppendingNextPage) {

@@ -7,6 +7,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.junit4.v2.createComposeRule
@@ -22,6 +23,8 @@ import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
@@ -38,10 +41,14 @@ import org.mewx.wenku8.data.remote.parser.ParsedNovelFullMeta
 import org.mewx.wenku8.data.remote.parser.ParsedNovelListItem
 import org.mewx.wenku8.data.remote.parser.ParsedNovelListPage
 import org.mewx.wenku8.data.repository.DiscoveryRepository
+import org.mewx.wenku8.domain.model.DiscoveryNovelCardItem
 import org.mewx.wenku8.domain.model.FeedScrollPosition
 import org.mewx.wenku8.domain.model.LatestFeedCategory
 import org.mewx.wenku8.domain.model.RankingMetric
 import org.mewx.wenku8.domain.model.RankingPeriod
+import org.mewx.wenku8.ui.detail.BannerAdLoadPhase
+import org.mewx.wenku8.ui.detail.DiscoveryFeedInlineAdPool
+import org.mewx.wenku8.ui.detail.InlineBannerPlacement
 import org.mewx.wenku8.ui.theme.Wenku8ExpressiveTheme
 import org.mewx.wenku8.ui.theme.Wenku8ThemeMode
 import org.robolectric.RobolectricTestRunner
@@ -535,6 +542,198 @@ class DiscoveryScreensTest {
             FeedScrollPosition(0, 0),
             repository.getFeedScrollPosition(Wenku8API.NovelSortedBy.dayVisit),
         )
+    }
+
+    @Test
+    fun buildDiscoveryFeedEntries_appliesPolicyCompliantCadenceAndNeverDanglesAtTail() {
+        fun sampleItems(count: Int): List<DiscoveryNovelCardItem> = (1..count).map { idx ->
+            DiscoveryNovelCardItem(
+                aid = 7000 + idx,
+                title = "作品-$idx",
+                author = "作者-$idx",
+                bookStatus = "连载中",
+                lastUpdate = "2026-11-22",
+                tags = emptyList(),
+                introShort = "简介-$idx",
+                coverUrl = "",
+                inLocalBookshelf = false,
+            )
+        }
+
+        assertTrue(buildDiscoveryFeedEntries(emptyList(), adsEnabled = true).isEmpty())
+
+        // Short feed of 4 novels must not dangle an ad at the very bottom
+        val fourItems = buildDiscoveryFeedEntries(sampleItems(4), adsEnabled = true)
+        assertEquals(4, fourItems.size)
+        assertTrue(fourItems.none { it is DiscoveryFeedEntry.InlineAd })
+
+        // 5 novels -> first ad inserted strictly between novel #4 (index 3) and novel #5 (index 4)
+        val fiveItems = buildDiscoveryFeedEntries(sampleItems(5), adsEnabled = true)
+        assertEquals(6, fiveItems.size)
+        assertEquals(DiscoveryFeedEntry.InlineAd(slotIndex = 0), fiveItems[4])
+        assertEquals(4, (fiveItems[5] as DiscoveryFeedEntry.Novel).novelIndex)
+
+        // 14 novels -> still only 1 ad (after #4); no dangling ad after #14
+        val fourteenItems = buildDiscoveryFeedEntries(sampleItems(14), adsEnabled = true)
+        assertEquals(15, fourteenItems.size)
+        assertEquals(1, fourteenItems.count { it is DiscoveryFeedEntry.InlineAd })
+
+        // 15 novels -> 2 ads: slot 0 after #4 (index 4) and slot 1 after #14 (index 15)
+        val fifteenItems = buildDiscoveryFeedEntries(sampleItems(15), adsEnabled = true)
+        assertEquals(17, fifteenItems.size)
+        assertEquals(DiscoveryFeedEntry.InlineAd(slotIndex = 0), fifteenItems[4])
+        assertEquals(DiscoveryFeedEntry.InlineAd(slotIndex = 1), fifteenItems[15])
+        assertEquals(14, (fifteenItems[16] as DiscoveryFeedEntry.Novel).novelIndex)
+
+        // 25 novels -> 3 ads after #4, #14, #24
+        val twentyFiveItems = buildDiscoveryFeedEntries(sampleItems(25), adsEnabled = true)
+        assertEquals(28, twentyFiveItems.size)
+        assertEquals(
+            listOf(0, 1, 2),
+            twentyFiveItems.filterIsInstance<DiscoveryFeedEntry.InlineAd>().map { it.slotIndex },
+        )
+
+        // Disabled ads -> exact 1:1 novel list with zero inline ad entries
+        val disabled = buildDiscoveryFeedEntries(sampleItems(25), adsEnabled = false)
+        assertEquals(25, disabled.size)
+        assertTrue(disabled.none { it is DiscoveryFeedEntry.InlineAd })
+    }
+
+    @Test
+    fun discoveryFeedInlineAdPool_enforcesBoundedLruEvictionAndReusesActiveSlots() {
+        val pool = DiscoveryFeedInlineAdPool(
+            initialPhase = BannerAdLoadPhase.StaticPreview,
+            maxCachedSlots = 3,
+        )
+        assertTrue(pool.isAdSlotEligible)
+
+        val slot0 = pool.getOrCreate("weekVisit_slot_0")
+        val slot1 = pool.getOrCreate("weekVisit_slot_1")
+        val slot2 = pool.getOrCreate("weekVisit_slot_2")
+        assertEquals(InlineBannerPlacement.DISCOVERY_FEED_INLINE, slot0.placement)
+        assertEquals(setOf("weekVisit_slot_0", "weekVisit_slot_1", "weekVisit_slot_2"), pool.activeSlotKeys())
+
+        // Touching slot 0 reuses the exact holder and refreshes its LRU recency so slot 1 becomes oldest
+        assertSame(slot0, pool.getOrCreate("weekVisit_slot_0"))
+
+        val slot3 = pool.getOrCreate("weekVisit_slot_3")
+        assertEquals(setOf("weekVisit_slot_0", "weekVisit_slot_2", "weekVisit_slot_3"), pool.activeSlotKeys())
+        assertTrue(slot1.isDisposed)
+        assertFalse(slot0.isDisposed)
+        assertFalse(slot2.isDisposed)
+        assertFalse(slot3.isDisposed)
+
+        pool.destroyAll()
+        assertTrue(pool.activeSlotKeys().isEmpty())
+        assertTrue(slot0.isDisposed)
+        assertTrue(slot2.isDisposed)
+        assertTrue(slot3.isDisposed)
+    }
+
+    @Test
+    fun rankingsScreenInlineAds_renderBetweenNovelsReserveHeightAndPreserveExactRankNumbers() {
+        val weekItems = (1..16).map { rank ->
+            val aid = 8000 + rank
+            ParsedNovelListItem(
+                aid = aid,
+                title = "榜单作品-$rank",
+                author = "作者-$rank",
+                bookStatus = "连载中",
+                lastUpdate = "2026-11-22",
+                tagsCsv = "奇幻 校园",
+                introShort = "作品简介-$rank",
+            )
+        }
+        val gateway = FakeDiscoveryGateway().apply {
+            pagesBySort[Wenku8API.NovelSortedBy.weekVisit] =
+                WenkuApiResult.Success(ParsedNovelListPage(totalPages = 3, items = weekItems))
+        }
+        val repository = DiscoveryRepository(database = database, apiClient = gateway)
+
+        composeTestRule.setContent {
+            Box(modifier = Modifier.size(width = 412.dp, height = 892.dp)) {
+                Wenku8ExpressiveTheme(themeMode = Wenku8ThemeMode.ARCHIVAL_DAY) {
+                    RankingsScreen(
+                        discoveryRepository = repository,
+                        appLanguage = Wenku8API.AppLanguage.SC,
+                        onOpenSearch = {},
+                        onNovelClicked = {},
+                        onOpenNetworkDiagnostics = {},
+                        isNetworkAvailableForAdOverride = true,
+                        isGmsAvailableForAdOverride = true,
+                        enableLiveAdViewInflation = false,
+                    )
+                }
+            }
+        }
+
+        composeTestRule.waitForIdle()
+        // Top of list starts cleanly with #1 (never an ad at index 0)
+        composeTestRule.onNodeWithText("#1").assertIsDisplayed()
+        composeTestRule.onNodeWithText("榜单作品-1").assertIsDisplayed()
+
+        // Scroll to first inline ad (index 4, directly after #4)
+        composeTestRule.onNodeWithTag(DiscoveryTestTags.FEED_LIST).performScrollToIndex(4)
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag("${DiscoveryTestTags.FEED_AD_CARD_PREFIX}0").assertIsDisplayed()
+        composeTestRule
+            .onNodeWithTag("${DiscoveryTestTags.FEED_AD_SLOT_PREFIX}0")
+            .assertHeightIsAtLeast(InlineBannerPlacement.DISCOVERY_FEED_INLINE.reservedMinHeight)
+        composeTestRule.onNodeWithText("广告").assertIsDisplayed()
+
+        // Novel immediately after ad slot 0 must preserve unbroken rank #5
+        composeTestRule.onNodeWithText("#5").assertIsDisplayed()
+        composeTestRule.onNodeWithText("榜单作品-5").assertIsDisplayed()
+
+        // Scroll to second inline ad (index 15, directly after #14) and verify rank #15 follows cleanly
+        composeTestRule.onNodeWithTag(DiscoveryTestTags.FEED_LIST).performScrollToIndex(15)
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag("${DiscoveryTestTags.FEED_AD_CARD_PREFIX}1").assertIsDisplayed()
+        composeTestRule.onNodeWithText("#15").assertIsDisplayed()
+        composeTestRule.onNodeWithText("榜单作品-15").assertIsDisplayed()
+    }
+
+    @Test
+    fun latestScreenInlineAds_collapseCompletelyWhenOffline() {
+        val recentItems = (1..15).map { idx ->
+            ParsedNovelListItem(
+                aid = 8500 + idx,
+                title = "离线最新-$idx",
+                author = "作者-$idx",
+                bookStatus = "连载中",
+                lastUpdate = "2026-11-22",
+                tagsCsv = "奇幻",
+                introShort = "简介-$idx",
+            )
+        }
+        val gateway = FakeDiscoveryGateway().apply {
+            pagesBySort[Wenku8API.NovelSortedBy.lastUpdate] =
+                WenkuApiResult.Success(ParsedNovelListPage(totalPages = 2, items = recentItems))
+        }
+        val repository = DiscoveryRepository(database = database, apiClient = gateway)
+
+        composeTestRule.setContent {
+            Box(modifier = Modifier.size(width = 412.dp, height = 892.dp)) {
+                Wenku8ExpressiveTheme(themeMode = Wenku8ThemeMode.ARCHIVAL_DAY) {
+                    LatestScreen(
+                        discoveryRepository = repository,
+                        appLanguage = Wenku8API.AppLanguage.SC,
+                        onOpenSearch = {},
+                        onNovelClicked = {},
+                        onOpenNetworkDiagnostics = {},
+                        isNetworkAvailableForAdOverride = false,
+                        isGmsAvailableForAdOverride = true,
+                        enableLiveAdViewInflation = false,
+                    )
+                }
+            }
+        }
+
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag(DiscoveryTestTags.FEED_LIST).performScrollToIndex(5)
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag("${DiscoveryTestTags.FEED_AD_CARD_PREFIX}0").assertDoesNotExist()
+        composeTestRule.onNodeWithText("离线最新-6").assertIsDisplayed()
     }
 
     private class FakeDiscoveryGateway : WenkuCatalogGateway {

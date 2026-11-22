@@ -65,6 +65,9 @@ fun RankingsScreen(
     onOpenNetworkDiagnostics: () -> Unit,
     modifier: Modifier = Modifier,
     reselectScrollToTopTrigger: Int = 0,
+    isNetworkAvailableForAdOverride: Boolean? = null,
+    isGmsAvailableForAdOverride: Boolean? = null,
+    enableLiveAdViewInflation: Boolean = true,
 ) {
     val isEink = LocalEinkMode.current
     var selectedMetric by rememberSaveable {
@@ -298,6 +301,9 @@ fun RankingsScreen(
             },
             onNovelClicked = onNovelClicked,
             onOpenNetworkDiagnostics = onOpenNetworkDiagnostics,
+            isNetworkAvailableForAdOverride = isNetworkAvailableForAdOverride,
+            isGmsAvailableForAdOverride = isGmsAvailableForAdOverride,
+            enableLiveAdViewInflation = enableLiveAdViewInflation,
             modifier = Modifier.weight(1f),
         )
     }

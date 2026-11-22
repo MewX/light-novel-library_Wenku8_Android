@@ -54,6 +54,9 @@ fun LatestScreen(
     onOpenNetworkDiagnostics: () -> Unit,
     modifier: Modifier = Modifier,
     reselectScrollToTopTrigger: Int = 0,
+    isNetworkAvailableForAdOverride: Boolean? = null,
+    isGmsAvailableForAdOverride: Boolean? = null,
+    enableLiveAdViewInflation: Boolean = true,
 ) {
     val isEink = LocalEinkMode.current
     val categories = LatestFeedCategory.entries
@@ -208,6 +211,9 @@ fun LatestScreen(
                 onNovelClicked = onNovelClicked,
                 onOpenNetworkDiagnostics = onOpenNetworkDiagnostics,
                 sharedTransitionOrigin = sharedOrigin,
+                isNetworkAvailableForAdOverride = isNetworkAvailableForAdOverride,
+                isGmsAvailableForAdOverride = isGmsAvailableForAdOverride,
+                enableLiveAdViewInflation = enableLiveAdViewInflation,
                 modifier = Modifier.fillMaxSize(),
             )
         }

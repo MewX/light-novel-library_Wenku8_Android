@@ -382,6 +382,113 @@ fun rememberNovelDetailBannerAdHolder(
     return holder
 }
 
+/**
+ * Bounded LRU pool of [NovelDetailBannerAdHolder] instances scoped to a Discovery feed (`最新` /
+ * `排行`), capping concurrent live WebView-backed `AdView`s to [maxCachedSlots] while keeping
+ * recently scrolled slots warm so scrolling back up reuses the loaded banner without re-requesting.
+ */
+@Stable
+class DiscoveryFeedInlineAdPool internal constructor(
+    val initialPhase: BannerAdLoadPhase,
+    val maxCachedSlots: Int = DEFAULT_MAX_CACHED_SLOTS,
+) {
+    private val holders = LinkedHashMap<String, NovelDetailBannerAdHolder>(
+        /* initialCapacity = */ (maxCachedSlots.coerceAtLeast(1) * 2),
+        /* loadFactor = */ 0.75f,
+        /* accessOrder = */ true,
+    )
+
+    val isAdSlotEligible: Boolean
+        get() = initialPhase != BannerAdLoadPhase.Collapsed
+
+    fun getOrCreate(slotKey: String): NovelDetailBannerAdHolder {
+        val existing = holders[slotKey]
+        if (existing != null && !existing.isDisposed) {
+            return existing
+        }
+        val created = NovelDetailBannerAdHolder(
+            initialPhase = initialPhase,
+            placement = InlineBannerPlacement.DISCOVERY_FEED_INLINE,
+        )
+        holders[slotKey] = created
+        val limit = maxCachedSlots.coerceAtLeast(1)
+        while (holders.size > limit) {
+            val eldest = holders.entries.iterator().next()
+            holders.remove(eldest.key)
+            eldest.value.destroy(markDisposed = true)
+        }
+        return created
+    }
+
+    internal fun activeSlotKeys(): Set<String> = holders.keys.toSet()
+
+    internal fun pauseAll() {
+        holders.values.forEach { it.pause() }
+    }
+
+    internal fun resumeAll() {
+        holders.values.forEach { it.resume() }
+    }
+
+    internal fun destroyAll() {
+        val snapshot = holders.values.toList()
+        holders.clear()
+        snapshot.forEach { it.destroy(markDisposed = true) }
+    }
+
+    companion object {
+        const val DEFAULT_MAX_CACHED_SLOTS = 3
+    }
+}
+
+@Composable
+fun rememberDiscoveryFeedInlineAdPool(
+    poolScopeKey: Any,
+    isNetworkAvailableOverride: Boolean? = null,
+    isGmsAvailableOverride: Boolean? = null,
+    enableLiveAdViewInflation: Boolean = true,
+    maxCachedSlots: Int = DiscoveryFeedInlineAdPool.DEFAULT_MAX_CACHED_SLOTS,
+): DiscoveryFeedInlineAdPool {
+    val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
+    val isOnline = isNetworkAvailableOverride ?: remember(poolScopeKey, context) {
+        hasActiveInternetCapability(context)
+    }
+    val isGmsReady = isGmsAvailableOverride ?: remember(poolScopeKey, context) {
+        isGooglePlayServicesReady(context)
+    }
+
+    val pool = remember(poolScopeKey, isOnline, isGmsReady, enableLiveAdViewInflation, maxCachedSlots) {
+        val initialPhase = when {
+            !isOnline || !isGmsReady -> BannerAdLoadPhase.Collapsed
+            !enableLiveAdViewInflation -> BannerAdLoadPhase.StaticPreview
+            else -> BannerAdLoadPhase.Loading
+        }
+        DiscoveryFeedInlineAdPool(
+            initialPhase = initialPhase,
+            maxCachedSlots = maxCachedSlots,
+        )
+    }
+
+    DisposableEffect(pool, lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_RESUME -> pool.resumeAll()
+                Lifecycle.Event.ON_PAUSE -> pool.pauseAll()
+                else -> Unit
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+            pool.destroyAll()
+        }
+    }
+
+    return pool
+}
+
+
 internal suspend fun startHolderBannerLoad(
     holder: NovelDetailBannerAdHolder,
     context: Context,
