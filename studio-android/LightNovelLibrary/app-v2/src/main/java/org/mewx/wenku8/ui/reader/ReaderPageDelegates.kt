@@ -133,8 +133,11 @@ import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import kotlin.math.PI
 import kotlin.math.abs
+import kotlin.math.cos
 import kotlin.math.roundToInt
+import kotlin.math.sin
 import kotlin.random.Random
 
 /**
@@ -297,6 +300,181 @@ internal fun computeLowerPageRevealClip(
         leftX = revealLeftX,
         rightX = viewportWidthPx,
     )
+}
+
+/**
+ * Layer role for a dual-column book spread participating in a center-spine hinged leaf-flip
+ * transition ([ReaderPageTurnMode.SIMULATION_CURL] when dual-column spreads are active).
+ *
+ * For every transition progress `p` in `(0, 1)` between Spread `k` (`pageOffset = p`) and
+ * Spread `k + 1` (`pageOffset = p - 1`), the two spreads occupy strictly disjoint horizontal
+ * partitions `[0, leafOuterEdgeX]` and `[leafOuterEdgeX, viewportWidthPx]`, guaranteeing zero
+ * midpoint flicker and zero bleed-through over custom day wallpapers.
+ */
+internal enum class DualColumnFlipLayerRole {
+    /** Spread is settled (`|pageOffset| <= 0.001f`) — render full spread normally. */
+    SETTLED,
+    /** Spread is off-stage (`|pageOffset| >= 0.999f`) — skip drawing. */
+    OFF_STAGE,
+    /**
+     * Lower-index spread in first half (`pageOffset` in `(0.001f, 0.5f]`):
+     * static left half `[0, spineX]` + hinged right leaf `[spineX, width]` folding toward `spineX`.
+     */
+    STATIC_LEFT_WITH_FOLDING_RIGHT_LEAF,
+    /**
+     * Higher-index spread in first half (`pageOffset` in `(-0.999f, -0.5f]`):
+     * revealed right region `[leafOuterEdgeX, width]` underneath the lifting right leaf, with cast shadow.
+     */
+    REVEALED_RIGHT_UNDERNEATH,
+    /**
+     * Lower-index spread in second half (`pageOffset` in `(0.5f, 0.999f)`):
+     * remaining left region `[0, leafOuterEdgeX]` underneath the unfolding left leaf, with cast shadow.
+     */
+    REVEALED_LEFT_UNDERNEATH,
+    /**
+     * Higher-index spread in second half (`pageOffset` in `(-0.5f, -0.001f)`):
+     * static right half `[spineX, width]` + hinged left leaf `[0, spineX]` unfolding outward from `spineX`.
+     */
+    STATIC_RIGHT_WITH_UNFOLDING_LEFT_LEAF,
+}
+
+/**
+ * Pure, unit-testable frame geometry for a center-spine hinged leaf flip in dual-column
+ * [ReaderPageTurnMode.SIMULATION_CURL].
+ */
+internal data class DualColumnBookFlipSpec(
+    val role: DualColumnFlipLayerRole,
+    val spineX: Float,
+    val flatClipLeftX: Float = 0f,
+    val flatClipRightX: Float = 0f,
+    val leafScaleX: Float = 0f,
+    val leafOuterEdgeX: Float = 0f,
+    val leafShadeAlpha: Float = 0f,
+    val castShadowLeftX: Float = 0f,
+    val castShadowRightX: Float = 0f,
+    val castShadowAlpha: Float = 0f,
+    val castShadowFadesRight: Boolean = true,
+)
+
+/**
+ * Computes the exact center-spine hinged leaf-flip geometry for a dual-column spread at
+ * [pageOffset] (`(currentPage - virtualPageIndex) + currentPageOffsetFraction`).
+ *
+ * Works symmetrically for forward flips (`k -> k + 1`), backward flips (`k + 1 -> k`), and
+ * mid-drag reversals, and honors asymmetric foldable hinge coordinates via [spineCenterXPx].
+ */
+internal fun computeDualColumnBookFlipSpec(
+    pageOffset: Float,
+    viewportWidthPx: Float,
+    spineCenterXPx: Float,
+): DualColumnBookFlipSpec {
+    if (viewportWidthPx <= 0f || abs(pageOffset) >= 0.999f) {
+        return DualColumnBookFlipSpec(
+            role = DualColumnFlipLayerRole.OFF_STAGE,
+            spineX = 0f,
+        )
+    }
+    val spineX = spineCenterXPx.coerceIn(1f, (viewportWidthPx - 1f).coerceAtLeast(1f))
+    if (abs(pageOffset) <= 0.001f) {
+        return DualColumnBookFlipSpec(
+            role = DualColumnFlipLayerRole.SETTLED,
+            spineX = spineX,
+            flatClipLeftX = 0f,
+            flatClipRightX = viewportWidthPx,
+        )
+    }
+
+    val leftHalfWidth = spineX.coerceAtLeast(1f)
+    val rightHalfWidth = (viewportWidthPx - spineX).coerceAtLeast(1f)
+
+    return when {
+        // First half, lower-index spread k (`pageOffset` in `(0.001f, 0.5f]`):
+        // left page stays flat; right leaf lifts from flat (0°) to vertical at spine (90°).
+        pageOffset > 0.001f && pageOffset <= 0.5f -> {
+            val t = (pageOffset * 2f).coerceIn(0f, 1f)
+            val leafScaleX = cos(t * (PI / 2.0)).toFloat().coerceIn(0f, 1f)
+            val outerEdgeX = (spineX + rightHalfWidth * leafScaleX).coerceIn(spineX, viewportWidthPx)
+            val leafShadeAlpha = ((1f - leafScaleX) * 0.24f).coerceIn(0f, 0.24f)
+            DualColumnBookFlipSpec(
+                role = DualColumnFlipLayerRole.STATIC_LEFT_WITH_FOLDING_RIGHT_LEAF,
+                spineX = spineX,
+                flatClipLeftX = 0f,
+                flatClipRightX = spineX,
+                leafScaleX = leafScaleX,
+                leafOuterEdgeX = outerEdgeX,
+                leafShadeAlpha = leafShadeAlpha,
+            )
+        }
+
+        // First half, higher-index spread k + 1 (`pageOffset` in `(-0.999f, -0.5f]`):
+        // right page revealed strictly in `[outerEdgeX, width]` with dynamic cast shadow.
+        pageOffset <= -0.5f -> {
+            val p = (1f + pageOffset).coerceIn(0f, 0.5f)
+            val t = (p * 2f).coerceIn(0f, 1f)
+            val leafScaleX = cos(t * (PI / 2.0)).toFloat().coerceIn(0f, 1f)
+            val outerEdgeX = (spineX + rightHalfWidth * leafScaleX).coerceIn(spineX, viewportWidthPx)
+            val remainingRight = (viewportWidthPx - outerEdgeX).coerceAtLeast(0f)
+            val rawShadowWidth = rightHalfWidth * (0.14f + 0.16f * sin(t * (PI / 2.0)).toFloat())
+            val shadowWidth = rawShadowWidth.coerceAtMost(remainingRight)
+            val castShadowAlpha = (0.30f * maxOf(sin(t * PI * 0.75).toFloat(), 0.18f * t))
+                .coerceIn(0f, 0.30f)
+            DualColumnBookFlipSpec(
+                role = DualColumnFlipLayerRole.REVEALED_RIGHT_UNDERNEATH,
+                spineX = spineX,
+                flatClipLeftX = outerEdgeX,
+                flatClipRightX = viewportWidthPx,
+                leafScaleX = leafScaleX,
+                leafOuterEdgeX = outerEdgeX,
+                castShadowLeftX = outerEdgeX,
+                castShadowRightX = (outerEdgeX + shadowWidth).coerceAtMost(viewportWidthPx),
+                castShadowAlpha = castShadowAlpha,
+                castShadowFadesRight = true,
+            )
+        }
+
+        // Second half, lower-index spread k (`pageOffset` in `(0.5f, 0.999f)`):
+        // left page progressively covered by k + 1's unfolding left leaf; clipped to `[0, outerEdgeX]`.
+        pageOffset > 0.5f -> {
+            val u = ((pageOffset - 0.5f) * 2f).coerceIn(0f, 1f)
+            val leafScaleX = sin(u * (PI / 2.0)).toFloat().coerceIn(0f, 1f)
+            val outerEdgeX = (spineX - leftHalfWidth * leafScaleX).coerceIn(0f, spineX)
+            val invU = (1f - u).coerceIn(0f, 1f)
+            val rawShadowWidth = leftHalfWidth * (0.14f + 0.16f * sin(invU * (PI / 2.0)).toFloat())
+            val shadowWidth = rawShadowWidth.coerceAtMost(outerEdgeX.coerceAtLeast(0f))
+            val castShadowAlpha = (0.30f * maxOf(sin(invU * PI * 0.75).toFloat(), 0.18f * invU))
+                .coerceIn(0f, 0.30f)
+            DualColumnBookFlipSpec(
+                role = DualColumnFlipLayerRole.REVEALED_LEFT_UNDERNEATH,
+                spineX = spineX,
+                flatClipLeftX = 0f,
+                flatClipRightX = outerEdgeX,
+                leafScaleX = leafScaleX,
+                leafOuterEdgeX = outerEdgeX,
+                castShadowLeftX = (outerEdgeX - shadowWidth).coerceAtLeast(0f),
+                castShadowRightX = outerEdgeX,
+                castShadowAlpha = castShadowAlpha,
+                castShadowFadesRight = false,
+            )
+        }
+
+        // Second half, higher-index spread k + 1 (`pageOffset` in `(-0.5f, -0.001f)`):
+        // right page stays flat; left leaf unfolds outward from vertical at spine (90°) to flat (0°).
+        else -> {
+            val u = (1f + pageOffset * 2f).coerceIn(0f, 1f)
+            val leafScaleX = sin(u * (PI / 2.0)).toFloat().coerceIn(0f, 1f)
+            val outerEdgeX = (spineX - leftHalfWidth * leafScaleX).coerceIn(0f, spineX)
+            val leafShadeAlpha = ((1f - leafScaleX) * 0.24f).coerceIn(0f, 0.24f)
+            DualColumnBookFlipSpec(
+                role = DualColumnFlipLayerRole.STATIC_RIGHT_WITH_UNFOLDING_LEFT_LEAF,
+                spineX = spineX,
+                flatClipLeftX = spineX,
+                flatClipRightX = viewportWidthPx,
+                leafScaleX = leafScaleX,
+                leafOuterEdgeX = outerEdgeX,
+                leafShadeAlpha = leafShadeAlpha,
+            )
+        }
+    }
 }
 
 /**
@@ -896,9 +1074,12 @@ fun ReaderViewportHost(
                                         pagerState.currentPageOffsetFraction
                                 },
                                 paperBackground = palette.backgroundColor,
+                                isDarkPalette = palette.isDarkPalette,
                                 hasCustomDayWallpaper = palette.customDayBackgroundFile != null,
                                 parchmentAssets = activeParchmentAssets,
                                 dualColumnSpineCenterXPx = pageSpineCenterPx,
+                                isDualColumnSpread = effectivePagedDualColumn,
+                                dualColumnFlipSpineCenterXPx = effectiveSpineCenterPx,
                             ),
                     ) {
                         if (resolution != null) {
@@ -931,17 +1112,20 @@ fun ReaderViewportHost(
 
 /**
  * Applies the selected official-AndroidX page-turn transition (`CoverSlide`, `SimulationCurl`
- * with API 33+ AGSL `RuntimeShader` + `Canvas` Bezier fallback, `SpringSlide`, `VerticalBunkobon`,
- * or `EInkInstant`).
+ * with API 33+ AGSL `RuntimeShader` + `Canvas` Bezier fallback and center-spine hinged leaf-flip
+ * in dual-column spreads, `SpringSlide`, `VerticalBunkobon`, or `EInkInstant`).
  */
 private fun Modifier.applyPageTurnTransition(
     mode: ReaderPageTurnMode,
     virtualPageIndex: Int,
     pageOffsetProvider: () -> Float,
     paperBackground: Color,
+    isDarkPalette: Boolean,
     hasCustomDayWallpaper: Boolean,
     parchmentAssets: ReaderParchmentBackgroundAssets?,
     dualColumnSpineCenterXPx: Float? = null,
+    isDualColumnSpread: Boolean = false,
+    dualColumnFlipSpineCenterXPx: Float? = null,
 ): Modifier {
     return when (mode) {
         ReaderPageTurnMode.COVER_SLIDE -> {
@@ -1047,13 +1231,189 @@ private fun Modifier.applyPageTurnTransition(
                     } else {
                         alpha = 1f
                         // Both outgoing (`pageOffset > 0f`) and incoming (`pageOffset < 0f`) pages stay
-                        // anchored at the book spine while the outgoing page clips & curls inward.
+                        // anchored at the book spine while the turning page/leaf animates in place.
                         translationX = pageOffset * size.width
                     }
                 }
                 .drawWithContent {
                     val pageOffset = pageOffsetProvider()
                     if (abs(pageOffset) >= 0.999f) return@drawWithContent
+
+                    if (isDualColumnSpread) {
+                        val hingeSpineX = dualColumnFlipSpineCenterXPx ?: (size.width * 0.5f)
+                        val spec = computeDualColumnBookFlipSpec(
+                            pageOffset = pageOffset,
+                            viewportWidthPx = size.width,
+                            spineCenterXPx = hingeSpineX,
+                        )
+                        when (spec.role) {
+                            DualColumnFlipLayerRole.OFF_STAGE -> Unit
+
+                            DualColumnFlipLayerRole.SETTLED -> {
+                                if (!hasCustomDayWallpaper) {
+                                    drawReaderPaperBackground(
+                                        paperBackground = paperBackground,
+                                        parchmentAssets = parchmentAssets,
+                                        dualColumnSpineCenterXPx = dualColumnSpineCenterXPx,
+                                    )
+                                }
+                                drawContent()
+                            }
+
+                            DualColumnFlipLayerRole.STATIC_LEFT_WITH_FOLDING_RIGHT_LEAF -> {
+                                // 1. Static left half `[0, spineX]`.
+                                if (spec.flatClipRightX - spec.flatClipLeftX > 0.5f) {
+                                    drawContext.canvas.save()
+                                    drawContext.canvas.clipRect(
+                                        left = spec.flatClipLeftX,
+                                        top = 0f,
+                                        right = spec.flatClipRightX,
+                                        bottom = size.height,
+                                    )
+                                    if (!hasCustomDayWallpaper) {
+                                        drawReaderPaperBackground(
+                                            paperBackground = paperBackground,
+                                            parchmentAssets = parchmentAssets,
+                                            dualColumnSpineCenterXPx = dualColumnSpineCenterXPx,
+                                        )
+                                    }
+                                    drawContent()
+                                    drawContext.canvas.restore()
+                                }
+
+                                // 2. Center-spine hinged right leaf folding inward `[spineX, leafOuterEdgeX]`.
+                                if (spec.leafScaleX > 0.004f && spec.leafOuterEdgeX - spec.spineX > 0.5f) {
+                                    drawContext.canvas.save()
+                                    drawContext.canvas.translate(spec.spineX, 0f)
+                                    drawContext.canvas.scale(spec.leafScaleX, 1f)
+                                    drawContext.canvas.translate(-spec.spineX, 0f)
+                                    drawContext.canvas.clipRect(
+                                        left = spec.spineX,
+                                        top = 0f,
+                                        right = size.width,
+                                        bottom = size.height,
+                                    )
+                                    if (!hasCustomDayWallpaper) {
+                                        drawReaderPaperBackground(
+                                            paperBackground = paperBackground,
+                                            parchmentAssets = parchmentAssets,
+                                            dualColumnSpineCenterXPx = dualColumnSpineCenterXPx,
+                                        )
+                                    }
+                                    drawContent()
+                                    drawContext.canvas.restore()
+
+                                    drawDualColumnHingedLeafShading(
+                                        leafLeftX = spec.spineX,
+                                        leafRightX = spec.leafOuterEdgeX,
+                                        isRightLeaf = true,
+                                        leafShadeAlpha = spec.leafShadeAlpha,
+                                        isDarkPalette = isDarkPalette,
+                                    )
+                                }
+                            }
+
+                            DualColumnFlipLayerRole.REVEALED_RIGHT_UNDERNEATH -> {
+                                if (spec.flatClipRightX - spec.flatClipLeftX > 0.5f) {
+                                    drawContext.canvas.save()
+                                    drawContext.canvas.clipRect(
+                                        left = spec.flatClipLeftX,
+                                        top = 0f,
+                                        right = spec.flatClipRightX,
+                                        bottom = size.height,
+                                    )
+                                    if (!hasCustomDayWallpaper) {
+                                        drawReaderPaperBackground(
+                                            paperBackground = paperBackground,
+                                            parchmentAssets = parchmentAssets,
+                                            dualColumnSpineCenterXPx = dualColumnSpineCenterXPx,
+                                        )
+                                    }
+                                    drawContent()
+                                    drawDualColumnHingedCastShadow(spec = spec)
+                                    drawContext.canvas.restore()
+                                }
+                            }
+
+                            DualColumnFlipLayerRole.REVEALED_LEFT_UNDERNEATH -> {
+                                if (spec.flatClipRightX - spec.flatClipLeftX > 0.5f) {
+                                    drawContext.canvas.save()
+                                    drawContext.canvas.clipRect(
+                                        left = spec.flatClipLeftX,
+                                        top = 0f,
+                                        right = spec.flatClipRightX,
+                                        bottom = size.height,
+                                    )
+                                    if (!hasCustomDayWallpaper) {
+                                        drawReaderPaperBackground(
+                                            paperBackground = paperBackground,
+                                            parchmentAssets = parchmentAssets,
+                                            dualColumnSpineCenterXPx = dualColumnSpineCenterXPx,
+                                        )
+                                    }
+                                    drawContent()
+                                    drawDualColumnHingedCastShadow(spec = spec)
+                                    drawContext.canvas.restore()
+                                }
+                            }
+
+                            DualColumnFlipLayerRole.STATIC_RIGHT_WITH_UNFOLDING_LEFT_LEAF -> {
+                                // 1. Static right half `[spineX, width]`.
+                                if (spec.flatClipRightX - spec.flatClipLeftX > 0.5f) {
+                                    drawContext.canvas.save()
+                                    drawContext.canvas.clipRect(
+                                        left = spec.flatClipLeftX,
+                                        top = 0f,
+                                        right = spec.flatClipRightX,
+                                        bottom = size.height,
+                                    )
+                                    if (!hasCustomDayWallpaper) {
+                                        drawReaderPaperBackground(
+                                            paperBackground = paperBackground,
+                                            parchmentAssets = parchmentAssets,
+                                            dualColumnSpineCenterXPx = dualColumnSpineCenterXPx,
+                                        )
+                                    }
+                                    drawContent()
+                                    drawContext.canvas.restore()
+                                }
+
+                                // 2. Center-spine hinged left leaf unfolding outward `[leafOuterEdgeX, spineX]`.
+                                if (spec.leafScaleX > 0.004f && spec.spineX - spec.leafOuterEdgeX > 0.5f) {
+                                    drawContext.canvas.save()
+                                    drawContext.canvas.translate(spec.spineX, 0f)
+                                    drawContext.canvas.scale(spec.leafScaleX, 1f)
+                                    drawContext.canvas.translate(-spec.spineX, 0f)
+                                    drawContext.canvas.clipRect(
+                                        left = 0f,
+                                        top = 0f,
+                                        right = spec.spineX,
+                                        bottom = size.height,
+                                    )
+                                    if (!hasCustomDayWallpaper) {
+                                        drawReaderPaperBackground(
+                                            paperBackground = paperBackground,
+                                            parchmentAssets = parchmentAssets,
+                                            dualColumnSpineCenterXPx = dualColumnSpineCenterXPx,
+                                        )
+                                    }
+                                    drawContent()
+                                    drawContext.canvas.restore()
+
+                                    drawDualColumnHingedLeafShading(
+                                        leafLeftX = spec.leafOuterEdgeX,
+                                        leafRightX = spec.spineX,
+                                        isRightLeaf = false,
+                                        leafShadeAlpha = spec.leafShadeAlpha,
+                                        isDarkPalette = isDarkPalette,
+                                    )
+                                }
+                            }
+                        }
+                        return@drawWithContent
+                    }
+
+                    // Single-column classic cylinder curl.
                     if (pageOffset <= 0.001f) {
                         val lowerRevealClip = computeLowerPageRevealClip(
                             pageOffset = pageOffset,
@@ -1134,6 +1494,100 @@ private fun Modifier.applyPageTurnTransition(
             }
         }
     }
+}
+
+private fun DrawScope.drawDualColumnHingedCastShadow(
+    spec: DualColumnBookFlipSpec,
+) {
+    val shadowWidth = spec.castShadowRightX - spec.castShadowLeftX
+    if (shadowWidth <= 0.5f || spec.castShadowAlpha <= 0.001f) return
+    val colors = if (spec.castShadowFadesRight) {
+        listOf(
+            Color.Black.copy(alpha = spec.castShadowAlpha),
+            Color.Black.copy(alpha = spec.castShadowAlpha * 0.35f),
+            Color.Transparent,
+        )
+    } else {
+        listOf(
+            Color.Transparent,
+            Color.Black.copy(alpha = spec.castShadowAlpha * 0.35f),
+            Color.Black.copy(alpha = spec.castShadowAlpha),
+        )
+    }
+    drawRect(
+        brush = Brush.horizontalGradient(
+            colors = colors,
+            startX = spec.castShadowLeftX,
+            endX = spec.castShadowRightX,
+        ),
+        topLeft = Offset(spec.castShadowLeftX, 0f),
+        size = Size(shadowWidth, size.height),
+    )
+}
+
+private fun DrawScope.drawDualColumnHingedLeafShading(
+    leafLeftX: Float,
+    leafRightX: Float,
+    isRightLeaf: Boolean,
+    leafShadeAlpha: Float,
+    isDarkPalette: Boolean,
+) {
+    val leafWidth = leafRightX - leafLeftX
+    if (leafWidth <= 0.5f) return
+
+    val effectiveShadeAlpha = if (isDarkPalette) leafShadeAlpha * 1.15f else leafShadeAlpha
+    val usedAgslShader = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        runCatching {
+            val shader = RuntimeShader(AGSL_HINGED_LEAF_SHADING_SHADER).apply {
+                setFloatUniform("uLeafRange", leafLeftX, leafRightX)
+                setFloatUniform("uIsRightLeaf", if (isRightLeaf) 1f else 0f)
+                setFloatUniform("uShadeAlpha", effectiveShadeAlpha)
+            }
+            val shaderPaint = AndroidPaint(AndroidPaint.ANTI_ALIAS_FLAG).apply {
+                this.shader = shader as Shader
+            }
+            drawIntoCanvas { canvas ->
+                canvas.nativeCanvas.drawRect(leafLeftX, 0f, leafRightX, size.height, shaderPaint)
+            }
+            true
+        }.getOrDefault(false)
+    } else {
+        false
+    }
+
+    if (!usedAgslShader) {
+        val spineDark = Color.Black.copy(alpha = (0.12f + effectiveShadeAlpha * 0.85f).coerceAtMost(0.40f))
+        val midShade = Color.Black.copy(alpha = (effectiveShadeAlpha * 0.55f).coerceAtMost(0.22f))
+        val outerShade = Color.Black.copy(alpha = (effectiveShadeAlpha * 0.85f).coerceAtMost(0.30f))
+        val gradientColors = if (isRightLeaf) {
+            listOf(spineDark, midShade, outerShade)
+        } else {
+            listOf(outerShade, midShade, spineDark)
+        }
+        drawRect(
+            brush = Brush.horizontalGradient(
+                colors = gradientColors,
+                startX = leafLeftX,
+                endX = leafRightX,
+            ),
+            topLeft = Offset(leafLeftX, 0f),
+            size = Size(leafWidth, size.height),
+        )
+    }
+
+    // Crisp tactile paper-edge rim along the moving outer border of the turning sheet.
+    val rimWidthPx = (1.5.dp.toPx()).coerceAtMost(leafWidth)
+    val outerEdgeLeft = if (isRightLeaf) {
+        (leafRightX - rimWidthPx).coerceAtLeast(leafLeftX)
+    } else {
+        leafLeftX
+    }
+    val rimHighlight = Color.White.copy(alpha = if (isDarkPalette) 0.14f else 0.34f)
+    drawRect(
+        color = rimHighlight,
+        topLeft = Offset(outerEdgeLeft, 0f),
+        size = Size(rimWidthPx, size.height),
+    )
 }
 
 private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawSimulationCreaseAndBackOfPage(
@@ -1220,6 +1674,24 @@ half4 main(float2 fragCoord) {
     float cylinderLight = sin(t * 3.14159265);
     half3 base = mix(uPaperColor.rgb * 0.86, min(half3(1.0), uPaperColor.rgb * 1.08), half(cylinderLight));
     return half4(base, 0.96);
+}
+"""
+
+private const val AGSL_HINGED_LEAF_SHADING_SHADER = """
+uniform float2 uLeafRange;
+uniform float uIsRightLeaf;
+uniform float uShadeAlpha;
+
+half4 main(float2 fragCoord) {
+    float span = max(1.0, uLeafRange.y - uLeafRange.x);
+    float rawU = clamp((fragCoord.x - uLeafRange.x) / span, 0.0, 1.0);
+    // u = 0 at the bound center spine, u = 1 at the moving outer edge of the leaf.
+    float u = mix(1.0 - rawU, rawU, uIsRightLeaf);
+    float spineCrease = (0.13 + uShadeAlpha * 0.45) * exp(-u * 5.5);
+    float sheetTilt = uShadeAlpha * (0.48 + 0.52 * (1.0 - sin(u * 3.14159265) * 0.35));
+    float shadowA = clamp(spineCrease + sheetTilt, 0.0, 0.42);
+    // Valid premultiplied black shadow alpha for smooth compositing over paper + ink.
+    return half4(0.0, 0.0, 0.0, half(shadowA));
 }
 """
 

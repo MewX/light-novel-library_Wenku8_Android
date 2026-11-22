@@ -2024,6 +2024,311 @@ class UnifiedReaderScreenTest {
             .assertCountEquals(0)
     }
 
+    @Test
+    fun dualColumnBookFlipSpec_partitionsDisjointlyAcrossForwardMidpointBackwardAndAsymmetricHinge() {
+        val width = 1000f
+        val centerSpine = 500f
+
+        // 1. Settled and off-stage bounds
+        assertEquals(
+            DualColumnFlipLayerRole.SETTLED,
+            computeDualColumnBookFlipSpec(0f, width, centerSpine).role,
+        )
+        assertEquals(
+            DualColumnFlipLayerRole.OFF_STAGE,
+            computeDualColumnBookFlipSpec(1f, width, centerSpine).role,
+        )
+        assertEquals(
+            DualColumnFlipLayerRole.OFF_STAGE,
+            computeDualColumnBookFlipSpec(-1f, width, centerSpine).role,
+        )
+        assertEquals(
+            DualColumnFlipLayerRole.OFF_STAGE,
+            computeDualColumnBookFlipSpec(0.25f, 0f, centerSpine).role,
+        )
+
+        // 2. First half (p = 0.25f): k folds right leaf, k + 1 reveals [outerEdgeX, W] with cast shadow.
+        val kFirstHalf = computeDualColumnBookFlipSpec(0.25f, width, centerSpine)
+        val kNextFirstHalf = computeDualColumnBookFlipSpec(-0.75f, width, centerSpine)
+        assertEquals(DualColumnFlipLayerRole.STATIC_LEFT_WITH_FOLDING_RIGHT_LEAF, kFirstHalf.role)
+        assertEquals(DualColumnFlipLayerRole.REVEALED_RIGHT_UNDERNEATH, kNextFirstHalf.role)
+        assertEquals(0f, kFirstHalf.flatClipLeftX, 0.01f)
+        assertEquals(centerSpine, kFirstHalf.flatClipRightX, 0.01f)
+        val expectedCos45 = kotlin.math.cos(kotlin.math.PI / 4.0).toFloat()
+        assertEquals(expectedCos45, kFirstHalf.leafScaleX, 0.001f)
+        assertEquals(kFirstHalf.leafOuterEdgeX, kNextFirstHalf.flatClipLeftX, 0.01f)
+        assertEquals(width, kNextFirstHalf.flatClipRightX, 0.01f)
+        assertTrue(kNextFirstHalf.castShadowFadesRight)
+        assertTrue(kNextFirstHalf.castShadowAlpha > 0.10f)
+        assertTrue(kNextFirstHalf.castShadowRightX > kNextFirstHalf.castShadowLeftX)
+
+        // 3. Exact midpoint (p = 0.50f): leaf stands vertical at spineX with continuous disjoint halves.
+        val kMid = computeDualColumnBookFlipSpec(0.50f, width, centerSpine)
+        val kNextMid = computeDualColumnBookFlipSpec(-0.50f, width, centerSpine)
+        assertEquals(0f, kMid.leafScaleX, 0.001f)
+        assertEquals(centerSpine, kMid.leafOuterEdgeX, 0.01f)
+        assertEquals(centerSpine, kNextMid.flatClipLeftX, 0.01f)
+        assertEquals(width, kNextMid.flatClipRightX, 0.01f)
+
+        // 4. Second half (p = 0.75f, also symmetric to first quarter of backward drag from k + 1 -> k):
+        // k stays underneath in [0, outerEdgeX] with left-fading shadow; k + 1 unfolds left leaf from spineX.
+        val kSecondHalf = computeDualColumnBookFlipSpec(0.75f, width, centerSpine)
+        val kNextSecondHalf = computeDualColumnBookFlipSpec(-0.25f, width, centerSpine)
+        assertEquals(DualColumnFlipLayerRole.REVEALED_LEFT_UNDERNEATH, kSecondHalf.role)
+        assertEquals(DualColumnFlipLayerRole.STATIC_RIGHT_WITH_UNFOLDING_LEFT_LEAF, kNextSecondHalf.role)
+        val expectedSin45 = kotlin.math.sin(kotlin.math.PI / 4.0).toFloat()
+        assertEquals(expectedSin45, kNextSecondHalf.leafScaleX, 0.001f)
+        assertEquals(0f, kSecondHalf.flatClipLeftX, 0.01f)
+        assertEquals(kNextSecondHalf.leafOuterEdgeX, kSecondHalf.flatClipRightX, 0.01f)
+        assertEquals(centerSpine, kNextSecondHalf.flatClipLeftX, 0.01f)
+        assertEquals(width, kNextSecondHalf.flatClipRightX, 0.01f)
+        assertFalse(kSecondHalf.castShadowFadesRight)
+        assertTrue(kSecondHalf.castShadowAlpha > 0.10f)
+        assertTrue(kSecondHalf.castShadowRightX > kSecondHalf.castShadowLeftX)
+
+        // 5. Asymmetric foldable hinge (spineX = 580f in 1000f viewport): both halves stay strictly disjoint.
+        val asymSpine = 580f
+        val asymLeftFirst = computeDualColumnBookFlipSpec(0.30f, width, asymSpine)
+        val asymRightFirst = computeDualColumnBookFlipSpec(-0.70f, width, asymSpine)
+        assertEquals(asymSpine, asymLeftFirst.spineX, 0.01f)
+        assertEquals(asymLeftFirst.leafOuterEdgeX, asymRightFirst.flatClipLeftX, 0.01f)
+        val asymLeftSecond = computeDualColumnBookFlipSpec(0.70f, width, asymSpine)
+        val asymRightSecond = computeDualColumnBookFlipSpec(-0.30f, width, asymSpine)
+        assertEquals(asymSpine, asymRightSecond.spineX, 0.01f)
+        assertEquals(asymRightSecond.leafOuterEdgeX, asymLeftSecond.flatClipRightX, 0.01f)
+    }
+
+    @Test
+    @Config(sdk = [34], qualifiers = "w1024dp-h640dp")
+    fun dualColumnSimulationCurl_midFlipHingedLeavesRenderCleanDisjointPartitionsWithoutBleed() {
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        val customBgFile = File.createTempFile("wenku8_dual_hinge_bg_", ".png", context.cacheDir)
+        try {
+            val bgBitmap = Bitmap.createBitmap(32, 32, Bitmap.Config.ARGB_8888).apply {
+                eraseColor(AndroidColor.rgb(245, 234, 214))
+            }
+            customBgFile.outputStream().use { out ->
+                bgBitmap.compress(Bitmap.CompressFormat.PNG, 100, out)
+            }
+            bgBitmap.recycle()
+
+            val chapter = OrderedChapterWithVolume(
+                aid = 2404,
+                vid = 944,
+                volumeOrder = 0,
+                volumeTitle = "第一卷",
+                cid = 9441,
+                chapterOrder = 0,
+                chapterTitle = "第一章 中缝折页测试",
+                isIllustrationChapter = false,
+            )
+            val config = ReaderLayoutConfig(
+                viewportWidthPx = 1024,
+                viewportHeightPx = 640,
+                fontSizePx = 28f,
+                lineDistancePx = 10f,
+                paragraphDistancePx = 12f,
+                pageEdgeDistancePx = 20f,
+                columnCount = 2,
+                columnGapPx = 48f,
+                spineCenterXPx = 512f,
+            )
+            val ast = WenkuChapterParser.parse(
+                rawChapterText = "第一卷 第一章 中缝折页测试\n　　折页正文。",
+                aid = chapter.aid,
+                vid = chapter.vid,
+                cid = chapter.cid,
+                volumeTitle = chapter.volumeTitle,
+                chapterTitle = chapter.chapterTitle,
+            )
+            // Spread 0: blank canvas so any dark ink in Spread 0's territory proves bleed-through.
+            val blankSpread0 = ReaderPage(
+                cid = chapter.cid,
+                pageIndexInChapter = 0,
+                totalPagesInChapter = 2,
+                startAnchor = ReadingAnchor(paragraphIndex = 0, charOffset = 0, progressPermille = 0),
+                endAnchor = ReadingAnchor(paragraphIndex = 0, charOffset = 0, progressPermille = 500),
+                characterCountOnPage = 0,
+                isFullBleedArtbookPage = true,
+                elements = emptyList(),
+                columnCount = 2,
+                spineCenterXPx = 512f,
+                columnGapPx = 48f,
+                logicalStartPageIndex = 0,
+                logicalEndPageIndex = 1,
+                totalLogicalPagesInChapter = 4,
+            )
+            // Spread 1: dense dark ink spanning both left and right facing pages.
+            val denseSpread1Elements = (0 until 6).flatMap { row ->
+                val topY = 180f + row * 40f
+                listOf(
+                    ReaderPageElement.TextLine(
+                        blockIndex = 1,
+                        rawStartChar = row * 20,
+                        rawEndChar = (row + 1) * 20,
+                        text = "████████████████████",
+                        xPx = 16f,
+                        topYPx = topY,
+                        baselineYPx = topY + 26f,
+                        heightPx = 32f,
+                        fontSizePx = 28f,
+                    ),
+                    ReaderPageElement.TextLine(
+                        blockIndex = 1,
+                        rawStartChar = 200 + row * 20,
+                        rawEndChar = 200 + (row + 1) * 20,
+                        text = "████████████████████",
+                        xPx = 540f,
+                        topYPx = topY,
+                        baselineYPx = topY + 26f,
+                        heightPx = 32f,
+                        fontSizePx = 28f,
+                    ),
+                )
+            }
+            val denseSpread1 = ReaderPage(
+                cid = chapter.cid,
+                pageIndexInChapter = 1,
+                totalPagesInChapter = 2,
+                startAnchor = ReadingAnchor(paragraphIndex = 1, charOffset = 0, progressPermille = 500),
+                endAnchor = ReadingAnchor(paragraphIndex = 1, charOffset = 400, progressPermille = 1000),
+                characterCountOnPage = 400,
+                isFullBleedArtbookPage = true,
+                elements = denseSpread1Elements,
+                columnCount = 2,
+                spineCenterXPx = 512f,
+                columnGapPx = 48f,
+                logicalStartPageIndex = 2,
+                logicalEndPageIndex = 3,
+                totalLogicalPagesInChapter = 4,
+            )
+            val layout = PaginatedChapterLayout(
+                ast = ast,
+                config = config,
+                pages = listOf(blankSpread0, denseSpread1),
+            )
+            val snapshot = ReaderWindowSnapshot(
+                aid = chapter.aid,
+                orderedToc = listOf(chapter),
+                currentTocIndex = 0,
+                currentSlot = ChapterWindowSlot.Loaded(chapter = chapter, layout = layout),
+                layoutConfig = config,
+                activeVirtualPageIndex = 0,
+            )
+            val palette = resolveReaderVisualPalette(
+                paperPreset = ReaderPaperPreset.PARCHMENT,
+                isEinkMode = false,
+                customBackgroundPath = customBgFile.absolutePath,
+                customFontPath = "",
+            )
+
+            fun countDarkInkPixels(bitmap: Bitmap, xStart: Int, xEnd: Int, yStart: Int, yEnd: Int): Int {
+                var count = 0
+                for (y in yStart until yEnd) {
+                    for (x in xStart until xEnd) {
+                        val px = bitmap.getPixel(x, y)
+                        val luma = (AndroidColor.red(px) + AndroidColor.green(px) + AndroidColor.blue(px)) / 3
+                        if (luma < 120) count++
+                    }
+                }
+                return count
+            }
+
+            var stage by mutableStateOf(0)
+            composeTestRule.setContent {
+                Wenku8ExpressiveTheme(themeMode = Wenku8ThemeMode.ARCHIVAL_DAY) {
+                    androidx.compose.runtime.key(stage) {
+                        val pagerState = if (stage == 0) {
+                            // First half: Spread 0 right leaf folds to ~85.4% of W (512 + 512*0.707 = 874px).
+                            rememberPagerState(
+                                initialPage = 0,
+                                initialPageOffsetFraction = 0.25f,
+                            ) { snapshot.totalVirtualPages }
+                        } else {
+                            // Second half: Spread 1 left leaf unfolds to ~14.6% of W (512 - 512*0.707 = 150px).
+                            rememberPagerState(
+                                initialPage = 1,
+                                initialPageOffsetFraction = -0.25f,
+                            ) { snapshot.totalVirtualPages }
+                        }
+                        ReaderViewportHost(
+                            pageTurnMode = ReaderPageTurnMode.SIMULATION_CURL,
+                            snapshot = snapshot,
+                            pagerState = pagerState,
+                            palette = palette,
+                            fontSizeSp = 28,
+                            lineDistanceDp = 10,
+                            paragraphDistanceDp = 12,
+                            pageEdgeDistanceDp = 20,
+                            leftEdgeBrightnessDragEnabled = false,
+                            contentSafeInsets = WindowInsets(0, 0, 0, 0),
+                            isDualColumnSpread = true,
+                            dualColumnSpineCenterXPx = 512f,
+                            onTapZoneAction = {},
+                            onBrightnessDragDelta = {},
+                            onIllustrationClicked = { _, _ -> },
+                            onContinuousScrollAnchorChanged = { _, _ -> },
+                            onRequestNextChapterInContinuousMode = {},
+                            onRequestPrevChapterInContinuousMode = {},
+                            onRetryFailedSlot = {},
+                            onOpenNetworkDiagnostics = {},
+                        )
+                    }
+                }
+            }
+
+            // Stage 0 (first half, p = 0.25f):
+            composeTestRule.waitForIdle()
+            val firstHalfBitmap = composeTestRule
+                .onNodeWithTag(ReaderTestTags.VIEWPORT_CONTAINER)
+                .captureToImage()
+                .asAndroidBitmap()
+            val w = firstHalfBitmap.width
+            val h = firstHalfBitmap.height
+            val yStart = (h * 0.30f).toInt().coerceIn(0, h - 1)
+            val yEnd = (h * 0.65f).toInt().coerceIn(yStart + 1, h)
+
+            assertEquals(
+                "Spread 1 ink bled into Spread 0's static left page during first half!",
+                0,
+                countDarkInkPixels(firstHalfBitmap, (w * 0.08f).toInt(), (w * 0.42f).toInt(), yStart, yEnd),
+            )
+            assertEquals(
+                "Spread 1 ink bled into Spread 0's folding right leaf during first half!",
+                0,
+                countDarkInkPixels(firstHalfBitmap, (w * 0.54f).toInt(), (w * 0.78f).toInt(), yStart, yEnd),
+            )
+            assertTrue(
+                "Expected Spread 1's revealed right edge [0.89W..0.97W] to render ink during first half",
+                countDarkInkPixels(firstHalfBitmap, (w * 0.89f).toInt(), (w * 0.97f).toInt(), yStart, yEnd) > 0,
+            )
+
+            // Stage 1 (second half, p = 0.75f -> page 1 at -0.25f):
+            stage = 1
+            composeTestRule.waitForIdle()
+            val secondHalfBitmap = composeTestRule
+                .onNodeWithTag(ReaderTestTags.VIEWPORT_CONTAINER)
+                .captureToImage()
+                .asAndroidBitmap()
+
+            assertEquals(
+                "Spread 1 unfolding left leaf bled past outerEdgeX (~0.146W) into Spread 0's remaining left strip!",
+                0,
+                countDarkInkPixels(secondHalfBitmap, (w * 0.02f).toInt(), (w * 0.11f).toInt(), yStart, yEnd),
+            )
+            assertTrue(
+                "Expected Spread 1's unfolding left leaf [0.22W..0.46W] to render foreshortened ink",
+                countDarkInkPixels(secondHalfBitmap, (w * 0.22f).toInt(), (w * 0.46f).toInt(), yStart, yEnd) > 0,
+            )
+            assertTrue(
+                "Expected Spread 1's static right half [0.58W..0.92W] to render ink",
+                countDarkInkPixels(secondHalfBitmap, (w * 0.58f).toInt(), (w * 0.92f).toInt(), yStart, yEnd) > 0,
+            )
+        } finally {
+            customBgFile.delete()
+        }
+    }
+
     private suspend fun seedDualColumnChapter(
         aid: Int,
         vid: Int,
