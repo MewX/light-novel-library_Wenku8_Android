@@ -578,10 +578,6 @@ fun NovelDetailScreen(
                 enableLiveAdViewInflation = enableLiveAdViewInflation,
             )
             Box(modifier = Modifier.fillMaxSize()) {
-                ServerSupportBannerAdStagingHost(
-                    holder = bannerAdHolder,
-                    modifier = Modifier.padding(innerPadding),
-                )
                 LazyColumn(
                     modifier = Modifier
                         .fillMaxSize()

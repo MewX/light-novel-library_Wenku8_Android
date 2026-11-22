@@ -446,7 +446,7 @@
     <string name="detail_synopsis_empty">暫無內容簡介</string>
     <string name="detail_synopsis_expand">展開全部</string>
     <string name="detail_synopsis_collapse">收起簡介</string>
-    <string name="detail_ad_support_label">贊助 · 支援中轉伺服器營運</string>
+    <string name="detail_ad_support_label">廣告</string>
     <string name="detail_toc_header_format">目錄與分卷 (共 %1$d 卷)</string>
     <string name="detail_toc_search_action">搜章節</string>
     <string name="detail_toc_search_placeholder">篩選分卷或章節標題…</string>

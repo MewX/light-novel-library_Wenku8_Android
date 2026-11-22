@@ -720,7 +720,29 @@ class NovelDetailAndDownloadTest {
     }
 
     @Test
-    fun serverSupportBannerAd_hidesBoxWhileLoadingOrFailedAndPreservesStateAcrossScroll() {
+    fun serverSupportBannerAd_usesNeutralCompliantLabelAcrossLocales() {
+        val app = ApplicationProvider.getApplicationContext<Application>()
+        val expectedByLocale = listOf(
+            Locale.SIMPLIFIED_CHINESE to "广告",
+            Locale.TAIWAN to "廣告",
+            Locale("zh", "HK") to "廣告",
+        )
+        for ((locale, expectedLabel) in expectedByLocale) {
+            val localizedConfig = Configuration(app.resources.configuration).apply {
+                setLocale(locale)
+            }
+            val localizedContext = app.createConfigurationContext(localizedConfig)
+            val label = localizedContext.getString(R.string.detail_ad_support_label)
+            assertEquals(expectedLabel, label)
+            assertFalse(
+                "Ad attribution label must not contain click-encouraging 'support' wording",
+                label.contains("支持") || label.contains("支援"),
+            )
+        }
+    }
+
+    @Test
+    fun serverSupportBannerAd_reservesVisibleSlotWhileLoadingCollapsesOnFailureAndPreservesAcrossScroll() {
         assertEquals(
             listOf(ServerSupportAdConstants.PRODUCTION_BANNER_AD_UNIT_ID),
             ServerSupportAdConstants.candidateBannerAdUnitIds(isDebugBuild = false),
@@ -730,20 +752,8 @@ class NovelDetailAndDownloadTest {
             ServerSupportAdConstants.candidateBannerAdUnitIds(isDebugBuild = true),
         )
 
-        // Activity-pooled holder retains Loaded phase across detail screen detach -> next novel attach
-        val pooledHolder = NovelDetailBannerAdHolder(
-            initialPhase = BannerAdLoadPhase.Loaded,
-            ownedByActivityPool = true,
-        )
-        pooledHolder.onDetailConsumerAttached()
-        assertEquals(1, pooledHolder.activeDetailConsumers)
-        assertTrue(pooledHolder.shouldRenderVisibleCard)
-        pooledHolder.onDetailConsumerDetached()
-        assertEquals(0, pooledHolder.activeDetailConsumers)
-        assertTrue("Preloaded Activity-pooled holder must stay Loaded for 0ms next-book open", pooledHolder.shouldRenderVisibleCard)
-
         val holder = NovelDetailBannerAdHolder(initialPhase = BannerAdLoadPhase.Loading)
-        assertEquals(false, holder.shouldRenderVisibleCard)
+        assertTrue(holder.shouldRenderVisibleCard)
 
         composeTestRule.setContent {
             Wenku8ExpressiveTheme(themeMode = Wenku8ThemeMode.ARCHIVAL_DAY) {
@@ -771,11 +781,17 @@ class NovelDetailAndDownloadTest {
         }
         composeTestRule.waitForIdle()
 
-        // 1. While Loading: no empty box rendered on open
+        // 1. While Loading: visible opaque reserved slot is mounted on-screen (zero CLS, no 0-alpha staging)
+        composeTestRule.onNodeWithTag(NovelDetailTestTags.SERVER_SUPPORT_AD_CARD)
+            .assertIsDisplayed()
+
+        // 2. When Collapsed (offline/no-GMS): disappears completely
+        composeTestRule.runOnIdle { holder.markCollapsedForTest() }
+        composeTestRule.waitForIdle()
         composeTestRule.onNodeWithTag(NovelDetailTestTags.SERVER_SUPPORT_AD_CARD)
             .assertDoesNotExist()
 
-        // 2. When Failed: remains invisible both initially and after scrolling down & back up
+        // 3. When Failed: remains invisible both initially and after scrolling down & back up
         composeTestRule.runOnIdle { holder.markFailedForTest() }
         composeTestRule.waitForIdle()
         composeTestRule.onNodeWithTag(NovelDetailTestTags.SERVER_SUPPORT_AD_CARD)
@@ -789,7 +805,7 @@ class NovelDetailAndDownloadTest {
         composeTestRule.onNodeWithTag(NovelDetailTestTags.SERVER_SUPPORT_AD_CARD)
             .assertDoesNotExist()
 
-        // 3. When Loaded: card renders and remains Loaded across scrolling down & back up
+        // 4. When Loaded: card renders and remains Loaded across scrolling down & back up
         composeTestRule.runOnIdle { holder.markLoadedForTest() }
         composeTestRule.waitForIdle()
         composeTestRule.onNodeWithTag(NovelDetailTestTags.SERVER_SUPPORT_AD_CARD)

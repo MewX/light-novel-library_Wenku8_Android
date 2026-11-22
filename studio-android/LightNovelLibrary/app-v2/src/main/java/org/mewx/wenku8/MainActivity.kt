@@ -28,7 +28,6 @@ import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.launch
 import org.mewx.wenku8.api.Wenku8API
 import org.mewx.wenku8.data.local.preferences.Wenku8UserPreferences
-import org.mewx.wenku8.ui.detail.PrewarmServerSupportBannerAdEffect
 import org.mewx.wenku8.ui.detail.ReaderLaunchRequest
 import org.mewx.wenku8.ui.navigation.AdaptiveMainScaffold
 import org.mewx.wenku8.ui.navigation.Wenku8DeepLinks
@@ -165,7 +164,6 @@ class MainActivity : AppCompatActivity(), HardwareVolumeKeyHost {
                     )
                 } else {
                     Box(modifier = Modifier.fillMaxSize()) {
-                        PrewarmServerSupportBannerAdEffect()
                         AdaptiveMainScaffold(
                             preferredHomeDestination = loadedPreferences.defaultHomeDestination,
                             isNetworkAvailableOnColdStart = hasActiveNetworkOnColdStart,

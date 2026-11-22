@@ -5,11 +5,8 @@ import android.content.Context
 import android.content.ContextWrapper
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
-import android.os.SystemClock
 import android.view.ViewGroup
-import androidx.activity.ComponentActivity
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -25,22 +22,21 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
-import androidx.lifecycle.DefaultLifecycleObserver
-import androidx.lifecycle.LifecycleOwner
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.google.android.gms.ads.AdListener
 import com.google.android.gms.ads.AdRequest
 import com.google.android.gms.ads.AdSize
@@ -52,14 +48,12 @@ import com.google.android.gms.common.GoogleApiAvailabilityLight
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import org.mewx.wenku8.BuildConfig
 import org.mewx.wenku8.R
 import org.mewx.wenku8.ui.theme.einkHairlineBorder
-import java.util.WeakHashMap
 import java.util.concurrent.atomic.AtomicBoolean
 
 object ServerSupportAdConstants {
@@ -99,8 +93,6 @@ object ServerSupportAdConstants {
         }
 
     val RESERVED_BANNER_SLOT_HEIGHT = 50.dp
-    internal const val RETRY_AFTER_FAILURE_COOLDOWN_MS = 30_000L
-    internal const val COLD_START_PREWARM_DELAY_MS = 350L
 }
 
 object ServerSupportAdInitializer {
@@ -144,15 +136,16 @@ enum class BannerAdLoadPhase {
 }
 
 /**
- * Holder for `NovelDetailScreen`'s inline banner ad. When pooled at the host `Activity` level via
- * [ActivityBannerAdPool], a single prewarmed `AdView` + WebView stays alive across novel visits
- * (`pause()`d off-screen, `resume()`d on `NovelDetailScreen`), rendering in `0ms` on open and
- * surviving `LazyColumn` scrolling without re-requesting or flashing.
+ * Screen-scoped holder for `NovelDetailScreen`'s inline banner ad.
+ *
+ * Loads strictly on-demand inside the visible, opaque reserved card container when the detail screen
+ * is actually opened (never preloaded into an off-screen/0-alpha container during cold start),
+ * survives `LazyColumn` scrolling within the visit without re-requesting, and destroys its `AdView`
+ * cleanly when leaving the screen.
  */
 @Stable
 class NovelDetailBannerAdHolder internal constructor(
     initialPhase: BannerAdLoadPhase,
-    internal val ownedByActivityPool: Boolean = false,
 ) {
     var phase by mutableStateOf(initialPhase)
         internal set
@@ -160,18 +153,20 @@ class NovelDetailBannerAdHolder internal constructor(
     var adView by mutableStateOf<AdView?>(null)
         internal set
 
-    var activeDetailConsumers by mutableIntStateOf(0)
-        internal set
-
-    internal var lastFailureAtMonoMs: Long = 0L
     internal var loadInProgress: Boolean = false
     internal var loadedWidthDp: Int = 0
 
+    /**
+     * Render the visible, opaque reserved card during [BannerAdLoadPhase.Loading] (preventing
+     * layout shift and keeping `AdView` visibly mounted per AdMob policy) as well as when
+     * [BannerAdLoadPhase.Loaded] or [BannerAdLoadPhase.StaticPreview]. Collapses completely when
+     * offline, GMS-unavailable ([BannerAdLoadPhase.Collapsed]), or on load failure
+     * ([BannerAdLoadPhase.Failed]).
+     */
     val shouldRenderVisibleCard: Boolean
-        get() = phase == BannerAdLoadPhase.Loaded || phase == BannerAdLoadPhase.StaticPreview
-
-    val shouldMountHiddenStagingView: Boolean
-        get() = phase == BannerAdLoadPhase.Loading && adView != null
+        get() = phase == BannerAdLoadPhase.Loading ||
+            phase == BannerAdLoadPhase.Loaded ||
+            phase == BannerAdLoadPhase.StaticPreview
 
     fun markLoadedForTest() {
         phase = BannerAdLoadPhase.Loaded
@@ -181,22 +176,16 @@ class NovelDetailBannerAdHolder internal constructor(
         phase = BannerAdLoadPhase.Failed
     }
 
-    internal fun onDetailConsumerAttached() {
-        activeDetailConsumers += 1
-        runCatching { adView?.resume() }
+    fun markCollapsedForTest() {
+        phase = BannerAdLoadPhase.Collapsed
     }
 
-    internal fun onDetailConsumerDetached() {
-        activeDetailConsumers = (activeDetailConsumers - 1).coerceAtLeast(0)
-        if (activeDetailConsumers == 0) {
-            val current = adView
-            if (current != null) {
-                runCatching {
-                    (current.parent as? ViewGroup)?.removeView(current)
-                    current.pause()
-                }
-            }
-        }
+    internal fun pause() {
+        runCatching { adView?.pause() }
+    }
+
+    internal fun resume() {
+        runCatching { adView?.resume() }
     }
 
     internal fun destroy() {
@@ -213,97 +202,6 @@ class NovelDetailBannerAdHolder internal constructor(
     }
 }
 
-private object ActivityBannerAdPool {
-    private val holdersByActivity = WeakHashMap<Activity, NovelDetailBannerAdHolder>()
-
-    @Synchronized
-    fun getOrCreateForActivity(
-        activity: Activity,
-        isOnline: Boolean,
-        isGmsReady: Boolean,
-    ): NovelDetailBannerAdHolder {
-        val existing = holdersByActivity[activity]
-        if (existing != null) {
-            val nowMono = SystemClock.elapsedRealtime()
-            val canRetryAfterFailure = existing.phase == BannerAdLoadPhase.Failed &&
-                nowMono - existing.lastFailureAtMonoMs >= ServerSupportAdConstants.RETRY_AFTER_FAILURE_COOLDOWN_MS
-            if (isOnline && isGmsReady && (existing.phase == BannerAdLoadPhase.Collapsed || canRetryAfterFailure)) {
-                existing.phase = BannerAdLoadPhase.Loading
-            }
-            return existing
-        }
-
-        val initialPhase = if (isOnline && isGmsReady) {
-            BannerAdLoadPhase.Loading
-        } else {
-            BannerAdLoadPhase.Collapsed
-        }
-        val created = NovelDetailBannerAdHolder(
-            initialPhase = initialPhase,
-            ownedByActivityPool = true,
-        )
-        holdersByActivity[activity] = created
-
-        if (activity is ComponentActivity) {
-            activity.lifecycle.addObserver(
-                object : DefaultLifecycleObserver {
-                    override fun onDestroy(owner: LifecycleOwner) {
-                        synchronized(this@ActivityBannerAdPool) {
-                            holdersByActivity.remove(activity)?.destroy()
-                        }
-                    }
-                },
-            )
-        }
-        return created
-    }
-}
-
-/**
- * Background prewarmer mounted once inside `MainActivity` after initial preferences load: waits
- * for the home screen's first frame + [ServerSupportAdConstants.COLD_START_PREWARM_DELAY_MS] so
- * cold start stays 120Hz, then preloads the single pooled banner `AdView` in the background so
- * opening any `NovelDetailScreen` displays the ad on Frame 1 (`0ms` wait).
- */
-@Composable
-fun PrewarmServerSupportBannerAdEffect() {
-    val context = LocalContext.current
-    val configuration = LocalConfiguration.current
-    val hostActivity = remember(context) { context.findHostActivity() } ?: return
-    val isOnline = remember(context) { hasActiveInternetCapability(context) }
-    val isGmsReady = remember(context) { isGooglePlayServicesReady(context) }
-    if (!isOnline || !isGmsReady) return
-
-    val holder = remember(hostActivity) {
-        ActivityBannerAdPool.getOrCreateForActivity(
-            activity = hostActivity,
-            isOnline = true,
-            isGmsReady = true,
-        )
-    }
-    val availableWidthDp = (configuration.screenWidthDp - 32).coerceAtLeast(160)
-
-    LaunchedEffect(holder, availableWidthDp) {
-        if (holder.phase != BannerAdLoadPhase.Loading || holder.loadInProgress || holder.adView != null) {
-            return@LaunchedEffect
-        }
-        withFrameNanos { }
-        delay(ServerSupportAdConstants.COLD_START_PREWARM_DELAY_MS)
-        startHolderBannerLoad(
-            holder = holder,
-            context = context,
-            hostContext = hostActivity,
-            availableWidthDp = availableWidthDp,
-        )
-    }
-
-    // While prewarming off-detail, provide a 0-alpha window attachment so WebView finishes layout,
-    // then immediately detach & pause once `onAdLoaded` transitions phase -> Loaded.
-    if (holder.activeDetailConsumers == 0 && holder.shouldMountHiddenStagingView) {
-        ServerSupportBannerAdStagingHost(holder = holder)
-    }
-}
-
 @Composable
 fun rememberNovelDetailBannerAdHolder(
     aid: Int,
@@ -313,46 +211,36 @@ fun rememberNovelDetailBannerAdHolder(
 ): NovelDetailBannerAdHolder {
     val context = LocalContext.current
     val configuration = LocalConfiguration.current
+    val lifecycleOwner = LocalLifecycleOwner.current
     val isOnline = isNetworkAvailableOverride ?: remember(aid, context) {
         hasActiveInternetCapability(context)
     }
     val isGmsReady = isGmsAvailableOverride ?: remember(aid, context) {
         isGooglePlayServicesReady(context)
     }
-
     val hostActivity = remember(context) { context.findHostActivity() }
-    val useActivityPool = enableLiveAdViewInflation &&
-        hostActivity != null &&
-        isNetworkAvailableOverride == null &&
-        isGmsAvailableOverride == null
 
-    val holder = remember(aid, isOnline, isGmsReady, enableLiveAdViewInflation, hostActivity) {
-        if (useActivityPool) {
-            ActivityBannerAdPool.getOrCreateForActivity(
-                activity = hostActivity,
-                isOnline = isOnline,
-                isGmsReady = isGmsReady,
-            )
-        } else {
-            val initialPhase = when {
-                !isOnline || !isGmsReady -> BannerAdLoadPhase.Collapsed
-                !enableLiveAdViewInflation -> BannerAdLoadPhase.StaticPreview
-                else -> BannerAdLoadPhase.Loading
-            }
-            NovelDetailBannerAdHolder(
-                initialPhase = initialPhase,
-                ownedByActivityPool = false,
-            )
+    val holder = remember(aid, isOnline, isGmsReady, enableLiveAdViewInflation) {
+        val initialPhase = when {
+            !isOnline || !isGmsReady -> BannerAdLoadPhase.Collapsed
+            !enableLiveAdViewInflation -> BannerAdLoadPhase.StaticPreview
+            else -> BannerAdLoadPhase.Loading
         }
+        NovelDetailBannerAdHolder(initialPhase = initialPhase)
     }
 
-    DisposableEffect(holder, aid) {
-        holder.onDetailConsumerAttached()
-        onDispose {
-            holder.onDetailConsumerDetached()
-            if (!holder.ownedByActivityPool) {
-                holder.destroy()
+    DisposableEffect(holder, lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_RESUME -> holder.resume()
+                Lifecycle.Event.ON_PAUSE -> holder.pause()
+                else -> Unit
             }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+            holder.destroy()
         }
     }
 
@@ -414,7 +302,6 @@ private suspend fun startHolderBannerLoad(
         val adUnit = candidateUnits.getOrNull(unitIndex)
         if (adUnit == null) {
             holder.destroy()
-            holder.lastFailureAtMonoMs = SystemClock.elapsedRealtime()
             holder.phase = BannerAdLoadPhase.Failed
             return
         }
@@ -430,12 +317,6 @@ private suspend fun startHolderBannerLoad(
                     override fun onAdLoaded() {
                         holder.loadInProgress = false
                         holder.phase = BannerAdLoadPhase.Loaded
-                        if (holder.activeDetailConsumers == 0) {
-                            runCatching {
-                                (parent as? ViewGroup)?.removeView(this@apply)
-                                pause()
-                            }
-                        }
                     }
 
                     override fun onAdFailedToLoad(error: LoadAdError) {
@@ -443,7 +324,6 @@ private suspend fun startHolderBannerLoad(
                             tryLoadUnitAt(unitIndex + 1)
                         } else {
                             holder.destroy()
-                            holder.lastFailureAtMonoMs = SystemClock.elapsedRealtime()
                             holder.phase = BannerAdLoadPhase.Failed
                         }
                     }
@@ -453,7 +333,6 @@ private suspend fun startHolderBannerLoad(
         }.getOrElse {
             holder.loadInProgress = false
             holder.loadedWidthDp = 0
-            holder.lastFailureAtMonoMs = SystemClock.elapsedRealtime()
             holder.phase = BannerAdLoadPhase.Failed
             null
         }
@@ -461,51 +340,6 @@ private suspend fun startHolderBannerLoad(
     }
 
     tryLoadUnitAt(0)
-}
-
-/**
- * Off-flow `0`-alpha staging host mounted ONLY while [holder] is in [BannerAdLoadPhase.Loading],
- * giving `AdView` a real window attachment and full width without adding an empty visible frame,
- * intercepting touches, or shifting `LazyColumn` spacing before `onAdLoaded` succeeds.
- */
-@Composable
-fun ServerSupportBannerAdStagingHost(
-    holder: NovelDetailBannerAdHolder,
-    modifier: Modifier = Modifier,
-) {
-    val liveAdView = holder.adView
-    if (!holder.shouldMountHiddenStagingView || liveAdView == null) {
-        return
-    }
-    Box(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp)
-            .alpha(0f),
-        contentAlignment = Alignment.TopCenter,
-    ) {
-        AndroidView(
-            factory = { ctx ->
-                object : android.widget.FrameLayout(ctx) {
-                    override fun dispatchTouchEvent(ev: android.view.MotionEvent?): Boolean = false
-                }.apply {
-                    importantForAccessibility =
-                        android.view.View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS
-                    (liveAdView.parent as? ViewGroup)?.removeView(liveAdView)
-                    addView(
-                        liveAdView,
-                        android.widget.FrameLayout.LayoutParams(
-                            ViewGroup.LayoutParams.MATCH_PARENT,
-                            ViewGroup.LayoutParams.WRAP_CONTENT,
-                        ),
-                    )
-                }
-            },
-            modifier = Modifier
-                .fillMaxWidth()
-                .wrapContentHeight(),
-        )
-    }
 }
 
 @Composable
@@ -521,7 +355,6 @@ fun ServerSupportBannerAd(
         isGmsAvailableOverride = isGmsAvailableOverride,
         enableLiveAdViewInflation = enableLiveAdViewInflation,
     )
-    ServerSupportBannerAdStagingHost(holder = holder)
     ServerSupportBannerAd(
         holder = holder,
         modifier = modifier,
@@ -529,7 +362,7 @@ fun ServerSupportBannerAd(
 }
 
 /**
- * Minimal, non-UX-harming server-support inline banner (`05-screen-by-screen-ui-specifications.md` §Screen 5).
+ * Policy-compliant, zero-CLS inline banner card rendered on-demand inside scrollable content.
  */
 @Composable
 fun ServerSupportBannerAd(
@@ -595,6 +428,11 @@ fun ServerSupportBannerAd(
                         factory = {
                             (liveAdView.parent as? ViewGroup)?.removeView(liveAdView)
                             liveAdView
+                        },
+                        update = { view ->
+                            if (view.parent == null) {
+                                // AndroidView re-attaches the returned view automatically.
+                            }
                         },
                         modifier = Modifier
                             .fillMaxWidth()
