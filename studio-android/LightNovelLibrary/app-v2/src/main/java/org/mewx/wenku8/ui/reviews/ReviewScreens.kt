@@ -71,6 +71,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -94,6 +95,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.mewx.wenku8.api.Wenku8API
@@ -116,6 +118,8 @@ object ReviewScreensTestTags {
     const val REVIEW_LIST_SCREEN = "review_list_screen"
     const val REVIEW_LIST_BACK_BUTTON = "review_list_back_button"
     const val REVIEW_LIST_NEW_THREAD_FAB = "review_list_new_thread_fab"
+    const val REVIEW_LIST_LOADING_INDICATOR = "review_list_loading_indicator"
+    const val REVIEW_LIST_APPEND_ERROR = "review_list_append_error"
     const val REVIEW_THREAD_CARD_PREFIX = "review_thread_card_"
 
     const val NEW_THREAD_BOTTOM_SHEET = "review_new_thread_bottom_sheet"
@@ -125,6 +129,7 @@ object ReviewScreensTestTags {
 
     const val REVIEW_THREAD_SCREEN = "review_thread_screen"
     const val REVIEW_THREAD_BACK_BUTTON = "review_thread_back_button"
+    const val REVIEW_THREAD_LOADING_INDICATOR = "review_thread_loading_indicator"
     const val REVIEW_FLOOR_CARD_PREFIX = "review_floor_card_"
     const val REVIEW_FLOOR_COPY_PREFIX = "review_floor_copy_"
     const val REVIEW_FLOOR_QUOTE_PREFIX = "review_floor_quote_"
@@ -177,12 +182,15 @@ fun ReviewListScreen(
     val listState = rememberLazyListState()
 
     var threadItems by remember(aid, appLanguage) { mutableStateOf<List<ReviewThreadCardItem>>(emptyList()) }
-    var currentPage by rememberSaveable(aid, appLanguage.name) { mutableIntStateOf(0) }
-    var totalPages by rememberSaveable(aid, appLanguage.name) { mutableIntStateOf(1) }
+    var currentPage by remember(aid, appLanguage) { mutableIntStateOf(0) }
+    var totalPages by remember(aid, appLanguage) { mutableIntStateOf(1) }
     var isInitialOrRefreshLoading by remember(aid, appLanguage) { mutableStateOf(false) }
     var isLoadingNextPage by remember(aid, appLanguage) { mutableStateOf(false) }
     var errorType by remember(aid, appLanguage) { mutableStateOf(ReviewLoadErrorType.NONE) }
     var isNewThreadSheetOpen by rememberSaveable(aid) { mutableStateOf(false) }
+
+    var activeLoadJob by remember { mutableStateOf<Job?>(null) }
+    var activeLoadGeneration by remember { mutableIntStateOf(0) }
 
     val sessionState = if (userSessionRepository != null) {
         val state by userSessionRepository.sessionState.collectAsStateWithLifecycle()
@@ -195,63 +203,107 @@ fun ReviewListScreen(
         sessionState is AccountSessionState.OfflineWithSavedAccount ||
         sessionState is AccountSessionState.RestoringSession
 
-    suspend fun loadPage(targetPage: Int, replaceExisting: Boolean) {
+    fun launchLoadPage(targetPage: Int, replaceExisting: Boolean) {
+        if (replaceExisting) {
+            activeLoadJob?.cancel()
+        } else if (isInitialOrRefreshLoading || isLoadingNextPage) {
+            return
+        }
+
+        val generation = activeLoadGeneration + 1
+        activeLoadGeneration = generation
         if (replaceExisting) {
             isInitialOrRefreshLoading = true
+            isLoadingNextPage = false
         } else {
             isLoadingNextPage = true
         }
         errorType = ReviewLoadErrorType.NONE
 
-        when (val res = reviewsRepository.fetchThreadListPage(aid = aid, pageNumber = targetPage, appLanguage = appLanguage)) {
-            is WenkuApiResult.Success -> {
-                currentPage = res.data.currentPage
-                totalPages = res.data.totalPages
-                threadItems = if (replaceExisting) {
-                    res.data.items
-                } else {
-                    val existingIds = threadItems.asSequence().map { it.rid }.toHashSet()
-                    threadItems + res.data.items.filter { it.rid !in existingIds }
+        activeLoadJob = coroutineScope.launch {
+            try {
+                when (
+                    val res = reviewsRepository.fetchThreadListPage(
+                        aid = aid,
+                        pageNumber = targetPage,
+                        appLanguage = appLanguage,
+                    )
+                ) {
+                    is WenkuApiResult.Success -> {
+                        if (activeLoadGeneration != generation) return@launch
+                        currentPage = res.data.currentPage
+                        totalPages = res.data.totalPages
+                        threadItems = if (replaceExisting) {
+                            res.data.items
+                        } else {
+                            val existingIds = threadItems.asSequence().map { it.rid }.toHashSet()
+                            threadItems + res.data.items.filter { it.rid !in existingIds }
+                        }
+                    }
+                    WenkuApiResult.ApiNotConfigured -> {
+                        if (activeLoadGeneration != generation) return@launch
+                        errorType = ReviewLoadErrorType.API_UNAVAILABLE
+                    }
+                    is WenkuApiResult.UpgradeRequired,
+                    WenkuApiResult.AuthRejected,
+                    is WenkuApiResult.NetworkError,
+                    is WenkuApiResult.ServerErrorCode,
+                    WenkuApiResult.EmptyResponse,
+                    is WenkuApiResult.ParseError,
+                    -> {
+                        if (activeLoadGeneration != generation) return@launch
+                        errorType = ReviewLoadErrorType.NETWORK_OR_SERVER
+                    }
+                }
+            } finally {
+                if (activeLoadGeneration == generation) {
+                    isInitialOrRefreshLoading = false
+                    isLoadingNextPage = false
+                    activeLoadJob = null
                 }
             }
-            WenkuApiResult.ApiNotConfigured -> {
-                errorType = ReviewLoadErrorType.API_UNAVAILABLE
-            }
-            is WenkuApiResult.UpgradeRequired,
-            WenkuApiResult.AuthRejected,
-            is WenkuApiResult.NetworkError,
-            is WenkuApiResult.ServerErrorCode,
-            WenkuApiResult.EmptyResponse,
-            is WenkuApiResult.ParseError,
-            -> {
-                errorType = ReviewLoadErrorType.NETWORK_OR_SERVER
-            }
         }
+    }
 
-        isInitialOrRefreshLoading = false
-        isLoadingNextPage = false
+    DisposableEffect(aid, appLanguage) {
+        onDispose {
+            activeLoadJob?.cancel()
+            activeLoadJob = null
+        }
     }
 
     LaunchedEffect(aid, appLanguage) {
-        loadPage(targetPage = 1, replaceExisting = true)
+        launchLoadPage(targetPage = 1, replaceExisting = true)
     }
 
-    val shouldAppendNextPage by remember {
+    val shouldAppendNextPage by remember(listState, threadItems.size) {
         derivedStateOf {
-            val layoutInfo = listState.layoutInfo
-            val totalCount = layoutInfo.totalItemsCount
-            val lastVisible = layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
-            totalCount > 0 && lastVisible >= totalCount - 3
+            if (threadItems.isEmpty()) {
+                false
+            } else {
+                val lastVisible = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: -1
+                lastVisible >= (threadItems.size - 3).coerceAtLeast(0)
+            }
         }
     }
 
-    LaunchedEffect(shouldAppendNextPage, currentPage, totalPages, isInitialOrRefreshLoading, isLoadingNextPage) {
+    LaunchedEffect(
+        aid,
+        appLanguage,
+        shouldAppendNextPage,
+        currentPage,
+        totalPages,
+        isInitialOrRefreshLoading,
+        isLoadingNextPage,
+        errorType,
+    ) {
         if (shouldAppendNextPage &&
             !isInitialOrRefreshLoading &&
             !isLoadingNextPage &&
+            errorType == ReviewLoadErrorType.NONE &&
             currentPage in 1 until totalPages
         ) {
-            loadPage(targetPage = currentPage + 1, replaceExisting = false)
+            launchLoadPage(targetPage = currentPage + 1, replaceExisting = false)
         }
     }
 
@@ -304,9 +356,7 @@ fun ReviewListScreen(
                         tooltipText = refreshLabel,
                         onClick = {
                             if (!isInitialOrRefreshLoading) {
-                                coroutineScope.launch {
-                                    loadPage(targetPage = 1, replaceExisting = true)
-                                }
+                                launchLoadPage(targetPage = 1, replaceExisting = true)
                             }
                         },
                     ) {
@@ -339,9 +389,7 @@ fun ReviewListScreen(
         PullToRefreshBox(
             isRefreshing = isInitialOrRefreshLoading && threadItems.isNotEmpty(),
             onRefresh = {
-                coroutineScope.launch {
-                    loadPage(targetPage = 1, replaceExisting = true)
-                }
+                launchLoadPage(targetPage = 1, replaceExisting = true)
             },
             modifier = Modifier
                 .fillMaxSize()
@@ -349,10 +397,13 @@ fun ReviewListScreen(
         ) {
             Column(modifier = Modifier.fillMaxSize()) {
                 if (isInitialOrRefreshLoading || isLoadingNextPage) {
+                    val progressModifier = Modifier
+                        .fillMaxWidth()
+                        .testTag(ReviewScreensTestTags.REVIEW_LIST_LOADING_INDICATOR)
                     if (isEinkMode) {
-                        LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                        LinearProgressIndicator(modifier = progressModifier)
                     } else {
-                        LinearWavyProgressIndicator(modifier = Modifier.fillMaxWidth())
+                        LinearWavyProgressIndicator(modifier = progressModifier)
                     }
                 }
 
@@ -372,9 +423,7 @@ fun ReviewListScreen(
                             ReviewErrorStateCard(
                                 errorType = errorType,
                                 onRetry = {
-                                    coroutineScope.launch {
-                                        loadPage(targetPage = 1, replaceExisting = true)
-                                    }
+                                    launchLoadPage(targetPage = 1, replaceExisting = true)
                                 },
                                 onOpenNetworkDiagnostics = onOpenNetworkDiagnostics,
                             )
@@ -392,6 +441,31 @@ fun ReviewListScreen(
                                 thread = thread,
                                 onClick = { onOpenThread(thread) },
                             )
+                        }
+
+                        if (errorType != ReviewLoadErrorType.NONE &&
+                            !isInitialOrRefreshLoading &&
+                            !isLoadingNextPage &&
+                            currentPage in 1 until totalPages
+                        ) {
+                            item(key = "review_list_append_error") {
+                                Box(
+                                    modifier = Modifier.testTag(
+                                        ReviewScreensTestTags.REVIEW_LIST_APPEND_ERROR,
+                                    ),
+                                ) {
+                                    ReviewErrorStateCard(
+                                        errorType = errorType,
+                                        onRetry = {
+                                            launchLoadPage(
+                                                targetPage = currentPage + 1,
+                                                replaceExisting = false,
+                                            )
+                                        },
+                                        onOpenNetworkDiagnostics = onOpenNetworkDiagnostics,
+                                    )
+                                }
+                            }
                         }
                     }
                 }
@@ -412,9 +486,9 @@ fun ReviewListScreen(
             onDismiss = { isNewThreadSheetOpen = false },
             onThreadPublished = {
                 isNewThreadSheetOpen = false
+                launchLoadPage(targetPage = 1, replaceExisting = true)
                 coroutineScope.launch {
                     snackbarHostState.showSnackbar(threadPublishedMsg)
-                    loadPage(targetPage = 1, replaceExisting = true)
                 }
             },
         )
@@ -451,11 +525,14 @@ fun ReviewThreadScreen(
     val listState = rememberLazyListState()
 
     var floorItems by remember(thread.rid, appLanguage) { mutableStateOf<List<ReviewReplyFloorItem>>(emptyList()) }
-    var currentPage by rememberSaveable(thread.rid, appLanguage.name) { mutableIntStateOf(0) }
-    var totalPages by rememberSaveable(thread.rid, appLanguage.name) { mutableIntStateOf(1) }
+    var currentPage by remember(thread.rid, appLanguage) { mutableIntStateOf(0) }
+    var totalPages by remember(thread.rid, appLanguage) { mutableIntStateOf(1) }
     var isInitialOrRefreshLoading by remember(thread.rid, appLanguage) { mutableStateOf(false) }
     var isLoadingNextPage by remember(thread.rid, appLanguage) { mutableStateOf(false) }
     var errorType by remember(thread.rid, appLanguage) { mutableStateOf(ReviewLoadErrorType.NONE) }
+
+    var activeLoadJob by remember { mutableStateOf<Job?>(null) }
+    var activeLoadGeneration by remember { mutableIntStateOf(0) }
 
     var replyContent by rememberSaveable(aid, thread.rid) { mutableStateOf("") }
     var initialDraftHydrated by remember(aid, thread.rid) { mutableStateOf(false) }
@@ -519,52 +596,78 @@ fun ReviewThreadScreen(
         )
     }
 
-    suspend fun loadFloorsPage(targetPage: Int, replaceExisting: Boolean) {
+    fun launchLoadFloorsPage(targetPage: Int, replaceExisting: Boolean) {
+        if (replaceExisting) {
+            activeLoadJob?.cancel()
+        } else if (isInitialOrRefreshLoading || isLoadingNextPage) {
+            return
+        }
+
+        val generation = activeLoadGeneration + 1
+        activeLoadGeneration = generation
         if (replaceExisting) {
             isInitialOrRefreshLoading = true
+            isLoadingNextPage = false
         } else {
             isLoadingNextPage = true
         }
         errorType = ReviewLoadErrorType.NONE
 
         val startingOffset = if (replaceExisting) 0 else floorItems.size
-        when (
-            val res = reviewsRepository.fetchReplyPage(
-                rid = thread.rid,
-                pageNumber = targetPage,
-                startingFloorOffset = startingOffset,
-                appLanguage = appLanguage,
-            )
-        ) {
-            is WenkuApiResult.Success -> {
-                currentPage = res.data.currentPage
-                totalPages = res.data.totalPages
-                floorItems = if (replaceExisting) {
-                    res.data.items
-                } else {
-                    floorItems + res.data.items
+        activeLoadJob = coroutineScope.launch {
+            try {
+                when (
+                    val res = reviewsRepository.fetchReplyPage(
+                        rid = thread.rid,
+                        pageNumber = targetPage,
+                        startingFloorOffset = startingOffset,
+                        appLanguage = appLanguage,
+                    )
+                ) {
+                    is WenkuApiResult.Success -> {
+                        if (activeLoadGeneration != generation) return@launch
+                        currentPage = res.data.currentPage
+                        totalPages = res.data.totalPages
+                        floorItems = if (replaceExisting) {
+                            res.data.items
+                        } else {
+                            floorItems + res.data.items
+                        }
+                    }
+                    WenkuApiResult.ApiNotConfigured -> {
+                        if (activeLoadGeneration != generation) return@launch
+                        errorType = ReviewLoadErrorType.API_UNAVAILABLE
+                    }
+                    is WenkuApiResult.UpgradeRequired,
+                    WenkuApiResult.AuthRejected,
+                    is WenkuApiResult.NetworkError,
+                    is WenkuApiResult.ServerErrorCode,
+                    WenkuApiResult.EmptyResponse,
+                    is WenkuApiResult.ParseError,
+                    -> {
+                        if (activeLoadGeneration != generation) return@launch
+                        errorType = ReviewLoadErrorType.NETWORK_OR_SERVER
+                    }
+                }
+            } finally {
+                if (activeLoadGeneration == generation) {
+                    isInitialOrRefreshLoading = false
+                    isLoadingNextPage = false
+                    activeLoadJob = null
                 }
             }
-            WenkuApiResult.ApiNotConfigured -> {
-                errorType = ReviewLoadErrorType.API_UNAVAILABLE
-            }
-            is WenkuApiResult.UpgradeRequired,
-            WenkuApiResult.AuthRejected,
-            is WenkuApiResult.NetworkError,
-            is WenkuApiResult.ServerErrorCode,
-            WenkuApiResult.EmptyResponse,
-            is WenkuApiResult.ParseError,
-            -> {
-                errorType = ReviewLoadErrorType.NETWORK_OR_SERVER
-            }
         }
+    }
 
-        isInitialOrRefreshLoading = false
-        isLoadingNextPage = false
+    DisposableEffect(thread.rid, appLanguage) {
+        onDispose {
+            activeLoadJob?.cancel()
+            activeLoadJob = null
+        }
     }
 
     LaunchedEffect(thread.rid, appLanguage) {
-        loadFloorsPage(targetPage = 1, replaceExisting = true)
+        launchLoadFloorsPage(targetPage = 1, replaceExisting = true)
     }
 
     val copiedMsg = stringResource(R.string.review_copied_snackbar)
@@ -617,9 +720,7 @@ fun ReviewThreadScreen(
                         tooltipText = refreshLabel,
                         onClick = {
                             if (!isInitialOrRefreshLoading) {
-                                coroutineScope.launch {
-                                    loadFloorsPage(targetPage = 1, replaceExisting = true)
-                                }
+                                launchLoadFloorsPage(targetPage = 1, replaceExisting = true)
                             }
                         },
                     ) {
@@ -657,8 +758,8 @@ fun ReviewThreadScreen(
                                     replyContent = ""
                                     lastPersistedDraftContent = ""
                                     draftSavedIndicatorVisible = false
+                                    launchLoadFloorsPage(targetPage = 1, replaceExisting = true)
                                     snackbarHostState.showSnackbar(replySuccessMsg)
-                                    loadFloorsPage(targetPage = 1, replaceExisting = true)
                                 }
                                 ReviewSubmitOutcome.NotLoggedIn -> {
                                     snackbarHostState.showSnackbar(loginRequiredMsg)
@@ -686,10 +787,13 @@ fun ReviewThreadScreen(
                 .padding(innerPadding),
         ) {
             if (isInitialOrRefreshLoading || isLoadingNextPage) {
+                val progressModifier = Modifier
+                    .fillMaxWidth()
+                    .testTag(ReviewScreensTestTags.REVIEW_THREAD_LOADING_INDICATOR)
                 if (isEinkMode) {
-                    LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                    LinearProgressIndicator(modifier = progressModifier)
                 } else {
-                    LinearWavyProgressIndicator(modifier = Modifier.fillMaxWidth())
+                    LinearWavyProgressIndicator(modifier = progressModifier)
                 }
             }
 
@@ -704,9 +808,7 @@ fun ReviewThreadScreen(
                         ReviewErrorStateCard(
                             errorType = errorType,
                             onRetry = {
-                                coroutineScope.launch {
-                                    loadFloorsPage(targetPage = 1, replaceExisting = true)
-                                }
+                                launchLoadFloorsPage(targetPage = 1, replaceExisting = true)
                             },
                             onOpenNetworkDiagnostics = onOpenNetworkDiagnostics,
                         )
@@ -742,21 +844,38 @@ fun ReviewThreadScreen(
                     }
 
                     if (currentPage in 1 until totalPages) {
-                        item(key = "load_more_floors") {
-                            OutlinedButton(
-                                onClick = {
-                                    if (!isLoadingNextPage) {
-                                        coroutineScope.launch {
-                                            loadFloorsPage(targetPage = currentPage + 1, replaceExisting = false)
-                                        }
-                                    }
-                                },
-                                enabled = !isLoadingNextPage,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .testTag(ReviewScreensTestTags.REVIEW_LOAD_MORE_BUTTON),
-                            ) {
-                                Text(text = stringResource(R.string.review_load_more_action))
+                        if (errorType != ReviewLoadErrorType.NONE &&
+                            !isInitialOrRefreshLoading &&
+                            !isLoadingNextPage
+                        ) {
+                            item(key = "review_thread_append_error") {
+                                ReviewErrorStateCard(
+                                    errorType = errorType,
+                                    onRetry = {
+                                        launchLoadFloorsPage(
+                                            targetPage = currentPage + 1,
+                                            replaceExisting = false,
+                                        )
+                                    },
+                                    onOpenNetworkDiagnostics = onOpenNetworkDiagnostics,
+                                )
+                            }
+                        } else {
+                            item(key = "load_more_floors") {
+                                OutlinedButton(
+                                    onClick = {
+                                        launchLoadFloorsPage(
+                                            targetPage = currentPage + 1,
+                                            replaceExisting = false,
+                                        )
+                                    },
+                                    enabled = !isLoadingNextPage && !isInitialOrRefreshLoading,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .testTag(ReviewScreensTestTags.REVIEW_LOAD_MORE_BUTTON),
+                                ) {
+                                    Text(text = stringResource(R.string.review_load_more_action))
+                                }
                             }
                         }
                     }

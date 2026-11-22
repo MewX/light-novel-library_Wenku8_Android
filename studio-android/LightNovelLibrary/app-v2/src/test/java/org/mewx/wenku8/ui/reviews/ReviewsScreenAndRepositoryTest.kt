@@ -8,14 +8,19 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertTextContains
+import androidx.compose.ui.test.hasScrollToIndexAction
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.test.performTextInput
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.test.runTest
+import java.util.concurrent.CopyOnWriteArrayList
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -395,11 +400,226 @@ class ReviewsScreenAndRepositoryTest {
         assertTrue(savedDraft!!.draftContent.contains("回复 2楼 @西兹："))
     }
 
+    @Test
+    fun reviewListScreen_scrollToBottom_completesNextPageLoadAndClearsProgressIndicator() {
+        val page2Started = CompletableDeferred<Unit>()
+        val page2Release = CompletableDeferred<WenkuApiResult<ParsedReviewThreadPage>>()
+
+        val page1Items = (1..12).map { index ->
+            ParsedReviewThreadItem(
+                rid = 1000 + index,
+                title = "第一页书评标题 #$index",
+                uid = 10000 + index,
+                userName = "读者$index",
+                replyCount = index,
+                postTimeFormatted = "2024-05-18 14:30",
+                lastReplyTimeFormatted = "2024-05-19 09:15",
+            )
+        }
+        val page2Items = (13..18).map { index ->
+            ParsedReviewThreadItem(
+                rid = 1000 + index,
+                title = "第二页书评标题 #$index",
+                uid = 10000 + index,
+                userName = "读者$index",
+                replyCount = index,
+                postTimeFormatted = "2024-05-20 10:00",
+                lastReplyTimeFormatted = "2024-05-20 11:00",
+            )
+        }
+
+        val gateway = FakeReviewCatalogGateway().apply {
+            threadPages[1] = ParsedReviewThreadPage(totalPages = 2, items = page1Items)
+            threadPageHandlers[2] = {
+                page2Started.complete(Unit)
+                page2Release.await()
+            }
+        }
+        val repo = ReviewsRepository(
+            database = database,
+            catalogGateway = gateway,
+            userSessionRepository = null,
+            postCooldownMs = 10_000L,
+        )
+
+        composeTestRule.setContent {
+            Wenku8ExpressiveTheme(themeMode = Wenku8ThemeMode.ARCHIVAL_DAY) {
+                ReviewListScreen(
+                    aid = 1306,
+                    novelTitle = "奇诺之旅",
+                    reviewsRepository = repo,
+                    appLanguage = Wenku8API.AppLanguage.SC,
+                    onNavigateBack = {},
+                    onOpenThread = {},
+                )
+            }
+        }
+
+        // Page 1 loads and finishes without triggering page 2 before scrolling.
+        composeTestRule.waitUntil(timeoutMillis = 5_000L) {
+            composeTestRule
+                .onAllNodes(hasTestTag("${ReviewScreensTestTags.REVIEW_THREAD_CARD_PREFIX}1001"))
+                .fetchSemanticsNodes()
+                .isNotEmpty()
+        }
+        composeTestRule.waitUntil(timeoutMillis = 5_000L) {
+            composeTestRule
+                .onAllNodes(hasTestTag(ReviewScreensTestTags.REVIEW_LIST_LOADING_INDICATOR))
+                .fetchSemanticsNodes()
+                .isEmpty()
+        }
+        assertEquals(listOf(1), gateway.requestedThreadPages.toList())
+
+        // Scroll to the bottom of page 1 -> page 2 starts loading and top progress indicator appears.
+        composeTestRule.onNode(hasScrollToIndexAction()).performScrollToIndex(11)
+        composeTestRule.waitUntil(timeoutMillis = 5_000L) {
+            page2Started.isCompleted &&
+                composeTestRule
+                    .onAllNodes(hasTestTag(ReviewScreensTestTags.REVIEW_LIST_LOADING_INDICATOR))
+                    .fetchSemanticsNodes()
+                    .isNotEmpty()
+        }
+
+        // Advance several frames while page 2 is still in flight to confirm recomposition does NOT cancel it.
+        repeat(5) {
+            composeTestRule.mainClock.advanceTimeByFrame()
+        }
+        assertEquals(listOf(1, 2), gateway.requestedThreadPages.toList())
+        assertTrue(
+            composeTestRule
+                .onAllNodes(hasTestTag(ReviewScreensTestTags.REVIEW_LIST_LOADING_INDICATOR))
+                .fetchSemanticsNodes()
+                .isNotEmpty(),
+        )
+
+        // Release page 2 response -> top progress indicator clears and page 2 items append cleanly.
+        page2Release.complete(
+            WenkuApiResult.Success(
+                ParsedReviewThreadPage(totalPages = 2, items = page2Items),
+            ),
+        )
+
+        composeTestRule.waitUntil(timeoutMillis = 5_000L) {
+            composeTestRule
+                .onAllNodes(hasTestTag(ReviewScreensTestTags.REVIEW_LIST_LOADING_INDICATOR))
+                .fetchSemanticsNodes()
+                .isEmpty()
+        }
+
+        composeTestRule.onNode(hasScrollToIndexAction()).performScrollToIndex(17)
+        composeTestRule.waitUntil(timeoutMillis = 5_000L) {
+            composeTestRule
+                .onAllNodes(hasTestTag("${ReviewScreensTestTags.REVIEW_THREAD_CARD_PREFIX}1018"))
+                .fetchSemanticsNodes()
+                .isNotEmpty()
+        }
+        composeTestRule.onNodeWithText("第二页书评标题 #18").assertIsDisplayed()
+        assertEquals(listOf(1, 2), gateway.requestedThreadPages.toList())
+    }
+
+    @Test
+    fun reviewListScreen_appendPageError_clearsProgressIndicatorAndAllowsManualRetry() {
+        var page2Attempts = 0
+        val page1Items = (1..12).map { index ->
+            ParsedReviewThreadItem(
+                rid = 2000 + index,
+                title = "首页书评 #$index",
+                uid = 20000 + index,
+                userName = "读者$index",
+                replyCount = index,
+                postTimeFormatted = "2024-05-18 14:30",
+                lastReplyTimeFormatted = "2024-05-19 09:15",
+            )
+        }
+        val page2Items = listOf(
+            ParsedReviewThreadItem(
+                rid = 2013,
+                title = "重试后加载的第二页书评",
+                uid = 20013,
+                userName = "重试读者",
+                replyCount = 4,
+                postTimeFormatted = "2024-05-20 10:00",
+                lastReplyTimeFormatted = "2024-05-20 11:00",
+            ),
+        )
+
+        val gateway = FakeReviewCatalogGateway().apply {
+            threadPages[1] = ParsedReviewThreadPage(totalPages = 2, items = page1Items)
+            threadPageHandlers[2] = {
+                page2Attempts++
+                if (page2Attempts == 1) {
+                    WenkuApiResult.NetworkError("simulated_timeout")
+                } else {
+                    WenkuApiResult.Success(
+                        ParsedReviewThreadPage(totalPages = 2, items = page2Items),
+                    )
+                }
+            }
+        }
+        val repo = ReviewsRepository(
+            database = database,
+            catalogGateway = gateway,
+            userSessionRepository = null,
+            postCooldownMs = 10_000L,
+        )
+
+        composeTestRule.setContent {
+            Wenku8ExpressiveTheme(themeMode = Wenku8ThemeMode.ARCHIVAL_DAY) {
+                ReviewListScreen(
+                    aid = 1306,
+                    novelTitle = "奇诺之旅",
+                    reviewsRepository = repo,
+                    appLanguage = Wenku8API.AppLanguage.SC,
+                    onNavigateBack = {},
+                    onOpenThread = {},
+                )
+            }
+        }
+
+        composeTestRule.waitUntil(timeoutMillis = 5_000L) {
+            composeTestRule
+                .onAllNodes(hasTestTag("${ReviewScreensTestTags.REVIEW_THREAD_CARD_PREFIX}2001"))
+                .fetchSemanticsNodes()
+                .isNotEmpty()
+        }
+
+        // Scroll to bottom -> page 2 fails once, progress bar clears, error card renders without looping.
+        composeTestRule.onNode(hasScrollToIndexAction()).performScrollToIndex(11)
+        composeTestRule.waitUntil(timeoutMillis = 5_000L) {
+            page2Attempts == 1 &&
+                composeTestRule
+                    .onAllNodes(hasTestTag(ReviewScreensTestTags.REVIEW_LIST_LOADING_INDICATOR))
+                    .fetchSemanticsNodes()
+                    .isEmpty()
+        }
+        composeTestRule.onNode(hasScrollToIndexAction()).performScrollToIndex(12)
+        composeTestRule.waitUntil(timeoutMillis = 5_000L) {
+            composeTestRule
+                .onAllNodes(hasTestTag(ReviewScreensTestTags.REVIEW_LIST_APPEND_ERROR))
+                .fetchSemanticsNodes()
+                .isNotEmpty()
+        }
+        assertEquals(1, page2Attempts)
+
+        // Tap Retry -> page 2 succeeds and renders the new item.
+        composeTestRule.onNodeWithText("重试").performClick()
+        composeTestRule.waitUntil(timeoutMillis = 5_000L) {
+            composeTestRule
+                .onAllNodes(hasTestTag("${ReviewScreensTestTags.REVIEW_THREAD_CARD_PREFIX}2013"))
+                .fetchSemanticsNodes()
+                .isNotEmpty()
+        }
+        composeTestRule.onNodeWithText("重试后加载的第二页书评").assertIsDisplayed()
+        assertEquals(2, page2Attempts)
+    }
+
     private class FakeReviewCatalogGateway : WenkuCatalogGateway {
         override val isApiConfigured: Boolean = true
         override val minReplyTextLength: Int = 7
 
         val threadPages = mutableMapOf<Int, ParsedReviewThreadPage>()
+        val threadPageHandlers = mutableMapOf<Int, suspend () -> WenkuApiResult<ParsedReviewThreadPage>>()
+        val requestedThreadPages = CopyOnWriteArrayList<Int>()
         val replyPages = mutableMapOf<Int, ParsedReviewReplyPage>()
         val replyResponses = ArrayDeque<WenkuApiResult<Unit>>()
         val newThreadResponses = ArrayDeque<WenkuApiResult<Unit>>()
@@ -416,6 +636,8 @@ class ReviewsScreenAndRepositoryTest {
             pageNumber: Int,
             appLanguage: Wenku8API.AppLanguage,
         ): WenkuApiResult<ParsedReviewThreadPage> {
+            requestedThreadPages.add(pageNumber)
+            threadPageHandlers[pageNumber]?.let { return it() }
             val page = threadPages[pageNumber] ?: ParsedReviewThreadPage(totalPages = 1, items = emptyList())
             return WenkuApiResult.Success(page)
         }
