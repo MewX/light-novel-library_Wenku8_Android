@@ -615,6 +615,44 @@ class DiscoveryScreensTest {
     }
 
     @Test
+    fun findUpcomingInlineAdSlotsToPrefetch_triggersOnlyWithinLookaheadWindow() {
+        val sampleTwenty = (1..20).map { idx ->
+            DiscoveryNovelCardItem(
+                aid = 7100 + idx,
+                title = "作品-$idx",
+                author = "作者-$idx",
+                bookStatus = "连载中",
+                lastUpdate = "2026-11-22",
+                tags = emptyList(),
+                introShort = "简介-$idx",
+                coverUrl = "",
+                inLocalBookshelf = false,
+            )
+        }
+        // Entries: 0..9 novels, 10 InlineAd(0), 11..20 novels, 21 InlineAd(1)
+        val entries = buildDiscoveryFeedEntries(sampleTwenty, adsEnabled = true)
+
+        assertTrue(findUpcomingInlineAdSlotsToPrefetch(emptyList(), lastVisibleIndex = 0).isEmpty())
+        assertTrue(findUpcomingInlineAdSlotsToPrefetch(entries, lastVisibleIndex = -1).isEmpty())
+
+        // At scroll top (e.g., lastVisibleIndex = 4 or 5), slot 0 at index 10 is outside 4-item window -> 0 requests
+        assertTrue(findUpcomingInlineAdSlotsToPrefetch(entries, lastVisibleIndex = 4).isEmpty())
+        assertTrue(findUpcomingInlineAdSlotsToPrefetch(entries, lastVisibleIndex = 5).isEmpty())
+
+        // Within 4 items of slot 0 (index 6..10) -> prefetches slot 0
+        assertEquals(listOf(0), findUpcomingInlineAdSlotsToPrefetch(entries, lastVisibleIndex = 6))
+        assertEquals(listOf(0), findUpcomingInlineAdSlotsToPrefetch(entries, lastVisibleIndex = 10))
+
+        // Mid-page 2 (index 11..16) -> no slot within lookahead window
+        assertTrue(findUpcomingInlineAdSlotsToPrefetch(entries, lastVisibleIndex = 11).isEmpty())
+        assertTrue(findUpcomingInlineAdSlotsToPrefetch(entries, lastVisibleIndex = 16).isEmpty())
+
+        // Within 4 items of slot 1 (index 17..21) -> prefetches slot 1
+        assertEquals(listOf(1), findUpcomingInlineAdSlotsToPrefetch(entries, lastVisibleIndex = 17))
+        assertEquals(listOf(1), findUpcomingInlineAdSlotsToPrefetch(entries, lastVisibleIndex = 21))
+    }
+
+    @Test
     fun discoveryFeedInlineAdPool_enforcesBoundedLruEvictionAndReusesActiveSlots() {
         val pool = DiscoveryFeedInlineAdPool(
             initialPhase = BannerAdLoadPhase.StaticPreview,

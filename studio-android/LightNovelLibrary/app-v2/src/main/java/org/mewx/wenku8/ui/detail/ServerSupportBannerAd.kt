@@ -22,6 +22,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -45,6 +46,7 @@ import com.google.android.gms.ads.LoadAdError
 import com.google.android.gms.ads.MobileAds
 import com.google.android.gms.common.ConnectionResult
 import com.google.android.gms.common.GoogleApiAvailabilityLight
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -502,7 +504,12 @@ internal suspend fun startHolderBannerLoad(
         return
     }
     holder.loadInProgress = true
-    ServerSupportAdInitializer.ensureInitialized(context)
+    try {
+        ServerSupportAdInitializer.ensureInitialized(context)
+    } catch (ce: CancellationException) {
+        holder.loadInProgress = false
+        throw ce
+    }
 
     if (holder.isDisposed || holder.phase != BannerAdLoadPhase.Loading || holder.adView != null) {
         holder.loadInProgress = false
@@ -532,6 +539,10 @@ internal suspend fun startHolderBannerLoad(
         holder.loadedWidthDp = safeWidthDp
         val nextAdView = runCatching {
             AdView(hostContext).apply {
+                layoutParams = ViewGroup.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                )
                 setAdSize(resolvedAdSize)
                 adUnitId = adUnit
                 adListener = object : AdListener() {
@@ -566,6 +577,40 @@ internal suspend fun startHolderBannerLoad(
     }
 
     tryLoadUnitAt(0)
+}
+
+/**
+ * Policy-compliant detached in-memory prefetch for an upcoming visible banner slot (e.g. when
+ * entering `NovelDetailScreen` where the banner sits just below the Synopsis fold).
+ *
+ * Unlike cold-start hidden `alpha(0f)` view staging, this never attaches an invisible `AdView` to
+ * the window hierarchy: AdMob does not record an impression until the `AdView` is actually bound
+ * into the visible `ServerSupportBannerAd` card on screen, eliminating blank-card latency when
+ * scrolling the slot into view.
+ */
+@Composable
+fun PrefetchBannerAdEffect(
+    holder: NovelDetailBannerAdHolder,
+    availableWidthDp: Int,
+) {
+    val context = LocalContext.current
+    val hostActivity = remember(context) { context.findHostActivity() }
+    val safeWidthDp = availableWidthDp.coerceAtLeast(160)
+    LaunchedEffect(holder, safeWidthDp) {
+        if (holder.isDisposed ||
+            holder.phase != BannerAdLoadPhase.Loading ||
+            holder.adView != null ||
+            holder.loadInProgress
+        ) {
+            return@LaunchedEffect
+        }
+        startHolderBannerLoad(
+            holder = holder,
+            context = context,
+            hostContext = hostActivity ?: context,
+            availableWidthDp = safeWidthDp,
+        )
+    }
 }
 
 @Composable
@@ -673,15 +718,17 @@ fun ServerSupportBannerAd(
                     }
                 }
                 if (liveAdView != null) {
-                    AndroidView(
-                        factory = {
-                            (liveAdView.parent as? ViewGroup)?.removeView(liveAdView)
-                            liveAdView
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .wrapContentHeight(),
-                    )
+                    key(liveAdView) {
+                        AndroidView(
+                            factory = {
+                                (liveAdView.parent as? ViewGroup)?.removeView(liveAdView)
+                                liveAdView
+                            },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .wrapContentHeight(),
+                        )
+                    }
                 }
             }
         }

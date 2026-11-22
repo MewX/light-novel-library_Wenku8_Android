@@ -581,7 +581,12 @@ fun NovelDetailScreen(
                 isGmsAvailableOverride = isGmsAvailableForAdOverride,
                 enableLiveAdViewInflation = enableLiveAdViewInflation,
             )
-            Box(modifier = Modifier.fillMaxSize()) {
+            BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+                val bannerSlotWidthDp = (maxWidth - 32.dp).value.toInt().coerceAtLeast(160)
+                PrefetchBannerAdEffect(
+                    holder = bannerAdHolder,
+                    availableWidthDp = bannerSlotWidthDp,
+                )
                 LazyColumn(
                     modifier = Modifier
                         .fillMaxSize()

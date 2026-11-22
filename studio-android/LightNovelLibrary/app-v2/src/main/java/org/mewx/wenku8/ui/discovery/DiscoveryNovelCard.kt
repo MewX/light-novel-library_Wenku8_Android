@@ -51,6 +51,7 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.snapshotFlow
@@ -59,6 +60,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -66,6 +68,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.launch
 import org.mewx.wenku8.api.Wenku8API
 import org.mewx.wenku8.R
 import org.mewx.wenku8.data.media.WenkuImageRequests
@@ -75,8 +78,11 @@ import org.mewx.wenku8.domain.model.DiscoveryNovelCardItem
 import org.mewx.wenku8.domain.model.FeedScrollPosition
 import org.mewx.wenku8.domain.model.PaginatedNovelFeedState
 import org.mewx.wenku8.domain.model.normalizeBookStatusText
+import org.mewx.wenku8.ui.detail.BannerAdLoadPhase
 import org.mewx.wenku8.ui.detail.ServerSupportBannerAd
+import org.mewx.wenku8.ui.detail.findHostActivity
 import org.mewx.wenku8.ui.detail.rememberDiscoveryFeedInlineAdPool
+import org.mewx.wenku8.ui.detail.startHolderBannerLoad
 import org.mewx.wenku8.ui.theme.LocalEinkMode
 import org.mewx.wenku8.ui.theme.Wenku8SharedElementKeys
 import org.mewx.wenku8.ui.theme.einkHairlineBorder
@@ -544,6 +550,14 @@ fun rememberDiscoveryFeedScrollStateHolder(
  */
 object DiscoveryFeedAdCadence {
     const val ITEMS_PER_PAGE = 10
+
+    /**
+     * Trigger detached in-memory prefetch when the user's scroll viewport comes within this many
+     * list entries of an upcoming page-end ad slot (e.g., scrolling past novel #6/#7 for slot 0
+     * after #10). Keeps top-of-list glances at 0 requests while letting the ad finish loading
+     * before entering the viewport.
+     */
+    const val PREFETCH_LOOKAHEAD_ITEMS = 4
 }
 
 sealed interface DiscoveryFeedEntry {
@@ -582,6 +596,30 @@ fun buildDiscoveryFeedEntries(
             }
         }
     }
+}
+
+/**
+ * Returns slot indices for upcoming [DiscoveryFeedEntry.InlineAd] entries located within
+ * `[lastVisibleIndex, lastVisibleIndex + lookaheadItems]`, enabling Google-recommended detached
+ * lookahead prefetching without wasting requests at scroll top.
+ */
+fun findUpcomingInlineAdSlotsToPrefetch(
+    entries: List<DiscoveryFeedEntry>,
+    lastVisibleIndex: Int,
+    lookaheadItems: Int = DiscoveryFeedAdCadence.PREFETCH_LOOKAHEAD_ITEMS,
+): List<Int> {
+    if (entries.isEmpty() || lastVisibleIndex < 0) return emptyList()
+    val startIndex = lastVisibleIndex.coerceAtLeast(0)
+    if (startIndex > entries.lastIndex) return emptyList()
+    val endIndex = (startIndex + lookaheadItems.coerceAtLeast(0)).coerceAtMost(entries.lastIndex)
+    val result = mutableListOf<Int>()
+    for (idx in startIndex..endIndex) {
+        val entry = entries[idx]
+        if (entry is DiscoveryFeedEntry.InlineAd) {
+            result.add(entry.slotIndex)
+        }
+    }
+    return result
 }
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
@@ -698,119 +736,161 @@ fun PaginatedNovelFeedContent(
                 // guarantees Compose never anchors scroll position to an overlapping novel `aid`
                 // when switching between 周榜 / 日榜 / 月榜 / 总榜.
                 key(feedState.sortedBy) {
-                    LazyColumn(
-                        state = listState,
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .testTag(DiscoveryTestTags.FEED_LIST),
-                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
-                        verticalArrangement = Arrangement.spacedBy(10.dp),
-                    ) {
-                        items(
-                            items = feedEntries,
-                            key = { entry ->
-                                when (entry) {
-                                    is DiscoveryFeedEntry.Novel -> "${feedState.sortedBy.name}_${entry.item.aid}"
-                                    is DiscoveryFeedEntry.InlineAd -> "${feedState.sortedBy.name}_inline_ad_${entry.slotIndex}"
-                                }
-                            },
-                            contentType = { entry ->
-                                when (entry) {
-                                    is DiscoveryFeedEntry.Novel -> "discovery_novel"
-                                    is DiscoveryFeedEntry.InlineAd -> "discovery_inline_ad"
-                                }
-                            },
-                        ) { entry ->
-                            when (entry) {
-                                is DiscoveryFeedEntry.Novel -> {
-                                    DiscoveryNovelCard(
-                                        item = entry.item,
-                                        rankNumber = if (showRankNumbers) entry.novelIndex + 1 else null,
-                                        onClick = { onNovelClicked(entry.item) },
-                                        sharedTransitionOrigin = sharedTransitionOrigin,
-                                    )
-                                }
+                    val context = LocalContext.current
+                    val hostActivity = remember(context) { context.findHostActivity() }
+                    val prefetchScope = rememberCoroutineScope()
+                    val upcomingAdSlotsToPrefetch by remember(listState, feedEntries, inlineAdPool.isAdSlotEligible) {
+                        derivedStateOf {
+                            if (!inlineAdPool.isAdSlotEligible || feedEntries.isEmpty()) {
+                                emptyList()
+                            } else {
+                                val lastVisibleIndex = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: -1
+                                findUpcomingInlineAdSlotsToPrefetch(
+                                    entries = feedEntries,
+                                    lastVisibleIndex = lastVisibleIndex,
+                                )
+                            }
+                        }
+                    }
 
-                                is DiscoveryFeedEntry.InlineAd -> {
-                                    val slotKey = "${feedState.sortedBy.name}_slot_${entry.slotIndex}"
-                                    val slotHolder = inlineAdPool.getOrCreate(slotKey)
-                                    ServerSupportBannerAd(
-                                        holder = slotHolder,
-                                        cardTestTag = DiscoveryTestTags.FEED_AD_CARD_PREFIX + entry.slotIndex,
-                                        slotTestTag = DiscoveryTestTags.FEED_AD_SLOT_PREFIX + entry.slotIndex,
-                                        useElevatedTonalContainer = true,
-                                        modifier = Modifier.padding(vertical = 4.dp),
-                                    )
+                    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+                        val adSlotWidthDp = (maxWidth - 32.dp).value.toInt().coerceAtLeast(160)
+                        LaunchedEffect(inlineAdPool, upcomingAdSlotsToPrefetch, adSlotWidthDp) {
+                            if (upcomingAdSlotsToPrefetch.isEmpty()) return@LaunchedEffect
+                            for (slotIndex in upcomingAdSlotsToPrefetch) {
+                                val slotKey = "${feedState.sortedBy.name}_slot_$slotIndex"
+                                val slotHolder = inlineAdPool.getOrCreate(slotKey)
+                                if (!slotHolder.isDisposed &&
+                                    slotHolder.phase == BannerAdLoadPhase.Loading &&
+                                    slotHolder.adView == null &&
+                                    !slotHolder.loadInProgress
+                                ) {
+                                    prefetchScope.launch {
+                                        startHolderBannerLoad(
+                                            holder = slotHolder,
+                                            context = context,
+                                            hostContext = hostActivity ?: context,
+                                            availableWidthDp = adSlotWidthDp,
+                                        )
+                                    }
                                 }
                             }
                         }
 
-                        if (feedState.isAppendingNextPage) {
-                            item(key = "${feedState.sortedBy.name}_pagination_loading_footer") {
-                                Column(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(vertical = 14.dp),
-                                    horizontalAlignment = Alignment.CenterHorizontally,
-                                ) {
-                                    if (isEink) {
-                                        LinearProgressIndicator(modifier = Modifier.fillMaxWidth(0.5f))
-                                    } else {
-                                        LinearWavyProgressIndicator(modifier = Modifier.fillMaxWidth(0.5f))
+                        LazyColumn(
+                            state = listState,
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .testTag(DiscoveryTestTags.FEED_LIST),
+                            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+                            verticalArrangement = Arrangement.spacedBy(10.dp),
+                        ) {
+                            items(
+                                items = feedEntries,
+                                key = { entry ->
+                                    when (entry) {
+                                        is DiscoveryFeedEntry.Novel -> "${feedState.sortedBy.name}_${entry.item.aid}"
+                                        is DiscoveryFeedEntry.InlineAd -> "${feedState.sortedBy.name}_inline_ad_${entry.slotIndex}"
                                     }
-                                    Spacer(modifier = Modifier.height(8.dp))
-                                    Text(
-                                        text = stringResource(
-                                            R.string.feed_loading_more,
-                                            feedState.loadedPage + 1,
-                                            feedState.totalPages,
-                                        ),
-                                        style = MaterialTheme.typography.labelMedium,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    )
+                                },
+                                contentType = { entry ->
+                                    when (entry) {
+                                        is DiscoveryFeedEntry.Novel -> "discovery_novel"
+                                        is DiscoveryFeedEntry.InlineAd -> "discovery_inline_ad"
+                                    }
+                                },
+                            ) { entry ->
+                                when (entry) {
+                                    is DiscoveryFeedEntry.Novel -> {
+                                        DiscoveryNovelCard(
+                                            item = entry.item,
+                                            rankNumber = if (showRankNumbers) entry.novelIndex + 1 else null,
+                                            onClick = { onNovelClicked(entry.item) },
+                                            sharedTransitionOrigin = sharedTransitionOrigin,
+                                        )
+                                    }
+
+                                    is DiscoveryFeedEntry.InlineAd -> {
+                                        val slotKey = "${feedState.sortedBy.name}_slot_${entry.slotIndex}"
+                                        val slotHolder = inlineAdPool.getOrCreate(slotKey)
+                                        ServerSupportBannerAd(
+                                            holder = slotHolder,
+                                            cardTestTag = DiscoveryTestTags.FEED_AD_CARD_PREFIX + entry.slotIndex,
+                                            slotTestTag = DiscoveryTestTags.FEED_AD_SLOT_PREFIX + entry.slotIndex,
+                                            useElevatedTonalContainer = true,
+                                            modifier = Modifier.padding(vertical = 4.dp),
+                                        )
+                                    }
                                 }
                             }
-                        } else if (feedState.errorKind != null && feedState.items.isNotEmpty()) {
-                            item(key = "${feedState.sortedBy.name}_pagination_retry_footer") {
-                                Surface(
-                                    color = MaterialTheme.colorScheme.errorContainer,
-                                    contentColor = MaterialTheme.colorScheme.onErrorContainer,
-                                    shape = MaterialTheme.shapes.medium,
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clickable { onLoadNextPage() }
-                                        .einkHairlineBorder(MaterialTheme.shapes.medium),
-                                ) {
-                                    Row(
-                                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.Center,
+
+                            if (feedState.isAppendingNextPage) {
+                                item(key = "${feedState.sortedBy.name}_pagination_loading_footer") {
+                                    Column(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(vertical = 14.dp),
+                                        horizontalAlignment = Alignment.CenterHorizontally,
                                     ) {
-                                        Icon(
-                                            imageVector = Icons.Outlined.Refresh,
-                                            contentDescription = null,
-                                        )
-                                        Spacer(modifier = Modifier.width(8.dp))
+                                        if (isEink) {
+                                            LinearProgressIndicator(modifier = Modifier.fillMaxWidth(0.5f))
+                                        } else {
+                                            LinearWavyProgressIndicator(modifier = Modifier.fillMaxWidth(0.5f))
+                                        }
+                                        Spacer(modifier = Modifier.height(8.dp))
                                         Text(
-                                            text = stringResource(R.string.feed_append_failed_retry),
-                                            style = MaterialTheme.typography.labelLarge,
+                                            text = stringResource(
+                                                R.string.feed_loading_more,
+                                                feedState.loadedPage + 1,
+                                                feedState.totalPages,
+                                            ),
+                                            style = MaterialTheme.typography.labelMedium,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                                         )
                                     }
                                 }
-                            }
-                        } else if (feedState.loadedPage >= feedState.totalPages && feedState.items.isNotEmpty()) {
-                            item(key = "${feedState.sortedBy.name}_pagination_end_footer") {
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(vertical = 12.dp),
-                                    contentAlignment = Alignment.Center,
-                                ) {
-                                    Text(
-                                        text = stringResource(R.string.feed_end_reached, feedState.items.size),
-                                        style = MaterialTheme.typography.labelMedium,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    )
+                            } else if (feedState.errorKind != null && feedState.items.isNotEmpty()) {
+                                item(key = "${feedState.sortedBy.name}_pagination_retry_footer") {
+                                    Surface(
+                                        color = MaterialTheme.colorScheme.errorContainer,
+                                        contentColor = MaterialTheme.colorScheme.onErrorContainer,
+                                        shape = MaterialTheme.shapes.medium,
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clickable { onLoadNextPage() }
+                                            .einkHairlineBorder(MaterialTheme.shapes.medium),
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.Center,
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Outlined.Refresh,
+                                                contentDescription = null,
+                                            )
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Text(
+                                                text = stringResource(R.string.feed_append_failed_retry),
+                                                style = MaterialTheme.typography.labelLarge,
+                                            )
+                                        }
+                                    }
+                                }
+                            } else if (feedState.loadedPage >= feedState.totalPages && feedState.items.isNotEmpty()) {
+                                item(key = "${feedState.sortedBy.name}_pagination_end_footer") {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(vertical = 12.dp),
+                                        contentAlignment = Alignment.Center,
+                                    ) {
+                                        Text(
+                                            text = stringResource(R.string.feed_end_reached, feedState.items.size),
+                                            style = MaterialTheme.typography.labelMedium,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
+                                    }
                                 }
                             }
                         }
