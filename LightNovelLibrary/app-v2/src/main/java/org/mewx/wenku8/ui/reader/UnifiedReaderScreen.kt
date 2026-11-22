@@ -1045,40 +1045,61 @@ fun UnifiedReaderScreen(
 
         // Open requested chapter on initial mount; re-paginate in memory on subsequent config changes!
         var didInitialOpen by remember(launchRequest.aid, launchRequest.cid) { mutableStateOf(false) }
+        // True once THIS instance (process + book + chapter) has completed its first open. Saved
+        // state, so it survives Activity recreation: on recreates the launch request is a restore,
+        // and its baked-in `initialParagraphIndex` anchor is STALE (the DB progress row has been
+        // updated on every page turn since). Without this flag every split-screen transition
+        // rewound the reader to the position the book was first opened at.
+        var readerOpenedBefore by rememberSaveable(launchRequest.aid, launchRequest.cid) { mutableStateOf(false) }
         LaunchedEffect(launchRequest.aid, launchRequest.cid, currentLayoutConfig) {
             Log.d(
                 "WenkuReaderReflow",
                 "openEffect restart cid=${launchRequest.cid} " +
                     "config=${currentLayoutConfig.viewportWidthPx}x${currentLayoutConfig.viewportHeightPx}" +
-                    "@${currentLayoutConfig.fontSizePx}px didOpen=$didInitialOpen",
+                    "@${currentLayoutConfig.fontSizePx}px didOpen=$didInitialOpen openedBefore=$readerOpenedBefore",
             )
             if (!didInitialOpen) {
                 didInitialOpen = true
+                // Honor the explicit in-request jump anchor ONLY on the very first open of this
+                // instance (search jump / TTS start / shelf continue-reading). Restores must use
+                // the DB row: it is persisted on every page turn and is always at least as fresh.
+                val honorLaunchAnchor = !readerOpenedBefore && launchRequest.initialParagraphIndex >= 0
                 try {
                     // The ENTIRE open sequence lives inside this try: the Room progress read below
                     // is the FIRST suspension point after the latch, and OEM window churn
                     // (OnePlus/ColorOS launcher relaunches, split-screen transitions) frequently
                     // lands its cancellation exactly there — leaving the latch set with an empty
                     // snapshot and a permanently blank reader.
-                    val resolvedInitialAnchor = if (launchRequest.initialParagraphIndex >= 0) {
-                        ReadingAnchor(
-                            paragraphIndex = launchRequest.initialParagraphIndex,
-                            charOffset = launchRequest.initialCharOffset.coerceAtLeast(0),
-                        )
-                    } else {
+                    val resolvedInitialAnchor: ReadingAnchor
+                    if (!honorLaunchAnchor) {
                         val saved = withContext(ioDispatcher) {
                             database.readingProgressDao().getProgressForNovel(launchRequest.aid)
                         }
-                        if (saved != null && saved.cid == launchRequest.cid) {
+                        resolvedInitialAnchor = if (saved != null && saved.cid == launchRequest.cid) {
                             ReadingAnchor(
                                 paragraphIndex = saved.paragraphIndex,
                                 charOffset = saved.charOffset,
                                 progressPermille = saved.progressPermille,
                             )
+                        } else if (!readerOpenedBefore && launchRequest.initialParagraphIndex >= 0) {
+                            // First open and no usable DB row for this chapter: fall back to the
+                            // requested jump anchor.
+                            ReadingAnchor(
+                                paragraphIndex = launchRequest.initialParagraphIndex,
+                                charOffset = launchRequest.initialCharOffset.coerceAtLeast(0),
+                            )
                         } else {
+                            // Restore with no usable DB row (should not happen — progress is
+                            // persisted per page): open at chapter start.
                             ReadingAnchor()
                         }
+                    } else {
+                        resolvedInitialAnchor = ReadingAnchor(
+                            paragraphIndex = launchRequest.initialParagraphIndex,
+                            charOffset = launchRequest.initialCharOffset.coerceAtLeast(0),
+                        )
                     }
+                    readerOpenedBefore = true
                     continuousScrollAnchor = resolvedInitialAnchor
                     if (resolvedInitialAnchor.paragraphIndex > 0) {
                         dispatchContinuousScrollJump(
