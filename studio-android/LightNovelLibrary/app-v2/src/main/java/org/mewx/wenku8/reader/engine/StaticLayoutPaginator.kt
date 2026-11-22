@@ -50,6 +50,12 @@ data class ReaderLayoutConfig(
     /** Optional per-URL learned `width / height` aspect ratios from decoded images. */
     val knownImageAspectRatios: Map<String, Float> = emptyMap(),
     val defaultImageAspectRatio: Float = DEFAULT_BUNKOBON_PLATE_ASPECT_RATIO,
+    /** Number of book columns per viewport (`1` = single page, `2` = open-book facing spread). */
+    val columnCount: Int = 1,
+    /** Center spine gutter (`px`) separating the two facing pages when [columnCount] >= 2. */
+    val columnGapPx: Float = 0f,
+    /** Optional spine/foldable-hinge center X coordinate (`px`); defaults to viewport midpoint. */
+    val spineCenterXPx: Float? = null,
 ) {
     val contentLeftPx: Float
         get() = pageEdgeDistancePx.coerceAtLeast(0f)
@@ -65,6 +71,47 @@ data class ReaderLayoutConfig(
             viewportHeightPx -
                 (pageEdgeDistancePx * 2f + headerReservePx + footerReservePx).roundToInt()
             ).coerceAtLeast(MIN_CONTENT_DIMENSION_PX)
+
+    val effectiveColumnCount: Int
+        get() = if (columnCount >= 2) 2 else 1
+
+    val effectiveColumnGapPx: Float
+        get() = if (effectiveColumnCount >= 2) columnGapPx.coerceAtLeast(0f) else 0f
+
+    val effectiveSpineCenterXPx: Float
+        get() {
+            val defaultCenter = viewportWidthPx * 0.5f
+            val raw = spineCenterXPx ?: defaultCenter
+            val maxEdge = (viewportWidthPx - contentLeftPx).coerceAtLeast(contentLeftPx)
+            return raw.coerceIn(contentLeftPx, maxEdge)
+        }
+
+    /** Balanced width (`px`) of a single reading column; equals [contentWidthPx] in 1-column mode. */
+    val singleColumnWidthPx: Int
+        get() {
+            if (effectiveColumnCount <= 1) return contentWidthPx
+            val halfGap = effectiveColumnGapPx * 0.5f
+            val leftSpan = (effectiveSpineCenterXPx - halfGap) - contentLeftPx
+            val rightSpan = (viewportWidthPx - contentLeftPx) - (effectiveSpineCenterXPx + halfGap)
+            return min(leftSpan, rightSpan).roundToInt().coerceAtLeast(MIN_CONTENT_DIMENSION_PX)
+        }
+
+    /** Left edge (`px`) of the left facing column (or the sole column in 1-column mode). */
+    val leftColumnLeftPx: Float
+        get() {
+            if (effectiveColumnCount <= 1) return contentLeftPx
+            val halfGap = effectiveColumnGapPx * 0.5f
+            return (effectiveSpineCenterXPx - halfGap - singleColumnWidthPx).coerceAtLeast(contentLeftPx)
+        }
+
+    /** Left edge (`px`) of the right facing column (equals [leftColumnLeftPx] in 1-column mode). */
+    val rightColumnLeftPx: Float
+        get() {
+            if (effectiveColumnCount <= 1) return contentLeftPx
+            val halfGap = effectiveColumnGapPx * 0.5f
+            val maxLeft = (viewportWidthPx - contentLeftPx - singleColumnWidthPx).coerceAtLeast(contentLeftPx)
+            return (effectiveSpineCenterXPx + halfGap).coerceAtMost(maxLeft)
+        }
 
     companion object {
         const val MIN_CONTENT_DIMENSION_PX = 64
@@ -143,7 +190,8 @@ sealed interface ReaderPageElement {
 }
 
 /**
- * Single pre-computed page inside a [PaginatedChapterLayout].
+ * Single pre-computed page (or open-book facing spread when [columnCount] == 2) inside a
+ * [PaginatedChapterLayout].
  */
 data class ReaderPage(
     val cid: Int,
@@ -154,7 +202,17 @@ data class ReaderPage(
     val characterCountOnPage: Int,
     val isFullBleedArtbookPage: Boolean,
     val elements: List<ReaderPageElement>,
+    val columnCount: Int = 1,
+    val spineCenterXPx: Float = 0f,
+    val columnGapPx: Float = 0f,
+    val logicalStartPageIndex: Int = pageIndexInChapter,
+    val logicalEndPageIndex: Int = pageIndexInChapter,
+    val totalLogicalPagesInChapter: Int = totalPagesInChapter,
+    val hasSecondaryColumnContent: Boolean = false,
 ) {
+    val isDualColumnSpread: Boolean
+        get() = columnCount >= 2
+
     fun toBookmarkOrProgressAnchor(): ReadingAnchor {
         val permille = if (totalPagesInChapter <= 1) {
             1000
@@ -302,6 +360,10 @@ class StaticLayoutPaginator(
         ast: ChapterAst,
         config: ReaderLayoutConfig,
     ): PaginatedChapterLayout {
+        val effectiveColumnCount = config.effectiveColumnCount
+        val spineCenterX = config.effectiveSpineCenterXPx
+        val columnGapPx = config.effectiveColumnGapPx
+
         if (ast.blocks.isEmpty()) {
             val emptyAnchor = ReadingAnchor(paragraphIndex = 0, charOffset = 0, progressPermille = 1000)
             val placeholderPage = ReaderPage(
@@ -313,6 +375,13 @@ class StaticLayoutPaginator(
                 characterCountOnPage = 0,
                 isFullBleedArtbookPage = false,
                 elements = emptyList(),
+                columnCount = effectiveColumnCount,
+                spineCenterXPx = spineCenterX,
+                columnGapPx = columnGapPx,
+                logicalStartPageIndex = 0,
+                logicalEndPageIndex = 0,
+                totalLogicalPagesInChapter = 1,
+                hasSecondaryColumnContent = false,
             )
             return PaginatedChapterLayout(
                 ast = ast,
@@ -328,7 +397,21 @@ class StaticLayoutPaginator(
         }
 
         val totalPages = rawPages.size.coerceAtLeast(1)
+        val logicalRanges = ArrayList<Pair<Int, Int>>(rawPages.size)
+        var logicalCursor = 0
+        for (draft in rawPages) {
+            val occupiesTwoLogicalPages = effectiveColumnCount >= 2 &&
+                !draft.isFullBleedArtbookPage &&
+                draft.hasSecondaryColumnContent
+            val startLogical = logicalCursor
+            val endLogical = if (occupiesTwoLogicalPages) logicalCursor + 1 else logicalCursor
+            logicalRanges.add(startLogical to endLogical)
+            logicalCursor = endLogical + 1
+        }
+        val totalLogicalPages = logicalCursor.coerceAtLeast(1)
+
         val finalizedPages = rawPages.mapIndexed { pageIndex, draft ->
+            val (logicalStart, logicalEnd) = logicalRanges[pageIndex]
             ReaderPage(
                 cid = ast.cid,
                 pageIndexInChapter = pageIndex,
@@ -338,6 +421,13 @@ class StaticLayoutPaginator(
                 characterCountOnPage = draft.characterCount,
                 isFullBleedArtbookPage = draft.isFullBleedArtbookPage,
                 elements = draft.elements,
+                columnCount = effectiveColumnCount,
+                spineCenterXPx = spineCenterX,
+                columnGapPx = columnGapPx,
+                logicalStartPageIndex = logicalStart,
+                logicalEndPageIndex = logicalEnd,
+                totalLogicalPagesInChapter = totalLogicalPages,
+                hasSecondaryColumnContent = draft.hasSecondaryColumnContent,
             )
         }
 
@@ -356,11 +446,16 @@ class StaticLayoutPaginator(
         val currentElements = ArrayList<ReaderPageElement>()
         var currentCharCount = 0
 
+        val columnCount = config.effectiveColumnCount
         val contentLeft = config.contentLeftPx
         val contentTop = config.contentTopPx
-        val contentWidth = config.contentWidthPx
+        val fullContentWidth = config.contentWidthPx
+        val columnWidth = config.singleColumnWidthPx
         val contentHeight = config.contentHeightPx.toFloat()
         val contentBottomLimit = contentTop + contentHeight
+
+        fun columnLeftPx(colIdx: Int): Float =
+            if (columnCount <= 1 || colIdx == 0) config.leftColumnLeftPx else config.rightColumnLeftPx
 
         val bodyFontSize = config.fontSizePx.coerceAtLeast(8f)
         val bodyLineHeight = bodyFontSize * BODY_GLYPH_HEIGHT_FACTOR
@@ -374,7 +469,12 @@ class StaticLayoutPaginator(
             contentHeight * MIN_INLINE_IMAGE_VIEWPORT_FRACTION,
         ).coerceAtMost(contentHeight)
 
+        var currentColumnIndex = 0
+        var currentColumnElementStartIndex = 0
+        var hasSecondaryColumn = false
         var cursorY = contentTop
+
+        fun currentColumnHasElements(): Boolean = currentElements.size > currentColumnElementStartIndex
 
         fun flushCurrentPage(isFullBleedArtbook: Boolean = false) {
             if (currentElements.isEmpty()) return
@@ -392,12 +492,33 @@ class StaticLayoutPaginator(
                     ),
                     characterCount = currentCharCount,
                     isFullBleedArtbookPage = isFullBleedArtbook,
+                    hasSecondaryColumnContent = hasSecondaryColumn && !isFullBleedArtbook,
                     elements = ArrayList(currentElements),
                 ),
             )
             currentElements.clear()
             currentCharCount = 0
+            currentColumnIndex = 0
+            currentColumnElementStartIndex = 0
+            hasSecondaryColumn = false
             cursorY = contentTop
+        }
+
+        fun advanceColumnOrFlush() {
+            if (columnCount >= 2 && currentColumnIndex == 0) {
+                currentColumnIndex = 1
+                currentColumnElementStartIndex = currentElements.size
+                cursorY = contentTop
+            } else {
+                flushCurrentPage()
+            }
+        }
+
+        fun appendToCurrentColumn(element: ReaderPageElement) {
+            currentElements.add(element)
+            if (currentColumnIndex > 0) {
+                hasSecondaryColumn = true
+            }
         }
 
         for (block in ast.blocks) {
@@ -406,23 +527,23 @@ class StaticLayoutPaginator(
                     val titleLines = wrapAndApplyKinsoku(
                         text = block.title,
                         fontSizePx = titleFontSize,
-                        maxWidthPx = contentWidth,
+                        maxWidthPx = columnWidth,
                         typeface = config.typeface,
                     )
                     for ((lineIdx, slice) in titleLines.lines.withIndex()) {
-                        if (currentElements.isNotEmpty() && cursorY + titleLineHeight > contentBottomLimit) {
-                            flushCurrentPage()
+                        if (currentColumnHasElements() && cursorY + titleLineHeight > contentBottomLimit) {
+                            advanceColumnOrFlush()
                         }
                         val lineText = block.title.substring(slice.startInclusive, slice.endExclusive)
                         val rawStart = slice.startInclusive.coerceIn(0, (block.title.length - 1).coerceAtLeast(0))
                         val rawEnd = (slice.endExclusive - 1).coerceIn(rawStart, (block.title.length - 1).coerceAtLeast(0))
-                        currentElements.add(
+                        appendToCurrentColumn(
                             ReaderPageElement.TitleLine(
                                 blockIndex = block.blockIndex,
                                 rawStartChar = rawStart,
                                 rawEndChar = rawEnd,
                                 text = lineText,
-                                xPx = contentLeft,
+                                xPx = columnLeftPx(currentColumnIndex),
                                 topYPx = cursorY,
                                 baselineYPx = cursorY + titleFontSize * BASELINE_ASCENT_RATIO,
                                 heightPx = titleLineHeight,
@@ -443,14 +564,14 @@ class StaticLayoutPaginator(
                     val wrapped = wrapAndApplyKinsoku(
                         text = formatted,
                         fontSizePx = bodyFontSize,
-                        maxWidthPx = contentWidth,
+                        maxWidthPx = columnWidth,
                         typeface = config.typeface,
                     )
                     val lastLineIndex = wrapped.lines.lastIndex
 
                     for ((lineIdx, slice) in wrapped.lines.withIndex()) {
-                        if (currentElements.isNotEmpty() && cursorY + bodyLineHeight > contentBottomLimit) {
-                            flushCurrentPage()
+                        if (currentColumnHasElements() && cursorY + bodyLineHeight > contentBottomLimit) {
+                            advanceColumnOrFlush()
                         }
 
                         val lineString = formatted.substring(slice.startInclusive, slice.endExclusive)
@@ -466,7 +587,7 @@ class StaticLayoutPaginator(
 
                         val isLastLine = lineIdx == lastLineIndex
                         val extraLetterSpacing = if (!isLastLine && lineString.length > 2) {
-                            val slackPx = contentWidth.toFloat() - slice.measuredWidthPx
+                            val slackPx = columnWidth.toFloat() - slice.measuredWidthPx
                             if (slackPx > 0.5f) {
                                 (slackPx / (lineString.length - 1).toFloat())
                                     .coerceIn(0f, bodyFontSize * MAX_JUSTIFICATION_LETTER_SPACING_EM)
@@ -477,13 +598,13 @@ class StaticLayoutPaginator(
                             0f
                         }
 
-                        currentElements.add(
+                        appendToCurrentColumn(
                             ReaderPageElement.TextLine(
                                 blockIndex = block.blockIndex,
                                 rawStartChar = rawStart,
                                 rawEndChar = rawEnd,
                                 text = lineString,
-                                xPx = contentLeft,
+                                xPx = columnLeftPx(currentColumnIndex),
                                 topYPx = cursorY,
                                 baselineYPx = cursorY + bodyFontSize * BASELINE_ASCENT_RATIO,
                                 heightPx = bodyLineHeight,
@@ -504,10 +625,14 @@ class StaticLayoutPaginator(
 
                 is ChapterBlock.IllustrationBlock -> {
                     val aspectRatio = resolveAspectRatio(block, config)
-                    val naturalWidth = contentWidth.toFloat()
+                    val naturalWidth = columnWidth.toFloat()
                     val naturalHeight = (naturalWidth / aspectRatio).coerceAtLeast(bodyFontSize * 3f)
                     val hasOnlyTitleOnCurrentPage = currentElements.isNotEmpty() &&
                         currentElements.all { it is ReaderPageElement.TitleLine }
+                    val hasOnlyTitleInCurrentColumn = currentColumnHasElements() &&
+                        (currentColumnElementStartIndex until currentElements.size).all { idx ->
+                            currentElements[idx] is ReaderPageElement.TitleLine
+                        }
 
                     if (ast.isDedicatedIllustrationChapter) {
                         // Dedicated `<chapter>插图</chapter>` gallery: never flush a Page 0 that
@@ -564,22 +689,68 @@ class StaticLayoutPaginator(
                             )
                             flushCurrentPage(isFullBleedArtbook = true)
                         }
+                    } else if (columnCount >= 2 && aspectRatio >= WIDE_SPREAD_IMAGE_ASPECT_RATIO) {
+                        // Wide / double-page spread artwork spans the entire dual-column spread.
+                        if (hasOnlyTitleOnCurrentPage && (contentBottomLimit - cursorY) >= bodyFontSize * 3f) {
+                            val availableHeight = (contentBottomLimit - cursorY).coerceAtLeast(bodyFontSize * 3f)
+                            val fitted = fitBoxInside(
+                                aspectRatio = aspectRatio,
+                                maxWidth = fullContentWidth.toFloat(),
+                                maxHeight = availableHeight,
+                            )
+                            currentElements.add(
+                                ReaderPageElement.ImageSlot(
+                                    blockIndex = block.blockIndex,
+                                    imageIndexInChapter = block.imageIndexInChapter,
+                                    imageUrl = block.imageUrl,
+                                    leftPx = contentLeft + (fullContentWidth - fitted.first) * 0.5f,
+                                    topPx = cursorY + (availableHeight - fitted.second) * 0.5f,
+                                    widthPx = fitted.first,
+                                    heightPx = fitted.second,
+                                    aspectRatio = aspectRatio,
+                                    isFullBleedArtbookSlot = true,
+                                ),
+                            )
+                            flushCurrentPage(isFullBleedArtbook = true)
+                        } else {
+                            flushCurrentPage()
+                            val fitted = fitBoxInside(
+                                aspectRatio = aspectRatio,
+                                maxWidth = fullContentWidth.toFloat(),
+                                maxHeight = contentHeight,
+                            )
+                            currentElements.add(
+                                ReaderPageElement.ImageSlot(
+                                    blockIndex = block.blockIndex,
+                                    imageIndexInChapter = block.imageIndexInChapter,
+                                    imageUrl = block.imageUrl,
+                                    leftPx = contentLeft + (fullContentWidth - fitted.first) * 0.5f,
+                                    topPx = contentTop + (contentHeight - fitted.second) * 0.5f,
+                                    widthPx = fitted.first,
+                                    heightPx = fitted.second,
+                                    aspectRatio = aspectRatio,
+                                    isFullBleedArtbookSlot = true,
+                                ),
+                            )
+                            flushCurrentPage(isFullBleedArtbook = true)
+                        }
                     } else {
                         val remainingHeight = contentBottomLimit - cursorY
-                        val canPlaceBelowExisting = currentElements.isNotEmpty() && (
+                        val canPlaceBelowExisting = currentColumnHasElements() && (
                             remainingHeight >= minInlineImageHeight ||
-                                (hasOnlyTitleOnCurrentPage && remainingHeight >= bodyFontSize * 3f)
+                                (hasOnlyTitleInCurrentColumn && remainingHeight >= bodyFontSize * 3f)
                             )
                         if (canPlaceBelowExisting) {
                             // Fits comfortably inline below the preceding paragraph or chapter title!
                             val maxInlineHeight = min(remainingHeight, naturalHeight)
                             val fitted = fitBoxInside(
                                 aspectRatio = aspectRatio,
-                                maxWidth = contentWidth.toFloat(),
+                                maxWidth = columnWidth.toFloat(),
                                 maxHeight = maxInlineHeight,
                             )
-                            val centeredLeft = contentLeft + (contentWidth - fitted.first) * 0.5f
-                            currentElements.add(
+                            val colLeft = columnLeftPx(currentColumnIndex)
+                            val centeredLeft = colLeft + (columnWidth - fitted.first) * 0.5f
+                            appendToCurrentColumn(
                                 ReaderPageElement.ImageSlot(
                                     blockIndex = block.blockIndex,
                                     imageIndexInChapter = block.imageIndexInChapter,
@@ -593,16 +764,45 @@ class StaticLayoutPaginator(
                                 ),
                             )
                             cursorY += fitted.second + paragraphGap
+                        } else if (columnCount >= 2) {
+                            // Dual-column facing-page Bunkobon placement for portrait artwork:
+                            // if current column already has prose, advance to the facing column
+                            // (or start a fresh spread's left column) so text & artwork face each other!
+                            if (currentColumnHasElements()) {
+                                advanceColumnOrFlush()
+                            }
+                            val fitted = fitBoxInside(
+                                aspectRatio = aspectRatio,
+                                maxWidth = columnWidth.toFloat(),
+                                maxHeight = contentHeight,
+                            )
+                            val colLeft = columnLeftPx(currentColumnIndex)
+                            val centeredLeft = colLeft + (columnWidth - fitted.first) * 0.5f
+                            val centeredTop = contentTop + (contentHeight - fitted.second) * 0.5f
+                            appendToCurrentColumn(
+                                ReaderPageElement.ImageSlot(
+                                    blockIndex = block.blockIndex,
+                                    imageIndexInChapter = block.imageIndexInChapter,
+                                    imageUrl = block.imageUrl,
+                                    leftPx = centeredLeft,
+                                    topPx = centeredTop,
+                                    widthPx = fitted.first,
+                                    heightPx = fitted.second,
+                                    aspectRatio = aspectRatio,
+                                    isFullBleedArtbookSlot = false,
+                                ),
+                            )
+                            advanceColumnOrFlush()
                         } else {
-                            // Remaining space is too short (or current page is empty): flush any
+                            // Single-column: remaining space is too short (or page is empty): flush
                             // preceding prose and give the illustration a dedicated Artbook Page.
                             flushCurrentPage()
                             val fitted = fitBoxInside(
                                 aspectRatio = aspectRatio,
-                                maxWidth = contentWidth.toFloat(),
+                                maxWidth = fullContentWidth.toFloat(),
                                 maxHeight = contentHeight,
                             )
-                            val centeredLeft = contentLeft + (contentWidth - fitted.first) * 0.5f
+                            val centeredLeft = contentLeft + (fullContentWidth - fitted.first) * 0.5f
                             val centeredTop = contentTop + (contentHeight - fitted.second) * 0.5f
                             currentElements.add(
                                 ReaderPageElement.ImageSlot(
@@ -636,11 +836,21 @@ class StaticLayoutPaginator(
         val currentColumns = ArrayList<ReaderPageElement>()
         var currentCharCount = 0
 
+        val spreadColumnCount = config.effectiveColumnCount
         val contentLeft = config.contentLeftPx
         val contentTop = config.contentTopPx
-        val contentWidth = config.contentWidthPx.toFloat()
+        val fullContentWidth = config.contentWidthPx.toFloat()
+        val halfWidth = config.singleColumnWidthPx.toFloat()
         val contentHeight = config.contentHeightPx.toFloat()
-        val rightStartEdge = contentLeft + contentWidth
+
+        // Traditional Japanese Bunkobon spread reads Right Page (half 0) -> Left Page (half 1).
+        fun halfLeftPx(halfIdx: Int): Float = when {
+            spreadColumnCount <= 1 -> config.leftColumnLeftPx
+            halfIdx == 0 -> config.rightColumnLeftPx
+            else -> config.leftColumnLeftPx
+        }
+
+        fun halfRightEdgePx(halfIdx: Int): Float = halfLeftPx(halfIdx) + halfWidth
 
         val bodyFontSize = config.fontSizePx.coerceAtLeast(8f)
         val cellAdvanceY = bodyFontSize * VERTICAL_CELL_ADVANCE_FACTOR
@@ -648,12 +858,15 @@ class StaticLayoutPaginator(
 
         val columnWidth = bodyFontSize * VERTICAL_COLUMN_WIDTH_FACTOR
         val columnStepX = columnWidth + config.lineDistancePx.coerceAtLeast(4f)
-        val maxColumnsPerPage = max(
+        val maxColumnsPerHalf = max(
             1,
-            floor((contentWidth + config.lineDistancePx.coerceAtLeast(4f)) / columnStepX).toInt(),
+            floor((halfWidth + config.lineDistancePx.coerceAtLeast(4f)) / columnStepX).toInt(),
         )
 
-        var columnIndexInPage = 0
+        var currentHalfIndex = 0
+        var columnIndexInHalf = 0
+        var totalColumnIndexInSpread = 0
+        var hasSecondaryHalf = false
 
         fun flushVerticalPage(isFullBleedArtbook: Boolean = false) {
             if (currentColumns.isEmpty()) return
@@ -665,12 +878,32 @@ class StaticLayoutPaginator(
                     endAnchor = ReadingAnchor(lastEl.blockIndex, lastEl.rawEndChar),
                     characterCount = currentCharCount,
                     isFullBleedArtbookPage = isFullBleedArtbook,
+                    hasSecondaryColumnContent = hasSecondaryHalf && !isFullBleedArtbook,
                     elements = ArrayList(currentColumns),
                 ),
             )
             currentColumns.clear()
             currentCharCount = 0
-            columnIndexInPage = 0
+            currentHalfIndex = 0
+            columnIndexInHalf = 0
+            totalColumnIndexInSpread = 0
+            hasSecondaryHalf = false
+        }
+
+        fun advanceHalfOrFlush() {
+            if (spreadColumnCount >= 2 && currentHalfIndex == 0) {
+                currentHalfIndex = 1
+                columnIndexInHalf = 0
+            } else {
+                flushVerticalPage()
+            }
+        }
+
+        fun appendToCurrentHalf(element: ReaderPageElement) {
+            currentColumns.add(element)
+            if (currentHalfIndex > 0) {
+                hasSecondaryHalf = true
+            }
         }
 
         for (block in ast.blocks) {
@@ -679,18 +912,19 @@ class StaticLayoutPaginator(
                     val mappedTitle = VerticalCjkGlyphMapper.mapString(block.title)
                     val colSlices = sliceVerticalColumnsWithKinsoku(mappedTitle, maxCellsPerColumn)
                     for (range in colSlices) {
-                        if (columnIndexInPage >= maxColumnsPerPage) {
-                            flushVerticalPage()
+                        if (columnIndexInHalf >= maxColumnsPerHalf) {
+                            advanceHalfOrFlush()
                         }
                         val colText = mappedTitle.substring(range.first, range.last + 1)
-                        val centerX = rightStartEdge - (columnIndexInPage * columnStepX) - columnWidth * 0.5f
-                        currentColumns.add(
+                        val centerX = halfRightEdgePx(currentHalfIndex) -
+                            (columnIndexInHalf * columnStepX) - columnWidth * 0.5f
+                        appendToCurrentHalf(
                             ReaderPageElement.VerticalColumn(
                                 blockIndex = block.blockIndex,
                                 rawStartChar = range.first.coerceIn(0, (block.title.length - 1).coerceAtLeast(0)),
                                 rawEndChar = range.last.coerceIn(0, (block.title.length - 1).coerceAtLeast(0)),
                                 verticalText = colText,
-                                columnIndexRtl = columnIndexInPage,
+                                columnIndexRtl = totalColumnIndexInSpread,
                                 centerXPx = centerX,
                                 startYPx = contentTop + bodyFontSize,
                                 cellAdvanceYPx = cellAdvanceY,
@@ -700,7 +934,8 @@ class StaticLayoutPaginator(
                         )
                         currentCharCount += colText.length
                         // Leave one blank breathing column after the chapter title when space allows.
-                        columnIndexInPage += 2
+                        columnIndexInHalf += 2
+                        totalColumnIndexInSpread += 2
                     }
                 }
 
@@ -709,8 +944,8 @@ class StaticLayoutPaginator(
                     val colSlices = sliceVerticalColumnsWithKinsoku(mappedFormatted, maxCellsPerColumn)
                     val rawMaxIndex = (block.text.length - 1).coerceAtLeast(0)
                     for (range in colSlices) {
-                        if (columnIndexInPage >= maxColumnsPerPage) {
-                            flushVerticalPage()
+                        if (columnIndexInHalf >= maxColumnsPerHalf) {
+                            advanceHalfOrFlush()
                         }
                         val startInFormatted = range.first
                         val endExclusiveInFormatted = range.last + 1
@@ -722,14 +957,15 @@ class StaticLayoutPaginator(
                                 (startInFormatted - block.indentLength).coerceAtLeast(0)
                             ).coerceAtLeast(0)
 
-                        val centerX = rightStartEdge - (columnIndexInPage * columnStepX) - columnWidth * 0.5f
-                        currentColumns.add(
+                        val centerX = halfRightEdgePx(currentHalfIndex) -
+                            (columnIndexInHalf * columnStepX) - columnWidth * 0.5f
+                        appendToCurrentHalf(
                             ReaderPageElement.VerticalColumn(
                                 blockIndex = block.blockIndex,
                                 rawStartChar = rawStart,
                                 rawEndChar = rawEnd,
                                 verticalText = colText,
-                                columnIndexRtl = columnIndexInPage,
+                                columnIndexRtl = totalColumnIndexInSpread,
                                 centerXPx = centerX,
                                 startYPx = contentTop + bodyFontSize,
                                 cellAdvanceYPx = cellAdvanceY,
@@ -738,7 +974,8 @@ class StaticLayoutPaginator(
                             ),
                         )
                         currentCharCount += rawChars
-                        columnIndexInPage++
+                        columnIndexInHalf++
+                        totalColumnIndexInSpread++
                     }
                 }
 
@@ -748,50 +985,108 @@ class StaticLayoutPaginator(
                         currentColumns.all {
                             it is ReaderPageElement.VerticalColumn && it.isTitleColumn
                         }
-                    val remainingWidthLeftOfTitle =
-                        (rightStartEdge - columnIndexInPage * columnStepX) - contentLeft
 
-                    if (hasOnlyTitleColumns && remainingWidthLeftOfTitle >= contentWidth * 0.45f) {
+                    if (spreadColumnCount >= 2 &&
+                        !ast.isDedicatedIllustrationChapter &&
+                        aspectRatio < WIDE_SPREAD_IMAGE_ASPECT_RATIO
+                    ) {
+                        // Portrait artwork occupies a facing page in the vertical Bunkobon spread.
+                        if (columnIndexInHalf > 0) {
+                            advanceHalfOrFlush()
+                        }
                         val fitted = fitBoxInside(
                             aspectRatio = aspectRatio,
-                            maxWidth = remainingWidthLeftOfTitle,
+                            maxWidth = halfWidth,
                             maxHeight = contentHeight,
                         )
-                        currentColumns.add(
+                        val curHalfLeft = halfLeftPx(currentHalfIndex)
+                        appendToCurrentHalf(
                             ReaderPageElement.ImageSlot(
                                 blockIndex = block.blockIndex,
                                 imageIndexInChapter = block.imageIndexInChapter,
                                 imageUrl = block.imageUrl,
-                                leftPx = contentLeft + (remainingWidthLeftOfTitle - fitted.first) * 0.5f,
+                                leftPx = curHalfLeft + (halfWidth - fitted.first) * 0.5f,
                                 topPx = contentTop + (contentHeight - fitted.second) * 0.5f,
                                 widthPx = fitted.first,
                                 heightPx = fitted.second,
                                 aspectRatio = aspectRatio,
-                                isFullBleedArtbookSlot = true,
+                                isFullBleedArtbookSlot = false,
                             ),
                         )
-                        flushVerticalPage(isFullBleedArtbook = ast.isDedicatedIllustrationChapter)
+                        advanceHalfOrFlush()
                     } else {
-                        flushVerticalPage()
-                        val fitted = fitBoxInside(
-                            aspectRatio = aspectRatio,
-                            maxWidth = contentWidth,
-                            maxHeight = contentHeight,
-                        )
-                        currentColumns.add(
-                            ReaderPageElement.ImageSlot(
-                                blockIndex = block.blockIndex,
-                                imageIndexInChapter = block.imageIndexInChapter,
-                                imageUrl = block.imageUrl,
-                                leftPx = contentLeft + (contentWidth - fitted.first) * 0.5f,
-                                topPx = contentTop + (contentHeight - fitted.second) * 0.5f,
-                                widthPx = fitted.first,
-                                heightPx = fitted.second,
+                        val remainingWidthLeftOfTitle =
+                            (halfRightEdgePx(currentHalfIndex) - columnIndexInHalf * columnStepX) - contentLeft
+
+                        if (spreadColumnCount == 1 &&
+                            hasOnlyTitleColumns &&
+                            remainingWidthLeftOfTitle >= fullContentWidth * 0.45f
+                        ) {
+                            val fitted = fitBoxInside(
                                 aspectRatio = aspectRatio,
-                                isFullBleedArtbookSlot = true,
-                            ),
-                        )
-                        flushVerticalPage(isFullBleedArtbook = true)
+                                maxWidth = remainingWidthLeftOfTitle,
+                                maxHeight = contentHeight,
+                            )
+                            currentColumns.add(
+                                ReaderPageElement.ImageSlot(
+                                    blockIndex = block.blockIndex,
+                                    imageIndexInChapter = block.imageIndexInChapter,
+                                    imageUrl = block.imageUrl,
+                                    leftPx = contentLeft + (remainingWidthLeftOfTitle - fitted.first) * 0.5f,
+                                    topPx = contentTop + (contentHeight - fitted.second) * 0.5f,
+                                    widthPx = fitted.first,
+                                    heightPx = fitted.second,
+                                    aspectRatio = aspectRatio,
+                                    isFullBleedArtbookSlot = true,
+                                ),
+                            )
+                            flushVerticalPage(isFullBleedArtbook = ast.isDedicatedIllustrationChapter)
+                        } else if (spreadColumnCount >= 2 && hasOnlyTitleColumns) {
+                            // Dedicated gallery Page 0 in dual-column vertical mode: place plate on facing Left half.
+                            currentHalfIndex = 1
+                            columnIndexInHalf = 0
+                            val fitted = fitBoxInside(
+                                aspectRatio = aspectRatio,
+                                maxWidth = halfWidth,
+                                maxHeight = contentHeight,
+                            )
+                            val curHalfLeft = halfLeftPx(1)
+                            appendToCurrentHalf(
+                                ReaderPageElement.ImageSlot(
+                                    blockIndex = block.blockIndex,
+                                    imageIndexInChapter = block.imageIndexInChapter,
+                                    imageUrl = block.imageUrl,
+                                    leftPx = curHalfLeft + (halfWidth - fitted.first) * 0.5f,
+                                    topPx = contentTop + (contentHeight - fitted.second) * 0.5f,
+                                    widthPx = fitted.first,
+                                    heightPx = fitted.second,
+                                    aspectRatio = aspectRatio,
+                                    isFullBleedArtbookSlot = true,
+                                ),
+                            )
+                            flushVerticalPage(isFullBleedArtbook = ast.isDedicatedIllustrationChapter)
+                        } else {
+                            flushVerticalPage()
+                            val fitted = fitBoxInside(
+                                aspectRatio = aspectRatio,
+                                maxWidth = fullContentWidth,
+                                maxHeight = contentHeight,
+                            )
+                            currentColumns.add(
+                                ReaderPageElement.ImageSlot(
+                                    blockIndex = block.blockIndex,
+                                    imageIndexInChapter = block.imageIndexInChapter,
+                                    imageUrl = block.imageUrl,
+                                    leftPx = contentLeft + (fullContentWidth - fitted.first) * 0.5f,
+                                    topPx = contentTop + (contentHeight - fitted.second) * 0.5f,
+                                    widthPx = fitted.first,
+                                    heightPx = fitted.second,
+                                    aspectRatio = aspectRatio,
+                                    isFullBleedArtbookSlot = true,
+                                ),
+                            )
+                            flushVerticalPage(isFullBleedArtbook = true)
+                        }
                     }
                 }
             }
@@ -1017,6 +1312,7 @@ class StaticLayoutPaginator(
         val endAnchor: ReadingAnchor,
         val characterCount: Int,
         val isFullBleedArtbookPage: Boolean,
+        val hasSecondaryColumnContent: Boolean = false,
         val elements: List<ReaderPageElement>,
     )
 
@@ -1027,6 +1323,7 @@ class StaticLayoutPaginator(
         private const val BASELINE_ASCENT_RATIO = 0.88f
         private const val MIN_INLINE_IMAGE_EM_MULTIPLIER = 7.0f
         private const val MIN_INLINE_IMAGE_VIEWPORT_FRACTION = 0.28f
+        private const val WIDE_SPREAD_IMAGE_ASPECT_RATIO = 1.25f
         private const val MAX_JUSTIFICATION_LETTER_SPACING_EM = 0.28f
         private const val MAX_KINSOKU_PULLBACK_CHARS = 3
 

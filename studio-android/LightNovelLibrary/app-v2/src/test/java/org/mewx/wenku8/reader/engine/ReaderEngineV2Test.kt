@@ -795,6 +795,217 @@ class ReaderEngineV2Test {
         assertNull(buildWenku8WebChapterUrl(aid = 4358, cid = -1))
     }
 
+    @Test
+    fun dualColumnHorizontalPaginationFlowsLeftToRightPreservesAnchorsAndLogicalPages() {
+        val raw = buildMultiPageChapter("第一卷", "双栏正文测试", paragraphCount = 24)
+        val ast = WenkuChapterParser.parse(
+            rawChapterText = raw,
+            aid = 100,
+            vid = 10,
+            cid = 9201,
+            volumeTitle = "第一卷",
+            chapterTitle = "双栏正文测试",
+        )
+        val paginator = StaticLayoutPaginator(lineBreaker = DeterministicCellLineBreaker)
+
+        val dualConfig = ReaderLayoutConfig(
+            viewportWidthPx = 1200,
+            viewportHeightPx = 720,
+            fontSizePx = 22f,
+            lineDistancePx = 10f,
+            paragraphDistancePx = 18f,
+            pageEdgeDistancePx = 24f,
+            headerReservePx = 28f,
+            footerReservePx = 28f,
+            columnCount = 2,
+            columnGapPx = 72f,
+            spineCenterXPx = 600f,
+        )
+        val singleConfig = dualConfig.copy(columnCount = 1, columnGapPx = 0f, spineCenterXPx = null)
+
+        val dualLayout = paginator.paginate(ast, dualConfig)
+        val singleLayout = paginator.paginate(ast, singleConfig)
+
+        assertTrue("Dual layout must produce multiple spreads", dualLayout.pages.size >= 2)
+        val firstSpread = dualLayout.pages.first()
+        assertEquals(2, firstSpread.columnCount)
+        assertTrue(firstSpread.isDualColumnSpread)
+        assertTrue(firstSpread.hasSecondaryColumnContent)
+        assertEquals(600f, firstSpread.spineCenterXPx, 0.5f)
+
+        val leftElements = firstSpread.elements.filter { el ->
+            when (el) {
+                is ReaderPageElement.TitleLine -> el.xPx < firstSpread.spineCenterXPx
+                is ReaderPageElement.TextLine -> el.xPx < firstSpread.spineCenterXPx
+                else -> false
+            }
+        }
+        val rightElements = firstSpread.elements.filter { el ->
+            when (el) {
+                is ReaderPageElement.TitleLine -> el.xPx >= firstSpread.spineCenterXPx
+                is ReaderPageElement.TextLine -> el.xPx >= firstSpread.spineCenterXPx
+                else -> false
+            }
+        }
+        assertTrue("Left column must have lines", leftElements.isNotEmpty())
+        assertTrue("Right column must have lines", rightElements.isNotEmpty())
+        assertTrue(
+            "All left elements must precede right elements in reading order",
+            ReadingAnchor(leftElements.last().blockIndex, leftElements.last().rawEndChar) <=
+                ReadingAnchor(rightElements.first().blockIndex, rightElements.first().rawStartChar),
+        )
+
+        // Verify contiguous 0-based logical page numbering across all spreads.
+        var expectedNextLogical = 0
+        for (spread in dualLayout.pages) {
+            assertEquals(expectedNextLogical, spread.logicalStartPageIndex)
+            val span = if (spread.hasSecondaryColumnContent && !spread.isFullBleedArtbookPage) 2 else 1
+            assertEquals(expectedNextLogical + span - 1, spread.logicalEndPageIndex)
+            expectedNextLogical = spread.logicalEndPageIndex + 1
+        }
+        assertEquals(expectedNextLogical, dualLayout.pages.first().totalLogicalPagesInChapter)
+
+        // Anchor in right column of spread 0 resolves back to spread 0, and survives 2 -> 1 -> 2 reflow!
+        val rightColAnchor = ReadingAnchor(
+            paragraphIndex = rightElements.first().blockIndex,
+            charOffset = rightElements.first().rawStartChar,
+        )
+        assertEquals(0, dualLayout.resolvePageIndexForAnchor(rightColAnchor))
+        val singleIdx = singleLayout.resolvePageIndexForAnchor(rightColAnchor)
+        val singlePage = singleLayout.pages[singleIdx]
+        assertTrue(rightColAnchor >= singlePage.startAnchor && rightColAnchor <= singlePage.endAnchor)
+        assertEquals(0, dualLayout.resolvePageIndexForAnchor(rightColAnchor))
+    }
+
+    @Test
+    fun dualColumnIllustrationsPlacePortraitOnFacingPageAndWideAcrossFullSpread() {
+        val portraitUrl = "https://pic.wenku8.com/pictures/1/100/200/portrait.jpg"
+        val wideUrl = "https://pic.wenku8.com/pictures/1/100/200/wide.jpg"
+        val raw = buildString {
+            append("第一卷 插图排版\r\n\r\n")
+            // Fill most of the left column so the portrait illustration cannot fit inline below prose.
+            for (i in 1..9) {
+                append("　　第${i}段：清晨的微风拂过书页，带来淡淡的墨香与木头的气息，窗外云层缓缓散开。\r\n")
+            }
+            append("<!--image-->$portraitUrl<!--image-->\r\n")
+            append("　　随后是一张跨页彩图，需要横跨整个双栏展开。\r\n")
+            append("<!--image-->$wideUrl<!--image-->\r\n")
+            append("　　跨页彩图之后恢复正常双栏正文排版。\r\n")
+        }
+        val ast = WenkuChapterParser.parse(
+            rawChapterText = raw,
+            aid = 100,
+            vid = 10,
+            cid = 9202,
+            volumeTitle = "第一卷",
+            chapterTitle = "插图排版",
+        )
+        val paginator = StaticLayoutPaginator(lineBreaker = DeterministicCellLineBreaker)
+        val config = ReaderLayoutConfig(
+            viewportWidthPx = 1200,
+            viewportHeightPx = 680,
+            fontSizePx = 22f,
+            lineDistancePx = 10f,
+            paragraphDistancePx = 16f,
+            pageEdgeDistancePx = 24f,
+            headerReservePx = 24f,
+            footerReservePx = 24f,
+            columnCount = 2,
+            columnGapPx = 72f,
+            spineCenterXPx = 600f,
+            knownImageAspectRatios = mapOf(
+                portraitUrl to 0.71f,
+                wideUrl to 1.65f,
+            ),
+        )
+
+        val layout = paginator.paginate(ast, config)
+
+        val portraitPage = layout.pages.first { page ->
+            page.elements.any { it is ReaderPageElement.ImageSlot && it.imageUrl == portraitUrl }
+        }
+        val portraitSlot = portraitPage.elements
+            .filterIsInstance<ReaderPageElement.ImageSlot>()
+            .first { it.imageUrl == portraitUrl }
+        assertFalse("Facing-page portrait plate keeps book spread chrome", portraitPage.isFullBleedArtbookPage)
+        assertTrue(
+            "Portrait illustration fits within one column width (${config.singleColumnWidthPx})",
+            portraitSlot.widthPx <= config.singleColumnWidthPx + 1f,
+        )
+
+        val widePage = layout.pages.first { page ->
+            page.elements.any { it is ReaderPageElement.ImageSlot && it.imageUrl == wideUrl }
+        }
+        val wideSlot = widePage.elements
+            .filterIsInstance<ReaderPageElement.ImageSlot>()
+            .first { it.imageUrl == wideUrl }
+        assertTrue("Wide spread artwork occupies a full-bleed artbook spread", widePage.isFullBleedArtbookPage)
+        assertTrue(wideSlot.isFullBleedArtbookSlot)
+        assertTrue(
+            "Wide spread artwork (${wideSlot.widthPx}) must span wider than a single column (${config.singleColumnWidthPx})",
+            wideSlot.widthPx > config.singleColumnWidthPx,
+        )
+    }
+
+    @Test
+    fun dualColumnVerticalBunkobonReadsRightPageBeforeLeftPageAcrossSpineGutter() {
+        val raw = buildMultiPageChapter("第一卷", "竖排双栏文库本", paragraphCount = 16)
+        val ast = WenkuChapterParser.parse(
+            rawChapterText = raw,
+            aid = 100,
+            vid = 10,
+            cid = 9203,
+            volumeTitle = "第一卷",
+            chapterTitle = "竖排双栏文库本",
+        )
+        val paginator = StaticLayoutPaginator(lineBreaker = DeterministicCellLineBreaker)
+        val config = ReaderLayoutConfig(
+            viewportWidthPx = 1200,
+            viewportHeightPx = 720,
+            fontSizePx = 24f,
+            lineDistancePx = 12f,
+            paragraphDistancePx = 16f,
+            pageEdgeDistancePx = 24f,
+            headerReservePx = 24f,
+            footerReservePx = 24f,
+            isVerticalBunkobon = true,
+            columnCount = 2,
+            columnGapPx = 72f,
+            spineCenterXPx = 600f,
+        )
+
+        val layout = paginator.paginate(ast, config)
+        val spread0 = layout.pages.first()
+        assertEquals(2, spread0.columnCount)
+        assertTrue(spread0.hasSecondaryColumnContent)
+
+        val verticalCols = spread0.elements.filterIsInstance<ReaderPageElement.VerticalColumn>()
+        val rightPageCols = verticalCols.filter { it.centerXPx > spread0.spineCenterXPx }
+        val leftPageCols = verticalCols.filter { it.centerXPx < spread0.spineCenterXPx }
+        assertTrue("Vertical spread must populate Right Page first", rightPageCols.isNotEmpty())
+        assertTrue("Vertical spread must flow onto Left Page", leftPageCols.isNotEmpty())
+
+        // Right Page columns come BEFORE Left Page columns in reading order!
+        assertTrue(
+            "Title / opening vertical column must start on Right Page",
+            verticalCols.first().centerXPx > spread0.spineCenterXPx,
+        )
+        assertTrue(
+            "Every Right Page vertical column must precede every Left Page vertical column",
+            rightPageCols.maxOf { it.columnIndexRtl } < leftPageCols.minOf { it.columnIndexRtl },
+        )
+
+        // No vertical column center falls inside the center spine gutter [600 - 36, 600 + 36].
+        val halfGap = config.effectiveColumnGapPx * 0.5f
+        for (col in verticalCols) {
+            assertTrue(
+                "Column centerX=${col.centerXPx} must stay outside spine gutter",
+                col.centerXPx <= spread0.spineCenterXPx - halfGap ||
+                    col.centerXPx >= spread0.spineCenterXPx + halfGap,
+            )
+        }
+    }
+
     private fun buildMultiPageChapter(
         volumeTitle: String,
         chapterTitle: String,
