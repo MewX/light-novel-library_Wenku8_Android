@@ -10,7 +10,6 @@ import {
     User,
     Calendar,
     ExternalLink,
-    Heart,
     ChevronRight,
     ChevronLeft,
     Globe,
@@ -878,66 +877,37 @@ const FeaturesAndPreviewsSection = ({
 
 // --- Dev Log Cards & Modal Sheet Drawer ---
 
-const BlogCard = ({ post, compact = false, className = '' }) => {
-    const [likes, setLikes] = useState(post.likes);
-    const [liked, setLiked] = useState(false);
-
-    const handleLike = () => {
-        setLikes((prev) => (liked ? prev - 1 : prev + 1));
-        setLiked((prev) => !prev);
-    };
-
-    return (
-        <article
-            className={`rounded-[24px] bg-[var(--md-surface)] border border-[var(--md-outline-variant)]/85 m3-emphasized hover:border-[var(--md-primary)]/45 flex flex-col ${
-                compact ? 'p-5' : 'p-6'
-            } ${className}`}
-        >
-            <div className="flex items-center justify-between gap-3 mb-4">
-                <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-full bg-[var(--md-primary-container)] text-[var(--md-on-primary-container)] flex items-center justify-center font-bold text-sm shrink-0">
-                        {post.author[0]}
-                    </div>
-                    <div>
-                        <h3 className="font-bold text-sm text-[var(--md-on-surface)]">
-                            {post.author}
-                        </h3>
-                        <div className="flex items-center text-xs text-[var(--md-on-surface-variant)]">
-                            <Calendar size={11} className="mr-1" />
-                            {post.date}
-                        </div>
+const BlogCard = ({ post, compact = false, className = '' }) => (
+    <article
+        className={`rounded-[24px] bg-[var(--md-surface)] border border-[var(--md-outline-variant)]/85 m3-emphasized hover:border-[var(--md-primary)]/45 flex flex-col ${
+            compact ? 'p-5' : 'p-6'
+        } ${className}`}
+    >
+        <div className="flex items-center justify-between gap-3 mb-4">
+            <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-full bg-[var(--md-primary-container)] text-[var(--md-on-primary-container)] flex items-center justify-center font-bold text-sm shrink-0">
+                    {post.author[0]}
+                </div>
+                <div>
+                    <h3 className="font-bold text-sm text-[var(--md-on-surface)]">
+                        {post.author}
+                    </h3>
+                    <div className="flex items-center text-xs text-[var(--md-on-surface-variant)]">
+                        <Calendar size={11} className="mr-1" />
+                        {post.date}
                     </div>
                 </div>
-                <span className="text-[11px] font-mono px-2.5 py-0.5 rounded-full bg-[var(--md-surface-container)] text-[var(--md-on-surface-variant)]">
-                    #{post.id}
-                </span>
             </div>
+            <span className="text-[11px] font-mono px-2.5 py-0.5 rounded-full bg-[var(--md-surface-container)] text-[var(--md-on-surface-variant)]">
+                #{post.id}
+            </span>
+        </div>
 
-            <div className="flex-grow mb-4">
-                <PostParagraphs paragraphs={post.paragraphs} />
-            </div>
-
-            <div className="pt-3 border-t border-[var(--md-outline-variant)]/60 flex items-center justify-between">
-                <button
-                    type="button"
-                    onClick={handleLike}
-                    aria-pressed={liked}
-                    className={`inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-full m3-spring cursor-pointer ${
-                        liked
-                            ? 'bg-rose-500/15 text-rose-500'
-                            : 'bg-[var(--md-surface-container)] text-[var(--md-on-surface-variant)] hover:text-rose-500'
-                    }`}
-                >
-                    <Heart size={14} fill={liked ? 'currentColor' : 'none'} />
-                    <span>{likes}</span>
-                </button>
-                <span className="text-[11px] text-[var(--md-on-surface-variant)] opacity-70">
-                    历史开发碎碎念
-                </span>
-            </div>
-        </article>
-    );
-};
+        <div className="flex-grow">
+            <PostParagraphs paragraphs={post.paragraphs} />
+        </div>
+    </article>
+);
 
 const NewsDrawer = ({ isOpen, onClose }) => {
     useEffect(() => {

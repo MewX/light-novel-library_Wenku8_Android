@@ -137,7 +137,6 @@ export const BLOG_POSTS = [
         id: 39,
         author: 'MewX',
         date: '2025-01-04 16:30',
-        likes: 18,
         paragraphs: [
             [
                 {
@@ -150,7 +149,6 @@ export const BLOG_POSTS = [
         id: 38,
         author: 'MewX',
         date: '2018-06-12 23:13',
-        likes: 14,
         paragraphs: [
             [{ text: '本来能至少加一下评论列表的，但是因为生产工具出了问题，先发一个临时版本解决一下，后续有时间慢慢更新！' }],
             [{ text: '另外欢迎有兴趣的童鞋来一起维护！' }],
@@ -160,7 +158,6 @@ export const BLOG_POSTS = [
         id: 37,
         author: 'MewX',
         date: '2015-09-03 23:20',
-        likes: 19,
         paragraphs: [
             [
                 {
@@ -173,7 +170,6 @@ export const BLOG_POSTS = [
         id: 36,
         author: 'MewX',
         date: '2015-08-16 00:02',
-        likes: 16,
         paragraphs: [
             [{ text: 'app里面也写了，尽量把想长期看的书全本缓存一下。', highlight: true }],
             [
@@ -186,7 +182,6 @@ export const BLOG_POSTS = [
         id: 35,
         author: 'MewX',
         date: '2015-08-02 22:33',
-        likes: 12,
         paragraphs: [
             [
                 {
@@ -199,7 +194,6 @@ export const BLOG_POSTS = [
         id: 34,
         author: 'MewX',
         date: '2015-08-01 09:55',
-        likes: 11,
         paragraphs: [
             [
                 {
@@ -212,7 +206,6 @@ export const BLOG_POSTS = [
         id: 33,
         author: 'MewX',
         date: '2015-07-30 15:30',
-        likes: 15,
         paragraphs: [
             [
                 {
@@ -225,14 +218,12 @@ export const BLOG_POSTS = [
         id: 32,
         author: 'MewX',
         date: '2015-06-15 02:32',
-        likes: 7,
         paragraphs: [[{ text: '这个月可能能上架！' }]],
     },
     {
         id: 31,
         author: 'MewX',
         date: '2015-06-06 23:55',
-        likes: 9,
         paragraphs: [
             [
                 {
@@ -245,7 +236,6 @@ export const BLOG_POSTS = [
         id: 30,
         author: 'MewX',
         date: '2015-05-15 23:04',
-        likes: 8,
         paragraphs: [
             [
                 {
@@ -258,7 +248,6 @@ export const BLOG_POSTS = [
         id: 29,
         author: 'MewX',
         date: '2015-03-24 23:30',
-        likes: 10,
         paragraphs: [
             [{ text: '已经开始继续开发了，现在在研读OSC、DesignerNews、IOSched的源代码，为了开发更美观的MD应用~' }],
         ],
@@ -267,7 +256,6 @@ export const BLOG_POSTS = [
         id: 28,
         author: 'MewX',
         date: '2015-03-20 20:06',
-        likes: 6,
         paragraphs: [
             [
                 { text: 'CROSS+CHANNEL汉化补丁发布！！！http://tieba.baidu.com/p/3648179205 接下来就是弄文库啦~' },
@@ -278,7 +266,6 @@ export const BLOG_POSTS = [
         id: 27,
         author: 'MewX',
         date: '2015-02-01 09:38',
-        likes: 5,
         paragraphs: [
             [
                 {
@@ -291,7 +278,6 @@ export const BLOG_POSTS = [
         id: 26,
         author: 'MewX',
         date: '2015-01-22 11:59',
-        likes: 4,
         paragraphs: [
             [
                 {
@@ -304,21 +290,18 @@ export const BLOG_POSTS = [
         id: 25,
         author: 'MewX',
         date: '2015-01-12 21:05',
-        likes: 9,
         paragraphs: [[{ text: '好久没有更新，这个月31日会有全新的版本！稳定性和外观都会上一个新的档次！' }]],
     },
     {
         id: 24,
         author: 'MewX',
         date: '2014-12-23 00:49',
-        likes: 7,
         paragraphs: [[{ text: '换肤完成～请期待圣诞特别版～～' }]],
     },
     {
         id: 23,
         author: 'MewX',
         date: '2014-12-22 13:49',
-        likes: 11,
         paragraphs: [
             [
                 {
@@ -331,14 +314,12 @@ export const BLOG_POSTS = [
         id: 22,
         author: 'MewX',
         date: '2014-12-21 23:22',
-        likes: 5,
         paragraphs: [[{ text: '大部分时间在群里了，目前版本是0.5.1.0030，下一个版本增加设置界面。' }]],
     },
     {
         id: 21,
         author: 'MewX',
         date: '2014-12-18 2:30',
-        likes: 8,
         paragraphs: [
             [{ text: '测试群号：427577610' }],
             [
@@ -352,28 +333,24 @@ export const BLOG_POSTS = [
         id: 20,
         author: 'MewX',
         date: '2014-12-16 23:27',
-        likes: 6,
         paragraphs: [[{ text: '添加了章节切换功能。文库管理员在招募测试人员了。' }]],
     },
     {
         id: 19,
         author: 'MewX',
         date: '2014-12-16 02:17',
-        likes: 4,
         paragraphs: [[{ text: '加一个设置界面就可以发初版了、' }]],
     },
     {
         id: 18,
         author: 'MewX',
         date: '2014-12-15 01:09',
-        likes: 5,
         paragraphs: [[{ text: '这周一定会发初版的。今天把风格优化了一下，简洁多了，书架按钮已搭好，白天填功能 ww' }]],
     },
     {
         id: 17,
         author: 'MewX',
         date: '2014-12-13 16:55',
-        likes: 9,
         paragraphs: [
             [{ text: '明天考试 _(:з」∠)_ 这几天一点没动代码，看了评论决定考完试补一点功能就发初版。' }],
             [
@@ -387,7 +364,6 @@ export const BLOG_POSTS = [
         id: 16,
         author: 'MewX',
         date: '2014-12-10 22:57',
-        likes: 6,
         paragraphs: [
             [
                 {
@@ -400,7 +376,6 @@ export const BLOG_POSTS = [
         id: 15,
         author: 'MewX',
         date: '2014-12-07 23:33',
-        likes: 7,
         paragraphs: [
             [
                 {
@@ -413,14 +388,12 @@ export const BLOG_POSTS = [
         id: 14,
         author: 'MewX',
         date: '2014-12-07 01:30',
-        likes: 3,
         paragraphs: [[{ text: '对搜索功能进一步完善；提高小说加载速度；计划白天完成本地书架搭建和存档功能。' }]],
     },
     {
         id: 13,
         author: 'MewX',
         date: '2014-12-06 02:28',
-        likes: 6,
         paragraphs: [
             [
                 {
@@ -433,7 +406,6 @@ export const BLOG_POSTS = [
         id: 12,
         author: 'MewX',
         date: '2014-12-04 21:11',
-        likes: 4,
         paragraphs: [
             [{ text: '基本阅读功能开发完毕，姑且可以说是能用的软件，当然用户体验会比较差，但是用丰富的数据资源来说还是可以权衡的。' }],
         ],
@@ -442,21 +414,18 @@ export const BLOG_POSTS = [
         id: 11,
         author: 'MewX',
         date: '2014-12-03 23:25',
-        likes: 3,
         paragraphs: [[{ text: '小说详情界面完成一半、RelativeLayout的大量应用使得布局简洁了许多。' }]],
     },
     {
         id: 10,
         author: 'MewX',
         date: '2014-12-02 23:48',
-        likes: 5,
         paragraphs: [[{ text: '最近的考试和课程设计终于是告一段落了 _(:з」∠)_ 白天可以堆代码了' }]],
     },
     {
         id: 9,
         author: 'MewX',
         date: '2014-11-28 19:49',
-        likes: 8,
         paragraphs: [
             [
                 { text: '感谢' },
@@ -474,7 +443,6 @@ export const BLOG_POSTS = [
         id: 8,
         author: 'MewX',
         date: '2014-11-28 00:29',
-        likes: 7,
         paragraphs: [
             [
                 { text: '之前看到有人在广泛fork开源的实用APP，咱们项目也被荣幸收录，所以打算整理以下手头代码commit一下。' },
@@ -487,7 +455,6 @@ export const BLOG_POSTS = [
         id: 7,
         author: 'MewX',
         date: '2014-11-26 03:00',
-        likes: 5,
         paragraphs: [
             [
                 {
@@ -500,7 +467,6 @@ export const BLOG_POSTS = [
         id: 6,
         author: 'MewX',
         date: '2014-11-23 01:50',
-        likes: 4,
         paragraphs: [
             [{ text: '最初版本大概除了主界面和该有图的界面会有图，其他的基本上都是文字了。不过图都是高清带alpha通道的png32哦～' }],
             [{ text: '重用性上面下了不少功夫吧，尽可能减少要写的代码量（其实是怕升级时的修改:P）。' }],
@@ -510,7 +476,6 @@ export const BLOG_POSTS = [
         id: 5,
         author: 'MewX',
         date: '2014-11-20 00:53',
-        likes: 10,
         paragraphs: [
             [{ text: '最近在看软件工程 ww 于是应用到本项目中就是决定要应用“快速原型模型“（RAD）了。' }],
             [{ text: '晚上把简约的书库分类入口界面做完了，新的app实用至上嘛。' }],
@@ -522,7 +487,6 @@ export const BLOG_POSTS = [
         id: 4,
         author: 'MewX',
         date: '2014-11-18 23:46',
-        likes: 9,
         paragraphs: [
             [{ text: 'GitHub二级域名的支持还是有点问题的，总是在commit半个小时后莫名其妙地显示GitHub-404。' }],
             [
@@ -541,21 +505,18 @@ export const BLOG_POSTS = [
         id: 3,
         author: 'MewX',
         date: '2014-11-17 21:44',
-        likes: 12,
         paragraphs: [[{ text: '开始正式写代码喽~~' }]],
     },
     {
         id: 2,
         author: 'MewX',
         date: '2014-11-17 20:19',
-        likes: 6,
         paragraphs: [[{ text: '动态载入XML文件哦~~~ 手机版也可以调用哈哈' }]],
     },
     {
         id: 1,
         author: 'MewX',
         date: '2014-11-17 20:18',
-        likes: 15,
         paragraphs: [[{ text: '主页即将诞生啦！！' }]],
     },
 ];
