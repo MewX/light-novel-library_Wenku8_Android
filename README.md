@@ -48,7 +48,7 @@
 **轻小说文库 Android `2.0`（`:app-v2`）** 是在初代 Material Design 1 版本发布十余年后的一次彻底世代重构。新版本完全抛弃了旧版繁杂的 `Activity`/`Fragment`/`AsyncTask` 视图栈，采用 **100% Kotlin + Jetpack Compose（Material 3 Expressive）** 从零重写，同时严格保留了正式版包名 `org.mewx.wenku8`，支持从 Google Play 商店已发布的 `1.x` 版本**直接原位覆盖升级并自动无损迁移全部本地数据**。
 
 > [!IMPORTANT]
-> **Vibe Coding 声明**：本项目的 **`2.0` 版本通过 Vibe Coding 方式打造，从前期旧版功能盘点、Material 3 Expressive 设计规范、Kotlin / Compose 代码实现、阅读引擎、数据迁移与备份系统，到自动化测试套件与文档，均完全由 `Gemini Carbon (High)` 完成！**
+> **Vibe Coding 声明**：本项目的 **`2.0` 版本通过 Vibe Coding 方式打造，从前期旧版功能盘点、Material 3 Expressive 设计规范、Kotlin / Compose 代码实现、阅读引擎、数据迁移与备份系统，到自动化测试套件与文档，均完全由 `Gemini 4 Carbon (High)` 完成！**
 
 ### <a id="v2-highlights"></a>核心特性亮点
 
@@ -71,7 +71,7 @@
 ### <a id="credits"></a>Credits 与 Vibe Coding 致谢声明
 
 - **`2.0` 版本全栈架构、UI 设计与代码实现（Vibe Coding）**：
-  - **完全由 `Gemini Carbon (High)` 完成** —— 独立完成了 `v2.0` 的旧版代码考古、产品与视觉设计文档（[`docs/designs/v2/`](docs/designs/v2/README.md)）、`:app-v2` 全部 Kotlin / Jetpack Compose 源代码、Room 数据库与 `1.x` 迁移器、阅读与插图引擎、GitHub Actions CI 适配以及全套单元与 Robolectric UI 测试。
+  - **完全由 `Gemini 4 Carbon (High)` 完成** —— 独立完成了 `v2.0` 的旧版代码考古、产品与视觉设计文档（[`docs/designs/v2/`](docs/designs/v2/README.md)）、`:app-v2` 全部 Kotlin / Jetpack Compose 源代码、Room 数据库与 `1.x` 迁移器、阅读与插图引擎、GitHub Actions CI 适配以及全套单元与 Robolectric UI 测试。
 - **项目原作者、架构指导与基础设施维护**：
   - [**MewX**](https://www.mewx.org) —— 项目发起人、`0.5.x` 与 `1.x` 版本原作者、中转与分享服务端基础设施搭建，以及 `2.0` Vibe Coding 过程中的产品决策、体验把控与真机验收。
 - **设计灵感与社区致谢**：
