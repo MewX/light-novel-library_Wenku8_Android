@@ -1,5 +1,146 @@
 @import "tailwindcss";
+@custom-variant dark (&:where(.dark, .dark *));
+
+/*
+ * Material Design 3 Expressive (M3e) Design System Tokens
+ * Grounded in Wenku8 Android v2.0 `Wenku8ColorSchemes.kt`
+ * (Classic Blue Light + Carbon Night / Azure Dark)
+ */
+:root {
+  --md-primary: #4284f5;
+  --md-on-primary: #ffffff;
+  --md-primary-container: #d8e6ff;
+  --md-on-primary-container: #0b2960;
+
+  --md-secondary: #3870d0;
+  --md-on-secondary: #ffffff;
+  --md-secondary-container: #dce8fc;
+  --md-on-secondary-container: #102c57;
+
+  --md-tertiary: #1e6f8e;
+  --md-on-tertiary: #ffffff;
+  --md-tertiary-container: #d2ecf9;
+  --md-on-tertiary-container: #072b3a;
+
+  --md-warm-container: #ffedd5;
+  --md-on-warm-container: #5c330b;
+
+  --md-background: #f5f7fc;
+  --md-on-background: #1c2026;
+  --md-surface: #ffffff;
+  --md-on-surface: #1c2026;
+  --md-on-surface-variant: #44484f;
+
+  --md-surface-container-lowest: #ffffff;
+  --md-surface-container-low: #f8fafd;
+  --md-surface-container: #f0f4fa;
+  --md-surface-container-high: #e8eef7;
+  --md-surface-container-highest: #dfe7f2;
+
+  --md-outline: #747982;
+  --md-outline-variant: #d4dce8;
+
+  --md-motion-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --md-motion-emphasized: cubic-bezier(0.2, 0, 0, 1);
+}
+
+.theme-dark {
+  --md-primary: #9cc0ff;
+  --md-on-primary: #072c6c;
+  --md-primary-container: #1f4485;
+  --md-on-primary-container: #d8e6ff;
+
+  --md-secondary: #b4c8ef;
+  --md-on-secondary: #1d3155;
+  --md-secondary-container: #26385a;
+  --md-on-secondary-container: #dce8fc;
+
+  --md-tertiary: #8ed1eb;
+  --md-on-tertiary: #003547;
+  --md-tertiary-container: #164b5f;
+  --md-on-tertiary-container: #d2ecf9;
+
+  --md-warm-container: #5f3d1c;
+  --md-on-warm-container: #ffdcc2;
+
+  --md-background: #0f1217;
+  --md-on-background: #e3e6ec;
+  --md-surface: #14181f;
+  --md-on-surface: #e3e6ec;
+  --md-on-surface-variant: #b8bfcb;
+
+  --md-surface-container-lowest: #0b0e12;
+  --md-surface-container-low: #161b22;
+  --md-surface-container: #1d232c;
+  --md-surface-container-high: #252c38;
+  --md-surface-container-highest: #2e3645;
+
+  --md-outline: #8b93a1;
+  --md-outline-variant: #313949;
+}
 
 @theme {
   --animate-bounce-slow: bounce 3s infinite;
+  --animate-float-gentle: float-gentle 6s ease-in-out infinite;
+  --animate-spin-very-slow: spin 36s linear infinite;
+}
+
+@keyframes float-gentle {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Noto Sans SC", "Microsoft YaHei", "Segoe UI", Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Expressive spring transition helper */
+.m3-spring {
+  transition-property: transform, background-color, border-color, color, box-shadow, opacity, border-radius;
+  transition-duration: 320ms;
+  transition-timing-function: var(--md-motion-spring);
+}
+
+.m3-emphasized {
+  transition-property: transform, background-color, border-color, color, box-shadow, opacity;
+  transition-duration: 260ms;
+  transition-timing-function: var(--md-motion-emphasized);
+}
+
+/* Hide scrollbars cleanly for snap carousels */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+/* Subtle dot pattern for expressive ambient surfaces */
+.m3-dot-pattern {
+  background-image: radial-gradient(color-mix(in srgb, var(--md-primary) 14%, transparent) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  .m3-spring,
+  .m3-emphasized,
+  .animate-float-gentle,
+  .animate-spin-very-slow {
+    animation: none !important;
+    transition-duration: 0.01ms !important;
+  }
 }
