@@ -175,6 +175,7 @@ class BackupArchiveRepository(
         } catch (cancelled: kotlinx.coroutines.CancellationException) {
             throw cancelled
         } catch (error: Throwable) {
+            org.mewx.wenku8.util.CrashReporter.recordException("BackupArchiveRepository.exportBackupArchive", error)
             Result.failure(error)
         } finally {
             stagingDir.deleteRecursively()
@@ -256,6 +257,7 @@ class BackupArchiveRepository(
         } catch (cancelled: kotlinx.coroutines.CancellationException) {
             throw cancelled
         } catch (error: Throwable) {
+            org.mewx.wenku8.util.CrashReporter.recordException("BackupArchiveRepository.importBackupArchive", error)
             Result.failure(error)
         } finally {
             stagingDir.deleteRecursively()

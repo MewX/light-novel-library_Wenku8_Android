@@ -389,6 +389,72 @@ class AppContainer(context: Context) {
     }
 
     /**
+     * Keeps Crashlytics custom keys and GA4 non-PII user properties synchronized with the user's
+     * active preferences and authentication state (boolean only — never account names).
+     */
+    fun triggerTelemetryStateSync() {
+        applicationScope.launch {
+            userPreferencesRepository.preferencesFlow
+                .map { prefs ->
+                    listOf(
+                        prefs.appLanguage.name,
+                        prefs.themeMode.name.lowercase(),
+                        prefs.readerPageTurnMode.name.lowercase(),
+                        prefs.readerColumnMode.name.lowercase(),
+                        prefs.einkModeEnabled.toString(),
+                        prefs.autoOptimizeConnectionEnabled.toString(),
+                    )
+                }
+                .distinctUntilChanged()
+                .collect { snapshot ->
+                    val language = snapshot[0]
+                    val themeMode = snapshot[1]
+                    val readerMode = snapshot[2]
+                    val readerColumns = snapshot[3]
+                    val einkEnabled = snapshot[4].toBoolean()
+                    val autoRouting = snapshot[5].toBoolean()
+
+                    org.mewx.wenku8.util.CrashReporter.setKey(
+                        org.mewx.wenku8.util.CrashReporter.Keys.LANGUAGE,
+                        language,
+                    )
+                    org.mewx.wenku8.util.CrashReporter.setKey(
+                        org.mewx.wenku8.util.CrashReporter.Keys.THEME_MODE,
+                        themeMode,
+                    )
+                    org.mewx.wenku8.util.CrashReporter.setKey(
+                        org.mewx.wenku8.util.CrashReporter.Keys.READER_MODE,
+                        readerMode,
+                    )
+                    org.mewx.wenku8.util.CrashReporter.setKey(
+                        org.mewx.wenku8.util.CrashReporter.Keys.READER_COLUMNS,
+                        readerColumns,
+                    )
+                    org.mewx.wenku8.util.CrashReporter.setKey(
+                        org.mewx.wenku8.util.CrashReporter.Keys.AUTO_ROUTING,
+                        autoRouting,
+                    )
+                    org.mewx.wenku8.util.AnalyticsTracker.syncUserPreferenceProperties(
+                        appLanguage = language,
+                        themeMode = themeMode,
+                        readerTurnMode = readerMode,
+                        readerColumnMode = readerColumns,
+                        einkModeEnabled = einkEnabled,
+                        distributionChannel = org.mewx.wenku8.BuildConfig.DISTRIBUTION_CHANNEL,
+                    )
+                }
+        }
+        applicationScope.launch {
+            userSessionRepository.sessionState
+                .map { it is org.mewx.wenku8.data.repository.AccountSessionState.SignedIn }
+                .distinctUntilChanged()
+                .collect { loggedIn ->
+                    org.mewx.wenku8.util.CrashReporter.setLoggedIn(loggedIn)
+                }
+        }
+    }
+
+    /**
      * Runs automatic non-blocking `v1.31 -> v2.0` internal-storage migration once on cold start
      * when upgrading an existing installation (`legacyV1InternalMigrationVersion < 2`).
      */
@@ -409,6 +475,13 @@ class AppContainer(context: Context) {
                 legacyV1StorageMigrator.migrateFromSource(
                     source = source,
                     onProgress = { progress -> _migrationProgressFlow.value = progress },
+                )
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                throw cancelled
+            } catch (e: Throwable) {
+                org.mewx.wenku8.util.CrashReporter.recordException(
+                    "AppContainer.automaticInternalMigration",
+                    e,
                 )
             } finally {
                 _migrationProgressFlow.value = null

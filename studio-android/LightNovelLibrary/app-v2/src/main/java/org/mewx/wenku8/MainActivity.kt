@@ -64,6 +64,7 @@ class MainActivity : AppCompatActivity(), HardwareVolumeKeyHost {
 
     override fun onResume() {
         super.onResume()
+        org.mewx.wenku8.util.CrashReporter.log("MainActivity#onResume")
         val coordinator =
             (application as? Wenku8V2Application)?.appContainer?.appUpdateCoordinator ?: return
         lifecycleScope.launch {
@@ -131,6 +132,9 @@ class MainActivity : AppCompatActivity(), HardwareVolumeKeyHost {
             (resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
         applyTransparentEdgeToEdge(isDark = isSystemDark)
         super.onCreate(savedInstanceState)
+        org.mewx.wenku8.util.CrashReporter.log(
+            if (savedInstanceState == null) "MainActivity#onCreate(fresh)" else "MainActivity#onCreate(recreated)",
+        )
 
         val launchedFromHistory =
             ((intent?.flags ?: 0) and Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY) != 0

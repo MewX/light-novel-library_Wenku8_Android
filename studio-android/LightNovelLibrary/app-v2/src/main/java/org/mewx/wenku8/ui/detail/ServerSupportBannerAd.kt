@@ -44,8 +44,6 @@ import com.google.android.gms.ads.AdSize
 import com.google.android.gms.ads.AdView
 import com.google.android.gms.ads.LoadAdError
 import com.google.android.gms.ads.MobileAds
-import com.google.android.gms.common.ConnectionResult
-import com.google.android.gms.common.GoogleApiAvailabilityLight
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
@@ -758,8 +756,5 @@ internal fun hasActiveInternetCapability(context: Context): Boolean {
 }
 
 internal fun isGooglePlayServicesReady(context: Context): Boolean {
-    return runCatching {
-        GoogleApiAvailabilityLight.getInstance()
-            .isGooglePlayServicesAvailable(context) == ConnectionResult.SUCCESS
-    }.getOrDefault(false)
+    return org.mewx.wenku8.util.GoogleServicesHelper.isGmsAvailable(context)
 }

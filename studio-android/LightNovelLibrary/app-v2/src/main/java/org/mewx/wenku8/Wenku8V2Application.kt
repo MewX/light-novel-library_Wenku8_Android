@@ -7,6 +7,8 @@ import coil3.SingletonImageLoader
 import org.mewx.wenku8.api.Wenku8API
 import org.mewx.wenku8.di.AppContainer
 import org.mewx.wenku8.ui.detail.ServerSupportAdInitializer
+import org.mewx.wenku8.util.AnalyticsTracker
+import org.mewx.wenku8.util.CrashReporter
 
 /**
  * Application entry point for Wenku8 `:app-v2`.
@@ -23,6 +25,10 @@ class Wenku8V2Application : Application(), SingletonImageLoader.Factory {
 
     override fun onCreate() {
         super.onCreate()
+        CrashReporter.setKey(CrashReporter.Keys.BUILD_FLAVOR, BuildConfig.DISTRIBUTION_CHANNEL)
+        CrashReporter.log("Wenku8V2Application#onCreate")
+        AnalyticsTracker.initialize(this)
+
         try {
             Wenku8API.initCrypto(
                 this,
@@ -34,8 +40,11 @@ class Wenku8V2Application : Application(), SingletonImageLoader.Factory {
             // Host-JVM Robolectric tests do not load Android Bionic JNI libraries.
         } catch (_: UnsupportedOperationException) {
             // Open-source :api-stub builds do not include private crypto.
+        } catch (t: Throwable) {
+            CrashReporter.recordException("Wenku8V2Application.initCrypto", t)
         }
         appContainer = AppContainer(this)
+        appContainer.triggerTelemetryStateSync()
         appContainer.triggerAutomaticInternalMigrationIfNeeded()
         appContainer.triggerStartupAccountAndNoticeSync()
         ServerSupportAdInitializer.warmUpInBackground(this, appContainer.applicationScope)

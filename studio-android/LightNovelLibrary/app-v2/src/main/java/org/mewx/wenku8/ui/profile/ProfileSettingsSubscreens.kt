@@ -1251,7 +1251,11 @@ private fun StorageAndBackupSettingsBody(
                         report.migratedChaptersCount,
                         report.migratedReadingProgressCount,
                     )
-                }.onFailure {
+                }.onFailure { error ->
+                    org.mewx.wenku8.util.CrashReporter.recordException(
+                        "ProfileSettings.importLegacySaf",
+                        error,
+                    )
                     storageStatusMessage = backupFailedMessage
                 }
             }

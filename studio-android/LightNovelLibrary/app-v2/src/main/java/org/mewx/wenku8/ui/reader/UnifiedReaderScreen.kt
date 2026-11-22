@@ -647,6 +647,10 @@ fun UnifiedReaderScreen(
             flushReadingSessionIfNonTrivial(sessionCid)
             sessionCid = activeChapter.cid
         }
+        org.mewx.wenku8.util.CrashReporter.setKey(
+            org.mewx.wenku8.util.CrashReporter.Keys.CHAPTER_CID,
+            activeChapter.cid,
+        )
         val activePage = snapshot.activeReaderPage ?: return@LaunchedEffect
         val pageVisitKey = (activeChapter.cid.toLong() shl 32) or
             (activePage.pageIndexInChapter.toLong() and 0xFFFFFFFFL)

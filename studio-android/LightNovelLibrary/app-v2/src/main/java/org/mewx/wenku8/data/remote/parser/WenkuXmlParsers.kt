@@ -2,6 +2,7 @@ package org.mewx.wenku8.data.remote.parser
 
 import org.mewx.wenku8.data.repository.ParsedChapterToc
 import org.mewx.wenku8.data.repository.ParsedVolumeToc
+import org.mewx.wenku8.util.CrashReporter
 import org.xmlpull.v1.XmlPullParser
 import org.xmlpull.v1.XmlPullParserFactory
 import java.io.StringReader
@@ -183,7 +184,8 @@ object WenkuXmlParsers {
                     tagsCsv = tagsCsv,
                 )
             }
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            CrashReporter.recordException("WenkuXmlParsers.parseNovelFullMeta", e)
             null
         }
     }
@@ -247,7 +249,8 @@ object WenkuXmlParsers {
                 }
                 eventType = parser.next()
             }
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            CrashReporter.recordException("WenkuXmlParsers.parseVolumeTocList", e)
             // Preserve all completed volumes (and any in-progress volume that already collected
             // valid chapters) when server-side malformed tail XML or stray closing tags occur.
             activeVolume?.takeIf { it.chapters.isNotEmpty() }?.let { parsedVolumes.add(it) }
@@ -364,7 +367,8 @@ object WenkuXmlParsers {
             }
 
             if (sawResultRoot) ParsedNovelListPage(totalPages = totalPages, items = items) else null
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            CrashReporter.recordException("WenkuXmlParsers.parseNovelListWithInfo", e)
             null
         }
     }
@@ -430,7 +434,8 @@ object WenkuXmlParsers {
             }
 
             if (sawMetadataRoot) entries else null
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            CrashReporter.recordException("WenkuXmlParsers.parseCloudBookshelfList", e)
             null
         }
     }
@@ -535,7 +540,8 @@ object WenkuXmlParsers {
                     introShort = introShort,
                 )
             }
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            CrashReporter.recordException("WenkuXmlParsers.parseNovelShortInfoUpdate", e)
             null
         }
     }
@@ -573,7 +579,8 @@ object WenkuXmlParsers {
             }
 
             if (sawResultRoot) orderedUniqueAids.toList() else null
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            CrashReporter.recordException("WenkuXmlParsers.parseSearchResultAidList", e)
             null
         }
     }
@@ -630,7 +637,8 @@ object WenkuXmlParsers {
                 experience = experience,
                 rank = rank,
             )
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            CrashReporter.recordException("WenkuXmlParsers.parseUserInfo", e)
             null
         }
     }
@@ -677,7 +685,8 @@ object WenkuXmlParsers {
 
             if (!sawMetadataRoot || (score == null && experience == null)) return null
             ParsedDailySignResult(score = score, experience = experience)
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            CrashReporter.recordException("WenkuXmlParsers.parseDailySignResult", e)
             null
         }
     }
@@ -772,7 +781,8 @@ object WenkuXmlParsers {
             } else {
                 null
             }
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            CrashReporter.recordException("WenkuXmlParsers.parseReviewThreadListPage", e)
             null
         }
     }
@@ -851,7 +861,8 @@ object WenkuXmlParsers {
             } else {
                 null
             }
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            CrashReporter.recordException("WenkuXmlParsers.parseReviewReplyPage", e)
             null
         }
     }

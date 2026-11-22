@@ -703,6 +703,51 @@ fun AdaptiveMainScaffold(
             else -> ScaffoldSceneState.HomeShell
         }
 
+        val activeTelemetryScreenName: String = when {
+            activeCoverLightboxUrl.isNotBlank() -> "ArtbookLightboxOverlay"
+            isLoginBottomSheetOpen -> "AccountLoginBottomSheet"
+            else -> when (val s = activeScene) {
+                ScaffoldSceneState.HomeShell -> if (showTwoPaneExpandedDetail && activeDetailNovelAid > 0) {
+                    "NovelDetailTwoPaneScreen"
+                } else {
+                    when (selectedDestination) {
+                        TopLevelDestination.LATEST -> "LatestScreen"
+                        TopLevelDestination.RANKINGS -> "RankingsScreen"
+                        TopLevelDestination.BOOKSHELF -> "BookshelfScreen"
+                        TopLevelDestination.PROFILE -> "ProfileAndStudioScreen"
+                    }
+                }
+                is ScaffoldSceneState.SearchStudio -> "UnifiedSearchScreen"
+                is ScaffoldSceneState.ReadingFootprint -> "ReadingFootprintScreen"
+                is ScaffoldSceneState.ProfileSettings -> "ProfileSettings_${s.section.name}"
+                is ScaffoldSceneState.CompactNovelDetail -> "NovelDetailScreen"
+                is ScaffoldSceneState.ReviewList -> "ReviewListScreen"
+                is ScaffoldSceneState.ReviewThread -> "ReviewThreadScreen"
+                is ScaffoldSceneState.Reader -> "UnifiedReaderScreen"
+                ScaffoldSceneState.NetworkDiagnostics -> "NetworkDiagnosticsScreen"
+            }
+        }
+        val activeTelemetryNovelAid: Int = when (val s = activeScene) {
+            is ScaffoldSceneState.Reader -> s.request.aid
+            is ScaffoldSceneState.CompactNovelDetail -> s.aid
+            is ScaffoldSceneState.ReviewList -> s.aid
+            is ScaffoldSceneState.ReviewThread -> s.aid
+            ScaffoldSceneState.HomeShell -> if (showTwoPaneExpandedDetail) activeDetailNovelAid else 0
+            else -> 0
+        }
+        val activeTelemetryChapterCid: Int = (activeScene as? ScaffoldSceneState.Reader)?.request?.cid ?: 0
+        LaunchedEffect(activeTelemetryScreenName, activeTelemetryNovelAid, activeTelemetryChapterCid) {
+            org.mewx.wenku8.util.CrashReporter.setScreen(activeTelemetryScreenName, "enter")
+            org.mewx.wenku8.util.CrashReporter.setKey(
+                org.mewx.wenku8.util.CrashReporter.Keys.NOVEL_AID,
+                activeTelemetryNovelAid,
+            )
+            org.mewx.wenku8.util.CrashReporter.setKey(
+                org.mewx.wenku8.util.CrashReporter.Keys.CHAPTER_CID,
+                activeTelemetryChapterCid,
+            )
+        }
+
         // Preserve v1's classic double-back-to-exit (`MainActivity.exitBy2Click`, 2000ms window).
         // Registered outer-most so inner BackHandlers (child scenes, two-pane detail, bookshelf
         // multi-select/local filter, bottom sheets, and dialogs) always take precedence first.

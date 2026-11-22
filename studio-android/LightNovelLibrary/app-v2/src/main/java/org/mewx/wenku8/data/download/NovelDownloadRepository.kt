@@ -365,6 +365,17 @@ class NovelDownloadRepository(
             } catch (cancelled: CancellationException) {
                 updateTerminalState(aid, NovelDownloadRunState.CANCELLED, 0, 0, 0, 0)
                 throw cancelled
+            } catch (error: Throwable) {
+                org.mewx.wenku8.util.CrashReporter.recordException("NovelDownloadRepository.executeDownload", error)
+                updateTerminalState(aid, NovelDownloadRunState.FAILED, 0, 0, 0, 0)
+                NovelDownloadOutcome(
+                    aid = aid,
+                    state = NovelDownloadRunState.FAILED,
+                    downloadedChapters = 0,
+                    totalTargetChapters = 0,
+                    downloadedImages = 0,
+                    failedChapters = 0,
+                )
             }
         }
     }
