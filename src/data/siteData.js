@@ -131,7 +131,7 @@ export const COMMUNITY_CREDITS = [
 ];
 
 // Complete historical dev log (39 entries from 2014 to 2025).
-// Structured cleanly as paragraphs & typed segments so JSX renders safely without dangerouslySetInnerHTML.
+// Structured cleanly as paragraphs & typed segments so JSX renders safely without raw HTML injection.
 export const BLOG_POSTS = [
     {
         id: 39,

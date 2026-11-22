@@ -1004,7 +1004,7 @@ const PrivacyPage = () => {
                 <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 text-center text-sm space-y-2">
                     <p className="font-semibold text-gray-200">Wenku8 Android</p>
                     <p>
-                        &copy; {new Date().getFullYear()} MewX &amp; Contributors.{' '}
+                        &copy; 2014-2027 MewX &amp; Contributors.{' '}
                         {isZh ? '保留所有权利。' : 'All rights reserved.'}
                     </p>
                     <p className="text-xs text-gray-500">

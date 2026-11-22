@@ -22,14 +22,14 @@ import {
     Sparkles,
     Layers,
     BookOpen,
-    Image as ImageIcon,
     ShieldCheck,
     Tablet,
     Check,
     Maximize2,
+    HardDriveDownload,
+    Wifi,
 } from 'lucide-react';
 import {
-    SCREENSHOT_CATEGORIES,
     SCREENSHOTS,
     STAFF,
     COMMUNITY_CREDITS,
@@ -49,7 +49,7 @@ const MaterialSunnyBadge = ({ className = '' }) => (
     </svg>
 );
 
-// --- Safe Post Content Renderer (Zero dangerouslySetInnerHTML) ---
+// --- Safe Post Content Renderer (No raw HTML injection) ---
 
 const PostParagraphs = ({ paragraphs }) => (
     <div className="space-y-2.5 text-sm leading-relaxed text-[var(--md-on-surface-variant)]">
@@ -91,11 +91,10 @@ const PostParagraphs = ({ paragraphs }) => (
 
 const NAV_LINKS = [
     { href: '#home', label: '首页' },
-    { href: '#features', label: '特性' },
-    { href: '#screenshots', label: '预览' },
-    { href: '#news', label: '日志' },
-    { href: '#staff', label: '团队' },
-    { href: '#comments', label: '留言' },
+    { href: '#features', label: '2.0 特性' },
+    { href: '#news', label: '开发日志' },
+    { href: '#staff', label: '制作团队' },
+    { href: '#comments', label: '留言板' },
     { href: '/privacy/', label: '隐私政策' },
 ];
 
@@ -199,7 +198,7 @@ const Navbar = ({ darkMode, toggleDarkMode }) => {
     );
 };
 
-// --- Hero Section (M3 Expressive Split Layout + 3-Phone Showcase) ---
+// --- Hero Section (M3 Expressive Split Layout + Equal-Width Button Grids) ---
 
 const Hero = ({ onSelectScreenshot }) => {
     const heroShots = [
@@ -241,7 +240,7 @@ const Hero = ({ onSelectScreenshot }) => {
 
             <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-10 items-center">
-                    {/* Left Column: Expressive Typography & Actions */}
+                    {/* Left Column: Expressive Typography & Aligned Action Grids */}
                     <div className="lg:col-span-7 text-center lg:text-left">
                         <div className="inline-flex items-center gap-3 mb-6">
                             <div className="relative w-14 h-14 flex items-center justify-center animate-float-gentle">
@@ -288,70 +287,70 @@ const Hero = ({ onSelectScreenshot }) => {
                             ；支持从 <code className="font-mono text-sm px-1.5 py-0.5 rounded-md bg-[var(--md-surface-container-high)]">1.x</code> 原位无损覆盖升级，开源、简洁、完全免费。
                         </p>
 
-                        {/* Expressive Full-Pill Primary CTAs */}
-                        <div className="mt-9 flex flex-wrap justify-center lg:justify-start gap-3.5">
+                        {/* Primary CTAs — Equal-Width 3-Column Grid */}
+                        <div className="mt-9 grid grid-cols-1 sm:grid-cols-3 gap-3 max-w-[620px] mx-auto lg:mx-0">
                             <a
                                 href="https://play.google.com/store/apps/details?id=org.mewx.wenku8"
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="inline-flex items-center justify-center gap-2.5 px-7 py-4 rounded-full bg-[var(--md-primary)] text-[var(--md-on-primary)] font-semibold text-base shadow-lg shadow-blue-600/25 m3-spring hover:scale-[1.03] hover:rounded-[20px]"
+                                className="w-full inline-flex items-center justify-center gap-2 px-4 py-3.5 rounded-full whitespace-nowrap bg-[var(--md-primary)] text-[var(--md-on-primary)] font-semibold text-sm sm:text-[15px] shadow-lg shadow-blue-600/25 m3-spring hover:scale-[1.03] hover:rounded-[20px]"
                             >
-                                <Download size={20} />
+                                <Download size={18} className="shrink-0" />
                                 从 Play Store 安装
                             </a>
                             <a
                                 href="https://buymeacoffee.com/mewx"
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="inline-flex items-center justify-center gap-2.5 px-7 py-4 rounded-full bg-[var(--md-warm-container)] text-[var(--md-on-warm-container)] font-semibold text-base border border-amber-500/20 m3-spring hover:scale-[1.03] hover:rounded-[20px]"
+                                className="w-full inline-flex items-center justify-center gap-2 px-4 py-3.5 rounded-full whitespace-nowrap bg-[var(--md-warm-container)] text-[var(--md-on-warm-container)] font-semibold text-sm sm:text-[15px] border border-amber-500/20 m3-spring hover:scale-[1.03] hover:rounded-[20px]"
                             >
-                                <Coffee size={20} />
+                                <Coffee size={18} className="shrink-0" />
                                 赞助服务器
                             </a>
                             <a
                                 href="https://github.com/MewX/light-novel-library_Wenku8_Android"
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="inline-flex items-center justify-center gap-2 px-6 py-4 rounded-full bg-[var(--md-surface-container-high)] text-[var(--md-on-surface)] border border-[var(--md-outline-variant)] font-semibold text-base m3-spring hover:scale-[1.03] hover:bg-[var(--md-primary-container)] hover:text-[var(--md-on-primary-container)]"
+                                className="w-full inline-flex items-center justify-center gap-2 px-4 py-3.5 rounded-full whitespace-nowrap bg-[var(--md-surface-container-high)] text-[var(--md-on-surface)] border border-[var(--md-outline-variant)] font-semibold text-sm sm:text-[15px] m3-spring hover:scale-[1.03] hover:bg-[var(--md-primary-container)] hover:text-[var(--md-on-primary-container)]"
                             >
-                                <Github size={19} />
+                                <Github size={18} className="shrink-0" />
                                 查看源码
                             </a>
                         </div>
 
-                        {/* Secondary Quick Links & Release Metadata */}
-                        <div className="mt-7 flex flex-wrap justify-center lg:justify-start gap-2.5 text-sm">
+                        {/* Secondary Quick Links — Equal-Width 4-Column Grid */}
+                        <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-2.5 max-w-[620px] mx-auto lg:mx-0 text-xs sm:text-sm">
                             <a
                                 href="https://t.me/wk8app"
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-[#2AABEE]/15 text-[#198BC8] dark:text-[#66C7F7] border border-[#2AABEE]/30 font-medium m3-emphasized hover:bg-[#2AABEE] hover:text-white"
+                                className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-full whitespace-nowrap bg-[#2AABEE]/15 text-[#198BC8] dark:text-[#66C7F7] border border-[#2AABEE]/30 font-medium m3-emphasized hover:bg-[#2AABEE] hover:text-white"
                             >
-                                <Send size={14} /> Telegram 群组
+                                <Send size={14} className="shrink-0" /> Telegram 群组
                             </a>
                             <a
                                 href="https://www.wenku8.com"
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-[var(--md-surface-container)] text-[var(--md-on-surface-variant)] border border-[var(--md-outline-variant)] m3-emphasized hover:bg-[var(--md-surface-container-high)] hover:text-[var(--md-on-surface)]"
+                                className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-full whitespace-nowrap bg-[var(--md-surface-container)] text-[var(--md-on-surface-variant)] border border-[var(--md-outline-variant)] font-medium m3-emphasized hover:bg-[var(--md-surface-container-high)] hover:text-[var(--md-on-surface)]"
                             >
-                                <Globe size={14} /> wenku8.com
+                                <Globe size={14} className="shrink-0" /> wenku8.com
                             </a>
                             <a
                                 href="https://mewx.org"
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-[var(--md-surface-container)] text-[var(--md-on-surface-variant)] border border-[var(--md-outline-variant)] m3-emphasized hover:bg-[var(--md-surface-container-high)] hover:text-[var(--md-on-surface)]"
+                                className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-full whitespace-nowrap bg-[var(--md-surface-container)] text-[var(--md-on-surface-variant)] border border-[var(--md-outline-variant)] font-medium m3-emphasized hover:bg-[var(--md-surface-container-high)] hover:text-[var(--md-on-surface)]"
                             >
-                                <User size={14} /> mewx.org
+                                <User size={14} className="shrink-0" /> mewx.org
                             </a>
                             <a
                                 href="https://web.archive.org/web/*/wenku8.mewx.org"
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-[var(--md-surface-container)] text-[var(--md-on-surface-variant)] border border-[var(--md-outline-variant)] m3-emphasized hover:bg-[var(--md-surface-container-high)] hover:text-[var(--md-on-surface)]"
+                                className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-full whitespace-nowrap bg-[var(--md-surface-container)] text-[var(--md-on-surface-variant)] border border-[var(--md-outline-variant)] font-medium m3-emphasized hover:bg-[var(--md-surface-container-high)] hover:text-[var(--md-on-surface)]"
                             >
-                                <Archive size={14} /> 旧版网页
+                                <Archive size={14} className="shrink-0" /> 旧版网页
                             </a>
                         </div>
 
@@ -366,7 +365,7 @@ const Hero = ({ onSelectScreenshot }) => {
                                 v2.0 正式发布 · GitHub Releases
                             </a>
                             <span className="opacity-75">
-                                Android 6.0+ (minSdk 23) · 原位升级保留全部 1.x 数据
+                                Android 6.0+ · 原位升级保留全部 1.x 数据
                             </span>
                         </div>
                     </div>
@@ -374,7 +373,6 @@ const Hero = ({ onSelectScreenshot }) => {
                     {/* Right Column: Overlapping 3-Phone M3 Expressive Composition */}
                     <div className="lg:col-span-5 flex justify-center items-center py-4 lg:py-0">
                         <div className="relative w-full max-w-[440px] h-[420px] sm:h-[470px] flex items-center justify-center">
-                            {/* Decorative Tonal Backdrop Pill */}
                             <div
                                 className="absolute w-72 h-72 sm:w-80 sm:h-80 rounded-[44px] rotate-6 opacity-65"
                                 style={{
@@ -383,7 +381,6 @@ const Hero = ({ onSelectScreenshot }) => {
                                 }}
                             />
 
-                            {/* Left Phone: Bookshelf Grid */}
                             {heroShots[0] && (
                                 <button
                                     type="button"
@@ -399,7 +396,6 @@ const Hero = ({ onSelectScreenshot }) => {
                                 </button>
                             )}
 
-                            {/* Right Phone: Novel Detail */}
                             {heroShots[2] && (
                                 <button
                                     type="button"
@@ -415,7 +411,6 @@ const Hero = ({ onSelectScreenshot }) => {
                                 </button>
                             )}
 
-                            {/* Center Hero Phone: 3D Spine Bookshelf */}
                             {heroShots[1] && (
                                 <button
                                     type="button"
@@ -441,194 +436,150 @@ const Hero = ({ onSelectScreenshot }) => {
     );
 };
 
-// --- Features Bento Section + Authentic E-Ink Showcase ---
+// --- Unified 2.0 Features + Pixel 8 Screenshot Showcases + Lightbox ---
 
-const FEATURE_CARDS = [
+const PhonePreviewTile = ({ shot, label, onSelect }) => (
+    <button
+        type="button"
+        onClick={() => onSelect(shot)}
+        aria-label={`全屏查看：${shot.title}`}
+        className="group flex flex-col rounded-[22px] p-2 bg-[var(--md-surface-container)] border border-[var(--md-outline-variant)]/80 shadow-sm text-left m3-spring hover:-translate-y-1.5 hover:shadow-xl hover:border-[var(--md-primary)]/50 cursor-pointer"
+    >
+        <div className="relative w-full overflow-hidden rounded-[16px] bg-[var(--md-surface)] border border-[var(--md-outline-variant)]/50">
+            <img
+                src={shot.src}
+                alt={shot.title}
+                loading="lazy"
+                className="w-full h-auto block m3-emphasized group-hover:scale-[1.02]"
+            />
+            <span className="absolute top-2 right-2 w-7 h-7 rounded-full bg-black/55 text-white backdrop-blur-md flex items-center justify-center opacity-0 group-hover:opacity-100 m3-emphasized">
+                <Maximize2 size={13} />
+            </span>
+        </div>
+        <span className="mt-2 px-1 pb-0.5 text-xs font-semibold text-[var(--md-on-surface)] group-hover:text-[var(--md-primary)] m3-emphasized truncate">
+            {label}
+        </span>
+    </button>
+);
+
+const SHOWCASE_GROUPS = [
     {
-        icon: Sparkles,
-        title: 'Material 3 Expressive 自适应界面',
-        badge: 'Compose UI',
-        span: 'lg:col-span-2',
-        accent: 'primary',
-        description:
-            '精简为直观的四栏主导航（书架 · 最新 · 排行 · 我的），自动适配手机底部导航栏与平板/折叠屏 NavigationRail；支持作品封面共享元素过渡、Android 12+ 动态壁纸取色，以及经典蓝 / 暖白 / 碳墨深色 / 纯黑 OLED 主题。',
-    },
-    {
+        id: 'bookshelf-showcase',
+        badge: 'BOOKSHELF · ROOM WAL',
         icon: Layers,
-        title: '3D 立体书脊 & 三视图书架',
-        badge: 'Room WAL',
-        span: 'lg:col-span-1',
-        accent: 'tertiary',
-        description:
-            '网格、列表与全新 3D 立体书脊视图自由切换，配合近期阅读置顶、继续阅读轮播、进入书架自动云端同步与四策略离线缓存。',
+        accent: 'bg-[var(--md-primary-container)] text-[var(--md-on-primary-container)]',
+        title: '3D 立体书脊 & 本地优先三视图书架',
+        lead: '采用 Room SQLite (WAL) 管理书架元数据、阅读进度与离线缓存，打造极具藏书质感的本地阅读空间：',
+        bullets: [
+            {
+                lead: '三视图自由切换',
+                text: '支持网格、列表与全新 3D 立体书脊视图；真实透视书脊与封面展开、滑动惯性吸附，并将近期阅读作品自动前置队首。',
+            },
+            {
+                lead: '继续阅读 & 智能云端同步',
+                text: '内置“继续阅读”轮播卡片与进入书架自动云端同步（防抖 TTL + 互斥保护），并将更新操作收纳于折叠式「云端同步」按钮。',
+            },
+            {
+                lead: '四策略离线缓存',
+                text: '支持智能更新、仅下载未缓存章节、分卷自由勾选与全本覆盖重下，随时随地畅快离线阅读。',
+            },
+        ],
+        shotGridClass: 'grid-cols-3',
+        reverseDesktop: false,
+        shots: [
+            { id: 'bookshelf-grid', label: '本地书架 · 网格' },
+            { id: 'bookshelf-spine-home', label: '3D 书脊 · 继续阅读' },
+            { id: 'bookshelf-spine-scroll', label: '3D 书脊 · 滑动浏览' },
+        ],
     },
     {
+        id: 'discover-showcase',
+        badge: 'MATERIAL 3 EXPRESSIVE',
+        icon: Sparkles,
+        accent: 'bg-[var(--md-secondary-container)] text-[var(--md-on-secondary-container)]',
+        title: 'Material 3 Expressive 自适应架构与全站发现',
+        lead: '完全抛弃旧版繁杂的视图栈，以 100% Kotlin + Jetpack Compose 带来更轻盈直觉的浏览体验：',
+        bullets: [
+            {
+                lead: '四栏自适应主导航',
+                text: '精简为「书架 · 最新 · 排行 · 我的」四栏导航，自动适配手机底部导航栏与平板 / 折叠屏 NavigationRail。',
+            },
+            {
+                lead: '二维排行榜与即时检索',
+                text: '覆盖点击 / 推荐 / 收藏 / 字数 × 日 / 周 / 月 / 总榜，支持连接式分段按钮切换与本地/全站混合搜索。',
+            },
+            {
+                lead: '沉浸式详情与动效',
+                text: '作品封面共享元素过渡、Android 12+ 动态壁纸取色、分卷折叠目录、拆分式阅读主按钮与完整社区书评。',
+            },
+        ],
+        shotGridClass: 'grid-cols-2',
+        reverseDesktop: true,
+        shots: [
+            { id: 'rankings', label: '二维排行榜矩阵' },
+            { id: 'novel-detail', label: '作品详情与分卷目录' },
+        ],
+    },
+    {
+        id: 'reader-showcase',
+        badge: 'CJK READER & ARTBOOK',
         icon: BookOpen,
-        title: '六模式中文排版阅读引擎',
-        badge: 'CJK StaticLayout',
-        span: 'lg:col-span-1',
-        accent: 'secondary',
-        description:
-            '内置覆盖翻页、仿真卷曲、平滑滑动、上下卷轴、日式竖排与墨水屏极速六种翻页模式；半透明排版工作室实时预览字号/行距/自定义字体，并支持全文检索、书签与系统 TTS 朗读。',
-    },
-    {
-        icon: ImageIcon,
-        title: 'Artbook 插图画集灯箱',
-        badge: '高清插画',
-        span: 'lg:col-span-1',
-        accent: 'tertiary',
-        description:
-            '一键抽离本卷全部插图，支持双指无级缩放、跨页彩插左右拼合、底部胶片缩略图速览与高清原图一键保存。',
-    },
-    {
-        icon: ShieldCheck,
-        title: '无损迁移 · 便携备份 · 自动中转',
-        badge: '1.x → 2.0',
-        span: 'lg:col-span-1',
-        accent: 'primary',
-        description:
-            '保留正式版包名 org.mewx.wenku8，升级自动无损迁移 1.x 本地书架、进度与缓存；全新 .wk8backup.zip 一键备份、默认开启 Cloudflare 自动中转优化与网络诊断，支持 share.wenku8.app 深度链接与桌面小组件。',
+        accent: 'bg-[var(--md-tertiary-container)] text-[var(--md-on-tertiary-container)]',
+        title: '六模式中文排版阅读引擎 & Artbook 插图灯箱',
+        lead: '基于原生 StaticLayout 深度定制的 CJK 排版分页引擎，兼顾精致阅读质感与海量插图体验：',
+        bullets: [
+            {
+                lead: '六种翻页与排版模式',
+                text: '内置覆盖翻页、仿真卷曲、平滑滑动、上下卷轴、日式竖排（从右至左）与墨水屏极速，满足各类阅读习惯。',
+            },
+            {
+                lead: '半透明实时排版工作室',
+                text: '即时预览字号、行距、段距、页边距、护眼纸张、繁简转换与自定义字体，内置全文检索、章节书签与系统 TTS 朗读。',
+            },
+            {
+                lead: 'Artbook 插图画集灯箱',
+                text: '一键抽离本卷全部插图，支持双指无级缩放、跨页彩插左右拼合、底部胶片缩略图速览与高清原图保存。',
+            },
+        ],
+        shotGridClass: 'grid-cols-3',
+        reverseDesktop: false,
+        shots: [
+            { id: 'reader-hud', label: '阅读引擎与悬浮栏' },
+            { id: 'reader-typography', label: '排版与纸张工作室' },
+            { id: 'artbook', label: 'Artbook 插图灯箱' },
+        ],
     },
 ];
 
-const ACCENT_STYLES = {
-    primary: 'bg-[var(--md-primary-container)] text-[var(--md-on-primary-container)]',
-    secondary: 'bg-[var(--md-secondary-container)] text-[var(--md-on-secondary-container)]',
-    tertiary: 'bg-[var(--md-tertiary-container)] text-[var(--md-on-tertiary-container)]',
-};
+const INFRA_HIGHLIGHTS = [
+    {
+        icon: ShieldCheck,
+        title: '1.x 原位无损自动迁移',
+        description:
+            '严格保留正式版包名 org.mewx.wenku8，从旧版覆盖升级后自动无损迁移本地书架、阅读进度、离线小说文本与插图及登录凭据。',
+    },
+    {
+        icon: HardDriveDownload,
+        title: '.wk8backup.zip 便携备份',
+        description:
+            '全新跨设备一键导出与智能合并导入方案，完整保护书架与阅读记录，且导出归档严格排除账号密码与会话 Cookie。',
+    },
+    {
+        icon: Wifi,
+        title: '自动中转优化与深度链接',
+        description:
+            '默认开启 Cloudflare 自动中转连通性评估与网络诊断中心；支持 share.wenku8.app 书籍直达链接与主屏幕“继续阅读”桌面小组件。',
+    },
+];
 
-const FeaturesSection = ({ onSelectScreenshot }) => {
-    const einkBookshelf = SCREENSHOTS.find((s) => s.id === 'eink-bookshelf');
-    const einkReader = SCREENSHOTS.find((s) => s.id === 'eink-reader');
-
-    return (
-        <section id="features" className="py-20 bg-[var(--md-surface-container-low)]">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                <div className="max-w-3xl mb-12">
-                    <span className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full text-xs font-semibold bg-[var(--md-primary-container)] text-[var(--md-on-primary-container)] mb-4">
-                        WHAT&rsquo;S NEW IN 2.0
-                    </span>
-                    <h2 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-[var(--md-on-surface)]">
-                        从零重写，为轻小说阅读而生
-                    </h2>
-                    <p className="mt-3 text-base text-[var(--md-on-surface-variant)]">
-                        告别十年前旧版繁杂的视图栈，以现代 Material 3 Expressive 视觉与流畅弹性动效焕然新生。
-                    </p>
-                </div>
-
-                {/* M3 Expressive Bento Grid */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-                    {FEATURE_CARDS.map((card) => {
-                        const Icon = card.icon;
-                        return (
-                            <article
-                                key={card.title}
-                                className={`${card.span} rounded-[28px] p-6 sm:p-7 bg-[var(--md-surface)] border border-[var(--md-outline-variant)]/80 m3-spring hover:-translate-y-1 hover:border-[var(--md-primary)]/45 flex flex-col`}
-                            >
-                                <div className="flex items-center justify-between gap-3 mb-5">
-                                    <div
-                                        className={`w-12 h-12 rounded-2xl flex items-center justify-center ${ACCENT_STYLES[card.accent]}`}
-                                    >
-                                        <Icon size={22} />
-                                    </div>
-                                    <span className="px-3 py-1 rounded-full text-xs font-mono font-medium bg-[var(--md-surface-container)] text-[var(--md-on-surface-variant)]">
-                                        {card.badge}
-                                    </span>
-                                </div>
-                                <h3 className="text-lg sm:text-xl font-bold text-[var(--md-on-surface)] mb-2.5">
-                                    {card.title}
-                                </h3>
-                                <p className="text-sm sm:text-[15px] leading-relaxed text-[var(--md-on-surface-variant)]">
-                                    {card.description}
-                                </p>
-                            </article>
-                        );
-                    })}
-                </div>
-
-                {/* Authentic E-Ink Mode Specimen Card (Pure White #FFFFFF + 1.5px #111111 Crisp Outlines) */}
-                <div className="mt-8 rounded-[12px] bg-[#FFFFFF] text-[#000000] border-[1.5px] border-[#111111] p-6 sm:p-8 lg:p-10">
-                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
-                        <div className="lg:col-span-7">
-                            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-[4px] border border-[#111111] text-xs font-mono font-bold tracking-wider mb-4">
-                                <Tablet size={14} />
-                                E-INK HIGH-CONTRAST MODE
-                            </div>
-                            <h3 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-[#000000]">
-                                墨水屏高对比模式（电子纸专属适配）
-                            </h3>
-                            <p className="mt-3 text-sm sm:text-base leading-relaxed text-[#111111]">
-                                针对文石（BOOX）、汉王、掌阅、墨案等开放式 Android 电子纸阅读器深度定制——并非简单的黑白滤镜，而是从主题令牌、组件描边到动画曲线的全局级重塑：
-                            </p>
-                            <ul className="mt-5 space-y-3 text-sm sm:text-[15px] text-[#000000]">
-                                <li className="flex items-start gap-2.5">
-                                    <span className="mt-0.5 w-5 h-5 rounded-[4px] bg-[#000000] text-[#FFFFFF] flex items-center justify-center shrink-0">
-                                        <Check size={13} strokeWidth={3} />
-                                    </span>
-                                    <span>
-                                        <strong>纯白底色与纯黑油墨</strong>：全局移除灰阶阴影与半透明表面叠色，采用{' '}
-                                        <code className="font-mono text-xs px-1.5 py-0.5 border border-[#111111] rounded-[3px]">#FFFFFF</code>{' '}
-                                        与{' '}
-                                        <code className="font-mono text-xs px-1.5 py-0.5 border border-[#111111] rounded-[3px]">#000000</code>
-                                        ，杜绝 16 阶灰度抖动发虚。
-                                    </span>
-                                </li>
-                                <li className="flex items-start gap-2.5">
-                                    <span className="mt-0.5 w-5 h-5 rounded-[4px] bg-[#000000] text-[#FFFFFF] flex items-center justify-center shrink-0">
-                                        <Check size={13} strokeWidth={3} />
-                                    </span>
-                                    <span>
-                                        <strong>全局 1dp 实体描边</strong>：卡片、搜索框、标签、工具栏与底部导航栏自动切换为锐利实体黑框，层级清晰分明。
-                                    </span>
-                                </li>
-                                <li className="flex items-start gap-2.5">
-                                    <span className="mt-0.5 w-5 h-5 rounded-[4px] bg-[#000000] text-[#FFFFFF] flex items-center justify-center shrink-0">
-                                        <Check size={13} strokeWidth={3} />
-                                    </span>
-                                    <span>
-                                        <strong>零残影瞬切翻页</strong>：全局关闭过渡动画，配合“墨水屏极速”无动画翻页与物理音量键支持，大幅减少刷新闪烁。
-                                    </span>
-                                </li>
-                            </ul>
-                        </div>
-
-                        <div className="lg:col-span-5 flex justify-center gap-4">
-                            {[einkBookshelf, einkReader].filter(Boolean).map((shot) => (
-                                <button
-                                    key={shot.id}
-                                    type="button"
-                                    onClick={() => onSelectScreenshot(shot)}
-                                    className="group w-1/2 max-w-[190px] rounded-[8px] border-[1.5px] border-[#111111] bg-[#FFFFFF] p-1.5 text-left cursor-pointer hover:bg-[#F2F2F2]"
-                                >
-                                    <img
-                                        src={shot.src}
-                                        alt={shot.title}
-                                        loading="lazy"
-                                        className="w-full h-auto rounded-[4px] border border-[#111111]/30 block"
-                                    />
-                                    <div className="mt-2 px-1 flex items-center justify-between text-xs font-semibold text-[#000000]">
-                                        <span className="truncate">{shot.title.replace('墨水屏高对比 · ', '')}</span>
-                                        <Maximize2 size={12} className="shrink-0" />
-                                    </div>
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </section>
-    );
-};
-
-// --- Screenshot Gallery (M3 Expressive Connected ButtonGroup + Lightbox) ---
-
-const ScreenshotGallery = ({ activeShot, onSelectScreenshot, onCloseLightbox }) => {
-    const [activeCategory, setActiveCategory] = useState('all');
-
-    const filteredShots =
-        activeCategory === 'all'
-            ? SCREENSHOTS
-            : SCREENSHOTS.filter((shot) => shot.category === activeCategory);
+const FeaturesAndPreviewsSection = ({
+    activeShot,
+    onSelectScreenshot,
+    onCloseLightbox,
+}) => {
+    const shotMap = Object.fromEntries(SCREENSHOTS.map((s) => [s.id, s]));
+    const einkBookshelf = shotMap['eink-bookshelf'];
+    const einkReader = shotMap['eink-reader'];
 
     // Lightbox navigation across all screenshots
     const currentIndex = activeShot
@@ -659,93 +610,207 @@ const ScreenshotGallery = ({ activeShot, onSelectScreenshot, onCloseLightbox }) 
     }, [activeShot, onCloseLightbox, showPrev, showNext]);
 
     return (
-        <section id="screenshots" className="py-20 bg-[var(--md-background)] m3-dot-pattern">
+        <section
+            id="features"
+            className="py-20 bg-[var(--md-surface-container-low)] m3-dot-pattern"
+        >
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-10">
-                    <div>
-                        <span className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full text-xs font-semibold bg-[var(--md-tertiary-container)] text-[var(--md-on-tertiary-container)] mb-3">
-                            PIXEL 8 实机截图
-                        </span>
-                        <h2 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-[var(--md-on-surface)]">
-                            2.0 界面一览
-                        </h2>
-                        <p className="mt-2 text-sm sm:text-base text-[var(--md-on-surface-variant)]">
-                            点击任意截图可全屏查看 1080 × 2400 高清原图，支持键盘左右键切换。
-                        </p>
-                    </div>
-
-                    {/* Material 3 Expressive Connected ButtonGroup */}
-                    <div
-                        role="tablist"
-                        aria-label="截图分类筛选"
-                        className="inline-flex flex-wrap gap-1.5 p-1.5 rounded-[24px] bg-[var(--md-surface-container)] border border-[var(--md-outline-variant)] self-start md:self-auto"
-                    >
-                        {SCREENSHOT_CATEGORIES.map((cat, idx) => {
-                            const isSelected = activeCategory === cat.id;
-                            const isFirst = idx === 0;
-                            const isLast = idx === SCREENSHOT_CATEGORIES.length - 1;
-                            const radiusClass = isSelected
-                                ? 'rounded-full'
-                                : isFirst
-                                    ? 'rounded-l-full rounded-r-[10px]'
-                                    : isLast
-                                        ? 'rounded-r-full rounded-l-[10px]'
-                                        : 'rounded-[10px]';
-
-                            return (
-                                <button
-                                    key={cat.id}
-                                    type="button"
-                                    role="tab"
-                                    aria-selected={isSelected}
-                                    onClick={() => setActiveCategory(cat.id)}
-                                    className={`px-4 py-2 text-xs sm:text-sm font-semibold m3-spring cursor-pointer ${radiusClass} ${
-                                        isSelected
-                                            ? 'bg-[var(--md-primary)] text-[var(--md-on-primary)] px-5 shadow-sm'
-                                            : 'bg-[var(--md-surface)]/80 text-[var(--md-on-surface-variant)] hover:bg-[var(--md-primary-container)] hover:text-[var(--md-on-primary-container)]'
-                                    }`}
-                                >
-                                    {cat.label}
-                                </button>
-                            );
-                        })}
-                    </div>
+                <div className="max-w-3xl mb-12">
+                    <span className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full text-xs font-semibold bg-[var(--md-primary-container)] text-[var(--md-on-primary-container)] mb-4">
+                        WHAT&rsquo;S NEW IN 2.0 · PIXEL 8 实机一览
+                    </span>
+                    <h2 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-[var(--md-on-surface)]">
+                        从零重写，为轻小说阅读而生
+                    </h2>
+                    <p className="mt-3 text-base text-[var(--md-on-surface-variant)]">
+                        以下全部配图均为 2.0 正式版 Pixel 8 实机截图，点击任意预览图即可全屏查看 1080 × 2400 高清原图。
+                    </p>
                 </div>
 
-                {/* Curated Pixel 8 Screenshot Grid */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-5">
-                    {filteredShots.map((shot) => (
-                        <button
-                            key={shot.id}
-                            type="button"
-                            onClick={() => onSelectScreenshot(shot)}
-                            className="group text-left rounded-[28px] p-3 bg-[var(--md-surface)] border border-[var(--md-outline-variant)]/85 shadow-sm m3-spring hover:-translate-y-1.5 hover:shadow-xl hover:border-[var(--md-primary)]/50 flex flex-col cursor-pointer"
-                        >
-                            <div className="relative w-full overflow-hidden rounded-[20px] bg-[var(--md-surface-container)] border border-[var(--md-outline-variant)]/50">
-                                <img
-                                    src={shot.src}
-                                    alt={shot.title}
-                                    loading="lazy"
-                                    className="w-full h-auto block m3-emphasized group-hover:scale-[1.02]"
-                                />
-                                <div className="absolute top-2.5 right-2.5 w-8 h-8 rounded-full bg-black/55 text-white backdrop-blur-md flex items-center justify-center opacity-0 group-hover:opacity-100 m3-emphasized">
-                                    <Maximize2 size={14} />
+                {/* Unified Feature + Screenshot Showcase Cards */}
+                <div className="space-y-7">
+                    {SHOWCASE_GROUPS.map((group) => {
+                        const Icon = group.icon;
+                        const isTwoShots = group.shots.length === 2;
+
+                        return (
+                            <article
+                                key={group.id}
+                                className="rounded-[32px] bg-[var(--md-surface)] border border-[var(--md-outline-variant)]/85 shadow-sm p-6 sm:p-8 lg:p-10"
+                            >
+                                <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10 items-center">
+                                    {/* Text Block */}
+                                    <div
+                                        className={`${
+                                            isTwoShots ? 'lg:col-span-7' : 'lg:col-span-5'
+                                        } ${group.reverseDesktop ? 'lg:order-2' : ''}`}
+                                    >
+                                        <div
+                                            className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-mono font-bold tracking-wide mb-4 ${group.accent}`}
+                                        >
+                                            <Icon size={14} />
+                                            {group.badge}
+                                        </div>
+                                        <h3 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-[var(--md-on-surface)]">
+                                            {group.title}
+                                        </h3>
+                                        <p className="mt-3 text-sm sm:text-base leading-relaxed text-[var(--md-on-surface-variant)]">
+                                            {group.lead}
+                                        </p>
+
+                                        <ul className="mt-5 space-y-3 text-sm sm:text-[15px] text-[var(--md-on-surface-variant)]">
+                                            {group.bullets.map((bullet) => (
+                                                <li
+                                                    key={bullet.lead}
+                                                    className="flex items-start gap-2.5"
+                                                >
+                                                    <span
+                                                        className={`mt-0.5 w-5 h-5 rounded-full flex items-center justify-center shrink-0 ${group.accent}`}
+                                                    >
+                                                        <Check size={12} strokeWidth={3} />
+                                                    </span>
+                                                    <span>
+                                                        <strong className="font-semibold text-[var(--md-on-surface)]">
+                                                            {bullet.lead}
+                                                        </strong>
+                                                        ：{bullet.text}
+                                                    </span>
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    </div>
+
+                                    {/* Screenshots Block */}
+                                    <div
+                                        className={`${
+                                            isTwoShots ? 'lg:col-span-5' : 'lg:col-span-7'
+                                        } ${group.reverseDesktop ? 'lg:order-1' : ''}`}
+                                    >
+                                        <div
+                                            className={`grid ${group.shotGridClass} gap-3 sm:gap-4 max-w-2xl mx-auto`}
+                                        >
+                                            {group.shots.map((item) => {
+                                                const shot = shotMap[item.id];
+                                                if (!shot) return null;
+                                                return (
+                                                    <PhonePreviewTile
+                                                        key={shot.id}
+                                                        shot={shot}
+                                                        label={item.label}
+                                                        onSelect={onSelectScreenshot}
+                                                    />
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
                                 </div>
-                            </div>
-                            <div className="pt-3.5 px-1.5 pb-1 flex-1 flex flex-col">
-                                <h3 className="font-bold text-sm text-[var(--md-on-surface)] group-hover:text-[var(--md-primary)] m3-emphasized">
-                                    {shot.title}
+                            </article>
+                        );
+                    })}
+
+                    {/* Authentic E-Ink Mode Specimen Card (Pure White #FFFFFF + 1.5px #111111 Crisp Outlines) */}
+                    <article className="rounded-[12px] bg-[#FFFFFF] text-[#000000] border-[1.5px] border-[#111111] p-6 sm:p-8 lg:p-10">
+                        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+                            <div className="lg:col-span-7">
+                                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-[4px] border border-[#111111] text-xs font-mono font-bold tracking-wider mb-4">
+                                    <Tablet size={14} />
+                                    E-INK HIGH-CONTRAST MODE
+                                </div>
+                                <h3 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-[#000000]">
+                                    墨水屏高对比模式（电子纸专属适配）
                                 </h3>
-                                <p className="mt-1 text-xs leading-relaxed text-[var(--md-on-surface-variant)] line-clamp-2">
-                                    {shot.caption}
+                                <p className="mt-3 text-sm sm:text-base leading-relaxed text-[#111111]">
+                                    针对文石（BOOX）、汉王、掌阅、墨案等开放式 Android 电子纸阅读器深度定制——并非简单的黑白滤镜，而是从主题令牌、组件描边到动画曲线的全局级重塑：
+                                </p>
+                                <ul className="mt-5 space-y-3 text-sm sm:text-[15px] text-[#000000]">
+                                    <li className="flex items-start gap-2.5">
+                                        <span className="mt-0.5 w-5 h-5 rounded-[4px] bg-[#000000] text-[#FFFFFF] flex items-center justify-center shrink-0">
+                                            <Check size={13} strokeWidth={3} />
+                                        </span>
+                                        <span>
+                                            <strong>纯白底色与纯黑油墨</strong>：全局移除灰阶阴影与半透明表面叠色，采用{' '}
+                                            <code className="font-mono text-xs px-1.5 py-0.5 border border-[#111111] rounded-[3px]">
+                                                #FFFFFF
+                                            </code>{' '}
+                                            与{' '}
+                                            <code className="font-mono text-xs px-1.5 py-0.5 border border-[#111111] rounded-[3px]">
+                                                #000000
+                                            </code>
+                                            ，杜绝 16 阶灰度抖动发虚。
+                                        </span>
+                                    </li>
+                                    <li className="flex items-start gap-2.5">
+                                        <span className="mt-0.5 w-5 h-5 rounded-[4px] bg-[#000000] text-[#FFFFFF] flex items-center justify-center shrink-0">
+                                            <Check size={13} strokeWidth={3} />
+                                        </span>
+                                        <span>
+                                            <strong>全局 1dp 实体描边</strong>：卡片、搜索框、标签、工具栏与底部导航栏自动切换为锐利实体黑框，层级清晰分明。
+                                        </span>
+                                    </li>
+                                    <li className="flex items-start gap-2.5">
+                                        <span className="mt-0.5 w-5 h-5 rounded-[4px] bg-[#000000] text-[#FFFFFF] flex items-center justify-center shrink-0">
+                                            <Check size={13} strokeWidth={3} />
+                                        </span>
+                                        <span>
+                                            <strong>零残影瞬切翻页</strong>：全局关闭过渡动画，配合“墨水屏极速”无动画翻页与物理音量键支持，大幅减少刷新闪烁。
+                                        </span>
+                                    </li>
+                                </ul>
+                            </div>
+
+                            <div className="lg:col-span-5 flex justify-center gap-4">
+                                {[einkBookshelf, einkReader].filter(Boolean).map((shot) => (
+                                    <button
+                                        key={shot.id}
+                                        type="button"
+                                        onClick={() => onSelectScreenshot(shot)}
+                                        aria-label={`全屏查看：${shot.title}`}
+                                        className="group w-1/2 max-w-[195px] rounded-[8px] border-[1.5px] border-[#111111] bg-[#FFFFFF] p-1.5 text-left cursor-pointer hover:bg-[#F2F2F2]"
+                                    >
+                                        <img
+                                            src={shot.src}
+                                            alt={shot.title}
+                                            loading="lazy"
+                                            className="w-full h-auto rounded-[4px] border border-[#111111]/30 block"
+                                        />
+                                        <div className="mt-2 px-1 flex items-center justify-between text-xs font-semibold text-[#000000]">
+                                            <span className="truncate">
+                                                {shot.title.replace('墨水屏高对比 · ', '')}
+                                            </span>
+                                            <Maximize2 size={12} className="shrink-0" />
+                                        </div>
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    </article>
+                </div>
+
+                {/* Compact Under-the-Hood v2.0 Capabilities Strip */}
+                <div className="mt-7 grid grid-cols-1 md:grid-cols-3 gap-5">
+                    {INFRA_HIGHLIGHTS.map((item) => {
+                        const Icon = item.icon;
+                        return (
+                            <div
+                                key={item.title}
+                                className="rounded-[24px] p-6 bg-[var(--md-surface)] border border-[var(--md-outline-variant)]/80 flex flex-col"
+                            >
+                                <div className="w-10 h-10 rounded-2xl bg-[var(--md-primary-container)] text-[var(--md-on-primary-container)] flex items-center justify-center mb-4">
+                                    <Icon size={20} />
+                                </div>
+                                <h3 className="text-base font-bold text-[var(--md-on-surface)] mb-2">
+                                    {item.title}
+                                </h3>
+                                <p className="text-sm leading-relaxed text-[var(--md-on-surface-variant)]">
+                                    {item.description}
                                 </p>
                             </div>
-                        </button>
-                    ))}
+                        );
+                    })}
                 </div>
             </div>
 
-            {/* Expressive Lightbox Modal */}
+            {/* Shared Expressive Lightbox Modal */}
             {activeShot && (
                 <div
                     role="dialog"
@@ -758,7 +823,6 @@ const ScreenshotGallery = ({ activeShot, onSelectScreenshot, onCloseLightbox }) 
                         className="relative max-w-4xl w-full flex flex-col items-center"
                         onClick={(e) => e.stopPropagation()}
                     >
-                        {/* Top Bar */}
                         <div className="w-full flex items-center justify-between mb-3 text-white">
                             <span className="px-3.5 py-1 rounded-full bg-white/15 text-xs font-mono">
                                 {currentIndex + 1} / {SCREENSHOTS.length}
@@ -773,7 +837,6 @@ const ScreenshotGallery = ({ activeShot, onSelectScreenshot, onCloseLightbox }) 
                             </button>
                         </div>
 
-                        {/* Image + Prev/Next Controls */}
                         <div className="relative flex items-center justify-center w-full">
                             <button
                                 type="button"
@@ -800,7 +863,6 @@ const ScreenshotGallery = ({ activeShot, onSelectScreenshot, onCloseLightbox }) 
                             </button>
                         </div>
 
-                        {/* Caption Pill */}
                         <div className="mt-4 max-w-xl text-center px-5 py-3 rounded-[22px] bg-white/12 backdrop-blur-md text-white">
                             <p className="font-bold text-sm sm:text-base">{activeShot.title}</p>
                             <p className="mt-0.5 text-xs sm:text-sm text-white/80">
@@ -940,7 +1002,7 @@ const NewsDrawer = ({ isOpen, onClose }) => {
                                 已显示全部历史记录
                             </p>
                             <p className="text-xs mt-1 text-[var(--md-on-surface-variant)] opacity-70">
-                                感谢十年一路相伴！
+                                感谢一路相伴！
                             </p>
                         </div>
                     </div>
@@ -954,35 +1016,38 @@ const NewsSection = ({ onOpenDrawer }) => {
     const recentPosts = BLOG_POSTS.slice(0, 3);
 
     return (
-        <section id="news" className="py-20 bg-[var(--md-surface-container-low)]">
+        <section id="news" className="py-20 bg-[var(--md-background)]">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-10">
-                    <div>
-                        <span className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full text-xs font-semibold bg-[var(--md-secondary-container)] text-[var(--md-on-secondary-container)] mb-3">
-                            DEVLOG ARCHIVE
-                        </span>
-                        <h2 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-[var(--md-on-surface)]">
-                            开发日志
-                        </h2>
-                    </div>
-
-                    <button
-                        type="button"
-                        onClick={onOpenDrawer}
-                        className="group inline-flex items-center gap-2 px-6 py-3 rounded-full bg-[var(--md-primary-container)] text-[var(--md-on-primary-container)] font-semibold text-sm m3-spring hover:bg-[var(--md-primary)] hover:text-[var(--md-on-primary)] self-start sm:self-auto cursor-pointer"
-                    >
-                        查看全部 {BLOG_POSTS.length} 条记录
-                        <ArrowRight
-                            size={16}
-                            className="m3-spring group-hover:translate-x-1"
-                        />
-                    </button>
+                <div className="mb-10">
+                    <span className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full text-xs font-semibold bg-[var(--md-secondary-container)] text-[var(--md-on-secondary-container)] mb-3">
+                        DEVLOG ARCHIVE · 2014 — 2025
+                    </span>
+                    <h2 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-[var(--md-on-surface)]">
+                        开发日志
+                    </h2>
+                    <p className="mt-2 text-sm sm:text-base text-[var(--md-on-surface-variant)]">
+                        完整保留自 2014 年起共 {BLOG_POSTS.length} 条开发者手记与历史更新记录。
+                    </p>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-10">
                     {recentPosts.map((post) => (
                         <BlogCard key={post.id} post={post} compact={true} className="h-full" />
                     ))}
+                </div>
+
+                <div className="text-center">
+                    <button
+                        type="button"
+                        onClick={onOpenDrawer}
+                        className="group inline-flex items-center gap-2.5 px-8 py-4 rounded-full bg-[var(--md-primary)] text-[var(--md-on-primary)] text-base font-bold shadow-lg shadow-blue-600/20 m3-spring hover:scale-[1.03] hover:rounded-[20px] cursor-pointer"
+                    >
+                        查看完整更新记录（共 {BLOG_POSTS.length} 条）
+                        <ArrowRight
+                            size={18}
+                            className="m3-spring group-hover:translate-x-1"
+                        />
+                    </button>
                 </div>
             </div>
         </section>
@@ -992,7 +1057,7 @@ const NewsSection = ({ onOpenDrawer }) => {
 // --- Staff & v2.0 Credits Section ---
 
 const StaffSection = () => (
-    <section id="staff" className="py-20 bg-[var(--md-background)]">
+    <section id="staff" className="py-20 bg-[var(--md-surface-container-low)]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="text-center max-w-2xl mx-auto mb-12">
                 <span className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full text-xs font-semibold bg-[var(--md-primary-container)] text-[var(--md-on-primary-container)] mb-3">
@@ -1047,10 +1112,10 @@ const StaffSection = () => (
                 {COMMUNITY_CREDITS.map((credit) => (
                     <div
                         key={credit.title}
-                        className="rounded-[24px] p-5 bg-[var(--md-surface-container)] border border-[var(--md-outline-variant)]/75 flex flex-col justify-between"
+                        className="rounded-[24px] p-5 bg-[var(--md-surface)] border border-[var(--md-outline-variant)]/75 flex flex-col justify-between"
                     >
                         <div>
-                            <span className="inline-block px-2.5 py-0.5 rounded-full text-[11px] font-mono font-semibold bg-[var(--md-surface)] text-[var(--md-primary)] border border-[var(--md-outline-variant)] mb-3">
+                            <span className="inline-block px-2.5 py-0.5 rounded-full text-[11px] font-mono font-semibold bg-[var(--md-surface-container)] text-[var(--md-primary)] border border-[var(--md-outline-variant)] mb-3">
                                 {credit.tag}
                             </span>
                             <h3 className="font-bold text-base text-[var(--md-on-surface)] mb-2">
@@ -1130,7 +1195,7 @@ const DisqusComments = () => {
     }, []);
 
     return (
-        <section id="comments" className="py-20 bg-[var(--md-surface-container-low)]">
+        <section id="comments" className="py-20 bg-[var(--md-background)]">
             <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="flex items-center gap-3 mb-8">
                     <div className="p-2.5 rounded-2xl bg-[var(--md-primary-container)] text-[var(--md-on-primary-container)]">
@@ -1181,7 +1246,7 @@ const Footer = () => (
                 </span>
             </div>
             <p className="text-sm text-[var(--md-on-surface-variant)]">
-                &copy; {new Date().getFullYear()} MewX &amp; Contributors. 保留所有权利。
+                &copy; 2014-2027 MewX &amp; Contributors. 保留所有权利。
             </p>
             <p className="mt-2 text-xs text-[var(--md-on-surface-variant)] opacity-80">
                 本项目是社区开源粉丝作品，与轻小说文库 (Wenku8.com) 无官方关联。
@@ -1236,8 +1301,7 @@ const App = () => {
             <Navbar darkMode={darkMode} toggleDarkMode={toggleDarkMode} />
             <main>
                 <Hero onSelectScreenshot={setActiveScreenshot} />
-                <FeaturesSection onSelectScreenshot={setActiveScreenshot} />
-                <ScreenshotGallery
+                <FeaturesAndPreviewsSection
                     activeShot={activeScreenshot}
                     onSelectScreenshot={setActiveScreenshot}
                     onCloseLightbox={() => setActiveScreenshot(null)}
