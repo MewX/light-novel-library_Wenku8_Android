@@ -185,6 +185,10 @@ fun UnifiedSearchScreen(
         }
         showDirectAidValidationError = false
         keyboardController?.hide()
+        org.mewx.wenku8.util.AnalyticsTracker.logSearch(
+            searchTerm = trimmed,
+            mode = mode.name.lowercase(),
+        )
         discoveryRepository.submitOnlineSearch(
             scope = coroutineScope,
             rawQuery = trimmed,

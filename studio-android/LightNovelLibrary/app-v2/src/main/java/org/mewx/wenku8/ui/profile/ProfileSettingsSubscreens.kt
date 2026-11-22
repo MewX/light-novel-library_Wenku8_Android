@@ -1233,6 +1233,9 @@ private fun StorageAndBackupSettingsBody(
         if (treeUri != null && legacyV1StorageMigrator != null) {
             coroutineScope.launch {
                 val treeRoot = DocumentFile.fromTreeUri(context, treeUri)
+                org.mewx.wenku8.util.AnalyticsTracker.logLegacyMigrationPathSelection(
+                    validPath = treeRoot != null,
+                )
                 if (treeRoot == null) {
                     storageStatusMessage = backupFailedMessage
                     return@launch
@@ -1245,6 +1248,14 @@ private fun StorageAndBackupSettingsBody(
                     )
                     legacyV1StorageMigrator.migrateFromSource(source = source)
                 }.onSuccess { report ->
+                    org.mewx.wenku8.util.AnalyticsTracker.logLegacyMigration(
+                        source = "manual_saf",
+                        status = "completed",
+                        novelsCount = report.migratedBookshelfNovelsCount,
+                        chaptersCount = report.migratedChaptersCount,
+                        progressCount = report.migratedReadingProgressCount,
+                        restoredAccount = report.restoredAccountCredential,
+                    )
                     storageStatusMessage = context.getString(
                         R.string.profile_legacy_saf_import_success_format,
                         report.migratedBookshelfNovelsCount,
@@ -1255,6 +1266,10 @@ private fun StorageAndBackupSettingsBody(
                     org.mewx.wenku8.util.CrashReporter.recordException(
                         "ProfileSettings.importLegacySaf",
                         error,
+                    )
+                    org.mewx.wenku8.util.AnalyticsTracker.logLegacyMigration(
+                        source = "manual_saf",
+                        status = "failed",
                     )
                     storageStatusMessage = backupFailedMessage
                 }

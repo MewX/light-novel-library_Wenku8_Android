@@ -165,6 +165,10 @@ class BackupArchiveRepository(
                 }
             }
 
+            org.mewx.wenku8.util.AnalyticsTracker.logBackupExport(
+                mode = mode.wireMode,
+                status = "success",
+            )
             Result.success(
                 BackupExportSummary(
                     mode = mode,
@@ -176,6 +180,10 @@ class BackupArchiveRepository(
             throw cancelled
         } catch (error: Throwable) {
             org.mewx.wenku8.util.CrashReporter.recordException("BackupArchiveRepository.exportBackupArchive", error)
+            org.mewx.wenku8.util.AnalyticsTracker.logBackupExport(
+                mode = mode.wireMode,
+                status = "failed",
+            )
             Result.failure(error)
         } finally {
             stagingDir.deleteRecursively()
@@ -191,15 +199,18 @@ class BackupArchiveRepository(
 
             val manifestFile = File(stagingDir, ENTRY_MANIFEST_JSON)
             if (!manifestFile.isFile) {
+                org.mewx.wenku8.util.AnalyticsTracker.logBackupImport("failed")
                 return@withContext Result.failure(IllegalArgumentException("Missing manifest.json in backup archive"))
             }
             val manifestObj = JSONObject(manifestFile.readText(StandardCharsets.UTF_8))
             if (manifestObj.optString("schema") != BACKUP_SCHEMA_ID) {
+                org.mewx.wenku8.util.AnalyticsTracker.logBackupImport("failed")
                 return@withContext Result.failure(IllegalArgumentException("Unsupported backup schema"))
             }
 
             val snapshotDbFile = File(stagingDir, ENTRY_SNAPSHOT_DB)
             if (!snapshotDbFile.isFile || snapshotDbFile.length() <= 0L) {
+                org.mewx.wenku8.util.AnalyticsTracker.logBackupImport("failed")
                 return@withContext Result.failure(IllegalArgumentException("Missing database snapshot in backup archive"))
             }
 
@@ -245,6 +256,7 @@ class BackupArchiveRepository(
                 userPreferencesRepository.applyImportedPortablePreferences(parsedPrefs)
             }
 
+            org.mewx.wenku8.util.AnalyticsTracker.logBackupImport("success")
             Result.success(
                 BackupImportSummary(
                     mergedShelfNovels = mergeCounts.mergedShelfNovels,
@@ -258,6 +270,7 @@ class BackupArchiveRepository(
             throw cancelled
         } catch (error: Throwable) {
             org.mewx.wenku8.util.CrashReporter.recordException("BackupArchiveRepository.importBackupArchive", error)
+            org.mewx.wenku8.util.AnalyticsTracker.logBackupImport("failed")
             Result.failure(error)
         } finally {
             stagingDir.deleteRecursively()

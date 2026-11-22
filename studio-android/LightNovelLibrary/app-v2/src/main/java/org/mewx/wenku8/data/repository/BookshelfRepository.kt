@@ -441,7 +441,7 @@ class BookshelfRepository(
             return CloudBookshelfSyncOutcome.AlreadyRunning
         }
         _isCloudSyncRunning.value = true
-        return try {
+        val outcome = try {
             withContext(ioDispatcher) {
                 if (!catalogGateway.isApiConfigured) {
                     return@withContext CloudBookshelfSyncOutcome.ApiNotConfigured
@@ -761,6 +761,31 @@ class BookshelfRepository(
             _isCloudSyncRunning.value = false
             syncMutex.unlock()
         }
+        val trigger = if (forceRefreshAll) "manual" else "auto"
+        when (outcome) {
+            is CloudBookshelfSyncOutcome.Success -> {
+                val status = when {
+                    outcome.cloudShelfFullReached -> "shelf_full"
+                    outcome.failedHydrationCount > 0 -> "partial_error"
+                    else -> "success"
+                }
+                org.mewx.wenku8.util.AnalyticsTracker.logBookshelfCloudSync(
+                    trigger = trigger,
+                    status = status,
+                )
+            }
+            is CloudBookshelfSyncOutcome.NetworkOrServerError -> {
+                org.mewx.wenku8.util.AnalyticsTracker.logBookshelfCloudSync(
+                    trigger = trigger,
+                    status = "error",
+                )
+            }
+            CloudBookshelfSyncOutcome.AlreadyRunning,
+            CloudBookshelfSyncOutcome.ApiNotConfigured,
+            CloudBookshelfSyncOutcome.NotLoggedIn,
+            -> Unit
+        }
+        return outcome
     }
 
     /**
@@ -969,6 +994,10 @@ class BookshelfRepository(
                 )
             }
         }
+        org.mewx.wenku8.util.AnalyticsTracker.logBookshelfAdd(
+            aid = novel.aid,
+            source = if (syncToCloudIfSignedIn) "user" else "local",
+        )
 
         if (syncToCloudIfSignedIn && catalogGateway.isApiConfigured && isSignedInOrSaved()) {
             val res = addNovelToCloudWithSingleRelogin(novel.aid)
@@ -1065,6 +1094,10 @@ class BookshelfRepository(
                 }
             }
         }
+        org.mewx.wenku8.util.AnalyticsTracker.logBookshelfRemove(
+            count = targetAids.size,
+            source = if (removeFromCloudIfSignedIn) "user" else "local",
+        )
 
         if (removeFromCloudIfSignedIn && catalogGateway.isApiConfigured && isSignedInOrSaved()) {
             for (aid in targetAids) {

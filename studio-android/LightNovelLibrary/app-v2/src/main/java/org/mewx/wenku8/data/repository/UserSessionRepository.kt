@@ -475,6 +475,7 @@ class UserSessionRepository(
                 return@withLock LoginOutcome.ApiNotConfigured
             }
 
+            val loginMethod = if (cleanIdentifier.contains('@')) "email" else "username"
             when (val code = executeLoginCallLocked(cleanIdentifier, rawPassword)) {
                 Wenku8Error.ErrorCode.SYSTEM_1_SUCCEEDED -> {
                     val previousIdentifier = cachedCredentials?.identifier
@@ -505,12 +506,22 @@ class UserSessionRepository(
                         avatarCacheBusterMs = System.currentTimeMillis(),
                         dailySignStatus = DailySignStatus.IDLE,
                     )
+                    org.mewx.wenku8.util.AnalyticsTracker.logLogin(method = loginMethod, success = true)
                     LoginOutcome.Success(resolvedProfile)
                 }
 
-                Wenku8Error.ErrorCode.SYSTEM_2_ERROR_USERNAME -> LoginOutcome.UsernameNotFound
-                Wenku8Error.ErrorCode.SYSTEM_3_ERROR_PASSWORD -> LoginOutcome.IncorrectPassword
-                else -> LoginOutcome.NetworkOrServerError(code)
+                Wenku8Error.ErrorCode.SYSTEM_2_ERROR_USERNAME -> {
+                    org.mewx.wenku8.util.AnalyticsTracker.logLogin(method = loginMethod, success = false)
+                    LoginOutcome.UsernameNotFound
+                }
+                Wenku8Error.ErrorCode.SYSTEM_3_ERROR_PASSWORD -> {
+                    org.mewx.wenku8.util.AnalyticsTracker.logLogin(method = loginMethod, success = false)
+                    LoginOutcome.IncorrectPassword
+                }
+                else -> {
+                    org.mewx.wenku8.util.AnalyticsTracker.logLogin(method = loginMethod, success = false)
+                    LoginOutcome.NetworkOrServerError(code)
+                }
             }
         }
     }
@@ -561,6 +572,10 @@ class UserSessionRepository(
                 if (relogin == Wenku8Error.ErrorCode.SYSTEM_1_SUCCEEDED) {
                     signResponse = executeSignRequestLocked()
                 } else {
+                    org.mewx.wenku8.util.AnalyticsTracker.logDailyCheckIn(
+                        effectiveClick = false,
+                        outcome = "relogin_failed",
+                    )
                     return@withLock DailySignOutcome.NetworkOrServerError(relogin)
                 }
             }
@@ -589,6 +604,10 @@ class UserSessionRepository(
                         avatarCacheBusterMs = System.currentTimeMillis(),
                         dailySignStatus = DailySignStatus.SIGNED_IN_SUCCESS,
                     )
+                    org.mewx.wenku8.util.AnalyticsTracker.logDailyCheckIn(
+                        effectiveClick = true,
+                        outcome = "success",
+                    )
                     DailySignOutcome.SignedAndRefreshed(updatedProfile)
                 }
 
@@ -598,14 +617,30 @@ class UserSessionRepository(
                             dailySignStatus = DailySignStatus.ALREADY_SIGNED_OR_REJECTED,
                         )
                     }
+                    org.mewx.wenku8.util.AnalyticsTracker.logDailyCheckIn(
+                        effectiveClick = false,
+                        outcome = "already_signed",
+                    )
                     DailySignOutcome.AlreadySignedOrRefused
                 }
 
-                SignServerResponse.NotLoggedIn -> DailySignOutcome.NetworkOrServerError(
-                    Wenku8Error.ErrorCode.SYSTEM_4_NOT_LOGGED_IN,
-                )
+                SignServerResponse.NotLoggedIn -> {
+                    org.mewx.wenku8.util.AnalyticsTracker.logDailyCheckIn(
+                        effectiveClick = false,
+                        outcome = "not_logged_in",
+                    )
+                    DailySignOutcome.NetworkOrServerError(
+                        Wenku8Error.ErrorCode.SYSTEM_4_NOT_LOGGED_IN,
+                    )
+                }
 
-                is SignServerResponse.Failure -> DailySignOutcome.NetworkOrServerError(signResponse.errorCode)
+                is SignServerResponse.Failure -> {
+                    org.mewx.wenku8.util.AnalyticsTracker.logDailyCheckIn(
+                        effectiveClick = false,
+                        outcome = "error",
+                    )
+                    DailySignOutcome.NetworkOrServerError(signResponse.errorCode)
+                }
             }
         }
     }
@@ -627,6 +662,7 @@ class UserSessionRepository(
                 }
             }
             wipeStoredAccountFilesAndMemoryLocked()
+            org.mewx.wenku8.util.AnalyticsTracker.logLogout()
             _sessionState.value = if (isAuthSupported) {
                 AccountSessionState.SignedOut
             } else {

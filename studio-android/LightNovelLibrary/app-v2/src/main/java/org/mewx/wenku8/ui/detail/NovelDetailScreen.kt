@@ -329,6 +329,20 @@ fun NovelDetailScreen(
         }
     }
 
+    var loggedViewItemAid by rememberSaveable(aid) { mutableStateOf(0) }
+    val resolvedAnalyticsTitle = snapshot.novel?.title?.takeIf { it.isNotBlank() }
+        ?: seedDiscoveryItem?.title?.takeIf { it.isNotBlank() }
+    LaunchedEffect(aid, resolvedAnalyticsTitle) {
+        if (aid > 0 && loggedViewItemAid != aid && resolvedAnalyticsTitle != null) {
+            loggedViewItemAid = aid
+            org.mewx.wenku8.util.AnalyticsTracker.logViewNovel(
+                aid = aid,
+                title = resolvedAnalyticsTitle,
+                from = sharedTransitionOrigin,
+            )
+        }
+    }
+
     LaunchedEffect(isRefreshing, isManualRefreshInFlight, snapshot.volumes.isEmpty()) {
         if (!isRefreshing) {
             showDebouncedAutoRefreshBar = false
@@ -549,7 +563,10 @@ fun NovelDetailScreen(
                         val shareLabel = stringResource(R.string.detail_action_share)
                         TooltipIconButton(
                             tooltipText = shareLabel,
-                            onClick = { shareNovelExternally(context, shareMessage) },
+                            onClick = {
+                                org.mewx.wenku8.util.AnalyticsTracker.logShareNovel(aid)
+                                shareNovelExternally(context, shareMessage)
+                            },
                             modifier = Modifier.testTag(NovelDetailTestTags.SHARE_BUTTON),
                         ) {
                             Icon(

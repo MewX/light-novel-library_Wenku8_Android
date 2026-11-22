@@ -472,16 +472,35 @@ class AppContainer(context: Context) {
                 fallbackExternalRoot = fallbackRoot,
             )
             try {
-                legacyV1StorageMigrator.migrateFromSource(
+                val report = legacyV1StorageMigrator.migrateFromSource(
                     source = source,
                     onProgress = { progress -> _migrationProgressFlow.value = progress },
                 )
+                val migratedAnyLegacyData = report.migratedSettingsCount > 0 ||
+                    report.migratedBookshelfNovelsCount > 0 ||
+                    report.migratedChaptersCount > 0 ||
+                    report.migratedReadingProgressCount > 0 ||
+                    report.restoredAccountCredential
+                if (migratedAnyLegacyData) {
+                    org.mewx.wenku8.util.AnalyticsTracker.logLegacyMigration(
+                        source = "auto_internal",
+                        status = "completed",
+                        novelsCount = report.migratedBookshelfNovelsCount,
+                        chaptersCount = report.migratedChaptersCount,
+                        progressCount = report.migratedReadingProgressCount,
+                        restoredAccount = report.restoredAccountCredential,
+                    )
+                }
             } catch (cancelled: kotlinx.coroutines.CancellationException) {
                 throw cancelled
             } catch (e: Throwable) {
                 org.mewx.wenku8.util.CrashReporter.recordException(
                     "AppContainer.automaticInternalMigration",
                     e,
+                )
+                org.mewx.wenku8.util.AnalyticsTracker.logLegacyMigration(
+                    source = "auto_internal",
+                    status = "failed",
                 )
             } finally {
                 _migrationProgressFlow.value = null

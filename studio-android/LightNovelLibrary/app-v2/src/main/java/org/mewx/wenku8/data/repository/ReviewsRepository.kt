@@ -307,12 +307,17 @@ class ReviewsRepository(
                 )
             }
 
-            mapMutationResultAndHandleDraft(
+            val outcome = mapMutationResultAndHandleDraft(
                 aid = aid,
                 rid = NEW_THREAD_DRAFT_RID,
                 novelTitleHint = novelTitleHint,
                 result = postResult,
             )
+            org.mewx.wenku8.util.AnalyticsTracker.logReviewPost(
+                aid = aid,
+                success = outcome is ReviewSubmitOutcome.Success,
+            )
+            outcome
         }
     }
 
@@ -358,12 +363,17 @@ class ReviewsRepository(
                 )
             }
 
-            mapMutationResultAndHandleDraft(
+            val outcome = mapMutationResultAndHandleDraft(
                 aid = aid,
                 rid = rid,
                 novelTitleHint = novelTitleHint,
                 result = postResult,
             )
+            org.mewx.wenku8.util.AnalyticsTracker.logReviewReply(
+                aid = aid,
+                success = outcome is ReviewSubmitOutcome.Success,
+            )
+            outcome
         }
     }
 

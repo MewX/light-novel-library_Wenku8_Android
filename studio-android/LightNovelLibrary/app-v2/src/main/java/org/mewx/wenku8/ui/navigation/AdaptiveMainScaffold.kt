@@ -432,6 +432,7 @@ fun AdaptiveMainScaffold(
     var postReadingElevationToken by remember {
         mutableStateOf<PostReadingAdElevationToken?>(null)
     }
+    var activeReaderStartedAtMonoMs by remember { mutableLongStateOf(0L) }
 
     val handleOpenCoverLightbox: (String, String) -> Unit = { title, coverUrl ->
         if (coverUrl.isNotBlank()) {
@@ -445,9 +446,26 @@ fun AdaptiveMainScaffold(
         if (database != null && catalogGateway != null && novelTocSyncRepository != null) {
             activeCoverLightboxUrl = ""
             activeCoverLightboxTitle = ""
+            val nowMono = SystemClock.elapsedRealtime()
+            activeReaderStartedAtMonoMs = nowMono
             postReadingAdTracker.onReaderSessionStarted(
                 aid = request.aid,
-                nowMonoMs = SystemClock.elapsedRealtime(),
+                nowMonoMs = nowMono,
+            )
+            val launchSource = when {
+                externalReaderLaunchRequest != null -> "widget"
+                activeFootprintTab != null -> "footprint"
+                activeDetailNovelAid > 0 -> "detail"
+                selectedDestination == TopLevelDestination.BOOKSHELF -> "bookshelf"
+                else -> "other"
+            }
+            org.mewx.wenku8.util.AnalyticsTracker.logReaderOpen(
+                aid = request.aid,
+                cid = request.cid,
+                pageTurnMode = effectivePreferences.readerPageTurnMode.name.lowercase(),
+                columnMode = effectivePreferences.readerColumnMode.name.lowercase(),
+                startWithTts = request.startWithTts,
+                source = launchSource,
             )
             activeReaderRequest = request
         }
@@ -490,6 +508,7 @@ fun AdaptiveMainScaffold(
             activeProfileSettingsSection = null
             isNetworkDiagnosticsOpen = false
             postReadingAdTracker.resetActiveSession()
+            activeReaderStartedAtMonoMs = 0L
             activeReaderRequest = null
             activeReviewsAid = 0
             activeReviewThread = null
@@ -736,6 +755,9 @@ fun AdaptiveMainScaffold(
             else -> 0
         }
         val activeTelemetryChapterCid: Int = (activeScene as? ScaffoldSceneState.Reader)?.request?.cid ?: 0
+        LaunchedEffect(activeTelemetryScreenName) {
+            org.mewx.wenku8.util.AnalyticsTracker.logScreenView(activeTelemetryScreenName)
+        }
         LaunchedEffect(activeTelemetryScreenName, activeTelemetryNovelAid, activeTelemetryChapterCid) {
             org.mewx.wenku8.util.CrashReporter.setScreen(activeTelemetryScreenName, "enter")
             org.mewx.wenku8.util.CrashReporter.setKey(
@@ -1458,8 +1480,18 @@ fun AdaptiveMainScaffold(
                                     onVolumeKeyPagingChanged = onVolumeKeyPagingChanged,
                                     onOpenNetworkDiagnostics = handleOpenNetworkDiagnostics,
                                     onNavigateBack = {
+                                        val nowMono = SystemClock.elapsedRealtime()
+                                        if (activeReaderStartedAtMonoMs > 0L) {
+                                            val durationSec = ((nowMono - activeReaderStartedAtMonoMs) / 1000L)
+                                                .coerceAtLeast(0L)
+                                            org.mewx.wenku8.util.AnalyticsTracker.logReaderSessionEnd(
+                                                aid = scene.request.aid,
+                                                durationSec = durationSec,
+                                            )
+                                            activeReaderStartedAtMonoMs = 0L
+                                        }
                                         postReadingAdTracker.onReaderSessionEnded(
-                                            nowMonoMs = SystemClock.elapsedRealtime(),
+                                            nowMonoMs = nowMono,
                                         )?.let { elevatedToken ->
                                             postReadingElevationToken = elevatedToken
                                         }

@@ -137,6 +137,10 @@ class NovelDownloadRepository(
     fun startDownload(request: NovelDownloadRequest) {
         if (request.aid <= 0) return
         activeJobs.remove(request.aid)?.cancel()
+        org.mewx.wenku8.util.AnalyticsTracker.logNovelDownloadStart(
+            aid = request.aid,
+            mode = request.mode.name.lowercase(),
+        )
 
         val scheduledInWorkManager = enqueueWorkManagerTaskIfAvailable(request)
         if (!scheduledInWorkManager) {
@@ -573,12 +577,14 @@ class NovelDownloadRepository(
         images: Int,
         failed: Int,
     ) {
+        var resolvedMode = NovelDownloadMode.SMART_UPDATE
         _activeDownloadsFlow.update { current ->
             val previous = current[aid]
+            resolvedMode = previous?.mode ?: NovelDownloadMode.SMART_UPDATE
             val updated = NovelDownloadProgress(
                 aid = aid,
                 novelTitle = previous?.novelTitle ?: "AID #$aid",
-                mode = previous?.mode ?: NovelDownloadMode.SMART_UPDATE,
+                mode = resolvedMode,
                 completedChapters = completed,
                 totalChapters = total,
                 currentChapterTitle = "",
@@ -588,6 +594,13 @@ class NovelDownloadRepository(
             )
             current + (aid to updated)
         }
+        org.mewx.wenku8.util.AnalyticsTracker.logNovelDownloadComplete(
+            aid = aid,
+            mode = resolvedMode.name.lowercase(),
+            status = state.name.lowercase(),
+            chaptersDownloaded = completed,
+            failedChapters = failed,
+        )
     }
 
     private fun enqueueWorkManagerTaskIfAvailable(request: NovelDownloadRequest): Boolean {

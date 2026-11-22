@@ -82,6 +82,10 @@ class NetworkDiagnosticsViewModel(
         if (resolution !is DiagnosticsEndpointResolution.Available) return
 
         pendingStopReason = DiagnosticsStopReason.USER_CANCELLED
+        org.mewx.wenku8.util.AnalyticsTracker.logNetworkDiagnosticsRun(
+            autoOptimizeEnabled = autoRoutingState.value !is org.mewx.wenku8.data.remote.diagnostics.AutoRoutingModeState.DisabledByUser &&
+                autoRoutingState.value !is org.mewx.wenku8.data.remote.diagnostics.AutoRoutingModeState.UnavailableStub,
+        )
         activeRunJob = viewModelScope.launch {
             relayRouteController.onManualDiagnosticsStarted()
             try {
