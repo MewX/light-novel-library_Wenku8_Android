@@ -130,9 +130,21 @@ export const COMMUNITY_CREDITS = [
     },
 ];
 
-// Complete historical dev log (39 entries from 2014 to 2025).
+// Complete historical dev log (40 entries from 2014 to 2026).
 // Structured cleanly as paragraphs & typed segments so JSX renders safely without raw HTML injection.
 export const BLOG_POSTS = [
+    {
+        id: 40,
+        author: 'MewX',
+        date: '2026-11-22 22:33',
+        paragraphs: [
+            [
+                {
+                    text: '花了3天左右的时间用 Gemini 4 Carbon (High) 重写了整个app，太舒服了，自主完成milestone。主要原因还是有个现象级的fork爆火了，导致我的API访问激增，然后看了一下网上把我的API加密逆向了个底朝天，内裤都被看光了。所以这次干脆让AI重做，加密也让AI来做，我就甩手掌柜了，做下来效果竟然还可以。我觉得按照这个进度，下次Material Design 出4的时候我估计一个双休日就能出正式版了。',
+                },
+            ],
+        ],
+    },
     {
         id: 39,
         author: 'MewX',

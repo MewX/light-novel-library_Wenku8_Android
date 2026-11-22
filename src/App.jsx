@@ -948,7 +948,7 @@ const NewsDrawer = ({ isOpen, onClose }) => {
                                     完整开发日志
                                 </h2>
                                 <p className="text-xs text-[var(--md-on-surface-variant)]">
-                                    共 {BLOG_POSTS.length} 条记录（2014 — 2025）
+                                    共 {BLOG_POSTS.length} 条记录（2014 — 2026）
                                 </p>
                             </div>
                         </div>
@@ -990,7 +990,7 @@ const NewsSection = ({ onOpenDrawer }) => {
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="mb-10">
                     <span className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full text-xs font-semibold bg-[var(--md-secondary-container)] text-[var(--md-on-secondary-container)] mb-3">
-                        DEVLOG ARCHIVE · 2014 — 2025
+                        DEVLOG ARCHIVE · 2014 — 2026
                     </span>
                     <h2 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-[var(--md-on-surface)]">
                         开发日志
