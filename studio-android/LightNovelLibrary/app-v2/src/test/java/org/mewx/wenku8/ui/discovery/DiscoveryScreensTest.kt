@@ -714,6 +714,7 @@ class DiscoveryScreensTest {
                         onOpenNetworkDiagnostics = {},
                         isNetworkAvailableForAdOverride = true,
                         isGmsAvailableForAdOverride = true,
+                        canRequestAdsForAdOverride = true,
                         enableLiveAdViewInflation = false,
                     )
                 }
@@ -747,6 +748,50 @@ class DiscoveryScreensTest {
     }
 
     @Test
+    fun rankingsScreenInlineAds_collapseCompletelyWhenConsentNotGranted() {
+        val weekItems = (1..15).map { rank ->
+            ParsedNovelListItem(
+                aid = 8700 + rank,
+                title = "无同意榜单-$rank",
+                author = "作者-$rank",
+                bookStatus = "连载中",
+                lastUpdate = "2026-11-22",
+                tagsCsv = "奇幻",
+                introShort = "简介-$rank",
+            )
+        }
+        val gateway = FakeDiscoveryGateway().apply {
+            pagesBySort[Wenku8API.NovelSortedBy.weekVisit] =
+                WenkuApiResult.Success(ParsedNovelListPage(totalPages = 2, items = weekItems))
+        }
+        val repository = DiscoveryRepository(database = database, apiClient = gateway)
+
+        composeTestRule.setContent {
+            Box(modifier = Modifier.size(width = 412.dp, height = 892.dp)) {
+                Wenku8ExpressiveTheme(themeMode = Wenku8ThemeMode.ARCHIVAL_DAY) {
+                    RankingsScreen(
+                        discoveryRepository = repository,
+                        appLanguage = Wenku8API.AppLanguage.SC,
+                        onOpenSearch = {},
+                        onNovelClicked = {},
+                        onOpenNetworkDiagnostics = {},
+                        isNetworkAvailableForAdOverride = true,
+                        isGmsAvailableForAdOverride = true,
+                        canRequestAdsForAdOverride = false,
+                        enableLiveAdViewInflation = false,
+                    )
+                }
+            }
+        }
+
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag(DiscoveryTestTags.FEED_LIST).performScrollToIndex(10)
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag("${DiscoveryTestTags.FEED_AD_CARD_PREFIX}0").assertDoesNotExist()
+        composeTestRule.onNodeWithText("无同意榜单-11").assertIsDisplayed()
+    }
+
+    @Test
     fun latestScreenInlineAds_collapseCompletelyWhenOffline() {
         val recentItems = (1..15).map { idx ->
             ParsedNovelListItem(
@@ -776,6 +821,7 @@ class DiscoveryScreensTest {
                         onOpenNetworkDiagnostics = {},
                         isNetworkAvailableForAdOverride = false,
                         isGmsAvailableForAdOverride = true,
+                        canRequestAdsForAdOverride = true,
                         enableLiveAdViewInflation = false,
                     )
                 }

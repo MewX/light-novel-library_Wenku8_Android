@@ -339,6 +339,7 @@ class NovelDetailAndDownloadTest {
                     onTagClicked = { tag -> clickedTag = tag },
                     isNetworkAvailableForAdOverride = true,
                     isGmsAvailableForAdOverride = true,
+                    canRequestAdsForAdOverride = true,
                     enableLiveAdViewInflation = false,
                 )
             }
@@ -928,6 +929,7 @@ class NovelDetailAndDownloadTest {
                     placement = InlineBannerPlacement.NOVEL_DETAIL_POST_READING_LARGE,
                     isNetworkAvailableOverride = true,
                     isGmsAvailableOverride = true,
+                    canRequestAdsOverride = true,
                     enableLiveAdViewInflation = false,
                 )
             }
@@ -937,6 +939,73 @@ class NovelDetailAndDownloadTest {
             .assertIsDisplayed()
         composeTestRule.onNodeWithTag(NovelDetailTestTags.SERVER_SUPPORT_AD_SLOT)
             .assertHeightIsAtLeast(InlineBannerPlacement.NOVEL_DETAIL_POST_READING_LARGE.reservedMinHeight)
+    }
+
+    @Test
+    fun serverSupportBannerAd_staysCollapsedAndSkipsInitWithoutConsentThenLoadsWhenConsentGranted() {
+        ServerSupportAdInitializer.resetForTests()
+        var initCalls = 0
+        ServerSupportAdInitializer.testInitAction = { _, onComplete ->
+            initCalls += 1
+            onComplete()
+        }
+        try {
+            val canRequestAdsState = androidx.compose.runtime.mutableStateOf(false)
+            lateinit var observedHolder: NovelDetailBannerAdHolder
+
+            composeTestRule.setContent {
+                Wenku8ExpressiveTheme(themeMode = Wenku8ThemeMode.ARCHIVAL_DAY) {
+                    androidx.compose.runtime.CompositionLocalProvider(
+                        LocalAdConsentCanRequestAds provides canRequestAdsState.value,
+                    ) {
+                        observedHolder = rememberNovelDetailBannerAdHolder(
+                            aid = 5,
+                            isNetworkAvailableOverride = true,
+                            isGmsAvailableOverride = true,
+                            enableLiveAdViewInflation = false,
+                        )
+                        PrefetchBannerAdEffect(
+                            holder = observedHolder,
+                            availableWidthDp = 360,
+                        )
+                        ServerSupportBannerAd(holder = observedHolder)
+                    }
+                }
+            }
+            composeTestRule.waitForIdle()
+
+            // Before consent: collapsed with zero card rendered and zero MobileAds initialization
+            assertEquals(BannerAdLoadPhase.Collapsed, observedHolder.phase)
+            assertEquals(0, initCalls)
+            assertFalse(ServerSupportAdInitializer.hasStartedInitialization)
+            composeTestRule.onNodeWithTag(NovelDetailTestTags.SERVER_SUPPORT_AD_CARD)
+                .assertDoesNotExist()
+
+            // Guard check: direct startHolderBannerLoad with canRequestAds = false is a strict no-op
+            val appContext = ApplicationProvider.getApplicationContext<android.content.Context>()
+            val directLoadingHolder = NovelDetailBannerAdHolder(initialPhase = BannerAdLoadPhase.Loading)
+            runBlocking {
+                startHolderBannerLoad(
+                    holder = directLoadingHolder,
+                    context = appContext,
+                    hostContext = appContext,
+                    availableWidthDp = 360,
+                    canRequestAds = false,
+                )
+            }
+            assertEquals(0, initCalls)
+            assertFalse(directLoadingHolder.loadInProgress)
+            assertFalse(ServerSupportAdInitializer.hasStartedInitialization)
+
+            // After consent becomes true: holder transitions naturally and card renders cleanly
+            composeTestRule.runOnIdle { canRequestAdsState.value = true }
+            composeTestRule.waitForIdle()
+            assertEquals(BannerAdLoadPhase.StaticPreview, observedHolder.phase)
+            composeTestRule.onNodeWithTag(NovelDetailTestTags.SERVER_SUPPORT_AD_CARD)
+                .assertIsDisplayed()
+        } finally {
+            ServerSupportAdInitializer.resetForTests()
+        }
     }
 
     @Test

@@ -1261,6 +1261,87 @@ class ProfileAndBackupTest {
         composeTestRule.onNodeWithText("繁體中文", substring = true).assertIsDisplayed()
     }
 
+    @Test
+    fun privacyPolicyAndAdOptions_showConditionallyAndOpenExpectedTargets() {
+        val app = ApplicationProvider.getApplicationContext<Application>()
+        val shadowApp = Shadows.shadowOf(app)
+        shadowApp.clearNextStartedActivities()
+
+        var privacyOptionsRequired by mutableStateOf(false)
+        var privacyOptionsClicks = 0
+
+        composeTestRule.setContent {
+            Box(modifier = Modifier.size(width = 412.dp, height = 892.dp)) {
+                Wenku8ExpressiveTheme(themeMode = Wenku8ThemeMode.SYSTEM) {
+                    ProfileSettingsSubscreen(
+                        section = ProfileSettingsSection.ABOUT_AND_FEEDBACK,
+                        preferences = Wenku8UserPreferences(),
+                        onNavigateBack = {},
+                        onThemeModeSelected = {},
+                        onDefaultHomeSelected = {},
+                        onAppLanguageSelected = {},
+                        onEinkModeChanged = {},
+                        onReaderTypographyChanged = { _, _, _, _ -> },
+                        onReaderCustomFontPathChanged = {},
+                        onReaderCustomBackgroundPathChanged = {},
+                        onVolumeKeyPagingChanged = {},
+                        isPrivacyOptionsRequired = privacyOptionsRequired,
+                        onOpenPrivacyOptions = { privacyOptionsClicks += 1 },
+                    )
+                }
+            }
+        }
+        composeTestRule.waitForIdle()
+
+        // 1. Non-EEA (isPrivacyOptionsRequired == false): Privacy Policy visible, Privacy & Ad Options hidden
+        composeTestRule.onNodeWithTag(ProfileStudioTestTags.SUBSCREEN_LIST)
+            .performScrollToNode(hasTestTag(ProfileStudioTestTags.PRIVACY_POLICY_BUTTON))
+        composeTestRule.onNodeWithTag(ProfileStudioTestTags.PRIVACY_POLICY_BUTTON)
+            .assertIsDisplayed()
+            .performClick()
+
+        val privacyIntent = shadowApp.nextStartedActivity
+        assertNotNull("Expected browser intent for Privacy Policy", privacyIntent)
+        assertEquals(Intent.ACTION_VIEW, privacyIntent.action)
+        assertEquals(PRIVACY_POLICY_URL, privacyIntent.dataString)
+        assertEquals("https://wenku8.app/privacy/", privacyIntent.dataString)
+
+        composeTestRule.onNodeWithTag(ProfileStudioTestTags.PRIVACY_OPTIONS_BUTTON)
+            .assertDoesNotExist()
+
+        // 2. EEA/UK (isPrivacyOptionsRequired == true): Privacy & Ad Options becomes visible & clickable
+        composeTestRule.runOnIdle { privacyOptionsRequired = true }
+        composeTestRule.waitForIdle()
+
+        composeTestRule.onNodeWithTag(ProfileStudioTestTags.SUBSCREEN_LIST)
+            .performScrollToNode(hasTestTag(ProfileStudioTestTags.PRIVACY_OPTIONS_BUTTON))
+        composeTestRule.onNodeWithTag(ProfileStudioTestTags.PRIVACY_OPTIONS_BUTTON)
+            .assertIsDisplayed()
+            .performClick()
+        assertEquals(1, privacyOptionsClicks)
+
+        // 3. Verify SC / zh-TW / zh-HK string resources for both privacy items
+        val expectedByLocale = listOf(
+            java.util.Locale.SIMPLIFIED_CHINESE to ("隐私政策" to "隐私与广告选项"),
+            java.util.Locale.TAIWAN to ("隱私政策" to "隱私與廣告選項"),
+            java.util.Locale("zh", "HK") to ("隱私政策" to "隱私與廣告選項"),
+        )
+        for ((locale, expectedPair) in expectedByLocale) {
+            val localizedConfig = android.content.res.Configuration(app.resources.configuration).apply {
+                setLocale(locale)
+            }
+            val localizedContext = app.createConfigurationContext(localizedConfig)
+            assertEquals(
+                expectedPair.first,
+                localizedContext.getString(org.mewx.wenku8.R.string.profile_privacy_policy_action),
+            )
+            assertEquals(
+                expectedPair.second,
+                localizedContext.getString(org.mewx.wenku8.R.string.profile_privacy_options_action),
+            )
+        }
+    }
+
     private fun Modifier.composeTestTagForLazyList(): Modifier =
         this.testTag(ProfileStudioTestTags.LIST)
 
