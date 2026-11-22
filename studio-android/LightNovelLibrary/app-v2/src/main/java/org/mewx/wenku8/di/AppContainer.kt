@@ -71,6 +71,12 @@ class AppContainer(context: Context) {
         UserPreferencesRepository.create(appContext, applicationScope)
     }
 
+    val adConsentManager: org.mewx.wenku8.util.AdConsentManager by lazy {
+        org.mewx.wenku8.util.UmpAdConsentManager(appContext)
+    }
+
+    private val hasStartedConsentGatedAdWarmUp = java.util.concurrent.atomic.AtomicBoolean(false)
+
     val sharedBaseOkHttpClient: OkHttpClient by lazy {
         OkHttpProbeTransport.defaultSharedBaseOkHttpClient()
     }
@@ -368,6 +374,22 @@ class AppContainer(context: Context) {
                 )
             }
             .build()
+    }
+
+    /**
+     * Observes [adConsentManager] and warms up the Google Mobile Ads SDK in the background at most
+     * once, strictly after `canRequestAds` becomes `true` (either synchronously from cached
+     * previous-session UMP consent or after the first-launch consent check finishes).
+     */
+    fun triggerConsentGatedAdWarmUp() {
+        if (!hasStartedConsentGatedAdWarmUp.compareAndSet(false, true)) return
+        applicationScope.launch {
+            adConsentManager.canRequestAds.first { it }
+            org.mewx.wenku8.ui.detail.ServerSupportAdInitializer.warmUpInBackground(
+                context = appContext,
+                scope = applicationScope,
+            )
+        }
     }
 
     /**

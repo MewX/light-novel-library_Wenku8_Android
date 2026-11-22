@@ -241,6 +241,7 @@ fun NovelDetailScreen(
     bannerRequestNonce: Int = 0,
     isNetworkAvailableForAdOverride: Boolean? = null,
     isGmsAvailableForAdOverride: Boolean? = null,
+    canRequestAdsForAdOverride: Boolean? = null,
     enableLiveAdViewInflation: Boolean = true,
     modifier: Modifier = Modifier,
 ) {
@@ -596,6 +597,7 @@ fun NovelDetailScreen(
                 requestNonce = bannerRequestNonce,
                 isNetworkAvailableOverride = isNetworkAvailableForAdOverride,
                 isGmsAvailableOverride = isGmsAvailableForAdOverride,
+                canRequestAdsOverride = canRequestAdsForAdOverride,
                 enableLiveAdViewInflation = enableLiveAdViewInflation,
             )
             BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
@@ -603,6 +605,7 @@ fun NovelDetailScreen(
                 PrefetchBannerAdEffect(
                     holder = bannerAdHolder,
                     availableWidthDp = bannerSlotWidthDp,
+                    canRequestAdsOverride = canRequestAdsForAdOverride,
                 )
                 LazyColumn(
                     modifier = Modifier
@@ -844,6 +847,7 @@ fun NovelDetailScreen(
                         item(key = "detail_server_support_ad") {
                             ServerSupportBannerAd(
                                 holder = bannerAdHolder,
+                                canRequestAdsOverride = canRequestAdsForAdOverride,
                                 modifier = Modifier.padding(vertical = 4.dp),
                             )
                         }

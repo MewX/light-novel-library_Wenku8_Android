@@ -21,6 +21,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
@@ -224,9 +225,25 @@ class PostReadingAdElevationTracker(
     }
 }
 
+/**
+ * Reactive UMP consent gate provided by `MainActivity` from `AdConsentManager.canRequestAds`.
+ *
+ * Defaults to `false` (fail-closed) so no AdMob SDK initialization or banner request can occur
+ * unless consent has been confirmed (or explicitly overridden in unit/Compose tests).
+ */
+val LocalAdConsentCanRequestAds = compositionLocalOf { false }
+
 object ServerSupportAdInitializer {
     private val initStarted = AtomicBoolean(false)
-    private val initCompleted = CompletableDeferred<Unit>()
+
+    @Volatile
+    private var initCompleted = CompletableDeferred<Unit>()
+
+    @Volatile
+    internal var testInitAction: ((Context, () -> Unit) -> Unit)? = null
+
+    internal val hasStartedInitialization: Boolean
+        get() = initStarted.get()
 
     fun warmUpInBackground(context: Context, scope: CoroutineScope) {
         val appContext = context.applicationContext
@@ -239,20 +256,38 @@ object ServerSupportAdInitializer {
 
     suspend fun ensureInitialized(context: Context) {
         val appContext = context.applicationContext
+        val completion = initCompleted
         if (initStarted.compareAndSet(false, true)) {
             withContext(Dispatchers.IO) {
-                runCatching {
-                    MobileAds.initialize(appContext) {
-                        initCompleted.complete(Unit)
+                val override = testInitAction
+                if (override != null) {
+                    runCatching {
+                        override(appContext) {
+                            completion.complete(Unit)
+                        }
+                    }.onFailure {
+                        completion.complete(Unit)
                     }
-                }.onFailure {
-                    initCompleted.complete(Unit)
+                } else {
+                    runCatching {
+                        MobileAds.initialize(appContext) {
+                            completion.complete(Unit)
+                        }
+                    }.onFailure {
+                        completion.complete(Unit)
+                    }
                 }
             }
         }
         withTimeoutOrNull(4_000L) {
-            initCompleted.await()
+            completion.await()
         }
+    }
+
+    internal fun resetForTests() {
+        initStarted.set(false)
+        testInitAction = null
+        initCompleted = CompletableDeferred()
     }
 }
 
@@ -343,6 +378,7 @@ fun rememberNovelDetailBannerAdHolder(
     requestNonce: Int = 0,
     isNetworkAvailableOverride: Boolean? = null,
     isGmsAvailableOverride: Boolean? = null,
+    canRequestAdsOverride: Boolean? = null,
     enableLiveAdViewInflation: Boolean = true,
 ): NovelDetailBannerAdHolder {
     val context = LocalContext.current
@@ -353,10 +389,19 @@ fun rememberNovelDetailBannerAdHolder(
     val isGmsReady = isGmsAvailableOverride ?: remember(aid, placement, requestNonce, context) {
         isGooglePlayServicesReady(context)
     }
+    val canRequestAds = canRequestAdsOverride ?: LocalAdConsentCanRequestAds.current
 
-    val holder = remember(aid, placement, requestNonce, isOnline, isGmsReady, enableLiveAdViewInflation) {
+    val holder = remember(
+        aid,
+        placement,
+        requestNonce,
+        isOnline,
+        isGmsReady,
+        canRequestAds,
+        enableLiveAdViewInflation,
+    ) {
         val initialPhase = when {
-            !isOnline || !isGmsReady -> BannerAdLoadPhase.Collapsed
+            !canRequestAds || !isOnline || !isGmsReady -> BannerAdLoadPhase.Collapsed
             !enableLiveAdViewInflation -> BannerAdLoadPhase.StaticPreview
             else -> BannerAdLoadPhase.Loading
         }
@@ -448,6 +493,7 @@ fun rememberDiscoveryFeedInlineAdPool(
     poolScopeKey: Any,
     isNetworkAvailableOverride: Boolean? = null,
     isGmsAvailableOverride: Boolean? = null,
+    canRequestAdsOverride: Boolean? = null,
     enableLiveAdViewInflation: Boolean = true,
     maxCachedSlots: Int = DiscoveryFeedInlineAdPool.DEFAULT_MAX_CACHED_SLOTS,
 ): DiscoveryFeedInlineAdPool {
@@ -459,10 +505,18 @@ fun rememberDiscoveryFeedInlineAdPool(
     val isGmsReady = isGmsAvailableOverride ?: remember(poolScopeKey, context) {
         isGooglePlayServicesReady(context)
     }
+    val canRequestAds = canRequestAdsOverride ?: LocalAdConsentCanRequestAds.current
 
-    val pool = remember(poolScopeKey, isOnline, isGmsReady, enableLiveAdViewInflation, maxCachedSlots) {
+    val pool = remember(
+        poolScopeKey,
+        isOnline,
+        isGmsReady,
+        canRequestAds,
+        enableLiveAdViewInflation,
+        maxCachedSlots,
+    ) {
         val initialPhase = when {
-            !isOnline || !isGmsReady -> BannerAdLoadPhase.Collapsed
+            !canRequestAds || !isOnline || !isGmsReady -> BannerAdLoadPhase.Collapsed
             !enableLiveAdViewInflation -> BannerAdLoadPhase.StaticPreview
             else -> BannerAdLoadPhase.Loading
         }
@@ -496,7 +550,11 @@ internal suspend fun startHolderBannerLoad(
     context: Context,
     hostContext: Context,
     availableWidthDp: Int,
+    canRequestAds: Boolean = false,
 ) {
+    if (!canRequestAds) {
+        return
+    }
     val safeWidthDp = availableWidthDp.coerceAtLeast(160)
     if (holder.isDisposed || holder.phase != BannerAdLoadPhase.Loading || holder.loadInProgress || holder.adView != null) {
         return
@@ -590,12 +648,15 @@ internal suspend fun startHolderBannerLoad(
 fun PrefetchBannerAdEffect(
     holder: NovelDetailBannerAdHolder,
     availableWidthDp: Int,
+    canRequestAdsOverride: Boolean? = null,
 ) {
     val context = LocalContext.current
     val hostActivity = remember(context) { context.findHostActivity() }
     val safeWidthDp = availableWidthDp.coerceAtLeast(160)
-    LaunchedEffect(holder, safeWidthDp) {
-        if (holder.isDisposed ||
+    val canRequestAds = canRequestAdsOverride ?: LocalAdConsentCanRequestAds.current
+    LaunchedEffect(holder, safeWidthDp, canRequestAds) {
+        if (!canRequestAds ||
+            holder.isDisposed ||
             holder.phase != BannerAdLoadPhase.Loading ||
             holder.adView != null ||
             holder.loadInProgress
@@ -607,6 +668,7 @@ fun PrefetchBannerAdEffect(
             context = context,
             hostContext = hostActivity ?: context,
             availableWidthDp = safeWidthDp,
+            canRequestAds = canRequestAds,
         )
     }
 }
@@ -617,6 +679,7 @@ fun ServerSupportBannerAd(
     placement: InlineBannerPlacement = InlineBannerPlacement.NOVEL_DETAIL_STANDARD,
     isNetworkAvailableOverride: Boolean? = null,
     isGmsAvailableOverride: Boolean? = null,
+    canRequestAdsOverride: Boolean? = null,
     enableLiveAdViewInflation: Boolean = true,
 ) {
     val holder = rememberNovelDetailBannerAdHolder(
@@ -624,11 +687,13 @@ fun ServerSupportBannerAd(
         placement = placement,
         isNetworkAvailableOverride = isNetworkAvailableOverride,
         isGmsAvailableOverride = isGmsAvailableOverride,
+        canRequestAdsOverride = canRequestAdsOverride,
         enableLiveAdViewInflation = enableLiveAdViewInflation,
     )
     ServerSupportBannerAd(
         holder = holder,
         modifier = modifier,
+        canRequestAdsOverride = canRequestAdsOverride,
     )
 }
 
@@ -644,6 +709,7 @@ fun ServerSupportBannerAd(
     cardTestTag: String = NovelDetailTestTags.SERVER_SUPPORT_AD_CARD,
     slotTestTag: String = NovelDetailTestTags.SERVER_SUPPORT_AD_SLOT,
     useElevatedTonalContainer: Boolean = false,
+    canRequestAdsOverride: Boolean? = null,
 ) {
     if (!holder.shouldRenderVisibleCard) {
         return
@@ -651,6 +717,7 @@ fun ServerSupportBannerAd(
 
     val context = LocalContext.current
     val hostActivity = remember(context) { context.findHostActivity() }
+    val canRequestAds = canRequestAdsOverride ?: LocalAdConsentCanRequestAds.current
     val liveAdView = holder.adView
     val cardShape = MaterialTheme.shapes.medium
     Card(
@@ -693,8 +760,12 @@ fun ServerSupportBannerAd(
                 contentAlignment = Alignment.Center,
             ) {
                 val slotWidthDp = maxWidth.value.toInt().coerceAtLeast(160)
-                LaunchedEffect(holder, slotWidthDp) {
-                    if (holder.phase == BannerAdLoadPhase.StaticPreview || holder.phase == BannerAdLoadPhase.Collapsed || holder.phase == BannerAdLoadPhase.Failed) {
+                LaunchedEffect(holder, slotWidthDp, canRequestAds) {
+                    if (!canRequestAds ||
+                        holder.phase == BannerAdLoadPhase.StaticPreview ||
+                        holder.phase == BannerAdLoadPhase.Collapsed ||
+                        holder.phase == BannerAdLoadPhase.Failed
+                    ) {
                         return@LaunchedEffect
                     }
                     val needsWidthReload = holder.adView != null &&
@@ -712,6 +783,7 @@ fun ServerSupportBannerAd(
                             context = context,
                             hostContext = hostActivity ?: context,
                             availableWidthDp = slotWidthDp,
+                            canRequestAds = canRequestAds,
                         )
                     }
                 }

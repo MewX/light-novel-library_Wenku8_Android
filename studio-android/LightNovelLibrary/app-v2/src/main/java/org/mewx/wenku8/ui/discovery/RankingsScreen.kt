@@ -67,6 +67,7 @@ fun RankingsScreen(
     reselectScrollToTopTrigger: Int = 0,
     isNetworkAvailableForAdOverride: Boolean? = null,
     isGmsAvailableForAdOverride: Boolean? = null,
+    canRequestAdsForAdOverride: Boolean? = null,
     enableLiveAdViewInflation: Boolean = true,
 ) {
     val isEink = LocalEinkMode.current
@@ -303,6 +304,7 @@ fun RankingsScreen(
             onOpenNetworkDiagnostics = onOpenNetworkDiagnostics,
             isNetworkAvailableForAdOverride = isNetworkAvailableForAdOverride,
             isGmsAvailableForAdOverride = isGmsAvailableForAdOverride,
+            canRequestAdsForAdOverride = canRequestAdsForAdOverride,
             enableLiveAdViewInflation = enableLiveAdViewInflation,
             modifier = Modifier.weight(1f),
         )

@@ -6,7 +6,6 @@ import coil3.PlatformContext
 import coil3.SingletonImageLoader
 import org.mewx.wenku8.api.Wenku8API
 import org.mewx.wenku8.di.AppContainer
-import org.mewx.wenku8.ui.detail.ServerSupportAdInitializer
 import org.mewx.wenku8.util.AnalyticsTracker
 import org.mewx.wenku8.util.CrashReporter
 
@@ -47,7 +46,7 @@ class Wenku8V2Application : Application(), SingletonImageLoader.Factory {
         appContainer.triggerTelemetryStateSync()
         appContainer.triggerAutomaticInternalMigrationIfNeeded()
         appContainer.triggerStartupAccountAndNoticeSync()
-        ServerSupportAdInitializer.warmUpInBackground(this, appContainer.applicationScope)
+        appContainer.triggerConsentGatedAdWarmUp()
     }
 
     override fun newImageLoader(context: PlatformContext): ImageLoader {

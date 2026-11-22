@@ -637,14 +637,17 @@ fun PaginatedNovelFeedContent(
     sharedTransitionOrigin: String = Wenku8SharedElementKeys.NOVEL_DEFAULT_ORIGIN,
     isNetworkAvailableForAdOverride: Boolean? = null,
     isGmsAvailableForAdOverride: Boolean? = null,
+    canRequestAdsForAdOverride: Boolean? = null,
     enableLiveAdViewInflation: Boolean = true,
 ) {
     val isEink = LocalEinkMode.current
+    val canRequestAds = canRequestAdsForAdOverride ?: org.mewx.wenku8.ui.detail.LocalAdConsentCanRequestAds.current
     val hasLoadedItems = feedState.items.isNotEmpty()
     val inlineAdPool = rememberDiscoveryFeedInlineAdPool(
         poolScopeKey = feedState.sortedBy,
         isNetworkAvailableOverride = isNetworkAvailableForAdOverride,
         isGmsAvailableOverride = isGmsAvailableForAdOverride,
+        canRequestAdsOverride = canRequestAdsForAdOverride,
         enableLiveAdViewInflation = enableLiveAdViewInflation,
     )
     val hasAppendErrorFooter = feedState.errorKind != null && feedState.items.isNotEmpty()
@@ -755,8 +758,8 @@ fun PaginatedNovelFeedContent(
 
                     BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
                         val adSlotWidthDp = (maxWidth - 32.dp).value.toInt().coerceAtLeast(160)
-                        LaunchedEffect(inlineAdPool, upcomingAdSlotsToPrefetch, adSlotWidthDp) {
-                            if (upcomingAdSlotsToPrefetch.isEmpty()) return@LaunchedEffect
+                        LaunchedEffect(inlineAdPool, upcomingAdSlotsToPrefetch, adSlotWidthDp, canRequestAds) {
+                            if (!canRequestAds || upcomingAdSlotsToPrefetch.isEmpty()) return@LaunchedEffect
                             for (slotIndex in upcomingAdSlotsToPrefetch) {
                                 val slotKey = "${feedState.sortedBy.name}_slot_$slotIndex"
                                 val slotHolder = inlineAdPool.getOrCreate(slotKey)
@@ -771,6 +774,7 @@ fun PaginatedNovelFeedContent(
                                             context = context,
                                             hostContext = hostActivity ?: context,
                                             availableWidthDp = adSlotWidthDp,
+                                            canRequestAds = canRequestAds,
                                         )
                                     }
                                 }
@@ -818,6 +822,7 @@ fun PaginatedNovelFeedContent(
                                             cardTestTag = DiscoveryTestTags.FEED_AD_CARD_PREFIX + entry.slotIndex,
                                             slotTestTag = DiscoveryTestTags.FEED_AD_SLOT_PREFIX + entry.slotIndex,
                                             useElevatedTonalContainer = true,
+                                            canRequestAdsOverride = canRequestAdsForAdOverride,
                                             modifier = Modifier.padding(vertical = 4.dp),
                                         )
                                     }
