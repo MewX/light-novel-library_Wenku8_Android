@@ -20,6 +20,7 @@ import kotlinx.coroutines.flow.map
 import org.mewx.wenku8.api.Wenku8API
 import org.mewx.wenku8.data.repository.BookshelfSortMode
 import org.mewx.wenku8.data.repository.BookshelfViewMode
+import org.mewx.wenku8.reader.model.ReaderColumnMode
 import org.mewx.wenku8.reader.model.ReaderPageTurnMode
 import org.mewx.wenku8.reader.model.ReaderPaperPreset
 import org.mewx.wenku8.ui.navigation.DefaultHomeDestination
@@ -40,9 +41,9 @@ import java.io.IOException
  * - `reader_background_path` (`""` = system default) -> [readerCustomBackgroundPath]
  * - Plus `v2.0`: [themeMode] (where [Wenku8ThemeMode.SYSTEM] unifies system Day/Night + Material You
  *   dynamic color), [defaultHomeDestination] (`LATEST` default / `BOOKSHELF`), [bookshelfViewMode],
- *   [bookshelfSortMode], [readerPageTurnMode], [readerPaperPreset], [readerKeepScreenOn],
- *   [readerEdgeBrightnessDragEnabled], [volumeKeyPagingEnabled], [autoOptimizeConnectionEnabled],
- *   and [legacyV1InternalMigrationVersion].
+ *   [bookshelfSortMode], [readerPageTurnMode], [readerColumnMode], [readerPaperPreset],
+ *   [readerKeepScreenOn], [readerEdgeBrightnessDragEnabled], [volumeKeyPagingEnabled],
+ *   [autoOptimizeConnectionEnabled], and [legacyV1InternalMigrationVersion].
  */
 data class Wenku8UserPreferences(
     val appLanguage: Wenku8API.AppLanguage = Wenku8API.AppLanguage.SC,
@@ -58,6 +59,7 @@ data class Wenku8UserPreferences(
     val readerCustomFontPath: String = "",
     val readerCustomBackgroundPath: String = "",
     val readerPageTurnMode: ReaderPageTurnMode = ReaderPageTurnMode.COVER_SLIDE,
+    val readerColumnMode: ReaderColumnMode = ReaderColumnMode.AUTO,
     val readerPaperPreset: ReaderPaperPreset = ReaderPaperPreset.PARCHMENT,
     val lastDayThemeMode: Wenku8ThemeMode = Wenku8ThemeMode.CLASSIC_BLUE,
     val lastDayPaperPreset: ReaderPaperPreset = ReaderPaperPreset.PARCHMENT,
@@ -262,6 +264,10 @@ class UserPreferencesRepository(
         dataStore.edit { it[Keys.READER_PAGE_TURN_MODE] = mode.name }
     }
 
+    suspend fun setReaderColumnMode(mode: ReaderColumnMode) {
+        dataStore.edit { it[Keys.READER_COLUMN_MODE] = mode.name }
+    }
+
     suspend fun setReaderPaperPreset(preset: ReaderPaperPreset) {
         dataStore.edit { prefs ->
             val curPaperPreset = enumValueOrDefault(
@@ -433,6 +439,7 @@ class UserPreferencesRepository(
             prefs[Keys.READER_CUSTOM_FONT_PATH] = imported.readerCustomFontPath
             prefs[Keys.READER_CUSTOM_BG_PATH] = imported.readerCustomBackgroundPath
             prefs[Keys.READER_PAGE_TURN_MODE] = imported.readerPageTurnMode.name
+            prefs[Keys.READER_COLUMN_MODE] = imported.readerColumnMode.name
             prefs[Keys.READER_PAPER_PRESET] = imported.readerPaperPreset.name
             prefs[Keys.READER_KEEP_SCREEN_ON] = imported.readerKeepScreenOn
             prefs[Keys.READER_EDGE_BRIGHTNESS_DRAG] = imported.readerEdgeBrightnessDragEnabled
@@ -465,6 +472,10 @@ class UserPreferencesRepository(
         val pageTurnMode = enumValueOrDefault(
             raw = prefs[Keys.READER_PAGE_TURN_MODE],
             default = ReaderPageTurnMode.COVER_SLIDE,
+        )
+        val columnMode = enumValueOrDefault(
+            raw = prefs[Keys.READER_COLUMN_MODE],
+            default = ReaderColumnMode.AUTO,
         )
         val paperPreset = enumValueOrDefault(
             raw = prefs[Keys.READER_PAPER_PRESET],
@@ -512,6 +523,7 @@ class UserPreferencesRepository(
             readerCustomFontPath = prefs[Keys.READER_CUSTOM_FONT_PATH] ?: "",
             readerCustomBackgroundPath = prefs[Keys.READER_CUSTOM_BG_PATH] ?: "",
             readerPageTurnMode = pageTurnMode,
+            readerColumnMode = columnMode,
             readerPaperPreset = paperPreset,
             lastDayThemeMode = lastDayTheme,
             lastDayPaperPreset = lastDayPaper,
@@ -545,6 +557,7 @@ class UserPreferencesRepository(
         val READER_CUSTOM_FONT_PATH = stringPreferencesKey("reader_custom_font_path")
         val READER_CUSTOM_BG_PATH = stringPreferencesKey("reader_custom_bg_path")
         val READER_PAGE_TURN_MODE = stringPreferencesKey("reader_page_turn_mode")
+        val READER_COLUMN_MODE = stringPreferencesKey("reader_column_mode")
         val READER_PAPER_PRESET = stringPreferencesKey("reader_paper_preset")
         val LAST_DAY_THEME_MODE = stringPreferencesKey("last_day_theme_mode")
         val LAST_DAY_PAPER_PRESET = stringPreferencesKey("last_day_paper_preset")

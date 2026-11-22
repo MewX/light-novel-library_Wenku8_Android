@@ -25,6 +25,7 @@ import org.mewx.wenku8.data.local.db.entity.SearchHistoryEntity
 import org.mewx.wenku8.data.local.db.entity.VolumeEntity
 import org.mewx.wenku8.data.local.preferences.UserPreferencesRepository
 import org.mewx.wenku8.data.local.preferences.Wenku8UserPreferences
+import org.mewx.wenku8.reader.model.ReaderColumnMode
 import org.mewx.wenku8.reader.model.ReaderPageTurnMode
 import org.mewx.wenku8.reader.model.ReaderPaperPreset
 import org.mewx.wenku8.ui.navigation.DefaultHomeDestination
@@ -696,6 +697,7 @@ class BackupArchiveRepository(
             put("readerCustomFontToken", portableCustomToken(prefs.readerCustomFontPath, CustomAssetSlot.READER_FONT))
             put("readerCustomBgToken", portableCustomToken(prefs.readerCustomBackgroundPath, CustomAssetSlot.READER_BACKGROUND))
             put("readerPageTurnMode", prefs.readerPageTurnMode.name)
+            put("readerColumnMode", prefs.readerColumnMode.name)
             put("readerPaperPreset", prefs.readerPaperPreset.name)
             put("readerKeepScreenOn", prefs.readerKeepScreenOn)
             put("readerEdgeBrightnessDragEnabled", prefs.readerEdgeBrightnessDragEnabled)
@@ -737,6 +739,9 @@ class BackupArchiveRepository(
         val pageTurnMode = runCatching {
             ReaderPageTurnMode.valueOf(obj.optString("readerPageTurnMode", fallbackPrefs.readerPageTurnMode.name))
         }.getOrDefault(fallbackPrefs.readerPageTurnMode)
+        val columnMode = runCatching {
+            ReaderColumnMode.valueOf(obj.optString("readerColumnMode", fallbackPrefs.readerColumnMode.name))
+        }.getOrDefault(fallbackPrefs.readerColumnMode)
         val paperPreset = runCatching {
             ReaderPaperPreset.valueOf(obj.optString("readerPaperPreset", fallbackPrefs.readerPaperPreset.name))
         }.getOrDefault(fallbackPrefs.readerPaperPreset)
@@ -755,6 +760,7 @@ class BackupArchiveRepository(
             readerCustomFontPath = resolveCustomToken(obj.optString("readerCustomFontToken", ""), CustomAssetSlot.READER_FONT),
             readerCustomBackgroundPath = resolveCustomToken(obj.optString("readerCustomBgToken", ""), CustomAssetSlot.READER_BACKGROUND),
             readerPageTurnMode = pageTurnMode,
+            readerColumnMode = columnMode,
             readerPaperPreset = paperPreset,
             readerKeepScreenOn = obj.optBoolean("readerKeepScreenOn", fallbackPrefs.readerKeepScreenOn),
             readerEdgeBrightnessDragEnabled = obj.optBoolean("readerEdgeBrightnessDragEnabled", fallbackPrefs.readerEdgeBrightnessDragEnabled),

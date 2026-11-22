@@ -46,6 +46,36 @@ class UserPreferencesRepositoryTest {
         assertEquals(8, defaults.readerPageEdgeDistanceDp)
         assertTrue(defaults.volumeKeyPagingEnabled)
         assertFalse(defaults.autoOptimizeConnectionEnabled)
+        assertEquals(org.mewx.wenku8.reader.model.ReaderColumnMode.AUTO, defaults.readerColumnMode)
+    }
+
+    @Test
+    fun readerColumnModePersistsAndImportsPortably() = runTest(UnconfinedTestDispatcher()) {
+        val repository = createRepository(this)
+        assertEquals(
+            org.mewx.wenku8.reader.model.ReaderColumnMode.AUTO,
+            repository.preferencesFlow.first().readerColumnMode,
+        )
+
+        repository.setReaderColumnMode(org.mewx.wenku8.reader.model.ReaderColumnMode.SINGLE)
+        assertEquals(
+            org.mewx.wenku8.reader.model.ReaderColumnMode.SINGLE,
+            repository.preferencesFlow.first().readerColumnMode,
+        )
+
+        repository.setReaderColumnMode(org.mewx.wenku8.reader.model.ReaderColumnMode.DUAL)
+        assertEquals(
+            org.mewx.wenku8.reader.model.ReaderColumnMode.DUAL,
+            repository.preferencesFlow.first().readerColumnMode,
+        )
+
+        repository.applyImportedPortablePreferences(
+            Wenku8UserPreferences(readerColumnMode = org.mewx.wenku8.reader.model.ReaderColumnMode.AUTO),
+        )
+        assertEquals(
+            org.mewx.wenku8.reader.model.ReaderColumnMode.AUTO,
+            repository.preferencesFlow.first().readerColumnMode,
+        )
     }
 
     @Test

@@ -80,3 +80,30 @@ enum class ReaderPaperPreset(
         secondaryTextArgb = 0xFF7D807DL,
     ),
 }
+
+/**
+ * Multi-column book-spread layout preference for paged reading modes (`Issue #204`).
+ *
+ * - [AUTO]: Dual-column book spread on large screens (tablets & unfolded foldables), single-column
+ *   on phones (including regular phone landscape).
+ * - [SINGLE]: Always render single-column regardless of screen size.
+ * - [DUAL]: Prefer dual-column whenever the viewport can fit two legible columns.
+ */
+enum class ReaderColumnMode(
+    val displayTitle: String,
+    val shortSubtitle: String,
+) {
+    AUTO(
+        displayTitle = "自动双栏",
+        shortSubtitle = "大屏与展开折叠屏自动双栏，手机横竖屏保持单栏",
+    ),
+    SINGLE(
+        displayTitle = "单栏",
+        shortSubtitle = "始终使用单列排版",
+    ),
+    DUAL(
+        displayTitle = "双栏",
+        shortSubtitle = "宽屏下始终使用双栏捧书排版",
+    ),
+}
+

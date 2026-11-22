@@ -255,6 +255,7 @@ class ProfileAndBackupTest {
                     pageEdgeDistanceDp = 14,
                 )
                 sourcePrefsRepo.setReaderCustomFontPath(customFontFile.absolutePath)
+                sourcePrefsRepo.setReaderColumnMode(org.mewx.wenku8.reader.model.ReaderColumnMode.DUAL)
 
                 // Populate source database (including a >300,000-char omnibus chapter to exercise 256k SUBSTR slicing)
                 sourceDb.novelDao().upsertNovel(
@@ -481,6 +482,10 @@ class ProfileAndBackupTest {
                 assertEquals(Wenku8API.AppLanguage.TC, restoredPrefs.appLanguage)
                 assertEquals(DefaultHomeDestination.BOOKSHELF, restoredPrefs.defaultHomeDestination)
                 assertEquals(24, restoredPrefs.readerFontSizeSp)
+                assertEquals(
+                    org.mewx.wenku8.reader.model.ReaderColumnMode.DUAL,
+                    restoredPrefs.readerColumnMode,
+                )
                 assertTrue(restoredPrefs.readerCustomFontPath.endsWith("/custom/reader_font"))
                 assertTrue(File(restoredPrefs.readerCustomFontPath).isFile)
 
