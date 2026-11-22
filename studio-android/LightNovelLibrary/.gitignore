@@ -8,6 +8,7 @@
 /skills/
 .kotlin/
 app*/default/
+*.hprof
 
 # distributions
 baidu/
