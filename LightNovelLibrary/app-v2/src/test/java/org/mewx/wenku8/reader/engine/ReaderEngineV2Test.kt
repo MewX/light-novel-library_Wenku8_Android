@@ -1147,6 +1147,169 @@ class ReaderEngineV2Test {
 
         buffer.close()
     }
+
+    @Test
+    fun pagination_coversEveryCharacterOnce_andAnchorsRoundTrip_acrossLayouts(): Unit = runBlocking {
+        // Pins the "missing / duplicated characters" guarantee (handoff/split-screen-audit.md §4):
+        // whatever the window size — split-screen half-width, fullscreen large font, or dual-column
+        // spread — the paginated layout must tile every block's text EXACTLY once (concatenating
+        // the rendered line texts reproduces the source verbatim), page anchors must strictly
+        // advance, and every page's start/end anchors must resolve back to their own page (so a
+        // reflow keeps the reader on the page containing the character they were reading).
+        val aid = 4400
+        database.novelDao().upsertNovel(
+            NovelEntity(aid = aid, title = "分页完整性测试"),
+        )
+        tocSyncRepository.syncNovelIndexAtomically(
+            aid = aid,
+            language = Wenku8API.AppLanguage.SC,
+            requestStartedAtMs = 6_000L,
+            parsedVolumes = listOf(
+                ParsedVolumeToc(
+                    vid = 800,
+                    volumeTitle = "第八卷",
+                    chapters = listOf(
+                        ParsedChapterToc(cid = 8001, chapterTitle = "第一话 覆盖完整性"),
+                    ),
+                ),
+            ),
+        )
+        val body = buildMultiPageChapter("第八卷", "第一话 覆盖完整性", paragraphCount = 40)
+        database.chapterContentDao().upsertChapterContent(
+            ChapterContentEntity(
+                cid = 8001,
+                aid = aid,
+                contentLang = Wenku8API.AppLanguage.SC.name,
+                contentText = body,
+                byteLength = body.toByteArray().size,
+                sha256Checksum = DigestUtils.sha256Hex(body),
+                downloadedAtMs = 7_000L,
+            ),
+        )
+
+        val paginator = StaticLayoutPaginator(lineBreaker = DeterministicCellLineBreaker)
+        val buffer = ChapterWindowBuffer(
+            aid = aid,
+            appLanguageProvider = { Wenku8API.AppLanguage.SC },
+            tocDao = database.tocDao(),
+            chapterContentDao = database.chapterContentDao(),
+            catalogGateway = fakeGateway,
+            novelTocSyncRepository = tocSyncRepository,
+            paginator = paginator,
+            scope = testScope,
+            ioDispatcher = Dispatchers.Unconfined,
+            computeDispatcher = Dispatchers.Unconfined,
+        )
+        val splitScreenConfig = ReaderLayoutConfig(
+            viewportWidthPx = 380,
+            viewportHeightPx = 640,
+            fontSizePx = 22f,
+            lineDistancePx = 10f,
+            paragraphDistancePx = 16f,
+            pageEdgeDistancePx = 20f,
+        )
+        val opened = buffer.openChapter(cid = 8001, layoutConfig = splitScreenConfig)
+        val ast = (opened.currentSlot as ChapterWindowSlot.Loaded).layout.ast
+        buffer.close()
+
+        val fullscreenLargeFontConfig = splitScreenConfig.copy(
+            viewportWidthPx = 560,
+            viewportHeightPx = 760,
+            fontSizePx = 30f,
+        )
+        val dualColumnSpreadConfig = fullscreenLargeFontConfig.copy(
+            columnCount = 2,
+            columnGapPx = 12f,
+        )
+
+        val configs = listOf(splitScreenConfig, fullscreenLargeFontConfig, dualColumnSpreadConfig)
+        configs.forEach { config ->
+            val paginated = paginator.paginate(ast, config)
+            assertTrue(paginated.pages.size >= 2)
+            assertLayoutCoversEveryCharacterOnce(paginated)
+        }
+
+        // Deterministic pagination: identical config re-run must produce byte-identical page
+        // breaks so saved anchors stay valid across re-entries.
+        assertEquals(
+            paginator.paginate(ast, fullscreenLargeFontConfig),
+            paginator.paginate(ast, fullscreenLargeFontConfig),
+        )
+    }
+
+    private fun assertLayoutCoversEveryCharacterOnce(paginated: PaginatedChapterLayout) {
+        val pages = paginated.pages
+        assertTrue(pages.isNotEmpty())
+
+        // Page anchors must never go backwards (no duplicated or reordered content across pages).
+        for (index in 1 until pages.size) {
+            assertTrue(
+                "page ${index - 1} endAnchor must not exceed page $index startAnchor",
+                pages[index].startAnchor >= pages[index - 1].endAnchor,
+            )
+        }
+
+        // Reconstruct every block verbatim from the rendered lines: concatenation must equal the
+        // source exactly — catches both missing characters (dropped lines) and duplicated ones.
+        val linesByBlock = LinkedHashMap<Int, MutableList<ReaderPageElement>>()
+        for (page in pages) {
+            for (element in page.elements) {
+                linesByBlock.getOrPut(element.blockIndex) { ArrayList() }.add(element)
+            }
+        }
+        for (block in paginated.ast.blocks) {
+            when (block) {
+                is ChapterBlock.ParagraphBlock -> {
+                    val lines = linesByBlock[block.blockIndex]
+                        .orEmpty()
+                        .filterIsInstance<ReaderPageElement.TextLine>()
+                    assertEquals(
+                        "paragraph ${block.blockIndex} text must tile exactly once",
+                        block.formattedText,
+                        lines.joinToString("") { it.text },
+                    )
+                    if (block.text.isNotEmpty()) {
+                        val sortedByStart = lines.sortedBy { it.rawStartChar }
+                        var expectedStart = 0
+                        for (line in sortedByStart) {
+                            assertEquals(expectedStart, line.rawStartChar)
+                            expectedStart = line.rawEndChar + 1
+                        }
+                        assertEquals(block.text.length, expectedStart)
+                    }
+                }
+
+                is ChapterBlock.TitleBlock -> {
+                    val lines = linesByBlock[block.blockIndex]
+                        .orEmpty()
+                        .filterIsInstance<ReaderPageElement.TitleLine>()
+                    assertEquals(
+                        "title ${block.blockIndex} text must tile exactly once",
+                        block.title,
+                        lines.joinToString("") { it.text },
+                    )
+                }
+
+                is ChapterBlock.IllustrationBlock -> Unit
+            }
+        }
+
+        // Round-trip: every non-artbook page's own anchors must resolve back to that page, so a
+        // reflow followed by `resolvePageIndexForAnchor` lands the reader exactly where they were.
+        for (page in pages) {
+            if (page.isFullBleedArtbookPage) continue
+            assertEquals(
+                "startAnchor of page ${page.pageIndexInChapter} must resolve to itself",
+                page.pageIndexInChapter,
+                paginated.resolvePageIndexForAnchor(page.startAnchor),
+            )
+            assertEquals(
+                "endAnchor of page ${page.pageIndexInChapter} must resolve to itself",
+                page.pageIndexInChapter,
+                paginated.resolvePageIndexForAnchor(page.endAnchor),
+            )
+        }
+    }
 }
 
 private class FakeReaderEngineGateway : WenkuCatalogGateway {
