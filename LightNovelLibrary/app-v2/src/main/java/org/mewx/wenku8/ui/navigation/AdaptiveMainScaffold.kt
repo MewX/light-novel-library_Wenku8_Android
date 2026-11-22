@@ -68,11 +68,14 @@ import androidx.compose.material3.rememberWideNavigationRailState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.Saver
+import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
@@ -261,6 +264,108 @@ private fun ScaffoldSceneState.saveableKey(): String = when (this) {
  *   sub-destinations in [SharedTransitionLayout] + [AnimatedContent] so the Searchbox pill/input
  *   and Light Novel Cover + Title morph smoothly across screens (and snap in `0ms` in E-Ink mode).
  */
+
+/**
+ * Persists the active reader launch across Activity recreations (split-screen entry, fold/unfold,
+ * resize drags — `MainActivity` declares no `android:configChanges`, so every window-size change
+ * recreates the Activity). Without this the reader scene silently unloads back to the home shell
+ * mid-reading; reading progress itself is already persisted to Room on every page turn.
+ *
+ * `null` (no reader open) round-trips as an empty list.
+ */
+internal fun saveReaderLaunchRequest(request: ReaderLaunchRequest?): List<Any> =
+    if (request == null) {
+        emptyList()
+    } else {
+        listOf(
+            request.aid,
+            request.vid,
+            request.cid,
+            request.novelTitle,
+            request.volumeTitle,
+            request.chapterTitle,
+            request.startWithTts,
+            request.initialParagraphIndex,
+            request.initialCharOffset,
+        )
+    }
+
+internal fun restoreReaderLaunchRequest(saved: List<Any>): ReaderLaunchRequest? {
+    if (saved.size < 6) {
+        return null
+    }
+    // Android restores saved instance state across app updates, so a payload written by an older
+    // version may be shorter than the current field list. Required identity fields are positional;
+    // the optional tail fields fall back to their data-class defaults instead of crashing.
+    return ReaderLaunchRequest(
+        aid = saved[0] as Int,
+        vid = saved[1] as Int,
+        cid = saved[2] as Int,
+        novelTitle = saved[3] as String,
+        volumeTitle = saved[4] as String,
+        chapterTitle = saved[5] as String,
+        startWithTts = saved.getOrNull(6) as? Boolean ?: false,
+        initialParagraphIndex = saved.getOrNull(7) as? Int ?: -1,
+        initialCharOffset = saved.getOrNull(8) as? Int ?: 0,
+    )
+}
+
+internal val ReaderLaunchRequestSaver = listSaver<ReaderLaunchRequest?, Any>(
+    save = { request -> saveReaderLaunchRequest(request) },
+    restore = { saved -> restoreReaderLaunchRequest(saved) },
+)
+
+/**
+ * Persists the two-pane detail seed card across Activity recreations so the detail pane keeps its
+ * title/author/cover skeleton after a split-screen resize even before Room emits a snapshot —
+ * previously the seed was a plain `remember` while the pane's `aid` was saveable, so recreation
+ * left the pane rendering a bare "AID #x" shell (the reported blank-detail-pane bug).
+ *
+ * `null` (no detail pane open) round-trips as an empty list.
+ */
+internal fun saveDetailSeedItem(item: DiscoveryNovelCardItem?): List<Any> =
+    if (item == null) {
+        emptyList()
+    } else {
+        listOf(
+            item.aid,
+            item.title,
+            item.author,
+            item.bookStatus,
+            item.lastUpdate,
+            ArrayList(item.tags),
+            item.introShort,
+            item.coverUrl,
+            item.inLocalBookshelf,
+            item.isHydratingMetadata,
+        )
+    }
+
+internal fun restoreDetailSeedItem(saved: List<Any>): DiscoveryNovelCardItem? {
+    if (saved.size < 8) {
+        return null
+    }
+    // Same forward-compat contract as [restoreReaderLaunchRequest]: positional required fields,
+    // defaulted optional tail fields, extra future entries ignored.
+    return DiscoveryNovelCardItem(
+        aid = saved[0] as Int,
+        title = saved[1] as String,
+        author = saved[2] as String,
+        bookStatus = saved[3] as String,
+        lastUpdate = saved[4] as String,
+        tags = saved[5] as ArrayList<String>,
+        introShort = saved[6] as String,
+        coverUrl = saved[7] as String,
+        inLocalBookshelf = saved.getOrNull(8) as? Boolean ?: false,
+        isHydratingMetadata = saved.getOrNull(9) as? Boolean ?: false,
+    )
+}
+
+internal val DetailSeedItemSaver = listSaver<DiscoveryNovelCardItem?, Any>(
+    save = { item -> saveDetailSeedItem(item) },
+    restore = { saved -> restoreDetailSeedItem(saved) },
+)
+
 @OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 fun AdaptiveMainScaffold(
@@ -399,7 +504,7 @@ fun AdaptiveMainScaffold(
     var activeDetailSharedOrigin by rememberSaveable {
         mutableStateOf(Wenku8SharedElementKeys.NOVEL_DEFAULT_ORIGIN)
     }
-    var activeDetailSeedItem by androidx.compose.runtime.remember {
+    var activeDetailSeedItem by rememberSaveable(stateSaver = DetailSeedItemSaver) {
         mutableStateOf<DiscoveryNovelCardItem?>(null)
     }
     var activeReviewsAid by rememberSaveable {
@@ -411,7 +516,7 @@ fun AdaptiveMainScaffold(
     var activeReviewThread by androidx.compose.runtime.remember {
         mutableStateOf<ReviewThreadCardItem?>(null)
     }
-    var activeReaderRequest by androidx.compose.runtime.remember {
+    var activeReaderRequest by rememberSaveable(stateSaver = ReaderLaunchRequestSaver) {
         mutableStateOf<ReaderLaunchRequest?>(null)
     }
     var activeFootprintTab by rememberSaveable {
@@ -1252,47 +1357,54 @@ fun AdaptiveMainScaffold(
                                             val activeElevation = postReadingElevationToken?.takeIf {
                                                 it.isFreshAt(SystemClock.elapsedRealtime())
                                             }
-                                            NovelDetailScreen(
-                                                aid = activeDetailNovelAid,
-                                                novelDetailRepository = novelDetailRepository,
-                                                bookshelfRepository = bookshelfRepository,
-                                                novelDownloadRepository = novelDownloadRepository,
-                                                appLanguage = appLanguage,
-                                                themeMode = effectivePreferences.themeMode,
-                                                useCoverTheme = effectivePreferences.themeMode == Wenku8ThemeMode.SYSTEM,
-                                                seedDiscoveryItem = activeDetailSeedItem?.takeIf {
-                                                    it.aid == activeDetailNovelAid
-                                                },
-                                                sharedTransitionOrigin = activeDetailSharedOrigin,
-                                                showBackButton = true,
-                                                onNavigateBack = {
-                                                    if (activeElevation != null) {
-                                                        postReadingElevationToken = null
-                                                    }
-                                                    activeDetailNovelAid = 0
-                                                    activeDetailSeedItem = null
-                                                },
-                                                onOpenReader = handleOpenReader,
-                                                onOpenReviews = { aid, title ->
-                                                    activeReviewsAid = aid
-                                                    activeReviewsNovelTitle = title
-                                                    activeReviewThread = null
-                                                },
-                                                onAuthorClicked = { author ->
-                                                    handleOpenSearchWithSeed(author, UnifiedSearchMode.AUTHOR_NAME)
-                                                },
-                                                onTagClicked = { tag ->
-                                                    handleOpenSearchWithSeed(tag, UnifiedSearchMode.NOVEL_TITLE)
-                                                },
-                                                onOpenCoverLightbox = handleOpenCoverLightbox,
-                                                bannerPlacement = if (activeElevation != null) {
-                                                    InlineBannerPlacement.NOVEL_DETAIL_POST_READING_LARGE
-                                                } else {
-                                                    InlineBannerPlacement.NOVEL_DETAIL_STANDARD
-                                                },
-                                                bannerRequestNonce = activeElevation?.nonce ?: 0,
-                                                modifier = Modifier.fillMaxSize(),
-                                            )
+                                            // `key(aid)` forces a fresh composition when the user
+                                            // jumps to a different book inside the same pane: the
+                                            // detail flow's `collectAsState` otherwise keeps the
+                                            // PREVIOUS book's last emission until the new flow's
+                                            // first emission lands (stale hero/TOC flash).
+                                            key(activeDetailNovelAid) {
+                                                NovelDetailScreen(
+                                                    aid = activeDetailNovelAid,
+                                                    novelDetailRepository = novelDetailRepository,
+                                                    bookshelfRepository = bookshelfRepository,
+                                                    novelDownloadRepository = novelDownloadRepository,
+                                                    appLanguage = appLanguage,
+                                                    themeMode = effectivePreferences.themeMode,
+                                                    useCoverTheme = effectivePreferences.themeMode == Wenku8ThemeMode.SYSTEM,
+                                                    seedDiscoveryItem = activeDetailSeedItem?.takeIf {
+                                                        it.aid == activeDetailNovelAid
+                                                    },
+                                                    sharedTransitionOrigin = activeDetailSharedOrigin,
+                                                    showBackButton = true,
+                                                    onNavigateBack = {
+                                                        if (activeElevation != null) {
+                                                            postReadingElevationToken = null
+                                                        }
+                                                        activeDetailNovelAid = 0
+                                                        activeDetailSeedItem = null
+                                                    },
+                                                    onOpenReader = handleOpenReader,
+                                                    onOpenReviews = { aid, title ->
+                                                        activeReviewsAid = aid
+                                                        activeReviewsNovelTitle = title
+                                                        activeReviewThread = null
+                                                    },
+                                                    onAuthorClicked = { author ->
+                                                        handleOpenSearchWithSeed(author, UnifiedSearchMode.AUTHOR_NAME)
+                                                    },
+                                                    onTagClicked = { tag ->
+                                                        handleOpenSearchWithSeed(tag, UnifiedSearchMode.NOVEL_TITLE)
+                                                    },
+                                                    onOpenCoverLightbox = handleOpenCoverLightbox,
+                                                    bannerPlacement = if (activeElevation != null) {
+                                                        InlineBannerPlacement.NOVEL_DETAIL_POST_READING_LARGE
+                                                    } else {
+                                                        InlineBannerPlacement.NOVEL_DETAIL_STANDARD
+                                                    },
+                                                    bannerRequestNonce = activeElevation?.nonce ?: 0,
+                                                    modifier = Modifier.fillMaxSize(),
+                                                )
+                                            }
                                         }
                                     }
                                 }

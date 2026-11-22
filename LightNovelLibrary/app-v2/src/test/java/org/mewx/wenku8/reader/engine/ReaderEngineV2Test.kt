@@ -2,7 +2,9 @@ package org.mewx.wenku8.reader.engine
 
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
@@ -1016,6 +1018,92 @@ class ReaderEngineV2Test {
             append("　　第${i}段正文：在清冷的晨雾之中，马蹄踏过石板街道发出清脆声响，麦穗与苹果的香气在木桶间弥漫开来。\r\n")
         }
     }
+
+    @Test
+    fun openChapter_remoteLoadCompletingAfterResize_revertsConfig_andConvergesOnCorrection() = runBlocking {
+        // Regression harness for the split-screen "stale pagination with clipped text" bug
+        // (handoff/split-screen-audit.md §2): `openChapter` captures its layout config at call
+        // time and writes it into the window snapshot on completion, so a resize that lands while
+        // the chapter is still loading gets reverted. `UnifiedReaderScreen` therefore carries a
+        // divergence watcher that re-issues `updateLayoutConfig`; this test pins BOTH the revert
+        // (why the watcher exists) and the one-pass convergence (why it terminates).
+        val aid = 4399
+        database.novelDao().upsertNovel(
+            NovelEntity(aid = aid, title = "分屏重排竞态测试作品"),
+        )
+        tocSyncRepository.syncNovelIndexAtomically(
+            aid = aid,
+            language = Wenku8API.AppLanguage.SC,
+            requestStartedAtMs = 5_000L,
+            parsedVolumes = listOf(
+                ParsedVolumeToc(
+                    vid = 700,
+                    volumeTitle = "第七卷",
+                    chapters = listOf(
+                        ParsedChapterToc(cid = 7001, chapterTitle = "第一话 分屏 resizing"),
+                    ),
+                ),
+            ),
+        )
+        fakeGateway.remoteChapters[7001] =
+            buildMultiPageChapter("第七卷", "第一话 分屏 resizing", paragraphCount = 16)
+
+        val gatedGateway = GatedReaderEngineGateway(fakeGateway)
+        val buffer = ChapterWindowBuffer(
+            aid = aid,
+            appLanguageProvider = { Wenku8API.AppLanguage.SC },
+            tocDao = database.tocDao(),
+            chapterContentDao = database.chapterContentDao(),
+            catalogGateway = gatedGateway,
+            novelTocSyncRepository = tocSyncRepository,
+            paginator = StaticLayoutPaginator(lineBreaker = DeterministicCellLineBreaker),
+            scope = testScope,
+            ioDispatcher = Dispatchers.Unconfined,
+            computeDispatcher = Dispatchers.Unconfined,
+        )
+
+        val oldConfig = ReaderLayoutConfig(
+            viewportWidthPx = 380,
+            viewportHeightPx = 640,
+            fontSizePx = 22f,
+            lineDistancePx = 10f,
+            paragraphDistancePx = 16f,
+            pageEdgeDistancePx = 20f,
+        )
+        val newConfig = oldConfig.copy(
+            viewportWidthPx = 560,
+            viewportHeightPx = 760,
+            fontSizePx = 30f,
+        )
+
+        // 1. Hold `openChapter` at the network gate (remote chapter, no local cache).
+        val openJob = launch { buffer.openChapter(cid = 7001, layoutConfig = oldConfig) }
+        gatedGateway.fetchEntered.await()
+
+        // 2. A split-screen divider drag lands mid-load: the UI re-issues the new config, which
+        //    is recorded into the snapshot (the Loading slot cannot be re-paginated yet).
+        buffer.updateLayoutConfig(newConfig)
+        assertEquals(newConfig, buffer.snapshotFlow.value.layoutConfig)
+
+        // 3. The chapter load completes and writes its captured OLD config back — the revert the
+        //    UI-side watcher must correct.
+        gatedGateway.fetchRelease.complete(Unit)
+        openJob.join()
+        assertEquals(oldConfig, buffer.snapshotFlow.value.layoutConfig)
+        assertTrue(buffer.snapshotFlow.value.currentSlot is ChapterWindowSlot.Loaded)
+
+        // 4. The watcher's correction pass: one `updateLayoutConfig(newConfig)` converges the
+        //    snapshot to the new config with consistent re-paginated Loaded pages, preserving
+        //    the reading anchor (top of chapter here).
+        val corrected = buffer.updateLayoutConfig(newConfig)
+        assertEquals(newConfig, corrected.layoutConfig)
+        assertTrue(corrected.currentSlot is ChapterWindowSlot.Loaded)
+        assertTrue(corrected.currentPageCount >= 1)
+        // No wasted network: content was fetched exactly once and cached locally.
+        assertEquals(listOf(7001), fakeGateway.requestedCids)
+
+        buffer.close()
+    }
 }
 
 private class FakeReaderEngineGateway : WenkuCatalogGateway {
@@ -1078,4 +1166,26 @@ private class FakeReaderEngineGateway : WenkuCatalogGateway {
     override suspend fun fetchCloudBookshelf(
         appLanguage: Wenku8API.AppLanguage,
     ): WenkuApiResult<List<ParsedCloudBookshelfEntry>> = WenkuApiResult.Success(emptyList())
+}
+
+/**
+ * Wraps [FakeReaderEngineGateway] with a deterministic suspension gate on [fetchChapterContent]
+ * so a test can hold `openChapter` mid-network-load and interleave an `updateLayoutConfig` call —
+ * reproducing the split-screen resize-during-load race in test code.
+ */
+private class GatedReaderEngineGateway(
+    private val delegate: FakeReaderEngineGateway,
+) : WenkuCatalogGateway by delegate {
+    val fetchEntered = CompletableDeferred<Unit>()
+    val fetchRelease = CompletableDeferred<Unit>()
+
+    override suspend fun fetchChapterContent(
+        aid: Int,
+        cid: Int,
+        appLanguage: Wenku8API.AppLanguage,
+    ): WenkuApiResult<String> {
+        fetchEntered.complete(Unit)
+        fetchRelease.await()
+        return delegate.fetchChapterContent(aid, cid, appLanguage)
+    }
 }

@@ -470,6 +470,9 @@
     <string name="detail_toc_empty_loading">正在同步分卷目录…</string>
     <string name="detail_toc_empty_offline">当前离线且尚未缓存目录，联网后点击刷新即可获取</string>
     <string name="detail_offline_preserved_banner">当前网络连接不可用，已为您展示本地保存的详情与目录</string>
+    <string name="detail_unresolved_loading">正在获取书籍信息…</string>
+    <string name="detail_unresolved_failed">暂时无法获取这本书的信息</string>
+    <string name="detail_unresolved_retry">重试</string>
     <string name="detail_title_dialog_header">作品完整信息</string>
     <string name="detail_title_dialog_aid_format">作品编号：#%1$d</string>
     <string name="detail_title_dialog_copy">复制标题与编号</string>

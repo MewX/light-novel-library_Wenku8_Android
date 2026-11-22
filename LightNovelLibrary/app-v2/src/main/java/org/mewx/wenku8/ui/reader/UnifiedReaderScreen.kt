@@ -1105,6 +1105,21 @@ fun UnifiedReaderScreen(
             }
         }
 
+        // Divergence safety net for cases the keyed effect above cannot observe: `openChapter`
+        // paginates with the config captured at call time and writes it into the snapshot on
+        // completion, so a split-screen resize (or live font change) while a chapter is still
+        // loading gets reverted to the stale layout with clipped text. Re-issue the re-layout
+        // whenever the buffer's snapshot config diverges from the UI-side config; converges in
+        // one pass because `updateLayoutConfig` writes `newConfig` back into the snapshot.
+        LaunchedEffect(snapshot.layoutConfig) {
+            if (didInitialOpen && snapshot.layoutConfig != currentLayoutConfig) {
+                windowBuffer.updateLayoutConfig(
+                    newConfig = currentLayoutConfig,
+                    lockedAnchorOverride = dragLockedAnchor,
+                )
+            }
+        }
+
         val curLoadedSlotForSync = snapshot.currentSlot as? ChapterWindowSlot.Loaded
         val isPrevSlotTranslationOnly =
             syncedSnapshotTracker.currentSlotLoaded &&

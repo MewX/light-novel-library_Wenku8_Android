@@ -1111,6 +1111,51 @@ class NovelDetailAndDownloadTest {
         // Host owns the full-screen overlay so inline overlay stays closed
         composeTestRule.onNodeWithTag(ArtbookTestTags.OVERLAY).assertDoesNotExist()
     }
+
+    @Test
+    fun unresolvedBook_showsLoadingRetryOverlay_andRecoversAfterSuccessfulRetry(): Unit = runBlocking {
+        // Regression test for the reported "blank two-pane detail when opening another book"
+        // (handoff/split-screen-audit.md §3): a book with no local snapshot AND no seed card used
+        // to render a bare zeroed skeleton. It must instead show the explicit unresolved overlay,
+        // offer retry once refresh gives up, and resolve into the normal detail on success.
+        fakeGateway.simulateNetworkOffline = true
+
+        composeTestRule.setContent {
+            Wenku8ExpressiveTheme(themeMode = Wenku8ThemeMode.ARCHIVAL_DAY) {
+                NovelDetailScreen(
+                    aid = 42,
+                    novelDetailRepository = detailRepository,
+                    bookshelfRepository = bookshelfRepository,
+                    novelDownloadRepository = downloadRepository,
+                    appLanguage = Wenku8API.AppLanguage.SC,
+                    themeMode = Wenku8ThemeMode.ARCHIVAL_DAY,
+                    seedDiscoveryItem = null,
+                    onOpenReader = {},
+                    onOpenReviews = { _, _ -> },
+                    onAuthorClicked = {},
+                    onTagClicked = {},
+                    isNetworkAvailableForAdOverride = true,
+                    isGmsAvailableForAdOverride = true,
+                    enableLiveAdViewInflation = false,
+                )
+            }
+        }
+        composeTestRule.waitForIdle()
+
+        // The initial auto-refresh failed offline: the overlay must present the failure state
+        // with a retry affordance instead of an empty skeleton.
+        composeTestRule.onNodeWithTag(NovelDetailTestTags.UNRESOLVED_STATE).assertIsDisplayed()
+        composeTestRule.onNodeWithText("暂时无法获取这本书的信息").assertIsDisplayed()
+        composeTestRule.onNodeWithText("重试").assertIsDisplayed()
+
+        // Retry with connectivity restored: the book resolves and the overlay disappears.
+        fakeGateway.simulateNetworkOffline = false
+        composeTestRule.onNodeWithText("重试").performClick()
+        composeTestRule.waitForIdle()
+
+        composeTestRule.onNodeWithTag(NovelDetailTestTags.UNRESOLVED_STATE).assertDoesNotExist()
+        composeTestRule.onNodeWithTag(NovelDetailTestTags.NOVEL_TITLE_TEXT).assertIsDisplayed()
+    }
 }
 
 private class FakeDetailAndDownloadGateway : WenkuCatalogGateway {

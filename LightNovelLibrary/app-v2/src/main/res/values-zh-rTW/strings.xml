@@ -470,6 +470,9 @@
     <string name="detail_toc_empty_loading">正在同步分卷目錄…</string>
     <string name="detail_toc_empty_offline">目前離線且尚未快取目錄，連網後點擊重新整理即可取得</string>
     <string name="detail_offline_preserved_banner">目前網路連線不可用，已為您顯示本地儲存的詳情與目錄</string>
+    <string name="detail_unresolved_loading">正在獲取書籍資訊…</string>
+    <string name="detail_unresolved_failed">暫時無法獲取這本書的資訊</string>
+    <string name="detail_unresolved_retry">重試</string>
     <string name="detail_title_dialog_header">作品完整資訊</string>
     <string name="detail_title_dialog_aid_format">作品編號：#%1$d</string>
     <string name="detail_title_dialog_copy">複製標題與編號</string>

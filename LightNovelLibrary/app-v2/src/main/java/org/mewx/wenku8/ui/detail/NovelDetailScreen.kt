@@ -95,6 +95,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -162,6 +163,7 @@ object NovelDetailTestTags {
     const val COVER_IMAGE_TRIGGER = "novel_detail_cover_image_trigger"
     const val NOVEL_TITLE_TEXT = "novel_detail_title_text"
     const val BOOK_STATUS_BADGE = "novel_detail_book_status_badge"
+    const val UNRESOLVED_STATE = "novel_detail_unresolved_state"
     const val TITLE_DIALOG = "novel_detail_title_dialog"
     const val TITLE_DIALOG_COPY_BUTTON = "novel_detail_title_dialog_copy"
     const val AUTHOR_TRIGGER = "novel_detail_author_trigger"
@@ -607,6 +609,21 @@ fun NovelDetailScreen(
                     availableWidthDp = bannerSlotWidthDp,
                     canRequestAdsOverride = canRequestAdsForAdOverride,
                 )
+                // Unresolved-book overlay: when the repository has no local snapshot AND no seed
+                // card, the pane would otherwise render a bare zeroed skeleton (the reported
+                // "blank detail pane"). Cover it with an explicit loading / retry state until the
+                // first Room emission or a successful refresh resolves the book.
+                if (snapshot.novel == null && snapshot.volumes.isEmpty()) {
+                    NovelDetailUnresolvedOverlay(
+                        isRefreshing = isRefreshing,
+                        isEinkMode = isEinkMode,
+                        onRetry = triggerRefresh,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .zIndex(1f)
+                            .background(MaterialTheme.colorScheme.background),
+                    )
+                }
                 LazyColumn(
                     modifier = Modifier
                         .fillMaxSize()
@@ -2594,5 +2611,58 @@ private fun shareNovelExternally(context: Context, shareText: String) {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
         context.startActivity(chooser)
+    }
+}
+
+/**
+ * Full-pane loading / retry state for a detail pane whose book has no local snapshot and no seed
+ * card (typically: opened by `aid` after process death, or a two-pane switch to a book that is
+ * neither shelved nor cached and whose first network refresh has not resolved yet). Replaces the
+ * bare zeroed skeleton previously rendered in that state.
+ */
+@Composable
+private fun NovelDetailUnresolvedOverlay(
+    isRefreshing: Boolean,
+    isEinkMode: Boolean,
+    onRetry: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Box(
+        modifier = modifier.testTag(NovelDetailTestTags.UNRESOLVED_STATE),
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+            modifier = Modifier.padding(horizontal = 24.dp),
+        ) {
+            if (isRefreshing) {
+                if (isEinkMode) {
+                    LinearProgressIndicator(modifier = Modifier.fillMaxWidth(0.55f))
+                } else {
+                    LinearWavyProgressIndicator(modifier = Modifier.fillMaxWidth(0.55f))
+                }
+                Text(
+                    text = stringResource(R.string.detail_unresolved_loading),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            } else {
+                Icon(
+                    imageVector = Icons.Outlined.CloudOff,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(36.dp),
+                )
+                Text(
+                    text = stringResource(R.string.detail_unresolved_failed),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                FilledTonalButton(onClick = onRetry) {
+                    Text(text = stringResource(R.string.detail_unresolved_retry))
+                }
+            }
+        }
     }
 }
