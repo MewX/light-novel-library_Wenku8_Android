@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.ContextWrapper
 import android.os.Build
 import android.os.SystemClock
+import android.util.Log
 import android.view.KeyEvent as AndroidKeyEvent
 import android.view.ViewTreeObserver
 import android.view.WindowManager
@@ -658,9 +659,14 @@ fun UnifiedReaderScreen(
             accumulatedSessionChars += activePage.characterCountOnPage
         }
         if (preferences.readerPageTurnMode != ReaderPageTurnMode.CONTINUOUS_SCROLL) {
+            val progressAnchor = activePage.toBookmarkOrProgressAnchor()
+            Log.d(
+                "WenkuReaderReflow",
+                "persist cid=${activeChapter.cid} anchor=$progressAnchor page=${activePage.pageIndexInChapter}",
+            )
             persistReadingProgress(
                 chapter = activeChapter,
-                anchor = activePage.toBookmarkOrProgressAnchor(),
+                anchor = progressAnchor,
             )
         }
     }
@@ -1040,6 +1046,12 @@ fun UnifiedReaderScreen(
         // Open requested chapter on initial mount; re-paginate in memory on subsequent config changes!
         var didInitialOpen by remember(launchRequest.aid, launchRequest.cid) { mutableStateOf(false) }
         LaunchedEffect(launchRequest.aid, launchRequest.cid, currentLayoutConfig) {
+            Log.d(
+                "WenkuReaderReflow",
+                "openEffect restart cid=${launchRequest.cid} " +
+                    "config=${currentLayoutConfig.viewportWidthPx}x${currentLayoutConfig.viewportHeightPx}" +
+                    "@${currentLayoutConfig.fontSizePx}px didOpen=$didInitialOpen",
+            )
             if (!didInitialOpen) {
                 didInitialOpen = true
                 try {
@@ -1082,13 +1094,20 @@ fun UnifiedReaderScreen(
                         fallbackVid = launchRequest.vid,
                         fallbackVolumeTitle = launchRequest.volumeTitle,
                         fallbackChapterTitle = launchRequest.chapterTitle,
-                    )
+                    ).also { opened ->
+                        Log.d(
+                            "WenkuReaderReflow",
+                            "open done anchor=$resolvedInitialAnchor " +
+                                "active=${opened.activeVirtualPageIndex} pages=${opened.totalVirtualPages}",
+                        )
+                    }
                 } catch (ce: CancellationException) {
                     if (!currentCoroutineContext().isActive) {
                         // The effect was cancelled mid-open: the cancelled sequence produced no
                         // content, so un-latch `didInitialOpen` — the restarted effect must re-run
                         // the full open path, because the `updateLayoutConfig` branch cannot
                         // recover an empty snapshot and would leave a permanently blank reader.
+                        Log.d("WenkuReaderReflow", "un-latch open (cancelled mid-sequence)")
                         didInitialOpen = false
                     }
                     throw ce
@@ -1097,7 +1116,7 @@ fun UnifiedReaderScreen(
                 // Preserve any live/in-flight paged target (e.g. fast Page 1 -> Page 2 flip while
                 // immersive system bars asynchronously hide and expand viewportHeightPx).
                 val livePagedAnchor = if (preferences.readerPageTurnMode != ReaderPageTurnMode.CONTINUOUS_SCROLL) {
-                    resolveReflowLockedAnchor(
+                    val resolved = resolveReflowLockedAnchor(
                         snapshot = snapshot,
                         pagerCurrentPage = pagerState.currentPage,
                         pagerOffsetFraction = pagerState.currentPageOffsetFraction,
@@ -1105,13 +1124,27 @@ fun UnifiedReaderScreen(
                         inFlightStep = inFlightStepRef[0],
                         interruptedStep = interruptedStepRef[0],
                     )
+                    Log.d(
+                        "WenkuReaderReflow",
+                        "reflowAnchor resolved=$resolved pager=${pagerState.currentPage}" +
+                            "+${pagerState.currentPageOffsetFraction} " +
+                            "snapActive=${snapshot.activeVirtualPageIndex}/${snapshot.totalVirtualPages} " +
+                            "trackerRev=${syncedSnapshotTracker.revision} snapRev=${snapshot.coordinateRevision}",
+                    )
+                    resolved
                 } else {
                     null
                 }
                 windowBuffer.updateLayoutConfig(
                     newConfig = currentLayoutConfig,
                     lockedAnchorOverride = dragLockedAnchor ?: livePagedAnchor,
-                )
+                ).also { reflowed ->
+                    Log.d(
+                        "WenkuReaderReflow",
+                        "reflow done active=${reflowed.activeVirtualPageIndex} " +
+                            "pages=${reflowed.totalVirtualPages} rev=${reflowed.coordinateRevision}",
+                    )
+                }
             }
         }
 
@@ -1210,6 +1243,12 @@ fun UnifiedReaderScreen(
                     syncedSnapshotTracker.pendingPostSyncShouldAnimate = false
                     syncedSnapshotTracker.wasScrollingAtExplicitReset = pagerState.isScrollInProgress
                     val target = snapshot.activeVirtualPageIndex.coerceIn(0, maxPage)
+                    Log.d(
+                        "WenkuReaderReflow",
+                        "sync rev=${snapshot.coordinateRevision} target=$target " +
+                            "pager=${pagerState.currentPage}+${pagerState.currentPageOffsetFraction} " +
+                            "translationOnly=$isPrevSlotTranslationOnly",
+                    )
                     if (pagerState.currentPage != target || pagerState.currentPageOffsetFraction != 0f) {
                         pagerState.requestScrollToPage(page = target, pageOffsetFraction = 0f)
                     }
