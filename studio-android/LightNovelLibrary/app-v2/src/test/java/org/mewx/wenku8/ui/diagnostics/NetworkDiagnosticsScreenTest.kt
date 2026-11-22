@@ -139,7 +139,7 @@ class NetworkDiagnosticsScreenTest {
         composeTestRule.onNodeWithTag(NetworkDiagnosticsTestTags.START_QUICK_CHECK_BUTTON)
             .assertIsDisplayed()
             .performClick()
-        composeTestRule.waitForIdle()
+        waitForTag(NetworkDiagnosticsTestTags.METRIC_SUCCESS_VALUE)
 
         // Verify 9 / 10 summary metrics
         composeTestRule.onNodeWithTag(NetworkDiagnosticsTestTags.METRIC_SUCCESS_VALUE)
@@ -269,7 +269,7 @@ class NetworkDiagnosticsScreenTest {
 
         composeTestRule.onNodeWithTag(NetworkDiagnosticsTestTags.START_QUICK_CHECK_BUTTON)
             .performClick()
-        composeTestRule.waitForIdle()
+        waitForTag(NetworkDiagnosticsTestTags.METRIC_SUCCESS_VALUE)
 
         composeTestRule.onNodeWithTag(NetworkDiagnosticsTestTags.METRIC_SUCCESS_VALUE)
             .assertTextEquals("0 / 10 次")
@@ -317,7 +317,7 @@ class NetworkDiagnosticsScreenTest {
 
         composeTestRule.onNodeWithTag(NetworkDiagnosticsTestTags.START_QUICK_CHECK_BUTTON)
             .performClick()
-        composeTestRule.waitForIdle()
+        waitForTag(NetworkDiagnosticsTestTags.FLAT_EINK_PROGRESS_INDICATOR)
 
         // While suspended at probe #02, E-Ink mode must render flat LinearProgressIndicator
         composeTestRule.onNodeWithTag(NetworkDiagnosticsTestTags.FLAT_EINK_PROGRESS_INDICATOR)
@@ -590,11 +590,12 @@ class NetworkDiagnosticsScreenTest {
             .performScrollToKey("quick_check_card")
         composeTestRule.onNodeWithTag(NetworkDiagnosticsTestTags.START_QUICK_CHECK_BUTTON)
             .performClick()
-        composeTestRule.waitForIdle()
+        waitForTag(NetworkDiagnosticsTestTags.METRIC_SUCCESS_VALUE)
 
         // 3. Recorded good IP appears right near the OFF toggle!
         composeTestRule.onNodeWithTag(NetworkDiagnosticsTestTags.CONTENT_LIST)
             .performScrollToKey("network_and_auto_routing_card")
+        waitForTag(NetworkDiagnosticsTestTags.RECORDED_IP_BANNER)
         composeTestRule.onNodeWithTag(NetworkDiagnosticsTestTags.RECORDED_IP_BANNER)
             .assertIsDisplayed()
         composeTestRule.onNodeWithTag(NetworkDiagnosticsTestTags.RECORDED_IP_TEXT)
@@ -603,7 +604,7 @@ class NetworkDiagnosticsScreenTest {
         // 4. Flip toggle ON -> immediately activates recorded IP and shows Selected IP banner!
         composeTestRule.onNodeWithTag(NetworkDiagnosticsTestTags.AUTO_OPTIMIZE_SWITCH)
             .performClick()
-        composeTestRule.waitForIdle()
+        waitForTag(NetworkDiagnosticsTestTags.SELECTED_IP_BANNER)
         assertTrue(toggleState.value)
         composeTestRule.onNodeWithTag(NetworkDiagnosticsTestTags.SELECTED_IP_BANNER)
             .assertIsDisplayed()
@@ -620,6 +621,16 @@ class NetworkDiagnosticsScreenTest {
         assertNotNull(exportedReport)
         val redactedJson = exportedReport!!.toRedactedJsonString("test-note")
         assertFalse(redactedJson.contains("162.159.135.99"))
+    }
+
+    private fun waitForTag(tag: String, timeoutMillis: Long = 5_000L) {
+        composeTestRule.waitUntil(timeoutMillis = timeoutMillis) {
+            composeTestRule
+                .onAllNodes(androidx.compose.ui.test.hasTestTag(tag))
+                .fetchSemanticsNodes()
+                .isNotEmpty()
+        }
+        composeTestRule.waitForIdle()
     }
 
     private fun fakeProbeTransport(
