@@ -111,18 +111,16 @@ object ServerSupportAdConstants {
     const val PRODUCTION_BANNER_AD_UNIT_ID = "ca-app-pub-7333757578973883/9658350163"
 
     /**
-     * Dedicated Ad Unit ID slot for post-reading large inline adaptive banners (`maxHeight = 250dp`).
-     * Defaults to [PRODUCTION_BANNER_AD_UNIT_ID] (which supports inline adaptive banners immediately)
-     * until a dedicated Banner Ad Unit is created in the AdMob console for independent reporting.
+     * Dedicated production Ad Unit ID for post-reading large inline adaptive banners
+     * (`maxHeight = 250dp`, AdMob unit: `Novel Detail - Post-Reading Large Banner`).
      */
-    const val PRODUCTION_POST_READING_LARGE_BANNER_AD_UNIT_ID = PRODUCTION_BANNER_AD_UNIT_ID
+    const val PRODUCTION_POST_READING_LARGE_BANNER_AD_UNIT_ID = "ca-app-pub-7333757578973883/8618142337"
 
     /**
-     * Dedicated Ad Unit ID slot for Discovery feed (`最新` / `排行`) inline adaptive banners.
-     * Defaults to [PRODUCTION_BANNER_AD_UNIT_ID] until a dedicated Banner Ad Unit is created in the
-     * AdMob console for independent CTR / viewability / eCPM tracking.
+     * Dedicated production Ad Unit ID for Discovery feed (`最新` / `排行`) inline adaptive banners
+     * (AdMob unit: `Discovery Feed - Inline Banner`).
      */
-    const val PRODUCTION_DISCOVERY_FEED_BANNER_AD_UNIT_ID = PRODUCTION_BANNER_AD_UNIT_ID
+    const val PRODUCTION_DISCOVERY_FEED_BANNER_AD_UNIT_ID = "ca-app-pub-7333757578973883/8426570642"
 
     /**
      * Ordered Ad Unit IDs to try for [placement]:

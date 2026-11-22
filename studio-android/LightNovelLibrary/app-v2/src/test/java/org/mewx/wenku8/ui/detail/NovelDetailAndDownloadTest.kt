@@ -837,6 +837,36 @@ class NovelDetailAndDownloadTest {
             assertFalse(prodUnits.contains(ServerSupportAdConstants.DEV_TEST_BANNER_AD_UNIT_ID))
         }
 
+        assertEquals(
+            listOf(ServerSupportAdConstants.PRODUCTION_BANNER_AD_UNIT_ID),
+            ServerSupportAdConstants.candidateBannerAdUnitIds(
+                placement = InlineBannerPlacement.NOVEL_DETAIL_STANDARD,
+                isDebugBuild = false,
+            ),
+        )
+        assertEquals(
+            listOf(ServerSupportAdConstants.PRODUCTION_POST_READING_LARGE_BANNER_AD_UNIT_ID),
+            ServerSupportAdConstants.candidateBannerAdUnitIds(
+                placement = InlineBannerPlacement.NOVEL_DETAIL_POST_READING_LARGE,
+                isDebugBuild = false,
+            ),
+        )
+        assertEquals(
+            listOf(ServerSupportAdConstants.PRODUCTION_DISCOVERY_FEED_BANNER_AD_UNIT_ID),
+            ServerSupportAdConstants.candidateBannerAdUnitIds(
+                placement = InlineBannerPlacement.DISCOVERY_FEED_INLINE,
+                isDebugBuild = false,
+            ),
+        )
+        assertEquals(
+            3,
+            setOf(
+                ServerSupportAdConstants.PRODUCTION_BANNER_AD_UNIT_ID,
+                ServerSupportAdConstants.PRODUCTION_POST_READING_LARGE_BANNER_AD_UNIT_ID,
+                ServerSupportAdConstants.PRODUCTION_DISCOVERY_FEED_BANNER_AD_UNIT_ID,
+            ).size,
+        )
+
         val standardSize = resolveInlineAdaptiveBannerAdSize(
             availableWidthDp = 380,
             placement = InlineBannerPlacement.NOVEL_DETAIL_STANDARD,
