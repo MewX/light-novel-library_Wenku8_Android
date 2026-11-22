@@ -1,4 +1,4 @@
-[submodule "studio-android/LightNovelLibrary/api"]
+[submodule "LightNovelLibrary/api"]
 	path = LightNovelLibrary/api
 	url = git@github.com:MewX/wenku8-api-core.git
 [submodule "previous_versions/v1.30/api"]
