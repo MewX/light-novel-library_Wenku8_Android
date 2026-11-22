@@ -209,6 +209,8 @@ dependencies {
 
     // Minimal server-support inline banner exclusively on NovelDetailScreen (Phase 4)
     implementation 'com.google.android.gms:play-services-ads:25.5.0'
+    // Google User Messaging Platform (UMP) SDK for GDPR / EEA & UK AdMob consent compliance.
+    implementation 'com.google.android.ump:user-messaging-platform:4.0.0'
 
     // Google Play In-App Updates (Flexible flow) strictly isolated to the `playstore` flavor
     // so non-Play builds stay GMS-update-free and Play builds never include external APK prompts.
