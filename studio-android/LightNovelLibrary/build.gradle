@@ -27,6 +27,8 @@ allprojects {
 }
 
 ext {
+    compileSdkVersion = 37
+    compileSdkMinorVersion = 2
     targetSdkVersion = 37
     buildToolsVersion = "37.0.0"
     minSdkVersion = 24  // Material 3 Expressive requires minSdk 24 (Android 7.0 Nougat).

@@ -8,7 +8,11 @@ apply plugin: 'jacoco'
 
 android {
     namespace 'org.mewx.wenku8'
-    compileSdkVersion rootProject.targetSdkVersion
+    compileSdk {
+        version = release(rootProject.compileSdkVersion) {
+            minorApiLevel = rootProject.compileSdkMinorVersion
+        }
+    }
     buildToolsVersion rootProject.buildToolsVersion
     ndkVersion '30.0.16248370'
 
