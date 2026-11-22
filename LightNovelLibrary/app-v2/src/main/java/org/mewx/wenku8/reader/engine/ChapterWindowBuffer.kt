@@ -8,6 +8,7 @@ import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -587,14 +588,23 @@ class ChapterWindowBuffer(
             return _snapshotFlow.value
         }
 
-        val repaginatedPrev = prevAst?.let {
-            withContext(computeDispatcher) { paginator.paginate(it, newConfig) }
-        }
-        val repaginatedCurrent = currentAst?.let {
-            withContext(computeDispatcher) { paginator.paginate(it, newConfig) }
-        }
-        val repaginatedNext = nextAst?.let {
-            withContext(computeDispatcher) { paginator.paginate(it, newConfig) }
+        // Re-paginate the three slots CONCURRENTLY with the current slot first: it is the page
+        // the reader is looking at, so its result gates the perceived re-layout latency during a
+        // split-screen divider drag or a font-size change; the neighbours only matter once the
+        // user swipes. All three run outside the state mutex on `computeDispatcher`, so
+        // parallelism does not affect snapshot consistency, and structured cancellation tears the
+        // children down together when the caller's effect is superseded by a newer config.
+        val (repaginatedPrev, repaginatedCurrent, repaginatedNext) = coroutineScope {
+            val current = async {
+                currentAst?.let { withContext(computeDispatcher) { paginator.paginate(it, newConfig) } }
+            }
+            val prev = async {
+                prevAst?.let { withContext(computeDispatcher) { paginator.paginate(it, newConfig) } }
+            }
+            val next = async {
+                nextAst?.let { withContext(computeDispatcher) { paginator.paginate(it, newConfig) } }
+            }
+            Triple(prev.await(), current.await(), next.await())
         }
 
         return stateMutex.withLock {

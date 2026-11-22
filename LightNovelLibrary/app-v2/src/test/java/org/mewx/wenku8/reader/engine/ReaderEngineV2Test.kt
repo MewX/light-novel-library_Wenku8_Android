@@ -1020,6 +1020,49 @@ class ReaderEngineV2Test {
     }
 
     @Test
+    fun updateLayoutConfig_onEmptySnapshot_recordsConfigWithoutTouchingSlots(): Unit = runBlocking {
+        // Documents the early-exit branch the reader screen's open latch depends on: when the
+        // window snapshot has no slots yet (a viewport change landing before the first open
+        // completes), `updateLayoutConfig` must only record the config — recovering content from
+        // that state is impossible, which is why `UnifiedReaderScreen` un-latches its open flag
+        // when the in-flight `openChapter` is cancelled and re-runs the full open path.
+        val aid = 4398
+        database.novelDao().upsertNovel(
+            NovelEntity(aid = aid, title = "空快照重排测试"),
+        )
+
+        val buffer = ChapterWindowBuffer(
+            aid = aid,
+            appLanguageProvider = { Wenku8API.AppLanguage.SC },
+            tocDao = database.tocDao(),
+            chapterContentDao = database.chapterContentDao(),
+            catalogGateway = fakeGateway,
+            novelTocSyncRepository = tocSyncRepository,
+            paginator = StaticLayoutPaginator(lineBreaker = DeterministicCellLineBreaker),
+            scope = testScope,
+            ioDispatcher = Dispatchers.Unconfined,
+            computeDispatcher = Dispatchers.Unconfined,
+        )
+
+        val newConfig = ReaderLayoutConfig(
+            viewportWidthPx = 520,
+            viewportHeightPx = 700,
+            fontSizePx = 24f,
+            lineDistancePx = 10f,
+            paragraphDistancePx = 16f,
+            pageEdgeDistancePx = 20f,
+        )
+        val snapshot = buffer.updateLayoutConfig(newConfig)
+        assertEquals(newConfig, snapshot.layoutConfig)
+        assertEquals(null, snapshot.currentSlot)
+        assertEquals(null, snapshot.prevSlot)
+        assertEquals(null, snapshot.nextSlot)
+        assertEquals(0, snapshot.totalVirtualPages)
+
+        buffer.close()
+    }
+
+    @Test
     fun openChapter_remoteLoadCompletingAfterResize_revertsConfig_andConvergesOnCorrection() = runBlocking {
         // Regression harness for the split-screen "stale pagination with clipped text" bug
         // (handoff/split-screen-audit.md §2): `openChapter` captures its layout config at call

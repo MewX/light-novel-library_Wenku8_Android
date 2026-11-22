@@ -1069,14 +1069,27 @@ fun UnifiedReaderScreen(
                         animated = false,
                     )
                 }
-                windowBuffer.openChapter(
-                    cid = launchRequest.cid,
-                    initialAnchor = resolvedInitialAnchor,
-                    layoutConfig = currentLayoutConfig,
-                    fallbackVid = launchRequest.vid,
-                    fallbackVolumeTitle = launchRequest.volumeTitle,
-                    fallbackChapterTitle = launchRequest.chapterTitle,
-                )
+                try {
+                    windowBuffer.openChapter(
+                        cid = launchRequest.cid,
+                        initialAnchor = resolvedInitialAnchor,
+                        layoutConfig = currentLayoutConfig,
+                        fallbackVid = launchRequest.vid,
+                        fallbackVolumeTitle = launchRequest.volumeTitle,
+                        fallbackChapterTitle = launchRequest.chapterTitle,
+                    )
+                } catch (ce: CancellationException) {
+                    if (!currentCoroutineContext().isActive) {
+                        // The effect was cancelled mid-open: split-screen entry/exit recreates the
+                        // Activity and the settling window insets restart this effect while the
+                        // chapter is still loading. The cancelled load produced no content, so
+                        // un-latch `didInitialOpen` — the restarted effect must re-run the full
+                        // open path, because the `updateLayoutConfig` branch cannot recover an
+                        // empty snapshot and would leave a permanently blank reader.
+                        didInitialOpen = false
+                    }
+                    throw ce
+                }
             } else {
                 // Preserve any live/in-flight paged target (e.g. fast Page 1 -> Page 2 flip while
                 // immersive system bars asynchronously hide and expand viewportHeightPx).
