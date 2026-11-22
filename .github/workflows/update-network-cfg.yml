@@ -9,7 +9,7 @@
 #   1. Daily at 04:23 UTC (or on manual dispatch), `.github/scripts/update_network_cfg_txt.py` fetches
 #      Cloudflare's official IPv4/IPv6 supernets (`cloudflare.com/ips-v4` & `ips-v6`), samples
 #      diverse `/24` slices across 8 Web-Edge Anycast supernets (~4M+ IPs), and live-probes both
-#      `wenku8-relay.mewx.org` and `wenku8-android.mewx.org` via `POST /__diagnostics/latency`.
+#      `wenku8-relay.mewx.org` and `mewx-android.wenku8.app` via `POST /__diagnostics/latency`.
 #   2. Before ANY Cloudflare DNS write API call is allowed, `validate_txt_record_before_publish`
 #      enforces hard safety gates (aborting non-zero on failure so the existing 30-day DNS record
 #      remains intact):

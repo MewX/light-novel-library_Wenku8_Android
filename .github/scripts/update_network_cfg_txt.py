@@ -56,6 +56,7 @@ from __future__ import annotations
 
 import argparse
 import concurrent.futures
+import dataclasses
 import datetime as dt
 import ipaddress
 import json
@@ -69,12 +70,12 @@ import sys
 import time
 import urllib.error
 import urllib.request
-from typing import Dict, List, Optional, Sequence, Set, Tuple, Union
+from typing import Callable, Dict, List, Optional, Sequence, Set, Tuple, Union
 
 DEFAULT_RECORD_NAME = "_network_cfg.wenku8.app"
 ALLOWED_ZONE_SUFFIX = ".wenku8.app"
 PRIMARY_RELAY_HOST = "wenku8-relay.mewx.org"
-SECONDARY_RELAY_HOST = "wenku8-android.mewx.org"
+SECONDARY_RELAY_HOST = "mewx-android.wenku8.app"
 RELAY_HOSTS = (PRIMARY_RELAY_HOST, SECONDARY_RELAY_HOST)
 
 TXT_SCHEMA_V1 = "wk8-txt-v1"
@@ -82,6 +83,12 @@ PROBE_SCHEMA = "wenku8-network-probe-v1"
 CLOUDFLARE_IPS_V4_URL = "https://www.cloudflare.com/ips-v4"
 CLOUDFLARE_IPS_V6_URL = "https://www.cloudflare.com/ips-v6"
 USER_AGENT = "Mozilla/5.0 (compatible; wenku8-network-cfg-curator/1.1)"
+
+PRIMARY_PROBE_TIMEOUT_SEC = 2.5
+SECONDARY_SPOT_CHECK_TIMEOUT_SEC = 5.0
+SECONDARY_SPOT_CHECK_MAX_SUBNETS = 3
+SECONDARY_SPOT_CHECK_TRANSIENT_RETRIES = 1
+TRANSIENT_HTTP_STATUS_CODES = frozenset({429, 500, 502, 503, 504, 520, 521, 522, 523, 524})
 
 MAX_RFC1035_TXT_CHUNK_BYTES = 255
 MAX_TOTAL_TXT_WIRE_BYTES = 1100
@@ -709,19 +716,43 @@ def build_candidate_v4_pool(
     return interleaved
 
 
-def probe_ip_for_host(
+@dataclasses.dataclass(frozen=True)
+class ProbeResult:
+    ok: bool
+    detail: str
+    transient: bool = False
+
+
+def _parse_content_length(header_text: str) -> Optional[int]:
+    if "transfer-encoding: chunked" in header_text.lower():
+        return None
+    for line in header_text.splitlines()[1:]:
+        if line.lower().startswith("content-length:"):
+            raw = line.split(":", 1)[1].strip()
+            if raw.isdigit():
+                return int(raw)
+    return None
+
+
+def probe_ip_for_host_detailed(
     ip_text: str,
     relay_host: str,
-    timeout_sec: float = 2.2,
+    timeout_sec: float = PRIMARY_PROBE_TIMEOUT_SEC,
     max_429_retries: int = 2,
-) -> bool:
+    max_transient_retries: int = 0,
+) -> ProbeResult:
     """Connects directly to `ip_text:443` with TLS SNI + X.509 hostname verification for
-    `relay_host` and validates a cryptographic `wenku8-network-probe-v1` nonce echo."""
+    `relay_host` and validates a cryptographic `wenku8-network-probe-v1` nonce echo.
+    Returns a `ProbeResult` containing structured diagnostic details for logging & retry policy."""
     addr_obj = ipaddress.ip_address(ip_text)
     sock_family = socket.AF_INET6 if addr_obj.version == 6 else socket.AF_INET
     tls_ctx = ssl.create_default_context()
 
-    for attempt in range(max_429_retries + 1):
+    retries_429_used = 0
+    retries_transient_used = 0
+    last_result = ProbeResult(False, "no_attempts", transient=True)
+
+    while True:
         nonce = secrets.token_hex(16)
         body_bytes = json.dumps(
             {"schema": PROBE_SCHEMA, "nonce": nonce},
@@ -739,75 +770,163 @@ def probe_ip_for_host(
             f"Connection: close\r\n\r\n"
         ).encode("ascii") + body_bytes
 
+        started_at = time.monotonic()
+        deadline = started_at + timeout_sec
+        raw_resp = b""
         try:
             with socket.socket(sock_family, socket.SOCK_STREAM) as raw_sock:
                 raw_sock.settimeout(timeout_sec)
                 raw_sock.connect((ip_text, 443))
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    raise TimeoutError("deadline exceeded before TLS handshake")
+                raw_sock.settimeout(remaining)
                 with tls_ctx.wrap_socket(raw_sock, server_hostname=relay_host) as tls_sock:
+                    remaining = deadline - time.monotonic()
+                    if remaining <= 0:
+                        raise TimeoutError("deadline exceeded after TLS handshake")
+                    tls_sock.settimeout(remaining)
                     tls_sock.sendall(request_bytes)
                     chunks: List[bytes] = []
                     total = 0
+                    expected_total_bytes: Optional[int] = None
                     while total < 8192:
+                        remaining = deadline - time.monotonic()
+                        if remaining <= 0:
+                            raise TimeoutError("deadline exceeded while reading response")
+                        tls_sock.settimeout(remaining)
                         data = tls_sock.recv(2048)
                         if not data:
                             break
                         chunks.append(data)
                         total += len(data)
-        except OSError:
-            return False
+                        if expected_total_bytes is None:
+                            joined_so_far = b"".join(chunks)
+                            hdr_end = joined_so_far.find(b"\r\n\r\n")
+                            if hdr_end >= 0:
+                                hdr_preview = joined_so_far[:hdr_end].decode("latin1", errors="replace")
+                                content_len = _parse_content_length(hdr_preview)
+                                if content_len is not None:
+                                    expected_total_bytes = hdr_end + 4 + content_len
+                        if expected_total_bytes is not None and total >= expected_total_bytes:
+                            break
+            raw_resp = b"".join(chunks)
+        except ssl.SSLCertVerificationError as exc:
+            return ProbeResult(False, f"tls_cert_error: {exc}", transient=False)
+        except (socket.timeout, TimeoutError):
+            last_result = ProbeResult(False, f"timeout after {timeout_sec:.1f}s", transient=True)
+            if retries_transient_used < max_transient_retries:
+                retries_transient_used += 1
+                time.sleep(min(3.0, 0.75 * retries_transient_used))
+                continue
+            return last_result
+        except OSError as exc:
+            last_result = ProbeResult(False, f"os_error ({type(exc).__name__}: {exc})", transient=True)
+            if retries_transient_used < max_transient_retries:
+                retries_transient_used += 1
+                time.sleep(min(3.0, 0.75 * retries_transient_used))
+                continue
+            return last_result
 
-        raw_resp = b"".join(chunks)
         header_end = raw_resp.find(b"\r\n\r\n")
         if header_end < 0:
-            return False
+            last_result = ProbeResult(False, f"malformed_http_response ({len(raw_resp)} bytes)", transient=True)
+            if retries_transient_used < max_transient_retries:
+                retries_transient_used += 1
+                time.sleep(min(3.0, 0.75 * retries_transient_used))
+                continue
+            return last_result
+
         header_text = raw_resp[:header_end].decode("latin1", errors="replace")
         status_line = header_text.splitlines()[0] if header_text else ""
+        status_parts = status_line.split()
+        status_code = int(status_parts[1]) if len(status_parts) >= 2 and status_parts[1].isdigit() else None
 
-        if " 429 " in status_line and attempt < max_429_retries:
-            retry_after = 2.0
-            for line in header_text.splitlines()[1:]:
-                if line.lower().startswith("retry-after:"):
-                    try:
-                        retry_after = min(10.0, max(1.0, float(line.split(":", 1)[1].strip())))
-                    except ValueError:
-                        pass
-            time.sleep(retry_after)
-            continue
+        if status_code == 429:
+            last_result = ProbeResult(False, f"http_429 ({status_line})", transient=True)
+            if retries_429_used < max_429_retries:
+                retries_429_used += 1
+                retry_after = 2.0
+                for line in header_text.splitlines()[1:]:
+                    if line.lower().startswith("retry-after:"):
+                        try:
+                            retry_after = min(10.0, max(1.0, float(line.split(":", 1)[1].strip())))
+                        except ValueError:
+                            pass
+                time.sleep(retry_after)
+                continue
+            return last_result
 
-        if " 200 " not in status_line:
-            return False
+        if status_code in TRANSIENT_HTTP_STATUS_CODES:
+            last_result = ProbeResult(False, f"http_{status_code} ({status_line})", transient=True)
+            if retries_transient_used < max_transient_retries:
+                retries_transient_used += 1
+                time.sleep(min(3.0, 0.75 * retries_transient_used))
+                continue
+            return last_result
+
+        if status_code != 200:
+            return ProbeResult(False, f"http_{status_code or 'unknown'} ({status_line})", transient=False)
 
         body_part = raw_resp[header_end + 4 :]
         if "transfer-encoding: chunked" in header_text.lower():
             decoded = bytearray()
             cursor = 0
-            while cursor < len(body_part):
-                rn = body_part.find(b"\r\n", cursor)
-                if rn < 0:
-                    break
-                size_hex = body_part[cursor:rn].split(b";", 1)[0].strip()
-                if not size_hex:
-                    break
-                chunk_len = int(size_hex, 16)
-                if chunk_len == 0:
-                    break
-                start = rn + 2
-                decoded.extend(body_part[start : start + chunk_len])
-                cursor = start + chunk_len + 2
+            try:
+                while cursor < len(body_part):
+                    rn = body_part.find(b"\r\n", cursor)
+                    if rn < 0:
+                        break
+                    size_hex = body_part[cursor:rn].split(b";", 1)[0].strip()
+                    if not size_hex:
+                        break
+                    chunk_len = int(size_hex, 16)
+                    if chunk_len == 0:
+                        break
+                    start = rn + 2
+                    decoded.extend(body_part[start : start + chunk_len])
+                    cursor = start + chunk_len + 2
+            except ValueError:
+                last_result = ProbeResult(False, "invalid_chunked_encoding", transient=True)
+                if retries_transient_used < max_transient_retries:
+                    retries_transient_used += 1
+                    time.sleep(min(3.0, 0.75 * retries_transient_used))
+                    continue
+                return last_result
             body_part = bytes(decoded)
 
         try:
             parsed = json.loads(body_part.decode("utf-8"))
-        except (UnicodeDecodeError, json.JSONDecodeError):
-            return False
+        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+            return ProbeResult(False, f"invalid_json ({exc})", transient=False)
 
-        return (
+        if (
             isinstance(parsed, dict)
             and parsed.get("schema") == PROBE_SCHEMA
             and parsed.get("nonce") == nonce
-        )
+        ):
+            elapsed_ms = int((time.monotonic() - started_at) * 1000)
+            return ProbeResult(True, f"ok ({elapsed_ms}ms)", transient=False)
 
-    return False
+        got_schema = parsed.get("schema") if isinstance(parsed, dict) else type(parsed).__name__
+        return ProbeResult(False, f"probe_payload_mismatch (schema={got_schema!r})", transient=False)
+
+
+def probe_ip_for_host(
+    ip_text: str,
+    relay_host: str,
+    timeout_sec: float = PRIMARY_PROBE_TIMEOUT_SEC,
+    max_429_retries: int = 2,
+    max_transient_retries: int = 0,
+) -> bool:
+    """Boolean wrapper around `probe_ip_for_host_detailed`."""
+    return probe_ip_for_host_detailed(
+        ip_text,
+        relay_host,
+        timeout_sec=timeout_sec,
+        max_429_retries=max_429_retries,
+        max_transient_retries=max_transient_retries,
+    ).ok
 
 
 def verify_ipv4_subnet(cidr: str) -> bool:
@@ -823,6 +942,78 @@ def verify_ipv4_subnet(cidr: str) -> bool:
     return True
 
 
+def select_diverse_spot_check_subnets(verified_v4: Sequence[str], max_count: int) -> List[str]:
+    """Selects up to `max_count` verified subnets prioritizing distinct `/16` families."""
+    selected: List[str] = []
+    seen_slash16: Set[Tuple[int, int]] = set()
+    for cidr in verified_v4:
+        if len(selected) >= max_count:
+            break
+        packed = ipaddress.IPv4Network(cidr, strict=True).network_address.packed
+        family = (packed[0], packed[1])
+        if family not in seen_slash16:
+            seen_slash16.add(family)
+            selected.append(cidr)
+    for cidr in verified_v4:
+        if len(selected) >= max_count:
+            break
+        if cidr not in selected:
+            selected.append(cidr)
+    return selected
+
+
+def spot_check_secondary_host(
+    verified_v4: Sequence[str],
+    secondary_host: str = SECONDARY_RELAY_HOST,
+    *,
+    probe_fn: Optional[Callable[[str, str], ProbeResult]] = None,
+    max_subnets: int = SECONDARY_SPOT_CHECK_MAX_SUBNETS,
+    timeout_sec: float = SECONDARY_SPOT_CHECK_TIMEOUT_SEC,
+    max_transient_retries: int = SECONDARY_SPOT_CHECK_TRANSIENT_RETRIES,
+    quiet: bool = False,
+) -> Tuple[str, List[str]]:
+    """Spot-checks `secondary_host` across up to `max_subnets` diverse verified IPv4 subnets
+    with transient retry & generous cross-region Smart Placement timeout.
+
+    Returns `(succeeded_cidr, failed_cidrs)` or raises `RuntimeError` with detailed per-IP
+    diagnostics if every checked subnet fails."""
+    if not verified_v4:
+        raise RuntimeError(f"Spot-check on secondary host {secondary_host} skipped: no verified IPv4 subnets.")
+
+    effective_probe = probe_fn or (
+        lambda ip_text, host: probe_ip_for_host_detailed(
+            ip_text,
+            host,
+            timeout_sec=timeout_sec,
+            max_429_retries=2,
+            max_transient_retries=max_transient_retries,
+        )
+    )
+
+    candidate_cidrs = select_diverse_spot_check_subnets(verified_v4, max_subnets)
+    failed_cidrs: List[str] = []
+    failure_notes: List[str] = []
+
+    for cidr in candidate_cidrs:
+        sample_ip = str(ipaddress.IPv4Network(cidr, strict=True).network_address + 1)
+        result = effective_probe(sample_ip, secondary_host)
+        if result.ok:
+            if failure_notes and not quiet:
+                print(
+                    f"WARN: Secondary host {secondary_host} spot-check recovered on {cidr} ({sample_ip}: "
+                    f"{result.detail}) after earlier failure(s): {'; '.join(failure_notes)}",
+                    file=sys.stderr,
+                )
+            return cidr, failed_cidrs
+        failed_cidrs.append(cidr)
+        failure_notes.append(f"{cidr} ({sample_ip}): {result.detail}")
+
+    raise RuntimeError(
+        f"Spot-check on secondary host {secondary_host} failed across {len(failure_notes)} verified subnet(s) "
+        f"({'; '.join(failure_notes)}); aborting DNS update."
+    )
+
+
 def verify_ipv6_prefix(cidr: str, relay_hosts: Sequence[str]) -> Optional[bool]:
     """Returns True if verified, False if failed, or None if host lacks IPv6 connectivity."""
     net = ipaddress.IPv6Network(cidr, strict=True)
@@ -836,7 +1027,15 @@ def verify_ipv6_prefix(cidr: str, relay_hosts: Sequence[str]) -> Optional[bool]:
             return None
         return False
 
-    return all(probe_ip_for_host(sample_ip, host) for host in relay_hosts)
+    return all(
+        probe_ip_for_host(
+            sample_ip,
+            host,
+            timeout_sec=SECONDARY_SPOT_CHECK_TIMEOUT_SEC,
+            max_transient_retries=SECONDARY_SPOT_CHECK_TRANSIENT_RETRIES,
+        )
+        for host in relay_hosts
+    )
 
 
 def build_txt_value(
@@ -1012,12 +1211,29 @@ def curate_verified_subnets(
             f"{MIN_REQUIRED_IPV4_SUBNETS}, probed {probed_count}); aborting DNS update."
         )
 
-    # Spot-check secondary relay hostname (`wenku8-android.mewx.org`) on the first verified subnet
-    first_ip = str(ipaddress.IPv4Network(verified_v4[0], strict=True).network_address + 1)
-    if not probe_ip_for_host(first_ip, SECONDARY_RELAY_HOST):
-        raise RuntimeError(
-            f"Spot-check on secondary host {SECONDARY_RELAY_HOST} via {first_ip} failed; aborting DNS update."
-        )
+    # Spot-check secondary relay hostname (`mewx-android.wenku8.app`) across diverse verified subnets
+    # with transient retry & generous cross-region Smart Placement timeout.
+    _, failed_secondary_cidrs = spot_check_secondary_host(verified_v4, SECONDARY_RELAY_HOST)
+    if failed_secondary_cidrs:
+        failed_set = set(failed_secondary_cidrs)
+        filtered_v4 = [cidr for cidr in verified_v4 if cidr not in failed_set]
+        filtered_families = {
+            (
+                ipaddress.IPv4Network(cidr, strict=True).network_address.packed[0],
+                ipaddress.IPv4Network(cidr, strict=True).network_address.packed[1],
+            )
+            for cidr in filtered_v4
+        }
+        if (
+            len(filtered_v4) >= MIN_REQUIRED_IPV4_SUBNETS
+            and len(filtered_families) >= MIN_REQUIRED_IPV4_SLASH16_FAMILIES
+        ):
+            verified_v4 = filtered_v4
+            print(
+                f"Excluded {len(failed_secondary_cidrs)} subnet(s) that failed secondary host spot-check: "
+                f"{', '.join(failed_secondary_cidrs)}",
+                file=sys.stderr,
+            )
 
     selected_v6: List[str] = []
     for v6_cidr in CANDIDATE_IPV6_PREFIXES:
@@ -1209,7 +1425,47 @@ def run_self_test() -> int:
         lambda: validate_txt_record_before_publish(valid_txt + ";", now_epoch=now, allowed_v4_supernets=cf_v4),
     )
 
-    print("Self-test passed (19/19 positive & negative safety assertions).", file=sys.stderr)
+    # 4. Secondary host spot-check diversity, fallback recovery & failure diagnostic tests
+    diverse_pick = select_diverse_spot_check_subnets(
+        ["172.67.200.0/24", "172.67.150.0/24", "104.16.80.0/24", "188.114.97.0/24"],
+        max_count=3,
+    )
+    assert diverse_pick == ["172.67.200.0/24", "104.16.80.0/24", "188.114.97.0/24"]
+
+    seen_probe_ips: List[str] = []
+
+    def flaky_first_probe(ip_text: str, host: str) -> ProbeResult:
+        assert host == SECONDARY_RELAY_HOST
+        seen_probe_ips.append(ip_text)
+        if ip_text == "172.67.200.1":
+            return ProbeResult(False, "timeout after 5.0s", transient=True)
+        return ProbeResult(True, "ok (210ms)", transient=False)
+
+    recovered_cidr, failed_cidrs = spot_check_secondary_host(
+        ["172.67.200.0/24", "172.67.150.0/24", "104.16.80.0/24"],
+        SECONDARY_RELAY_HOST,
+        probe_fn=flaky_first_probe,
+        quiet=True,
+    )
+    assert recovered_cidr == "104.16.80.0/24"
+    assert failed_cidrs == ["172.67.200.0/24"]
+    assert seen_probe_ips == ["172.67.200.1", "104.16.80.1"]
+
+    all_fail_err = ""
+    try:
+        spot_check_secondary_host(
+            ["172.67.200.0/24", "104.16.80.0/24"],
+            SECONDARY_RELAY_HOST,
+            probe_fn=lambda ip, _h: ProbeResult(False, f"http_403 via {ip}", transient=False),
+        )
+    except RuntimeError as exc:
+        all_fail_err = str(exc)
+    assert "http_403 via 172.67.200.1" in all_fail_err and "http_403 via 104.16.80.1" in all_fail_err
+
+    assert _parse_content_length("HTTP/1.1 200 OK\r\nContent-Length: 279\r\nConnection: close") == 279
+    assert _parse_content_length("HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\nContent-Length: 279") is None
+
+    print("Self-test passed (24/24 positive, negative & spot-check safety assertions).", file=sys.stderr)
     return 0
 
 
