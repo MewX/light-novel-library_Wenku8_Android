@@ -1,0 +1,596 @@
+package org.mewx.wenku8.ui.bookshelf
+
+import androidx.compose.ui.geometry.Offset
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
+import org.junit.Test
+
+class Bookshelf3dGeometryTest {
+
+    @Test
+    fun computeMetrics_adaptsAcrossCompactPhone_standardPhone_foldable_tablet_andShortLandscape() {
+        val compactPhone = Bookshelf3dGeometry.computeMetrics(availableWidthDp = 320f, availableHeightDp = 568f)
+        val standardPhone = Bookshelf3dGeometry.computeMetrics(availableWidthDp = 412f, availableHeightDp = 892f)
+        val foldableMedium = Bookshelf3dGeometry.computeMetrics(availableWidthDp = 640f, availableHeightDp = 840f)
+        val tabletLandscape = Bookshelf3dGeometry.computeMetrics(availableWidthDp = 960f, availableHeightDp = 700f)
+        val shortLandscapePhone = Bookshelf3dGeometry.computeMetrics(availableWidthDp = 800f, availableHeightDp = 360f)
+        val narrowSplitScreen = Bookshelf3dGeometry.computeMetrics(availableWidthDp = 360f, availableHeightDp = 360f)
+
+        // Compact & medium screens use single-column layout; wide tablets & landscape phones activate two-pane spotlight
+        assertFalse(compactPhone.isTwoPane)
+        assertFalse(standardPhone.isTwoPane)
+        assertFalse(foldableMedium.isTwoPane)
+        assertFalse(narrowSplitScreen.isTwoPane)
+        assertTrue(tabletLandscape.isTwoPane)
+        assertTrue(shortLandscapePhone.isTwoPane)
+        // Short landscape phone scales cover & stage height down so shelf + scroller fit inside 360dp
+        assertTrue(
+            "Short landscape cover (${shortLandscapePhone.coverWidthDp}) should scale below standard (${standardPhone.coverWidthDp})",
+            shortLandscapePhone.coverWidthDp < standardPhone.coverWidthDp,
+        )
+        assertTrue(
+            "Short landscape stageHeight (${shortLandscapePhone.stageHeightDp}) should be more compact than standard (${standardPhone.stageHeightDp})",
+            shortLandscapePhone.stageHeightDp < standardPhone.stageHeightDp,
+        )
+        assertTrue(
+            "Short landscape stageHeight + scroller (${shortLandscapePhone.stageHeightDp + 46f}) should fit within 360dp",
+            shortLandscapePhone.stageHeightDp + 46f <= 360f,
+        )
+
+        // Stage width never exceeds available width and caps cleanly on large screens
+        assertTrue(compactPhone.stageWidthDp <= 320f)
+        assertTrue(standardPhone.stageWidthDp <= 412f)
+        assertTrue(foldableMedium.stageWidthDp <= 540f)
+        assertTrue(tabletLandscape.stageWidthDp <= 520f)
+        assertTrue(tabletLandscape.stageWidthDp >= 340f)
+
+        // Book dimensions scale monotonically from compact phone up to standard phone
+        assertTrue(compactPhone.spineWidthDp <= standardPhone.spineWidthDp)
+        assertTrue(compactPhone.coverWidthDp <= standardPhone.coverWidthDp)
+        assertTrue(compactPhone.bodyHeightDp <= standardPhone.bodyHeightDp)
+        assertTrue(compactPhone.pitchDp > compactPhone.spineWidthDp)
+        assertTrue(tabletLandscape.maxVisibleSideSlots >= 5)
+    }
+
+    @Test
+    fun extractionWeight_isSymmetric_peaksAtZero_andVanishesAtRadius() {
+        assertEquals(1f, Bookshelf3dGeometry.extractionWeight(0f), 1e-4f)
+        assertEquals(0f, Bookshelf3dGeometry.extractionWeight(Bookshelf3dGeometry.EXTRACTION_RADIUS), 1e-4f)
+        assertEquals(0f, Bookshelf3dGeometry.extractionWeight(-Bookshelf3dGeometry.EXTRACTION_RADIUS - 1f), 1e-4f)
+
+        val wHalfPos = Bookshelf3dGeometry.extractionWeight(0.5f)
+        val wHalfNeg = Bookshelf3dGeometry.extractionWeight(-0.5f)
+        val wOne = Bookshelf3dGeometry.extractionWeight(1.0f)
+        assertEquals(wHalfPos, wHalfNeg, 1e-5f)
+        assertTrue("Weight must strictly decrease away from focus", 1f > wHalfPos && wHalfPos > wOne && wOne > 0f)
+    }
+
+    @Test
+    fun localSpineAndCoverMatrices_mapFlatRectCornersToExactShared3dVertices() {
+        val metrics = Bookshelf3dGeometry.computeMetrics(availableWidthDp = 412f, availableHeightDp = 892f)
+        val pose = Bookshelf3dGeometry.computeBookPosePx(
+            index = 2,
+            focus = 2f,
+            metrics = metrics,
+            density = 2.5f,
+        )
+
+        val spineMatrix = Bookshelf3dGeometry.buildLocalSpineMatrix()
+        val coverMatrix = Bookshelf3dGeometry.buildLocalCoverMatrix()
+
+        // Spine local corners offset by pose.origin must equal pose.spineQuad [p0, p1, b1, b0]
+        val mappedSpineCorners = listOf(
+            Offset(0f, 0f),
+            Offset(pose.spineWidthPx, 0f),
+            Offset(pose.spineWidthPx, pose.bodyHeightPx),
+            Offset(0f, pose.bodyHeightPx),
+        ).map { pose.origin + spineMatrix.map(it) }
+
+        mappedSpineCorners.zip(pose.spineQuad).forEach { (mapped, expected) ->
+            assertEquals(expected.x, mapped.x, 0.05f)
+            assertEquals(expected.y, mapped.y, 0.05f)
+        }
+
+        // Cover local corners offset by p1 (= spineQuad[1]) must equal pose.coverQuad [p1, p2, b2, b1]
+        val coverAnchor = pose.spineQuad[1]
+        val mappedCoverCorners = listOf(
+            Offset(0f, 0f),
+            Offset(pose.coverWidthPx, 0f),
+            Offset(pose.coverWidthPx, pose.bodyHeightPx),
+            Offset(0f, pose.bodyHeightPx),
+        ).map { coverAnchor + coverMatrix.map(it) }
+
+        mappedCoverCorners.zip(pose.coverQuad).forEach { (mapped, expected) ->
+            assertEquals(expected.x, mapped.x, 0.05f)
+            assertEquals(expected.y, mapped.y, 0.05f)
+        }
+
+        // Top cap shares p0, p1 with spine and p1, p2 with cover seamlessly
+        assertEquals(pose.spineQuad[0], pose.topCapQuad[0])
+        assertEquals(pose.spineQuad[1], pose.topCapQuad[1])
+        assertEquals(pose.coverQuad[1], pose.topCapQuad[2])
+    }
+
+    @Test
+    fun hitTestBookIndex_respectsFrontToBackOcclusion_andExposedBoundsAlwaysHitOwnBook() {
+        val metrics = Bookshelf3dGeometry.computeMetrics(availableWidthDp = 412f, availableHeightDp = 892f)
+        val density = 2f
+        val stageW = metrics.stageWidthDp * density
+        val stageH = metrics.stageHeightDp * density
+
+        for (count in listOf(1, 2, 6, 20)) {
+            val focus = if (count >= 6) 3f else 0f
+            val visibleRange = Bookshelf3dGeometry.computeVisibleIndexRange(count, focus, metrics)
+            val poses = visibleRange.map { idx ->
+                Bookshelf3dGeometry.computeBookPosePx(idx, focus, metrics, density)
+            }
+            val focusedIndex = focus.toInt()
+
+            // Verify focused book's cover center hits focused book
+            val focusedPose = poses.first { it.index == focusedIndex }
+            val focusedExposed = Bookshelf3dGeometry.computeExposedBoundsPx(
+                pose = focusedPose,
+                visiblePoses = poses,
+                focusedIndex = focusedIndex,
+                stageWidthPx = stageW,
+                stageHeightPx = stageH,
+            )
+            assertTrue(focusedExposed.width > 10f && focusedExposed.height > 10f)
+            assertEquals(
+                focusedIndex,
+                Bookshelf3dGeometry.hitTestBookIndex(focusedExposed.center, poses),
+            )
+
+            // Verify immediate neighbors' exposed rects resolve to themselves
+            listOf(focusedIndex - 1, focusedIndex + 1)
+                .filter { it in visibleRange }
+                .forEach { neighborIdx ->
+                    val neighborPose = poses.first { it.index == neighborIdx }
+                    val exposed = Bookshelf3dGeometry.computeExposedBoundsPx(
+                        pose = neighborPose,
+                        visiblePoses = poses,
+                        focusedIndex = focusedIndex,
+                        stageWidthPx = stageW,
+                        stageHeightPx = stageH,
+                    )
+                    if (exposed.width > 4f && exposed.height > 4f) {
+                        assertEquals(
+                            "Expected exposed center of neighbor $neighborIdx (count=$count) to hit itself",
+                            neighborIdx,
+                            Bookshelf3dGeometry.hitTestBookIndex(exposed.center, poses),
+                        )
+                    }
+                }
+        }
+
+        // Far outside stage hits nothing
+        val samplePoses = listOf(
+            Bookshelf3dGeometry.computeBookPosePx(0, 0f, metrics, density),
+        )
+        // Top page-edge cap hit-testing on the focused book
+        val focusedPose = samplePoses.first()
+        val topCapCenter = Offset(
+            x = focusedPose.topCapQuad.map { it.x }.average().toFloat(),
+            y = focusedPose.topCapQuad.map { it.y }.average().toFloat(),
+        )
+        assertEquals(0, Bookshelf3dGeometry.hitTestBookIndex(topCapCenter, samplePoses))
+
+        assertNull(Bookshelf3dGeometry.hitTestBookIndex(Offset(-500f, -500f), samplePoses))
+        assertNull(Bookshelf3dGeometry.hitTestBookIndex(Offset(stageW + 500f, stageH + 500f), samplePoses))
+    }
+
+    @Test
+    fun visibleIndexRangeAndPoses_cullLargeLibraryStrictlyToViewport() {
+        val metrics = Bookshelf3dGeometry.computeMetrics(availableWidthDp = 412f, availableHeightDp = 892f)
+        val range = Bookshelf3dGeometry.computeVisibleIndexRange(
+            itemCount = 200,
+            focus = 100f,
+            metrics = metrics,
+        )
+        assertTrue("Visible range should stay bounded (was ${range.count()})", range.count() <= 35)
+        assertTrue(100 in range)
+
+        val density = 2f
+        val stageW = metrics.stageWidthDp * density
+        val poses = Bookshelf3dGeometry.computeVisiblePosesPx(
+            itemCount = 200,
+            focus = 100f,
+            metrics = metrics,
+            density = density,
+        )
+        assertTrue("Viewport culling should drop off-screen books (${poses.size} < ${range.count()})", poses.size < range.count())
+        assertTrue("Focused book must always be included", poses.any { it.index == 100 })
+        poses.forEach { pose ->
+            assertTrue("Culled pose ${pose.index} right edge must enter viewport", pose.solidBounds.right >= -4f)
+            assertTrue("Culled pose ${pose.index} left edge must enter viewport", pose.solidBounds.left <= stageW + 4f)
+        }
+
+        assertTrue(Bookshelf3dGeometry.computeVisibleIndexRange(0, 0f, metrics).isEmpty())
+        assertTrue(Bookshelf3dGeometry.computeVisiblePosesPx(0, 0f, metrics, density).isEmpty())
+        assertEquals(0..0, Bookshelf3dGeometry.computeVisibleIndexRange(1, 0f, metrics))
+    }
+
+    @Test
+    fun shouldLoadBookCover_keepsVisibleCoversLoadedDuringScrubbingAndCapsWindow() {
+        val total = 50
+        val focus = 20
+
+        // Active fast-scrollbar scrubbing keeps the focused book + immediate neighbors [-1..+1]
+        // loaded so covers stay visible instead of dropping to placeholder icons, while excluding
+        // distant occluded books to cap concurrent bitmap/network churn.
+        val loadedWhileScrubbing = (0 until total).filter {
+            Bookshelf3dGeometry.shouldLoadBookCover(it, focus, total, isScrubbing = true)
+        }
+        assertEquals(listOf(19, 20, 21), loadedWhileScrubbing)
+
+        // Settled browsing loads at most [-1..+2] = 4 covers in the middle of the shelf
+        val loadedMiddle = (0 until total).filter {
+            Bookshelf3dGeometry.shouldLoadBookCover(it, focus, total, isScrubbing = false)
+        }
+        assertEquals(listOf(19, 20, 21, 22), loadedMiddle)
+
+        // Near the end of the shelf, the exposed last book cover (index 49) stays eligible within +4
+        // both when settled and while scrubbing.
+        assertTrue(Bookshelf3dGeometry.shouldLoadBookCover(49, focusedIndex = 45, itemCount = total, isScrubbing = false))
+        assertTrue(Bookshelf3dGeometry.shouldLoadBookCover(49, focusedIndex = 45, itemCount = total, isScrubbing = true))
+        assertFalse(Bookshelf3dGeometry.shouldLoadBookCover(49, focusedIndex = 44, itemCount = total, isScrubbing = false))
+        assertFalse(Bookshelf3dGeometry.shouldLoadBookCover(49, focusedIndex = 44, itemCount = total, isScrubbing = true))
+
+        // Out-of-bounds & empty guards
+        assertFalse(Bookshelf3dGeometry.shouldLoadBookCover(0, 0, itemCount = 0, isScrubbing = false))
+        assertFalse(Bookshelf3dGeometry.shouldLoadBookCover(-1, 0, itemCount = total, isScrubbing = false))
+        assertFalse(Bookshelf3dGeometry.shouldLoadBookCover(total, 0, itemCount = total, isScrubbing = false))
+    }
+
+    @Test
+    fun snapPhysics_handlesDirectionalFling_lowVelocitySnap_edgeClamping_andFractionMapping() {
+        val pitchPx = 80f
+
+        // Stationary release snaps to nearest integer
+        assertEquals(
+            3,
+            Bookshelf3dSnapPhysics.computeFlingTargetIndex(
+                currentFocus = 2.6f,
+                velocityPxPerSec = 10f,
+                pitchPx = pitchPx,
+                itemCount = 10,
+            ),
+        )
+
+        // Moderate directional flick right above threshold guarantees at least 1 slot advance
+        assertEquals(
+            3,
+            Bookshelf3dSnapPhysics.computeFlingTargetIndex(
+                currentFocus = 2.0f,
+                velocityPxPerSec = -200f,
+                pitchPx = pitchPx,
+                itemCount = 20,
+            ),
+        )
+        assertEquals(
+            7,
+            Bookshelf3dSnapPhysics.computeFlingTargetIndex(
+                currentFocus = 8.0f,
+                velocityPxPerSec = 200f,
+                pitchPx = pitchPx,
+                itemCount = 20,
+            ),
+        )
+        // Flick when slightly off-integer with runway requirement (covers minRunway floor/ceil)
+        assertEquals(
+            4,
+            Bookshelf3dSnapPhysics.computeFlingTargetIndex(
+                currentFocus = 2.4f,
+                velocityPxPerSec = -420f,
+                pitchPx = pitchPx,
+                itemCount = 20,
+            ),
+        )
+        assertEquals(
+            6,
+            Bookshelf3dSnapPhysics.computeFlingTargetIndex(
+                currentFocus = 7.6f,
+                velocityPxPerSec = 420f,
+                pitchPx = pitchPx,
+                itemCount = 20,
+            ),
+        )
+
+        // Left swipe (negative px/s) moves forward to a higher index
+        val forwardTarget = Bookshelf3dSnapPhysics.computeFlingTargetIndex(
+            currentFocus = 2.0f,
+            velocityPxPerSec = -900f,
+            pitchPx = pitchPx,
+            itemCount = 20,
+        )
+        assertTrue("Left flick should advance past index 2 (got $forwardTarget)", forwardTarget > 2)
+
+        // Right swipe (positive px/s) moves backward to a lower index
+        val backwardTarget = Bookshelf3dSnapPhysics.computeFlingTargetIndex(
+            currentFocus = 8.0f,
+            velocityPxPerSec = 900f,
+            pitchPx = pitchPx,
+            itemCount = 20,
+        )
+        assertTrue("Right flick should retreat below index 8 (got $backwardTarget)", backwardTarget < 8)
+
+        // Clamping at boundaries & single-book edge case
+        assertEquals(
+            9,
+            Bookshelf3dSnapPhysics.computeFlingTargetIndex(8.5f, -5000f, pitchPx, itemCount = 10),
+        )
+        assertEquals(
+            0,
+            Bookshelf3dSnapPhysics.computeFlingTargetIndex(0.5f, 5000f, pitchPx, itemCount = 10),
+        )
+        assertEquals(
+            0,
+            Bookshelf3dSnapPhysics.computeFlingTargetIndex(0f, -1200f, pitchPx, itemCount = 1),
+        )
+
+        // Fraction <-> focus round-trip
+        assertEquals(0f, Bookshelf3dSnapPhysics.focusToFraction(0f, 1), 1e-5f)
+        assertEquals(0f, Bookshelf3dSnapPhysics.fractionToFocus(0.75f, 1), 1e-5f)
+        assertEquals(0.5f, Bookshelf3dSnapPhysics.focusToFraction(10f, 21), 1e-5f)
+        assertEquals(10f, Bookshelf3dSnapPhysics.fractionToFocus(0.5f, 21), 1e-5f)
+        assertEquals(20f, Bookshelf3dSnapPhysics.fractionToFocus(1.5f, 21), 1e-5f)
+    }
+
+    @Test
+    fun parseSpineTitleRuns_keepsLatinWordsIntact_stacksCjk_andClipsLongTitles() {
+        val (mixedRuns, mixedTruncated) = parseSpineTitleRuns("绝对双刃absolute duo")
+        assertFalse(mixedTruncated)
+        assertEquals(
+            listOf(
+                SpineTitleRun("绝", false),
+                SpineTitleRun("对", false),
+                SpineTitleRun("双", false),
+                SpineTitleRun("刃", false),
+                SpineTitleRun("absolute duo", true),
+            ),
+            mixedRuns,
+        )
+
+        val (longRuns, longTruncated) = parseSpineTitleRuns("关于我转生变成史莱姆这档事特别篇", maxRuns = 7)
+        assertTrue(longTruncated)
+        assertEquals(7, longRuns.size)
+        assertTrue(longRuns.all { !it.isRotatedLatin })
+
+        val (emptyRuns, emptyTruncated) = parseSpineTitleRuns("   ")
+        assertTrue(emptyRuns.isEmpty())
+        assertFalse(emptyTruncated)
+
+        val (longAsciiRuns, _) = parseSpineTitleRuns("Sword Art Online Progressive Aria of a Starless Night")
+        assertEquals(1, longAsciiRuns.size)
+        assertTrue(longAsciiRuns[0].isRotatedLatin)
+        assertTrue(longAsciiRuns[0].text.endsWith("…"))
+    }
+
+    @Test
+    fun build3dShelfEntries_promotesContinueReadingToFront_preservesOriginalSortNumbers_andDeduplicates() {
+        val sortedBooks = listOf(101, 102, 103, 104, 105)
+
+        // Empty continue-reading list preserves original order and 1-based numbers
+        val plain = build3dShelfEntries(sortedBooks, emptyList()) { it }
+        assertEquals(sortedBooks, plain.map { it.item })
+        assertEquals(listOf(1, 2, 3, 4, 5), plain.map { it.shelfOrderNumber })
+        assertTrue(plain.none { it.isContinueReading })
+
+        // Empty sorted list yields empty result even if continue-reading IDs are provided
+        assertTrue(build3dShelfEntries(emptyList<Int>(), listOf(105, 103)) { it }.isEmpty())
+
+        // Continue-reading books move to the front in recency order, ignoring unknown/duplicate IDs,
+        // while keeping every book's canonical 1-based sort number from the original shelf order.
+        val promoted = build3dShelfEntries(
+            sortedItems = sortedBooks,
+            continueReadingIds = listOf(105, 999, 103, 105),
+            idSelector = { it },
+        )
+        assertEquals(listOf(105, 103, 101, 102, 104), promoted.map { it.item })
+        assertEquals(listOf(5, 3, 1, 2, 4), promoted.map { it.shelfOrderNumber })
+        assertEquals(listOf(true, true, false, false, false), promoted.map { it.isContinueReading })
+    }
+
+    @Test
+    fun discreteExtractionMode_quantizesFocus_liftsOnlyFocusedBook_andShiftsSlotsIdenticallyInPlace() {
+        val metrics = Bookshelf3dGeometry.computeMetrics(availableWidthDp = 412f, availableHeightDp = 760f)
+        val density = 2.5f
+
+        // Fractional focus 2.35f quantizes to integer 2f; ONLY book 2 is lifted (weight = 1f),
+        // while immediate neighbors 1 and 3 stay completely flush on the shelf rail (weight = 0f).
+        val posesAtFractional = Bookshelf3dGeometry.computeVisiblePosesPx(
+            itemCount = 12,
+            focus = 2.35f,
+            metrics = metrics,
+            density = density,
+            discreteExtraction = true,
+        )
+        val posesAtTwo = Bookshelf3dGeometry.computeVisiblePosesPx(
+            itemCount = 12,
+            focus = 2f,
+            metrics = metrics,
+            density = density,
+            discreteExtraction = true,
+        )
+        assertEquals(posesAtTwo.map { it.index }, posesAtFractional.map { it.index })
+        posesAtFractional.forEachIndexed { i, pose ->
+            assertEquals(posesAtTwo[i].origin.x, pose.origin.x, 1e-4f)
+            assertEquals(posesAtTwo[i].origin.y, pose.origin.y, 1e-4f)
+            val expectedWeight = if (pose.index == 2) 1f else 0f
+            assertEquals(expectedWeight, pose.weight, 1e-5f)
+        }
+
+        // Shifting focus from 2 -> 3 shifts every book into the exact screen coordinates of the
+        // preceding slot (book-by-book in-place shift with zero geometry drift).
+        for (slotOffset in -2..2) {
+            val poseBefore = Bookshelf3dGeometry.computeBookPosePx(
+                index = 2 + slotOffset,
+                focus = 2f,
+                metrics = metrics,
+                density = density,
+                discreteExtraction = true,
+            )
+            val poseAfter = Bookshelf3dGeometry.computeBookPosePx(
+                index = 3 + slotOffset,
+                focus = 3f,
+                metrics = metrics,
+                density = density,
+                discreteExtraction = true,
+            )
+            assertEquals(poseBefore.origin.x, poseAfter.origin.x, 1e-4f)
+            assertEquals(poseBefore.origin.y, poseAfter.origin.y, 1e-4f)
+            assertEquals(poseBefore.weight, poseAfter.weight, 1e-5f)
+        }
+    }
+
+    @Test
+    fun computeCoverArtworkVisualBoundsPx_matchesProjectedShearedParallelogramCenterAndWidth() {
+        val metrics = Bookshelf3dGeometry.computeMetrics(availableWidthDp = 412f, availableHeightDp = 820f)
+        val density = 2.5f
+        val focusedPose = Bookshelf3dGeometry.computeBookPosePx(
+            index = 3,
+            focus = 3f,
+            metrics = metrics,
+            density = density,
+        )
+
+        val visualRect = Bookshelf3dGeometry.computeCoverArtworkVisualBoundsPx(
+            pose = focusedPose,
+            density = density,
+        )
+
+        val padX = Bookshelf3dGeometry.COVER_ARTWORK_HORIZONTAL_PADDING_DP * density
+        val topInset = Bookshelf3dGeometry.COVER_ARTWORK_TOP_INSET_DP * density
+        val bottomInset = Bookshelf3dGeometry.COVER_ARTWORK_BOTTOM_INSET_DP * density
+        val localArtWidth = focusedPose.coverWidthPx - 2f * padX
+        val localArtHeight = focusedPose.bodyHeightPx - topInset - bottomInset
+        val coverAnchor = focusedPose.spineQuad[1]
+
+        // Apply exact coverMatrix transform (x' = anchor.x + x * DEPTH_X, y' = anchor.y + x * DEPTH_Y + y)
+        // to the 4 local corners of the artwork rectangle and check visual center & horizontal span.
+        val tlX = coverAnchor.x + padX * Bookshelf3dGeometry.DEPTH_X
+        val tlY = coverAnchor.y + padX * Bookshelf3dGeometry.DEPTH_Y + topInset
+        val trX = coverAnchor.x + (focusedPose.coverWidthPx - padX) * Bookshelf3dGeometry.DEPTH_X
+        val trY = coverAnchor.y + (focusedPose.coverWidthPx - padX) * Bookshelf3dGeometry.DEPTH_Y + topInset
+        val brX = trX
+        val brY = trY + localArtHeight
+        val blX = tlX
+        val blY = tlY + localArtHeight
+
+        val expectedCenterX = (tlX + trX + brX + blX) / 4f
+        val expectedCenterY = (tlY + trY + brY + blY) / 4f
+
+        assertEquals(tlX, visualRect.left, 1e-3f)
+        assertEquals(trX, visualRect.right, 1e-3f)
+        assertEquals(expectedCenterX, visualRect.center.x, 1e-3f)
+        assertEquals(expectedCenterY, visualRect.center.y, 1e-3f)
+        assertEquals(localArtWidth * Bookshelf3dGeometry.DEPTH_X, visualRect.width, 1e-3f)
+        assertEquals(localArtHeight, visualRect.height, 1e-3f)
+
+        // Verify the projected visual rect differs substantially from the untransformed pre-matrix
+        // layout rect (confirming why attaching sharedElement inside the matrix box drifted/snapped).
+        val untransformedCenterX = coverAnchor.x + focusedPose.coverWidthPx * 0.5f
+        val untransformedCenterY = coverAnchor.y + topInset + localArtHeight * 0.5f
+        assertTrue(
+            "Projected X center (${visualRect.center.x}) should sit left of untransformed ($untransformedCenterX)",
+            untransformedCenterX - visualRect.center.x > 10f * density,
+        )
+        assertTrue(
+            "Projected Y center (${visualRect.center.y}) should sit above untransformed ($untransformedCenterY)",
+            untransformedCenterY - visualRect.center.y > 10f * density,
+        )
+        assertTrue(
+            "Projected width (${visualRect.width}) should be narrower than untransformed ($localArtWidth)",
+            localArtWidth - visualRect.width > 15f * density,
+        )
+    }
+
+    @Test
+    fun buildInterpolatedCoverMorphMatrix_interpolatesIdentityToExact3dParallelogramCornersAndScale() {
+        val metrics = Bookshelf3dGeometry.computeMetrics(availableWidthDp = 412f, availableHeightDp = 820f)
+        val density = 2.5f
+        val focusedPose = Bookshelf3dGeometry.computeBookPosePx(
+            index = 3,
+            focus = 3f,
+            metrics = metrics,
+            density = density,
+        )
+        val visualRect = Bookshelf3dGeometry.computeCoverArtworkVisualBoundsPx(
+            pose = focusedPose,
+            density = density,
+        )
+        val padX = Bookshelf3dGeometry.COVER_ARTWORK_HORIZONTAL_PADDING_DP * density
+        val topInset = Bookshelf3dGeometry.COVER_ARTWORK_TOP_INSET_DP * density
+        val bottomInset = Bookshelf3dGeometry.COVER_ARTWORK_BOTTOM_INSET_DP * density
+        val localArtWidth = focusedPose.coverWidthPx - 2f * padX
+        val localArtHeight = focusedPose.bodyHeightPx - topInset - bottomInset
+        val coverAnchor = focusedPose.spineQuad[1]
+
+        // 1. At slantedFraction = 0f (Detail hero): exact identity & 12dp corner radius
+        assertEquals(1f, Bookshelf3dGeometry.interpolatedCoverScaleX(0f), 1e-5f)
+        assertEquals(12f, Bookshelf3dGeometry.interpolatedCoverCornerDp(0f), 1e-5f)
+        val flatMatrix = Bookshelf3dGeometry.buildInterpolatedCoverMorphMatrix(
+            overlayWidthPx = 116f * density,
+            slantedFraction = 0f,
+        )
+        val flatCorner = flatMatrix.map(Offset(116f * density, 164f * density))
+        assertEquals(116f * density, flatCorner.x, 1e-3f)
+        assertEquals(164f * density, flatCorner.y, 1e-3f)
+
+        // 2. At slantedFraction = 0.5f: halfway foreshortening & centered vertical shear
+        val midScaleX = Bookshelf3dGeometry.interpolatedCoverScaleX(0.5f)
+        assertEquals((1f + Bookshelf3dGeometry.DEPTH_X) * 0.5f, midScaleX, 1e-5f)
+        assertEquals(7.5f, Bookshelf3dGeometry.interpolatedCoverCornerDp(0.5f), 1e-5f)
+        val midOverlayW = 100f * density
+        val midUnforeshortenedW = midOverlayW / midScaleX
+        val midMatrix = Bookshelf3dGeometry.buildInterpolatedCoverMorphMatrix(
+            overlayWidthPx = midOverlayW,
+            slantedFraction = 0.5f,
+        )
+        val midCenter = midMatrix.map(Offset(midUnforeshortenedW * 0.5f, 80f * density))
+        assertEquals(midOverlayW * 0.5f, midCenter.x, 1e-3f)
+        assertEquals(80f * density, midCenter.y, 1e-3f)
+        val midRightTop = midMatrix.map(Offset(midUnforeshortenedW, 0f))
+        assertEquals(midOverlayW, midRightTop.x, 1e-3f)
+        assertTrue("Right edge rises upward (negative Y) at 50% slant", midRightTop.y < 0f)
+
+        // 3. At slantedFraction = 1f (3D Shelf): exact DEPTH_X foreshortening, 3dp corner radius,
+        // and all 4 mapped corners of [0, localArtWidth] x [0, localArtHeight] match Bookshelf3dCoverFace to 0px
+        assertEquals(Bookshelf3dGeometry.DEPTH_X, Bookshelf3dGeometry.interpolatedCoverScaleX(1f), 1e-5f)
+        assertEquals(3f, Bookshelf3dGeometry.interpolatedCoverCornerDp(1f), 1e-5f)
+        val slantedMatrix = Bookshelf3dGeometry.buildInterpolatedCoverMorphMatrix(
+            overlayWidthPx = visualRect.width,
+            slantedFraction = 1f,
+        )
+        val stageOffset = Offset(visualRect.left, visualRect.top)
+        val mappedTl = stageOffset + slantedMatrix.map(Offset(0f, 0f))
+        val mappedTr = stageOffset + slantedMatrix.map(Offset(localArtWidth, 0f))
+        val mappedBr = stageOffset + slantedMatrix.map(Offset(localArtWidth, localArtHeight))
+        val mappedBl = stageOffset + slantedMatrix.map(Offset(0f, localArtHeight))
+
+        val expectedTl = Offset(
+            coverAnchor.x + padX * Bookshelf3dGeometry.DEPTH_X,
+            coverAnchor.y + padX * Bookshelf3dGeometry.DEPTH_Y + topInset,
+        )
+        val expectedTr = Offset(
+            coverAnchor.x + (focusedPose.coverWidthPx - padX) * Bookshelf3dGeometry.DEPTH_X,
+            coverAnchor.y + (focusedPose.coverWidthPx - padX) * Bookshelf3dGeometry.DEPTH_Y + topInset,
+        )
+        val expectedBr = Offset(expectedTr.x, expectedTr.y + localArtHeight)
+        val expectedBl = Offset(expectedTl.x, expectedTl.y + localArtHeight)
+
+        assertEquals(expectedTl.x, mappedTl.x, 1e-2f)
+        assertEquals(expectedTl.y, mappedTl.y, 1e-2f)
+        assertEquals(expectedTr.x, mappedTr.x, 1e-2f)
+        assertEquals(expectedTr.y, mappedTr.y, 1e-2f)
+        assertEquals(expectedBr.x, mappedBr.x, 1e-2f)
+        assertEquals(expectedBr.y, mappedBr.y, 1e-2f)
+        assertEquals(expectedBl.x, mappedBl.x, 1e-2f)
+        assertEquals(expectedBl.y, mappedBl.y, 1e-2f)
+    }
+}
+
+
+

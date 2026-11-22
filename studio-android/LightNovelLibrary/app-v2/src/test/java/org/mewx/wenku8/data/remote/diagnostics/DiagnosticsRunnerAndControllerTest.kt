@@ -1,0 +1,975 @@
+package org.mewx.wenku8.data.remote.diagnostics
+
+import androidx.datastore.preferences.core.PreferenceDataStoreFactory
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
+import mockwebserver3.MockResponse
+import mockwebserver3.MockWebServer
+import okio.Buffer
+import org.json.JSONObject
+import org.junit.After
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
+import org.junit.Before
+import org.junit.Rule
+import org.junit.Test
+import org.junit.rules.TemporaryFolder
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
+import java.io.ByteArrayOutputStream
+import java.io.File
+import java.net.InetAddress
+import java.net.Proxy
+import java.nio.charset.StandardCharsets
+import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicLong
+import java.util.zip.GZIPOutputStream
+
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [34])
+class DiagnosticsRunnerAndControllerTest {
+
+    @get:Rule
+    val tempFolder = TemporaryFolder()
+
+    private lateinit var storeScope: CoroutineScope
+    private lateinit var routingLocalStore: RoutingLocalStore
+
+    private val testEndpoint = (
+        DiagnosticsEndpointConfig.parseAndValidate("https://wenku8-relay.mewx.org/")
+            as DiagnosticsEndpointResolution.Available
+        ).endpoint
+
+    @Before
+    fun setUp() {
+        storeScope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
+        val dsFile = File(tempFolder.newFolder("datastore"), "routing_test.preferences_pb")
+        val dataStore = PreferenceDataStoreFactory.create(
+            scope = storeScope,
+            produceFile = { dsFile },
+        )
+        routingLocalStore = RoutingLocalStore(dataStore)
+    }
+
+    @After
+    fun tearDown() {
+        storeScope.cancel()
+    }
+
+    @Test
+    fun manifestRepositoryValidatesSchemaRejectsHostMismatchAndPreventsRollbackAfterRevocation() = runBlocking {
+        val nowWall = 1_762_732_800_000L // 2025-11-10T00:00:00Z
+        val nowMono = 10_000L
+
+        val repo = ManifestRepository(
+            localStore = routingLocalStore,
+            wallClockEpochMillis = { nowWall },
+            monotonicClockMillis = { nowMono },
+        )
+
+        val validV1Json = """
+            {
+              "schema": "wenku8-ip-candidates-v1",
+              "revision": "rev-1",
+              "hostname": "wenku8-relay.mewx.org",
+              "enabled": true,
+              "minAppVersionCode": 0,
+              "rolloutPermille": 1000,
+              "fallbackEndpointIds": ["unknown-gw"],
+              "issuedAt": "2025-11-10T00:00:00Z",
+              "expiresAt": "2025-11-10T12:00:00Z",
+              "candidates": [
+                { "id": "cf-v4-01", "ip": "104.16.132.229" },
+                { "id": "cf-v6-01", "ip": "2606:4700::6810:84e5" }
+              ]
+            }
+        """.trimIndent()
+
+        // Hostname mismatch rejected
+        assertNull(repo.ingestManifestPayload(validV1Json, expectedRelayHostname = "evil.example.com"))
+
+        // Valid ingestion succeeds and strips unknown fallbackEndpointIds
+        val accepted = repo.ingestManifestPayload(validV1Json, expectedRelayHostname = "wenku8-relay.mewx.org")
+        assertNotNull(accepted)
+        assertEquals(2, accepted!!.candidates.size)
+        assertTrue(accepted.fallbackEndpointIds.isEmpty())
+
+        // Newer revocation (`enabled = false`) disables routing
+        val revokeV2Json = """
+            {
+              "schema": "wenku8-ip-candidates-v1",
+              "revision": "rev-2-killswitch",
+              "hostname": "wenku8-relay.mewx.org",
+              "enabled": false,
+              "minAppVersionCode": 0,
+              "rolloutPermille": 1000,
+              "issuedAt": "2025-11-10T00:03:00Z",
+              "expiresAt": "2025-11-10T12:00:00Z",
+              "candidates": []
+            }
+        """.trimIndent()
+        val revoked = repo.ingestManifestPayload(revokeV2Json, expectedRelayHostname = "wenku8-relay.mewx.org")
+        assertNotNull(revoked)
+        assertFalse(revoked!!.enabled)
+
+        // Lagging mirror serving older `rev-1` cannot undo `rev-2-killswitch`!
+        val afterStaleAttempt = repo.ingestManifestPayload(validV1Json, expectedRelayHostname = "wenku8-relay.mewx.org")
+        assertFalse(afterStaleAttempt!!.enabled)
+        assertEquals("rev-2-killswitch", afterStaleAttempt.revision)
+    }
+
+    @Test
+    fun routingLocalStoreEnforcesRolling24hMetered60AndTotal120Budgets() = runBlocking {
+        val baseEpoch = 1_762_732_800_000L
+
+        // Consume all 60 metered probe slots
+        repeat(60) { i ->
+            assertTrue(
+                routingLocalStore.tryConsumeAutomaticProbeBudget(
+                    nowEpochMs = baseEpoch + i * 1_000L,
+                    isMeteredOrUnknown = true,
+                ),
+            )
+        }
+        // 61st metered probe within 24h is rejected
+        assertFalse(
+            routingLocalStore.tryConsumeAutomaticProbeBudget(
+                nowEpochMs = baseEpoch + 61_000L,
+                isMeteredOrUnknown = true,
+            ),
+        )
+
+        // Unmetered Wi-Fi still has remaining 60 slots up to the 120 total cap
+        repeat(60) { i ->
+            assertTrue(
+                routingLocalStore.tryConsumeAutomaticProbeBudget(
+                    nowEpochMs = baseEpoch + 100_000L + i * 1_000L,
+                    isMeteredOrUnknown = false,
+                ),
+            )
+        }
+        // 121st total probe within 24h is rejected even on unmetered Wi-Fi
+        assertFalse(
+            routingLocalStore.tryConsumeAutomaticProbeBudget(
+                nowEpochMs = baseEpoch + 200_000L,
+                isMeteredOrUnknown = false,
+            ),
+        )
+
+        // Advance past rolling 24h window -> budget replenishes!
+        assertTrue(
+            routingLocalStore.tryConsumeAutomaticProbeBudget(
+                nowEpochMs = baseEpoch + RoutingLocalStore.ROLLING_WINDOW_MILLIS + 5_000L,
+                isMeteredOrUnknown = true,
+            ),
+        )
+    }
+
+    @Test
+    fun diagnosticsRunnerStopsOnNetworkTransitionAndRateLimitAndExportsExplicitNullJson() = runBlocking {
+        val networkFlow = MutableStateFlow(
+            NetworkSnapshot(
+                internalNetworkHandleKey = "wifi-100",
+                isConnected = true,
+                underlyingTransports = setOf(UnderlyingTransportKind.WIFI),
+                isVpnActive = false,
+                isMetered = false,
+            ),
+        )
+        val fakeObserver = object : NetworkConnectivityObserver {
+            override fun currentSnapshot(): NetworkSnapshot = networkFlow.value
+            override fun observeDefaultNetworkSnapshots(): Flow<NetworkSnapshot> = networkFlow
+        }
+
+        // Scenario A: Wi-Fi -> Cellular switch after Sample #2 stops run cleanly with partial results
+        val callCounter = AtomicInteger(0)
+        val transitionProbeTransport = object : DiagnosticsProbeTransport {
+            override suspend fun executeProbe(
+                endpoint: ValidatedRelayEndpoint,
+                armConfig: ProbeArmConfig,
+                sampleIndex: Int,
+                explicitNonce: String?,
+            ): ProbeSampleResult {
+                val n = callCounter.incrementAndGet()
+                if (n == 3) {
+                    // Simulate OS switching to Cellular during Probe #3
+                    networkFlow.value = NetworkSnapshot(
+                        internalNetworkHandleKey = "cell-200",
+                        isConnected = true,
+                        underlyingTransports = setOf(UnderlyingTransportKind.CELLULAR),
+                        isMetered = true,
+                    )
+                }
+                return syntheticProbeSample(
+                    index = sampleIndex,
+                    armId = armConfig.armId,
+                    candidateId = null,
+                    succeeded = true,
+                    elapsedMs = 150L,
+                    reused = sampleIndex > 1,
+                )
+            }
+        }
+
+        val runner = DiagnosticsRunner(
+            probeTransport = transitionProbeTransport,
+            networkObserver = fakeObserver,
+        )
+        val partialReport = runner.runQuickCheck(
+            endpoint = testEndpoint,
+            plannedAttempts = 10,
+            interSampleGapMillis = 0L,
+        )
+        assertEquals(DiagnosticsStopReason.NETWORK_TRANSITION, partialReport.stopReason)
+        assertTrue(partialReport.networkTransitionInterrupted)
+        assertEquals("Only pre-transition samples must be retained", 2, partialReport.samples.size)
+
+        // Scenario B: HTTP 429 on Sample #1 stops immediately with 0 successes (`"—"`) and explicit JSON nulls
+        val rateLimitedTransport = object : DiagnosticsProbeTransport {
+            var count = 0
+            override suspend fun executeProbe(
+                endpoint: ValidatedRelayEndpoint,
+                armConfig: ProbeArmConfig,
+                sampleIndex: Int,
+                explicitNonce: String?,
+            ): ProbeSampleResult {
+                count += 1
+                return ProbeSampleResult(
+                    sampleIndex = sampleIndex,
+                    armId = armConfig.armId,
+                    candidateId = "cf-v4-01",
+                    succeeded = false,
+                    httpStatusCode = 429,
+                    retryAfterSeconds = 30L,
+                    errorCategory = ProbeErrorCategory.HTTP_RATE_LIMITED,
+                    fullResponseElapsedMs = 95L,
+                    responseHeadersStartMs = 90L,
+                    dnsDurationMs = null,
+                    tcpConnectDurationMs = null,
+                    tlsHandshakeDurationMs = null,
+                    connectionReused = false,
+                    connectAttemptCount = 1,
+                    observedProxyType = Proxy.Type.DIRECT,
+                    localSocketFamily = IpAddressFamily.IPV4,
+                    negotiatedProtocol = "h2",
+                    responseBodyBytesRead = 12,
+                    bodyComplete = true,
+                    serverPayload = null,
+                    observedEvents = listOf("callStart", "responseHeadersStart"),
+                )
+            }
+        }
+
+        val runner429 = DiagnosticsRunner(
+            probeTransport = rateLimitedTransport,
+            networkObserver = fakeObserver,
+        )
+        val report429 = runner429.runQuickCheck(
+            endpoint = testEndpoint,
+            plannedAttempts = 10,
+            interSampleGapMillis = 0L,
+        )
+        assertEquals(1, rateLimitedTransport.count)
+        assertEquals(DiagnosticsStopReason.RATE_LIMITED, report429.stopReason)
+        assertNull("0-success run must have null median, never 0ms", report429.summary.medianFullResponseMs)
+        assertEquals("—", DiagnosticsReport.formatNullableMillisForUi(report429.summary.medianFullResponseMs))
+
+        val exportedJson = report429.toRedactedJsonString(optionalUserNote = null)
+        val parsedExport = JSONObject(exportedJson)
+        assertEquals("wenku8-network-report-v1", parsedExport.getString("schema"))
+        assertTrue(parsedExport.has("userNote") && parsedExport.isNull("userNote"))
+        val summaryJson = parsedExport.getJSONObject("summary")
+        assertTrue(summaryJson.has("medianFullResponseMs") && summaryJson.isNull("medianFullResponseMs"))
+        assertFalse("Internal network handle must never be exported", exportedJson.contains("cell-200"))
+        assertFalse("Raw IP literal must never be exported", exportedJson.contains("104.16.132.229"))
+    }
+
+    @Test
+    fun relayRouteControllerCompactTournamentEnforcesThresholdWarmGuardAndNetworkInvalidation() = runBlocking {
+        val nowWall = 1_762_732_800_000L
+        val monoClock = AtomicLong(20_000L)
+        val networkFlow = MutableStateFlow(
+            NetworkSnapshot(
+                internalNetworkHandleKey = "wifi-home",
+                isConnected = true,
+                underlyingTransports = setOf(UnderlyingTransportKind.WIFI),
+                isMetered = false,
+            ),
+        )
+        val fakeObserver = object : NetworkConnectivityObserver {
+            override fun currentSnapshot(): NetworkSnapshot = networkFlow.value
+            override fun observeDefaultNetworkSnapshots(): Flow<NetworkSnapshot> = networkFlow
+        }
+
+        val manifestRepo = ManifestRepository(
+            localStore = routingLocalStore,
+            wallClockEpochMillis = { nowWall },
+            monotonicClockMillis = { monoClock.get() },
+        )
+        manifestRepo.ingestManifestPayload(
+            rawJson = """
+                {
+                  "schema": "wenku8-ip-candidates-v1",
+                  "revision": "rev-fast",
+                  "hostname": "wenku8-relay.mewx.org",
+                  "enabled": true,
+                  "minAppVersionCode": 0,
+                  "rolloutPermille": 1000,
+                  "issuedAt": "2025-11-10T00:00:00Z",
+                  "expiresAt": "2025-11-10T12:00:00Z",
+                  "candidates": [
+                    { "id": "cf-v4-fast", "ip": "104.16.132.229" },
+                    { "id": "cf-v6-slow", "ip": "2606:4700::6810:84e5" }
+                  ]
+                }
+            """.trimIndent(),
+            expectedRelayHostname = "wenku8-relay.mewx.org",
+        )
+
+        var warmReuseAllowed = true
+        var defaultLatencyMs = 200L
+        var fastCandidateLatencyMs = 90L
+        var totalProbesSent = 0
+
+        val tournamentTransport = object : DiagnosticsProbeTransport {
+            override suspend fun executeProbe(
+                endpoint: ValidatedRelayEndpoint,
+                armConfig: ProbeArmConfig,
+                sampleIndex: Int,
+                explicitNonce: String?,
+            ): ProbeSampleResult {
+                totalProbesSent += 1
+                val candidateId = (armConfig.dnsPolicy as? ProbeDnsPolicy.PinnedCandidate)?.candidateId
+                val isWarmGuard = armConfig.armId.startsWith("warm_guard:")
+                val latency = when (candidateId) {
+                    "cf-v4-fast" -> fastCandidateLatencyMs
+                    "cf-v6-slow" -> 260L
+                    else -> defaultLatencyMs
+                }
+                return syntheticProbeSample(
+                    index = sampleIndex,
+                    armId = armConfig.armId,
+                    candidateId = candidateId,
+                    succeeded = true,
+                    elapsedMs = latency,
+                    reused = isWarmGuard && warmReuseAllowed,
+                )
+            }
+        }
+
+        val passiveDefaultController = RelayRouteController(
+            applicationScope = storeScope,
+            endpointResolutionProvider = { DiagnosticsEndpointResolution.Available(testEndpoint) },
+            probeTransport = tournamentTransport,
+            manifestRepository = manifestRepo,
+            routingLocalStore = routingLocalStore,
+            networkObserver = fakeObserver,
+            autoProbeGapMillis = 0L,
+            monotonicClockMillis = { monoClock.get() },
+            wallClockEpochMillis = { nowWall },
+        )
+        assertTrue(passiveDefaultController.uiState.value is AutoRoutingModeState.DisabledByUser)
+        passiveDefaultController.onPassiveCallCompleted(
+            generationId = 1L,
+            candidateId = null,
+            succeeded = false,
+            connectionSetupMs = null,
+        )
+        repeat(5) {
+            passiveDefaultController.onPassiveCallCompleted(
+                generationId = 1L,
+                candidateId = null,
+                succeeded = true,
+                connectionSetupMs = 950L,
+            )
+        }
+        assertEquals("Passive default controller must emit zero background probes", 0, totalProbesSent)
+
+        val controller = RelayRouteController(
+            applicationScope = storeScope,
+            endpointResolutionProvider = { DiagnosticsEndpointResolution.Available(testEndpoint) },
+            probeTransport = tournamentTransport,
+            manifestRepository = manifestRepo,
+            routingLocalStore = routingLocalStore,
+            networkObserver = fakeObserver,
+            autoProbeGapMillis = 0L,
+            initialAutoOptimizeEnabled = true,
+            monotonicClockMillis = { monoClock.get() },
+            wallClockEpochMillis = { nowWall },
+        )
+
+        // Even when auto-optimize is toggled ON, ordinary failed/slow API calls must NOT silently burn relay quota
+        controller.onPassiveCallCompleted(
+            generationId = 1L,
+            candidateId = null,
+            succeeded = false,
+            connectionSetupMs = null,
+        )
+        assertEquals(0, totalProbesSent)
+
+        // 1. Sub-threshold improvement (Default 120ms vs Challenger 98ms -> 22ms < 30ms): NOT promoted!
+        defaultLatencyMs = 120L
+        fastCandidateLatencyMs = 98L
+        assertFalse(controller.runCompactTournament(manualRecheck = true))
+        assertNull(controller.currentPinnedCandidateOrNull())
+        assertTrue(controller.uiState.value is AutoRoutingModeState.EnabledUsingDefault)
+
+        // 2. Broken warm-reuse guard (`connectionReused = false`): NOT promoted!
+        defaultLatencyMs = 200L
+        fastCandidateLatencyMs = 90L
+        warmReuseAllowed = false
+        assertFalse(controller.runCompactTournament(manualRecheck = true))
+        assertNull(controller.currentPinnedCandidateOrNull())
+
+        // 3. Valid win (Default 200ms vs Challenger 90ms = 55% & 110ms improvement + warm socket reused): PROMOTED!
+        totalProbesSent = 0
+        warmReuseAllowed = true
+        assertTrue(controller.runCompactTournament(manualRecheck = true))
+        assertTrue("Tournament must stay well within <=18 probe cap", totalProbesSent <= 18)
+        assertEquals("cf-v4-fast", controller.currentPinnedCandidateOrNull()?.id)
+        val activeState = controller.uiState.value as AutoRoutingModeState.OptimizedRouteActive
+        assertEquals(55, activeState.reductionPercent)
+
+        val pinnedGen = controller.currentRouteForHost("wenku8-relay.mewx.org").generationId
+
+        // 4. Network transition (Wi-Fi -> Cellular) immediately revokes pinned candidate & bumps generation!
+        networkFlow.value = NetworkSnapshot(
+            internalNetworkHandleKey = "cellular-5g",
+            isConnected = true,
+            underlyingTransports = setOf(UnderlyingTransportKind.CELLULAR),
+            isMetered = true,
+        )
+        assertNull(controller.currentPinnedCandidateOrNull())
+        val afterTransitionRoute = controller.currentRouteForHost("wenku8-relay.mewx.org")
+        assertNull(afterTransitionRoute.pinnedCandidate)
+        assertTrue(afterTransitionRoute.generationId > pinnedGen)
+    }
+
+    @Test
+    fun manifestRepositoryRefreshFromIndependentOriginsDecompressesGzipPayload() = runBlocking {
+        MockWebServer().use { originServer ->
+            originServer.start(InetAddress.getByName("127.0.0.1"), 0)
+
+            val nowWall = 1_762_732_800_000L
+            val manifestJson = """
+                {
+                  "schema": "wenku8-ip-candidates-v1",
+                  "revision": "rev-gzip-1",
+                  "hostname": "wenku8-relay.mewx.org",
+                  "enabled": true,
+                  "minAppVersionCode": 0,
+                  "rolloutPermille": 1000,
+                  "issuedAt": "2025-11-10T00:00:00Z",
+                  "expiresAt": "2025-11-10T12:00:00Z",
+                  "candidates": [
+                    { "id": "cf-v4-gzip", "ip": "104.16.132.229" }
+                  ]
+                }
+            """.trimIndent()
+
+            val gzipBytes = ByteArrayOutputStream().use { baos ->
+                GZIPOutputStream(baos).use { gz ->
+                    gz.write(manifestJson.toByteArray(StandardCharsets.UTF_8))
+                }
+                baos.toByteArray()
+            }
+
+            originServer.enqueue(
+                MockResponse.Builder()
+                    .code(200)
+                    .addHeader("Content-Type", "application/json")
+                    .addHeader("Content-Encoding", "gzip")
+                    .addHeader("ETag", "\"etag-gzip-1\"")
+                    .body(Buffer().write(gzipBytes))
+                    .build(),
+            )
+
+            val repo = ManifestRepository(
+                localStore = routingLocalStore,
+                configurationOrigins = listOf("http://127.0.0.1:${originServer.port}/ip-candidates.json"),
+                wallClockEpochMillis = { nowWall },
+                monotonicClockMillis = { 10_000L },
+            )
+
+            val fetched = repo.refreshFromIndependentOrigins("wenku8-relay.mewx.org")
+            assertNotNull("Gzipped manifest from independent origin must decompress and validate", fetched)
+            assertEquals("rev-gzip-1", fetched!!.revision)
+            assertEquals(1, fetched.candidates.size)
+            assertEquals("cf-v4-gzip", fetched.candidates.first().id)
+        }
+    }
+
+    @Test
+    fun relayRouteControllerNeverPromotesCandidateIpWithoutAuthenticatedProbeSchema() = runBlocking {
+        val nowWall = 1_762_732_800_000L
+        val networkFlow = MutableStateFlow(
+            NetworkSnapshot(
+                internalNetworkHandleKey = "wifi-legacy",
+                isConnected = true,
+                underlyingTransports = setOf(UnderlyingTransportKind.WIFI),
+                isMetered = false,
+            ),
+        )
+        val fakeObserver = object : NetworkConnectivityObserver {
+            override fun currentSnapshot(): NetworkSnapshot = networkFlow.value
+            override fun observeDefaultNetworkSnapshots(): Flow<NetworkSnapshot> = networkFlow
+        }
+
+        val manifestRepo = ManifestRepository(
+            localStore = routingLocalStore,
+            wallClockEpochMillis = { nowWall },
+            monotonicClockMillis = { 20_000L },
+        )
+        manifestRepo.ingestManifestPayload(
+            rawJson = """
+                {
+                  "schema": "wenku8-ip-candidates-v1",
+                  "revision": "rev-legacy-guard",
+                  "hostname": "wenku8-relay.mewx.org",
+                  "enabled": true,
+                  "minAppVersionCode": 0,
+                  "rolloutPermille": 1000,
+                  "issuedAt": "2025-11-10T00:00:00Z",
+                  "expiresAt": "2025-11-10T12:00:00Z",
+                  "candidates": [
+                    { "id": "cf-v4-legacy", "ip": "104.16.132.229" }
+                  ]
+                }
+            """.trimIndent(),
+            expectedRelayHostname = "wenku8-relay.mewx.org",
+        )
+
+        val unauthenticatedLegacyTransport = object : DiagnosticsProbeTransport {
+            override suspend fun executeProbe(
+                endpoint: ValidatedRelayEndpoint,
+                armConfig: ProbeArmConfig,
+                sampleIndex: Int,
+                explicitNonce: String?,
+            ): ProbeSampleResult {
+                val candidateId = (armConfig.dnsPolicy as? ProbeDnsPolicy.PinnedCandidate)?.candidateId
+                val isWarmGuard = armConfig.armId.startsWith("warm_guard:")
+                val base = syntheticProbeSample(
+                    index = sampleIndex,
+                    armId = armConfig.armId,
+                    candidateId = candidateId,
+                    succeeded = true,
+                    elapsedMs = if (candidateId != null) 75L else 220L,
+                    reused = isWarmGuard,
+                )
+                return base.copy(
+                    serverPayload = base.serverPayload?.copy(
+                        schema = OkHttpProbeTransport.LEGACY_RELAY_PROBE_SCHEMA_V1,
+                    ),
+                )
+            }
+        }
+
+        val controller = RelayRouteController(
+            applicationScope = storeScope,
+            endpointResolutionProvider = { DiagnosticsEndpointResolution.Available(testEndpoint) },
+            probeTransport = unauthenticatedLegacyTransport,
+            manifestRepository = manifestRepo,
+            routingLocalStore = routingLocalStore,
+            networkObserver = fakeObserver,
+            autoProbeGapMillis = 0L,
+            monotonicClockMillis = { 20_000L },
+            wallClockEpochMillis = { nowWall },
+        )
+        controller.setAutoOptimizeEnabled(true)
+
+        assertFalse(
+            "Candidate IP promotion must require cryptographic wenku8-network-probe-v1 nonce echo",
+            controller.runCompactTournament(manualRecheck = true),
+        )
+        assertNull(controller.currentPinnedCandidateOrNull())
+    }
+
+    @Test
+    fun relayRouteControllerAndRunnerShortCircuitOn503DiagnosticsDisabledAndPauseOneHour() = runBlocking {
+        val nowWall = 1_762_732_800_000L
+        val monoClock = AtomicLong(50_000L)
+        val networkFlow = MutableStateFlow(
+            NetworkSnapshot(
+                internalNetworkHandleKey = "wifi-disabled-check",
+                isConnected = true,
+                underlyingTransports = setOf(UnderlyingTransportKind.WIFI),
+                isMetered = false,
+            ),
+        )
+        val fakeObserver = object : NetworkConnectivityObserver {
+            override fun currentSnapshot(): NetworkSnapshot = networkFlow.value
+            override fun observeDefaultNetworkSnapshots(): Flow<NetworkSnapshot> = networkFlow
+        }
+
+        val manifestRepo = ManifestRepository(
+            localStore = routingLocalStore,
+            wallClockEpochMillis = { nowWall },
+            monotonicClockMillis = { monoClock.get() },
+        )
+        manifestRepo.ingestManifestPayload(
+            rawJson = """
+                {
+                  "schema": "wenku8-ip-candidates-v1",
+                  "revision": "rev-503-pause",
+                  "hostname": "wenku8-relay.mewx.org",
+                  "enabled": true,
+                  "minAppVersionCode": 0,
+                  "rolloutPermille": 1000,
+                  "issuedAt": "2025-11-10T00:00:00Z",
+                  "expiresAt": "2025-11-10T12:00:00Z",
+                  "candidates": [
+                    { "id": "cf-1", "ip": "104.16.132.229" },
+                    { "id": "cf-2", "ip": "104.16.133.229" },
+                    { "id": "cf-3", "ip": "2606:4700::6810:84e5" },
+                    { "id": "cf-4", "ip": "2606:4700::6810:85e5" }
+                  ]
+                }
+            """.trimIndent(),
+            expectedRelayHostname = "wenku8-relay.mewx.org",
+        )
+
+        var serverDisabled = true
+        var probesSent = 0
+        val transport = object : DiagnosticsProbeTransport {
+            override suspend fun executeProbe(
+                endpoint: ValidatedRelayEndpoint,
+                armConfig: ProbeArmConfig,
+                sampleIndex: Int,
+                explicitNonce: String?,
+            ): ProbeSampleResult {
+                probesSent += 1
+                val candidateId = (armConfig.dnsPolicy as? ProbeDnsPolicy.PinnedCandidate)?.candidateId
+                if (serverDisabled) {
+                    return syntheticProbeSample(
+                        index = sampleIndex,
+                        armId = armConfig.armId,
+                        candidateId = candidateId,
+                        succeeded = false,
+                        elapsedMs = 35L,
+                        reused = false,
+                    ).copy(
+                        httpStatusCode = 503,
+                        errorCategory = ProbeErrorCategory.HTTP_STATUS_ERROR,
+                        serverPayload = null,
+                    )
+                }
+                return syntheticProbeSample(
+                    index = sampleIndex,
+                    armId = armConfig.armId,
+                    candidateId = candidateId,
+                    succeeded = true,
+                    elapsedMs = if (candidateId != null) 80L else 220L,
+                    reused = armConfig.armId.startsWith("warm_guard:"),
+                )
+            }
+        }
+
+        // 1. Manual runner stops after 1st sample with DIAGNOSTICS_DISABLED instead of probing 10 times
+        val runner = DiagnosticsRunner(
+            probeTransport = transport,
+            networkObserver = fakeObserver,
+            monotonicClockMillis = { monoClock.get() },
+            wallClockEpochMillis = { nowWall },
+        )
+        val disabledReport = runner.runQuickCheck(
+            endpoint = testEndpoint,
+            plannedAttempts = 10,
+            interSampleGapMillis = 0L,
+        )
+        assertEquals(1, probesSent)
+        assertEquals(DiagnosticsStopReason.DIAGNOSTICS_DISABLED, disabledReport.stopReason)
+
+        // 2. Compact tournament stops immediately on controlScreen 503 (1 probe, NOT 5) & pauses auto cycles for 1h
+        probesSent = 0
+        val controller = RelayRouteController(
+            applicationScope = storeScope,
+            endpointResolutionProvider = { DiagnosticsEndpointResolution.Available(testEndpoint) },
+            probeTransport = transport,
+            manifestRepository = manifestRepo,
+            routingLocalStore = routingLocalStore,
+            networkObserver = fakeObserver,
+            autoProbeGapMillis = 0L,
+            initialAutoOptimizeEnabled = true,
+            monotonicClockMillis = { monoClock.get() },
+            wallClockEpochMillis = { nowWall },
+        )
+        assertFalse(controller.runCompactTournament(manualRecheck = false))
+        assertEquals("503 on controlScreen must short-circuit without probing 4 candidates", 1, probesSent)
+        assertTrue(controller.uiState.value is AutoRoutingModeState.EnabledUsingDefault)
+
+        // Even after normal 30-min tournament cooldown (+45 min), automatic probes remain paused (< 60 min)!
+        serverDisabled = false
+        probesSent = 0
+        monoClock.addAndGet(45L * 60L * 1_000L)
+        assertFalse(controller.runCompactTournament(manualRecheck = false))
+        assertFalse(controller.runBootstrapRecovery())
+        assertEquals("Automatic probes must stay paused during 1-hour 503 cooldown", 0, probesSent)
+
+        // Once 1 hour has elapsed (+20 min -> +65 min total), automatic tournament resumes normally
+        monoClock.addAndGet(20L * 60L * 1_000L)
+        assertTrue(controller.runCompactTournament(manualRecheck = false))
+        assertTrue(probesSent > 1)
+    }
+
+    @Test
+    fun discoverRecordsGoodIpAndTogglingSwitchImmediatelyActivatesRelayOnlyRouteWithAutoFallback() = runBlocking {
+        val nowWall = 1_762_740_000_000L // 2025-11-10T02:00:00Z
+        val monoClock = AtomicLong(10_000L)
+        val networkFlow = MutableStateFlow(
+            NetworkSnapshot(
+                internalNetworkHandleKey = "wifi-home",
+                isConnected = true,
+                underlyingTransports = setOf(UnderlyingTransportKind.WIFI),
+                isVpnActive = false,
+                isMetered = false,
+            ),
+        )
+        val fakeObserver = object : NetworkConnectivityObserver {
+            override fun currentSnapshot(): NetworkSnapshot = networkFlow.value
+            override fun observeDefaultNetworkSnapshots(): Flow<NetworkSnapshot> = networkFlow
+        }
+
+        val manifestRepo = ManifestRepository(
+            localStore = routingLocalStore,
+            wallClockEpochMillis = { nowWall },
+            monotonicClockMillis = { monoClock.get() },
+        )
+        manifestRepo.ingestManifestPayload(
+            rawJson = """
+                {
+                  "schema": "wenku8-ip-candidates-v1",
+                  "revision": "rev-recorded-ip",
+                  "hostname": "wenku8-relay.mewx.org",
+                  "enabled": true,
+                  "minAppVersionCode": 0,
+                  "rolloutPermille": 1000,
+                  "issuedAt": "2025-11-10T00:00:00Z",
+                  "expiresAt": "2025-11-10T12:00:00Z",
+                  "candidates": [
+                    { "id": "cf-v4-blocked", "ip": "104.21.48.10" },
+                    { "id": "cf-v4-good", "ip": "162.159.135.88" },
+                    { "id": "cf-v4-backup", "ip": "172.67.150.42" }
+                  ]
+                }
+            """.trimIndent(),
+            expectedRelayHostname = "wenku8-relay.mewx.org",
+        )
+
+        var probesSent = 0
+        val transport = object : DiagnosticsProbeTransport {
+            override suspend fun executeProbe(
+                endpoint: ValidatedRelayEndpoint,
+                armConfig: ProbeArmConfig,
+                sampleIndex: Int,
+                explicitNonce: String?,
+            ): ProbeSampleResult {
+                probesSent += 1
+                val candidateId = (armConfig.dnsPolicy as? ProbeDnsPolicy.PinnedCandidate)?.candidateId
+                val isWarmVerify = armConfig.armId.startsWith("discover_warm:")
+                return when (candidateId) {
+                    "cf-v4-blocked" -> syntheticProbeSample(
+                        index = sampleIndex,
+                        armId = armConfig.armId,
+                        candidateId = candidateId,
+                        succeeded = false,
+                        elapsedMs = 3_000L,
+                        reused = false,
+                    )
+                    "cf-v4-good" -> syntheticProbeSample(
+                        index = sampleIndex,
+                        armId = armConfig.armId,
+                        candidateId = candidateId,
+                        succeeded = true,
+                        elapsedMs = if (isWarmVerify) 82L else 94L,
+                        reused = isWarmVerify,
+                    )
+                    "cf-v4-backup" -> syntheticProbeSample(
+                        index = sampleIndex,
+                        armId = armConfig.armId,
+                        candidateId = candidateId,
+                        succeeded = true,
+                        elapsedMs = if (isWarmVerify) 118L else 132L,
+                        reused = isWarmVerify,
+                    )
+                    else -> syntheticProbeSample(
+                        index = sampleIndex,
+                        armId = armConfig.armId,
+                        candidateId = null,
+                        succeeded = true,
+                        elapsedMs = 240L,
+                        reused = false,
+                    )
+                }
+            }
+        }
+
+        val controller = RelayRouteController(
+            applicationScope = storeScope,
+            endpointResolutionProvider = { DiagnosticsEndpointResolution.Available(testEndpoint) },
+            probeTransport = transport,
+            manifestRepository = manifestRepo,
+            routingLocalStore = routingLocalStore,
+            networkObserver = fakeObserver,
+            autoProbeGapMillis = 0L,
+            initialAutoOptimizeEnabled = false,
+            allowAutoSelectOnEnable = true,
+            monotonicClockMillis = { monoClock.get() },
+            wallClockEpochMillis = { nowWall },
+        )
+
+        // 1. Discover & record good IP while toggle is OFF (simulating post-QuickCheck recording)
+        val recorded = controller.discoverAndRecordPreferredCandidate(
+            applyIfEnabled = true,
+            invokedFromManualCheck = true,
+            userInitiated = true,
+        )
+        assertNotNull(recorded)
+        assertEquals("cf-v4-good", recorded!!.candidateId)
+        assertEquals("162.159.135.88", recorded.ipLiteral)
+        assertEquals("HKG", recorded.ingressColo)
+        assertEquals(recorded, controller.recordedCandidateSummary.value)
+        assertTrue(controller.uiState.value is AutoRoutingModeState.DisabledByUser)
+        assertNull(controller.currentRouteForHost("wenku8-relay.mewx.org").pinnedCandidate)
+
+        // 2. User flips toggle ON -> immediately activates recorded IP with ZERO additional probes!
+        val probesBeforeToggle = probesSent
+        controller.onUserToggledAutoOptimize(true)
+        assertEquals("Recorded IP must activate instantaneously without extra probes", probesBeforeToggle, probesSent)
+        val activeState = controller.uiState.value as AutoRoutingModeState.OptimizedRouteActive
+        assertEquals("cf-v4-good", activeState.candidateId)
+        assertEquals("162.159.135.88", activeState.selectedIpLiteral)
+        assertEquals("HKG", activeState.ingressColo)
+
+        val relayRoute = controller.currentRouteForHost("wenku8-relay.mewx.org")
+        assertNotNull(relayRoute.pinnedCandidate)
+        assertEquals(
+            "162.159.135.88",
+            InetAddress.getByAddress(relayRoute.pinnedCandidate!!.rawIpBytes).hostAddress,
+        )
+
+        // 3. Strict Relay-Only Host Scoping: Wenku8 website & image CDNs MUST NEVER use pinned IP!
+        for (nonRelayHost in listOf(
+            "pic.wenku8.com",
+            "img.wenku8.com",
+            "app.wenku8.com",
+            "www.wenku8.net",
+            "wenku8.cn",
+            "wenku8.mewx.org",
+            "cdn.example.org",
+        )) {
+            assertNull(
+                "Host $nonRelayHost must stay on System DNS and never use pinned relay IP",
+                controller.currentRouteForHost(nonRelayHost).pinnedCandidate,
+            )
+        }
+        assertTrue(org.mewx.wenku8.data.remote.transport.RelayHttpTransport.isDirectWenkuOriginOrCdnHost("pic.wenku8.com"))
+        assertTrue(org.mewx.wenku8.data.remote.transport.RelayHttpTransport.isDirectWenkuOriginOrCdnHost("www.wenku8.net"))
+        assertFalse(org.mewx.wenku8.data.remote.transport.RelayHttpTransport.isDirectWenkuOriginOrCdnHost("wenku8-relay.mewx.org"))
+
+        // 4. User toggles OFF -> reverts to System DNS while keeping recorded IP near the toggle;
+        //    toggling ON again immediately re-activates!
+        controller.onUserToggledAutoOptimize(false)
+        assertTrue(controller.uiState.value is AutoRoutingModeState.DisabledByUser)
+        assertNull(controller.currentRouteForHost("wenku8-relay.mewx.org").pinnedCandidate)
+        assertEquals("162.159.135.88", controller.recordedCandidateSummary.value?.ipLiteral)
+
+        controller.onUserToggledAutoOptimize(true)
+        assertEquals(
+            "cf-v4-good",
+            (controller.uiState.value as AutoRoutingModeState.OptimizedRouteActive).candidateId,
+        )
+
+        // 5. Pinned IP fails during an in-flight foreground call -> immediate fallback route uses
+        //    Default System DNS (`pinnedCandidate == null`), background re-selection yields until
+        //    the foreground retry finishes (`onForegroundCallFinished`), then promotes `cf-v4-backup`!
+        val currentGen = controller.currentRouteForHost("wenku8-relay.mewx.org").generationId
+        controller.onForegroundCallStarted()
+        val immediateFallback = controller.fallbackRouteAfterCandidateFailure(
+            failedGenerationId = currentGen,
+            failedCandidateId = "cf-v4-good",
+            failureBeforeSend = true,
+        )
+        assertNull("Immediate in-flight fallback must use System DNS", immediateFallback.pinnedCandidate)
+        controller.onForegroundCallFinished()
+
+        val reselectedState = kotlinx.coroutines.withTimeout(5_000L) {
+            controller.uiState.first { it is AutoRoutingModeState.OptimizedRouteActive }
+        } as AutoRoutingModeState.OptimizedRouteActive
+        assertEquals("cf-v4-backup", reselectedState.candidateId)
+        assertEquals("172.67.150.42", reselectedState.selectedIpLiteral)
+
+        // 6. Network transition (Wi-Fi -> Cellular) clears old network's IP & re-evaluates on Cellular
+        networkFlow.value = NetworkSnapshot(
+            internalNetworkHandleKey = "cell-5g",
+            isConnected = true,
+            underlyingTransports = setOf(UnderlyingTransportKind.CELLULAR),
+            isVpnActive = false,
+            isMetered = true,
+        )
+        val cellActive = kotlinx.coroutines.withTimeout(5_000L) {
+            controller.uiState.first {
+                it is AutoRoutingModeState.OptimizedRouteActive && it.selectedIpLiteral == "162.159.135.88"
+            }
+        } as AutoRoutingModeState.OptimizedRouteActive
+        assertEquals("162.159.135.88", cellActive.selectedIpLiteral)
+    }
+
+    private fun syntheticProbeSample(
+        index: Int,
+        armId: String,
+        candidateId: String?,
+        succeeded: Boolean,
+        elapsedMs: Long,
+        reused: Boolean,
+    ): ProbeSampleResult {
+        return ProbeSampleResult(
+            sampleIndex = index,
+            armId = armId,
+            candidateId = candidateId,
+            succeeded = succeeded,
+            httpStatusCode = if (succeeded) 200 else 502,
+            retryAfterSeconds = null,
+            errorCategory = if (succeeded) null else ProbeErrorCategory.HTTP_STATUS_ERROR,
+            fullResponseElapsedMs = elapsedMs,
+            responseHeadersStartMs = (elapsedMs - 10L).coerceAtLeast(1L),
+            dnsDurationMs = if (reused) null else 5L,
+            tcpConnectDurationMs = if (reused) null else 20L,
+            tlsHandshakeDurationMs = if (reused) null else 30L,
+            connectionReused = reused,
+            connectAttemptCount = if (reused) 0 else 1,
+            observedProxyType = Proxy.Type.DIRECT,
+            localSocketFamily = IpAddressFamily.IPV4,
+            negotiatedProtocol = "h2",
+            responseBodyBytesRead = 180,
+            bodyComplete = true,
+            serverPayload = ParsedServerProbePayload(
+                schema = "wenku8-network-probe-v1",
+                nonce = "0123456789abcdef0123456789abcdef",
+                endpointRole = "placed-relay",
+                ingressColo = "HKG",
+                country = "AU",
+                asn = 13335L,
+                clientIpFamily = IpAddressFamily.IPV4,
+                httpProtocol = "HTTP/2",
+                transportRttMs = 22L,
+                transportRttSource = "tcp",
+                handlerElapsedMs = 1L,
+            ),
+            observedEvents = if (reused) {
+                listOf("callStart", "connectionAcquired", "callEnd")
+            } else {
+                listOf("callStart", "connectStart(DIRECT)", "connectionAcquired", "callEnd")
+            },
+        )
+    }
+}

@@ -1,0 +1,288 @@
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+
+apply plugin: 'com.android.application'
+apply plugin: 'com.google.gms.google-services'
+apply plugin: 'com.google.firebase.crashlytics'
+apply plugin: 'org.jetbrains.kotlin.plugin.compose'
+apply plugin: 'org.jetbrains.kotlin.plugin.serialization'
+apply plugin: 'com.google.devtools.ksp'
+apply plugin: 'jacoco'
+
+// Automatically upload Crashlytics R8 mappings and NDK symbols on real local release builds
+// (both `defaultRelease` and `playstoreRelease`), while keeping CI, `api-stub`, debug builds,
+// and explicit offline builds (`-PskipCrashlyticsUpload=true`) completely upload-free.
+def isCiBuild = providers.environmentVariable('CI').map { it.equalsIgnoreCase('true') }.getOrElse(false) ||
+        providers.environmentVariable('GITHUB_ACTIONS').map { it.equalsIgnoreCase('true') }.getOrElse(false)
+def isPrivateApiAvailable = project(':api').projectDir.name != 'api-stub'
+def skipCrashlyticsUpload = providers.gradleProperty('skipCrashlyticsUpload')
+        .map { it.equalsIgnoreCase('true') }
+        .getOrElse(false)
+def enableReleaseCrashlyticsUpload = !isCiBuild && isPrivateApiAvailable && !skipCrashlyticsUpload
+
+android {
+    namespace 'org.mewx.wenku8'
+    compileSdk {
+        version = release(rootProject.compileSdkVersion) {
+            minorApiLevel = rootProject.compileSdkMinorVersion
+        }
+    }
+    buildToolsVersion rootProject.buildToolsVersion
+    ndkVersion '30.0.16248370'
+
+    defaultConfig {
+        // Production package ID matching v1 on Google Play Store for seamless in-place upgrades.
+        applicationId "org.mewx.wenku8"
+        // Material 3 Expressive (androidx.compose.material3:1.5.0-beta01 / 1.5.0-rc01+) officially
+        // requires minSdk 24 (Android 7.0 Nougat) per AndroidX's 2026 baseline.
+        minSdkVersion rootProject.minSdkVersion
+        targetSdkVersion rootProject.targetSdkVersion
+        versionCode 105
+        versionName "2.0.5"
+
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        vectorDrawables {
+            useSupportLibrary = true
+        }
+    }
+
+    // Connected devices with an Android Work Profile (User 10) will otherwise install Debug APKs
+    // into BOTH Personal (User 0) and Work profiles during Gradle install* tasks. Enforce User 0.
+    installation {
+        installOptions.addAll(['--user', '0'])
+    }
+
+    buildTypes {
+        debug {
+            debuggable true
+            minifyEnabled false
+            enableUnitTestCoverage true
+            // Official Google demo AdMob App ID so local/open-source debug builds never hit
+            // production AdMob inventory or trigger Invalid Traffic policy warnings.
+            manifestPlaceholders = [ADMOB_APP_ID: "ca-app-pub-3940256099942544~3347511713"]
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            firebaseCrashlytics {
+                mappingFileUploadEnabled false
+                nativeSymbolUploadEnabled false
+            }
+        }
+        release {
+            debuggable false
+            minifyEnabled true
+            shrinkResources true
+            manifestPlaceholders = [ADMOB_APP_ID: "ca-app-pub-7333757578973883~9635263460"]
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            ndk {
+                // Package full unstripped symbols in AAB BUNDLE-METADATA for Play Console
+                // crash symbolication while still shipping stripped .so binaries inside the APK.
+                debugSymbolLevel 'FULL'
+                abiFilters 'armeabi-v7a', 'arm64-v8a', 'x86', 'x86_64'
+            }
+            firebaseCrashlytics {
+                mappingFileUploadEnabled enableReleaseCrashlyticsUpload
+                nativeSymbolUploadEnabled enableReleaseCrashlyticsUpload
+            }
+        }
+    }
+
+    flavorDimensions "channel"
+    productFlavors {
+        'default' {
+            dimension "channel"
+            buildConfigField "String", "DISTRIBUTION_CHANNEL", "\"default\""
+        }
+        playstore {
+            dimension "channel"
+            buildConfigField "String", "DISTRIBUTION_CHANNEL", "\"playstore\""
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+        coreLibraryDesugaringEnabled true
+    }
+
+    buildFeatures {
+        compose true
+        buildConfig true
+    }
+
+    packagingOptions {
+        resources {
+            excludes += [
+                    '/META-INF/{AL2.0,LGPL2.1}',
+                    'META-INF/LICENSE.txt',
+                    'META-INF/NOTICE.txt',
+                    '.readme',
+            ]
+        }
+    }
+
+    testOptions {
+        unitTests {
+            includeAndroidResources = true
+            returnDefaultValues = true
+            all {
+                systemProperty 'robolectric.graphicsMode', 'NATIVE'
+                systemProperty 'wenku8.liveNetworkTest', System.getProperty('wenku8.liveNetworkTest', 'false')
+                maxHeapSize = '2048m'
+                jacoco {
+                    includeNoLocationClasses = true
+                    excludes = ['jdk.internal.*']
+                }
+            }
+        }
+    }
+}
+
+androidComponents {
+    onVariants(selector().withBuildType('release')) { variant ->
+        def prefix = "${project.name}-${variant.flavorName}-${variant.buildType}"
+        variant.outputs.each { output ->
+            def versionName = output.versionName.orNull
+            def versionCode = output.versionCode.orNull
+            if (versionName != null && versionCode != null) {
+                output.outputFileName.set("${prefix}.v${versionName}.${versionCode}.apk")
+            }
+        }
+    }
+}
+
+kotlin {
+    compilerOptions {
+        jvmTarget.set(JvmTarget.JVM_17)
+        optIn.addAll(
+                'androidx.compose.material3.ExperimentalMaterial3Api',
+                'androidx.compose.material3.ExperimentalMaterial3ExpressiveApi',
+        )
+    }
+}
+
+ksp {
+    arg("room.schemaLocation", "$projectDir/schemas")
+    arg("room.incremental", "true")
+    arg("room.generateKotlin", "true")
+}
+
+dependencies {
+    // Shared Wenku8 protocol & encryption module (real submodule locally; :api-stub on public CI).
+    implementation project(':api')
+    coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.1.5'
+
+    // Core AndroidX & AppCompat (retained for per-app SC/TC locale switching on API 23-32).
+    implementation 'androidx.core:core-ktx:1.19.1'
+    implementation 'androidx.appcompat:appcompat:1.8.0'
+    implementation 'androidx.documentfile:documentfile:1.1.0'
+    implementation 'androidx.activity:activity-compose:1.13.0'
+    implementation 'androidx.lifecycle:lifecycle-runtime-ktx:2.11.1'
+    implementation 'androidx.lifecycle:lifecycle-runtime-compose:2.11.1'
+    implementation 'androidx.lifecycle:lifecycle-viewmodel-compose:2.11.1'
+
+    // Jetpack Compose & Material 3 Expressive (M3e 1.5.0-rc01). Zero third-party UI libraries.
+    def composeBom = platform('androidx.compose:compose-bom:2026.11.01')
+    implementation composeBom
+    testImplementation composeBom
+    androidTestImplementation composeBom
+
+    implementation 'androidx.compose.ui:ui'
+    implementation 'androidx.compose.ui:ui-graphics'
+    implementation 'androidx.compose.ui:ui-tooling-preview'
+    implementation 'androidx.compose.foundation:foundation'
+    implementation 'androidx.compose.material3:material3:1.5.0'
+    implementation 'androidx.compose.material:material-icons-extended:1.7.8'
+    implementation 'androidx.compose.material3.adaptive:adaptive:1.3.0'
+    implementation 'androidx.graphics:graphics-shapes:1.1.0'
+    implementation 'androidx.navigation:navigation-compose:2.10.2'
+
+    // Coroutines & Kotlinx Serialization
+    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0'
+    implementation 'org.jetbrains.kotlinx:kotlinx-serialization-json:1.13.0'
+
+    // Room SQLite (WAL) & Preferences DataStore (wired in P0.2)
+    def roomVersion = '2.8.5'
+    implementation "androidx.room:room-runtime:${roomVersion}"
+    implementation "androidx.room:room-ktx:${roomVersion}"
+    ksp "androidx.room:room-compiler:${roomVersion}"
+    // 1.2.1+ fixes 16 KB page-size PT_GNU_RELRO segment alignment in libdatastore_shared_counter.so.
+    implementation 'androidx.datastore:datastore-preferences:1.3.0'
+
+    // OkHttp 5.x & Coil 3 (wired in P0.3 / Phase 2)
+    implementation 'com.squareup.okhttp3:okhttp:5.5.1'
+    implementation 'io.coil-kt.coil3:coil-compose:3.6.3'
+    implementation 'io.coil-kt.coil3:coil-network-okhttp:3.6.3'
+
+    // WorkManager for atomic background novel downloads (Phase 4)
+    implementation 'androidx.work:work-runtime-ktx:2.12.0'
+
+    // Firebase Analytics, Crashlytics & Crashlytics NDK (managed by Firebase BoM).
+    implementation platform('com.google.firebase:firebase-bom:35.2.0')
+    implementation 'com.google.firebase:firebase-analytics'
+    implementation 'com.google.firebase:firebase-crashlytics'
+    implementation 'com.google.firebase:firebase-crashlytics-ndk'
+
+    // Minimal server-support inline banner exclusively on NovelDetailScreen (Phase 4)
+    implementation 'com.google.android.gms:play-services-ads:25.5.0'
+    // Google User Messaging Platform (UMP) SDK for GDPR / EEA & UK AdMob consent compliance.
+    implementation 'com.google.android.ump:user-messaging-platform:4.0.0'
+
+    // Google Play In-App Updates (Flexible flow) strictly isolated to the `playstore` flavor
+    // so non-Play builds stay GMS-update-free and Play builds never include external APK prompts.
+    playstoreImplementation 'com.google.android.play:app-update:2.1.0'
+    playstoreImplementation 'com.google.android.play:app-update-ktx:2.1.0'
+
+    // Debug Compose tooling
+    debugImplementation 'androidx.compose.ui:ui-tooling'
+    debugImplementation 'androidx.compose.ui:ui-test-manifest'
+
+    // JVM Unit & Robolectric Compose UI Tests
+    testImplementation 'junit:junit:4.13.2'
+    testImplementation 'org.robolectric:robolectric:4.18.1'
+    testImplementation 'androidx.test:core-ktx:1.7.0'
+    testImplementation 'androidx.test.ext:junit-ktx:1.3.0'
+    testImplementation 'androidx.compose.ui:ui-test-junit4'
+    testImplementation 'org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0'
+    testImplementation "androidx.room:room-testing:${roomVersion}"
+    testImplementation 'com.squareup.okhttp3:mockwebserver3:5.5.1'
+
+    // Instrumented Android Tests
+    androidTestImplementation 'androidx.test.ext:junit:1.3.0'
+    androidTestImplementation 'androidx.compose.ui:ui-test-junit4'
+}
+
+jacoco {
+    toolVersion = "0.8.12"
+}
+
+def v2GeneratedExcludes = [
+        '**/R.class', '**/R$*.class', '**/BuildConfig.*', '**/Manifest*.*',
+        '**/*_Impl*.*', '**/*$$serializer*.*', '**/ComposableSingletons$*.*',
+        '**/*$Lambda$*.*', '**/*$inlined$*.*',
+]
+
+tasks.register('jacocoDefaultDebugUnitTestReport', JacocoReport) {
+    dependsOn 'testDefaultDebugUnitTest'
+    group = 'verification'
+    description = 'Generates JaCoCo XML/HTML coverage for the app-v2 defaultDebug JVM & Compose unit tests.'
+    reports {
+        xml.required = true
+        html.required = true
+    }
+    classDirectories.setFrom(files([
+            fileTree(dir: layout.buildDirectory.dir('tmp/kotlin-classes/defaultDebug').get(),
+                    excludes: v2GeneratedExcludes),
+    ]))
+    sourceDirectories.setFrom(files(['src/main/java']))
+    executionData.setFrom(fileTree(dir: layout.buildDirectory.get().asFile,
+            includes: ['outputs/unit_test_code_coverage/defaultDebugUnitTest/**/*.exec']))
+}
+
+if (enableReleaseCrashlyticsUpload) {
+    ['DefaultRelease', 'PlaystoreRelease'].each { variantName ->
+        def uploadSymbolsTaskName = "uploadCrashlyticsSymbolFile${variantName}"
+        ["assemble${variantName}", "bundle${variantName}"].each { packageTaskName ->
+            tasks.matching { it.name == packageTaskName }.configureEach {
+                finalizedBy(uploadSymbolsTaskName)
+            }
+        }
+    }
+}

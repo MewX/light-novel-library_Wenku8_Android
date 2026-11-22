@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <cache-path
+        name="diagnostics_reports"
+        path="diagnostics/" />
+    <cache-path
+        name="artbook_share"
+        path="artbook_share/" />
+</paths>

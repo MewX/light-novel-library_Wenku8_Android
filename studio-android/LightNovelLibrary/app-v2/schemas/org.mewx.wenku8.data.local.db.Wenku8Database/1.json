@@ -1,0 +1,855 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 1,
+    "identityHash": "6575057a2fc5b3b5c3eb8961b90fcd16",
+    "entities": [
+      {
+        "tableName": "novels",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`aid` INTEGER NOT NULL, `content_lang` TEXT NOT NULL, `toc_version` INTEGER NOT NULL, `toc_sha256` TEXT NOT NULL, `meta_synced_at_ms` INTEGER NOT NULL, `title` TEXT NOT NULL, `author` TEXT NOT NULL, `book_status` TEXT NOT NULL, `press_id` TEXT NOT NULL, `book_length` INTEGER NOT NULL, `last_update` TEXT NOT NULL, `latest_section_cid` INTEGER NOT NULL, `latest_section_name` TEXT NOT NULL, `day_hits` INTEGER NOT NULL, `total_hits` INTEGER NOT NULL, `push_count` INTEGER NOT NULL, `fav_count` INTEGER NOT NULL, `tags_csv` TEXT NOT NULL, `intro_short` TEXT NOT NULL, `full_intro` TEXT NOT NULL, `in_bookshelf` INTEGER NOT NULL, `shelf_category` TEXT NOT NULL, `cloud_synced` INTEGER NOT NULL, `has_unread_update` INTEGER NOT NULL, `shelf_sort_order` INTEGER NOT NULL, `last_accessed_ms` INTEGER NOT NULL, PRIMARY KEY(`aid`))",
+        "fields": [
+          {
+            "fieldPath": "aid",
+            "columnName": "aid",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "contentLang",
+            "columnName": "content_lang",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "tocVersion",
+            "columnName": "toc_version",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "tocSha256",
+            "columnName": "toc_sha256",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "metaSyncedAtMs",
+            "columnName": "meta_synced_at_ms",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "title",
+            "columnName": "title",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "author",
+            "columnName": "author",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "bookStatus",
+            "columnName": "book_status",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "pressId",
+            "columnName": "press_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "bookLength",
+            "columnName": "book_length",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "lastUpdate",
+            "columnName": "last_update",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "latestSectionCid",
+            "columnName": "latest_section_cid",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "latestSectionName",
+            "columnName": "latest_section_name",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "dayHits",
+            "columnName": "day_hits",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "totalHits",
+            "columnName": "total_hits",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "pushCount",
+            "columnName": "push_count",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "favCount",
+            "columnName": "fav_count",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "tagsCsv",
+            "columnName": "tags_csv",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "introShort",
+            "columnName": "intro_short",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "fullIntro",
+            "columnName": "full_intro",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "inBookshelf",
+            "columnName": "in_bookshelf",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "shelfCategory",
+            "columnName": "shelf_category",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "cloudSynced",
+            "columnName": "cloud_synced",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "hasUnreadUpdate",
+            "columnName": "has_unread_update",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "shelfSortOrder",
+            "columnName": "shelf_sort_order",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "lastAccessedMs",
+            "columnName": "last_accessed_ms",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "aid"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_novels_in_bookshelf_shelf_sort_order",
+            "unique": false,
+            "columnNames": [
+              "in_bookshelf",
+              "shelf_sort_order"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_novels_in_bookshelf_shelf_sort_order` ON `${TABLE_NAME}` (`in_bookshelf`, `shelf_sort_order`)"
+          },
+          {
+            "name": "index_novels_last_accessed_ms",
+            "unique": false,
+            "columnNames": [
+              "last_accessed_ms"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_novels_last_accessed_ms` ON `${TABLE_NAME}` (`last_accessed_ms`)"
+          },
+          {
+            "name": "index_novels_title",
+            "unique": false,
+            "columnNames": [
+              "title"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_novels_title` ON `${TABLE_NAME}` (`title`)"
+          },
+          {
+            "name": "index_novels_author",
+            "unique": false,
+            "columnNames": [
+              "author"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_novels_author` ON `${TABLE_NAME}` (`author`)"
+          }
+        ]
+      },
+      {
+        "tableName": "volumes",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`vid` INTEGER NOT NULL, `aid` INTEGER NOT NULL, `volume_order` INTEGER NOT NULL, `volume_title` TEXT NOT NULL, PRIMARY KEY(`vid`), FOREIGN KEY(`aid`) REFERENCES `novels`(`aid`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "vid",
+            "columnName": "vid",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "aid",
+            "columnName": "aid",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "volumeOrder",
+            "columnName": "volume_order",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "volumeTitle",
+            "columnName": "volume_title",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "vid"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_volumes_aid_volume_order",
+            "unique": false,
+            "columnNames": [
+              "aid",
+              "volume_order"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_volumes_aid_volume_order` ON `${TABLE_NAME}` (`aid`, `volume_order`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "novels",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "aid"
+            ],
+            "referencedColumns": [
+              "aid"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "chapters",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`cid` INTEGER NOT NULL, `vid` INTEGER NOT NULL, `aid` INTEGER NOT NULL, `chapter_order` INTEGER NOT NULL, `chapter_title` TEXT NOT NULL, `is_illustration_chapter` INTEGER NOT NULL, PRIMARY KEY(`cid`), FOREIGN KEY(`vid`) REFERENCES `volumes`(`vid`) ON UPDATE NO ACTION ON DELETE CASCADE , FOREIGN KEY(`aid`) REFERENCES `novels`(`aid`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "cid",
+            "columnName": "cid",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "vid",
+            "columnName": "vid",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "aid",
+            "columnName": "aid",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "chapterOrder",
+            "columnName": "chapter_order",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "chapterTitle",
+            "columnName": "chapter_title",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "isIllustrationChapter",
+            "columnName": "is_illustration_chapter",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "cid"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_chapters_vid_chapter_order",
+            "unique": false,
+            "columnNames": [
+              "vid",
+              "chapter_order"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_chapters_vid_chapter_order` ON `${TABLE_NAME}` (`vid`, `chapter_order`)"
+          },
+          {
+            "name": "index_chapters_aid",
+            "unique": false,
+            "columnNames": [
+              "aid"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_chapters_aid` ON `${TABLE_NAME}` (`aid`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "volumes",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "vid"
+            ],
+            "referencedColumns": [
+              "vid"
+            ]
+          },
+          {
+            "table": "novels",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "aid"
+            ],
+            "referencedColumns": [
+              "aid"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "chapter_contents",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`cid` INTEGER NOT NULL, `aid` INTEGER NOT NULL, `content_lang` TEXT NOT NULL, `content_text` TEXT NOT NULL, `byte_length` INTEGER NOT NULL, `image_urls_json` TEXT NOT NULL, `image_count` INTEGER NOT NULL, `sha256_checksum` TEXT NOT NULL, `downloaded_at_ms` INTEGER NOT NULL, PRIMARY KEY(`cid`), FOREIGN KEY(`aid`) REFERENCES `novels`(`aid`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "cid",
+            "columnName": "cid",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "aid",
+            "columnName": "aid",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "contentLang",
+            "columnName": "content_lang",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "contentText",
+            "columnName": "content_text",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "byteLength",
+            "columnName": "byte_length",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "imageUrlsJson",
+            "columnName": "image_urls_json",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "imageCount",
+            "columnName": "image_count",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sha256Checksum",
+            "columnName": "sha256_checksum",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "downloadedAtMs",
+            "columnName": "downloaded_at_ms",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "cid"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_chapter_contents_aid",
+            "unique": false,
+            "columnNames": [
+              "aid"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_chapter_contents_aid` ON `${TABLE_NAME}` (`aid`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "novels",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "aid"
+            ],
+            "referencedColumns": [
+              "aid"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "reading_progress",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`aid` INTEGER NOT NULL, `vid` INTEGER NOT NULL, `cid` INTEGER NOT NULL, `volume_title` TEXT NOT NULL, `chapter_title` TEXT NOT NULL, `paragraph_index` INTEGER NOT NULL, `char_offset` INTEGER NOT NULL, `legacy_scroll_px` INTEGER NOT NULL, `progress_permille` INTEGER NOT NULL, `updated_at_ms` INTEGER NOT NULL, PRIMARY KEY(`aid`), FOREIGN KEY(`aid`) REFERENCES `novels`(`aid`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "aid",
+            "columnName": "aid",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "vid",
+            "columnName": "vid",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "cid",
+            "columnName": "cid",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "volumeTitle",
+            "columnName": "volume_title",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "chapterTitle",
+            "columnName": "chapter_title",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "paragraphIndex",
+            "columnName": "paragraph_index",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "charOffset",
+            "columnName": "char_offset",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "legacyScrollPx",
+            "columnName": "legacy_scroll_px",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "progressPermille",
+            "columnName": "progress_permille",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "updatedAtMs",
+            "columnName": "updated_at_ms",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "aid"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_reading_progress_updated_at_ms",
+            "unique": false,
+            "columnNames": [
+              "updated_at_ms"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_reading_progress_updated_at_ms` ON `${TABLE_NAME}` (`updated_at_ms`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "novels",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "aid"
+            ],
+            "referencedColumns": [
+              "aid"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "bookmarks_notes",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `aid` INTEGER NOT NULL, `vid` INTEGER NOT NULL, `cid` INTEGER NOT NULL, `chapter_title` TEXT NOT NULL, `start_paragraph` INTEGER NOT NULL, `start_char` INTEGER NOT NULL, `end_paragraph` INTEGER NOT NULL, `end_char` INTEGER NOT NULL, `snippet_text` TEXT NOT NULL, `note_markdown` TEXT NOT NULL, `style_type` TEXT NOT NULL, `color_hex` TEXT NOT NULL, `created_at_ms` INTEGER NOT NULL, FOREIGN KEY(`aid`) REFERENCES `novels`(`aid`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "aid",
+            "columnName": "aid",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "vid",
+            "columnName": "vid",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "cid",
+            "columnName": "cid",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "chapterTitle",
+            "columnName": "chapter_title",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "startParagraph",
+            "columnName": "start_paragraph",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "startChar",
+            "columnName": "start_char",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "endParagraph",
+            "columnName": "end_paragraph",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "endChar",
+            "columnName": "end_char",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "snippetText",
+            "columnName": "snippet_text",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "noteMarkdown",
+            "columnName": "note_markdown",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "styleType",
+            "columnName": "style_type",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "colorHex",
+            "columnName": "color_hex",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "createdAtMs",
+            "columnName": "created_at_ms",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_bookmarks_notes_aid_cid",
+            "unique": false,
+            "columnNames": [
+              "aid",
+              "cid"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_bookmarks_notes_aid_cid` ON `${TABLE_NAME}` (`aid`, `cid`)"
+          },
+          {
+            "name": "index_bookmarks_notes_created_at_ms",
+            "unique": false,
+            "columnNames": [
+              "created_at_ms"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_bookmarks_notes_created_at_ms` ON `${TABLE_NAME}` (`created_at_ms`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "novels",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "aid"
+            ],
+            "referencedColumns": [
+              "aid"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "reading_sessions",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `aid` INTEGER NOT NULL, `cid` INTEGER NOT NULL, `date_epoch_day` INTEGER NOT NULL, `duration_seconds` INTEGER NOT NULL, `characters_read` INTEGER NOT NULL)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "aid",
+            "columnName": "aid",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "cid",
+            "columnName": "cid",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "dateEpochDay",
+            "columnName": "date_epoch_day",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "durationSeconds",
+            "columnName": "duration_seconds",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "charactersRead",
+            "columnName": "characters_read",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_reading_sessions_date_epoch_day",
+            "unique": false,
+            "columnNames": [
+              "date_epoch_day"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_reading_sessions_date_epoch_day` ON `${TABLE_NAME}` (`date_epoch_day`)"
+          },
+          {
+            "name": "index_reading_sessions_aid",
+            "unique": false,
+            "columnNames": [
+              "aid"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_reading_sessions_aid` ON `${TABLE_NAME}` (`aid`)"
+          }
+        ]
+      },
+      {
+        "tableName": "review_drafts",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`aid` INTEGER NOT NULL, `rid` INTEGER NOT NULL, `draft_title` TEXT NOT NULL, `draft_content` TEXT NOT NULL, `updated_at_ms` INTEGER NOT NULL, PRIMARY KEY(`aid`, `rid`), FOREIGN KEY(`aid`) REFERENCES `novels`(`aid`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "aid",
+            "columnName": "aid",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "rid",
+            "columnName": "rid",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "draftTitle",
+            "columnName": "draft_title",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "draftContent",
+            "columnName": "draft_content",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "updatedAtMs",
+            "columnName": "updated_at_ms",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "aid",
+            "rid"
+          ]
+        },
+        "foreignKeys": [
+          {
+            "table": "novels",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "aid"
+            ],
+            "referencedColumns": [
+              "aid"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "search_history",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`query` TEXT NOT NULL, `search_type` TEXT NOT NULL, `searched_at_ms` INTEGER NOT NULL, PRIMARY KEY(`query`))",
+        "fields": [
+          {
+            "fieldPath": "query",
+            "columnName": "query",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "searchType",
+            "columnName": "search_type",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "searchedAtMs",
+            "columnName": "searched_at_ms",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "query"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_search_history_searched_at_ms",
+            "unique": false,
+            "columnNames": [
+              "searched_at_ms"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_search_history_searched_at_ms` ON `${TABLE_NAME}` (`searched_at_ms`)"
+          }
+        ]
+      }
+    ],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '6575057a2fc5b3b5c3eb8961b90fcd16')"
+    ]
+  }
+}

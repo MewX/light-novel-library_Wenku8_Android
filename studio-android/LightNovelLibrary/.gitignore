@@ -5,10 +5,15 @@
 .kiro/
 .DS_Store
 /build
+/skills/
+.kotlin/
+app*/default/
+*.hprof
 
 # distributions
 baidu/
 coolapk/
 alpha/
 playstore/
+!app-v2/src/playstore/
 

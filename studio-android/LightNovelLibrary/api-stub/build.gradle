@@ -4,7 +4,11 @@ plugins {
 
 android {
     namespace 'org.mewx.wenku8.api'
-    compileSdkVersion rootProject.targetSdkVersion
+    compileSdk {
+        version = release(rootProject.compileSdkVersion) {
+            minorApiLevel = rootProject.compileSdkMinorVersion
+        }
+    }
     buildToolsVersion rootProject.buildToolsVersion
 
     defaultConfig {
