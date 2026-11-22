@@ -2,6 +2,7 @@ package org.mewx.wenku8.util
 
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
+import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -9,8 +10,20 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.mewx.wenku8.api.Wenku8Error
+import org.mewx.wenku8.data.remote.parser.WenkuXmlParsers
+import org.mewx.wenku8.data.remote.transport.RelayPostResult
+import org.mewx.wenku8.data.remote.transport.WenkuTransport
+import org.mewx.wenku8.data.repository.AccountAuthGateway
+import org.mewx.wenku8.data.repository.DailySignOutcome
+import org.mewx.wenku8.data.repository.LoginOutcome
+import org.mewx.wenku8.data.repository.StoredAccountCredentials
+import org.mewx.wenku8.data.repository.UserSessionRepository
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import java.io.File
+import java.nio.charset.StandardCharsets
+import java.nio.file.Files
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34])
@@ -229,5 +242,116 @@ class TelemetryWrappersTest {
         AnalyticsTracker.initialize(context)
         AnalyticsTracker.logScreenView("LatestScreen")
         AnalyticsTracker.setUserProperty(AnalyticsTracker.UserProperties.THEME_MODE, "light")
+    }
+
+    @Test
+    fun xmlParsers_recordNonFatalExceptionsIntoCrashReporter() {
+        CrashReporter.setTestBackend(crashBackend)
+
+        // Malformed XML must return null/empty safely while reporting a non-fatal exception.
+        val meta = WenkuXmlParsers.parseNovelFullMeta("<package><metadata><data></package>")
+        val volumes = WenkuXmlParsers.parseVolumeTocList("<package><volume vid=\"1\"><chapter></volume></package>")
+
+        assertEquals(null, meta)
+        assertTrue(volumes.isEmpty())
+        assertTrue(crashBackend.logs.contains("WenkuXmlParsers.parseNovelFullMeta"))
+        assertTrue(crashBackend.logs.contains("WenkuXmlParsers.parseVolumeTocList"))
+        assertEquals(2, crashBackend.exceptions.size)
+    }
+
+    @Test
+    fun userSessionRepository_emitsZeroPiiLoginCheckInAndLogoutEvents() = runTest {
+        AnalyticsTracker.setTestBackend(analyticsBackend)
+        val rootDir: File = Files.createTempDirectory("telemetry_session_test").toFile()
+        var signedToday = false
+        try {
+            val transport = object : WenkuTransport {
+                override val isEndpointConfigured: Boolean = true
+
+                override suspend fun postSealedAction(
+                    rawActionQuery: String,
+                    isIdempotentReadOnly: Boolean,
+                ): RelayPostResult {
+                    val body = when {
+                        rawActionQuery.startsWith("login:") -> "1"
+                        rawActionQuery == "userinfo" -> """
+                            <?xml version="1.0" encoding="utf-8"?>
+                            <metadata>
+                                <uname>Alice</uname>
+                                <nickname>AliceNick</nickname>
+                                <score>${if (signedToday) 102 else 100}</score>
+                                <experience>250</experience>
+                                <rank>普通会员</rank>
+                            </metadata>
+                        """.trimIndent()
+                        rawActionQuery == "sign" -> {
+                            if (signedToday) {
+                                "9"
+                            } else {
+                                signedToday = true
+                                "1"
+                            }
+                        }
+                        rawActionQuery == "logout" -> "1"
+                        else -> "0"
+                    }
+                    return RelayPostResult.Success(body.toByteArray(StandardCharsets.UTF_8))
+                }
+            }
+            val authGateway = object : AccountAuthGateway {
+                override val isAuthConfigured: Boolean = true
+                override val baseUrlOrEmpty: String = "https://example.test"
+                override val registerUrlOrEmpty: String = "https://example.test/register"
+                override fun loginQuery(identifier: String, password: String): String = "login:$identifier"
+                override fun logoutQuery(): String = "logout"
+                override fun userInfoQuery(): String = "userinfo"
+                override fun userSignQuery(): String = "sign"
+                override fun avatarUrlForUid(uid: Int): String = ""
+                override fun mapServerErrorCode(rawCode: Int): Wenku8Error.ErrorCode = when (rawCode) {
+                    1 -> Wenku8Error.ErrorCode.SYSTEM_1_SUCCEEDED
+                    9 -> Wenku8Error.ErrorCode.SYSTEM_9_SIGN_FAILED
+                    else -> Wenku8Error.ErrorCode.ERROR_DEFAULT
+                }
+                override fun decodeCertBlob(rawCertContent: String): StoredAccountCredentials? = null
+                override fun encodeCertBlob(identifier: String, password: String): String = "encoded"
+                override fun syncInMemoryCredentials(identifier: String, password: String) {}
+                override fun clearInMemorySession() {}
+            }
+
+            val repo = UserSessionRepository(
+                transport = transport,
+                assetRootsProvider = { listOf(rootDir) },
+                authGateway = authGateway,
+            )
+
+            val loginOutcome = repo.loginWithCredentials("alice@example.com", "secretPass123")
+            assertTrue(loginOutcome is LoginOutcome.Success)
+
+            val firstSign = repo.performDailySignIn()
+            assertTrue(firstSign is DailySignOutcome.SignedAndRefreshed)
+
+            val secondSign = repo.performDailySignIn()
+            assertTrue(secondSign is DailySignOutcome.AlreadySignedOrRefused)
+
+            repo.logout()
+
+            val loginEvent = analyticsBackend.events.first { it.name == AnalyticsTracker.Events.LOGIN }
+            assertEquals("email", loginEvent.params[AnalyticsTracker.Params.METHOD])
+            assertEquals("true", loginEvent.params[AnalyticsTracker.Params.SUCCESS])
+            // Ensure zero PII (email/password/username) ever appears in any Analytics parameter
+            val allParamValues = analyticsBackend.events.flatMap { it.params.values.map(Any::toString) }
+            assertFalse(allParamValues.any { it.contains("alice", ignoreCase = true) || it.contains("secret") })
+
+            val checkIns = analyticsBackend.events.filter { it.name == AnalyticsTracker.Events.DAILY_CHECK_IN }
+            assertEquals(2, checkIns.size)
+            assertEquals("true", checkIns[0].params[AnalyticsTracker.Params.EFFECTIVE_CLICK])
+            assertEquals("success", checkIns[0].params[AnalyticsTracker.Params.OUTCOME])
+            assertEquals("false", checkIns[1].params[AnalyticsTracker.Params.EFFECTIVE_CLICK])
+            assertEquals("already_signed", checkIns[1].params[AnalyticsTracker.Params.OUTCOME])
+
+            assertTrue(analyticsBackend.events.any { it.name == AnalyticsTracker.Events.LOGOUT })
+        } finally {
+            rootDir.deleteRecursively()
+        }
     }
 }
