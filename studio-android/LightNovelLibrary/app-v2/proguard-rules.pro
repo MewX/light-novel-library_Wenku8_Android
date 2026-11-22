@@ -1,5 +1,6 @@
 # Wenku8 v2 (:app-v2) R8 / ProGuard rules
 -keepattributes SourceFile,LineNumberTable
+-keep public class * extends java.lang.Exception
 
 # Private :api JNI bridge keep rules are supplied exclusively by :api/consumer-rules.pro.
 

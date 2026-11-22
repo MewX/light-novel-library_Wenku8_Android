@@ -1,6 +1,8 @@
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 apply plugin: 'com.android.application'
+apply plugin: 'com.google.gms.google-services'
+apply plugin: 'com.google.firebase.crashlytics'
 apply plugin: 'org.jetbrains.kotlin.plugin.compose'
 apply plugin: 'org.jetbrains.kotlin.plugin.serialization'
 apply plugin: 'com.google.devtools.ksp'
@@ -47,6 +49,10 @@ android {
             // production AdMob inventory or trigger Invalid Traffic policy warnings.
             manifestPlaceholders = [ADMOB_APP_ID: "ca-app-pub-3940256099942544~3347511713"]
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            firebaseCrashlytics {
+                mappingFileUploadEnabled false
+                nativeSymbolUploadEnabled false
+            }
         }
         release {
             debuggable false
@@ -68,10 +74,19 @@ android {
         'default' {
             dimension "channel"
             buildConfigField "String", "DISTRIBUTION_CHANNEL", "\"default\""
+            firebaseCrashlytics {
+                mappingFileUploadEnabled false
+                nativeSymbolUploadEnabled false
+            }
         }
         playstore {
             dimension "channel"
             buildConfigField "String", "DISTRIBUTION_CHANNEL", "\"playstore\""
+            firebaseCrashlytics {
+                // Upload ProGuard mappings and NDK symbols exclusively for Play Store releases.
+                mappingFileUploadEnabled true
+                nativeSymbolUploadEnabled true
+            }
         }
     }
 
@@ -179,6 +194,12 @@ dependencies {
 
     // WorkManager for atomic background novel downloads (Phase 4)
     implementation 'androidx.work:work-runtime-ktx:2.12.0'
+
+    // Firebase Analytics, Crashlytics & Crashlytics NDK (managed by Firebase BoM).
+    implementation platform('com.google.firebase:firebase-bom:35.2.0')
+    implementation 'com.google.firebase:firebase-analytics'
+    implementation 'com.google.firebase:firebase-crashlytics'
+    implementation 'com.google.firebase:firebase-crashlytics-ndk'
 
     // Minimal server-support inline banner exclusively on NovelDetailScreen (Phase 4)
     implementation 'com.google.android.gms:play-services-ads:25.5.0'
