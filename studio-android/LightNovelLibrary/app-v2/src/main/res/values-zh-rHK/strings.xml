@@ -312,7 +312,7 @@
     <string name="profile_summary_volume_paging_off">音量鍵翻頁關</string>
     <string name="profile_summary_reader_format">%1$d sp · %2$s · %3$s</string>
     <string name="profile_summary_storage_default">快速/深度快取清理 · .wk8backup 備份 · 舊版遷移</string>
-    <string name="profile_summary_about_format">v%1$s · 問題回饋 · 開源授權</string>
+    <string name="profile_summary_about_format">v%1$s · 問題回饋 · 隱私與授權</string>
     <string name="profile_summary_network_ip_format">優選 %1$s (%2$d ms)</string>
     <string name="profile_summary_network_recorded_format">已記錄 %1$s (%2$d ms)</string>
     <string name="profile_reader_typography_sliders_title">字體大小與間距</string>
@@ -327,6 +327,10 @@
     <string name="profile_about_info_section">版本與聲明</string>
     <string name="profile_report_bug_github_desc">前往 GitHub Issues 提交缺陷或功能建議</string>
     <string name="profile_feedback_email_desc">透過電郵發送附帶版本與裝置資訊的回饋</string>
+    <string name="profile_privacy_policy_action">隱私政策</string>
+    <string name="profile_privacy_policy_desc">查看應用程式數據收集、廣告與私隱保護說明</string>
+    <string name="profile_privacy_options_action">隱私與廣告選項</string>
+    <string name="profile_privacy_options_desc">管理歐洲經濟區/英國地區的廣告與數據同意設定</string>
     <string name="profile_license_desc">查看開源授權與第三方依賴致謝</string>
     <string name="profile_about_desc_format">目前版本 %1$s (%2$d) · %3$s</string>
     <string name="profile_about_easter_egg">✨ 旅途愉快！願每一本輕小說都為你留下一段奇諾般的風景 (5/5)</string>

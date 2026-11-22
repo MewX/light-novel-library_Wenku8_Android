@@ -288,6 +288,8 @@ fun AdaptiveMainScaffold(
     novelDetailRepository: NovelDetailRepository? = null,
     novelDownloadRepository: NovelDownloadRepository? = null,
     legacyV1StorageMigrator: LegacyV1StorageMigrator? = null,
+    isPrivacyOptionsRequired: Boolean = false,
+    onOpenPrivacyOptions: () -> Unit = {},
     appLanguage: Wenku8API.AppLanguage = Wenku8API.AppLanguage.SC,
     networkDiagnosticsViewModelFactory: NetworkDiagnosticsViewModel.Factory? = null,
     autoOptimizeConnectionEnabled: Boolean = false,
@@ -1364,6 +1366,8 @@ fun AdaptiveMainScaffold(
                                 legacyV1StorageMigrator = legacyV1StorageMigrator,
                                 isPlayStoreChannel = appUpdateCoordinator?.isPlayStoreChannel
                                     ?: (org.mewx.wenku8.BuildConfig.DISTRIBUTION_CHANNEL == "playstore"),
+                                isPrivacyOptionsRequired = isPrivacyOptionsRequired,
+                                onOpenPrivacyOptions = onOpenPrivacyOptions,
                             )
                         }
 

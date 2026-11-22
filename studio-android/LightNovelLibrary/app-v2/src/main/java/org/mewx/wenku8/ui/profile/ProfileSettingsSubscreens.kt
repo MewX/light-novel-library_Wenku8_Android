@@ -45,6 +45,8 @@ import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.Email
 import androidx.compose.material.icons.outlined.FolderOpen
 import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.Policy
+import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material.icons.outlined.Unarchive
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
@@ -445,6 +447,8 @@ fun ProfileSettingsSubscreen(
     backupArchiveRepository: BackupArchiveRepository? = null,
     legacyV1StorageMigrator: LegacyV1StorageMigrator? = null,
     isPlayStoreChannel: Boolean = BuildConfig.DISTRIBUTION_CHANNEL == "playstore",
+    isPrivacyOptionsRequired: Boolean = false,
+    onOpenPrivacyOptions: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     BackHandler(onBack = onNavigateBack)
@@ -532,6 +536,8 @@ fun ProfileSettingsSubscreen(
                     AboutAndFeedbackSettingsBody(
                         horizontalPadding = horizontalPadding,
                         isPlayStoreChannel = isPlayStoreChannel,
+                        isPrivacyOptionsRequired = isPrivacyOptionsRequired,
+                        onOpenPrivacyOptions = onOpenPrivacyOptions,
                         modifier = containerModifier,
                     )
                 }
@@ -1455,6 +1461,8 @@ private fun StorageAndBackupSettingsBody(
 private fun AboutAndFeedbackSettingsBody(
     horizontalPadding: androidx.compose.ui.unit.Dp,
     isPlayStoreChannel: Boolean,
+    isPrivacyOptionsRequired: Boolean,
+    onOpenPrivacyOptions: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
@@ -1512,10 +1520,32 @@ private fun AboutAndFeedbackSettingsBody(
         }
 
         item(key = "about_info_group") {
+            val infoRowCount = if (isPrivacyOptionsRequired) 4 else 3
+            var rowIndex = 0
             ProfileSegmentedListSection(title = stringResource(R.string.profile_about_info_section)) {
                 ProfileSegmentedSettingRow(
-                    index = 0,
-                    count = 2,
+                    index = rowIndex++,
+                    count = infoRowCount,
+                    icon = Icons.Outlined.Policy,
+                    title = stringResource(R.string.profile_privacy_policy_action),
+                    subtitle = stringResource(R.string.profile_privacy_policy_desc),
+                    onClick = { openSafeBrowserUrl(context, PRIVACY_POLICY_URL) },
+                    modifier = Modifier.testTag(ProfileStudioTestTags.PRIVACY_POLICY_BUTTON),
+                )
+                if (isPrivacyOptionsRequired) {
+                    ProfileSegmentedSettingRow(
+                        index = rowIndex++,
+                        count = infoRowCount,
+                        icon = Icons.Outlined.Tune,
+                        title = stringResource(R.string.profile_privacy_options_action),
+                        subtitle = stringResource(R.string.profile_privacy_options_desc),
+                        onClick = onOpenPrivacyOptions,
+                        modifier = Modifier.testTag(ProfileStudioTestTags.PRIVACY_OPTIONS_BUTTON),
+                    )
+                }
+                ProfileSegmentedSettingRow(
+                    index = rowIndex++,
+                    count = infoRowCount,
                     icon = Icons.Outlined.Description,
                     title = stringResource(R.string.profile_license_action),
                     subtitle = stringResource(R.string.profile_license_desc),
@@ -1523,8 +1553,8 @@ private fun AboutAndFeedbackSettingsBody(
                     modifier = Modifier.testTag(ProfileStudioTestTags.OPEN_LICENSE_BUTTON),
                 )
                 ProfileSegmentedSettingRow(
-                    index = 1,
-                    count = 2,
+                    index = rowIndex,
+                    count = infoRowCount,
                     icon = Icons.Outlined.Info,
                     title = stringResource(R.string.profile_about_action),
                     subtitle = stringResource(

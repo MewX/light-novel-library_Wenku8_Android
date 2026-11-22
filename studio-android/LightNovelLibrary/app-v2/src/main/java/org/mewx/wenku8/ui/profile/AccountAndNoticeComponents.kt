@@ -1589,6 +1589,7 @@ internal fun openSafeBrowserUrl(context: Context, rawUrl: String) {
 
 internal const val GITHUB_ISSUES_URL =
     "https://github.com/MewX/light-novel-library_Wenku8_Android/issues"
+internal const val PRIVACY_POLICY_URL = "https://wenku8.app/privacy/"
 internal const val FEEDBACK_EMAIL_ADDRESS = "wenku8@mewx.org"
 
 internal fun formatDeviceModel(

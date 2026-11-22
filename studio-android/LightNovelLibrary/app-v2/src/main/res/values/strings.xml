@@ -312,7 +312,7 @@
     <string name="profile_summary_volume_paging_off">音量键翻页关</string>
     <string name="profile_summary_reader_format">%1$d sp · %2$s · %3$s</string>
     <string name="profile_summary_storage_default">快速/深度缓存清理 · .wk8backup 备份 · 旧版迁移</string>
-    <string name="profile_summary_about_format">v%1$s · 问题反馈 · 开源许可</string>
+    <string name="profile_summary_about_format">v%1$s · 问题反馈 · 隐私与许可</string>
     <string name="profile_summary_network_ip_format">优选 %1$s (%2$d ms)</string>
     <string name="profile_summary_network_recorded_format">已记录 %1$s (%2$d ms)</string>
     <string name="profile_reader_typography_sliders_title">字号与间距</string>
@@ -327,6 +327,10 @@
     <string name="profile_about_info_section">版本与声明</string>
     <string name="profile_report_bug_github_desc">前往 GitHub Issues 提交缺陷或功能建议</string>
     <string name="profile_feedback_email_desc">通过邮件发送附带版本与设备信息的反馈</string>
+    <string name="profile_privacy_policy_action">隐私政策</string>
+    <string name="profile_privacy_policy_desc">查看应用数据收集、广告与隐私保护说明</string>
+    <string name="profile_privacy_options_action">隐私与广告选项</string>
+    <string name="profile_privacy_options_desc">管理欧洲经济区/英国地区的广告与数据同意设置</string>
     <string name="profile_license_desc">查看开源协议与第三方依赖致谢</string>
     <string name="profile_about_desc_format">当前版本 %1$s (%2$d) · %3$s</string>
     <string name="profile_about_easter_egg">✨ 旅途愉快！愿每一本轻小说都为你留下一段奇诺般的风景 (5/5)</string>

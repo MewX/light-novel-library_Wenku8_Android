@@ -115,6 +115,8 @@ object ProfileStudioTestTags {
     const val IMPORT_LEGACY_SAF_BUTTON = "profile_import_legacy_saf_button"
     const val OPEN_LICENSE_BUTTON = "profile_open_license_button"
     const val OPEN_ABOUT_BUTTON = "profile_open_about_button"
+    const val PRIVACY_POLICY_BUTTON = "profile_privacy_policy_button"
+    const val PRIVACY_OPTIONS_BUTTON = "profile_privacy_options_button"
     const val REPORT_BUG_GITHUB_BUTTON = "profile_report_bug_github_button"
     const val FEEDBACK_EMAIL_BUTTON = "profile_feedback_email_button"
     const val ABOUT_VERSION_TAP_TARGET = "profile_about_version_tap_target"
@@ -181,6 +183,8 @@ fun ProfileAndStudioScreen(
     storageAndCacheRepository: StorageAndCacheRepository? = null,
     backupArchiveRepository: BackupArchiveRepository? = null,
     legacyV1StorageMigrator: LegacyV1StorageMigrator? = null,
+    isPrivacyOptionsRequired: Boolean = false,
+    onOpenPrivacyOptions: () -> Unit = {},
     onOpenLoginSheet: () -> Unit = {},
     onOpenSettingsSection: ((ProfileSettingsSection) -> Unit)? = null,
     reselectScrollToTopTrigger: Int = 0,
@@ -216,6 +220,8 @@ fun ProfileAndStudioScreen(
             backupArchiveRepository = backupArchiveRepository,
             legacyV1StorageMigrator = legacyV1StorageMigrator,
             isPlayStoreChannel = isPlayStoreChannel,
+            isPrivacyOptionsRequired = isPrivacyOptionsRequired,
+            onOpenPrivacyOptions = onOpenPrivacyOptions,
             modifier = Modifier.fillMaxSize(),
         )
         return
