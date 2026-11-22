@@ -73,7 +73,7 @@ enum class InlineBannerPlacement(
 
     /**
      * Larger inline adaptive banner requested as a fresh `AdView` (never resizing an existing one)
-     * when returning after a qualifying long reading session (`>= 15 min`), allowing higher-eCPM
+     * when returning after a qualifying long reading session (`>= 10 min`), allowing higher-eCPM
      * `300x250` / rich inline adaptive creatives.
      */
     NOVEL_DETAIL_POST_READING_LARGE(maxHeightDp = 250, reservedMinHeightDp = 250),
@@ -147,7 +147,7 @@ object ServerSupportAdConstants {
     val RESERVED_BANNER_SLOT_HEIGHT = InlineBannerPlacement.NOVEL_DETAIL_STANDARD.reservedMinHeight
 
     /** Minimum active reading duration before returning to `NovelDetailScreen` upgrades to a large banner. */
-    const val POST_READING_LARGE_AD_MIN_DURATION_MS = 15L * 60_000L
+    const val POST_READING_LARGE_AD_MIN_DURATION_MS = 10L * 60_000L
 
     /** Cooldown between elevated post-reading large banner triggers to keep UX calm. */
     const val POST_READING_LARGE_AD_COOLDOWN_MS = 30L * 60_000L

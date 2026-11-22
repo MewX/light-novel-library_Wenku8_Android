@@ -885,18 +885,17 @@ class NovelDetailAndDownloadTest {
 
     @Test
     fun postReadingAdElevationTracker_enforcesMinDurationCooldownAndFreshness() {
-        val tracker = PostReadingAdElevationTracker(
-            minReadingDurationMs = 15L * 60_000L,
-            cooldownMs = 30L * 60_000L,
-        )
+        assertEquals(10L * 60_000L, ServerSupportAdConstants.POST_READING_LARGE_AD_MIN_DURATION_MS)
+        assertEquals(30L * 60_000L, ServerSupportAdConstants.POST_READING_LARGE_AD_COOLDOWN_MS)
+        val tracker = PostReadingAdElevationTracker()
 
-        // Short reading session (< 15 min) does not elevate
+        // Short reading session (< 10 min) does not elevate
         tracker.onReaderSessionStarted(aid = 5, nowMonoMs = 1_000L)
-        assertEquals(null, tracker.onReaderSessionEnded(nowMonoMs = 1_000L + 14L * 60_000L))
+        assertEquals(null, tracker.onReaderSessionEnded(nowMonoMs = 1_000L + 9L * 60_000L))
 
-        // Qualifying session (>= 15 min) elevates with nonce = 1
+        // Qualifying session (>= 10 min) elevates with nonce = 1
         tracker.onReaderSessionStarted(aid = 5, nowMonoMs = 100_000L)
-        val firstToken = tracker.onReaderSessionEnded(nowMonoMs = 100_000L + 16L * 60_000L)
+        val firstToken = tracker.onReaderSessionEnded(nowMonoMs = 100_000L + 10L * 60_000L)
         assertNotNull(firstToken)
         assertEquals(1, firstToken!!.nonce)
         assertEquals(5, firstToken.targetAid)
@@ -909,9 +908,9 @@ class NovelDetailAndDownloadTest {
         assertEquals(null, tracker.onReaderSessionEnded(nowMonoMs = cooldownStart + 20L * 60_000L))
 
         // Session ending after 30-min cooldown elevates cleanly with nonce = 2
-        val postCooldownStart = firstToken.issuedAtMonoMs + 20L * 60_000L
+        val postCooldownStart = firstToken.issuedAtMonoMs + 25L * 60_000L
         tracker.onReaderSessionStarted(aid = 7, nowMonoMs = postCooldownStart)
-        val secondToken = tracker.onReaderSessionEnded(nowMonoMs = postCooldownStart + 15L * 60_000L)
+        val secondToken = tracker.onReaderSessionEnded(nowMonoMs = postCooldownStart + 10L * 60_000L)
         assertNotNull(secondToken)
         assertEquals(2, secondToken!!.nonce)
         assertEquals(7, secondToken.targetAid)
