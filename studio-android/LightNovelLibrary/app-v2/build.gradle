@@ -135,6 +135,19 @@ android {
     }
 }
 
+androidComponents {
+    onVariants(selector().withBuildType('release')) { variant ->
+        def prefix = "${project.name}-${variant.flavorName}-${variant.buildType}"
+        variant.outputs.each { output ->
+            def versionName = output.versionName.orNull
+            def versionCode = output.versionCode.orNull
+            if (versionName != null && versionCode != null) {
+                output.outputFileName.set("${prefix}.v${versionName}.${versionCode}.apk")
+            }
+        }
+    }
+}
+
 kotlin {
     compilerOptions {
         jvmTarget.set(JvmTarget.JVM_17)
