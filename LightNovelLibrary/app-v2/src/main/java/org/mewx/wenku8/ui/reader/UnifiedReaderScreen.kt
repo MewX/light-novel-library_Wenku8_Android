@@ -1042,34 +1042,39 @@ fun UnifiedReaderScreen(
         LaunchedEffect(launchRequest.aid, launchRequest.cid, currentLayoutConfig) {
             if (!didInitialOpen) {
                 didInitialOpen = true
-                val resolvedInitialAnchor = if (launchRequest.initialParagraphIndex >= 0) {
-                    ReadingAnchor(
-                        paragraphIndex = launchRequest.initialParagraphIndex,
-                        charOffset = launchRequest.initialCharOffset.coerceAtLeast(0),
-                    )
-                } else {
-                    val saved = withContext(ioDispatcher) {
-                        database.readingProgressDao().getProgressForNovel(launchRequest.aid)
-                    }
-                    if (saved != null && saved.cid == launchRequest.cid) {
+                try {
+                    // The ENTIRE open sequence lives inside this try: the Room progress read below
+                    // is the FIRST suspension point after the latch, and OEM window churn
+                    // (OnePlus/ColorOS launcher relaunches, split-screen transitions) frequently
+                    // lands its cancellation exactly there — leaving the latch set with an empty
+                    // snapshot and a permanently blank reader.
+                    val resolvedInitialAnchor = if (launchRequest.initialParagraphIndex >= 0) {
                         ReadingAnchor(
-                            paragraphIndex = saved.paragraphIndex,
-                            charOffset = saved.charOffset,
-                            progressPermille = saved.progressPermille,
+                            paragraphIndex = launchRequest.initialParagraphIndex,
+                            charOffset = launchRequest.initialCharOffset.coerceAtLeast(0),
                         )
                     } else {
-                        ReadingAnchor()
+                        val saved = withContext(ioDispatcher) {
+                            database.readingProgressDao().getProgressForNovel(launchRequest.aid)
+                        }
+                        if (saved != null && saved.cid == launchRequest.cid) {
+                            ReadingAnchor(
+                                paragraphIndex = saved.paragraphIndex,
+                                charOffset = saved.charOffset,
+                                progressPermille = saved.progressPermille,
+                            )
+                        } else {
+                            ReadingAnchor()
+                        }
                     }
-                }
-                continuousScrollAnchor = resolvedInitialAnchor
-                if (resolvedInitialAnchor.paragraphIndex > 0) {
-                    dispatchContinuousScrollJump(
-                        cid = launchRequest.cid,
-                        paragraphIndex = resolvedInitialAnchor.paragraphIndex,
-                        animated = false,
-                    )
-                }
-                try {
+                    continuousScrollAnchor = resolvedInitialAnchor
+                    if (resolvedInitialAnchor.paragraphIndex > 0) {
+                        dispatchContinuousScrollJump(
+                            cid = launchRequest.cid,
+                            paragraphIndex = resolvedInitialAnchor.paragraphIndex,
+                            animated = false,
+                        )
+                    }
                     windowBuffer.openChapter(
                         cid = launchRequest.cid,
                         initialAnchor = resolvedInitialAnchor,
@@ -1080,12 +1085,10 @@ fun UnifiedReaderScreen(
                     )
                 } catch (ce: CancellationException) {
                     if (!currentCoroutineContext().isActive) {
-                        // The effect was cancelled mid-open: split-screen entry/exit recreates the
-                        // Activity and the settling window insets restart this effect while the
-                        // chapter is still loading. The cancelled load produced no content, so
-                        // un-latch `didInitialOpen` — the restarted effect must re-run the full
-                        // open path, because the `updateLayoutConfig` branch cannot recover an
-                        // empty snapshot and would leave a permanently blank reader.
+                        // The effect was cancelled mid-open: the cancelled sequence produced no
+                        // content, so un-latch `didInitialOpen` — the restarted effect must re-run
+                        // the full open path, because the `updateLayoutConfig` branch cannot
+                        // recover an empty snapshot and would leave a permanently blank reader.
                         didInitialOpen = false
                     }
                     throw ce
@@ -1094,20 +1097,14 @@ fun UnifiedReaderScreen(
                 // Preserve any live/in-flight paged target (e.g. fast Page 1 -> Page 2 flip while
                 // immersive system bars asynchronously hide and expand viewportHeightPx).
                 val livePagedAnchor = if (preferences.readerPageTurnMode != ReaderPageTurnMode.CONTINUOUS_SCROLL) {
-                    val stepTarget = (inFlightStepRef[0] ?: interruptedStepRef[0])
-                        ?.takeIf { it.coordinateRevision == snapshot.coordinateRevision }
-                        ?.targetVirtualPage
-                    val candidateVirtual = stepTarget
-                        ?: if (syncedSnapshotTracker.revision == snapshot.coordinateRevision) {
-                            if (pagerState.isScrollInProgress) pagerState.targetPage else pagerState.currentPage
-                        } else {
-                            null
-                        }
-                    candidateVirtual
-                        ?.let { snapshot.resolveVirtualPage(it) }
-                        ?.takeIf { it.role == WindowSlotRole.CURRENT }
-                        ?.page
-                        ?.startAnchor
+                    resolveReflowLockedAnchor(
+                        snapshot = snapshot,
+                        pagerCurrentPage = pagerState.currentPage,
+                        pagerOffsetFraction = pagerState.currentPageOffsetFraction,
+                        trackerInSync = syncedSnapshotTracker.revision == snapshot.coordinateRevision,
+                        inFlightStep = inFlightStepRef[0],
+                        interruptedStep = interruptedStepRef[0],
+                    )
                 } else {
                     null
                 }
@@ -3939,10 +3936,48 @@ private data class IdlePagerObservation(
     val coordinateRevision: Long,
 )
 
-private class InFlightStepTarget(
+internal class InFlightStepTarget(
     var targetVirtualPage: Int,
     var coordinateRevision: Long,
 )
+
+/**
+ * Resolves the reading anchor that a re-layout must preserve, from the pager's live position.
+ *
+ * Semantics: the anchor is the first character of the page the user is currently LOOKING at.
+ * During an in-flight swipe that is whichever page occupies the MAJORITY of the viewport
+ * (`round(currentPage + offsetFraction)`) — NOT `targetPage` (the page the finger is moving
+ * toward), so a split-screen resize landing mid-swipe keeps the user on the page they were
+ * reading instead of silently jumping to the next one. An explicit page-turn command (a
+ * programmatic step still in flight, or one interrupted by this very re-layout) still commits
+ * to its target: the user chose to turn the page.
+ *
+ * Returns `null` when the pager position cannot be trusted (the coordinate tracker is out of
+ * sync with the window snapshot); the caller then falls back to the snapshot's own active-page
+ * anchor, which is authoritative for that case.
+ */
+internal fun resolveReflowLockedAnchor(
+    snapshot: ReaderWindowSnapshot,
+    pagerCurrentPage: Int,
+    pagerOffsetFraction: Float,
+    trackerInSync: Boolean,
+    inFlightStep: InFlightStepTarget?,
+    interruptedStep: InFlightStepTarget?,
+): ReadingAnchor? {
+    val stepTarget = (inFlightStep ?: interruptedStep)
+        ?.takeIf { it.coordinateRevision == snapshot.coordinateRevision }
+        ?.targetVirtualPage
+    val candidateVirtual = stepTarget ?: if (trackerInSync) {
+        kotlin.math.round(pagerCurrentPage + pagerOffsetFraction).toInt()
+    } else {
+        null
+    }
+    return candidateVirtual
+        ?.let { snapshot.resolveVirtualPage(it) }
+        ?.takeIf { it.role == WindowSlotRole.CURRENT }
+        ?.page
+        ?.startAnchor
+}
 
 private fun Context.findHostActivity(): Activity? {
     var cur: Context? = this
