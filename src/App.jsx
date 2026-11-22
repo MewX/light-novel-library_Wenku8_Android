@@ -295,6 +295,7 @@ const Navbar = ({ darkMode, toggleDarkMode }) => {
                             <a href="#news" className={`hover:bg-blue-500 hover:text-white px-3 py-2 rounded-md text-sm font-medium transition-colors ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>日志</a>
                             <a href="#staff" className={`hover:bg-blue-500 hover:text-white px-3 py-2 rounded-md text-sm font-medium transition-colors ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>作者</a>
                             <a href="#comments" className={`hover:bg-blue-500 hover:text-white px-3 py-2 rounded-md text-sm font-medium transition-colors ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>留言</a>
+                            <a href="/privacy/" className={`hover:bg-blue-500 hover:text-white px-3 py-2 rounded-md text-sm font-medium transition-colors ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>隐私政策</a>
                             <button
                                 onClick={toggleDarkMode}
                                 className={`p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors ${darkMode ? 'text-yellow-400' : 'text-slate-600'}`}
@@ -329,6 +330,7 @@ const Navbar = ({ darkMode, toggleDarkMode }) => {
                         <a href="#news" className={`block px-3 py-2 rounded-md text-base font-medium ${darkMode ? 'text-gray-300 hover:text-white hover:bg-slate-700' : 'text-gray-700 hover:text-gray-900 hover:bg-gray-50'}`}>日志</a>
                         <a href="#staff" className={`block px-3 py-2 rounded-md text-base font-medium ${darkMode ? 'text-gray-300 hover:text-white hover:bg-slate-700' : 'text-gray-700 hover:text-gray-900 hover:bg-gray-50'}`}>作者</a>
                         <a href="#comments" className={`block px-3 py-2 rounded-md text-base font-medium ${darkMode ? 'text-gray-300 hover:text-white hover:bg-slate-700' : 'text-gray-700 hover:text-gray-900 hover:bg-gray-50'}`}>留言</a>
+                        <a href="/privacy/" className={`block px-3 py-2 rounded-md text-base font-medium ${darkMode ? 'text-gray-300 hover:text-white hover:bg-slate-700' : 'text-gray-700 hover:text-gray-900 hover:bg-gray-50'}`}>隐私政策</a>
                     </div>
                 </div>
             )}
@@ -750,6 +752,11 @@ const Footer = ({ darkMode }) => {
                     <p>&copy; {new Date().getFullYear()} MewX & Contributors. 保留所有权利。</p>
                     <p className="mt-2 text-xs text-gray-600">
                         本项目是粉丝作品，与轻小说文库 (Wenku8.com) 无官方关联。
+                    </p>
+                    <p className="mt-3 text-xs">
+                        <a href="/privacy/" className="text-gray-400 hover:text-white underline underline-offset-2 transition-colors">
+                            隐私政策 / Privacy Policy
+                        </a>
                     </p>
                 </div>
             </div>
