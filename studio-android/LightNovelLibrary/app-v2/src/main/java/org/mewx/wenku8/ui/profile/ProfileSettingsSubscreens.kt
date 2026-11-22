@@ -105,6 +105,7 @@ import org.mewx.wenku8.data.repository.BackupArchiveRepository
 import org.mewx.wenku8.data.repository.CustomAssetSlot
 import org.mewx.wenku8.data.repository.DeepCleanProgress
 import org.mewx.wenku8.data.repository.StorageAndCacheRepository
+import org.mewx.wenku8.reader.model.ReaderColumnMode
 import org.mewx.wenku8.ui.components.TooltipIconButton
 import org.mewx.wenku8.ui.navigation.DefaultHomeDestination
 import org.mewx.wenku8.ui.theme.Wenku8ThemeMode
@@ -439,6 +440,7 @@ fun ProfileSettingsSubscreen(
     onReaderCustomFontPathChanged: (String) -> Unit,
     onReaderCustomBackgroundPathChanged: (String) -> Unit,
     onVolumeKeyPagingChanged: (Boolean) -> Unit,
+    onReaderColumnModeChanged: (ReaderColumnMode) -> Unit = {},
     storageAndCacheRepository: StorageAndCacheRepository? = null,
     backupArchiveRepository: BackupArchiveRepository? = null,
     legacyV1StorageMigrator: LegacyV1StorageMigrator? = null,
@@ -511,6 +513,7 @@ fun ProfileSettingsSubscreen(
                         onCustomFontPathChanged = onReaderCustomFontPathChanged,
                         onCustomBackgroundPathChanged = onReaderCustomBackgroundPathChanged,
                         onVolumeKeyPagingChanged = onVolumeKeyPagingChanged,
+                        onReaderColumnModeChanged = onReaderColumnModeChanged,
                         modifier = containerModifier,
                     )
                 }
@@ -685,6 +688,7 @@ private fun ReaderTypographySettingsBody(
     onCustomFontPathChanged: (String) -> Unit,
     onCustomBackgroundPathChanged: (String) -> Unit,
     onVolumeKeyPagingChanged: (Boolean) -> Unit,
+    onReaderColumnModeChanged: (ReaderColumnMode) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
@@ -929,6 +933,50 @@ private fun ReaderTypographySettingsBody(
                                 )
                             },
                         )
+                    }
+                }
+            }
+
+            item(key = "reader_column_layout") {
+                Card(
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                    ),
+                    shape = MaterialTheme.shapes.large,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .einkHairlineBorder(MaterialTheme.shapes.large),
+                ) {
+                    Column(
+                        modifier = Modifier.padding(20.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        Text(
+                            text = stringResource(R.string.profile_reader_column_mode_title),
+                            style = MaterialTheme.typography.titleMedium,
+                        )
+                        Text(
+                            text = stringResource(R.string.profile_reader_column_mode_desc),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        FlowRow(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            ReaderColumnMode.entries.forEach { mode ->
+                                val labelRes = when (mode) {
+                                    ReaderColumnMode.AUTO -> R.string.profile_reader_column_mode_auto
+                                    ReaderColumnMode.SINGLE -> R.string.profile_reader_column_mode_single
+                                    ReaderColumnMode.DUAL -> R.string.profile_reader_column_mode_dual
+                                }
+                                FilterChip(
+                                    selected = preferences.readerColumnMode == mode,
+                                    onClick = { onReaderColumnModeChanged(mode) },
+                                    label = { Text(stringResource(labelRes)) },
+                                )
+                            }
+                        }
                     }
                 }
             }

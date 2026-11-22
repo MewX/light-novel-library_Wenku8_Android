@@ -252,6 +252,11 @@
     <string name="profile_reader_bg_pick">選擇背景圖片…</string>
     <string name="profile_reader_bg_custom_active">已啟用自訂日間背景</string>
     <string name="profile_reader_volume_paging">音量鍵翻頁</string>
+    <string name="profile_reader_column_mode_title">雙欄閱讀排版</string>
+    <string name="profile_reader_column_mode_auto">自動雙欄</string>
+    <string name="profile_reader_column_mode_single">單欄</string>
+    <string name="profile_reader_column_mode_dual">雙欄</string>
+    <string name="profile_reader_column_mode_desc">大螢幕平板橫向與摺疊機自動啟用雙欄，一般手機橫向維持單欄；上下捲軸大螢幕自動置中限寬</string>
 
     <string name="profile_storage_title">儲存、快取清理與存檔管理</string>
     <string name="profile_cache_fast_action">快速清理</string>

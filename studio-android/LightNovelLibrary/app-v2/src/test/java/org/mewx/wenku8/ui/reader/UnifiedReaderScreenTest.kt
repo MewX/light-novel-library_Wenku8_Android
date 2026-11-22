@@ -76,6 +76,7 @@ import org.mewx.wenku8.reader.engine.ReaderWindowSnapshot
 import org.mewx.wenku8.reader.engine.ReadingAnchor
 import org.mewx.wenku8.reader.engine.StaticLayoutPaginator
 import org.mewx.wenku8.reader.engine.WenkuChapterParser
+import org.mewx.wenku8.reader.model.ReaderColumnMode
 import org.mewx.wenku8.reader.model.ReaderPageTurnMode
 import org.mewx.wenku8.reader.model.ReaderPaperPreset
 import org.mewx.wenku8.ui.detail.ReaderLaunchRequest
@@ -1780,6 +1781,296 @@ class UnifiedReaderScreenTest {
             0f,
             settledBounds.left.value,
             0.5f,
+        )
+    }
+
+    @Test
+    fun dualColumnTapZones_useTwoHandedBookMarginsInLtrAndRtl() {
+        val width = 1000f
+        val height = 640f
+        // LTR book spread: left 30% = PREV, middle 40% = HUD (all vertical rows), right 30% = NEXT.
+        for (y in listOf(60f, 320f, 580f)) {
+            assertEquals(
+                ReaderTapZoneAction.PREV_PAGE,
+                resolveNineZoneTapAction(150f, y, width, height, isRtlBook = false, isDualColumnSpread = true),
+            )
+            assertEquals(
+                ReaderTapZoneAction.TOGGLE_HUD,
+                resolveNineZoneTapAction(500f, y, width, height, isRtlBook = false, isDualColumnSpread = true),
+            )
+            assertEquals(
+                ReaderTapZoneAction.NEXT_PAGE,
+                resolveNineZoneTapAction(850f, y, width, height, isRtlBook = false, isDualColumnSpread = true),
+            )
+        }
+        // RTL Bunkobon spread mirrors horizontal edges: left 30% = NEXT, middle 40% = HUD, right 30% = PREV.
+        assertEquals(
+            ReaderTapZoneAction.NEXT_PAGE,
+            resolveNineZoneTapAction(150f, 320f, width, height, isRtlBook = true, isDualColumnSpread = true),
+        )
+        assertEquals(
+            ReaderTapZoneAction.TOGGLE_HUD,
+            resolveNineZoneTapAction(500f, 320f, width, height, isRtlBook = true, isDualColumnSpread = true),
+        )
+        assertEquals(
+            ReaderTapZoneAction.PREV_PAGE,
+            resolveNineZoneTapAction(850f, 320f, width, height, isRtlBook = true, isDualColumnSpread = true),
+        )
+    }
+
+    @Test
+    @Config(sdk = [34], qualifiers = "w1024dp-h640dp")
+    fun tabletLandscape_autoActivatesDualColumnSpread_constrainsHudAndAllowsSingleColumnToggle(): Unit = runBlocking {
+        seedDualColumnChapter(aid = 2401, vid = 941, cid = 9411, novelTitle = "大屏双栏排版测试")
+
+        var prefs by mutableStateOf(
+            Wenku8UserPreferences(
+                readerColumnMode = ReaderColumnMode.AUTO,
+                readerPageTurnMode = ReaderPageTurnMode.COVER_SLIDE,
+            ),
+        )
+
+        composeTestRule.setContent {
+            Wenku8ExpressiveTheme(themeMode = Wenku8ThemeMode.ARCHIVAL_DAY) {
+                UnifiedReaderScreen(
+                    launchRequest = ReaderLaunchRequest(
+                        aid = 2401,
+                        vid = 941,
+                        cid = 9411,
+                        novelTitle = "大屏双栏排版测试",
+                        volumeTitle = "第一卷",
+                        chapterTitle = "第一章 双栏序幕",
+                    ),
+                    database = database,
+                    catalogGateway = fakeGateway,
+                    novelTocSyncRepository = tocSyncRepository,
+                    preferences = prefs,
+                    onReaderTypographyChanged = { _, _, _, _ -> },
+                    onReaderColumnModeChanged = { newMode ->
+                        prefs = prefs.copy(readerColumnMode = newMode)
+                    },
+                    onNavigateBack = {},
+                    lineBreaker = DeterministicCellLineBreaker,
+                    ioDispatcher = Dispatchers.Main.immediate,
+                    computeDispatcher = Dispatchers.Main.immediate,
+                )
+            }
+        }
+
+        composeTestRule.waitUntil(5_000) {
+            composeTestRule
+                .onAllNodesWithTag(ReaderTestTags.DUAL_COLUMN_SPINE_DIVIDER)
+                .fetchSemanticsNodes()
+                .isNotEmpty()
+        }
+        composeTestRule.onNodeWithTag(ReaderTestTags.DUAL_COLUMN_SPINE_DIVIDER).assertIsDisplayed()
+
+        // Tap center spine region to toggle HUD; scrubber card must be constrained to <= 640dp.
+        composeTestRule.onNodeWithTag(ReaderTestTags.VIEWPORT_CONTAINER).performTouchInput {
+            click(Offset(width * 0.50f, height * 0.50f))
+        }
+        composeTestRule.waitUntil(5_000) {
+            composeTestRule
+                .onAllNodesWithTag(ReaderTestTags.HUD_SCRUBBER_CARD)
+                .fetchSemanticsNodes()
+                .isNotEmpty()
+        }
+        val scrubberBounds = composeTestRule
+            .onNodeWithTag(ReaderTestTags.HUD_SCRUBBER_CARD)
+            .getUnclippedBoundsInRoot()
+        val scrubberWidthDp = scrubberBounds.right.value - scrubberBounds.left.value
+        assertTrue(
+            "Expected wide-screen scrubber card width <= 640dp, got ${scrubberWidthDp}dp",
+            scrubberWidthDp <= 641f,
+        )
+
+        // Open Typography Studio and switch to SINGLE column; center spine divider must disappear.
+        composeTestRule.onNodeWithTag(ReaderTestTags.ACTION_TYPOGRAPHY).performClick()
+        composeTestRule.waitUntil(5_000) {
+            composeTestRule
+                .onAllNodesWithTag("${ReaderTestTags.COLUMN_MODE_CHIP_PREFIX}${ReaderColumnMode.SINGLE.name}")
+                .fetchSemanticsNodes()
+                .isNotEmpty()
+        }
+        composeTestRule
+            .onNodeWithTag("${ReaderTestTags.COLUMN_MODE_CHIP_PREFIX}${ReaderColumnMode.SINGLE.name}")
+            .performClick()
+        composeTestRule.waitUntil(5_000) {
+            prefs.readerColumnMode == ReaderColumnMode.SINGLE &&
+                composeTestRule
+                    .onAllNodesWithTag(ReaderTestTags.DUAL_COLUMN_SPINE_DIVIDER)
+                    .fetchSemanticsNodes()
+                    .isEmpty()
+        }
+        assertEquals(ReaderColumnMode.SINGLE, prefs.readerColumnMode)
+        composeTestRule
+            .onAllNodesWithTag(ReaderTestTags.DUAL_COLUMN_SPINE_DIVIDER)
+            .assertCountEquals(0)
+    }
+
+    @Test
+    @Config(sdk = [34], qualifiers = "w892dp-h412dp")
+    fun phoneLandscape_autoStaysSingleColumn_andExplicitDualActivatesSpread(): Unit = runBlocking {
+        seedDualColumnChapter(aid = 2402, vid = 942, cid = 9421, novelTitle = "普通横屏防双栏测试")
+
+        var prefs by mutableStateOf(
+            Wenku8UserPreferences(
+                readerColumnMode = ReaderColumnMode.AUTO,
+                readerPageTurnMode = ReaderPageTurnMode.COVER_SLIDE,
+            ),
+        )
+
+        composeTestRule.setContent {
+            Wenku8ExpressiveTheme(themeMode = Wenku8ThemeMode.ARCHIVAL_DAY) {
+                UnifiedReaderScreen(
+                    launchRequest = ReaderLaunchRequest(
+                        aid = 2402,
+                        vid = 942,
+                        cid = 9421,
+                        novelTitle = "普通横屏防双栏测试",
+                        volumeTitle = "第一卷",
+                        chapterTitle = "第一章 横屏测试",
+                    ),
+                    database = database,
+                    catalogGateway = fakeGateway,
+                    novelTocSyncRepository = tocSyncRepository,
+                    preferences = prefs,
+                    onReaderTypographyChanged = { _, _, _, _ -> },
+                    onReaderColumnModeChanged = { newMode ->
+                        prefs = prefs.copy(readerColumnMode = newMode)
+                    },
+                    onNavigateBack = {},
+                    lineBreaker = DeterministicCellLineBreaker,
+                    ioDispatcher = Dispatchers.Main.immediate,
+                    computeDispatcher = Dispatchers.Main.immediate,
+                )
+            }
+        }
+
+        composeTestRule.waitUntil(5_000) {
+            composeTestRule
+                .onAllNodesWithTag("${ReaderTestTags.PAGE_CANVAS_PREFIX}CURRENT_0")
+                .fetchSemanticsNodes()
+                .isNotEmpty()
+        }
+        // Issue #204: ordinary phone landscape MUST remain single-column under AUTO.
+        composeTestRule
+            .onAllNodesWithTag(ReaderTestTags.DUAL_COLUMN_SPINE_DIVIDER)
+            .assertCountEquals(0)
+
+        // Explicit DUAL user override activates dual-column spread when columns still fit comfortably.
+        prefs = prefs.copy(readerColumnMode = ReaderColumnMode.DUAL)
+        composeTestRule.waitUntil(5_000) {
+            composeTestRule
+                .onAllNodesWithTag(ReaderTestTags.DUAL_COLUMN_SPINE_DIVIDER)
+                .fetchSemanticsNodes()
+                .isNotEmpty()
+        }
+        composeTestRule.onNodeWithTag(ReaderTestTags.DUAL_COLUMN_SPINE_DIVIDER).assertIsDisplayed()
+    }
+
+    @Test
+    @Config(sdk = [34], qualifiers = "w1024dp-h640dp")
+    fun continuousScroll_onTabletLandscape_centersReadableColumnAtMax680dp(): Unit = runBlocking {
+        seedDualColumnChapter(aid = 2403, vid = 943, cid = 9431, novelTitle = "大屏卷轴行宽测试")
+
+        composeTestRule.setContent {
+            Wenku8ExpressiveTheme(themeMode = Wenku8ThemeMode.ARCHIVAL_DAY) {
+                UnifiedReaderScreen(
+                    launchRequest = ReaderLaunchRequest(
+                        aid = 2403,
+                        vid = 943,
+                        cid = 9431,
+                        novelTitle = "大屏卷轴行宽测试",
+                        volumeTitle = "第一卷",
+                        chapterTitle = "第一章 卷轴居中",
+                    ),
+                    database = database,
+                    catalogGateway = fakeGateway,
+                    novelTocSyncRepository = tocSyncRepository,
+                    preferences = Wenku8UserPreferences(
+                        readerColumnMode = ReaderColumnMode.AUTO,
+                        readerPageTurnMode = ReaderPageTurnMode.CONTINUOUS_SCROLL,
+                    ),
+                    onReaderTypographyChanged = { _, _, _, _ -> },
+                    onNavigateBack = {},
+                    lineBreaker = DeterministicCellLineBreaker,
+                    ioDispatcher = Dispatchers.Main.immediate,
+                    computeDispatcher = Dispatchers.Main.immediate,
+                )
+            }
+        }
+
+        composeTestRule.waitUntil(5_000) {
+            composeTestRule
+                .onAllNodesWithTag(ReaderTestTags.CONTINUOUS_SCROLL_LIST)
+                .fetchSemanticsNodes()
+                .isNotEmpty()
+        }
+        val listBounds = composeTestRule
+            .onNodeWithTag(ReaderTestTags.CONTINUOUS_SCROLL_LIST)
+            .getUnclippedBoundsInRoot()
+        val listWidthDp = listBounds.right.value - listBounds.left.value
+        assertTrue(
+            "Expected continuous scroll list width <= 680dp on 1024dp tablet, got ${listWidthDp}dp",
+            listWidthDp <= 681f,
+        )
+        assertTrue(
+            "Expected continuous scroll list to be centered with horizontal margins, left=${listBounds.left.value}dp",
+            listBounds.left.value > 100f,
+        )
+        composeTestRule
+            .onAllNodesWithTag(ReaderTestTags.DUAL_COLUMN_SPINE_DIVIDER)
+            .assertCountEquals(0)
+    }
+
+    private suspend fun seedDualColumnChapter(
+        aid: Int,
+        vid: Int,
+        cid: Int,
+        novelTitle: String,
+    ) {
+        database.novelDao().upsertNovel(
+            NovelEntity(
+                aid = aid,
+                title = novelTitle,
+                author = "测试作者",
+                inBookshelf = true,
+                metaSyncedAtMs = 1_000L,
+            ),
+        )
+        tocSyncRepository.syncNovelIndexAtomically(
+            aid = aid,
+            language = Wenku8API.AppLanguage.SC,
+            requestStartedAtMs = 2_000L,
+            parsedVolumes = listOf(
+                ParsedVolumeToc(
+                    vid = vid,
+                    volumeTitle = "第一卷",
+                    chapters = listOf(
+                        ParsedChapterToc(cid = cid, chapterTitle = "第一章 双栏序幕"),
+                    ),
+                ),
+            ),
+        )
+        val longBody = buildString {
+            appendLine("第一卷 第一章 双栏序幕")
+            repeat(80) { idx ->
+                appendLine(
+                    "　　这是第${idx + 1}段双栏排版与实体书对开阅读验证正文，用来确保左右两页均有充足文字内容，并生成多页书页对开。",
+                )
+            }
+        }
+        database.chapterContentDao().upsertChapterContent(
+            ChapterContentEntity(
+                cid = cid,
+                aid = aid,
+                contentLang = Wenku8API.AppLanguage.SC.name,
+                contentText = longBody,
+                byteLength = longBody.toByteArray().size,
+                sha256Checksum = "sha_$cid",
+                downloadedAtMs = 1_700_000_000_000L,
+            ),
         )
     }
 }

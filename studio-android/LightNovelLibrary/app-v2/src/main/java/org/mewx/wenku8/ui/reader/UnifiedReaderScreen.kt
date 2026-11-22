@@ -106,6 +106,7 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
@@ -135,6 +136,8 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.window.layout.FoldingFeature
+import androidx.window.layout.WindowInfoTracker
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
@@ -170,10 +173,13 @@ import org.mewx.wenku8.reader.engine.ParagraphLineBreaker
 import org.mewx.wenku8.reader.engine.AndroidStaticLayoutLineBreaker
 import org.mewx.wenku8.reader.engine.ReaderLayoutConfig
 import org.mewx.wenku8.reader.engine.ReaderPageElement
+import org.mewx.wenku8.reader.engine.ReaderVerticalHingeBounds
 import org.mewx.wenku8.reader.engine.ReaderWindowSnapshot
 import org.mewx.wenku8.reader.engine.ReadingAnchor
 import org.mewx.wenku8.reader.engine.StaticLayoutPaginator
 import org.mewx.wenku8.reader.engine.WindowSlotRole
+import org.mewx.wenku8.reader.engine.resolveReaderSpreadGeometry
+import org.mewx.wenku8.reader.model.ReaderColumnMode
 import org.mewx.wenku8.reader.model.ReaderPageTurnMode
 import org.mewx.wenku8.reader.model.ReaderPaperPreset
 import org.mewx.wenku8.ui.components.ActionTooltipBox
@@ -194,6 +200,7 @@ object ReaderTestTags {
     const val PAGED_HORIZONTAL_PAGER = "reader_paged_horizontal_pager"
     const val CONTINUOUS_SCROLL_LIST = "reader_continuous_scroll_list"
     const val PAGE_CANVAS_PREFIX = "reader_page_canvas_"
+    const val DUAL_COLUMN_SPINE_DIVIDER = "reader_dual_column_spine_divider"
     const val INLINE_IMAGE_PREFIX = "reader_inline_image_"
     const val LOADING_SLOT = "reader_loading_slot"
     const val ERROR_SLOT = "reader_error_slot"
@@ -203,6 +210,7 @@ object ReaderTestTags {
     const val HUD_BOOKMARK_TOGGLE = "reader_hud_bookmark_toggle"
     const val HUD_VIEW_ILLUSTRATIONS_CHIP = "reader_hud_view_illustrations_chip"
     const val HUD_PEEK_VOLUME_ILLUSTRATIONS_BUTTON = "reader_hud_peek_volume_illustrations_button"
+    const val HUD_SCRUBBER_CARD = "reader_hud_scrubber_card"
     const val HUD_SCRUBBER_SLIDER = "reader_hud_scrubber_slider"
     const val HUD_PREV_CHAPTER_BUTTON = "reader_hud_prev_chapter_button"
     const val HUD_NEXT_CHAPTER_BUTTON = "reader_hud_next_chapter_button"
@@ -221,6 +229,7 @@ object ReaderTestTags {
     const val SLIDER_PAGE_EDGE = "reader_slider_page_edge"
     const val PAGE_MODE_ITEM_PREFIX = "reader_page_mode_item_"
     const val PAPER_PRESET_CHIP_PREFIX = "reader_paper_preset_"
+    const val COLUMN_MODE_CHIP_PREFIX = "reader_column_mode_chip_"
     const val TOC_SHEET = "reader_toc_sheet"
     const val TOC_HEADER_TITLE = "reader_toc_header_title"
     const val TOC_VOLUME_SUBTITLE = "reader_toc_volume_subtitle"
@@ -363,6 +372,7 @@ fun UnifiedReaderScreen(
     onReaderCustomFontPathChanged: (String) -> Unit = {},
     onReaderCustomBackgroundPathChanged: (String) -> Unit = {},
     onReaderPageTurnModeChanged: (ReaderPageTurnMode) -> Unit = {},
+    onReaderColumnModeChanged: (ReaderColumnMode) -> Unit = {},
     onReaderPaperPresetChanged: (ReaderPaperPreset) -> Unit = {},
     onThemeModeSelected: (Wenku8ThemeMode) -> Unit = {},
     onReaderKeepScreenOnChanged: (Boolean) -> Unit = {},
@@ -898,6 +908,29 @@ fun UnifiedReaderScreen(
     val safeTopPx = cutoutInsets.getTop(density)
     val safeBottomPx = cutoutInsets.getBottom(density)
 
+    val verticalHingeBounds by produceState<ReaderVerticalHingeBounds?>(
+        initialValue = null,
+        key1 = context,
+        key2 = safeLeftPx,
+    ) {
+        val activity = context.findHostActivity() ?: return@produceState
+        runCatching {
+            WindowInfoTracker.getOrCreate(activity)
+                .windowLayoutInfo(activity)
+                .collect { layoutInfo ->
+                    val verticalFold = layoutInfo.displayFeatures
+                        .filterIsInstance<FoldingFeature>()
+                        .firstOrNull { it.orientation == FoldingFeature.Orientation.VERTICAL }
+                    value = verticalFold?.let { fold ->
+                        ReaderVerticalHingeBounds(
+                            leftPx = (fold.bounds.left - safeLeftPx).toFloat(),
+                            rightPx = (fold.bounds.right - safeLeftPx).toFloat(),
+                        )
+                    }
+                }
+        }
+    }
+
     BoxWithConstraints(
         modifier = modifier
             .fillMaxSize()
@@ -917,6 +950,28 @@ fun UnifiedReaderScreen(
         val viewportWidthPx = (constraints.maxWidth - safeLeftPx - safeRightPx).coerceAtLeast(320)
         val viewportHeightPx = (constraints.maxHeight - safeTopPx - safeBottomPx).coerceAtLeast(360)
 
+        val spreadGeometry = remember(
+            preferences.readerColumnMode,
+            viewportWidthPx,
+            viewportHeightPx,
+            density.density,
+            liveFontSizeSp,
+            livePageEdgeDistanceDp,
+            verticalHingeBounds,
+        ) {
+            with(density) {
+                resolveReaderSpreadGeometry(
+                    columnMode = preferences.readerColumnMode,
+                    viewportWidthPx = viewportWidthPx,
+                    viewportHeightPx = viewportHeightPx,
+                    density = this.density,
+                    fontSizePx = liveFontSizeSp.sp.toPx(),
+                    pageEdgeDistancePx = livePageEdgeDistanceDp.dp.toPx(),
+                    verticalHinge = verticalHingeBounds,
+                )
+            }
+        }
+
         val currentLayoutConfig = remember(
             viewportWidthPx,
             viewportHeightPx,
@@ -926,6 +981,7 @@ fun UnifiedReaderScreen(
             livePageEdgeDistanceDp,
             palette.customTypeface,
             preferences.readerPageTurnMode,
+            spreadGeometry,
         ) {
             with(density) {
                 val dynamicEdgeReservePx = maxOf(
@@ -943,6 +999,9 @@ fun UnifiedReaderScreen(
                     footerReservePx = dynamicEdgeReservePx,
                     typeface = palette.customTypeface,
                     isVerticalBunkobon = preferences.readerPageTurnMode == ReaderPageTurnMode.VERTICAL_BUNKOBON,
+                    columnCount = spreadGeometry.columnCount,
+                    columnGapPx = spreadGeometry.columnGapPx,
+                    spineCenterXPx = spreadGeometry.spineCenterXPx,
                 )
             }
         }
@@ -1742,6 +1801,13 @@ fun UnifiedReaderScreen(
             continuousScrollJumpCommand = continuousScrollJumpCommand,
             parchmentAssets = parchmentAssets,
             contentSafeInsets = cutoutInsets,
+            isDualColumnSpread = spreadGeometry.isDualColumn,
+            dualColumnSpineCenterXPx = if (spreadGeometry.isDualColumn) {
+                spreadGeometry.spineCenterXPx + safeLeftPx
+            } else {
+                null
+            },
+            novelTitle = launchRequest.novelTitle,
             onTapZoneAction = { action ->
                 if (isTypographyPanelOpen) {
                     interruptedStepRef[0] = null
@@ -2318,7 +2384,9 @@ fun UnifiedReaderScreen(
                     onSkipNext = { ttsController.skipNext(latestAppLang) },
                     onCycleSpeechRate = { ttsController.cycleSpeechRate(latestAppLang) },
                     onStopAndDismiss = { ttsController.stopAndDismiss() },
-                    modifier = Modifier.padding(bottom = 8.dp),
+                    modifier = Modifier
+                        .widthIn(max = 640.dp)
+                        .padding(bottom = 8.dp),
                 )
             }
 
@@ -2402,6 +2470,8 @@ fun UnifiedReaderScreen(
             }
 
             if (isTypographyPanelOpen) {
+                val isContinuousScrollMode =
+                    preferences.readerPageTurnMode == ReaderPageTurnMode.CONTINUOUS_SCROLL
                 ReaderTypographyReflowOverlay(
                     fontSizeSp = liveFontSizeSp,
                     lineDistanceDp = liveLineDistanceDp,
@@ -2409,6 +2479,9 @@ fun UnifiedReaderScreen(
                     pageEdgeDistanceDp = livePageEdgeDistanceDp,
                     activeDraggingSlider = activeDraggingSlider,
                     selectedPaperPreset = effectivePaperPreset,
+                    selectedColumnMode = preferences.readerColumnMode,
+                    isDualColumnActive = spreadGeometry.isDualColumn && !isContinuousScrollMode,
+                    isContinuousScrollMode = isContinuousScrollMode,
                     isBuiltinSerifFont = preferences.isBuiltinSerifFont,
                     hasCustomFont = preferences.hasCustomFontFile,
                     hasCustomDayBackground = preferences.readerCustomBackgroundPath.isNotBlank(),
@@ -2444,6 +2517,7 @@ fun UnifiedReaderScreen(
                         )
                     },
                     onSelectPaperPreset = applyPaperPresetAndSyncGlobalTheme,
+                    onSelectColumnMode = onReaderColumnModeChanged,
                     onSelectBuiltinSerifFont = {
                         onReaderCustomFontPathChanged(Wenku8UserPreferences.BUILTIN_SERIF_FONT_TOKEN)
                     },
@@ -2486,8 +2560,20 @@ fun UnifiedReaderScreen(
                     mutableFloatStateOf(curPageZeroBased.toFloat())
                 }
 
+                val loadedCurLayout = (snapshot.currentSlot as? ChapterWindowSlot.Loaded)?.layout
+                val previewSpreadPage = loadedCurLayout?.pages?.getOrNull(scrubPreviewIndex.roundToInt())
                 val scrubberCaption = if (isContinuousScrollMode) {
                     "阅读进度 $previewPct% (${previewPosInt + 1} / $totalBlocks 段)"
+                } else if (previewSpreadPage != null && previewSpreadPage.isDualColumnSpread) {
+                    val startOneBased = previewSpreadPage.logicalStartPageIndex + 1
+                    val endOneBased = previewSpreadPage.logicalEndPageIndex + 1
+                    val totalLogical = previewSpreadPage.totalLogicalPagesInChapter
+                        .coerceAtLeast(endOneBased)
+                    if (endOneBased > startOneBased) {
+                        "第 $startOneBased–$endOneBased / $totalLogical 页"
+                    } else {
+                        "第 $startOneBased / $totalLogical 页"
+                    }
                 } else {
                     "第 ${scrubPreviewIndex.roundToInt() + 1} / $totalPagesInCur 页"
                 }
@@ -2601,9 +2687,11 @@ fun UnifiedReaderScreen(
                         contentColor = MaterialTheme.colorScheme.onSurface,
                     ),
                     modifier = Modifier
+                        .widthIn(max = 640.dp)
                         .fillMaxWidth()
                         .padding(bottom = 10.dp)
-                        .einkHairlineBorder(MaterialTheme.shapes.large),
+                        .einkHairlineBorder(MaterialTheme.shapes.large)
+                        .testTag(ReaderTestTags.HUD_SCRUBBER_CARD),
                 ) {
                     BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
                         // Inside the 12dp outer HUD padding, 320dp inner corresponds to ~344dp screen width
@@ -3371,6 +3459,9 @@ private fun ReaderTypographyReflowOverlay(
     pageEdgeDistanceDp: Int,
     activeDraggingSlider: ReaderTypographySliderField?,
     selectedPaperPreset: ReaderPaperPreset,
+    selectedColumnMode: ReaderColumnMode,
+    isDualColumnActive: Boolean,
+    isContinuousScrollMode: Boolean,
     isBuiltinSerifFont: Boolean,
     hasCustomFont: Boolean,
     hasCustomDayBackground: Boolean,
@@ -3381,6 +3472,7 @@ private fun ReaderTypographyReflowOverlay(
     onSliderDragValueChanged: (ReaderTypographySliderField, Int) -> Unit,
     onSliderDragFinished: () -> Unit,
     onSelectPaperPreset: (ReaderPaperPreset) -> Unit,
+    onSelectColumnMode: (ReaderColumnMode) -> Unit,
     onSelectBuiltinSerifFont: () -> Unit,
     onPickCustomFont: () -> Unit,
     onResetCustomFont: () -> Unit,
@@ -3441,6 +3533,7 @@ private fun ReaderTypographyReflowOverlay(
         contentColor = MaterialTheme.colorScheme.onSurface,
         tonalElevation = if (isCapsuleMode) 6.dp else 3.dp,
         modifier = Modifier
+            .widthIn(max = 640.dp)
             .fillMaxWidth()
             .then(if (isCapsuleMode) Modifier else Modifier.heightIn(max = 460.dp))
             .einkHairlineBorder(containerShape)
@@ -3491,6 +3584,52 @@ private fun ReaderTypographyReflowOverlay(
                             modifier = Modifier.testTag("${ReaderTestTags.PAPER_PRESET_CHIP_PREFIX}${preset.name}"),
                         )
                     }
+                }
+
+                // 3-way column layout selector (Auto Dual / Single / Dual)
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(
+                        text = stringResource(R.string.profile_reader_column_mode_title),
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    val columnScrollState = rememberScrollState()
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScrollFadeEdge(
+                                scrollState = columnScrollState,
+                                fadeColor = containerColor,
+                                isEink = isEinkMode,
+                                einkIndicatorColor = MaterialTheme.colorScheme.outlineVariant,
+                            )
+                            .horizontalScroll(columnScrollState),
+                    ) {
+                        ReaderColumnMode.entries.forEach { mode ->
+                            val labelRes = when (mode) {
+                                ReaderColumnMode.AUTO -> R.string.profile_reader_column_mode_auto
+                                ReaderColumnMode.SINGLE -> R.string.profile_reader_column_mode_single
+                                ReaderColumnMode.DUAL -> R.string.profile_reader_column_mode_dual
+                            }
+                            FilterChip(
+                                selected = selectedColumnMode == mode,
+                                onClick = { onSelectColumnMode(mode) },
+                                label = { Text(stringResource(labelRes), maxLines = 1, softWrap = false) },
+                                modifier = Modifier.testTag("${ReaderTestTags.COLUMN_MODE_CHIP_PREFIX}${mode.name}"),
+                            )
+                        }
+                    }
+                    Text(
+                        text = when {
+                            isContinuousScrollMode -> "上下卷轴在大屏下自动居中最佳行宽"
+                            isDualColumnActive -> "当前为双栏书页对开排版"
+                            selectedColumnMode == ReaderColumnMode.DUAL -> "当前屏幕较窄，自动回退单栏以保证阅读舒适度"
+                            else -> stringResource(R.string.profile_reader_column_mode_desc)
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
             }
 

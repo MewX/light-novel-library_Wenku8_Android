@@ -116,6 +116,7 @@ import org.mewx.wenku8.data.update.AppUpdateCoordinator
 import org.mewx.wenku8.data.update.AppUpdateUiState
 import org.mewx.wenku8.domain.model.DiscoveryNovelCardItem
 import org.mewx.wenku8.domain.model.UnifiedSearchMode
+import org.mewx.wenku8.reader.model.ReaderColumnMode
 import org.mewx.wenku8.reader.model.ReaderPageTurnMode
 import org.mewx.wenku8.reader.model.ReaderPaperPreset
 import org.mewx.wenku8.ui.bookshelf.BookshelfScreen
@@ -304,6 +305,7 @@ fun AdaptiveMainScaffold(
     onReaderCustomFontPathChanged: (String) -> Unit = {},
     onReaderCustomBackgroundPathChanged: (String) -> Unit = {},
     onReaderPageTurnModeChanged: (ReaderPageTurnMode) -> Unit = {},
+    onReaderColumnModeChanged: (ReaderColumnMode) -> Unit = {},
     onReaderPaperPresetChanged: (ReaderPaperPreset) -> Unit = {},
     onReaderKeepScreenOnChanged: (Boolean) -> Unit = {},
     onReaderEdgeBrightnessDragChanged: (Boolean) -> Unit = {},
@@ -1289,6 +1291,7 @@ fun AdaptiveMainScaffold(
                                 onReaderCustomFontPathChanged = onReaderCustomFontPathChanged,
                                 onReaderCustomBackgroundPathChanged = onReaderCustomBackgroundPathChanged,
                                 onVolumeKeyPagingChanged = onVolumeKeyPagingChanged,
+                                onReaderColumnModeChanged = onReaderColumnModeChanged,
                                 storageAndCacheRepository = storageAndCacheRepository,
                                 backupArchiveRepository = backupArchiveRepository,
                                 legacyV1StorageMigrator = legacyV1StorageMigrator,
@@ -1402,6 +1405,7 @@ fun AdaptiveMainScaffold(
                                     onReaderCustomFontPathChanged = onReaderCustomFontPathChanged,
                                     onReaderCustomBackgroundPathChanged = onReaderCustomBackgroundPathChanged,
                                     onReaderPageTurnModeChanged = onReaderPageTurnModeChanged,
+                                    onReaderColumnModeChanged = onReaderColumnModeChanged,
                                     onReaderPaperPresetChanged = onReaderPaperPresetChanged,
                                     onThemeModeSelected = onThemeModeSelected,
                                     onReaderKeepScreenOnChanged = onReaderKeepScreenOnChanged,

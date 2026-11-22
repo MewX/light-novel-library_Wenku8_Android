@@ -39,6 +39,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -442,6 +444,7 @@ fun rememberReaderParchmentAssets(enabled: Boolean): ReaderParchmentBackgroundAs
 internal fun DrawScope.drawReaderPaperBackground(
     paperBackground: Color,
     parchmentAssets: ReaderParchmentBackgroundAssets?,
+    dualColumnSpineCenterXPx: Float? = null,
 ) {
     drawRect(color = paperBackground)
     if (parchmentAssets == null) return
@@ -453,19 +456,38 @@ internal fun DrawScope.drawReaderPaperBackground(
     drawRect(brush = parchmentAssets.tileShaderBrush)
 
     val edgeBitmap = parchmentAssets.edgeVignetteBitmap ?: return
-    drawImage(
-        image = edgeBitmap,
-        dstOffset = IntOffset.Zero,
-        dstSize = IntSize(widthPx, heightPx),
-        filterQuality = FilterQuality.Low,
-    )
+    if (dualColumnSpineCenterXPx != null && widthPx >= 4) {
+        val spineX = dualColumnSpineCenterXPx.roundToInt().coerceIn(1, widthPx - 1)
+        drawImage(
+            image = edgeBitmap,
+            dstOffset = IntOffset.Zero,
+            dstSize = IntSize(spineX, heightPx),
+            filterQuality = FilterQuality.Low,
+        )
+        drawImage(
+            image = edgeBitmap,
+            dstOffset = IntOffset(spineX, 0),
+            dstSize = IntSize(widthPx - spineX, heightPx),
+            filterQuality = FilterQuality.Low,
+        )
+    } else {
+        drawImage(
+            image = edgeBitmap,
+            dstOffset = IntOffset.Zero,
+            dstSize = IntSize(widthPx, heightPx),
+            filterQuality = FilterQuality.Low,
+        )
+    }
 }
 
 /**
- * Pure, unit-testable 9-zone tap resolver (`10-next-gen-reader-engine-architecture.md` §6):
- * - Top row: `[Prev, Prev, Next]`
- * - Middle row: `[Prev, Toggle HUD, Next]`
- * - Bottom row: `[Next, Next, Next]`
+ * Pure, unit-testable tap-zone resolver (`10-next-gen-reader-engine-architecture.md` §6):
+ * - Single-column 3x3 matrix:
+ *   - Top row: `[Prev, Prev, Next]`
+ *   - Middle row: `[Prev, Toggle HUD, Next]`
+ *   - Bottom row: `[Next, Next, Next]`
+ * - Dual-column open-book spread (`isDualColumnSpread == true`):
+ *   - Two-handed book ergonomics: left `30%` = `Prev`, center `40%` = `Toggle HUD`, right `30%` = `Next`.
  *
  * When [isRtlBook] is `true` (`日式竖排`), horizontal columns mirror so tapping the left side of a
  * right-bound Bunkobon advances to the next page!
@@ -476,9 +498,19 @@ fun resolveNineZoneTapAction(
     viewportWidth: Float,
     viewportHeight: Float,
     isRtlBook: Boolean = false,
+    isDualColumnSpread: Boolean = false,
 ): ReaderTapZoneAction {
     if (viewportWidth <= 0f || viewportHeight <= 0f) {
         return ReaderTapZoneAction.TOGGLE_HUD
+    }
+    if (isDualColumnSpread) {
+        val xFraction = (tapX / viewportWidth).coerceIn(0f, 1f)
+        val normalizedX = if (isRtlBook) 1f - xFraction else xFraction
+        return when {
+            normalizedX < 0.30f -> ReaderTapZoneAction.PREV_PAGE
+            normalizedX > 0.70f -> ReaderTapZoneAction.NEXT_PAGE
+            else -> ReaderTapZoneAction.TOGGLE_HUD
+        }
     }
     val rawCol = ((tapX / viewportWidth) * 3f).toInt().coerceIn(0, 2)
     val col = if (isRtlBook) 2 - rawCol else rawCol
@@ -588,6 +620,9 @@ fun ReaderViewportHost(
     continuousScrollJumpCommand: ContinuousScrollJumpCommand? = null,
     parchmentAssets: ReaderParchmentBackgroundAssets? = null,
     contentSafeInsets: WindowInsets = WindowInsets.displayCutout,
+    isDualColumnSpread: Boolean = false,
+    dualColumnSpineCenterXPx: Float? = null,
+    novelTitle: String = "",
     onTapZoneAction: (ReaderTapZoneAction) -> Unit,
     onBrightnessDragDelta: (Float) -> Unit,
     onIllustrationClicked: (imageUrl: String, imageIndexInChapter: Int) -> Unit,
@@ -610,6 +645,8 @@ fun ReaderViewportHost(
 
     val density = LocalDensity.current
     val isRtlBunkobon = effectiveMode == ReaderPageTurnMode.VERTICAL_BUNKOBON
+    val effectivePagedDualColumn = isDualColumnSpread && effectiveMode != ReaderPageTurnMode.CONTINUOUS_SCROLL
+    val effectiveSpineCenterPx = if (effectivePagedDualColumn) dualColumnSpineCenterXPx else null
     val clockLabel = rememberSystemClockText()
     val fallbackParchmentAssets = rememberReaderParchmentAssets(
         enabled = parchmentAssets == null && palette.useSimulatedParchmentTexture,
@@ -632,11 +669,12 @@ fun ReaderViewportHost(
                     drawReaderPaperBackground(
                         paperBackground = palette.backgroundColor,
                         parchmentAssets = activeParchmentAssets,
+                        dualColumnSpineCenterXPx = effectiveSpineCenterPx,
                     )
                 }
             }
             .testTag(ReaderTestTags.VIEWPORT_CONTAINER)
-            .pointerInput(effectiveMode, isRtlBunkobon, pagerState) {
+            .pointerInput(effectiveMode, isRtlBunkobon, effectivePagedDualColumn, pagerState) {
                 if (effectiveMode != ReaderPageTurnMode.CONTINUOUS_SCROLL) {
                     awaitEachGesture {
                         val down = awaitFirstDown(
@@ -657,6 +695,7 @@ fun ReaderViewportHost(
                                     viewportWidth = size.width.toFloat(),
                                     viewportHeight = size.height.toFloat(),
                                     isRtlBook = isRtlBunkobon,
+                                    isDualColumnSpread = effectivePagedDualColumn,
                                 )
                                 latestOnTapZoneAction(action)
                             }
@@ -694,6 +733,7 @@ fun ReaderViewportHost(
                                     viewportWidth = size.width.toFloat(),
                                     viewportHeight = size.height.toFloat(),
                                     isRtlBook = isRtlBunkobon,
+                                    isDualColumnSpread = effectivePagedDualColumn,
                                 )
                                 latestOnTapZoneAction(action)
                             }
@@ -838,6 +878,12 @@ fun ReaderViewportHost(
                 ) { virtualPageIndex ->
                     val resolution = snapshot.resolveVirtualPage(virtualPageIndex)
                     val isActiveViewportPage = virtualPageIndex == pagerState.currentPage
+                    val isArtbookSpread = resolution?.page?.isFullBleedArtbookPage == true
+                    val pageSpineCenterPx = if (effectivePagedDualColumn && !isArtbookSpread) {
+                        effectiveSpineCenterPx
+                    } else {
+                        null
+                    }
 
                     Box(
                         modifier = Modifier
@@ -852,6 +898,7 @@ fun ReaderViewportHost(
                                 paperBackground = palette.backgroundColor,
                                 hasCustomDayWallpaper = palette.customDayBackgroundFile != null,
                                 parchmentAssets = activeParchmentAssets,
+                                dualColumnSpineCenterXPx = pageSpineCenterPx,
                             ),
                     ) {
                         if (resolution != null) {
@@ -866,6 +913,8 @@ fun ReaderViewportHost(
                                     clockLabel = clockLabel,
                                     contentHighlight = contentHighlight,
                                     isActiveViewportPage = isActiveViewportPage,
+                                    novelTitle = novelTitle,
+                                    isRtlBunkobon = isRtlBunkobon,
                                     onIllustrationClicked = onIllustrationClicked,
                                     onRetryFailedSlot = onRetryFailedSlot,
                                     onOpenNetworkDiagnostics = onOpenNetworkDiagnostics,
@@ -892,6 +941,7 @@ private fun Modifier.applyPageTurnTransition(
     paperBackground: Color,
     hasCustomDayWallpaper: Boolean,
     parchmentAssets: ReaderParchmentBackgroundAssets?,
+    dualColumnSpineCenterXPx: Float? = null,
 ): Modifier {
     return when (mode) {
         ReaderPageTurnMode.COVER_SLIDE -> {
@@ -934,6 +984,7 @@ private fun Modifier.applyPageTurnTransition(
                                 drawReaderPaperBackground(
                                     paperBackground = paperBackground,
                                     parchmentAssets = parchmentAssets,
+                                    dualColumnSpineCenterXPx = dualColumnSpineCenterXPx,
                                 )
                             }
                             drawContent()
@@ -974,6 +1025,7 @@ private fun Modifier.applyPageTurnTransition(
                             drawReaderPaperBackground(
                                 paperBackground = paperBackground,
                                 parchmentAssets = parchmentAssets,
+                                dualColumnSpineCenterXPx = dualColumnSpineCenterXPx,
                             )
                         }
                         drawContent()
@@ -1020,6 +1072,7 @@ private fun Modifier.applyPageTurnTransition(
                                     drawReaderPaperBackground(
                                         paperBackground = paperBackground,
                                         parchmentAssets = parchmentAssets,
+                                        dualColumnSpineCenterXPx = dualColumnSpineCenterXPx,
                                     )
                                 }
                                 drawContent()
@@ -1030,6 +1083,7 @@ private fun Modifier.applyPageTurnTransition(
                                 drawReaderPaperBackground(
                                     paperBackground = paperBackground,
                                     parchmentAssets = parchmentAssets,
+                                    dualColumnSpineCenterXPx = dualColumnSpineCenterXPx,
                                 )
                             }
                             drawContent()
@@ -1047,6 +1101,7 @@ private fun Modifier.applyPageTurnTransition(
                             drawReaderPaperBackground(
                                 paperBackground = paperBackground,
                                 parchmentAssets = parchmentAssets,
+                                dualColumnSpineCenterXPx = dualColumnSpineCenterXPx,
                             )
                         }
                         drawContent()
@@ -1072,6 +1127,7 @@ private fun Modifier.applyPageTurnTransition(
                     drawReaderPaperBackground(
                         paperBackground = paperBackground,
                         parchmentAssets = parchmentAssets,
+                        dualColumnSpineCenterXPx = dualColumnSpineCenterXPx,
                     )
                 }
                 drawContent()
@@ -1180,6 +1236,8 @@ private fun ReaderResolvedPageSurface(
     clockLabel: String,
     contentHighlight: ReaderContentHighlight,
     isActiveViewportPage: Boolean,
+    novelTitle: String = "",
+    isRtlBunkobon: Boolean = false,
     onIllustrationClicked: (imageUrl: String, imageIndexInChapter: Int) -> Unit,
     onRetryFailedSlot: (cid: Int) -> Unit,
     onOpenNetworkDiagnostics: () -> Unit,
@@ -1191,6 +1249,8 @@ private fun ReaderResolvedPageSurface(
             if (page != null) {
                 ReaderCanvasPage(
                     chapterTitle = "${slot.chapter.volumeTitle} · ${slot.chapter.chapterTitle}".trim(' ', '·'),
+                    novelTitle = novelTitle,
+                    isRtlBunkobon = isRtlBunkobon,
                     page = page,
                     palette = palette,
                     clockLabel = clockLabel,
@@ -1311,6 +1371,8 @@ private fun ReaderResolvedPageSurface(
 @Composable
 private fun ReaderCanvasPage(
     chapterTitle: String,
+    novelTitle: String = "",
+    isRtlBunkobon: Boolean = false,
     page: ReaderPage,
     palette: ReaderVisualPalette,
     clockLabel: String,
@@ -1348,9 +1410,24 @@ private fun ReaderCanvasPage(
         val textPreview = buildString {
             append(chapterTitle)
             append(" 第 ")
-            append(page.pageIndexInChapter + 1)
-            append(" / ")
-            append(page.totalPagesInChapter)
+            if (page.isDualColumnSpread &&
+                !page.isFullBleedArtbookPage &&
+                page.logicalEndPageIndex > page.logicalStartPageIndex
+            ) {
+                append(page.logicalStartPageIndex + 1)
+                append("–")
+                append(page.logicalEndPageIndex + 1)
+                append(" / ")
+                append(page.totalLogicalPagesInChapter)
+            } else if (page.isDualColumnSpread) {
+                append(page.logicalStartPageIndex + 1)
+                append(" / ")
+                append(page.totalLogicalPagesInChapter)
+            } else {
+                append(page.pageIndexInChapter + 1)
+                append(" / ")
+                append(page.totalPagesInChapter)
+            }
             append(" 页 ")
             for (element in page.elements) {
                 when (element) {
@@ -1385,6 +1462,14 @@ private fun ReaderCanvasPage(
             .testTag(ReaderTestTags.PAGE_CANVAS_PREFIX + tagSuffix)
             .semantics { contentDescription = accessibilitySummary },
     ) {
+        if (isActiveViewportPage && page.isDualColumnSpread && !page.isFullBleedArtbookPage) {
+            Box(
+                modifier = Modifier
+                    .size(1.dp)
+                    .align(Alignment.TopCenter)
+                    .testTag(ReaderTestTags.DUAL_COLUMN_SPINE_DIVIDER),
+            )
+        }
         if (isActiveViewportPage && hasTtsHighlightOnPage) {
             Box(
                 modifier = Modifier
@@ -1402,38 +1487,132 @@ private fun ReaderCanvasPage(
 
         // Running header & footer captions (suppressed on full-bleed dedicated Artbook plates).
         if (!page.isFullBleedArtbookPage) {
-            Text(
-                text = chapterTitle,
-                color = palette.secondaryInkColor,
-                fontSize = 11.sp,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier
-                    .align(Alignment.TopStart)
-                    .padding(horizontal = 16.dp, vertical = 6.dp),
-            )
-            Row(
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 6.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-            ) {
+            if (page.isDualColumnSpread) {
+                val leftHeader = if (isRtlBunkobon) {
+                    chapterTitle
+                } else {
+                    novelTitle.ifBlank { chapterTitle }
+                }
+                val rightHeader = if (isRtlBunkobon) {
+                    novelTitle.ifBlank { chapterTitle }
+                } else {
+                    chapterTitle
+                }
+                Row(
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = leftHeader,
+                        color = palette.secondaryInkColor,
+                        fontSize = 11.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f),
+                    )
+                    Spacer(modifier = Modifier.width(36.dp))
+                    Text(
+                        text = rightHeader,
+                        color = palette.secondaryInkColor,
+                        fontSize = 11.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        textAlign = TextAlign.End,
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+
+                val firstLogical = page.logicalStartPageIndex + 1
+                val secondLogical = if (page.hasSecondaryColumnContent) {
+                    page.logicalEndPageIndex + 1
+                } else {
+                    null
+                }
+                val totalLogical = page.totalLogicalPagesInChapter.coerceAtLeast(1)
+                val leftFooterText = if (isRtlBunkobon) {
+                    secondLogical?.let { "$it / $totalLogical" } ?: ""
+                } else {
+                    "$firstLogical / $totalLogical"
+                }
+                val rightPageNumText = if (isRtlBunkobon) {
+                    "$firstLogical / $totalLogical ($progressPercent%)"
+                } else if (secondLogical != null) {
+                    "$secondLogical / $totalLogical ($progressPercent%)"
+                } else {
+                    "($progressPercent%)"
+                }
+
+                Row(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 6.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = leftFooterText,
+                        color = palette.secondaryInkColor,
+                        fontSize = 11.sp,
+                    )
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            text = rightPageNumText,
+                            color = palette.secondaryInkColor,
+                            fontSize = 11.sp,
+                        )
+                        Text(
+                            text = clockLabel,
+                            color = palette.secondaryInkColor,
+                            fontSize = 11.sp,
+                            modifier = if (isActiveViewportPage) {
+                                Modifier.testTag(ReaderTestTags.READER_CLOCK_LABEL)
+                            } else {
+                                Modifier
+                            },
+                        )
+                    }
+                }
+            } else {
                 Text(
-                    text = "${page.pageIndexInChapter + 1} / ${page.totalPagesInChapter} ($progressPercent%)",
+                    text = chapterTitle,
                     color = palette.secondaryInkColor,
                     fontSize = 11.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .padding(horizontal = 16.dp, vertical = 6.dp),
                 )
-                Text(
-                    text = clockLabel,
-                    color = palette.secondaryInkColor,
-                    fontSize = 11.sp,
-                    modifier = if (isActiveViewportPage) {
-                        Modifier.testTag(ReaderTestTags.READER_CLOCK_LABEL)
-                    } else {
-                        Modifier
-                    },
-                )
+                Row(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 6.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Text(
+                        text = "${page.pageIndexInChapter + 1} / ${page.totalPagesInChapter} ($progressPercent%)",
+                        color = palette.secondaryInkColor,
+                        fontSize = 11.sp,
+                    )
+                    Text(
+                        text = clockLabel,
+                        color = palette.secondaryInkColor,
+                        fontSize = 11.sp,
+                        modifier = if (isActiveViewportPage) {
+                            Modifier.testTag(ReaderTestTags.READER_CLOCK_LABEL)
+                        } else {
+                            Modifier
+                        },
+                    )
+                }
             }
         }
 
@@ -1442,6 +1621,53 @@ private fun ReaderCanvasPage(
             val accentBarWidthPx = 3.dp.toPx()
             val highlightCorner = CornerRadius(4.dp.toPx(), 4.dp.toPx())
             val keywordCorner = CornerRadius(3.dp.toPx(), 3.dp.toPx())
+
+            // Subtle physical open-book spine binding crease on dual-column prose spreads.
+            if (page.isDualColumnSpread && !page.isFullBleedArtbookPage && size.width > 4f) {
+                val spineX = page.spineCenterXPx.coerceIn(2f, size.width - 2f)
+                if (palette.isEinkMonochrome) {
+                    drawLine(
+                        color = Color(0xFFCCCCCC),
+                        start = Offset(spineX, 0f),
+                        end = Offset(spineX, size.height),
+                        strokeWidth = 1.dp.toPx(),
+                    )
+                } else {
+                    val creaseHalfWidth = 18.dp.toPx().coerceAtMost(size.width * 0.12f)
+                    val creaseAlpha = if (palette.isDarkPalette) 0.22f else 0.09f
+                    val shadowColor = Color.Black.copy(alpha = creaseAlpha)
+                    val leftStart = (spineX - creaseHalfWidth).coerceAtLeast(0f)
+                    val rightEnd = (spineX + creaseHalfWidth).coerceAtMost(size.width)
+                    if (spineX > leftStart) {
+                        drawRect(
+                            brush = Brush.horizontalGradient(
+                                colors = listOf(Color.Transparent, shadowColor),
+                                startX = leftStart,
+                                endX = spineX,
+                            ),
+                            topLeft = Offset(leftStart, 0f),
+                            size = Size(spineX - leftStart, size.height),
+                        )
+                    }
+                    if (rightEnd > spineX) {
+                        drawRect(
+                            brush = Brush.horizontalGradient(
+                                colors = listOf(shadowColor, Color.Transparent),
+                                startX = spineX,
+                                endX = rightEnd,
+                            ),
+                            topLeft = Offset(spineX, 0f),
+                            size = Size(rightEnd - spineX, size.height),
+                        )
+                    }
+                    drawLine(
+                        color = palette.secondaryInkColor.copy(alpha = if (palette.isDarkPalette) 0.22f else 0.14f),
+                        start = Offset(spineX, 0f),
+                        end = Offset(spineX, size.height),
+                        strokeWidth = 1.dp.toPx(),
+                    )
+                }
+            }
 
             for (element in page.elements) {
                 when (element) {
@@ -1842,9 +2068,13 @@ private fun ContinuousScrollReaderDelegate(
     val progressPercent = ((currentBlockPosAndProgress.second * 100f).roundToInt()).coerceIn(0, 100)
 
     Box(
+        contentAlignment = Alignment.TopCenter,
         modifier = Modifier
             .fillMaxSize()
-            .windowInsetsPadding(contentSafeInsets),
+            .windowInsetsPadding(contentSafeInsets)
+            .pointerInput(onToggleHud) {
+                detectTapGestures { onToggleHud() }
+            },
     ) {
         LazyColumn(
             state = listState,
@@ -1856,10 +2086,8 @@ private fun ContinuousScrollReaderDelegate(
             ),
             verticalArrangement = Arrangement.spacedBy(paragraphDistanceDp.coerceAtLeast(6).dp),
             modifier = Modifier
+                .widthIn(max = CONTINUOUS_SCROLL_MAX_READABLE_WIDTH_DP)
                 .fillMaxSize()
-                .pointerInput(onToggleHud) {
-                    detectTapGestures { onToggleHud() }
-                }
                 .testTag(ReaderTestTags.CONTINUOUS_SCROLL_LIST),
         ) {
             if (snapshot.prevSlot != null) {
@@ -2032,40 +2260,56 @@ private fun ContinuousScrollReaderDelegate(
         }
 
         // Running header & footer captions matching paged Bunkobon modes.
-        Text(
-            text = chapterHeaderTitle,
-            color = palette.secondaryInkColor,
-            fontSize = 11.sp,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
+        Box(
+            contentAlignment = Alignment.Center,
             modifier = Modifier
-                .align(Alignment.TopStart)
+                .align(Alignment.TopCenter)
                 .background(palette.backgroundColor.copy(alpha = 0.86f))
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 4.dp),
-        )
-        Row(
+                .fillMaxWidth(),
+        ) {
+            Text(
+                text = chapterHeaderTitle,
+                color = palette.secondaryInkColor,
+                fontSize = 11.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier
+                    .widthIn(max = CONTINUOUS_SCROLL_MAX_READABLE_WIDTH_DP)
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 4.dp),
+            )
+        }
+        Box(
+            contentAlignment = Alignment.Center,
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .background(palette.backgroundColor.copy(alpha = 0.86f))
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 4.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
+                .fillMaxWidth(),
         ) {
-            Text(
-                text = "阅读进度 $progressPercent%",
-                color = palette.secondaryInkColor,
-                fontSize = 11.sp,
-            )
-            Text(
-                text = clockLabel,
-                color = palette.secondaryInkColor,
-                fontSize = 11.sp,
-                modifier = Modifier.testTag(ReaderTestTags.READER_CLOCK_LABEL),
-            )
+            Row(
+                modifier = Modifier
+                    .widthIn(max = CONTINUOUS_SCROLL_MAX_READABLE_WIDTH_DP)
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 4.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Text(
+                    text = "阅读进度 $progressPercent%",
+                    color = palette.secondaryInkColor,
+                    fontSize = 11.sp,
+                )
+                Text(
+                    text = clockLabel,
+                    color = palette.secondaryInkColor,
+                    fontSize = 11.sp,
+                    modifier = Modifier.testTag(ReaderTestTags.READER_CLOCK_LABEL),
+                )
+            }
         }
     }
 }
+
+internal val CONTINUOUS_SCROLL_MAX_READABLE_WIDTH_DP = 680.dp
 
 private fun buildHighlightedScrollText(
     displayText: String,

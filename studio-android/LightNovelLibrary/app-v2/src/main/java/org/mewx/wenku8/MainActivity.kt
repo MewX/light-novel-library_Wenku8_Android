@@ -261,6 +261,11 @@ class MainActivity : AppCompatActivity(), HardwareVolumeKeyHost {
                                     preferencesRepository.setReaderPageTurnMode(mode)
                                 }
                             },
+                            onReaderColumnModeChanged = { columnMode ->
+                                coroutineScope.launch {
+                                    preferencesRepository.setReaderColumnMode(columnMode)
+                                }
+                            },
                             onReaderPaperPresetChanged = { preset ->
                                 coroutineScope.launch {
                                     preferencesRepository.setReaderPaperPreset(preset)
