@@ -7,8 +7,10 @@ import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import android.util.Log
 import android.view.ViewGroup
+import android.webkit.WebSettings
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -265,6 +267,7 @@ val LocalAdConsentCanRequestAds = compositionLocalOf { false }
 
 object ServerSupportAdInitializer {
     private val initStarted = AtomicBoolean(false)
+    private val webViewWarmUpStarted = AtomicBoolean(false)
 
     @Volatile
     private var initCompleted = CompletableDeferred<Unit>()
@@ -279,7 +282,31 @@ object ServerSupportAdInitializer {
         val appContext = context.applicationContext
         scope.launch(Dispatchers.IO) {
             if (isGooglePlayServicesReady(appContext)) {
+                warmUpWebViewWhenIdle(appContext, scope)
                 ensureInitialized(appContext)
+            }
+        }
+    }
+
+    /**
+     * Primes the system Chromium/WebView provider once the UI thread goes idle after startup so
+     * the very first banner inflation avoids a cold WebView engine spin-up stall.
+     */
+    private fun warmUpWebViewWhenIdle(appContext: Context, scope: CoroutineScope) {
+        if (!webViewWarmUpStarted.compareAndSet(false, true)) return
+        runOnMainThread {
+            runCatching {
+                Looper.myQueue().addIdleHandler {
+                    scope.launch(Dispatchers.IO) {
+                        val startedAt = SystemClock.elapsedRealtime()
+                        runCatching { WebSettings.getDefaultUserAgent(appContext) }
+                        val elapsedMs = (SystemClock.elapsedRealtime() - startedAt).coerceAtLeast(0L)
+                        runCatching {
+                            Log.d(AD_LOG_TAG, "Idle WebView warmup finished in ${elapsedMs}ms")
+                        }
+                    }
+                    false
+                }
             }
         }
     }
@@ -288,6 +315,7 @@ object ServerSupportAdInitializer {
         val appContext = context.applicationContext
         val completion = initCompleted
         if (initStarted.compareAndSet(false, true)) {
+            val initStartedAt = SystemClock.elapsedRealtime()
             withContext(Dispatchers.IO) {
                 val override = testInitAction
                 if (override != null) {
@@ -306,6 +334,14 @@ object ServerSupportAdInitializer {
                             .disableMediationAdapterInitialization()
                             .build()
                         MobileAds.initialize(appContext, initConfig) {
+                            val elapsedMs = (SystemClock.elapsedRealtime() - initStartedAt)
+                                .coerceAtLeast(0L)
+                            runCatching {
+                                Log.d(
+                                    AD_LOG_TAG,
+                                    "Next-Gen MobileAds.initialize completed in ${elapsedMs}ms",
+                                )
+                            }
                             completion.complete(Unit)
                         }
                     }.onFailure { t ->
@@ -322,6 +358,7 @@ object ServerSupportAdInitializer {
 
     internal fun resetForTests() {
         initStarted.set(false)
+        webViewWarmUpStarted.set(false)
         testInitAction = null
         initCompleted = CompletableDeferred()
     }
@@ -562,6 +599,7 @@ internal suspend fun startHolderBannerLoad(
         return
     }
     holder.loadInProgress = true
+    val loadStartedAt = SystemClock.elapsedRealtime()
     try {
         ServerSupportAdInitializer.ensureInitialized(context)
     } catch (ce: CancellationException) {
@@ -615,6 +653,13 @@ internal suspend fun startHolderBannerLoad(
                     holder.adView = preloadedAdView
                     holder.loadInProgress = false
                     holder.phase = BannerAdLoadPhase.Loaded
+                    val elapsedMs = (SystemClock.elapsedRealtime() - loadStartedAt).coerceAtLeast(0L)
+                    runCatching {
+                        Log.d(
+                            AD_LOG_TAG,
+                            "Banner preload HIT bound (${holder.placement}, ${safeWidthDp}dp) in ${elapsedMs}ms",
+                        )
+                    }
                     true
                 } else {
                     false
@@ -666,6 +711,14 @@ internal suspend fun startHolderBannerLoad(
                                 }
                                 holder.loadInProgress = false
                                 holder.phase = BannerAdLoadPhase.Loaded
+                                val elapsedMs = (SystemClock.elapsedRealtime() - loadStartedAt)
+                                    .coerceAtLeast(0L)
+                                runCatching {
+                                    Log.d(
+                                        AD_LOG_TAG,
+                                        "Banner live fallback loaded (${holder.placement}, ${safeWidthDp}dp) in ${elapsedMs}ms",
+                                    )
+                                }
                             }
                         }
 
