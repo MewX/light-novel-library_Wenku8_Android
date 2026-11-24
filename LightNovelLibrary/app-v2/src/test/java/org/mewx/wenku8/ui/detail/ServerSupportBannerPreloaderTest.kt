@@ -123,7 +123,7 @@ class ServerSupportBannerPreloaderTest {
             ServerSupportBannerPreloader.preloadIdFor(InlineBannerPlacement.NOVEL_DETAIL_STANDARD),
             firstCall.preloadId,
         )
-        assertEquals(1, firstCall.config.bufferSize)
+        assertEquals(2, firstCall.config.bufferSize)
         val firstRequest = firstCall.config.request as BannerAdRequest
         assertEquals(ServerSupportAdConstants.PRODUCTION_BANNER_AD_UNIT_ID, firstRequest.adUnitId)
         assertEquals(380, firstRequest.adSize.width)
@@ -207,6 +207,10 @@ class ServerSupportBannerPreloaderTest {
         )
         assertTrue(ServerSupportBannerPreloader.isPlacementPreloading(InlineBannerPlacement.NOVEL_DETAIL_STANDARD))
         assertTrue(ServerSupportBannerPreloader.isPlacementPreloading(InlineBannerPlacement.DISCOVERY_FEED_INLINE))
+        assertEquals(5, ServerSupportBannerPreloader.defaultBufferSizeFor(InlineBannerPlacement.DISCOVERY_FEED_INLINE))
+        assertEquals(2, ServerSupportBannerPreloader.defaultBufferSizeFor(InlineBannerPlacement.NOVEL_DETAIL_STANDARD))
+        assertEquals(1, ServerSupportBannerPreloader.defaultBufferSizeFor(InlineBannerPlacement.NOVEL_DETAIL_POST_READING_LARGE))
+        assertEquals(5, fakeClient.startCalls.last().config.bufferSize)
 
         ServerSupportBannerPreloader.onConsentStateChanged(canRequestAds = false)
 

@@ -56,8 +56,9 @@ private object RealBannerPreloaderClient : BannerPreloaderClient {
  * Design & AdMob policy guarantees:
  * - Strictly fail-closed on UMP consent (`canRequestAds == false`), offline state, and non-GMS
  *   devices (never initializes or starts preloading).
- * - Uses `bufferSize = 1` per placement so at most one ready banner is held per active surface,
- *   preserving AdMob Show Rate while eliminating blank-card wait times.
+ * - Uses placement-tuned buffer sizes (`5` for Discovery feed, `2` for Novel Detail standard, `1`
+ *   for one-shot Post-Reading large) so rapid feed scrolling and consecutive detail visits stay
+ *   served from warm memory buffers.
  * - Immediately tears down the one-shot [InlineBannerPlacement.NOVEL_DETAIL_POST_READING_LARGE]
  *   preloader upon polling so the SDK does not auto-refill another 250dp creative during the
  *   30-minute post-reading cooldown.
@@ -68,7 +69,9 @@ private object RealBannerPreloaderClient : BannerPreloaderClient {
 object ServerSupportBannerPreloader {
     private const val TAG = "BannerAdPreloader"
     internal const val WIDTH_RECONFIGURE_THRESHOLD_DP = 48
-    internal const val DEFAULT_BUFFER_SIZE = 1
+    internal const val DISCOVERY_FEED_BUFFER_SIZE = 5
+    internal const val NOVEL_DETAIL_STANDARD_BUFFER_SIZE = 2
+    internal const val POST_READING_LARGE_BUFFER_SIZE = 1
 
     private val lock = Any()
     private val activeWidthByPlacement = ConcurrentHashMap<InlineBannerPlacement, Int>()
@@ -86,6 +89,12 @@ object ServerSupportBannerPreloader {
 
     @Volatile
     internal var isDebugBuildProvider: () -> Boolean = { org.mewx.wenku8.BuildConfig.DEBUG }
+
+    fun defaultBufferSizeFor(placement: InlineBannerPlacement): Int = when (placement) {
+        InlineBannerPlacement.DISCOVERY_FEED_INLINE -> DISCOVERY_FEED_BUFFER_SIZE
+        InlineBannerPlacement.NOVEL_DETAIL_STANDARD -> NOVEL_DETAIL_STANDARD_BUFFER_SIZE
+        InlineBannerPlacement.NOVEL_DETAIL_POST_READING_LARGE -> POST_READING_LARGE_BUFFER_SIZE
+    }
 
     fun preloadIdFor(placement: InlineBannerPlacement): String = when (placement) {
         InlineBannerPlacement.NOVEL_DETAIL_STANDARD -> "wenku8_banner_novel_detail_standard"
@@ -106,7 +115,8 @@ object ServerSupportBannerPreloader {
     }
 
     /**
-     * Ensures a `bufferSize = 1` [BannerAdPreloader] is active for [placement] at [availableWidthDp].
+     * Ensures a [BannerAdPreloader] is active for [placement] at [availableWidthDp] using the
+     * placement's configured [bufferSize] (`5 / 2 / 1` by default).
      *
      * Idempotent when already active for a compatible width (`< 48dp` delta). Safe to call from
      * any coroutine dispatcher.
@@ -116,7 +126,7 @@ object ServerSupportBannerPreloader {
         placement: InlineBannerPlacement,
         availableWidthDp: Int,
         canRequestAds: Boolean,
-        bufferSize: Int = DEFAULT_BUFFER_SIZE,
+        bufferSize: Int = defaultBufferSizeFor(placement),
     ): Boolean {
         if (!canRequestAds) {
             return false
@@ -177,23 +187,28 @@ object ServerSupportBannerPreloader {
                     config = config,
                     callback = object : PreloadCallback {
                         override fun onAdPreloaded(preloadId: String, responseInfo: ResponseInfo) {
-                            val elapsedMs = (SystemClock.elapsedRealtime() - startMonoMs).coerceAtLeast(0L)
+                            val nowMono = SystemClock.elapsedRealtime()
+                            val refStart = preloadStartMonoMsByPlacement.put(placement, nowMono) ?: startMonoMs
+                            val elapsedMs = (nowMono - refStart).coerceAtLeast(0L)
                             runCatching {
                                 Log.d(
                                     TAG,
-                                    "Preloaded $placement (${safeWidthDp}dp) in ${elapsedMs}ms [id=$preloadId]",
+                                    "Preloaded $placement (${safeWidthDp}dp, buf=${config.bufferSize}) in ${elapsedMs}ms [id=$preloadId]",
                                 )
                             }
                         }
 
                         override fun onAdsExhausted(preloadId: String) {
+                            preloadStartMonoMsByPlacement[placement] = SystemClock.elapsedRealtime()
                             runCatching {
                                 Log.d(TAG, "Preload buffer exhausted for $placement [id=$preloadId]")
                             }
                         }
 
                         override fun onAdFailedToPreload(preloadId: String, adError: LoadAdError) {
-                            val elapsedMs = (SystemClock.elapsedRealtime() - startMonoMs).coerceAtLeast(0L)
+                            val nowMono = SystemClock.elapsedRealtime()
+                            val refStart = preloadStartMonoMsByPlacement.put(placement, nowMono) ?: startMonoMs
+                            val elapsedMs = (nowMono - refStart).coerceAtLeast(0L)
                             runCatching {
                                 Log.d(
                                     TAG,
@@ -243,11 +258,15 @@ object ServerSupportBannerPreloader {
                     runCatching { Log.w(TAG, "BannerAdPreloader.pollAd threw for $placement", t) }
                 }
                 .getOrNull()
-            if (ad != null && placement == InlineBannerPlacement.NOVEL_DETAIL_POST_READING_LARGE) {
-                // One-shot consumption: prevent background auto-refill during 30-min cooldown.
-                runCatching { client.destroy(preloadId) }
-                activeWidthByPlacement.remove(placement)
-                preloadStartMonoMsByPlacement.remove(placement)
+            if (ad != null) {
+                if (placement == InlineBannerPlacement.NOVEL_DETAIL_POST_READING_LARGE) {
+                    // One-shot consumption: prevent background auto-refill during 30-min cooldown.
+                    runCatching { client.destroy(preloadId) }
+                    activeWidthByPlacement.remove(placement)
+                    preloadStartMonoMsByPlacement.remove(placement)
+                } else {
+                    preloadStartMonoMsByPlacement[placement] = SystemClock.elapsedRealtime()
+                }
             }
             ad
         }
