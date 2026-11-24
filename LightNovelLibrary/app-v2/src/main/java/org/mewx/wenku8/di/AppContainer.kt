@@ -16,6 +16,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
+import okhttp3.Call
 import okhttp3.Dns
 import okhttp3.OkHttpClient
 import okio.Path.Companion.toOkioPath
@@ -29,7 +30,6 @@ import org.mewx.wenku8.data.migration.InternalFileSaveSource
 import org.mewx.wenku8.data.migration.LegacyMigrationProgress
 import org.mewx.wenku8.data.migration.LegacyV1StorageMigrator
 import org.mewx.wenku8.api.Wenku8API
-import java.util.concurrent.TimeUnit
 import org.mewx.wenku8.data.remote.api.WenkuApiClient
 import org.mewx.wenku8.data.remote.api.WenkuApiResult
 import org.mewx.wenku8.data.remote.diagnostics.DiagnosticsEndpointConfig
@@ -42,6 +42,7 @@ import org.mewx.wenku8.data.remote.diagnostics.ReadOnlyApiDiagnosticCapability
 import org.mewx.wenku8.data.remote.diagnostics.RelayRouteController
 import org.mewx.wenku8.data.remote.diagnostics.RoutingLocalStore
 import org.mewx.wenku8.data.remote.diagnostics.StalledDnsGuard
+import org.mewx.wenku8.data.remote.transport.CloudflareAcceleratedCallFactory
 import org.mewx.wenku8.data.remote.transport.RelayHttpTransport
 import org.mewx.wenku8.data.remote.transport.WenkuTransport
 import org.mewx.wenku8.data.repository.DiscoveryRepository
@@ -82,19 +83,22 @@ class AppContainer(context: Context) {
     }
 
     /**
-     * Shared OkHttpClient for Coil 3 & Artbook image loading: reuses [sharedBaseOkHttpClient]'s
-     * TCP/TLS connection pool and dispatcher while stamping immutable cache headers onto Wenku8
-     * static covers and illustrations so DiskCache never re-requests cached assets.
+     * Shared [Call.Factory] for all direct app `GET` traffic: Coil 3 covers & chapter illustrations
+     * (`img.wenku8.com`, `pic.wenku8.com`, `pic.wenku8.cn`, and redirect targets like
+     * `pic.777743.xyz`), Artbook high-res downloads, offline novel downloads, user avatars, and
+     * notice/version checks (`wenku8.mewx.org` / `wenku8.app`).
+     *
+     * When `"自动优化连接"` has an active verified Cloudflare IP in [relayRouteController], requests
+     * automatically ride that preferred Cloudflare Anycast IP on an isolated connection pool with
+     * transparent per-host fallback to [Dns.SYSTEM] (never polluting the relay lease).
      */
-    val sharedImageOkHttpClient: OkHttpClient by lazy {
-        sharedBaseOkHttpClient.newBuilder()
-            .dns(Dns.SYSTEM)
-            .connectTimeout(12L, TimeUnit.SECONDS)
-            .readTimeout(25L, TimeUnit.SECONDS)
-            .followRedirects(true)
-            .followSslRedirects(true)
-            .addNetworkInterceptor(WenkuImmutableImageCacheInterceptor)
-            .build()
+    val sharedDirectGetCallFactory: CloudflareAcceleratedCallFactory by lazy {
+        CloudflareAcceleratedCallFactory(
+            baseOkHttpClient = sharedBaseOkHttpClient,
+            edgeRouteProvider = relayRouteController,
+            systemDns = Dns.SYSTEM,
+            networkInterceptors = listOf(WenkuImmutableImageCacheInterceptor),
+        )
     }
 
     // =========================================================================
@@ -108,8 +112,8 @@ class AppContainer(context: Context) {
     //   connection pools while respecting user opt-in (`autoOptimizeConnectionEnabled`) and 24h budgets.
     // - `wenkuTransport` (`RelayHttpTransport`): Executes all Wenku8 relay POST calls over the
     //   active route with full TLS hostname verification and automatic pre-send fallback to System DNS
-    //   if a pinned candidate IP ever becomes unreachable. (Note: `sharedImageOkHttpClient` above
-    //   serves `pic.wenku8.com` cover/illustration CDN assets and intentionally stays on `Dns.SYSTEM`.)
+    //   if a pinned candidate IP ever becomes unreachable, and routes direct GETs (images, avatars,
+    //   notices, version checks) through `sharedDirectGetCallFactory`.
     val stalledDnsGuard: StalledDnsGuard by lazy {
         StalledDnsGuard(maxConcurrentProbePermits = 2)
     }
@@ -173,6 +177,7 @@ class AppContainer(context: Context) {
         RelayHttpTransport(
             baseOkHttpClient = sharedBaseOkHttpClient,
             routeProvider = relayRouteController,
+            directGetCallFactory = sharedDirectGetCallFactory,
             onUpgradeRequired = { minVersionCode, minVersionName ->
                 appUpdateCoordinator.onServerUpgradeRequired(minVersionCode, minVersionName)
             },
@@ -369,7 +374,7 @@ class AppContainer(context: Context) {
                 )
                 add(
                     OkHttpNetworkFetcherFactory(
-                        callFactory = { sharedImageOkHttpClient },
+                        callFactory = { sharedDirectGetCallFactory },
                     ),
                 )
             }
