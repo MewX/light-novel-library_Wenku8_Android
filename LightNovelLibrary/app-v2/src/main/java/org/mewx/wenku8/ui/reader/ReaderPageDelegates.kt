@@ -389,12 +389,20 @@ internal fun computeDualColumnBookFlipSpec(
 
     return when {
         // First half, lower-index spread k (`pageOffset` in `(0.001f, 0.5f]`):
-        // left page stays flat; right leaf lifts from flat (0°) to vertical at spine (90°).
+        // left page stays flat (receiving a smooth ambient spine shadow as the leaf rises toward 90°);
+        // right leaf lifts from flat (0°) to vertical at spine (90°).
         pageOffset > 0.001f && pageOffset <= 0.5f -> {
             val t = (pageOffset * 2f).coerceIn(0f, 1f)
-            val leafScaleX = cos(t * (PI / 2.0)).toFloat().coerceIn(0f, 1f)
+            val theta = t * (PI / 2.0)
+            val leafScaleX = cos(theta).toFloat().coerceIn(0f, 1f)
+            val lift = (1f - leafScaleX * leafScaleX).coerceIn(0f, 1f)
             val outerEdgeX = (spineX + rightHalfWidth * leafScaleX).coerceIn(spineX, viewportWidthPx)
-            val leafShadeAlpha = ((1f - leafScaleX) * 0.24f).coerceIn(0f, 0.24f)
+            val leafShadeAlpha = ((1f - leafScaleX) * DUAL_FLIP_MAX_LEAF_SHADE_ALPHA)
+                .coerceIn(0f, DUAL_FLIP_MAX_LEAF_SHADE_ALPHA)
+            val staticShadowWidth = (leftHalfWidth * DUAL_FLIP_MAX_CAST_SHADOW_WIDTH_FRACTION * lift)
+                .coerceAtMost(leftHalfWidth)
+            val staticShadowAlpha = (DUAL_FLIP_MAX_CAST_SHADOW_ALPHA * lift * lift)
+                .coerceIn(0f, DUAL_FLIP_MAX_CAST_SHADOW_ALPHA)
             DualColumnBookFlipSpec(
                 role = DualColumnFlipLayerRole.STATIC_LEFT_WITH_FOLDING_RIGHT_LEAF,
                 spineX = spineX,
@@ -403,21 +411,28 @@ internal fun computeDualColumnBookFlipSpec(
                 leafScaleX = leafScaleX,
                 leafOuterEdgeX = outerEdgeX,
                 leafShadeAlpha = leafShadeAlpha,
+                castShadowLeftX = (spineX - staticShadowWidth).coerceAtLeast(0f),
+                castShadowRightX = spineX,
+                castShadowAlpha = staticShadowAlpha,
+                castShadowFadesRight = false,
             )
         }
 
         // First half, higher-index spread k + 1 (`pageOffset` in `(-0.999f, -0.5f]`):
-        // right page revealed strictly in `[outerEdgeX, width]` with dynamic cast shadow.
+        // right page revealed strictly in `[outerEdgeX, width]` with continuous cast shadow.
         pageOffset <= -0.5f -> {
             val p = (1f + pageOffset).coerceIn(0f, 0.5f)
             val t = (p * 2f).coerceIn(0f, 1f)
-            val leafScaleX = cos(t * (PI / 2.0)).toFloat().coerceIn(0f, 1f)
+            val theta = t * (PI / 2.0)
+            val leafScaleX = cos(theta).toFloat().coerceIn(0f, 1f)
+            val sinTheta = sin(theta).toFloat().coerceIn(0f, 1f)
+            val lift = (1f - leafScaleX * leafScaleX).coerceIn(0f, 1f)
             val outerEdgeX = (spineX + rightHalfWidth * leafScaleX).coerceIn(spineX, viewportWidthPx)
             val remainingRight = (viewportWidthPx - outerEdgeX).coerceAtLeast(0f)
-            val rawShadowWidth = rightHalfWidth * (0.14f + 0.16f * sin(t * (PI / 2.0)).toFloat())
+            val rawShadowWidth = rightHalfWidth * DUAL_FLIP_MAX_CAST_SHADOW_WIDTH_FRACTION * sinTheta
             val shadowWidth = rawShadowWidth.coerceAtMost(remainingRight)
-            val castShadowAlpha = (0.30f * maxOf(sin(t * PI * 0.75).toFloat(), 0.18f * t))
-                .coerceIn(0f, 0.30f)
+            val castShadowAlpha = (DUAL_FLIP_MAX_CAST_SHADOW_ALPHA * lift)
+                .coerceIn(0f, DUAL_FLIP_MAX_CAST_SHADOW_ALPHA)
             DualColumnBookFlipSpec(
                 role = DualColumnFlipLayerRole.REVEALED_RIGHT_UNDERNEATH,
                 spineX = spineX,
@@ -436,13 +451,15 @@ internal fun computeDualColumnBookFlipSpec(
         // left page progressively covered by k + 1's unfolding left leaf; clipped to `[0, outerEdgeX]`.
         pageOffset > 0.5f -> {
             val u = ((pageOffset - 0.5f) * 2f).coerceIn(0f, 1f)
-            val leafScaleX = sin(u * (PI / 2.0)).toFloat().coerceIn(0f, 1f)
+            val angle = u * (PI / 2.0)
+            val leafScaleX = sin(angle).toFloat().coerceIn(0f, 1f)
+            val sinFromFlat = cos(angle).toFloat().coerceIn(0f, 1f)
+            val lift = (1f - leafScaleX * leafScaleX).coerceIn(0f, 1f)
             val outerEdgeX = (spineX - leftHalfWidth * leafScaleX).coerceIn(0f, spineX)
-            val invU = (1f - u).coerceIn(0f, 1f)
-            val rawShadowWidth = leftHalfWidth * (0.14f + 0.16f * sin(invU * (PI / 2.0)).toFloat())
+            val rawShadowWidth = leftHalfWidth * DUAL_FLIP_MAX_CAST_SHADOW_WIDTH_FRACTION * sinFromFlat
             val shadowWidth = rawShadowWidth.coerceAtMost(outerEdgeX.coerceAtLeast(0f))
-            val castShadowAlpha = (0.30f * maxOf(sin(invU * PI * 0.75).toFloat(), 0.18f * invU))
-                .coerceIn(0f, 0.30f)
+            val castShadowAlpha = (DUAL_FLIP_MAX_CAST_SHADOW_ALPHA * lift)
+                .coerceIn(0f, DUAL_FLIP_MAX_CAST_SHADOW_ALPHA)
             DualColumnBookFlipSpec(
                 role = DualColumnFlipLayerRole.REVEALED_LEFT_UNDERNEATH,
                 spineX = spineX,
@@ -458,12 +475,20 @@ internal fun computeDualColumnBookFlipSpec(
         }
 
         // Second half, higher-index spread k + 1 (`pageOffset` in `(-0.5f, -0.001f)`):
-        // right page stays flat; left leaf unfolds outward from vertical at spine (90°) to flat (0°).
+        // right page stays flat (with spine ambient shadow seamlessly decaying from midpoint to 0);
+        // left leaf unfolds outward from vertical at spine (90°) to flat (0°).
         else -> {
             val u = (1f + pageOffset * 2f).coerceIn(0f, 1f)
-            val leafScaleX = sin(u * (PI / 2.0)).toFloat().coerceIn(0f, 1f)
+            val angle = u * (PI / 2.0)
+            val leafScaleX = sin(angle).toFloat().coerceIn(0f, 1f)
+            val lift = (1f - leafScaleX * leafScaleX).coerceIn(0f, 1f)
             val outerEdgeX = (spineX - leftHalfWidth * leafScaleX).coerceIn(0f, spineX)
-            val leafShadeAlpha = ((1f - leafScaleX) * 0.24f).coerceIn(0f, 0.24f)
+            val leafShadeAlpha = ((1f - leafScaleX) * DUAL_FLIP_MAX_LEAF_SHADE_ALPHA)
+                .coerceIn(0f, DUAL_FLIP_MAX_LEAF_SHADE_ALPHA)
+            val staticShadowWidth = (rightHalfWidth * DUAL_FLIP_MAX_CAST_SHADOW_WIDTH_FRACTION * lift)
+                .coerceAtMost(rightHalfWidth)
+            val staticShadowAlpha = (DUAL_FLIP_MAX_CAST_SHADOW_ALPHA * lift * lift)
+                .coerceIn(0f, DUAL_FLIP_MAX_CAST_SHADOW_ALPHA)
             DualColumnBookFlipSpec(
                 role = DualColumnFlipLayerRole.STATIC_RIGHT_WITH_UNFOLDING_LEFT_LEAF,
                 spineX = spineX,
@@ -472,10 +497,18 @@ internal fun computeDualColumnBookFlipSpec(
                 leafScaleX = leafScaleX,
                 leafOuterEdgeX = outerEdgeX,
                 leafShadeAlpha = leafShadeAlpha,
+                castShadowLeftX = spineX,
+                castShadowRightX = (spineX + staticShadowWidth).coerceAtMost(viewportWidthPx),
+                castShadowAlpha = staticShadowAlpha,
+                castShadowFadesRight = true,
             )
         }
     }
 }
+
+private const val DUAL_FLIP_MAX_LEAF_SHADE_ALPHA = 0.22f
+private const val DUAL_FLIP_MAX_CAST_SHADOW_ALPHA = 0.24f
+private const val DUAL_FLIP_MAX_CAST_SHADOW_WIDTH_FRACTION = 0.18f
 
 /**
  * Tap actions emitted by the 3x3 reader tap-zone matrix (`10-next-gen-reader-engine-architecture.md` §6).
@@ -1278,6 +1311,7 @@ private fun Modifier.applyPageTurnTransition(
                                         )
                                     }
                                     drawContent()
+                                    drawDualColumnHingedCastShadow(spec = spec)
                                     drawContext.canvas.restore()
                                 }
 
@@ -1375,6 +1409,7 @@ private fun Modifier.applyPageTurnTransition(
                                         )
                                     }
                                     drawContent()
+                                    drawDualColumnHingedCastShadow(spec = spec)
                                     drawContext.canvas.restore()
                                 }
 
@@ -1500,26 +1535,29 @@ private fun DrawScope.drawDualColumnHingedCastShadow(
     spec: DualColumnBookFlipSpec,
 ) {
     val shadowWidth = spec.castShadowRightX - spec.castShadowLeftX
-    if (shadowWidth <= 0.5f || spec.castShadowAlpha <= 0.001f) return
-    val colors = if (spec.castShadowFadesRight) {
-        listOf(
-            Color.Black.copy(alpha = spec.castShadowAlpha),
-            Color.Black.copy(alpha = spec.castShadowAlpha * 0.35f),
-            Color.Transparent,
+    if (shadowWidth <= 0.5f || spec.castShadowAlpha <= 0.002f) return
+    val a = spec.castShadowAlpha
+    val brush = if (spec.castShadowFadesRight) {
+        Brush.horizontalGradient(
+            0.0f to Color.Black.copy(alpha = a),
+            0.28f to Color.Black.copy(alpha = a * 0.48f),
+            0.62f to Color.Black.copy(alpha = a * 0.14f),
+            1.0f to Color.Transparent,
+            startX = spec.castShadowLeftX,
+            endX = spec.castShadowRightX,
         )
     } else {
-        listOf(
-            Color.Transparent,
-            Color.Black.copy(alpha = spec.castShadowAlpha * 0.35f),
-            Color.Black.copy(alpha = spec.castShadowAlpha),
+        Brush.horizontalGradient(
+            0.0f to Color.Transparent,
+            0.38f to Color.Black.copy(alpha = a * 0.14f),
+            0.72f to Color.Black.copy(alpha = a * 0.48f),
+            1.0f to Color.Black.copy(alpha = a),
+            startX = spec.castShadowLeftX,
+            endX = spec.castShadowRightX,
         )
     }
     drawRect(
-        brush = Brush.horizontalGradient(
-            colors = colors,
-            startX = spec.castShadowLeftX,
-            endX = spec.castShadowRightX,
-        ),
+        brush = brush,
         topLeft = Offset(spec.castShadowLeftX, 0f),
         size = Size(shadowWidth, size.height),
     )
@@ -1533,7 +1571,7 @@ private fun DrawScope.drawDualColumnHingedLeafShading(
     isDarkPalette: Boolean,
 ) {
     val leafWidth = leafRightX - leafLeftX
-    if (leafWidth <= 0.5f) return
+    if (leafWidth <= 0.5f || leafShadeAlpha <= 0.002f) return
 
     val effectiveShadeAlpha = if (isDarkPalette) leafShadeAlpha * 1.15f else leafShadeAlpha
     val usedAgslShader = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -1556,38 +1594,53 @@ private fun DrawScope.drawDualColumnHingedLeafShading(
     }
 
     if (!usedAgslShader) {
-        val spineDark = Color.Black.copy(alpha = (0.12f + effectiveShadeAlpha * 0.85f).coerceAtMost(0.40f))
-        val midShade = Color.Black.copy(alpha = (effectiveShadeAlpha * 0.55f).coerceAtMost(0.22f))
-        val outerShade = Color.Black.copy(alpha = (effectiveShadeAlpha * 0.85f).coerceAtMost(0.30f))
-        val gradientColors = if (isRightLeaf) {
-            listOf(spineDark, midShade, outerShade)
-        } else {
-            listOf(outerShade, midShade, spineDark)
-        }
-        drawRect(
-            brush = Brush.horizontalGradient(
-                colors = gradientColors,
+        val spineDark = Color.Black.copy(alpha = (effectiveShadeAlpha * 1.55f).coerceAtMost(0.38f))
+        val nearSpineShade = Color.Black.copy(alpha = (effectiveShadeAlpha * 0.92f).coerceAtMost(0.24f))
+        val midShade = Color.Black.copy(alpha = (effectiveShadeAlpha * 0.78f).coerceAtMost(0.22f))
+        val outerShade = Color.Black.copy(alpha = (effectiveShadeAlpha * 0.95f).coerceAtMost(0.26f))
+        val brush = if (isRightLeaf) {
+            Brush.horizontalGradient(
+                0.0f to spineDark,
+                0.20f to nearSpineShade,
+                0.55f to midShade,
+                1.0f to outerShade,
                 startX = leafLeftX,
                 endX = leafRightX,
-            ),
+            )
+        } else {
+            Brush.horizontalGradient(
+                0.0f to outerShade,
+                0.45f to midShade,
+                0.80f to nearSpineShade,
+                1.0f to spineDark,
+                startX = leafLeftX,
+                endX = leafRightX,
+            )
+        }
+        drawRect(
+            brush = brush,
             topLeft = Offset(leafLeftX, 0f),
             size = Size(leafWidth, size.height),
         )
     }
 
-    // Crisp tactile paper-edge rim along the moving outer border of the turning sheet.
-    val rimWidthPx = (1.5.dp.toPx()).coerceAtMost(leafWidth)
-    val outerEdgeLeft = if (isRightLeaf) {
-        (leafRightX - rimWidthPx).coerceAtLeast(leafLeftX)
-    } else {
-        leafLeftX
+    // Crisp tactile paper-edge rim along the moving outer border of the turning sheet,
+    // modulated by tilt so it fades in smoothly at flip start and disappears before settle.
+    val rimVisibility = (leafShadeAlpha / 0.08f).coerceIn(0f, 1f)
+    val rimAlpha = (if (isDarkPalette) 0.14f else 0.34f) * rimVisibility
+    if (rimAlpha > 0.004f) {
+        val rimWidthPx = (1.5.dp.toPx()).coerceAtMost(leafWidth)
+        val outerEdgeLeft = if (isRightLeaf) {
+            (leafRightX - rimWidthPx).coerceAtLeast(leafLeftX)
+        } else {
+            leafLeftX
+        }
+        drawRect(
+            color = Color.White.copy(alpha = rimAlpha),
+            topLeft = Offset(outerEdgeLeft, 0f),
+            size = Size(rimWidthPx, size.height),
+        )
     }
-    val rimHighlight = Color.White.copy(alpha = if (isDarkPalette) 0.14f else 0.34f)
-    drawRect(
-        color = rimHighlight,
-        topLeft = Offset(outerEdgeLeft, 0f),
-        size = Size(rimWidthPx, size.height),
-    )
 }
 
 private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawSimulationCreaseAndBackOfPage(
@@ -1687,9 +1740,10 @@ half4 main(float2 fragCoord) {
     float rawU = clamp((fragCoord.x - uLeafRange.x) / span, 0.0, 1.0);
     // u = 0 at the bound center spine, u = 1 at the moving outer edge of the leaf.
     float u = mix(1.0 - rawU, rawU, uIsRightLeaf);
-    float spineCrease = (0.13 + uShadeAlpha * 0.45) * exp(-u * 5.5);
-    float sheetTilt = uShadeAlpha * (0.48 + 0.52 * (1.0 - sin(u * 3.14159265) * 0.35));
-    float shadowA = clamp(spineCrease + sheetTilt, 0.0, 0.42);
+    // All terms scale strictly with uShadeAlpha so extra shading is 0 when the leaf lies flat.
+    float spineCrease = uShadeAlpha * 0.65 * exp(-u * 6.0);
+    float sheetTilt = uShadeAlpha * (0.45 + 0.55 * (1.0 - sin(u * 3.14159265) * 0.35));
+    float shadowA = clamp(spineCrease + sheetTilt, 0.0, 0.38);
     // Valid premultiplied black shadow alpha for smooth compositing over paper + ink.
     return half4(0.0, 0.0, 0.0, half(shadowA));
 }
