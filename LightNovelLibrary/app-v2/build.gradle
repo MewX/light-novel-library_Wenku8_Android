@@ -220,8 +220,8 @@ dependencies {
     implementation 'com.google.firebase:firebase-crashlytics'
     implementation 'com.google.firebase:firebase-crashlytics-ndk'
 
-    // Minimal server-support inline banner exclusively on NovelDetailScreen (Phase 4)
-    implementation 'com.google.android.gms:play-services-ads:25.5.0'
+    // Google Mobile Ads Next-Gen SDK for inline adaptive banners + BannerAdPreloader.
+    implementation 'com.google.android.libraries.ads.mobile.sdk:ads-mobile-sdk:1.7.0'
     // Google User Messaging Platform (UMP) SDK for GDPR / EEA & UK AdMob consent compliance.
     implementation 'com.google.android.ump:user-messaging-platform:4.0.0'
 
