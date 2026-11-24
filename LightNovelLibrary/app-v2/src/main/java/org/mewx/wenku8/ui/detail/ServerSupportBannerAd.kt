@@ -5,6 +5,9 @@ import android.content.Context
 import android.content.ContextWrapper
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
+import android.os.Handler
+import android.os.Looper
+import android.util.Log
 import android.view.ViewGroup
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -36,15 +39,14 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleEventObserver
-import androidx.lifecycle.compose.LocalLifecycleOwner
-import com.google.android.gms.ads.AdListener
-import com.google.android.gms.ads.AdRequest
-import com.google.android.gms.ads.AdSize
-import com.google.android.gms.ads.AdView
-import com.google.android.gms.ads.LoadAdError
-import com.google.android.gms.ads.MobileAds
+import com.google.android.libraries.ads.mobile.sdk.MobileAds
+import com.google.android.libraries.ads.mobile.sdk.banner.AdSize
+import com.google.android.libraries.ads.mobile.sdk.banner.AdView
+import com.google.android.libraries.ads.mobile.sdk.banner.BannerAd
+import com.google.android.libraries.ads.mobile.sdk.banner.BannerAdRequest
+import com.google.android.libraries.ads.mobile.sdk.common.AdLoadCallback
+import com.google.android.libraries.ads.mobile.sdk.common.LoadAdError
+import com.google.android.libraries.ads.mobile.sdk.initialization.InitializationConfig
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
@@ -126,6 +128,13 @@ object ServerSupportAdConstants {
      * (AdMob unit: `Discovery Feed - Inline Banner`).
      */
     const val PRODUCTION_DISCOVERY_FEED_BANNER_AD_UNIT_ID = "ca-app-pub-7333757578973883/8426570642"
+
+    /**
+     * Build-type-strict AdMob App ID passed programmatically to Next-Gen GMA SDK's
+     * [InitializationConfig] (matching the manifest placeholder consumed by UMP).
+     */
+    fun activeAdMobAppId(isDebugBuild: Boolean = BuildConfig.DEBUG): String =
+        if (isDebugBuild) DEV_TEST_ADMOB_APP_ID else PRODUCTION_ADMOB_APP_ID
 
     /**
      * Ordered Ad Unit IDs to try for [placement]:
@@ -270,10 +279,16 @@ object ServerSupportAdInitializer {
                     }
                 } else {
                     runCatching {
-                        MobileAds.initialize(appContext) {
+                        val initConfig = InitializationConfig.Builder(
+                            ServerSupportAdConstants.activeAdMobAppId(),
+                        )
+                            .disableMediationAdapterInitialization()
+                            .build()
+                        MobileAds.initialize(appContext, initConfig) {
                             completion.complete(Unit)
                         }
-                    }.onFailure {
+                    }.onFailure { t ->
+                        runCatching { Log.w(AD_LOG_TAG, "Next-Gen MobileAds.initialize failed", t) }
                         completion.complete(Unit)
                     }
                 }
@@ -346,14 +361,6 @@ class NovelDetailBannerAdHolder internal constructor(
         phase = BannerAdLoadPhase.Collapsed
     }
 
-    internal fun pause() {
-        runCatching { adView?.pause() }
-    }
-
-    internal fun resume() {
-        runCatching { adView?.resume() }
-    }
-
     internal fun destroy(markDisposed: Boolean = false) {
         if (markDisposed) {
             isDisposed = true
@@ -382,7 +389,6 @@ fun rememberNovelDetailBannerAdHolder(
     enableLiveAdViewInflation: Boolean = true,
 ): NovelDetailBannerAdHolder {
     val context = LocalContext.current
-    val lifecycleOwner = LocalLifecycleOwner.current
     val isOnline = isNetworkAvailableOverride ?: remember(aid, placement, requestNonce, context) {
         hasActiveInternetCapability(context)
     }
@@ -411,17 +417,8 @@ fun rememberNovelDetailBannerAdHolder(
         )
     }
 
-    DisposableEffect(holder, lifecycleOwner) {
-        val observer = LifecycleEventObserver { _, event ->
-            when (event) {
-                Lifecycle.Event.ON_RESUME -> holder.resume()
-                Lifecycle.Event.ON_PAUSE -> holder.pause()
-                else -> Unit
-            }
-        }
-        lifecycleOwner.lifecycle.addObserver(observer)
+    DisposableEffect(holder) {
         onDispose {
-            lifecycleOwner.lifecycle.removeObserver(observer)
             holder.destroy(markDisposed = true)
         }
     }
@@ -469,14 +466,6 @@ class DiscoveryFeedInlineAdPool internal constructor(
 
     internal fun activeSlotKeys(): Set<String> = holders.keys.toSet()
 
-    internal fun pauseAll() {
-        holders.values.forEach { it.pause() }
-    }
-
-    internal fun resumeAll() {
-        holders.values.forEach { it.resume() }
-    }
-
     internal fun destroyAll() {
         val snapshot = holders.values.toList()
         holders.clear()
@@ -498,7 +487,6 @@ fun rememberDiscoveryFeedInlineAdPool(
     maxCachedSlots: Int = DiscoveryFeedInlineAdPool.DEFAULT_MAX_CACHED_SLOTS,
 ): DiscoveryFeedInlineAdPool {
     val context = LocalContext.current
-    val lifecycleOwner = LocalLifecycleOwner.current
     val isOnline = isNetworkAvailableOverride ?: remember(poolScopeKey, context) {
         hasActiveInternetCapability(context)
     }
@@ -526,17 +514,8 @@ fun rememberDiscoveryFeedInlineAdPool(
         )
     }
 
-    DisposableEffect(pool, lifecycleOwner) {
-        val observer = LifecycleEventObserver { _, event ->
-            when (event) {
-                Lifecycle.Event.ON_RESUME -> pool.resumeAll()
-                Lifecycle.Event.ON_PAUSE -> pool.pauseAll()
-                else -> Unit
-            }
-        }
-        lifecycleOwner.lifecycle.addObserver(observer)
+    DisposableEffect(pool) {
         onDispose {
-            lifecycleOwner.lifecycle.removeObserver(observer)
             pool.destroyAll()
         }
     }
@@ -593,35 +572,47 @@ internal suspend fun startHolderBannerLoad(
         holder.destroy()
         holder.loadInProgress = true
         holder.loadedWidthDp = safeWidthDp
+        val request = BannerAdRequest.Builder(adUnit, resolvedAdSize).build()
         val nextAdView = runCatching {
             AdView(hostContext).apply {
                 layoutParams = ViewGroup.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT,
                     ViewGroup.LayoutParams.WRAP_CONTENT,
                 )
-                setAdSize(resolvedAdSize)
-                adUnitId = adUnit
-                adListener = object : AdListener() {
-                    override fun onAdLoaded() {
-                        if (holder.isDisposed) {
-                            holder.destroy(markDisposed = true)
-                            return
+                loadAd(
+                    request,
+                    object : AdLoadCallback<BannerAd> {
+                        override fun onAdLoaded(ad: BannerAd) {
+                            runOnMainThread {
+                                if (holder.isDisposed) {
+                                    runCatching { ad.destroy() }
+                                    holder.destroy(markDisposed = true)
+                                    return@runOnMainThread
+                                }
+                                holder.loadInProgress = false
+                                holder.phase = BannerAdLoadPhase.Loaded
+                            }
                         }
-                        holder.loadInProgress = false
-                        holder.phase = BannerAdLoadPhase.Loaded
-                    }
 
-                    override fun onAdFailedToLoad(error: LoadAdError) {
-                        if (holder.isDisposed) return
-                        if (unitIndex + 1 < candidateUnits.size) {
-                            tryLoadUnitAt(unitIndex + 1)
-                        } else {
-                            holder.destroy()
-                            holder.phase = BannerAdLoadPhase.Failed
+                        override fun onAdFailedToLoad(adError: LoadAdError) {
+                            runOnMainThread {
+                                if (holder.isDisposed) return@runOnMainThread
+                                runCatching {
+                                    Log.d(
+                                        AD_LOG_TAG,
+                                        "Banner load failed (${holder.placement}, code=${adError.code}): ${adError.message}",
+                                    )
+                                }
+                                if (unitIndex + 1 < candidateUnits.size) {
+                                    tryLoadUnitAt(unitIndex + 1)
+                                } else {
+                                    holder.destroy()
+                                    holder.phase = BannerAdLoadPhase.Failed
+                                }
+                            }
                         }
-                    }
-                }
-                loadAd(AdRequest.Builder().build())
+                    },
+                )
             }
         }.getOrElse {
             holder.loadInProgress = false
@@ -632,7 +623,9 @@ internal suspend fun startHolderBannerLoad(
         holder.adView = nextAdView
     }
 
-    tryLoadUnitAt(0)
+    withContext(Dispatchers.Main.immediate) {
+        tryLoadUnitAt(0)
+    }
 }
 
 /**
@@ -825,6 +818,18 @@ internal fun hasActiveInternetCapability(context: Context): Boolean {
     val active = cm.activeNetwork ?: return false
     val caps = cm.getNetworkCapabilities(active) ?: return false
     return caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+}
+
+private const val AD_LOG_TAG = "ServerSupportAd"
+
+private val mainThreadHandler by lazy { Handler(Looper.getMainLooper()) }
+
+internal inline fun runOnMainThread(crossinline action: () -> Unit) {
+    if (Looper.myLooper() == Looper.getMainLooper()) {
+        action()
+    } else {
+        mainThreadHandler.post { action() }
+    }
 }
 
 internal fun isGooglePlayServicesReady(context: Context): Boolean {

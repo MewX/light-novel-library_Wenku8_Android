@@ -14,15 +14,11 @@
         android:theme="@style/Theme.Wenku8V2"
         android:usesCleartextTraffic="true">
 
+        <!-- Required by Google UMP SDK for consent form resolution (Next-Gen GMA SDK receives the
+             same build-type-strict App ID programmatically via InitializationConfig). -->
         <meta-data
             android:name="com.google.android.gms.ads.APPLICATION_ID"
             android:value="${ADMOB_APP_ID}" />
-        <meta-data
-            android:name="com.google.android.gms.ads.flag.OPTIMIZE_INITIALIZATION"
-            android:value="true" />
-        <meta-data
-            android:name="com.google.android.gms.ads.flag.OPTIMIZE_AD_LOADING"
-            android:value="true" />
 
         <activity
             android:name=".MainActivity"
