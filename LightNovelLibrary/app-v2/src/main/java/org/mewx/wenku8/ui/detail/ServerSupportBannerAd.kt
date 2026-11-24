@@ -524,6 +524,8 @@ fun rememberDiscoveryFeedInlineAdPool(
 }
 
 
+internal var testBindPreloadedAdAction: ((Context, Activity, BannerAd) -> AdView?)? = null
+
 internal suspend fun startHolderBannerLoad(
     holder: NovelDetailBannerAdHolder,
     context: Context,
@@ -549,6 +551,58 @@ internal suspend fun startHolderBannerLoad(
     if (holder.isDisposed || holder.phase != BannerAdLoadPhase.Loading || holder.adView != null) {
         holder.loadInProgress = false
         return
+    }
+
+    // Fast path: consume an SDK-preloaded BannerAd from BannerAdPreloader when available so the
+    // visible card renders immediately with zero network wait.
+    val hostActivity = hostContext.findHostActivity()
+    if (hostActivity != null) {
+        val preloadedAd = ServerSupportBannerPreloader.pollReadyAd(
+            placement = holder.placement,
+            requestedWidthDp = safeWidthDp,
+            canRequestAds = canRequestAds,
+        )
+        if (preloadedAd != null) {
+            val bound = withContext(Dispatchers.Main.immediate) {
+                if (holder.isDisposed || holder.phase != BannerAdLoadPhase.Loading || holder.adView != null) {
+                    runCatching { preloadedAd.destroy() }
+                    holder.loadInProgress = false
+                    return@withContext true
+                }
+                val bindOverride = testBindPreloadedAdAction
+                val preloadedAdView = runCatching {
+                    if (bindOverride != null) {
+                        bindOverride(hostContext, hostActivity, preloadedAd)
+                    } else {
+                        AdView(hostContext).apply {
+                            layoutParams = ViewGroup.LayoutParams(
+                                ViewGroup.LayoutParams.MATCH_PARENT,
+                                ViewGroup.LayoutParams.WRAP_CONTENT,
+                            )
+                            registerBannerAd(preloadedAd, hostActivity)
+                        }
+                    }
+                }.onFailure { t ->
+                    runCatching {
+                        Log.w(AD_LOG_TAG, "registerBannerAd failed; falling back to live load", t)
+                    }
+                    runCatching { preloadedAd.destroy() }
+                }.getOrNull()
+
+                if (preloadedAdView != null) {
+                    holder.loadedWidthDp = safeWidthDp
+                    holder.adView = preloadedAdView
+                    holder.loadInProgress = false
+                    holder.phase = BannerAdLoadPhase.Loaded
+                    true
+                } else {
+                    false
+                }
+            }
+            if (bound) {
+                return
+            }
+        }
     }
 
     val candidateUnits = ServerSupportAdConstants.candidateBannerAdUnitIds(placement = holder.placement)
