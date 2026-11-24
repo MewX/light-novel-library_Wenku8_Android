@@ -2099,6 +2099,221 @@ class UnifiedReaderScreenTest {
     }
 
     @Test
+    fun dualColumnBookFlipSpec_shadowsTransitionContinuouslyAtStartMidpointAndSettleTail() {
+        val width = 1000f
+        for (spineX in listOf(500f, 580f)) {
+            // 1. Flip start (p = 0.002..0.04) and spring settle tail (pageOffset = -0.04..-0.002):
+            // shadows must vanish quadratically/quartically so they never pop in at flip start or linger ~200ms after turn.
+            for (tinyOffset in listOf(0.002f, 0.01f, 0.02f, 0.04f)) {
+                val startLeaf = computeDualColumnBookFlipSpec(tinyOffset, width, spineX)
+                val startUnder = computeDualColumnBookFlipSpec(tinyOffset - 1f, width, spineX)
+                val settleLeaf = computeDualColumnBookFlipSpec(-tinyOffset, width, spineX)
+                val settleUnder = computeDualColumnBookFlipSpec(1f - tinyOffset, width, spineX)
+
+                assertTrue(
+                    "Expected negligible leafShadeAlpha at start offset=$tinyOffset, got ${startLeaf.leafShadeAlpha}",
+                    startLeaf.leafShadeAlpha < 0.002f,
+                )
+                assertTrue(
+                    "Expected negligible static shadow at start offset=$tinyOffset, got ${startLeaf.castShadowAlpha}",
+                    startLeaf.castShadowAlpha < 0.001f,
+                )
+                assertTrue(
+                    "Expected negligible revealed cast shadow at start offset=$tinyOffset, got ${startUnder.castShadowAlpha}",
+                    startUnder.castShadowAlpha < 0.005f,
+                )
+                assertTrue(
+                    "Expected negligible leafShadeAlpha during settle tail offset=-$tinyOffset, got ${settleLeaf.leafShadeAlpha}",
+                    settleLeaf.leafShadeAlpha < 0.002f,
+                )
+                assertTrue(
+                    "Expected negligible static shadow during settle tail offset=-$tinyOffset, got ${settleLeaf.castShadowAlpha}",
+                    settleLeaf.castShadowAlpha < 0.001f,
+                )
+                assertTrue(
+                    "Expected negligible revealed cast shadow during settle tail offset=-$tinyOffset, got ${settleUnder.castShadowAlpha}",
+                    settleUnder.castShadowAlpha < 0.005f,
+                )
+            }
+
+            // 2. Midpoint continuity (p = 0.499 -> 0.501):
+            // Both left-of-spine and right-of-spine shadows must hand off seamlessly without teleporting across the spine.
+            val beforeMidLeft = computeDualColumnBookFlipSpec(0.499f, width, spineX)
+            val beforeMidRight = computeDualColumnBookFlipSpec(-0.501f, width, spineX)
+            val afterMidLeft = computeDualColumnBookFlipSpec(0.501f, width, spineX)
+            val afterMidRight = computeDualColumnBookFlipSpec(-0.499f, width, spineX)
+
+            assertFalse(beforeMidLeft.castShadowFadesRight)
+            assertFalse(afterMidLeft.castShadowFadesRight)
+            assertEquals(beforeMidLeft.castShadowAlpha, afterMidLeft.castShadowAlpha, 0.005f)
+            assertEquals(beforeMidLeft.castShadowLeftX, afterMidLeft.castShadowLeftX, 3f)
+            assertEquals(beforeMidLeft.castShadowRightX, afterMidLeft.castShadowRightX, 3f)
+
+            assertTrue(beforeMidRight.castShadowFadesRight)
+            assertTrue(afterMidRight.castShadowFadesRight)
+            assertEquals(beforeMidRight.castShadowAlpha, afterMidRight.castShadowAlpha, 0.005f)
+            assertEquals(beforeMidRight.castShadowLeftX, afterMidRight.castShadowLeftX, 3f)
+            assertEquals(beforeMidRight.castShadowRightX, afterMidRight.castShadowRightX, 3f)
+        }
+    }
+
+    @Test
+    @Config(sdk = [34], qualifiers = "w1024dp-h640dp")
+    fun dualColumnSimulationCurl_noCenterShadowPopAtStartOrLingerDuringSettleTail() {
+        val chapter = OrderedChapterWithVolume(
+            aid = 2405,
+            vid = 945,
+            volumeOrder = 0,
+            volumeTitle = "第一卷",
+            cid = 9451,
+            chapterOrder = 0,
+            chapterTitle = "第一章 阴影连续性测试",
+            isIllustrationChapter = false,
+        )
+        val config = ReaderLayoutConfig(
+            viewportWidthPx = 1024,
+            viewportHeightPx = 640,
+            fontSizePx = 28f,
+            lineDistancePx = 10f,
+            paragraphDistancePx = 12f,
+            pageEdgeDistancePx = 20f,
+            columnCount = 2,
+            columnGapPx = 48f,
+            spineCenterXPx = 512f,
+        )
+        val ast = WenkuChapterParser.parse(
+            rawChapterText = "第一卷 第一章 阴影连续性测试\n　　测试正文。",
+            aid = chapter.aid,
+            vid = chapter.vid,
+            cid = chapter.cid,
+            volumeTitle = chapter.volumeTitle,
+            chapterTitle = chapter.chapterTitle,
+        )
+        fun blankSpread(index: Int) = ReaderPage(
+            cid = chapter.cid,
+            pageIndexInChapter = index,
+            totalPagesInChapter = 2,
+            startAnchor = ReadingAnchor(paragraphIndex = index, charOffset = 0, progressPermille = index * 500),
+            endAnchor = ReadingAnchor(paragraphIndex = index, charOffset = 0, progressPermille = (index + 1) * 500),
+            characterCountOnPage = 0,
+            isFullBleedArtbookPage = true,
+            elements = emptyList(),
+            columnCount = 2,
+            spineCenterXPx = 512f,
+            columnGapPx = 48f,
+            logicalStartPageIndex = index * 2,
+            logicalEndPageIndex = index * 2 + 1,
+            totalLogicalPagesInChapter = 4,
+        )
+        val layout = PaginatedChapterLayout(
+            ast = ast,
+            config = config,
+            pages = listOf(blankSpread(0), blankSpread(1)),
+        )
+        val snapshot = ReaderWindowSnapshot(
+            aid = chapter.aid,
+            orderedToc = listOf(chapter),
+            currentTocIndex = 0,
+            currentSlot = ChapterWindowSlot.Loaded(chapter = chapter, layout = layout),
+            layoutConfig = config,
+            activeVirtualPageIndex = 0,
+        )
+        val palette = resolveReaderVisualPalette(
+            paperPreset = ReaderPaperPreset.PURE_WHITE,
+            isEinkMode = false,
+            customBackgroundPath = "",
+            customFontPath = "",
+        )
+
+        fun avgLuma(bitmap: Bitmap, xStart: Int, xEnd: Int, yStart: Int, yEnd: Int): Float {
+            var sum = 0L
+            var count = 0
+            for (y in yStart until yEnd) {
+                for (x in xStart until xEnd) {
+                    val px = bitmap.getPixel(x, y)
+                    sum += (AndroidColor.red(px) + AndroidColor.green(px) + AndroidColor.blue(px)) / 3
+                    count++
+                }
+            }
+            return if (count > 0) sum.toFloat() / count else 0f
+        }
+
+        // Stages: 0 = settled, 1 = flip just started (0.005f), 2 = post-turn spring settle tail (-0.03f), 3 = mid-flip (0.35f)
+        var stage by mutableStateOf(0)
+        composeTestRule.setContent {
+            Wenku8ExpressiveTheme(themeMode = Wenku8ThemeMode.ARCHIVAL_DAY) {
+                androidx.compose.runtime.key(stage) {
+                    val pagerState = when (stage) {
+                        0 -> rememberPagerState(initialPage = 0, initialPageOffsetFraction = 0f) { snapshot.totalVirtualPages }
+                        1 -> rememberPagerState(initialPage = 0, initialPageOffsetFraction = 0.005f) { snapshot.totalVirtualPages }
+                        2 -> rememberPagerState(initialPage = 1, initialPageOffsetFraction = -0.03f) { snapshot.totalVirtualPages }
+                        else -> rememberPagerState(initialPage = 0, initialPageOffsetFraction = 0.35f) { snapshot.totalVirtualPages }
+                    }
+                    ReaderViewportHost(
+                        pageTurnMode = ReaderPageTurnMode.SIMULATION_CURL,
+                        snapshot = snapshot,
+                        pagerState = pagerState,
+                        palette = palette,
+                        fontSizeSp = 28,
+                        lineDistanceDp = 10,
+                        paragraphDistanceDp = 12,
+                        pageEdgeDistanceDp = 20,
+                        leftEdgeBrightnessDragEnabled = false,
+                        contentSafeInsets = WindowInsets(0, 0, 0, 0),
+                        isDualColumnSpread = true,
+                        dualColumnSpineCenterXPx = 512f,
+                        onTapZoneAction = {},
+                        onBrightnessDragDelta = {},
+                        onIllustrationClicked = { _, _ -> },
+                        onContinuousScrollAnchorChanged = { _, _ -> },
+                        onRequestNextChapterInContinuousMode = {},
+                        onRequestPrevChapterInContinuousMode = {},
+                        onRetryFailedSlot = {},
+                        onOpenNetworkDiagnostics = {},
+                    )
+                }
+            }
+        }
+
+        fun captureSpineLumas(): Pair<Float, Float> {
+            composeTestRule.waitForIdle()
+            val bmp = composeTestRule
+                .onNodeWithTag(ReaderTestTags.VIEWPORT_CONTAINER)
+                .captureToImage()
+                .asAndroidBitmap()
+            val midX = bmp.width / 2
+            val yStart = (bmp.height * 0.35f).toInt()
+            val yEnd = (bmp.height * 0.65f).toInt()
+            val leftSpine = avgLuma(bmp, midX - 40, midX - 4, yStart, yEnd)
+            val rightSpine = avgLuma(bmp, midX + 4, midX + 40, yStart, yEnd)
+            return leftSpine to rightSpine
+        }
+
+        val (settledLeft, settledRight) = captureSpineLumas()
+
+        stage = 1 // Flip just started (0.005f): must NOT pop a center shadow onto the spine!
+        val (startLeft, startRight) = captureSpineLumas()
+        assertEquals("Flip start popped shadow on left of spine", settledLeft, startLeft, 2.0f)
+        assertEquals("Flip start popped shadow on right of spine", settledRight, startRight, 2.0f)
+
+        stage = 2 // Spring settle tail (-0.03f): must NOT retain a lingering center shadow!
+        val (settleLeft, settleRight) = captureSpineLumas()
+        assertEquals("Settle tail lingered shadow on left of spine", settledLeft, settleLeft, 2.0f)
+        assertEquals("Settle tail lingered shadow on right of spine", settledRight, settleRight, 2.0f)
+
+        stage = 3 // Active mid-flip (0.35f): turning leaf and adjacent spine must show visible dynamic shading!
+        val (midLeft, midRight) = captureSpineLumas()
+        assertTrue(
+            "Expected visible shading on folding right leaf near spine at p=0.35f (settled=$settledRight, mid=$midRight)",
+            settledRight - midRight > 10f,
+        )
+        assertTrue(
+            "Expected smooth ambient shadow on static left half near spine at p=0.35f (settled=$settledLeft, mid=$midLeft)",
+            settledLeft - midLeft > 10f,
+        )
+    }
+
+    @Test
     @Config(sdk = [34], qualifiers = "w1024dp-h640dp")
     fun dualColumnSimulationCurl_midFlipHingedLeavesRenderCleanDisjointPartitionsWithoutBleed() {
         val context = ApplicationProvider.getApplicationContext<android.content.Context>()
