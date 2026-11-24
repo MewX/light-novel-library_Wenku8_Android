@@ -76,6 +76,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -88,6 +89,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.mewx.wenku8.api.Wenku8API
 import org.mewx.wenku8.R
@@ -122,10 +124,12 @@ import org.mewx.wenku8.reader.model.ReaderPaperPreset
 import org.mewx.wenku8.ui.bookshelf.BookshelfScreen
 import org.mewx.wenku8.ui.components.TooltipIconButton
 import org.mewx.wenku8.ui.detail.InlineBannerPlacement
+import org.mewx.wenku8.ui.detail.LocalAdConsentCanRequestAds
 import org.mewx.wenku8.ui.detail.NovelDetailScreen
 import org.mewx.wenku8.ui.detail.PostReadingAdElevationToken
 import org.mewx.wenku8.ui.detail.PostReadingAdElevationTracker
 import org.mewx.wenku8.ui.detail.ReaderLaunchRequest
+import org.mewx.wenku8.ui.detail.ServerSupportBannerPreloader
 import org.mewx.wenku8.ui.diagnostics.NetworkDiagnosticsScreen
 import org.mewx.wenku8.ui.diagnostics.NetworkDiagnosticsViewModel
 import org.mewx.wenku8.ui.discovery.LatestScreen
@@ -777,6 +781,59 @@ fun AdaptiveMainScaffold(
         // multi-select/local filter, bottom sheets, and dialogs) always take precedence first.
         val scaffoldContext = LocalContext.current
         val scaffoldCoroutineScope = rememberCoroutineScope()
+        val canRequestAds = LocalAdConsentCanRequestAds.current
+        val estimatedDetailBannerWidthDp = remember(maxWidth) {
+            if (maxWidth >= TwoPaneDetailWindowWidthBreakpoint) {
+                ((maxWidth.value - 80f) * 0.56f - 32f).toInt().coerceAtLeast(160)
+            } else {
+                (maxWidth.value - 32f).toInt().coerceAtLeast(160)
+            }
+        }
+        val shouldPreloadStandardDetailBanner = canRequestAds && when (activeScene) {
+            ScaffoldSceneState.HomeShell ->
+                selectedDestination != TopLevelDestination.PROFILE || showTwoPaneExpandedDetail
+            is ScaffoldSceneState.SearchStudio,
+            is ScaffoldSceneState.ReadingFootprint,
+            is ScaffoldSceneState.CompactNovelDetail -> true
+            else -> false
+        }
+        // Keep 1 SDK-managed standard Novel Detail banner ready while browsing novel lists,
+        // bookshelf, search, or reading history so opening any detail screen renders instantly.
+        LaunchedEffect(shouldPreloadStandardDetailBanner, estimatedDetailBannerWidthDp) {
+            if (!shouldPreloadStandardDetailBanner) return@LaunchedEffect
+            withFrameNanos { }
+            ServerSupportBannerPreloader.ensurePreloading(
+                context = scaffoldContext,
+                placement = InlineBannerPlacement.NOVEL_DETAIL_STANDARD,
+                availableWidthDp = estimatedDetailBannerWidthDp,
+                canRequestAds = canRequestAds,
+            )
+        }
+        // Mid-session one-shot preload for the 250dp post-reading banner: triggers only once the
+        // active reading session crosses 10 min (outside 30-min cooldown) and will return to an
+        // open NovelDetailScreen, delivering 0ms display upon exiting the reader with zero waste.
+        LaunchedEffect(activeScene, activeDetailNovelAid, activeReaderStartedAtMonoMs, canRequestAds) {
+            if (!canRequestAds || activeScene !is ScaffoldSceneState.Reader || activeDetailNovelAid <= 0) {
+                return@LaunchedEffect
+            }
+            val remainingMs = postReadingAdTracker.remainingMsUntilPreloadEligible(
+                nowMonoMs = SystemClock.elapsedRealtime(),
+            ) ?: return@LaunchedEffect
+            if (remainingMs > 0L) {
+                delay(remainingMs)
+            }
+            val stillEligible = postReadingAdTracker.remainingMsUntilPreloadEligible(
+                nowMonoMs = SystemClock.elapsedRealtime(),
+            ) == 0L
+            if (stillEligible) {
+                ServerSupportBannerPreloader.ensurePreloading(
+                    context = scaffoldContext,
+                    placement = InlineBannerPlacement.NOVEL_DETAIL_POST_READING_LARGE,
+                    availableWidthDp = estimatedDetailBannerWidthDp,
+                    canRequestAds = canRequestAds,
+                )
+            }
+        }
         var lastExitBackPressMonoMs by remember { mutableLongStateOf(-DOUBLE_BACK_EXIT_WINDOW_MS) }
         var activeExitToast by remember { mutableStateOf<Toast?>(null) }
         val isAtRootHomeShell = activeScene == ScaffoldSceneState.HomeShell &&

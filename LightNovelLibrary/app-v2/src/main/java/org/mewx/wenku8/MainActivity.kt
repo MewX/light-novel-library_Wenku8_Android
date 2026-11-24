@@ -78,6 +78,7 @@ class MainActivity : AppCompatActivity(), HardwareVolumeKeyHost {
 
     override fun onDestroy() {
         if (isFinishing) {
+            org.mewx.wenku8.ui.detail.ServerSupportBannerPreloader.destroyAll()
             (application as? Wenku8V2Application)?.appContainer?.appUpdateCoordinator?.dispose()
         }
         super.onDestroy()

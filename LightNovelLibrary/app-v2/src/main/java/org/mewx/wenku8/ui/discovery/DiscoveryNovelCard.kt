@@ -758,6 +758,21 @@ fun PaginatedNovelFeedContent(
 
                     BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
                         val adSlotWidthDp = (maxWidth - 32.dp).value.toInt().coerceAtLeast(160)
+                        val hasInlineAdSlot = remember(feedEntries) {
+                            feedEntries.any { it is DiscoveryFeedEntry.InlineAd }
+                        }
+                        // Start the SDK-managed Discovery feed BannerAdPreloader as soon as page 1
+                        // produces an inline ad boundary so slot 0 is ready well before scroll-down.
+                        LaunchedEffect(canRequestAds, enableLiveAdViewInflation, hasInlineAdSlot, adSlotWidthDp) {
+                            if (canRequestAds && enableLiveAdViewInflation && hasInlineAdSlot) {
+                                org.mewx.wenku8.ui.detail.ServerSupportBannerPreloader.ensurePreloading(
+                                    context = context,
+                                    placement = org.mewx.wenku8.ui.detail.InlineBannerPlacement.DISCOVERY_FEED_INLINE,
+                                    availableWidthDp = adSlotWidthDp,
+                                    canRequestAds = canRequestAds,
+                                )
+                            }
+                        }
                         LaunchedEffect(inlineAdPool, upcomingAdSlotsToPrefetch, adSlotWidthDp, canRequestAds) {
                             if (!canRequestAds || upcomingAdSlotsToPrefetch.isEmpty()) return@LaunchedEffect
                             for (slotIndex in upcomingAdSlotsToPrefetch) {
