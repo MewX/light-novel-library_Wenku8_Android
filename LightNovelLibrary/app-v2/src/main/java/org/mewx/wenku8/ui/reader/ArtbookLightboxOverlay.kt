@@ -500,19 +500,19 @@ object ArtbookImageFileResolver {
             }
         }
 
-        // 3. Download from Wenku8 picture CDN using the app's pooled `sharedImageOkHttpClient`.
+        // 3. Download from Wenku8 picture CDN using the app's Cloudflare-accelerated `sharedDirectGetCallFactory`.
         if (!trimmed.startsWith("http://") && !trimmed.startsWith("https://")) {
             return@withContext null
         }
-        val httpClient = (context.applicationContext as? Wenku8V2Application)
+        val httpCallFactory: okhttp3.Call.Factory = (context.applicationContext as? Wenku8V2Application)
             ?.appContainer
-            ?.sharedImageOkHttpClient
+            ?.sharedDirectGetCallFactory
             ?: cdnHttpClient
 
         val tempFile = File(cacheDir, "$safeName.tmp")
         runCatching {
             val request = Request.Builder().url(trimmed).get().build()
-            httpClient.newCall(request).execute().use { response ->
+            httpCallFactory.newCall(request).execute().use { response ->
                 if (!response.isSuccessful) return@runCatching null
                 val body = response.body
                 FileOutputStream(tempFile).use { out ->

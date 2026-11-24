@@ -133,6 +133,7 @@ class InMemorySessionCookieStore : WenkuSessionCookieStore {
 class RelayHttpTransport(
     private val baseOkHttpClient: OkHttpClient = OkHttpProbeTransport.defaultSharedBaseOkHttpClient(),
     private val routeProvider: RelayRouteProvider = DefaultSystemDnsRouteProvider,
+    private val directGetCallFactory: Call.Factory? = null,
     private val sessionCookieStore: WenkuSessionCookieStore = InMemorySessionCookieStore(),
     private val systemDns: Dns = Dns.SYSTEM,
     private val endpointConfiguredResolver: () -> Boolean = {
@@ -474,7 +475,8 @@ class RelayHttpTransport(
                 return@withContext null
             }
 
-            val call = cookieFreeGetClient.newCall(request)
+            val callFactory: Call.Factory = directGetCallFactory ?: cookieFreeGetClient
+            val call = callFactory.newCall(request)
             try {
                 awaitCall(call).use { response ->
                     if (response.code != 200) return@use null
