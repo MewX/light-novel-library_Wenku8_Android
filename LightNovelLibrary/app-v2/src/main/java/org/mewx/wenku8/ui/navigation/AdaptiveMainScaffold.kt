@@ -789,6 +789,16 @@ fun AdaptiveMainScaffold(
                 (maxWidth.value - 32f).toInt().coerceAtLeast(160)
             }
         }
+        val estimatedDiscoveryBannerWidthDp = remember(maxWidth, isExpandedRailWidth, showTwoPaneExpandedDetail) {
+            when {
+                showTwoPaneExpandedDetail ->
+                    ((maxWidth.value - 80f) * 0.44f - 32f).toInt().coerceAtLeast(160)
+                isExpandedRailWidth ->
+                    (maxWidth.value - 80f - 32f).toInt().coerceAtLeast(160)
+                else ->
+                    (maxWidth.value - 32f).toInt().coerceAtLeast(160)
+            }
+        }
         val shouldPreloadStandardDetailBanner = canRequestAds && when (activeScene) {
             ScaffoldSceneState.HomeShell ->
                 selectedDestination != TopLevelDestination.PROFILE || showTwoPaneExpandedDetail
@@ -797,8 +807,24 @@ fun AdaptiveMainScaffold(
             is ScaffoldSceneState.CompactNovelDetail -> true
             else -> false
         }
-        // Keep 1 SDK-managed standard Novel Detail banner ready while browsing novel lists,
-        // bookshelf, search, or reading history so opening any detail screen renders instantly.
+        val shouldPreloadDiscoveryFeedBanner = canRequestAds &&
+            activeScene == ScaffoldSceneState.HomeShell &&
+            (selectedDestination == TopLevelDestination.LATEST ||
+                selectedDestination == TopLevelDestination.RANKINGS)
+        // Start Discovery feed preloader (`bufferSize = 5`) as soon as user enters Latest/Rankings
+        // without waiting for page-1 API responses so scrolling past #10/#20/#30 hits warm buffers.
+        LaunchedEffect(shouldPreloadDiscoveryFeedBanner, estimatedDiscoveryBannerWidthDp) {
+            if (!shouldPreloadDiscoveryFeedBanner) return@LaunchedEffect
+            withFrameNanos { }
+            ServerSupportBannerPreloader.ensurePreloading(
+                context = scaffoldContext,
+                placement = InlineBannerPlacement.DISCOVERY_FEED_INLINE,
+                availableWidthDp = estimatedDiscoveryBannerWidthDp,
+                canRequestAds = canRequestAds,
+            )
+        }
+        // Keep 2 SDK-managed standard Novel Detail banners ready while browsing novel lists,
+        // bookshelf, search, or reading history so consecutive detail visits render instantly.
         LaunchedEffect(shouldPreloadStandardDetailBanner, estimatedDetailBannerWidthDp) {
             if (!shouldPreloadStandardDetailBanner) return@LaunchedEffect
             withFrameNanos { }

@@ -898,7 +898,9 @@ fun ServerSupportBannerAd(
                         holder.phase = BannerAdLoadPhase.Loading
                     }
                     if (holder.phase == BannerAdLoadPhase.Loading && holder.adView == null && !holder.loadInProgress) {
-                        withFrameNanos { }
+                        if (!ServerSupportBannerPreloader.isAdReady(holder.placement)) {
+                            withFrameNanos { }
+                        }
                         startHolderBannerLoad(
                             holder = holder,
                             context = context,
