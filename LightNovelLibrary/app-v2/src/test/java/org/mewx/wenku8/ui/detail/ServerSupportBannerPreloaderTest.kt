@@ -260,6 +260,52 @@ class ServerSupportBannerPreloaderTest {
         assertTrue(ServerSupportBannerPreloader.isPlacementPreloading(placement))
     }
 
+    @Test
+    fun postReadingAdElevationTracker_remainingMsUntilPreloadEligible_tracksDurationAndCooldown() {
+        val tracker = PostReadingAdElevationTracker()
+        // No active session -> null
+        assertNull(tracker.remainingMsUntilPreloadEligible(nowMonoMs = 1_000L))
+
+        // Session started at t = 10_000 -> eligible at t = 10_000 + 10 min
+        val start = 10_000L
+        tracker.onReaderSessionStarted(aid = 42, nowMonoMs = start)
+        assertEquals(
+            10L * 60_000L,
+            tracker.remainingMsUntilPreloadEligible(nowMonoMs = start),
+        )
+        assertEquals(
+            3L * 60_000L,
+            tracker.remainingMsUntilPreloadEligible(nowMonoMs = start + 7L * 60_000L),
+        )
+        assertEquals(
+            0L,
+            tracker.remainingMsUntilPreloadEligible(nowMonoMs = start + 10L * 60_000L),
+        )
+
+        // End qualifying session -> triggers 30-min cooldown from t = end
+        val end = start + 10L * 60_000L
+        val token = tracker.onReaderSessionEnded(nowMonoMs = end)
+        assertNotNull(token)
+        assertNull(tracker.remainingMsUntilPreloadEligible(nowMonoMs = end + 1_000L))
+
+        // New session starts 5 min into the 30-min cooldown:
+        // even after 10 min of reading, 15 min of cooldown still remains (total 25 min from start2).
+        val start2 = end + 5L * 60_000L
+        tracker.onReaderSessionStarted(aid = 42, nowMonoMs = start2)
+        assertEquals(
+            25L * 60_000L,
+            tracker.remainingMsUntilPreloadEligible(nowMonoMs = start2),
+        )
+        assertEquals(
+            15L * 60_000L,
+            tracker.remainingMsUntilPreloadEligible(nowMonoMs = start2 + 10L * 60_000L),
+        )
+        assertEquals(
+            0L,
+            tracker.remainingMsUntilPreloadEligible(nowMonoMs = end + 30L * 60_000L),
+        )
+    }
+
     private data class RecordedStart(
         val preloadId: String,
         val config: PreloadConfiguration,

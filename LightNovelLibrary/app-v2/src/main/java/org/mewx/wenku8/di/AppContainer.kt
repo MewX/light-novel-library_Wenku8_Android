@@ -377,18 +377,26 @@ class AppContainer(context: Context) {
     }
 
     /**
-     * Observes [adConsentManager] and warms up the Google Mobile Ads SDK in the background at most
-     * once, strictly after `canRequestAds` becomes `true` (either synchronously from cached
-     * previous-session UMP consent or after the first-launch consent check finishes).
+     * Observes [adConsentManager] continuously:
+     * - Mirrors every `canRequestAds` transition into [ServerSupportBannerPreloader] so GDPR
+     *   consent revocation immediately calls `BannerAdPreloader.destroyAll()`.
+     * - Warms up the Next-Gen Google Mobile Ads SDK in the background at most once, strictly after
+     *   `canRequestAds` becomes `true`.
      */
     fun triggerConsentGatedAdWarmUp() {
         if (!hasStartedConsentGatedAdWarmUp.compareAndSet(false, true)) return
         applicationScope.launch {
-            adConsentManager.canRequestAds.first { it }
-            org.mewx.wenku8.ui.detail.ServerSupportAdInitializer.warmUpInBackground(
-                context = appContext,
-                scope = applicationScope,
-            )
+            var hasWarmedUpSdk = false
+            adConsentManager.canRequestAds.collect { canRequest ->
+                org.mewx.wenku8.ui.detail.ServerSupportBannerPreloader.onConsentStateChanged(canRequest)
+                if (canRequest && !hasWarmedUpSdk) {
+                    hasWarmedUpSdk = true
+                    org.mewx.wenku8.ui.detail.ServerSupportAdInitializer.warmUpInBackground(
+                        context = appContext,
+                        scope = applicationScope,
+                    )
+                }
+            }
         }
     }
 

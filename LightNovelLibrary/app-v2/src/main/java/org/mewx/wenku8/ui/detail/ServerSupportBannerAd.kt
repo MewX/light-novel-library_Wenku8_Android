@@ -228,6 +228,27 @@ class PostReadingAdElevationTracker(
         )
     }
 
+    /**
+     * Returns the remaining delay (in ms) until the currently active reading session qualifies
+     * for [InlineBannerPlacement.NOVEL_DETAIL_POST_READING_LARGE] preloading, or `null` when no
+     * session is active.
+     *
+     * Returning `0L` indicates both the minimum reading duration (`>= 10 min`) and the cooldown
+     * window (`>= 30 min` since last elevation) have elapsed, so preloading the one-shot 250dp
+     * banner mid-session guarantees zero wait when returning to `NovelDetailScreen`.
+     */
+    fun remainingMsUntilPreloadEligible(nowMonoMs: Long): Long? {
+        if (activeAid <= 0 || sessionStartedAtMonoMs <= 0L) return null
+        val durationReadyAt = sessionStartedAtMonoMs + minReadingDurationMs
+        val cooldownReadyAt = if (lastElevatedAtMonoMs == Long.MIN_VALUE) {
+            Long.MIN_VALUE
+        } else {
+            lastElevatedAtMonoMs + cooldownMs
+        }
+        val eligibleAt = maxOf(durationReadyAt, cooldownReadyAt)
+        return (eligibleAt - nowMonoMs).coerceAtLeast(0L)
+    }
+
     fun resetActiveSession() {
         activeAid = 0
         sessionStartedAtMonoMs = 0L
