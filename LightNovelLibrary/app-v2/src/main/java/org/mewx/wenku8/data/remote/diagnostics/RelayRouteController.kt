@@ -13,7 +13,9 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.sync.withPermit
 import okhttp3.ConnectionPool
 import org.mewx.wenku8.BuildConfig
+import org.mewx.wenku8.data.remote.transport.ActiveCloudflareEdgeRoute
 import org.mewx.wenku8.data.remote.transport.ActiveRelayRoute
+import org.mewx.wenku8.data.remote.transport.CloudflareEdgeRouteProvider
 import org.mewx.wenku8.data.remote.transport.PinnedRelayCandidate
 import org.mewx.wenku8.data.remote.transport.RelayHttpTransport
 import org.mewx.wenku8.data.remote.transport.RelayRouteProvider
@@ -102,7 +104,7 @@ class RelayRouteController(
     private val allowAutoSelectOnEnable: Boolean = false,
     private val monotonicClockMillis: () -> Long = { SystemClock.elapsedRealtime() },
     private val wallClockEpochMillis: () -> Long = { System.currentTimeMillis() },
-) : RelayRouteProvider {
+) : RelayRouteProvider, CloudflareEdgeRouteProvider {
 
     companion object {
         const val MAX_TOURNAMENT_PROBES: Int = 18
@@ -306,6 +308,27 @@ class RelayRouteController(
                 null
             } else {
                 lease.candidate
+            }
+        }
+    }
+
+    override fun currentActiveEdgeRouteOrNull(): ActiveCloudflareEdgeRoute? {
+        return synchronized(routeStateLock) {
+            val lease = activeLease ?: return@synchronized null
+            if (!userAutoOptimizeEnabled) {
+                return@synchronized null
+            }
+            if (monotonicClockMillis() >= lease.leaseExpiresAtMonotonicMs) {
+                activeLease = null
+                generationCounter.incrementAndGet()
+                refreshUiStateLocked()
+                null
+            } else {
+                ActiveCloudflareEdgeRoute(
+                    generationId = lease.generationId,
+                    candidateId = lease.candidate.id,
+                    rawIpBytes = lease.candidate.rawIpBytes.copyOf(),
+                )
             }
         }
     }
