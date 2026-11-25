@@ -1,5 +1,7 @@
 package org.mewx.wenku8.ui.reader
 
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
@@ -10,6 +12,8 @@ import android.graphics.Canvas as AndroidCanvas
 import android.graphics.Matrix
 import android.graphics.Paint
 import android.graphics.Rect
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
@@ -57,14 +61,22 @@ import androidx.compose.material.icons.automirrored.outlined.MenuBook
 import androidx.compose.material.icons.automirrored.outlined.NavigateBefore
 import androidx.compose.material.icons.automirrored.outlined.NavigateNext
 import androidx.compose.material.icons.outlined.AutoStories
+import androidx.compose.material.icons.outlined.BrokenImage
 import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.Download
+import androidx.compose.material.icons.outlined.ExpandLess
+import androidx.compose.material.icons.outlined.ExpandMore
+import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Rotate90DegreesCw
 import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material.icons.outlined.SwapHoriz
+import androidx.compose.material.icons.outlined.WifiOff
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
@@ -75,6 +87,7 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.carousel.HorizontalMultiBrowseCarousel
 import androidx.compose.material3.carousel.rememberCarouselState
 import androidx.compose.runtime.Composable
@@ -103,7 +116,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
@@ -115,6 +130,7 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import okhttp3.Call
 import okhttp3.Dns
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -122,15 +138,25 @@ import org.mewx.wenku8.R
 import org.mewx.wenku8.Wenku8V2Application
 import org.mewx.wenku8.data.media.OfflineFirstWenkuImageFetcher
 import org.mewx.wenku8.data.media.WenkuImageRequests
+import org.mewx.wenku8.data.media.WenkuImageValidator
+import org.mewx.wenku8.data.remote.diagnostics.IpAddressFamily
 import org.mewx.wenku8.data.remote.parser.WenkuXmlParsers
+import org.mewx.wenku8.data.remote.transport.CloudflareAcceleratedCallFactory
 import org.mewx.wenku8.ui.components.TooltipIconButton
 import org.mewx.wenku8.ui.components.horizontalScrollFadeEdge
 import org.mewx.wenku8.ui.theme.LocalEinkMode
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
+import java.io.IOException
+import java.net.ConnectException
+import java.net.SocketTimeoutException
+import java.net.URI
+import java.net.UnknownHostException
 import java.security.MessageDigest
+import java.util.Locale
 import java.util.concurrent.TimeUnit
+import javax.net.ssl.SSLException
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
@@ -156,6 +182,44 @@ object ArtbookTestTags {
     const val PAGE_INDICATOR = "artbook_page_indicator"
     const val CAROUSEL = "artbook_thumbnail_carousel"
     const val THUMBNAIL_PREFIX = "artbook_thumbnail_"
+    const val ERROR_MESSAGE = "artbook_error_message"
+    const val RETRY_BUTTON = "artbook_retry_button"
+    const val FAILURE_DETAILS_TOGGLE = "artbook_failure_details_toggle"
+    const val FAILURE_DETAILS_PANEL = "artbook_failure_details_panel"
+    const val FAILURE_DETAILS_COPY_BUTTON = "artbook_failure_details_copy_button"
+}
+
+/** High-level human-friendly illustration failure categories (no raw error codes shown by default). */
+enum class ArtbookLoadFailureKind {
+    OFFLINE_NOT_CACHED,
+    TIMEOUT,
+    NETWORK_ERROR,
+    HTTP_ERROR,
+    DECODE_FAILED,
+}
+
+/**
+ * Structured, privacy-redacted failure context surfaced ONLY when the user expands `"排查信息"`
+ * to share a clear bug report (never exposes raw IPs, cookies, or account data).
+ */
+data class ArtbookLoadFailure(
+    val kind: ArtbookLoadFailureKind,
+    val stageDetail: String,
+    val routeLabel: String,
+    val host: String?,
+) {
+    fun formatDiagnosticSummary(): String = buildString {
+        append("阶段: ").append(stageDetail)
+        append("\n线路: ").append(routeLabel)
+        if (!host.isNullOrBlank()) {
+            append("\n主机: ").append(host)
+        }
+    }
+}
+
+sealed interface ArtbookImageResolutionResult {
+    data class Success(val file: File) : ArtbookImageResolutionResult
+    data class Failure(val failure: ArtbookLoadFailure) : ArtbookImageResolutionResult
 }
 
 /**
@@ -411,12 +475,16 @@ internal class DecodedArtbookSource(
 }
 
 /**
- * Offline-first local file resolver for Wenku8 illustrations:
- * 1. Checks permanent offline storage (`filesDir/saves/imgs/` & `filesDir/imgs/`) via
- *    [OfflineFirstWenkuImageFetcher.findExistingOfflineImageFile] — zero network & zero copy!
- * 2. Checks `cacheDir/artbook_images/` for already-fetched session images.
- * 3. Downloads over `Dns.SYSTEM` CDN HTTP/HTTPS to a `.tmp` file and atomically renames into
- *    `cacheDir/artbook_images/`.
+ * Offline-first local file resolver for Wenku8 illustrations with corrupt-cache self-healing and
+ * mid-body System-DNS fallback:
+ * 1. Checks permanent offline storage (`filesDir/saves/imgs/` & `filesDir/imgs/`) and validates
+ *    bitmap decodability — automatically deleting corrupt/truncated local files and healing via
+ *    network instead of staying permanently stuck!
+ * 2. Checks `cacheDir/artbook_images/` and Coil 3's `DiskCache` (validated before promotion).
+ * 3. Downloads to a unique per-call `.tmp` file via `sharedDirectGetCallFactory`, verifying HTTP
+ *    status, non-text `Content-Type`, exact `Content-Length`, and `BitmapFactory` bounds — and
+ *    automatically retrying once over System DNS Happy Eyeballs if a pinned Cloudflare IP fails
+ *    mid-body!
  */
 object ArtbookImageFileResolver {
 
@@ -435,25 +503,53 @@ object ArtbookImageFileResolver {
         imageUrl: String,
         assetRoots: List<File> = listOf(context.filesDir),
         ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
-    ): File? = withContext(ioDispatcher) {
-        val trimmed = imageUrl.trim()
-        if (trimmed.isEmpty()) return@withContext null
+    ): File? {
+        return (resolveWithDiagnostics(
+            context = context,
+            imageUrl = imageUrl,
+            assetRoots = assetRoots,
+            ioDispatcher = ioDispatcher,
+        ) as? ArtbookImageResolutionResult.Success)?.file
+    }
 
-        // Direct local file path or file:// URI support (used in tests or imported local files).
-        if (trimmed.startsWith("file://")) {
-            val local = File(trimmed.removePrefix("file://"))
-            if (local.isFile && local.length() > 0L) return@withContext local
-        } else if (trimmed.startsWith("/")) {
-            val local = File(trimmed)
-            if (local.isFile && local.length() > 0L) return@withContext local
+    suspend fun resolveWithDiagnostics(
+        context: Context,
+        imageUrl: String,
+        assetRoots: List<File> = listOf(context.filesDir),
+        forceNetworkRefresh: Boolean = false,
+        preferSystemDns: Boolean = false,
+        callFactoryOverride: Call.Factory? = null,
+        offlineCheckOverride: (() -> Boolean)? = null,
+        ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+    ): ArtbookImageResolutionResult = withContext(ioDispatcher) {
+        val trimmed = imageUrl.trim()
+        if (trimmed.isEmpty()) {
+            return@withContext ArtbookImageResolutionResult.Failure(
+                ArtbookLoadFailure(
+                    kind = ArtbookLoadFailureKind.DECODE_FAILED,
+                    stageDetail = "空图片地址",
+                    routeLabel = "本地",
+                    host = null,
+                ),
+            )
         }
 
-        // 1. Permanent offline storage (`saves/imgs/` & `imgs/`) + `artbook_images` cache.
-        OfflineFirstWenkuImageFetcher.findExistingOfflineImageFile(
-            imageUrl = trimmed,
-            storageRoots = assetRoots,
-            cacheRoot = context.cacheDir,
-        )?.let { return@withContext it }
+        // Direct local file path or file:// URI support (used in tests or imported local files).
+        if (trimmed.startsWith("file://") || trimmed.startsWith("/")) {
+            val local = File(trimmed.removePrefix("file://"))
+            return@withContext if (WenkuImageValidator.isDecodableBitmapFile(local)) {
+                ArtbookImageResolutionResult.Success(local)
+            } else {
+                ArtbookImageResolutionResult.Failure(
+                    ArtbookLoadFailure(
+                        kind = ArtbookLoadFailureKind.DECODE_FAILED,
+                        stageDetail = if (local.isFile) "本地文件解码失败 (${local.length()} B)" else "本地文件不存在",
+                        routeLabel = "本地文件",
+                        host = null,
+                    ),
+                )
+            }
+        }
 
         val cacheDir = File(context.cacheDir, WenkuImageRequests.ARTBOOK_CACHE_DIR_NAME).apply {
             mkdirs()
@@ -462,76 +558,351 @@ object ArtbookImageFileResolver {
             sha256Hex(trimmed) + ".jpg"
         }
         val cachedFile = File(cacheDir, safeName)
-        if (cachedFile.isFile && cachedFile.length() > 0L) {
-            return@withContext cachedFile
-        }
+        var healedCorruptLocalCache = false
 
-        // 2. Reuse Coil 3's persistent `DiskCache` if already fetched inline in Reader!
-        val diskCache = runCatching { SingletonImageLoader.get(context).diskCache }.getOrNull()
-        if (diskCache != null) {
-            val candidateKeys = listOfNotNull(
-                WenkuImageRequests.canonicalIllustrationCacheKey(trimmed),
-                WenkuImageRequests.canonicalCacheKeyForUrl(trimmed),
-                trimmed,
-            ).distinct()
-            for (key in candidateKeys) {
-                val snapshot = runCatching { diskCache.openSnapshot(key) }.getOrNull() ?: continue
-                val promoted = snapshot.use { snap ->
-                    val dataFile = snap.data.toFile()
-                    if (dataFile.isFile && dataFile.length() > 0L) {
-                        val tmpCopy = File(cacheDir, "$safeName.coil.tmp")
-                        runCatching {
-                            dataFile.copyTo(tmpCopy, overwrite = true)
-                            if (!tmpCopy.renameTo(cachedFile)) {
-                                tmpCopy.copyTo(cachedFile, overwrite = true)
-                                tmpCopy.delete()
-                            }
-                            cachedFile.takeIf { it.isFile && it.length() > 0L }
-                        }.onFailure {
-                            tmpCopy.delete()
-                        }.getOrNull()
-                    } else {
-                        null
-                    }
+        if (forceNetworkRefresh) {
+            WenkuImageValidator.purgeCachedImageForUrl(
+                imageUrl = trimmed,
+                storageRoots = assetRoots,
+                cacheRoot = context.cacheDir,
+                appContext = context.applicationContext,
+                includePermanentOfflineFiles = true,
+            )
+        } else {
+            // 1. Permanent offline storage (`saves/imgs/` & `imgs/`) + `artbook_images` cache.
+            val existingOffline = OfflineFirstWenkuImageFetcher.findExistingOfflineImageFile(
+                imageUrl = trimmed,
+                storageRoots = assetRoots,
+                cacheRoot = context.cacheDir,
+                deleteCorruptFiles = true,
+            )
+            if (existingOffline != null) {
+                if (WenkuImageValidator.isDecodableBitmapFile(existingOffline)) {
+                    return@withContext ArtbookImageResolutionResult.Success(existingOffline)
                 }
-                if (promoted != null) {
-                    return@withContext promoted
+                // File passed basic header check yet failed Skia decode -> delete and heal via network!
+                healedCorruptLocalCache = true
+                runCatching { existingOffline.delete() }
+            }
+
+            if (cachedFile.isFile) {
+                if (WenkuImageValidator.isDecodableBitmapFile(cachedFile)) {
+                    return@withContext ArtbookImageResolutionResult.Success(cachedFile)
+                }
+                healedCorruptLocalCache = true
+                runCatching { cachedFile.delete() }
+            }
+
+            // 2. Reuse Coil 3's persistent `DiskCache` ONLY if it decodes cleanly as a bitmap!
+            val diskCache = runCatching { SingletonImageLoader.get(context).diskCache }.getOrNull()
+            if (diskCache != null) {
+                val candidateKeys = listOfNotNull(
+                    WenkuImageRequests.canonicalIllustrationCacheKey(trimmed),
+                    WenkuImageRequests.canonicalCacheKeyForUrl(trimmed),
+                    trimmed,
+                ).distinct()
+                for (key in candidateKeys) {
+                    val snapshot = runCatching { diskCache.openSnapshot(key) }.getOrNull() ?: continue
+                    val promoted = snapshot.use { snap ->
+                        val dataFile = snap.data.toFile()
+                        if (WenkuImageValidator.isDecodableBitmapFile(dataFile)) {
+                            val tmpCopy = File(cacheDir, "$safeName.${System.nanoTime()}.coil.tmp")
+                            runCatching {
+                                dataFile.copyTo(tmpCopy, overwrite = true)
+                                if (!tmpCopy.renameTo(cachedFile)) {
+                                    tmpCopy.copyTo(cachedFile, overwrite = true)
+                                    tmpCopy.delete()
+                                }
+                                cachedFile.takeIf { it.isFile && it.length() > 0L }
+                            }.onFailure {
+                                tmpCopy.delete()
+                            }.getOrNull()
+                        } else {
+                            healedCorruptLocalCache = true
+                            null
+                        }
+                    }
+                    if (promoted != null) {
+                        return@withContext ArtbookImageResolutionResult.Success(promoted)
+                    }
+                    if (healedCorruptLocalCache) {
+                        runCatching { diskCache.remove(key) }
+                    }
                 }
             }
         }
 
         // 3. Download from Wenku8 picture CDN using the app's Cloudflare-accelerated `sharedDirectGetCallFactory`.
-        if (!trimmed.startsWith("http://") && !trimmed.startsWith("https://")) {
-            return@withContext null
+        val host = extractHostSafely(trimmed)
+        if (!trimmed.startsWith("http://", ignoreCase = true) &&
+            !trimmed.startsWith("https://", ignoreCase = true)
+        ) {
+            return@withContext ArtbookImageResolutionResult.Failure(
+                ArtbookLoadFailure(
+                    kind = ArtbookLoadFailureKind.DECODE_FAILED,
+                    stageDetail = "不支持的链接格式",
+                    routeLabel = "本地",
+                    host = host,
+                ),
+            )
         }
-        val httpCallFactory: okhttp3.Call.Factory = (context.applicationContext as? Wenku8V2Application)
-            ?.appContainer
-            ?.sharedDirectGetCallFactory
+
+        val isOffline = offlineCheckOverride?.invoke() ?: isDeviceDefinitelyOffline(context)
+        if (isOffline) {
+            return@withContext ArtbookImageResolutionResult.Failure(
+                ArtbookLoadFailure(
+                    kind = ArtbookLoadFailureKind.OFFLINE_NOT_CACHED,
+                    stageDetail = if (healedCorruptLocalCache) "本地缓存损坏且当前离线" else "当前离线且未离线缓存",
+                    routeLabel = "离线",
+                    host = host,
+                ),
+            )
+        }
+
+        val httpCallFactory: Call.Factory = callFactoryOverride
+            ?: (context.applicationContext as? Wenku8V2Application)
+                ?.appContainer
+                ?.sharedDirectGetCallFactory
             ?: cdnHttpClient
 
-        val tempFile = File(cacheDir, "$safeName.tmp")
-        runCatching {
-            val request = Request.Builder().url(trimmed).get().build()
-            httpCallFactory.newCall(request).execute().use { response ->
-                if (!response.isSuccessful) return@runCatching null
-                val body = response.body
-                FileOutputStream(tempFile).use { out ->
-                    body.byteStream().copyTo(out)
-                    out.fd.sync()
-                }
-                if (tempFile.length() <= 0L) {
-                    tempFile.delete()
-                    return@runCatching null
-                }
-                if (!tempFile.renameTo(cachedFile)) {
-                    tempFile.copyTo(cachedFile, overwrite = true)
-                    tempFile.delete()
-                }
-                cachedFile
+        val cfFactory = httpCallFactory as? CloudflareAcceleratedCallFactory
+        val pinnedFamily = if (!preferSystemDns && host != null) {
+            cfFactory?.activePinnedFamilyForHostOrNull(host)
+        } else {
+            null
+        }
+
+        val primaryFactory: Call.Factory = if (preferSystemDns && cfFactory != null) {
+            Call.Factory { cfFactory.newDirectSystemDnsCall(it) }
+        } else {
+            httpCallFactory
+        }
+        val primaryRouteLabel = when {
+            preferSystemDns -> "系统默认 DNS (手动重试)"
+            pinnedFamily == IpAddressFamily.IPV6 -> "优选 IPv6"
+            pinnedFamily == IpAddressFamily.IPV4 -> "优选 IPv4"
+            else -> "系统默认 DNS"
+        }
+
+        val primaryOutcome = downloadAndValidateToFile(
+            callFactory = primaryFactory,
+            url = trimmed,
+            cacheDir = cacheDir,
+            safeName = safeName,
+            targetFile = cachedFile,
+            routeLabel = primaryRouteLabel,
+            fallbackHost = host,
+        )
+        if (primaryOutcome is ArtbookImageResolutionResult.Success) {
+            if (forceNetworkRefresh || healedCorruptLocalCache) {
+                WenkuImageValidator.evictCoilCachesForUrl(context.applicationContext, trimmed)
             }
-        }.onFailure {
+            return@withContext primaryOutcome
+        }
+
+        // If a pinned Cloudflare edge failed during body streaming, truncation, or decode, report
+        // the body failure (immediately cooling down flaky cellular IPv6 edges) and transparently
+        // retry ONCE over System DNS Happy Eyeballs in the same load!
+        if (cfFactory != null && pinnedFamily != null) {
+            val failedHost = (primaryOutcome as ArtbookImageResolutionResult.Failure).failure.host ?: host
+            if (!failedHost.isNullOrBlank()) {
+                cfFactory.reportPinnedBodyReadFailure(failedHost, pinnedFamily)
+            }
+            val fallbackRouteLabel = "优选 ${pinnedFamily.wireLabel.uppercase(Locale.ROOT)} (已回退系统 DNS)"
+            val fallbackOutcome = downloadAndValidateToFile(
+                callFactory = Call.Factory { cfFactory.newDirectSystemDnsCall(it) },
+                url = trimmed,
+                cacheDir = cacheDir,
+                safeName = safeName,
+                targetFile = cachedFile,
+                routeLabel = fallbackRouteLabel,
+                fallbackHost = failedHost,
+            )
+            if (fallbackOutcome is ArtbookImageResolutionResult.Success) {
+                if (forceNetworkRefresh || healedCorruptLocalCache) {
+                    WenkuImageValidator.evictCoilCachesForUrl(context.applicationContext, trimmed)
+                }
+            }
+            return@withContext fallbackOutcome
+        }
+
+        primaryOutcome
+    }
+
+    private fun downloadAndValidateToFile(
+        callFactory: Call.Factory,
+        url: String,
+        cacheDir: File,
+        safeName: String,
+        targetFile: File,
+        routeLabel: String,
+        fallbackHost: String?,
+    ): ArtbookImageResolutionResult {
+        val request = try {
+            Request.Builder().url(url).get().build()
+        } catch (_: IllegalArgumentException) {
+            return ArtbookImageResolutionResult.Failure(
+                ArtbookLoadFailure(
+                    kind = ArtbookLoadFailureKind.DECODE_FAILED,
+                    stageDetail = "图片链接格式异常",
+                    routeLabel = routeLabel,
+                    host = fallbackHost,
+                ),
+            )
+        }
+
+        val tempFile = File(cacheDir, "$safeName.${System.nanoTime()}.tmp")
+        var observedFinalHost = fallbackHost
+        return try {
+            callFactory.newCall(request).execute().use { response ->
+                observedFinalHost = response.request.url.host.takeIf { it.isNotBlank() } ?: fallbackHost
+                if (!response.isSuccessful) {
+                    return ArtbookImageResolutionResult.Failure(
+                        ArtbookLoadFailure(
+                            kind = ArtbookLoadFailureKind.HTTP_ERROR,
+                            stageDetail = "HTTP ${response.code}",
+                            routeLabel = routeLabel,
+                            host = observedFinalHost,
+                        ),
+                    )
+                }
+
+                val contentType = response.header("Content-Type")
+                if (!WenkuImageValidator.isValidImageContentType(contentType)) {
+                    val shortType = contentType?.substringBefore(';')?.trim().orEmpty().ifEmpty { "unknown" }
+                    return ArtbookImageResolutionResult.Failure(
+                        ArtbookLoadFailure(
+                            kind = ArtbookLoadFailureKind.DECODE_FAILED,
+                            stageDetail = "返回非图片内容 ($shortType)",
+                            routeLabel = routeLabel,
+                            host = observedFinalHost,
+                        ),
+                    )
+                }
+
+                val body = response.body
+                val expectedContentLength = body.contentLength()
+                val writtenBytes = FileOutputStream(tempFile).use { out ->
+                    val copied = body.byteStream().copyTo(out)
+                    out.fd.sync()
+                    copied
+                }
+
+                if (writtenBytes <= 0L) {
+                    tempFile.delete()
+                    return ArtbookImageResolutionResult.Failure(
+                        ArtbookLoadFailure(
+                            kind = ArtbookLoadFailureKind.DECODE_FAILED,
+                            stageDetail = "空响应 (0 B)",
+                            routeLabel = routeLabel,
+                            host = observedFinalHost,
+                        ),
+                    )
+                }
+
+                if (expectedContentLength > 0L && writtenBytes != expectedContentLength) {
+                    tempFile.delete()
+                    return ArtbookImageResolutionResult.Failure(
+                        ArtbookLoadFailure(
+                            kind = ArtbookLoadFailureKind.NETWORK_ERROR,
+                            stageDetail = "传输中断 ($writtenBytes / $expectedContentLength B)",
+                            routeLabel = routeLabel,
+                            host = observedFinalHost,
+                        ),
+                    )
+                }
+
+                if (!WenkuImageValidator.isDecodableBitmapFile(tempFile)) {
+                    val badLen = tempFile.length()
+                    tempFile.delete()
+                    return ArtbookImageResolutionResult.Failure(
+                        ArtbookLoadFailure(
+                            kind = ArtbookLoadFailureKind.DECODE_FAILED,
+                            stageDetail = "图片解码失败 ($badLen B)",
+                            routeLabel = routeLabel,
+                            host = observedFinalHost,
+                        ),
+                    )
+                }
+
+                if (targetFile.exists()) {
+                    targetFile.delete()
+                }
+                if (!tempFile.renameTo(targetFile)) {
+                    tempFile.copyTo(targetFile, overwrite = true)
+                    tempFile.delete()
+                }
+                ArtbookImageResolutionResult.Success(targetFile)
+            }
+        } catch (ioError: IOException) {
             tempFile.delete()
-        }.getOrNull()
+            classifyIoFailure(ioError, routeLabel, observedFinalHost)
+        } catch (_: Throwable) {
+            tempFile.delete()
+            ArtbookImageResolutionResult.Failure(
+                ArtbookLoadFailure(
+                    kind = ArtbookLoadFailureKind.NETWORK_ERROR,
+                    stageDetail = "加载异常",
+                    routeLabel = routeLabel,
+                    host = observedFinalHost,
+                ),
+            )
+        }
+    }
+
+    private fun classifyIoFailure(
+        error: IOException,
+        routeLabel: String,
+        host: String?,
+    ): ArtbookImageResolutionResult.Failure {
+        val failure = when (error) {
+            is SocketTimeoutException -> ArtbookLoadFailure(
+                kind = ArtbookLoadFailureKind.TIMEOUT,
+                stageDetail = "网络读取超时",
+                routeLabel = routeLabel,
+                host = host,
+            )
+            is UnknownHostException -> ArtbookLoadFailure(
+                kind = ArtbookLoadFailureKind.NETWORK_ERROR,
+                stageDetail = "域名解析失败",
+                routeLabel = routeLabel,
+                host = host,
+            )
+            is SSLException -> ArtbookLoadFailure(
+                kind = ArtbookLoadFailureKind.NETWORK_ERROR,
+                stageDetail = "TLS 握手失败",
+                routeLabel = routeLabel,
+                host = host,
+            )
+            is ConnectException -> ArtbookLoadFailure(
+                kind = ArtbookLoadFailureKind.NETWORK_ERROR,
+                stageDetail = "连接被拒绝或中断",
+                routeLabel = routeLabel,
+                host = host,
+            )
+            else -> ArtbookLoadFailure(
+                kind = ArtbookLoadFailureKind.NETWORK_ERROR,
+                stageDetail = "网络传输中断 (${error.javaClass.simpleName})",
+                routeLabel = routeLabel,
+                host = host,
+            )
+        }
+        return ArtbookImageResolutionResult.Failure(failure)
+    }
+
+    private fun isDeviceDefinitelyOffline(context: Context): Boolean {
+        return runCatching {
+            val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
+                ?: return false
+            val active = cm.activeNetwork ?: return true
+            val caps = cm.getNetworkCapabilities(active) ?: return false
+            !caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+        }.getOrDefault(false)
+    }
+
+    private fun extractHostSafely(url: String): String? {
+        return runCatching { URI(url).host?.trim()?.lowercase(Locale.ROOT)?.takeIf { it.isNotEmpty() } }
+            .getOrNull()
     }
 
     private fun sha256Hex(input: String): String {
@@ -615,6 +986,44 @@ fun ArtbookLightboxOverlay(
             )
         }
     }
+
+    val effectiveDiagnosticResolver: suspend (String, Boolean) -> ArtbookImageResolutionResult = remember(
+        context,
+        effectiveAssetRoots,
+        imageFileResolver,
+        ioDispatcher,
+    ) {
+        if (imageFileResolver != null) {
+            { url, _ ->
+                val resolved = imageFileResolver(url)
+                if (resolved != null) {
+                    ArtbookImageResolutionResult.Success(resolved)
+                } else {
+                    ArtbookImageResolutionResult.Failure(
+                        ArtbookLoadFailure(
+                            kind = ArtbookLoadFailureKind.NETWORK_ERROR,
+                            stageDetail = "图片获取失败",
+                            routeLabel = "自定义加载器",
+                            host = runCatching { URI(url).host }.getOrNull(),
+                        ),
+                    )
+                }
+            }
+        } else {
+            { url, isUserRetry ->
+                ArtbookImageFileResolver.resolveWithDiagnostics(
+                    context = context,
+                    imageUrl = url,
+                    assetRoots = effectiveAssetRoots,
+                    forceNetworkRefresh = isUserRetry,
+                    preferSystemDns = isUserRetry,
+                    ioDispatcher = ioDispatcher,
+                )
+            }
+        }
+    }
+
+    var thumbnailRefreshEpoch by remember { mutableIntStateOf(0) }
 
     var isChromeVisible by rememberSaveable { mutableStateOf(true) }
     var isSpreadModeEnabled by rememberSaveable { mutableStateOf(false) }
@@ -734,7 +1143,7 @@ fun ArtbookLightboxOverlay(
                 entryIndex = entryIndex,
                 isCurrentPage = entryIndex == pagerState.currentPage,
                 rotationDegrees = animatedRotationDeg,
-                imageFileResolver = effectiveFileResolver,
+                diagnosticResolver = effectiveDiagnosticResolver,
                 ioDispatcher = ioDispatcher,
                 onZoomChanged = { zoom ->
                     if (entryIndex == pagerState.currentPage) {
@@ -743,6 +1152,16 @@ fun ArtbookLightboxOverlay(
                 },
                 onSingleTapToggleChrome = {
                     isChromeVisible = !isChromeVisible
+                },
+                onRetryRecovered = {
+                    thumbnailRefreshEpoch += 1
+                },
+                onDiagnosticCopied = {
+                    coroutineScope.launch {
+                        snackbarHostState.showSnackbar(
+                            context.getString(R.string.artbook_diagnostics_copied),
+                        )
+                    }
                 },
             )
         }
@@ -1133,12 +1552,14 @@ fun ArtbookLightboxOverlay(
                                 }
                                 .testTag("${ArtbookTestTags.THUMBNAIL_PREFIX}$thumbIdx"),
                         ) {
-                            AsyncImage(
-                                model = WenkuImageRequests.rememberIllustrationImageRequest(imageUrls[thumbIdx]),
-                                contentDescription = "插图 ${thumbIdx + 1}",
-                                contentScale = ContentScale.Crop,
-                                modifier = Modifier.fillMaxSize(),
-                            )
+                            androidx.compose.runtime.key(thumbnailRefreshEpoch, imageUrls[thumbIdx]) {
+                                AsyncImage(
+                                    model = WenkuImageRequests.rememberIllustrationImageRequest(imageUrls[thumbIdx]),
+                                    contentDescription = "插图 ${thumbIdx + 1}",
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier.fillMaxSize(),
+                                )
+                            }
                             Surface(
                                 shape = CircleShape,
                                 color = Color(0xAA000000),
@@ -1178,15 +1599,21 @@ private fun ArtbookEntryViewport(
     entryIndex: Int,
     isCurrentPage: Boolean,
     rotationDegrees: Float,
-    imageFileResolver: suspend (String) -> File?,
+    diagnosticResolver: suspend (url: String, isUserRetry: Boolean) -> ArtbookImageResolutionResult,
     ioDispatcher: CoroutineDispatcher,
     onZoomChanged: (Float) -> Unit,
     onSingleTapToggleChrome: () -> Unit,
+    onRetryRecovered: () -> Unit = {},
+    onDiagnosticCopied: () -> Unit = {},
 ) {
+    val context = LocalContext.current
     var leftSource by remember(entry) { mutableStateOf<DecodedArtbookSource?>(null) }
     var rightSource by remember(entry) { mutableStateOf<DecodedArtbookSource?>(null) }
     var isLoading by remember(entry) { mutableStateOf(true) }
     var loadFailed by remember(entry) { mutableStateOf(false) }
+    var loadFailure by remember(entry) { mutableStateOf<ArtbookLoadFailure?>(null) }
+    var retryNonce by remember(entry) { mutableIntStateOf(0) }
+    var showFailureDetails by remember(entry, retryNonce) { mutableStateOf(false) }
 
     DisposableEffect(entry) {
         onDispose {
@@ -1195,30 +1622,71 @@ private fun ArtbookEntryViewport(
         }
     }
 
-    LaunchedEffect(entry) {
+    LaunchedEffect(entry, retryNonce) {
+        val isUserRetry = retryNonce > 0
         isLoading = true
         loadFailed = false
+        loadFailure = null
+        leftSource?.close()
+        rightSource?.close()
+        leftSource = null
+        rightSource = null
+
         when (entry) {
             is ArtbookEntry.Single -> {
-                val decoded = withContext(ioDispatcher) {
-                    imageFileResolver(entry.imageUrl)?.let { DecodedArtbookSource.open(it) }
+                val (decoded, failure) = withContext(ioDispatcher) {
+                    when (val res = diagnosticResolver(entry.imageUrl, isUserRetry)) {
+                        is ArtbookImageResolutionResult.Success -> {
+                            val bmp = DecodedArtbookSource.open(res.file)
+                            if (bmp != null) {
+                                bmp to null
+                            } else {
+                                null to ArtbookLoadFailure(
+                                    kind = ArtbookLoadFailureKind.DECODE_FAILED,
+                                    stageDetail = "本地解码失败 (${res.file.length()} B)",
+                                    routeLabel = "本地解码",
+                                    host = runCatching { URI(entry.imageUrl).host }.getOrNull(),
+                                )
+                            }
+                        }
+                        is ArtbookImageResolutionResult.Failure -> null to res.failure
+                    }
                 }
                 leftSource = decoded
                 rightSource = null
                 loadFailed = decoded == null
+                loadFailure = failure
+                if (isUserRetry && decoded != null) {
+                    onRetryRecovered()
+                }
             }
             is ArtbookEntry.DoubleSpread -> {
-                val (decodedL, decodedR) = withContext(ioDispatcher) {
-                    val fileL = imageFileResolver(entry.leftImageUrl)
-                    val fileR = imageFileResolver(entry.rightImageUrl)
-                    Pair(
-                        fileL?.let { DecodedArtbookSource.open(it) },
-                        fileR?.let { DecodedArtbookSource.open(it) },
-                    )
+                val (decodedL, decodedR, failure) = withContext(ioDispatcher) {
+                    val resL = diagnosticResolver(entry.leftImageUrl, isUserRetry)
+                    val resR = diagnosticResolver(entry.rightImageUrl, isUserRetry)
+                    val bmpL = (resL as? ArtbookImageResolutionResult.Success)?.file?.let { DecodedArtbookSource.open(it) }
+                    val bmpR = (resR as? ArtbookImageResolutionResult.Success)?.file?.let { DecodedArtbookSource.open(it) }
+                    val firstFail = (resL as? ArtbookImageResolutionResult.Failure)?.failure
+                        ?: (resR as? ArtbookImageResolutionResult.Failure)?.failure
+                        ?: if (bmpL == null && bmpR == null) {
+                            ArtbookLoadFailure(
+                                kind = ArtbookLoadFailureKind.DECODE_FAILED,
+                                stageDetail = "跨页图片解码失败",
+                                routeLabel = "本地解码",
+                                host = runCatching { URI(entry.leftImageUrl).host }.getOrNull(),
+                            )
+                        } else {
+                            null
+                        }
+                    Triple(bmpL, bmpR, firstFail)
                 }
                 leftSource = decodedL
                 rightSource = decodedR
                 loadFailed = decodedL == null && decodedR == null
+                loadFailure = if (loadFailed) failure else null
+                if (isUserRetry && !loadFailed) {
+                    onRetryRecovered()
+                }
             }
         }
         isLoading = false
@@ -1265,11 +1733,137 @@ private fun ArtbookEntryViewport(
             return@BoxWithConstraints
         }
         if (loadFailed || srcL == null) {
-            Text(
-                text = stringResource(R.string.artbook_image_load_failed),
-                color = Color(0xFFD0D6E0),
-                style = MaterialTheme.typography.bodyMedium,
-            )
+            val activeFailure = loadFailure
+            val friendlyMessageRes = when (activeFailure?.kind) {
+                ArtbookLoadFailureKind.OFFLINE_NOT_CACHED -> R.string.artbook_error_offline_not_cached
+                ArtbookLoadFailureKind.TIMEOUT -> R.string.artbook_error_timeout
+                ArtbookLoadFailureKind.HTTP_ERROR -> R.string.artbook_error_http
+                ArtbookLoadFailureKind.DECODE_FAILED -> R.string.artbook_error_decode
+                else -> R.string.artbook_image_load_failed
+            }
+            val errorIcon = if (activeFailure?.kind == ArtbookLoadFailureKind.OFFLINE_NOT_CACHED) {
+                Icons.Outlined.WifiOff
+            } else {
+                Icons.Outlined.BrokenImage
+            }
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 32.dp),
+            ) {
+                Icon(
+                    imageVector = errorIcon,
+                    contentDescription = null,
+                    tint = Color(0xFFB8C0CC),
+                    modifier = Modifier.size(36.dp),
+                )
+                Text(
+                    text = stringResource(friendlyMessageRes),
+                    color = Color(0xFFE0E5EE),
+                    style = MaterialTheme.typography.bodyMedium,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.testTag(ArtbookTestTags.ERROR_MESSAGE),
+                )
+                FilledTonalButton(
+                    onClick = { retryNonce += 1 },
+                    colors = ButtonDefaults.filledTonalButtonColors(
+                        containerColor = Color(0x33FFFFFF),
+                        contentColor = Color.White,
+                    ),
+                    modifier = Modifier.testTag(ArtbookTestTags.RETRY_BUTTON),
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.Refresh,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp),
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(text = stringResource(R.string.artbook_action_retry))
+                }
+                if (activeFailure != null) {
+                    TextButton(
+                        onClick = { showFailureDetails = !showFailureDetails },
+                        colors = ButtonDefaults.textButtonColors(contentColor = Color(0x99D0D6E0)),
+                        modifier = Modifier.testTag(ArtbookTestTags.FAILURE_DETAILS_TOGGLE),
+                    ) {
+                        Text(
+                            text = stringResource(
+                                if (showFailureDetails) {
+                                    R.string.artbook_diagnostics_toggle_hide
+                                } else {
+                                    R.string.artbook_diagnostics_toggle_show
+                                },
+                            ),
+                            style = MaterialTheme.typography.labelMedium,
+                        )
+                        Spacer(modifier = Modifier.width(2.dp))
+                        Icon(
+                            imageVector = if (showFailureDetails) {
+                                Icons.Outlined.ExpandLess
+                            } else {
+                                Icons.Outlined.ExpandMore
+                            },
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp),
+                        )
+                    }
+                    if (showFailureDetails) {
+                        val summaryText = activeFailure.formatDiagnosticSummary()
+                        Surface(
+                            color = Color(0xCC161A22),
+                            shape = MaterialTheme.shapes.medium,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .border(1.dp, Color(0x33FFFFFF), MaterialTheme.shapes.medium)
+                                .testTag(ArtbookTestTags.FAILURE_DETAILS_PANEL),
+                        ) {
+                            Column(
+                                verticalArrangement = Arrangement.spacedBy(8.dp),
+                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                            ) {
+                                Text(
+                                    text = summaryText,
+                                    color = Color(0xFFC8D0DC),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontFamily = FontFamily.Monospace,
+                                )
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.End,
+                                ) {
+                                    TextButton(
+                                        onClick = {
+                                            runCatching {
+                                                val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+                                                clipboard?.setPrimaryClip(
+                                                    ClipData.newPlainText("artbook_diagnostic", summaryText),
+                                                )
+                                                onDiagnosticCopied()
+                                            }
+                                        },
+                                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                                        colors = ButtonDefaults.textButtonColors(contentColor = Color(0xFFD0E4FF)),
+                                        modifier = Modifier.testTag(ArtbookTestTags.FAILURE_DETAILS_COPY_BUTTON),
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Outlined.ContentCopy,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(14.dp),
+                                        )
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text(
+                                            text = stringResource(R.string.artbook_diagnostics_copy_action),
+                                            style = MaterialTheme.typography.labelSmall,
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
             return@BoxWithConstraints
         }
 

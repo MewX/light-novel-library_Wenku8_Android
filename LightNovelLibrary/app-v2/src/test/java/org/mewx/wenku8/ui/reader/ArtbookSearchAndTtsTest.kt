@@ -1,10 +1,14 @@
 package org.mewx.wenku8.ui.reader
 
+import android.content.ClipboardManager
+import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.Color as AndroidColor
 import android.graphics.Rect
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
@@ -25,10 +29,15 @@ import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
+import mockwebserver3.MockResponse
+import mockwebserver3.MockWebServer
+import okhttp3.Dns
+import okio.Buffer
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
@@ -40,13 +49,18 @@ import org.mewx.wenku8.data.local.db.Wenku8Database
 import org.mewx.wenku8.data.local.db.entity.ChapterContentEntity
 import org.mewx.wenku8.data.local.db.entity.NovelEntity
 import org.mewx.wenku8.data.local.preferences.Wenku8UserPreferences
+import org.mewx.wenku8.data.media.WenkuImageValidator
 import org.mewx.wenku8.data.remote.api.OnlineSearchField
 import org.mewx.wenku8.data.remote.api.WenkuApiResult
 import org.mewx.wenku8.data.remote.api.WenkuCatalogGateway
+import org.mewx.wenku8.data.remote.diagnostics.IpLiteralParser
 import org.mewx.wenku8.data.remote.parser.ParsedCloudBookshelfEntry
 import org.mewx.wenku8.data.remote.parser.ParsedNovelFullMeta
 import org.mewx.wenku8.data.remote.parser.ParsedNovelListItem
 import org.mewx.wenku8.data.remote.parser.ParsedNovelListPage
+import org.mewx.wenku8.data.remote.parser.WenkuXmlParsers
+import org.mewx.wenku8.data.remote.transport.ActiveCloudflareEdgeRoute
+import org.mewx.wenku8.data.remote.transport.CloudflareAcceleratedCallFactory
 import org.mewx.wenku8.data.repository.NovelTocSyncRepository
 import org.mewx.wenku8.data.repository.ParsedChapterToc
 import org.mewx.wenku8.data.repository.ParsedVolumeToc
@@ -56,10 +70,15 @@ import org.mewx.wenku8.ui.detail.ReaderLaunchRequest
 import org.mewx.wenku8.ui.theme.Wenku8ExpressiveTheme
 import org.mewx.wenku8.ui.theme.Wenku8ThemeMode
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.Shadows
 import org.robolectric.annotation.Config
+import org.robolectric.shadows.ShadowNetworkCapabilities
+import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileOutputStream
+import java.net.InetAddress
 import java.util.concurrent.Executor
+import java.util.concurrent.atomic.AtomicReference
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], qualifiers = "w412dp-h892dp")
@@ -1267,6 +1286,216 @@ class ArtbookSearchAndTtsTest {
                 downloadedAtMs = 1_700_000_000_000L,
             ),
         )
+    }
+
+    @Test
+    fun artbookImageFileResolver_healsCorruptLocalCache_rejectsHtml_andFallsBackFromPinnedEdgeToSystemDns() =
+        runBlocking {
+            val context = ApplicationProvider.getApplicationContext<Context>()
+            val validJpegBytes = ByteArrayOutputStream().use { out ->
+                val bmp = Bitmap.createBitmap(64, 96, Bitmap.Config.ARGB_8888).apply {
+                    eraseColor(AndroidColor.rgb(80, 140, 210))
+                }
+                bmp.compress(Bitmap.CompressFormat.JPEG, 90, out)
+                bmp.recycle()
+                out.toByteArray()
+            }
+
+            MockWebServer().use { systemOrigin ->
+                MockWebServer().use { pinnedEdge ->
+                    systemOrigin.start(InetAddress.getByName("127.0.0.1"), 0)
+                    val sharedPort = systemOrigin.port
+                    pinnedEdge.start(InetAddress.getByName("127.0.0.2"), sharedPort)
+
+                    val pinnedIpv6Mapped = byteArrayOf(
+                        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0xFF.toByte(), 0xFF.toByte(), 127, 0, 0, 2,
+                    )
+                    val systemBytes = IpLiteralParser.parseNumericIpBytes("127.0.0.1", requirePublicUnicast = false)!!
+                    val cfFactory = CloudflareAcceleratedCallFactory(
+                        edgeRouteProvider = {
+                            ActiveCloudflareEdgeRoute(
+                                generationId = 7L,
+                                candidateId = "cf-v6-test",
+                                rawIpBytes = pinnedIpv6Mapped,
+                            )
+                        },
+                        systemDns = Dns { host -> listOf(InetAddress.getByAddress(host, systemBytes)) },
+                    )
+
+                    val assetRoot = tempFolder.newFolder("artbook_heal_root")
+                    val savesImgs = File(assetRoot, "saves/imgs").apply { mkdirs() }
+
+                    // 1. Corrupt local file in saves/imgs/ + pinned IPv6 edge returning HTML -> auto-deletes
+                    //    corrupt file, falls back to System DNS, and heals cleanly!
+                    val healUrl = "http://pic.777743.xyz:$sharedPort/3/3770/1.jpg"
+                    val corruptLocalFile = File(
+                        savesImgs,
+                        WenkuXmlParsers.generateLegacyImageFileName(healUrl),
+                    ).apply {
+                        writeText("<html>Truncated Local Cache</html>")
+                    }
+                    pinnedEdge.enqueue(
+                        MockResponse.Builder()
+                            .code(200)
+                            .addHeader("Server", "cloudflare")
+                            .addHeader("Content-Type", "text/html; charset=utf-8")
+                            .body("<html>Edge Stall</html>")
+                            .build(),
+                    )
+                    systemOrigin.enqueue(
+                        MockResponse.Builder()
+                            .code(200)
+                            .addHeader("Content-Type", "image/jpeg")
+                            .body(Buffer().write(validJpegBytes))
+                            .build(),
+                    )
+
+                    val healed = ArtbookImageFileResolver.resolveWithDiagnostics(
+                        context = context,
+                        imageUrl = healUrl,
+                        assetRoots = listOf(assetRoot),
+                        callFactoryOverride = cfFactory,
+                        offlineCheckOverride = { false },
+                        ioDispatcher = Dispatchers.IO,
+                    )
+                    assertTrue("Expected healed Success, got $healed", healed is ArtbookImageResolutionResult.Success)
+                    assertFalse("Corrupt local file in saves/imgs/ must be deleted", corruptLocalFile.exists())
+                    assertTrue(WenkuImageValidator.isDecodableBitmapFile((healed as ArtbookImageResolutionResult.Success).file))
+                    assertTrue(
+                        "Pinned IPv6 edge failure must trip IPv6 bulk bypass",
+                        cfFactory.isIpv6EdgeCurrentlyBypassed(),
+                    )
+
+                    // 2. HTTP 200 with Content-Type: text/html on System DNS returns DECODE_FAILED without caching garbage
+                    val htmlUrl = "http://127.0.0.1:$sharedPort/3/3770/html_error.jpg"
+                    systemOrigin.enqueue(
+                        MockResponse.Builder()
+                            .code(200)
+                            .addHeader("Content-Type", "text/html")
+                            .body("<html>Not an image</html>")
+                            .build(),
+                    )
+                    val htmlRes = ArtbookImageFileResolver.resolveWithDiagnostics(
+                        context = context,
+                        imageUrl = htmlUrl,
+                        assetRoots = listOf(assetRoot),
+                        callFactoryOverride = cfFactory,
+                        offlineCheckOverride = { false },
+                        ioDispatcher = Dispatchers.IO,
+                    )
+                    assertTrue(htmlRes is ArtbookImageResolutionResult.Failure)
+                    val htmlFailure = (htmlRes as ArtbookImageResolutionResult.Failure).failure
+                    assertEquals(ArtbookLoadFailureKind.DECODE_FAILED, htmlFailure.kind)
+                    assertTrue(htmlFailure.stageDetail.contains("text/html"))
+
+                    // 3. Offline check returns OFFLINE_NOT_CACHED cleanly
+                    val offlineRes = ArtbookImageFileResolver.resolveWithDiagnostics(
+                        context = context,
+                        imageUrl = "http://pic.wenku8.com/pictures/3/3770/offline_missing.jpg",
+                        assetRoots = listOf(assetRoot),
+                        callFactoryOverride = cfFactory,
+                        offlineCheckOverride = { true },
+                        ioDispatcher = Dispatchers.IO,
+                    )
+                    assertTrue(offlineRes is ArtbookImageResolutionResult.Failure)
+                    assertEquals(
+                        ArtbookLoadFailureKind.OFFLINE_NOT_CACHED,
+                        (offlineRes as ArtbookImageResolutionResult.Failure).failure.kind,
+                    )
+                }
+            }
+        }
+
+    @Test
+    fun artbookLightboxOverlay_showsFriendlyErrorWithRetry_collapsedDiagnosticsPanel_andRecoversOnRetry() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        val onlineCaps = ShadowNetworkCapabilities.newInstance()
+        Shadows.shadowOf(onlineCaps).addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+        Shadows.shadowOf(cm).setNetworkCapabilities(cm.activeNetwork, onlineCaps)
+
+        val validJpegBytes = ByteArrayOutputStream().use { out ->
+            val bmp = Bitmap.createBitmap(120, 160, Bitmap.Config.ARGB_8888).apply {
+                eraseColor(AndroidColor.rgb(42, 160, 120))
+            }
+            bmp.compress(Bitmap.CompressFormat.JPEG, 90, out)
+            bmp.recycle()
+            out.toByteArray()
+        }
+
+        MockWebServer().use { server ->
+            server.start(InetAddress.getByName("127.0.0.1"), 0)
+            // First load fails with HTTP 503; user retry returns a valid JPEG!
+            server.enqueue(
+                MockResponse.Builder()
+                    .code(503)
+                    .body("Service Unavailable")
+                    .build(),
+            )
+            server.enqueue(
+                MockResponse.Builder()
+                    .code(200)
+                    .addHeader("Content-Type", "image/jpeg")
+                    .body(Buffer().write(validJpegBytes))
+                    .build(),
+            )
+            val testUrl = "http://127.0.0.1:${server.port}/pictures/3/3770/retry_test_${System.nanoTime()}.jpg"
+            val assetRoot = tempFolder.newFolder("artbook_ui_retry_root")
+
+            composeTestRule.setContent {
+                Wenku8ExpressiveTheme(themeMode = Wenku8ThemeMode.ARCHIVAL_DAY) {
+                    ArtbookLightboxOverlay(
+                        novelTitle = "装成熟！！",
+                        chapterTitle = "插图",
+                        imageUrls = listOf(testUrl),
+                        assetSearchRoots = listOf(assetRoot),
+                        ioDispatcher = Dispatchers.IO,
+                        onDismiss = {},
+                    )
+                }
+            }
+
+            // 1. Layer 1: friendly human message + retry button displayed; Layer 2 diagnostics collapsed by default!
+            composeTestRule.waitUntil(timeoutMillis = 5_000L) {
+                composeTestRule.onAllNodesWithTag(ArtbookTestTags.ERROR_MESSAGE)
+                    .fetchSemanticsNodes()
+                    .isNotEmpty()
+            }
+            composeTestRule.onNodeWithTag(ArtbookTestTags.ERROR_MESSAGE).assertIsDisplayed()
+            composeTestRule.onNodeWithTag(ArtbookTestTags.RETRY_BUTTON).assertIsDisplayed()
+            composeTestRule.onNodeWithTag(ArtbookTestTags.FAILURE_DETAILS_TOGGLE).assertIsDisplayed()
+            assertEquals(
+                "Diagnostic panel must stay collapsed by default to avoid cognitive burden",
+                0,
+                composeTestRule.onAllNodesWithTag(ArtbookTestTags.FAILURE_DETAILS_PANEL).fetchSemanticsNodes().size,
+            )
+
+            // 2. Expanding Layer 2 shows redacted diagnostic details & copies them to clipboard
+            composeTestRule.onNodeWithTag(ArtbookTestTags.FAILURE_DETAILS_TOGGLE).performClick()
+            composeTestRule.waitForIdle()
+            composeTestRule.onNodeWithTag(ArtbookTestTags.FAILURE_DETAILS_PANEL).assertIsDisplayed()
+            composeTestRule.onNodeWithTag(ArtbookTestTags.FAILURE_DETAILS_COPY_BUTTON).performClick()
+            composeTestRule.waitForIdle()
+
+            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+            val copiedText = clipboard.primaryClip?.getItemAt(0)?.text?.toString().orEmpty()
+            assertTrue("Copied diagnostic summary should include HTTP 503, got: $copiedText", copiedText.contains("HTTP 503"))
+            assertTrue("Copied diagnostic summary should include route info, got: $copiedText", copiedText.contains("线路:"))
+            assertTrue("Copied diagnostic summary should include host, got: $copiedText", copiedText.contains("127.0.0.1"))
+
+            // 3. Clicking retry re-fetches over System DNS and recovers cleanly to canvas!
+            composeTestRule.onNodeWithTag(ArtbookTestTags.RETRY_BUTTON).performClick()
+            composeTestRule.waitUntil(timeoutMillis = 5_000L) {
+                composeTestRule.onAllNodesWithTag("${ArtbookTestTags.CANVAS_PREFIX}0")
+                    .fetchSemanticsNodes()
+                    .isNotEmpty()
+            }
+            composeTestRule.onNodeWithTag("${ArtbookTestTags.CANVAS_PREFIX}0").assertIsDisplayed()
+            assertEquals(
+                0,
+                composeTestRule.onAllNodesWithTag(ArtbookTestTags.ERROR_MESSAGE).fetchSemanticsNodes().size,
+            )
+        }
     }
 }
 

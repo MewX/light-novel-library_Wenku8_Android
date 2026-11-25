@@ -556,7 +556,16 @@
     <string name="artbook_save_success_snackbar">已保存至相册 Pictures/Wenku8</string>
     <string name="artbook_save_failed_snackbar">保存图片失败，请重试</string>
     <string name="artbook_share_failed_snackbar">准备分享文件失败，请重试</string>
-    <string name="artbook_image_load_failed">图片加载失败，请检查网络连接</string>
+    <string name="artbook_image_load_failed">图片加载失败，请稍后重试</string>
+    <string name="artbook_error_offline_not_cached">当前处于离线状态，该插图尚未缓存</string>
+    <string name="artbook_error_timeout">图片加载超时，点击重新加载</string>
+    <string name="artbook_error_http">图片暂时无法加载，点击重新加载</string>
+    <string name="artbook_error_decode">图片解析失败，点击重新加载</string>
+    <string name="artbook_action_retry">重新加载</string>
+    <string name="artbook_diagnostics_toggle_show">排查信息</string>
+    <string name="artbook_diagnostics_toggle_hide">收起排查信息</string>
+    <string name="artbook_diagnostics_copy_action">复制信息</string>
+    <string name="artbook_diagnostics_copied">已复制排查信息</string>
     <string name="detail_cover_view_action">查看封面大图</string>
     <string name="detail_cover_lightbox_subtitle">封面</string>
     <string name="reader_action_peek_volume_illustrations">本卷插图</string>
