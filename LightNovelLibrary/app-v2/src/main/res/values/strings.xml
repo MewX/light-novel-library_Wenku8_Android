@@ -258,6 +258,14 @@
     <string name="profile_reader_column_mode_dual">双栏</string>
     <string name="profile_reader_column_mode_desc">大屏平板横屏与折叠屏自动启用双栏，普通手机横屏保持单栏；上下卷轴大屏自动居中限宽</string>
 
+    <string name="profile_tts_title">语音朗读 (TTS) 与引擎</string>
+    <string name="profile_tts_summary_auto_format">自动优选中文引擎 · %1$sx</string>
+    <string name="profile_tts_summary_engine_format">%1$s · %2$sx</string>
+    <string name="profile_tts_summary_unavailable">未检测到可用中文引擎 · 点击配置</string>
+    <string name="reader_tts_settings">朗读与引擎设置</string>
+    <string name="reader_tts_fix_engine">修复 / 切换引擎</string>
+    <string name="reader_tts_install_google">安装 Google 语音</string>
+
     <string name="profile_storage_title">存储、缓存清理与存档管理</string>
     <string name="profile_cache_fast_action">快速清理</string>
     <string name="profile_cache_fast_desc">清理临时网络缓存与非书架封面</string>

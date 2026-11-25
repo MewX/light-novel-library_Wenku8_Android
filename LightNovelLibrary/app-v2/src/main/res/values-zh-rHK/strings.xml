@@ -258,6 +258,14 @@
     <string name="profile_reader_column_mode_dual">雙欄</string>
     <string name="profile_reader_column_mode_desc">大螢幕平板橫向與摺疊機自動啟用雙欄，一般手機橫向維持單欄；上下捲軸大螢幕自動置中限寬</string>
 
+    <string name="profile_tts_title">語音朗讀 (TTS) 與引擎</string>
+    <string name="profile_tts_summary_auto_format">自動優選中文引擎 · %1$sx</string>
+    <string name="profile_tts_summary_engine_format">%1$s · %2$sx</string>
+    <string name="profile_tts_summary_unavailable">未偵測到可用中文引擎 · 點擊設定</string>
+    <string name="reader_tts_settings">朗讀與引擎設定</string>
+    <string name="reader_tts_fix_engine">修復 / 切換引擎</string>
+    <string name="reader_tts_install_google">安裝 Google 語音</string>
+
     <string name="profile_storage_title">儲存、快取清理與存檔管理</string>
     <string name="profile_cache_fast_action">快速清理</string>
     <string name="profile_cache_fast_desc">清理暫存網絡快取與非書架封面</string>

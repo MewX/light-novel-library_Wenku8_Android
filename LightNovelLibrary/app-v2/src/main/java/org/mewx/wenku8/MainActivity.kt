@@ -34,6 +34,7 @@ import org.mewx.wenku8.ui.detail.LocalAdConsentCanRequestAds
 import org.mewx.wenku8.ui.detail.ReaderLaunchRequest
 import org.mewx.wenku8.ui.navigation.AdaptiveMainScaffold
 import org.mewx.wenku8.ui.navigation.Wenku8DeepLinks
+import org.mewx.wenku8.ui.profile.TtsPreferencesActions
 import org.mewx.wenku8.ui.reader.HardwareVolumeKeyHost
 import org.mewx.wenku8.ui.theme.Wenku8ExpressiveTheme
 import org.mewx.wenku8.ui.theme.applyTransparentEdgeToEdge
@@ -309,6 +310,58 @@ class MainActivity : AppCompatActivity(), HardwareVolumeKeyHost {
                                         preferencesRepository.setVolumeKeyPagingEnabled(enabled)
                                     }
                                 },
+                                ttsPreferencesActions = TtsPreferencesActions(
+                                    onPreferredEngineChanged = { pkg ->
+                                        coroutineScope.launch {
+                                            preferencesRepository.setTtsPreferredEnginePackage(pkg)
+                                        }
+                                    },
+                                    onFallbackEngineChanged = { pkg ->
+                                        coroutineScope.launch {
+                                            preferencesRepository.setTtsFallbackEnginePackage(pkg)
+                                        }
+                                    },
+                                    onAutoFallbackChanged = { enabled ->
+                                        coroutineScope.launch {
+                                            preferencesRepository.setTtsAutoFallbackEnabled(enabled)
+                                        }
+                                    },
+                                    onPreferredVoiceChanged = { voice ->
+                                        coroutineScope.launch {
+                                            preferencesRepository.setTtsPreferredVoiceName(voice)
+                                        }
+                                    },
+                                    onSpeechRateChanged = { rate ->
+                                        coroutineScope.launch {
+                                            preferencesRepository.setTtsSpeechRate(rate)
+                                        }
+                                    },
+                                    onPitchChanged = { pitch ->
+                                        coroutineScope.launch {
+                                            preferencesRepository.setTtsPitch(pitch)
+                                        }
+                                    },
+                                    onDefaultSleepTimerChanged = { minutes ->
+                                        coroutineScope.launch {
+                                            preferencesRepository.setTtsDefaultSleepTimerMinutes(minutes)
+                                        }
+                                    },
+                                    onFollowReadingPageChanged = { enabled ->
+                                        coroutineScope.launch {
+                                            preferencesRepository.setTtsFollowReadingPage(enabled)
+                                        }
+                                    },
+                                    onPauseOnAudioFocusLossChanged = { enabled ->
+                                        coroutineScope.launch {
+                                            preferencesRepository.setTtsPauseOnAudioFocusLoss(enabled)
+                                        }
+                                    },
+                                    onResetDefaults = {
+                                        coroutineScope.launch {
+                                            preferencesRepository.resetTtsDefaults()
+                                        }
+                                    },
+                                ),
                             )
                         }
                     }

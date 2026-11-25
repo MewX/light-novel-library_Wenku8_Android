@@ -123,6 +123,7 @@ enum class ProfileSettingsSection(
 ) {
     APPEARANCE(R.string.profile_appearance_title),
     READER_TYPOGRAPHY(R.string.profile_reader_studio_title),
+    TTS_SETTINGS(R.string.profile_tts_title),
     STORAGE_AND_BACKUP(R.string.profile_storage_title),
     ABOUT_AND_FEEDBACK(R.string.profile_about_section_title),
 }
@@ -443,6 +444,7 @@ fun ProfileSettingsSubscreen(
     onReaderCustomBackgroundPathChanged: (String) -> Unit,
     onVolumeKeyPagingChanged: (Boolean) -> Unit,
     onReaderColumnModeChanged: (ReaderColumnMode) -> Unit = {},
+    ttsPreferencesActions: TtsPreferencesActions = TtsPreferencesActions(),
     storageAndCacheRepository: StorageAndCacheRepository? = null,
     backupArchiveRepository: BackupArchiveRepository? = null,
     legacyV1StorageMigrator: LegacyV1StorageMigrator? = null,
@@ -518,6 +520,16 @@ fun ProfileSettingsSubscreen(
                         onCustomBackgroundPathChanged = onReaderCustomBackgroundPathChanged,
                         onVolumeKeyPagingChanged = onVolumeKeyPagingChanged,
                         onReaderColumnModeChanged = onReaderColumnModeChanged,
+                        modifier = containerModifier,
+                    )
+                }
+
+                ProfileSettingsSection.TTS_SETTINGS -> {
+                    TtsSettingsBody(
+                        preferences = preferences,
+                        horizontalPadding = horizontalPadding,
+                        isPlayStoreChannel = isPlayStoreChannel,
+                        ttsPreferencesActions = ttsPreferencesActions,
                         modifier = containerModifier,
                     )
                 }
