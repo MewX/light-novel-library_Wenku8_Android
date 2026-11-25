@@ -6,6 +6,7 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.emptyPreferences
+import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
@@ -23,6 +24,7 @@ import org.mewx.wenku8.data.repository.BookshelfViewMode
 import org.mewx.wenku8.reader.model.ReaderColumnMode
 import org.mewx.wenku8.reader.model.ReaderPageTurnMode
 import org.mewx.wenku8.reader.model.ReaderPaperPreset
+import org.mewx.wenku8.tts.TtsBackendType
 import org.mewx.wenku8.ui.navigation.DefaultHomeDestination
 import org.mewx.wenku8.ui.theme.Wenku8ThemeMode
 import java.io.IOException
@@ -71,6 +73,16 @@ data class Wenku8UserPreferences(
     val legacyV1InternalMigrationVersion: Int = 0,
     val lastAutoUpdateCheckEpochMs: Long = 0L,
     val dismissedUpdateVersionCode: Int = 0,
+    val ttsBackendType: TtsBackendType = TtsBackendType.SYSTEM,
+    val ttsPreferredEnginePackage: String = "",
+    val ttsFallbackEnginePackage: String = "",
+    val ttsAutoFallbackEnabled: Boolean = true,
+    val ttsPreferredVoiceName: String = "",
+    val ttsSpeechRate: Float = DEFAULT_TTS_SPEECH_RATE,
+    val ttsPitch: Float = DEFAULT_TTS_PITCH,
+    val ttsDefaultSleepTimerMinutes: Int = 0,
+    val ttsFollowReadingPage: Boolean = true,
+    val ttsPauseOnAudioFocusLoss: Boolean = true,
 ) {
     val isBuiltinSerifFont: Boolean
         get() = readerCustomFontPath == BUILTIN_SERIF_FONT_TOKEN
@@ -96,6 +108,18 @@ data class Wenku8UserPreferences(
         const val MIN_READER_PAGE_EDGE_DISTANCE_DP = 0
         const val MAX_READER_PAGE_EDGE_DISTANCE_DP = 32
         const val DEFAULT_READER_PAGE_EDGE_DISTANCE_DP = 8
+
+        const val MIN_TTS_SPEECH_RATE = 0.5f
+        const val MAX_TTS_SPEECH_RATE = 2.5f
+        const val DEFAULT_TTS_SPEECH_RATE = 1.0f
+
+        const val MIN_TTS_PITCH = 0.5f
+        const val MAX_TTS_PITCH = 2.0f
+        const val DEFAULT_TTS_PITCH = 1.0f
+
+        const val TTS_SLEEP_TIMER_OFF = 0
+        const val TTS_SLEEP_TIMER_END_OF_CHAPTER = -1
+        const val MAX_TTS_SLEEP_TIMER_MINUTES = 240
     }
 }
 
@@ -334,6 +358,80 @@ class UserPreferencesRepository(
         dataStore.edit { it[Keys.DISMISSED_UPDATE_VERSION_CODE] = versionCode.coerceAtLeast(0) }
     }
 
+    suspend fun setTtsBackendType(backendType: TtsBackendType) {
+        dataStore.edit { it[Keys.TTS_BACKEND_TYPE] = backendType.name }
+    }
+
+    suspend fun setTtsPreferredEnginePackage(packageName: String) {
+        dataStore.edit { prefs ->
+            val trimmed = packageName.trim()
+            val previous = prefs[Keys.TTS_PREFERRED_ENGINE_PACKAGE].orEmpty()
+            prefs[Keys.TTS_PREFERRED_ENGINE_PACKAGE] = trimmed
+            if (previous != trimmed) {
+                // Voice IDs are engine-specific; clear voice override when switching engines.
+                prefs[Keys.TTS_PREFERRED_VOICE_NAME] = ""
+            }
+        }
+    }
+
+    suspend fun setTtsFallbackEnginePackage(packageName: String) {
+        dataStore.edit { it[Keys.TTS_FALLBACK_ENGINE_PACKAGE] = packageName.trim() }
+    }
+
+    suspend fun setTtsAutoFallbackEnabled(enabled: Boolean) {
+        dataStore.edit { it[Keys.TTS_AUTO_FALLBACK_ENABLED] = enabled }
+    }
+
+    suspend fun setTtsPreferredVoiceName(voiceName: String) {
+        dataStore.edit { it[Keys.TTS_PREFERRED_VOICE_NAME] = voiceName.trim() }
+    }
+
+    suspend fun setTtsSpeechRate(rate: Float) {
+        dataStore.edit {
+            it[Keys.TTS_SPEECH_RATE] = rate.coerceIn(
+                Wenku8UserPreferences.MIN_TTS_SPEECH_RATE,
+                Wenku8UserPreferences.MAX_TTS_SPEECH_RATE,
+            )
+        }
+    }
+
+    suspend fun setTtsPitch(pitch: Float) {
+        dataStore.edit {
+            it[Keys.TTS_PITCH] = pitch.coerceIn(
+                Wenku8UserPreferences.MIN_TTS_PITCH,
+                Wenku8UserPreferences.MAX_TTS_PITCH,
+            )
+        }
+    }
+
+    suspend fun setTtsDefaultSleepTimerMinutes(minutes: Int) {
+        val sanitized = sanitizeSleepTimerMinutes(minutes)
+        dataStore.edit { it[Keys.TTS_DEFAULT_SLEEP_TIMER_MINUTES] = sanitized }
+    }
+
+    suspend fun setTtsFollowReadingPage(enabled: Boolean) {
+        dataStore.edit { it[Keys.TTS_FOLLOW_READING_PAGE] = enabled }
+    }
+
+    suspend fun setTtsPauseOnAudioFocusLoss(enabled: Boolean) {
+        dataStore.edit { it[Keys.TTS_PAUSE_ON_AUDIO_FOCUS_LOSS] = enabled }
+    }
+
+    suspend fun resetTtsDefaults() {
+        dataStore.edit { prefs ->
+            prefs[Keys.TTS_BACKEND_TYPE] = TtsBackendType.SYSTEM.name
+            prefs[Keys.TTS_PREFERRED_ENGINE_PACKAGE] = ""
+            prefs[Keys.TTS_FALLBACK_ENGINE_PACKAGE] = ""
+            prefs[Keys.TTS_AUTO_FALLBACK_ENABLED] = true
+            prefs[Keys.TTS_PREFERRED_VOICE_NAME] = ""
+            prefs[Keys.TTS_SPEECH_RATE] = Wenku8UserPreferences.DEFAULT_TTS_SPEECH_RATE
+            prefs[Keys.TTS_PITCH] = Wenku8UserPreferences.DEFAULT_TTS_PITCH
+            prefs[Keys.TTS_DEFAULT_SLEEP_TIMER_MINUTES] = Wenku8UserPreferences.TTS_SLEEP_TIMER_OFF
+            prefs[Keys.TTS_FOLLOW_READING_PAGE] = true
+            prefs[Keys.TTS_PAUSE_ON_AUDIO_FOCUS_LOSS] = true
+        }
+    }
+
     /**
      * Atomically writes all settings parsed from a legacy `v1.31` `settings.wk8` file (`P0.3`)
      * and stamps [migrationVersion] so internal-storage migration runs strictly once.
@@ -445,6 +543,19 @@ class UserPreferencesRepository(
             prefs[Keys.READER_EDGE_BRIGHTNESS_DRAG] = imported.readerEdgeBrightnessDragEnabled
             prefs[Keys.VOLUME_KEY_PAGING_ENABLED] = imported.volumeKeyPagingEnabled
             prefs[Keys.AUTO_OPTIMIZE_CONNECTION_ENABLED] = imported.autoOptimizeConnectionEnabled
+            prefs[Keys.TTS_AUTO_FALLBACK_ENABLED] = imported.ttsAutoFallbackEnabled
+            prefs[Keys.TTS_SPEECH_RATE] = imported.ttsSpeechRate.coerceIn(
+                Wenku8UserPreferences.MIN_TTS_SPEECH_RATE,
+                Wenku8UserPreferences.MAX_TTS_SPEECH_RATE,
+            )
+            prefs[Keys.TTS_PITCH] = imported.ttsPitch.coerceIn(
+                Wenku8UserPreferences.MIN_TTS_PITCH,
+                Wenku8UserPreferences.MAX_TTS_PITCH,
+            )
+            prefs[Keys.TTS_DEFAULT_SLEEP_TIMER_MINUTES] =
+                sanitizeSleepTimerMinutes(imported.ttsDefaultSleepTimerMinutes)
+            prefs[Keys.TTS_FOLLOW_READING_PAGE] = imported.ttsFollowReadingPage
+            prefs[Keys.TTS_PAUSE_ON_AUDIO_FOCUS_LOSS] = imported.ttsPauseOnAudioFocusLoss
         }
     }
 
@@ -535,7 +646,37 @@ class UserPreferencesRepository(
             legacyV1InternalMigrationVersion = prefs[Keys.LEGACY_V1_MIGRATION_VERSION] ?: 0,
             lastAutoUpdateCheckEpochMs = (prefs[Keys.LAST_AUTO_UPDATE_CHECK_EPOCH_MS] ?: 0L).coerceAtLeast(0L),
             dismissedUpdateVersionCode = (prefs[Keys.DISMISSED_UPDATE_VERSION_CODE] ?: 0).coerceAtLeast(0),
+            ttsBackendType = enumValueOrDefault(
+                raw = prefs[Keys.TTS_BACKEND_TYPE],
+                default = TtsBackendType.SYSTEM,
+            ),
+            ttsPreferredEnginePackage = prefs[Keys.TTS_PREFERRED_ENGINE_PACKAGE].orEmpty().trim(),
+            ttsFallbackEnginePackage = prefs[Keys.TTS_FALLBACK_ENGINE_PACKAGE].orEmpty().trim(),
+            ttsAutoFallbackEnabled = prefs[Keys.TTS_AUTO_FALLBACK_ENABLED] ?: true,
+            ttsPreferredVoiceName = prefs[Keys.TTS_PREFERRED_VOICE_NAME].orEmpty().trim(),
+            ttsSpeechRate = (prefs[Keys.TTS_SPEECH_RATE]
+                ?: Wenku8UserPreferences.DEFAULT_TTS_SPEECH_RATE).coerceIn(
+                Wenku8UserPreferences.MIN_TTS_SPEECH_RATE,
+                Wenku8UserPreferences.MAX_TTS_SPEECH_RATE,
+            ),
+            ttsPitch = (prefs[Keys.TTS_PITCH]
+                ?: Wenku8UserPreferences.DEFAULT_TTS_PITCH).coerceIn(
+                Wenku8UserPreferences.MIN_TTS_PITCH,
+                Wenku8UserPreferences.MAX_TTS_PITCH,
+            ),
+            ttsDefaultSleepTimerMinutes = sanitizeSleepTimerMinutes(
+                prefs[Keys.TTS_DEFAULT_SLEEP_TIMER_MINUTES] ?: Wenku8UserPreferences.TTS_SLEEP_TIMER_OFF,
+            ),
+            ttsFollowReadingPage = prefs[Keys.TTS_FOLLOW_READING_PAGE] ?: true,
+            ttsPauseOnAudioFocusLoss = prefs[Keys.TTS_PAUSE_ON_AUDIO_FOCUS_LOSS] ?: true,
         )
+    }
+
+    private fun sanitizeSleepTimerMinutes(raw: Int): Int = when {
+        raw == Wenku8UserPreferences.TTS_SLEEP_TIMER_END_OF_CHAPTER ->
+            Wenku8UserPreferences.TTS_SLEEP_TIMER_END_OF_CHAPTER
+        raw <= 0 -> Wenku8UserPreferences.TTS_SLEEP_TIMER_OFF
+        else -> raw.coerceAtMost(Wenku8UserPreferences.MAX_TTS_SLEEP_TIMER_MINUTES)
     }
 
     private inline fun <reified E : Enum<E>> enumValueOrDefault(raw: String?, default: E): E {
@@ -569,6 +710,16 @@ class UserPreferencesRepository(
         val LEGACY_V1_MIGRATION_VERSION = intPreferencesKey("legacy_v1_internal_migrated_version")
         val LAST_AUTO_UPDATE_CHECK_EPOCH_MS = longPreferencesKey("last_auto_update_check_epoch_ms")
         val DISMISSED_UPDATE_VERSION_CODE = intPreferencesKey("dismissed_update_version_code")
+        val TTS_BACKEND_TYPE = stringPreferencesKey("tts_backend_type")
+        val TTS_PREFERRED_ENGINE_PACKAGE = stringPreferencesKey("tts_preferred_engine_package")
+        val TTS_FALLBACK_ENGINE_PACKAGE = stringPreferencesKey("tts_fallback_engine_package")
+        val TTS_AUTO_FALLBACK_ENABLED = booleanPreferencesKey("tts_auto_fallback_enabled")
+        val TTS_PREFERRED_VOICE_NAME = stringPreferencesKey("tts_preferred_voice_name")
+        val TTS_SPEECH_RATE = floatPreferencesKey("tts_speech_rate")
+        val TTS_PITCH = floatPreferencesKey("tts_pitch")
+        val TTS_DEFAULT_SLEEP_TIMER_MINUTES = intPreferencesKey("tts_default_sleep_timer_minutes")
+        val TTS_FOLLOW_READING_PAGE = booleanPreferencesKey("tts_follow_reading_page")
+        val TTS_PAUSE_ON_AUDIO_FOCUS_LOSS = booleanPreferencesKey("tts_pause_on_audio_focus_loss")
     }
 
     companion object {

@@ -5,6 +5,24 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="com.google.android.gms.permission.AD_ID" />
 
+    <queries>
+        <!-- Required on Android 11+ (API 30+) to discover and bind system / open-source TTS engines -->
+        <intent>
+            <action android:name="android.intent.action.TTS_SERVICE" />
+        </intent>
+        <!-- Allow checking and launching voice-data downloads for installed TTS engines -->
+        <intent>
+            <action android:name="android.speech.tts.engine.CHECK_TTS_DATA" />
+        </intent>
+        <intent>
+            <action android:name="android.speech.tts.engine.INSTALL_TTS_DATA" />
+        </intent>
+        <!-- Forward-compatible discovery for official or community enhanced Wenku8 TTS plugins -->
+        <intent>
+            <action android:name="org.mewx.wenku8.action.TTS_PLUGIN_V1" />
+        </intent>
+    </queries>
+
     <application
         android:name=".Wenku8V2Application"
         android:allowBackup="true"

@@ -718,6 +718,12 @@ class BackupArchiveRepository(
             put("readerEdgeBrightnessDragEnabled", prefs.readerEdgeBrightnessDragEnabled)
             put("volumeKeyPagingEnabled", prefs.volumeKeyPagingEnabled)
             put("autoOptimizeConnectionEnabled", prefs.autoOptimizeConnectionEnabled)
+            put("ttsAutoFallbackEnabled", prefs.ttsAutoFallbackEnabled)
+            put("ttsSpeechRate", prefs.ttsSpeechRate.toDouble())
+            put("ttsPitch", prefs.ttsPitch.toDouble())
+            put("ttsDefaultSleepTimerMinutes", prefs.ttsDefaultSleepTimerMinutes)
+            put("ttsFollowReadingPage", prefs.ttsFollowReadingPage)
+            put("ttsPauseOnAudioFocusLoss", prefs.ttsPauseOnAudioFocusLoss)
         }.toString(2)
     }
 
@@ -781,6 +787,18 @@ class BackupArchiveRepository(
             readerEdgeBrightnessDragEnabled = obj.optBoolean("readerEdgeBrightnessDragEnabled", fallbackPrefs.readerEdgeBrightnessDragEnabled),
             volumeKeyPagingEnabled = obj.optBoolean("volumeKeyPagingEnabled", fallbackPrefs.volumeKeyPagingEnabled),
             autoOptimizeConnectionEnabled = obj.optBoolean("autoOptimizeConnectionEnabled", fallbackPrefs.autoOptimizeConnectionEnabled),
+            ttsAutoFallbackEnabled = obj.optBoolean("ttsAutoFallbackEnabled", fallbackPrefs.ttsAutoFallbackEnabled),
+            ttsSpeechRate = obj.optDouble("ttsSpeechRate", fallbackPrefs.ttsSpeechRate.toDouble()).toFloat(),
+            ttsPitch = obj.optDouble("ttsPitch", fallbackPrefs.ttsPitch.toDouble()).toFloat(),
+            ttsDefaultSleepTimerMinutes = obj.optInt(
+                "ttsDefaultSleepTimerMinutes",
+                fallbackPrefs.ttsDefaultSleepTimerMinutes,
+            ),
+            ttsFollowReadingPage = obj.optBoolean("ttsFollowReadingPage", fallbackPrefs.ttsFollowReadingPage),
+            ttsPauseOnAudioFocusLoss = obj.optBoolean(
+                "ttsPauseOnAudioFocusLoss",
+                fallbackPrefs.ttsPauseOnAudioFocusLoss,
+            ),
         )
     }
 
