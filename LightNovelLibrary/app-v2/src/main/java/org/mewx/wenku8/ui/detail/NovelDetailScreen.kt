@@ -591,21 +591,17 @@ fun NovelDetailScreen(
                 )
             },
         ) { innerPadding ->
-            val bannerAdHolder = rememberNovelDetailBannerAdHolder(
-                aid = aid,
-                placement = bannerPlacement,
-                requestNonce = bannerRequestNonce,
-                isNetworkAvailableOverride = isNetworkAvailableForAdOverride,
-                isGmsAvailableOverride = isGmsAvailableForAdOverride,
-                canRequestAdsOverride = canRequestAdsForAdOverride,
-                enableLiveAdViewInflation = enableLiveAdViewInflation,
-            )
             BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
                 val bannerSlotWidthDp = (maxWidth - 32.dp).value.toInt().coerceAtLeast(160)
-                PrefetchBannerAdEffect(
-                    holder = bannerAdHolder,
+                val bannerAdHolder = rememberNovelDetailBannerAdHolder(
+                    aid = aid,
+                    placement = bannerPlacement,
+                    requestNonce = bannerRequestNonce,
                     availableWidthDp = bannerSlotWidthDp,
+                    isNetworkAvailableOverride = isNetworkAvailableForAdOverride,
+                    isGmsAvailableOverride = isGmsAvailableForAdOverride,
                     canRequestAdsOverride = canRequestAdsForAdOverride,
+                    enableLiveAdViewInflation = enableLiveAdViewInflation,
                 )
                 LazyColumn(
                     modifier = Modifier

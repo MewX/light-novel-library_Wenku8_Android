@@ -319,6 +319,85 @@ class ServerSupportBannerPreloaderTest {
     }
 
     @Test
+    fun bindPreloadedBannerToHolder_cacheHitDisplaysImmediately_cacheMissStaysCollapsed_andUnimpressedRecycles() = runBlocking {
+        val placement = InlineBannerPlacement.NOVEL_DETAIL_STANDARD
+        val preloadId = ServerSupportBannerPreloader.preloadIdFor(placement)
+        ServerSupportBannerPreloader.ensurePreloading(
+            context = appContext,
+            placement = placement,
+            availableWidthDp = 380,
+            canRequestAds = true,
+        )
+
+        // 1. Cache miss: holder starts Collapsed and stays Collapsed (zero blank placeholder)
+        val missHolder = NovelDetailBannerAdHolder(
+            initialPhase = BannerAdLoadPhase.Collapsed,
+            placement = placement,
+        )
+        assertFalse(
+            bindPreloadedBannerToHolder(
+                holder = missHolder,
+                hostContext = activity,
+                availableWidthDp = 380,
+                canRequestAds = true,
+            ),
+        )
+        assertEquals(BannerAdLoadPhase.Collapsed, missHolder.phase)
+        assertFalse(missHolder.shouldRenderVisibleCard)
+        assertNull(missHolder.adView)
+
+        // 2. Cache hit: holder transitions synchronously to Loaded with zero Loading state
+        val ad1 = FakeBannerAd(ServerSupportAdConstants.PRODUCTION_BANNER_AD_UNIT_ID)
+        fakeClient.enqueueAd(preloadId, ad1)
+        val stubAdView1 = AdView(activity)
+        testBindPreloadedAdAction = { _, _, _ -> stubAdView1 }
+
+        val hitHolder = NovelDetailBannerAdHolder(
+            initialPhase = BannerAdLoadPhase.Collapsed,
+            placement = placement,
+        )
+        assertTrue(
+            bindPreloadedBannerToHolder(
+                holder = hitHolder,
+                hostContext = activity,
+                availableWidthDp = 380,
+                canRequestAds = true,
+            ),
+        )
+        assertEquals(BannerAdLoadPhase.Loaded, hitHolder.phase)
+        assertTrue(hitHolder.shouldRenderVisibleCard)
+        assertSame(stubAdView1, hitHolder.adView)
+        assertFalse(hitHolder.hasRecordedImpression)
+
+        // 3. Disposing BEFORE onAdImpression recycles ad1 back for the next detail screen!
+        hitHolder.destroy(markDisposed = true, recycleIfUnimpressed = true)
+        assertFalse(ad1.destroyed)
+        assertEquals(1, ServerSupportBannerPreloader.readyCount(placement))
+
+        val nextHolder = NovelDetailBannerAdHolder(
+            initialPhase = BannerAdLoadPhase.Collapsed,
+            placement = placement,
+        )
+        val stubAdView2 = AdView(activity)
+        testBindPreloadedAdAction = { _, _, _ -> stubAdView2 }
+        assertTrue(
+            bindPreloadedBannerToHolder(
+                holder = nextHolder,
+                hostContext = activity,
+                availableWidthDp = 380,
+                canRequestAds = true,
+            ),
+        )
+        assertSame(ad1, nextHolder.boundBannerAd)
+
+        // 4. Disposing AFTER onAdImpression does NOT recycle ad1
+        ad1.adEventCallback?.onAdImpression()
+        assertTrue(nextHolder.hasRecordedImpression)
+        nextHolder.destroy(markDisposed = true, recycleIfUnimpressed = true)
+        assertEquals(0, ServerSupportBannerPreloader.readyCount(placement))
+    }
+
+    @Test
     fun postReadingAdElevationTracker_remainingMsUntilPreloadEligible_tracksDurationAndCooldown() {
         val tracker = PostReadingAdElevationTracker()
         // No active session -> null
