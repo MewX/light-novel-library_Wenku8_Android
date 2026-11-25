@@ -137,11 +137,14 @@ import okhttp3.Request
 import org.mewx.wenku8.R
 import org.mewx.wenku8.Wenku8V2Application
 import org.mewx.wenku8.data.media.OfflineFirstWenkuImageFetcher
+import org.mewx.wenku8.data.media.WenkuHttpsRedirectUpgradeInterceptor
 import org.mewx.wenku8.data.media.WenkuImageRequests
+import org.mewx.wenku8.data.media.WenkuImageUrlPolicy
 import org.mewx.wenku8.data.media.WenkuImageValidator
 import org.mewx.wenku8.data.remote.diagnostics.IpAddressFamily
 import org.mewx.wenku8.data.remote.parser.WenkuXmlParsers
 import org.mewx.wenku8.data.remote.transport.CloudflareAcceleratedCallFactory
+import org.mewx.wenku8.data.remote.transport.MirrorAttemptTrace
 import org.mewx.wenku8.ui.components.TooltipIconButton
 import org.mewx.wenku8.ui.components.horizontalScrollFadeEdge
 import org.mewx.wenku8.ui.theme.LocalEinkMode
@@ -491,6 +494,7 @@ object ArtbookImageFileResolver {
     private val cdnHttpClient: OkHttpClient by lazy {
         OkHttpClient.Builder()
             .dns(Dns.SYSTEM)
+            .addNetworkInterceptor(WenkuHttpsRedirectUpgradeInterceptor)
             .connectTimeout(12, TimeUnit.SECONDS)
             .readTimeout(25, TimeUnit.SECONDS)
             .followRedirects(true)
@@ -633,16 +637,18 @@ object ArtbookImageFileResolver {
         }
 
         // 3. Download from Wenku8 picture CDN using the app's Cloudflare-accelerated `sharedDirectGetCallFactory`.
-        val host = extractHostSafely(trimmed)
-        if (!trimmed.startsWith("http://", ignoreCase = true) &&
-            !trimmed.startsWith("https://", ignoreCase = true)
+        val requestUrl = WenkuImageUrlPolicy.upgradeToHttpsIfSupported(trimmed)
+        val rawHost = extractHostSafely(requestUrl)
+        val schemeAndHost = extractSchemeAndHostSafely(requestUrl) ?: rawHost
+        if (!requestUrl.startsWith("http://", ignoreCase = true) &&
+            !requestUrl.startsWith("https://", ignoreCase = true)
         ) {
             return@withContext ArtbookImageResolutionResult.Failure(
                 ArtbookLoadFailure(
                     kind = ArtbookLoadFailureKind.DECODE_FAILED,
                     stageDetail = "不支持的链接格式",
                     routeLabel = "本地",
-                    host = host,
+                    host = schemeAndHost,
                 ),
             )
         }
@@ -654,7 +660,7 @@ object ArtbookImageFileResolver {
                     kind = ArtbookLoadFailureKind.OFFLINE_NOT_CACHED,
                     stageDetail = if (healedCorruptLocalCache) "本地缓存损坏且当前离线" else "当前离线且未离线缓存",
                     routeLabel = "离线",
-                    host = host,
+                    host = schemeAndHost,
                 ),
             )
         }
@@ -666,8 +672,8 @@ object ArtbookImageFileResolver {
             ?: cdnHttpClient
 
         val cfFactory = httpCallFactory as? CloudflareAcceleratedCallFactory
-        val pinnedFamily = if (!preferSystemDns && host != null) {
-            cfFactory?.activePinnedFamilyForHostOrNull(host)
+        val pinnedFamily = if (!preferSystemDns && rawHost != null) {
+            cfFactory?.activePinnedFamilyForHostOrNull(rawHost)
         } else {
             null
         }
@@ -684,50 +690,59 @@ object ArtbookImageFileResolver {
             else -> "系统默认 DNS"
         }
 
-        val primaryOutcome = downloadAndValidateToFile(
+        val primaryAttempt = downloadAndValidateToFile(
             callFactory = primaryFactory,
-            url = trimmed,
+            url = requestUrl,
             cacheDir = cacheDir,
             safeName = safeName,
             targetFile = cachedFile,
             routeLabel = primaryRouteLabel,
-            fallbackHost = host,
+            fallbackRawHost = rawHost,
+            fallbackSchemeAndHost = schemeAndHost,
         )
-        if (primaryOutcome is ArtbookImageResolutionResult.Success) {
+        if (primaryAttempt.result is ArtbookImageResolutionResult.Success) {
             if (forceNetworkRefresh || healedCorruptLocalCache) {
                 WenkuImageValidator.evictCoilCachesForUrl(context.applicationContext, trimmed)
             }
-            return@withContext primaryOutcome
+            return@withContext primaryAttempt.result
         }
 
-        // If a pinned Cloudflare edge failed during body streaming, truncation, or decode, report
-        // the body failure (immediately cooling down flaky cellular IPv6 edges) and transparently
-        // retry ONCE over System DNS Happy Eyeballs in the same load!
-        if (cfFactory != null && pinnedFamily != null) {
-            val failedHost = (primaryOutcome as ArtbookImageResolutionResult.Failure).failure.host ?: host
-            if (!failedHost.isNullOrBlank()) {
-                cfFactory.reportPinnedBodyReadFailure(failedHost, pinnedFamily)
+        // If a pinned Cloudflare edge received HTTP headers and then failed during body streaming,
+        // truncation, non-image payload, or decode, report the body failure (immediately cooling
+        // down flaky cellular IPv6 edges) and transparently retry ONCE over System DNS Happy Eyeballs!
+        // Pre-header failures already fell back inside `CloudflareAcceleratedCallFactory`.
+        if (cfFactory != null && pinnedFamily != null && primaryAttempt.sawResponseHeaders) {
+            val failedRawHost = primaryAttempt.observedRawHost ?: rawHost
+            if (!failedRawHost.isNullOrBlank()) {
+                cfFactory.reportPinnedBodyReadFailure(failedRawHost, pinnedFamily)
             }
             val fallbackRouteLabel = "优选 ${pinnedFamily.wireLabel.uppercase(Locale.ROOT)} (已回退系统 DNS)"
-            val fallbackOutcome = downloadAndValidateToFile(
+            val fallbackAttempt = downloadAndValidateToFile(
                 callFactory = Call.Factory { cfFactory.newDirectSystemDnsCall(it) },
-                url = trimmed,
+                url = requestUrl,
                 cacheDir = cacheDir,
                 safeName = safeName,
                 targetFile = cachedFile,
                 routeLabel = fallbackRouteLabel,
-                fallbackHost = failedHost,
+                fallbackRawHost = failedRawHost,
+                fallbackSchemeAndHost = schemeAndHost,
             )
-            if (fallbackOutcome is ArtbookImageResolutionResult.Success) {
+            if (fallbackAttempt.result is ArtbookImageResolutionResult.Success) {
                 if (forceNetworkRefresh || healedCorruptLocalCache) {
                     WenkuImageValidator.evictCoilCachesForUrl(context.applicationContext, trimmed)
                 }
             }
-            return@withContext fallbackOutcome
+            return@withContext fallbackAttempt.result
         }
 
-        primaryOutcome
+        primaryAttempt.result
     }
+
+    private data class DownloadAttemptReport(
+        val result: ArtbookImageResolutionResult,
+        val sawResponseHeaders: Boolean,
+        val observedRawHost: String?,
+    )
 
     private fun downloadAndValidateToFile(
         callFactory: Call.Factory,
@@ -736,47 +751,67 @@ object ArtbookImageFileResolver {
         safeName: String,
         targetFile: File,
         routeLabel: String,
-        fallbackHost: String?,
-    ): ArtbookImageResolutionResult {
+        fallbackRawHost: String?,
+        fallbackSchemeAndHost: String?,
+    ): DownloadAttemptReport {
         val request = try {
             Request.Builder().url(url).get().build()
         } catch (_: IllegalArgumentException) {
-            return ArtbookImageResolutionResult.Failure(
-                ArtbookLoadFailure(
-                    kind = ArtbookLoadFailureKind.DECODE_FAILED,
-                    stageDetail = "图片链接格式异常",
-                    routeLabel = routeLabel,
-                    host = fallbackHost,
+            return DownloadAttemptReport(
+                result = ArtbookImageResolutionResult.Failure(
+                    ArtbookLoadFailure(
+                        kind = ArtbookLoadFailureKind.DECODE_FAILED,
+                        stageDetail = "图片链接格式异常",
+                        routeLabel = routeLabel,
+                        host = fallbackSchemeAndHost,
+                    ),
                 ),
+                sawResponseHeaders = false,
+                observedRawHost = fallbackRawHost,
             )
         }
 
         val tempFile = File(cacheDir, "$safeName.${System.nanoTime()}.tmp")
-        var observedFinalHost = fallbackHost
+        var observedRawHost = fallbackRawHost
+        var observedSchemeAndHost = fallbackSchemeAndHost
+        var sawResponseHeaders = false
+        val call = callFactory.newCall(request)
         return try {
-            callFactory.newCall(request).execute().use { response ->
-                observedFinalHost = response.request.url.host.takeIf { it.isNotBlank() } ?: fallbackHost
+            call.execute().use { response ->
+                sawResponseHeaders = true
+                val finalUrl = response.request.url
+                observedRawHost = finalUrl.host.takeIf { it.isNotBlank() } ?: fallbackRawHost
+                observedSchemeAndHost = "${finalUrl.scheme}://${finalUrl.host}"
+                val diagnosticHost = formatDiagnosticHostWithTrace(observedSchemeAndHost, call)
                 if (!response.isSuccessful) {
-                    return ArtbookImageResolutionResult.Failure(
-                        ArtbookLoadFailure(
-                            kind = ArtbookLoadFailureKind.HTTP_ERROR,
-                            stageDetail = "HTTP ${response.code}",
-                            routeLabel = routeLabel,
-                            host = observedFinalHost,
+                    return DownloadAttemptReport(
+                        result = ArtbookImageResolutionResult.Failure(
+                            ArtbookLoadFailure(
+                                kind = ArtbookLoadFailureKind.HTTP_ERROR,
+                                stageDetail = "HTTP ${response.code}",
+                                routeLabel = routeLabel,
+                                host = diagnosticHost,
+                            ),
                         ),
+                        sawResponseHeaders = true,
+                        observedRawHost = observedRawHost,
                     )
                 }
 
                 val contentType = response.header("Content-Type")
                 if (!WenkuImageValidator.isValidImageContentType(contentType)) {
                     val shortType = contentType?.substringBefore(';')?.trim().orEmpty().ifEmpty { "unknown" }
-                    return ArtbookImageResolutionResult.Failure(
-                        ArtbookLoadFailure(
-                            kind = ArtbookLoadFailureKind.DECODE_FAILED,
-                            stageDetail = "返回非图片内容 ($shortType)",
-                            routeLabel = routeLabel,
-                            host = observedFinalHost,
+                    return DownloadAttemptReport(
+                        result = ArtbookImageResolutionResult.Failure(
+                            ArtbookLoadFailure(
+                                kind = ArtbookLoadFailureKind.DECODE_FAILED,
+                                stageDetail = "返回非图片内容 ($shortType)",
+                                routeLabel = routeLabel,
+                                host = diagnosticHost,
+                            ),
                         ),
+                        sawResponseHeaders = true,
+                        observedRawHost = observedRawHost,
                     )
                 }
 
@@ -790,38 +825,50 @@ object ArtbookImageFileResolver {
 
                 if (writtenBytes <= 0L) {
                     tempFile.delete()
-                    return ArtbookImageResolutionResult.Failure(
-                        ArtbookLoadFailure(
-                            kind = ArtbookLoadFailureKind.DECODE_FAILED,
-                            stageDetail = "空响应 (0 B)",
-                            routeLabel = routeLabel,
-                            host = observedFinalHost,
+                    return DownloadAttemptReport(
+                        result = ArtbookImageResolutionResult.Failure(
+                            ArtbookLoadFailure(
+                                kind = ArtbookLoadFailureKind.DECODE_FAILED,
+                                stageDetail = "空响应 (0 B)",
+                                routeLabel = routeLabel,
+                                host = diagnosticHost,
+                            ),
                         ),
+                        sawResponseHeaders = true,
+                        observedRawHost = observedRawHost,
                     )
                 }
 
                 if (expectedContentLength > 0L && writtenBytes != expectedContentLength) {
                     tempFile.delete()
-                    return ArtbookImageResolutionResult.Failure(
-                        ArtbookLoadFailure(
-                            kind = ArtbookLoadFailureKind.NETWORK_ERROR,
-                            stageDetail = "传输中断 ($writtenBytes / $expectedContentLength B)",
-                            routeLabel = routeLabel,
-                            host = observedFinalHost,
+                    return DownloadAttemptReport(
+                        result = ArtbookImageResolutionResult.Failure(
+                            ArtbookLoadFailure(
+                                kind = ArtbookLoadFailureKind.NETWORK_ERROR,
+                                stageDetail = "传输中断 ($writtenBytes / $expectedContentLength B)",
+                                routeLabel = routeLabel,
+                                host = diagnosticHost,
+                            ),
                         ),
+                        sawResponseHeaders = true,
+                        observedRawHost = observedRawHost,
                     )
                 }
 
                 if (!WenkuImageValidator.isDecodableBitmapFile(tempFile)) {
                     val badLen = tempFile.length()
                     tempFile.delete()
-                    return ArtbookImageResolutionResult.Failure(
-                        ArtbookLoadFailure(
-                            kind = ArtbookLoadFailureKind.DECODE_FAILED,
-                            stageDetail = "图片解码失败 ($badLen B)",
-                            routeLabel = routeLabel,
-                            host = observedFinalHost,
+                    return DownloadAttemptReport(
+                        result = ArtbookImageResolutionResult.Failure(
+                            ArtbookLoadFailure(
+                                kind = ArtbookLoadFailureKind.DECODE_FAILED,
+                                stageDetail = "图片解码失败 ($badLen B)",
+                                routeLabel = routeLabel,
+                                host = diagnosticHost,
+                            ),
                         ),
+                        sawResponseHeaders = true,
+                        observedRawHost = observedRawHost,
                     )
                 }
 
@@ -832,21 +879,52 @@ object ArtbookImageFileResolver {
                     tempFile.copyTo(targetFile, overwrite = true)
                     tempFile.delete()
                 }
-                ArtbookImageResolutionResult.Success(targetFile)
+                DownloadAttemptReport(
+                    result = ArtbookImageResolutionResult.Success(targetFile),
+                    sawResponseHeaders = true,
+                    observedRawHost = observedRawHost,
+                )
             }
         } catch (ioError: IOException) {
             tempFile.delete()
-            classifyIoFailure(ioError, routeLabel, observedFinalHost)
+            val diagnosticHost = formatDiagnosticHostWithTrace(observedSchemeAndHost, call)
+            DownloadAttemptReport(
+                result = classifyIoFailure(ioError, routeLabel, diagnosticHost),
+                sawResponseHeaders = sawResponseHeaders,
+                observedRawHost = observedRawHost,
+            )
         } catch (_: Throwable) {
             tempFile.delete()
-            ArtbookImageResolutionResult.Failure(
-                ArtbookLoadFailure(
-                    kind = ArtbookLoadFailureKind.NETWORK_ERROR,
-                    stageDetail = "加载异常",
-                    routeLabel = routeLabel,
-                    host = observedFinalHost,
+            val diagnosticHost = formatDiagnosticHostWithTrace(observedSchemeAndHost, call)
+            DownloadAttemptReport(
+                result = ArtbookImageResolutionResult.Failure(
+                    ArtbookLoadFailure(
+                        kind = ArtbookLoadFailureKind.NETWORK_ERROR,
+                        stageDetail = "加载异常",
+                        routeLabel = routeLabel,
+                        host = diagnosticHost,
+                    ),
                 ),
+                sawResponseHeaders = sawResponseHeaders,
+                observedRawHost = observedRawHost,
             )
+        }
+    }
+
+    private fun formatDiagnosticHostWithTrace(
+        observedSchemeAndHost: String?,
+        call: Call,
+    ): String? {
+        val attempted = call.tag(MirrorAttemptTrace::class)?.attemptedEndpoints.orEmpty()
+        if (attempted.size <= 1) {
+            return observedSchemeAndHost ?: attempted.firstOrNull()
+        }
+        val primary = attempted.first()
+        val fallbacks = attempted.drop(1).map { it.substringAfter("://", it) }.distinct()
+        return if (fallbacks.isNotEmpty()) {
+            "$primary (已试 ${fallbacks.joinToString(", ")})"
+        } else {
+            primary
         }
     }
 
@@ -855,10 +933,13 @@ object ArtbookImageFileResolver {
         routeLabel: String,
         host: String?,
     ): ArtbookImageResolutionResult.Failure {
+        val shortReason = WenkuImageUrlPolicy.sanitizeIoExceptionReason(error)
+        val reasonSuffix = shortReason?.let { ": $it" }.orEmpty()
+        val parenReason = shortReason?.let { " ($it)" }.orEmpty()
         val failure = when (error) {
             is SocketTimeoutException -> ArtbookLoadFailure(
                 kind = ArtbookLoadFailureKind.TIMEOUT,
-                stageDetail = "网络读取超时",
+                stageDetail = "网络读取超时$parenReason",
                 routeLabel = routeLabel,
                 host = host,
             )
@@ -870,19 +951,19 @@ object ArtbookImageFileResolver {
             )
             is SSLException -> ArtbookLoadFailure(
                 kind = ArtbookLoadFailureKind.NETWORK_ERROR,
-                stageDetail = "TLS 握手失败",
+                stageDetail = "TLS 握手失败 (${error.javaClass.simpleName}$reasonSuffix)",
                 routeLabel = routeLabel,
                 host = host,
             )
             is ConnectException -> ArtbookLoadFailure(
                 kind = ArtbookLoadFailureKind.NETWORK_ERROR,
-                stageDetail = "连接被拒绝或中断",
+                stageDetail = "连接被拒绝或中断$parenReason",
                 routeLabel = routeLabel,
                 host = host,
             )
             else -> ArtbookLoadFailure(
                 kind = ArtbookLoadFailureKind.NETWORK_ERROR,
-                stageDetail = "网络传输中断 (${error.javaClass.simpleName})",
+                stageDetail = "网络传输中断 (${error.javaClass.simpleName}$reasonSuffix)",
                 routeLabel = routeLabel,
                 host = host,
             )
@@ -903,6 +984,15 @@ object ArtbookImageFileResolver {
     private fun extractHostSafely(url: String): String? {
         return runCatching { URI(url).host?.trim()?.lowercase(Locale.ROOT)?.takeIf { it.isNotEmpty() } }
             .getOrNull()
+    }
+
+    private fun extractSchemeAndHostSafely(url: String): String? {
+        return runCatching {
+            val uri = URI(url)
+            val scheme = uri.scheme?.trim()?.lowercase(Locale.ROOT)?.takeIf { it.isNotEmpty() } ?: return@runCatching null
+            val host = uri.host?.trim()?.lowercase(Locale.ROOT)?.takeIf { it.isNotEmpty() } ?: return@runCatching null
+            "$scheme://$host"
+        }.getOrNull()
     }
 
     private fun sha256Hex(input: String): String {
