@@ -1,5 +1,6 @@
 package org.mewx.wenku8.ui.profile
 
+import android.content.Context
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -23,6 +24,7 @@ import androidx.compose.material.icons.outlined.Archive
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.CloudOff
 import androidx.compose.material.icons.outlined.FormatSize
+import androidx.compose.material.icons.outlined.GraphicEq
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.NetworkCheck
 import androidx.compose.material.icons.outlined.Palette
@@ -78,6 +80,8 @@ import org.mewx.wenku8.data.repository.StorageAndCacheRepository
 import org.mewx.wenku8.data.repository.UserSessionRepository
 import org.mewx.wenku8.data.update.AppUpdateCoordinator
 import org.mewx.wenku8.data.update.AppUpdateUiState
+import org.mewx.wenku8.tts.KnownTtsEngineCatalog
+import org.mewx.wenku8.tts.TtsEngineDiscovery
 import org.mewx.wenku8.ui.components.TooltipIconButton
 import org.mewx.wenku8.ui.navigation.DefaultHomeDestination
 import org.mewx.wenku8.ui.navigation.MainScaffoldTestTags
@@ -128,6 +132,7 @@ object ProfileStudioTestTags {
     const val SUBSCREEN_BACK_BUTTON = "profile_settings_subscreen_back"
     const val ENTRY_APPEARANCE = "profile_entry_appearance"
     const val ENTRY_READER_TYPOGRAPHY = "profile_entry_reader_typography"
+    const val ENTRY_TTS = "profile_entry_tts"
     const val ENTRY_NETWORK = "profile_entry_network"
     const val ENTRY_STORAGE = "profile_entry_storage"
     const val ENTRY_UPDATE = "profile_entry_update"
@@ -177,6 +182,7 @@ fun ProfileAndStudioScreen(
     onReaderCustomFontPathChanged: (String) -> Unit = {},
     onReaderCustomBackgroundPathChanged: (String) -> Unit = {},
     onVolumeKeyPagingChanged: (Boolean) -> Unit = {},
+    ttsPreferencesActions: TtsPreferencesActions = TtsPreferencesActions(),
     userSessionRepository: UserSessionRepository? = null,
     serverNoticeAndUpdateRepository: ServerNoticeAndUpdateRepository? = null,
     appUpdateCoordinator: AppUpdateCoordinator? = null,
@@ -216,6 +222,7 @@ fun ProfileAndStudioScreen(
             onReaderCustomFontPathChanged = onReaderCustomFontPathChanged,
             onReaderCustomBackgroundPathChanged = onReaderCustomBackgroundPathChanged,
             onVolumeKeyPagingChanged = onVolumeKeyPagingChanged,
+            ttsPreferencesActions = ttsPreferencesActions,
             storageAndCacheRepository = storageAndCacheRepository,
             backupArchiveRepository = backupArchiveRepository,
             legacyV1StorageMigrator = legacyV1StorageMigrator,
@@ -363,12 +370,20 @@ fun ProfileAndStudioScreen(
 
         // 4. MD3e Segmented Group 1: Preferences & Reader
         item(key = "profile_group_reading_preferences") {
+            val ttsContext = LocalContext.current
+            val ttsSummary = remember(
+                preferences.ttsPreferredEnginePackage,
+                preferences.ttsSpeechRate,
+                ttsContext,
+            ) {
+                buildTtsSummary(ttsContext, preferences)
+            }
             ProfileSegmentedListSection(
                 title = stringResource(R.string.profile_group_reading_preferences),
             ) {
                 ProfileSegmentedSettingRow(
                     index = 0,
-                    count = 2,
+                    count = 3,
                     icon = Icons.Outlined.Palette,
                     title = stringResource(R.string.profile_appearance_title),
                     subtitle = appearanceSummary,
@@ -377,12 +392,21 @@ fun ProfileAndStudioScreen(
                 )
                 ProfileSegmentedSettingRow(
                     index = 1,
-                    count = 2,
+                    count = 3,
                     icon = Icons.Outlined.FormatSize,
                     title = stringResource(R.string.profile_reader_studio_title),
                     subtitle = readerSummary,
                     onClick = { openSettingsSection(ProfileSettingsSection.READER_TYPOGRAPHY) },
                     modifier = Modifier.testTag(ProfileStudioTestTags.ENTRY_READER_TYPOGRAPHY),
+                )
+                ProfileSegmentedSettingRow(
+                    index = 2,
+                    count = 3,
+                    icon = Icons.Outlined.GraphicEq,
+                    title = stringResource(R.string.profile_tts_title),
+                    subtitle = ttsSummary,
+                    onClick = { openSettingsSection(ProfileSettingsSection.TTS_SETTINGS) },
+                    modifier = Modifier.testTag(ProfileStudioTestTags.ENTRY_TTS),
                 )
             }
         }
@@ -454,6 +478,29 @@ fun ProfileAndStudioScreen(
                 )
             }
         }
+    }
+}
+
+private fun buildTtsSummary(
+    context: Context,
+    preferences: Wenku8UserPreferences,
+): String {
+    val rateStr = if (kotlin.math.abs(preferences.ttsSpeechRate * 10f - kotlin.math.round(preferences.ttsSpeechRate * 10f)) < 0.01f) {
+        String.format(Locale.US, "%.1f", preferences.ttsSpeechRate)
+    } else {
+        String.format(Locale.US, "%.2f", preferences.ttsSpeechRate)
+    }
+    val preferred = preferences.ttsPreferredEnginePackage.trim()
+    if (preferred.isNotEmpty()) {
+        val label = KnownTtsEngineCatalog.describe(preferred).displayName
+        return context.getString(R.string.profile_tts_summary_engine_format, label, rateStr)
+    }
+    val installed = TtsEngineDiscovery.discoverInstalledEngines(context)
+    val usable = installed.firstOrNull { !it.isKnownUnsupportedChinese }
+    return if (usable == null) {
+        context.getString(R.string.profile_tts_summary_unavailable)
+    } else {
+        context.getString(R.string.profile_tts_summary_auto_format, rateStr)
     }
 }
 

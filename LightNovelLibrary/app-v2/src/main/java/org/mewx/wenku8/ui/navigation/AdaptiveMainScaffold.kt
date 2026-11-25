@@ -143,6 +143,7 @@ import org.mewx.wenku8.ui.profile.DirectUpdateAvailableDialog
 import org.mewx.wenku8.ui.profile.ProfileAndStudioScreen
 import org.mewx.wenku8.ui.profile.ProfileSettingsSection
 import org.mewx.wenku8.ui.profile.ProfileSettingsSubscreen
+import org.mewx.wenku8.ui.profile.TtsPreferencesActions
 import org.mewx.wenku8.ui.profile.ReadingFootprintScreen
 import org.mewx.wenku8.ui.profile.ReadingFootprintTab
 import org.mewx.wenku8.ui.profile.ServerUpgradeRequiredDialog
@@ -319,6 +320,7 @@ fun AdaptiveMainScaffold(
     onReaderKeepScreenOnChanged: (Boolean) -> Unit = {},
     onReaderEdgeBrightnessDragChanged: (Boolean) -> Unit = {},
     onVolumeKeyPagingChanged: (Boolean) -> Unit = {},
+    ttsPreferencesActions: TtsPreferencesActions = TtsPreferencesActions(),
     initialOpenReviewsAid: Int = 0,
     initialOpenReviewsTitle: String = "",
     externalReaderLaunchRequest: ReaderLaunchRequest? = null,
@@ -1119,6 +1121,7 @@ fun AdaptiveMainScaffold(
                                                 onReaderCustomFontPathChanged = onReaderCustomFontPathChanged,
                                                 onReaderCustomBackgroundPathChanged = onReaderCustomBackgroundPathChanged,
                                                 onVolumeKeyPagingChanged = onVolumeKeyPagingChanged,
+                                                ttsPreferencesActions = ttsPreferencesActions,
                                                 database = database,
                                                 relayRouteController = relayRouteController,
                                                 discoveryRepository = discoveryRepository,
@@ -1286,6 +1289,7 @@ fun AdaptiveMainScaffold(
                                                     onReaderCustomFontPathChanged = onReaderCustomFontPathChanged,
                                                     onReaderCustomBackgroundPathChanged = onReaderCustomBackgroundPathChanged,
                                                     onVolumeKeyPagingChanged = onVolumeKeyPagingChanged,
+                                                    ttsPreferencesActions = ttsPreferencesActions,
                                                     database = database,
                                                     relayRouteController = relayRouteController,
                                                     discoveryRepository = discoveryRepository,
@@ -1468,6 +1472,7 @@ fun AdaptiveMainScaffold(
                                 onReaderCustomBackgroundPathChanged = onReaderCustomBackgroundPathChanged,
                                 onVolumeKeyPagingChanged = onVolumeKeyPagingChanged,
                                 onReaderColumnModeChanged = onReaderColumnModeChanged,
+                                ttsPreferencesActions = ttsPreferencesActions,
                                 storageAndCacheRepository = storageAndCacheRepository,
                                 backupArchiveRepository = backupArchiveRepository,
                                 legacyV1StorageMigrator = legacyV1StorageMigrator,
@@ -1764,6 +1769,7 @@ private fun MainDestinationBody(
     onReaderCustomFontPathChanged: (String) -> Unit,
     onReaderCustomBackgroundPathChanged: (String) -> Unit,
     onVolumeKeyPagingChanged: (Boolean) -> Unit,
+    ttsPreferencesActions: TtsPreferencesActions,
     database: Wenku8Database?,
     relayRouteController: RelayRouteController?,
     discoveryRepository: DiscoveryRepository?,
@@ -1939,6 +1945,7 @@ private fun MainDestinationBody(
             onReaderCustomFontPathChanged = onReaderCustomFontPathChanged,
             onReaderCustomBackgroundPathChanged = onReaderCustomBackgroundPathChanged,
             onVolumeKeyPagingChanged = onVolumeKeyPagingChanged,
+            ttsPreferencesActions = ttsPreferencesActions,
             userSessionRepository = userSessionRepository,
             serverNoticeAndUpdateRepository = serverNoticeAndUpdateRepository,
             appUpdateCoordinator = appUpdateCoordinator,
