@@ -284,12 +284,12 @@ val ttsPauseOnAudioFocusLoss: Boolean = true,
 
 ## 8. 分阶段落地路线图与验收 Checklist
 
-### Phase 1：轻量快速止血 + 独立 TTS 设置大类（优先实施）
-- [ ] **P0 根因修复**：`AndroidManifest.xml` 补齐 `<queries>`；修复 `createdTts` 闭包竞态；重写 `setLanguage` 严格校验与 SC/TC 降级链。
-- [ ] **引擎发现与多级自动回退**：实现 `SystemTtsEngineRegistry`、`KnownTtsEngineCatalog`、App 内三参指定引擎绑定，以及「引擎 → 语言 → 音色 → 播放期连续失败熔断」自动回退状态机。
-- [ ] **独立设置大类与实时预览**：在 `Tab 4 · 我的` → `偏好与阅读` 下新增 `ProfileSettingsSection.TTS_SETTINGS`（阅读器悬浮条与报错态一键直达），内置轻小说 SC/TC 范文 + 自定义文本试听、引擎/音色列表与行内试听、语速/音调/定时关闭/音频焦点配置，并持久化至 DataStore。
-- [ ] **分渠道官方/免费安装引导**：实现 `TtsChannelOnboardingCard`（`playstore` 引导 Google Speech Recognition & Synthesis + 下载中文包 + Play 开源离线备选；`default` 引导本机引擎 + SherpaTTS / VoxSherpa / tts-server-android / MultiTTS）及四级安全跳转系统设置。
-- [ ] **基础听书能力与测试**：补齐 `AudioManager` 音频焦点处理、定时关闭（含「读完本章」）、以及全套 Robolectric 单元测试与窄屏/E-Ink 适配验证。
+### Phase 1：轻量快速止血 + 独立 TTS 设置大类（已完成）
+- [x] **P0 根因修复**：`AndroidManifest.xml` 补齐 `<queries>`；修复 `createdTts` 闭包竞态；重写 `setLanguage` 严格校验与 SC/TC 降级链。
+- [x] **引擎发现与多级自动回退**：实现 `TtsEngineDiscovery`、`KnownTtsEngineCatalog`、App 内三参指定引擎绑定，以及「引擎 → 语言 → 音色 → 播放期连续失败熔断」自动回退状态机。
+- [x] **独立设置大类与实时预览**：在 `Tab 4 · 我的` → `偏好与阅读` 下新增 `ProfileSettingsSection.TTS_SETTINGS`（阅读器悬浮条与报错态一键直达），内置轻小说 SC/TC 范文 + 自定义文本试听、引擎/音色列表与行内试听、语速/音调/定时关闭/音频焦点配置，并持久化至 DataStore（含 `.wk8backup.zip` 便携偏好同步）。
+- [x] **分渠道官方/免费安装引导**：实现 `TtsChannelOnboardingCard`（`playstore` 引导 Google Speech Recognition & Synthesis + 下载中文包；`default` 引导本机引擎 + SherpaTTS / VoxSherpa / tts-server-android）及四级安全跳转系统设置。
+- [x] **基础听书能力与测试**：补齐 `AudioManager` 音频焦点处理、定时关闭（含「读完本章」）、以及 `defaultDebug` & `playstoreDebug` 全量 Robolectric 单元测试与 320dp 窄屏 / E-Ink 适配验证。
 
 ### Phase 2：专业后台听书体验 + 免费自建/开源远程语音（规划就绪，后续排期）
 - [ ] 引入 Media3 `MediaSessionService` + `ExoPlayer`：锁屏、通知栏卡片、蓝牙耳机线控。
