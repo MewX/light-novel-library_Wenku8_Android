@@ -87,11 +87,16 @@ class OfflineFirstWenkuImageFetcher(
          * Resolves a Wenku8 image URL against permanent `saves/imgs/` and `imgs/` inside each
          * candidate storage root (`context.filesDir` first, optional legacy external root second),
          * plus the shared `artbook_images` session cache inside [cacheRoot] when present.
+         *
+         * Automatically validates structural image integrity via [WenkuImageValidator] and deletes
+         * corrupt/truncated/non-image files in place so callers self-heal via network fetch instead
+         * of getting permanently stuck on a broken cached file.
          */
         fun findExistingOfflineImageFile(
             imageUrl: String,
             storageRoots: List<File>,
             cacheRoot: File? = null,
+            deleteCorruptFiles: Boolean = true,
         ): File? {
             val legacyFileName = WenkuXmlParsers.generateLegacyImageFileName(imageUrl)
             val coverAid = WENKU_COVER_URL_REGEX.find(imageUrl)?.groupValues?.getOrNull(1)
@@ -110,8 +115,12 @@ class OfflineFirstWenkuImageFetcher(
             for (root in storageRoots) {
                 for (relativePath in relativeCandidates) {
                     val candidate = File(root, relativePath)
-                    if (candidate.isFile && candidate.length() > 0L) {
+                    if (!candidate.isFile) continue
+                    if (WenkuImageValidator.hasValidImageStructure(candidate)) {
                         return candidate
+                    }
+                    if (deleteCorruptFiles) {
+                        runCatching { candidate.delete() }
                     }
                 }
             }
@@ -121,8 +130,13 @@ class OfflineFirstWenkuImageFetcher(
                     File(cacheRoot, WenkuImageRequests.ARTBOOK_CACHE_DIR_NAME),
                     legacyFileName,
                 )
-                if (artbookCached.isFile && artbookCached.length() > 0L) {
-                    return artbookCached
+                if (artbookCached.isFile) {
+                    if (WenkuImageValidator.hasValidImageStructure(artbookCached)) {
+                        return artbookCached
+                    }
+                    if (deleteCorruptFiles) {
+                        runCatching { artbookCached.delete() }
+                    }
                 }
             }
 

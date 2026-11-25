@@ -1,6 +1,7 @@
 package org.mewx.wenku8.data.remote.parser
 
 import android.content.Context
+import android.graphics.Bitmap
 import androidx.test.core.app.ApplicationProvider
 import coil3.ImageLoader
 import coil3.decode.DataSource
@@ -9,6 +10,7 @@ import coil3.request.Options
 import coil3.toUri
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -18,9 +20,13 @@ import org.junit.rules.TemporaryFolder
 import org.junit.runner.RunWith
 import org.mewx.wenku8.data.media.OfflineFirstWenkuImageFetcher
 import org.mewx.wenku8.data.media.WenkuImageRequests
+import org.mewx.wenku8.data.media.WenkuImageValidator
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import java.io.ByteArrayOutputStream
 import java.io.File
+import java.nio.charset.Charset
+import java.nio.charset.StandardCharsets
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34])
@@ -250,5 +256,152 @@ class WenkuXmlParsersAndImageFetcherTest {
         assertEquals("wenku8_cover_1306", detailCoverReq.placeholderMemoryCacheKey?.key)
         assertEquals("wenku8_cover_1306", detailCoverReq.diskCacheKey)
         assertNotNull(detailCoverReq.defined.sizeResolver)
+    }
+
+    @Test
+    fun wenkuImageValidator_validatesHeadersTrailersAndRejectsCorruptOrTextPayloads() {
+        // Content-Type filtering rejects text/HTML/XML/JSON while accepting image/* and octet-stream
+        assertTrue(WenkuImageValidator.isValidImageContentType("image/jpeg"))
+        assertTrue(WenkuImageValidator.isValidImageContentType("image/webp; charset=binary"))
+        assertTrue(WenkuImageValidator.isValidImageContentType("application/octet-stream"))
+        assertTrue(WenkuImageValidator.isValidImageContentType(null))
+        assertTrue(WenkuImageValidator.isValidImageContentType(""))
+        assertFalse(WenkuImageValidator.isValidImageContentType("text/html; charset=utf-8"))
+        assertFalse(WenkuImageValidator.isValidImageContentType("text/plain"))
+        assertFalse(WenkuImageValidator.isValidImageContentType("application/xml"))
+        assertFalse(WenkuImageValidator.isValidImageContentType("application/json"))
+
+        // Valid real compressed JPEG & PNG bitmaps
+        val bmp = Bitmap.createBitmap(16, 16, Bitmap.Config.ARGB_8888)
+        val jpegBytes = ByteArrayOutputStream().use { out ->
+            bmp.compress(Bitmap.CompressFormat.JPEG, 90, out)
+            out.toByteArray()
+        }
+        val pngBytes = ByteArrayOutputStream().use { out ->
+            bmp.compress(Bitmap.CompressFormat.PNG, 100, out)
+            out.toByteArray()
+        }
+        bmp.recycle()
+
+        assertTrue(WenkuImageValidator.hasValidImageStructure(jpegBytes))
+        assertTrue(WenkuImageValidator.hasValidImageStructure(jpegBytes + byteArrayOf(0x00, 0x0A)))
+        assertTrue(WenkuImageValidator.hasValidImageStructure(pngBytes))
+        assertTrue(
+            "Minimal 4-byte SOI+EOI fixture must remain accepted",
+            WenkuImageValidator.hasValidImageStructure(
+                byteArrayOf(0xFF.toByte(), 0xD8.toByte(), 0xFF.toByte(), 0xD9.toByte()),
+            ),
+        )
+
+        // Valid GIF89a, WebP, BMP, AVIF headers/trailers
+        val validGif = "GIF89a\u0001\u0000\u0001\u0000".toByteArray(StandardCharsets.US_ASCII) + byteArrayOf(0x3B)
+        assertTrue(WenkuImageValidator.hasValidImageStructure(validGif))
+
+        val validWebp = byteArrayOf(
+            'R'.code.toByte(), 'I'.code.toByte(), 'F'.code.toByte(), 'F'.code.toByte(),
+            12, 0, 0, 0, // declared RIFF payload = 12 -> total file = 20 bytes
+            'W'.code.toByte(), 'E'.code.toByte(), 'B'.code.toByte(), 'P'.code.toByte(),
+            'V'.code.toByte(), 'P'.code.toByte(), '8'.code.toByte(), ' '.code.toByte(),
+            0, 0, 0, 0,
+        )
+        assertTrue(WenkuImageValidator.hasValidImageStructure(validWebp))
+
+        val validBmp = byteArrayOf('B'.code.toByte(), 'M'.code.toByte()) + ByteArray(14)
+        assertTrue(WenkuImageValidator.hasValidImageStructure(validBmp))
+
+        val validAvif = byteArrayOf(
+            0, 0, 0, 16,
+            'f'.code.toByte(), 't'.code.toByte(), 'y'.code.toByte(), 'p'.code.toByte(),
+            'a'.code.toByte(), 'v'.code.toByte(), 'i'.code.toByte(), 'f'.code.toByte(),
+            0, 0, 0, 0,
+        )
+        assertTrue(WenkuImageValidator.hasValidImageStructure(validAvif))
+
+        // Invalid / truncated / non-image payloads must all be rejected
+        assertFalse(WenkuImageValidator.hasValidImageStructure(ByteArray(0)))
+        assertFalse(WenkuImageValidator.hasValidImageStructure(ByteArray(3)))
+        assertFalse(WenkuImageValidator.hasValidImageStructure(ByteArray(4096)))
+        assertFalse(
+            WenkuImageValidator.hasValidImageStructure("<html><body>502 Bad Gateway</body></html>".toByteArray()),
+        )
+        assertFalse(
+            WenkuImageValidator.hasValidImageStructure("禁止访问".toByteArray(Charset.forName("GBK"))),
+        )
+        // Truncated JPEG (missing FF D9 EOI)
+        assertFalse(WenkuImageValidator.hasValidImageStructure(jpegBytes.copyOfRange(0, jpegBytes.size - 4)))
+        // Truncated PNG (missing IEND)
+        assertFalse(WenkuImageValidator.hasValidImageStructure(pngBytes.copyOfRange(0, pngBytes.size - 12)))
+        // Truncated WebP (declared RIFF payload 12 -> needs 20 bytes, only 16 provided)
+        assertFalse(WenkuImageValidator.hasValidImageStructure(validWebp.copyOfRange(0, 16)))
+
+        // File-level validation & Skia decode check
+        val realJpegFile = tempFolder.newFile("real.jpg").apply { writeBytes(jpegBytes) }
+        val truncatedJpegFile = tempFolder.newFile("trunc.jpg").apply {
+            writeBytes(jpegBytes.copyOfRange(0, jpegBytes.size - 4))
+        }
+        assertTrue(WenkuImageValidator.hasValidImageStructure(realJpegFile))
+        assertTrue(WenkuImageValidator.isDecodableBitmapFile(realJpegFile))
+        assertFalse(WenkuImageValidator.hasValidImageStructure(truncatedJpegFile))
+        assertFalse(WenkuImageValidator.isDecodableBitmapFile(truncatedJpegFile))
+    }
+
+    @Test
+    fun offlineFirstWenkuImageFetcher_autoDeletesCorruptFilesAndPurgeRemovesAllLocalCopies() {
+        val chapterImgUrl = "http://pic.wenku8.cn/pictures/3/3770/141001/1.jpg"
+        val legacyName = WenkuXmlParsers.generateLegacyImageFileName(chapterImgUrl)
+
+        val fakeFilesDir = tempFolder.newFolder("heal_files")
+        val fakeCacheDir = tempFolder.newFolder("heal_cache")
+        val savesImgsDir = File(fakeFilesDir, "saves/imgs").apply { mkdirs() }
+        val artbookDir = File(fakeCacheDir, WenkuImageRequests.ARTBOOK_CACHE_DIR_NAME).apply { mkdirs() }
+
+        // Seed corrupt truncated JPEG in permanent saves/imgs/ AND HTML error page in artbook_images/
+        val corruptSavesFile = File(savesImgsDir, legacyName).apply {
+            writeBytes(byteArrayOf(0xFF.toByte(), 0xD8.toByte(), 0xFF.toByte(), 0xE0.toByte(), 0x00, 0x10))
+        }
+        val corruptArtbookFile = File(artbookDir, legacyName).apply {
+            writeText("<html>Access Denied</html>")
+        }
+
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val imageLoader = ImageLoader.Builder(context).build()
+        val factory = OfflineFirstWenkuImageFetcher.Factory(
+            assetSearchRootsProvider = { listOf(fakeFilesDir) },
+            cacheRootProvider = { fakeCacheDir },
+        )
+
+        // Fetcher must auto-delete BOTH corrupt copies and return null so Coil self-heals from network!
+        val fetcher = factory.create(
+            data = chapterImgUrl.toUri(),
+            options = Options(context),
+            imageLoader = imageLoader,
+        )
+        assertNull(fetcher)
+        assertFalse("Corrupt saves/imgs file must be auto-deleted", corruptSavesFile.exists())
+        assertFalse("Corrupt artbook_images file must be auto-deleted", corruptArtbookFile.exists())
+
+        // Verify purgeCachedImageForUrl removes valid copies across saves/imgs/, imgs/, and artbook_images/
+        val validMinimalJpeg = byteArrayOf(0xFF.toByte(), 0xD8.toByte(), 0xFF.toByte(), 0xD9.toByte())
+        val validSaves = File(savesImgsDir, legacyName).apply { writeBytes(validMinimalJpeg) }
+        val validArtbook = File(artbookDir, legacyName).apply { writeBytes(validMinimalJpeg) }
+        val coverUrl = "https://img.wenku8.com/image/3/3770/3770s.jpg"
+        val imgsDir = File(fakeFilesDir, "imgs").apply { mkdirs() }
+        val validCover = File(imgsDir, "3770.jpg").apply { writeBytes(validMinimalJpeg) }
+
+        WenkuImageValidator.purgeCachedImageForUrl(
+            imageUrl = chapterImgUrl,
+            storageRoots = listOf(fakeFilesDir),
+            cacheRoot = fakeCacheDir,
+            includePermanentOfflineFiles = true,
+        )
+        WenkuImageValidator.purgeCachedImageForUrl(
+            imageUrl = coverUrl,
+            storageRoots = listOf(fakeFilesDir),
+            cacheRoot = fakeCacheDir,
+            includePermanentOfflineFiles = true,
+        )
+        assertFalse(validSaves.exists())
+        assertFalse(validArtbook.exists())
+        assertFalse(validCover.exists())
     }
 }
