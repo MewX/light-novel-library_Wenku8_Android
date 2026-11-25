@@ -2,7 +2,7 @@
 
 [![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2FMewX%2Flight-novel-library_Wenku8_Android.svg?type=shield)](https://app.fossa.com/projects/git%2Bgithub.com%2FMewX%2Flight-novel-library_Wenku8_Android?ref=badge_shield)
 [![Android CI](https://github.com/MewX/light-novel-library_Wenku8_Android/actions/workflows/android-ci.yml/badge.svg)](https://github.com/MewX/light-novel-library_Wenku8_Android/actions/workflows/android-ci.yml)
-[![Coverage Status](https://coveralls.io/repos/github/MewX/light-novel-library_Wenku8_Android/badge.svg)](https://coveralls.io/github/MewX/light-novel-library_Wenku8_Android)
+[![Coverage Status](https://img.shields.io/coverallsCoverage/github/MewX/light-novel-library_Wenku8_Android?branch=master&color=brightgreen&logo=Coveralls&logoColor=white)](https://coveralls.io/github/MewX/light-novel-library_Wenku8_Android)
 
 项目主页：[https://wenku8.app](https://wenku8.app)
 
