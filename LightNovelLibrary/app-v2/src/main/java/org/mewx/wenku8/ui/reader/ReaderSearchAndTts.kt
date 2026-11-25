@@ -10,7 +10,11 @@ import android.speech.tts.UtteranceProgressListener
 import android.speech.tts.Voice
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
+import org.mewx.wenku8.data.local.preferences.Wenku8UserPreferences
 import org.mewx.wenku8.tts.KnownTtsEngineCatalog
+import org.mewx.wenku8.tts.NoOpTtsAudioFocusController
+import org.mewx.wenku8.tts.TtsAudioFocusController
+import org.mewx.wenku8.tts.TtsAudioFocusEvent
 import org.mewx.wenku8.tts.TtsDiagnosticReason
 import org.mewx.wenku8.tts.TtsEngineDescriptor
 import org.mewx.wenku8.tts.TtsEngineDiscovery
@@ -80,6 +84,7 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -1145,7 +1150,17 @@ data class ReaderTtsUiState(
     val totalUtterances: Int = 0,
     val activeBlockIndex: Int = 0,
     val currentSnippet: String = "",
-    val speechRate: Float = 1.0f,
+    val speechRate: Float = Wenku8UserPreferences.DEFAULT_TTS_SPEECH_RATE,
+    val pitch: Float = Wenku8UserPreferences.DEFAULT_TTS_PITCH,
+    val activeEnginePackage: String = "",
+    val activeEngineLabel: String = "",
+    val activeVoiceName: String = "",
+    val isFallbackActive: Boolean = false,
+    val fallbackNoticeMessage: String? = null,
+    val diagnosticReason: TtsDiagnosticReason = TtsDiagnosticReason.NONE,
+    val sleepTimerModeMinutes: Int = Wenku8UserPreferences.TTS_SLEEP_TIMER_OFF,
+    val sleepTimerRemainingSec: Int = 0,
+    val stopAfterCurrentChapter: Boolean = false,
 ) {
     companion object {
         val SUPPORTED_SPEECH_RATES: List<Float> = listOf(0.75f, 1.0f, 1.25f, 1.5f, 2.0f)
@@ -1154,28 +1169,113 @@ data class ReaderTtsUiState(
 
 /**
  * Coordinates Android `TextToSpeech` playback across paragraphs and chapters inside
- * `UnifiedReaderScreen` (`P5.3`).
+ * `UnifiedReaderScreen` (`P5.3` + `docs/designs/v2/tts` Phase 1).
+ *
+ * Includes 4-level fallback + playback circuit breaker (1 retry -> hot-switch backup engine at
+ * current utterance), [TtsAudioFocusController] pause/resume handling, pitch control, and
+ * sleep timers (countdown minutes or end-of-chapter stop).
  */
 class ReaderTtsController(
     private val engineAdapter: SpeechEngineAdapter,
     private val scope: CoroutineScope,
+    private val audioFocusController: TtsAudioFocusController = NoOpTtsAudioFocusController,
+    initialConfig: TtsPlaybackConfig = TtsPlaybackConfig(),
     private val onChapterFinished: (completedCid: Int) -> Unit = {},
 ) {
-    private val _uiState = MutableStateFlow(ReaderTtsUiState())
+    private var activeConfig: TtsPlaybackConfig = initialConfig
+
+    private val _uiState = MutableStateFlow(
+        ReaderTtsUiState(
+            speechRate = initialConfig.speechRate.coerceIn(
+                Wenku8UserPreferences.MIN_TTS_SPEECH_RATE,
+                Wenku8UserPreferences.MAX_TTS_SPEECH_RATE,
+            ),
+            pitch = initialConfig.pitch.coerceIn(
+                Wenku8UserPreferences.MIN_TTS_PITCH,
+                Wenku8UserPreferences.MAX_TTS_PITCH,
+            ),
+            sleepTimerModeMinutes = initialConfig.defaultSleepTimerMinutes,
+            stopAfterCurrentChapter =
+                initialConfig.defaultSleepTimerMinutes == Wenku8UserPreferences.TTS_SLEEP_TIMER_END_OF_CHAPTER,
+        ),
+    )
     val uiState: StateFlow<ReaderTtsUiState> = _uiState.asStateFlow()
 
     private var utterances: List<TtsUtteranceItem> = emptyList()
     private var engineInitialized = false
     private var engineInitializing = false
     private var initializedLang: Wenku8API.AppLanguage? = null
+    private var activeAppLanguage: Wenku8API.AppLanguage = Wenku8API.AppLanguage.SC
     private var pendingSpeakAfterInit = false
     private var generationCounter = 0L
+
+    private val failedEnginePackages = LinkedHashSet<String>()
+    private var consecutiveUtteranceErrors = 0
+    private var retriedCurrentUtterance = false
+    private var pausedByTransientAudioFocus = false
+    private var sleepTimerJob: Job? = null
+
+    fun updateConfig(
+        newConfig: TtsPlaybackConfig,
+        appLanguage: Wenku8API.AppLanguage? = null,
+    ) {
+        val prev = activeConfig
+        activeConfig = newConfig
+        val clampedRate = newConfig.speechRate.coerceIn(
+            Wenku8UserPreferences.MIN_TTS_SPEECH_RATE,
+            Wenku8UserPreferences.MAX_TTS_SPEECH_RATE,
+        )
+        val clampedPitch = newConfig.pitch.coerceIn(
+            Wenku8UserPreferences.MIN_TTS_PITCH,
+            Wenku8UserPreferences.MAX_TTS_PITCH,
+        )
+        val engineOrVoiceChanged =
+            prev.preferredEnginePackage.trim() != newConfig.preferredEnginePackage.trim() ||
+                prev.fallbackEnginePackage.trim() != newConfig.fallbackEnginePackage.trim() ||
+                prev.preferredVoiceName.trim() != newConfig.preferredVoiceName.trim() ||
+                prev.autoFallbackEnabled != newConfig.autoFallbackEnabled
+
+        _uiState.update {
+            it.copy(
+                speechRate = clampedRate,
+                pitch = clampedPitch,
+            )
+        }
+        if (engineInitialized) {
+            engineAdapter.setSpeechRate(clampedRate)
+            engineAdapter.setPitch(clampedPitch)
+        }
+
+        if (prev.defaultSleepTimerMinutes != newConfig.defaultSleepTimerMinutes &&
+            !_uiState.value.isSessionOpen
+        ) {
+            setSleepTimer(newConfig.defaultSleepTimerMinutes)
+        }
+
+        if (engineOrVoiceChanged) {
+            val wasSpeaking = _uiState.value.isSpeaking
+            val sessionOpen = _uiState.value.isSessionOpen
+            generationCounter++
+            engineAdapter.stop()
+            engineInitialized = false
+            engineInitializing = false
+            failedEnginePackages.clear()
+            consecutiveUtteranceErrors = 0
+            retriedCurrentUtterance = false
+            if (sessionOpen && wasSpeaking && utterances.isNotEmpty()) {
+                val targetLang = appLanguage ?: activeAppLanguage
+                ensureEngineAndSpeakCurrent(targetLang)
+            }
+        }
+    }
 
     fun startChapter(
         ast: ChapterAst,
         startFromBlockIndex: Int,
         appLanguage: Wenku8API.AppLanguage,
     ) {
+        activeAppLanguage = appLanguage
+        val wasSessionOpen = _uiState.value.isSessionOpen
         val extracted = extractSpeakableUtterances(ast)
         if (extracted.isEmpty()) {
             utterances = emptyList()
@@ -1187,6 +1287,7 @@ class ReaderTtsController(
                     activeUtteranceIndex = 0,
                     totalUtterances = 0,
                     currentSnippet = "",
+                    diagnosticReason = TtsDiagnosticReason.NONE,
                     engineErrorMessage = "本章为纯插图或空白章节，无可朗读正文",
                 )
             }
@@ -1196,12 +1297,22 @@ class ReaderTtsController(
         val startIdx = extracted.indexOfFirst { it.blockIndex >= startFromBlockIndex }
             .let { if (it >= 0) it else 0 }
         val targetItem = extracted[startIdx]
+        consecutiveUtteranceErrors = 0
+        retriedCurrentUtterance = false
+        pausedByTransientAudioFocus = false
+        if (!wasSessionOpen) {
+            failedEnginePackages.clear()
+            if (activeConfig.defaultSleepTimerMinutes != Wenku8UserPreferences.TTS_SLEEP_TIMER_OFF) {
+                setSleepTimer(activeConfig.defaultSleepTimerMinutes)
+            }
+        }
 
         _uiState.update {
             it.copy(
                 isSessionOpen = true,
                 isSpeaking = true,
                 engineErrorMessage = null,
+                diagnosticReason = TtsDiagnosticReason.NONE,
                 activeCid = ast.cid,
                 activeUtteranceIndex = startIdx,
                 totalUtterances = extracted.size,
@@ -1214,6 +1325,7 @@ class ReaderTtsController(
     }
 
     private fun ensureEngineAndSpeakCurrent(appLanguage: Wenku8API.AppLanguage) {
+        activeAppLanguage = appLanguage
         if (engineInitialized && initializedLang == appLanguage) {
             speakCurrentUtteranceNow()
             return
@@ -1224,24 +1336,59 @@ class ReaderTtsController(
         }
         engineInitializing = true
         initializedLang = appLanguage
-        engineAdapter.initialize(
+        val effectiveConfig = activeConfig.copy(
+            speechRate = _uiState.value.speechRate,
+            pitch = _uiState.value.pitch,
+        )
+        engineAdapter.initializeConfigured(
             appLanguage = appLanguage,
-            onInitialized = { success ->
+            config = effectiveConfig,
+            excludedEnginePackages = failedEnginePackages.toSet(),
+            onInitialized = { result ->
                 scope.launch {
                     engineInitializing = false
-                    engineInitialized = success
-                    if (!success) {
+                    engineInitialized = result.success
+                    if (!result.success) {
                         pendingSpeakAfterInit = false
+                        audioFocusController.abandonFocus()
+                        val resolvedReason = if (failedEnginePackages.isNotEmpty() &&
+                            result.diagnosticReason == TtsDiagnosticReason.NO_ENGINE_INSTALLED
+                        ) {
+                            TtsDiagnosticReason.PLAYBACK_INTERRUPTED
+                        } else {
+                            result.diagnosticReason
+                        }
                         _uiState.update {
                             it.copy(
                                 isSpeaking = false,
                                 isEngineReady = false,
-                                engineErrorMessage = "系统语音朗读引擎不可用，请检查系统 TTS 设置",
+                                diagnosticReason = resolvedReason,
+                                engineErrorMessage = result.diagnosticMessage
+                                    ?: AndroidTextToSpeechEngineAdapter.diagnosticMessageFor(resolvedReason),
                             )
                         }
                     } else {
                         engineAdapter.setSpeechRate(_uiState.value.speechRate)
-                        _uiState.update { it.copy(isEngineReady = true, engineErrorMessage = null) }
+                        engineAdapter.setPitch(_uiState.value.pitch)
+                        val circuitBrokenFallback = failedEnginePackages.isNotEmpty()
+                        val fallbackActive = result.isFallbackActive || circuitBrokenFallback
+                        val notice = result.fallbackNoticeMessage ?: if (circuitBrokenFallback) {
+                            "当前语音引擎异常，已自动切换至 ${result.activeEngineLabel}"
+                        } else {
+                            null
+                        }
+                        _uiState.update {
+                            it.copy(
+                                isEngineReady = true,
+                                engineErrorMessage = null,
+                                diagnosticReason = TtsDiagnosticReason.NONE,
+                                activeEnginePackage = result.activeEnginePackage,
+                                activeEngineLabel = result.activeEngineLabel,
+                                activeVoiceName = result.activeVoiceName,
+                                isFallbackActive = fallbackActive,
+                                fallbackNoticeMessage = notice ?: it.fallbackNoticeMessage,
+                            )
+                        }
                         if (pendingSpeakAfterInit && _uiState.value.isSessionOpen) {
                             pendingSpeakAfterInit = false
                             speakCurrentUtteranceNow()
@@ -1257,14 +1404,7 @@ class ReaderTtsController(
             },
             onUtteranceError = { utteranceId ->
                 scope.launch {
-                    if (isCurrentGenerationUtterance(utteranceId)) {
-                        _uiState.update {
-                            it.copy(
-                                isSpeaking = false,
-                                engineErrorMessage = "语音合成中断，点击播放可继续",
-                            )
-                        }
-                    }
+                    handleUtteranceError(utteranceId)
                 }
             },
         )
@@ -1278,19 +1418,130 @@ class ReaderTtsController(
         return utteranceId == expected
     }
 
+    private fun acquireAudioFocusIfConfigured(): Boolean {
+        if (!activeConfig.pauseOnAudioFocusLoss) return true
+        return audioFocusController.requestFocus { event ->
+            scope.launch {
+                handleAudioFocusEvent(event)
+            }
+        }
+    }
+
+    private fun handleAudioFocusEvent(event: TtsAudioFocusEvent) {
+        val state = _uiState.value
+        if (!state.isSessionOpen) return
+        when (event) {
+            TtsAudioFocusEvent.LOSS -> {
+                pausedByTransientAudioFocus = false
+                if (state.isSpeaking) {
+                    generationCounter++
+                    engineAdapter.stop()
+                    _uiState.update { it.copy(isSpeaking = false) }
+                }
+            }
+            TtsAudioFocusEvent.LOSS_TRANSIENT -> {
+                if (state.isSpeaking) {
+                    pausedByTransientAudioFocus = true
+                    generationCounter++
+                    engineAdapter.stop()
+                    _uiState.update { it.copy(isSpeaking = false) }
+                }
+            }
+            TtsAudioFocusEvent.GAIN -> {
+                if (pausedByTransientAudioFocus && !state.isSpeaking && utterances.isNotEmpty()) {
+                    pausedByTransientAudioFocus = false
+                    _uiState.update { it.copy(isSpeaking = true, engineErrorMessage = null) }
+                    ensureEngineAndSpeakCurrent(activeAppLanguage)
+                }
+            }
+        }
+    }
+
     private fun speakCurrentUtteranceNow() {
         val state = _uiState.value
         val item = utterances.getOrNull(state.activeUtteranceIndex) ?: return
+        if (!acquireAudioFocusIfConfigured()) {
+            _uiState.update {
+                it.copy(
+                    isSpeaking = false,
+                    engineErrorMessage = "音频焦点被其他应用占用，请点击播放继续",
+                )
+            }
+            return
+        }
         generationCounter++
         val utteranceId = buildUtteranceId(generationCounter, item.utteranceIndex)
         engineAdapter.setSpeechRate(state.speechRate)
+        engineAdapter.setPitch(state.pitch)
         val ok = engineAdapter.speakFlush(item.text, utteranceId)
+        if (!ok) {
+            handleSpeakDispatchFailure()
+            return
+        }
         _uiState.update {
             it.copy(
-                isSpeaking = ok,
+                isSpeaking = true,
                 activeBlockIndex = item.blockIndex,
                 currentSnippet = item.text.take(48),
-                engineErrorMessage = if (ok) null else "启动系统朗读失败",
+                engineErrorMessage = null,
+                diagnosticReason = TtsDiagnosticReason.NONE,
+            )
+        }
+    }
+
+    private fun handleSpeakDispatchFailure() {
+        val currentPkg = _uiState.value.activeEnginePackage.ifBlank { engineAdapter.activeEnginePackage() }
+        if (activeConfig.autoFallbackEnabled && currentPkg.isNotBlank() && currentPkg !in failedEnginePackages) {
+            failedEnginePackages.add(currentPkg)
+            engineInitialized = false
+            engineInitializing = false
+            consecutiveUtteranceErrors = 0
+            retriedCurrentUtterance = false
+            ensureEngineAndSpeakCurrent(activeAppLanguage)
+            return
+        }
+        audioFocusController.abandonFocus()
+        _uiState.update {
+            it.copy(
+                isSpeaking = false,
+                diagnosticReason = TtsDiagnosticReason.PLAYBACK_INTERRUPTED,
+                engineErrorMessage = "启动系统朗读失败，请重试或切换备用引擎",
+            )
+        }
+    }
+
+    private fun handleUtteranceError(utteranceId: String) {
+        if (!isCurrentGenerationUtterance(utteranceId)) return
+        val state = _uiState.value
+        if (!state.isSessionOpen || !state.isSpeaking) return
+
+        consecutiveUtteranceErrors++
+        if (!retriedCurrentUtterance && consecutiveUtteranceErrors < CIRCUIT_BREAKER_ERROR_THRESHOLD) {
+            retriedCurrentUtterance = true
+            speakCurrentUtteranceNow()
+            return
+        }
+
+        val failingPkg = state.activeEnginePackage.ifBlank { engineAdapter.activeEnginePackage() }
+        if (activeConfig.autoFallbackEnabled &&
+            failingPkg.isNotBlank() &&
+            failingPkg !in failedEnginePackages
+        ) {
+            failedEnginePackages.add(failingPkg)
+            engineInitialized = false
+            engineInitializing = false
+            consecutiveUtteranceErrors = 0
+            retriedCurrentUtterance = false
+            ensureEngineAndSpeakCurrent(activeAppLanguage)
+            return
+        }
+
+        audioFocusController.abandonFocus()
+        _uiState.update {
+            it.copy(
+                isSpeaking = false,
+                diagnosticReason = TtsDiagnosticReason.PLAYBACK_INTERRUPTED,
+                engineErrorMessage = "语音合成中断，点击播放可继续或切换引擎",
             )
         }
     }
@@ -1299,6 +1550,9 @@ class ReaderTtsController(
         val state = _uiState.value
         if (!state.isSessionOpen || !state.isSpeaking) return
         if (!isCurrentGenerationUtterance(utteranceId)) return
+
+        consecutiveUtteranceErrors = 0
+        retriedCurrentUtterance = false
 
         val nextIdx = state.activeUtteranceIndex + 1
         if (nextIdx < utterances.size) {
@@ -1313,26 +1567,74 @@ class ReaderTtsController(
             speakCurrentUtteranceNow()
         } else {
             val completedCid = state.activeCid
-            _uiState.update { it.copy(isSpeaking = false) }
-            onChapterFinished(completedCid)
+            if (state.stopAfterCurrentChapter) {
+                cancelSleepTimerJob()
+                audioFocusController.abandonFocus()
+                _uiState.update {
+                    it.copy(
+                        isSpeaking = false,
+                        stopAfterCurrentChapter = false,
+                        sleepTimerModeMinutes = Wenku8UserPreferences.TTS_SLEEP_TIMER_OFF,
+                        sleepTimerRemainingSec = 0,
+                    )
+                }
+            } else {
+                _uiState.update { it.copy(isSpeaking = false) }
+                onChapterFinished(completedCid)
+            }
         }
     }
 
     fun togglePlayPause(appLanguage: Wenku8API.AppLanguage) {
         val state = _uiState.value
         if (!state.isSessionOpen) return
+        pausedByTransientAudioFocus = false
         if (state.isSpeaking) {
             generationCounter++
             engineAdapter.stop()
+            audioFocusController.abandonFocus()
             _uiState.update { it.copy(isSpeaking = false) }
         } else if (utterances.isNotEmpty()) {
-            _uiState.update { it.copy(isSpeaking = true, engineErrorMessage = null) }
+            consecutiveUtteranceErrors = 0
+            retriedCurrentUtterance = false
+            _uiState.update {
+                it.copy(
+                    isSpeaking = true,
+                    engineErrorMessage = null,
+                    diagnosticReason = TtsDiagnosticReason.NONE,
+                )
+            }
             ensureEngineAndSpeakCurrent(appLanguage)
         }
     }
 
+    fun retryEngine(appLanguage: Wenku8API.AppLanguage) {
+        failedEnginePackages.clear()
+        consecutiveUtteranceErrors = 0
+        retriedCurrentUtterance = false
+        engineInitialized = false
+        engineInitializing = false
+        if (utterances.isNotEmpty()) {
+            _uiState.update {
+                it.copy(
+                    isSpeaking = true,
+                    engineErrorMessage = null,
+                    diagnosticReason = TtsDiagnosticReason.NONE,
+                )
+            }
+            ensureEngineAndSpeakCurrent(appLanguage)
+        }
+    }
+
+    fun clearFallbackNotice() {
+        _uiState.update { it.copy(fallbackNoticeMessage = null) }
+    }
+
     fun skipPrevious(appLanguage: Wenku8API.AppLanguage) {
         if (utterances.isEmpty()) return
+        pausedByTransientAudioFocus = false
+        consecutiveUtteranceErrors = 0
+        retriedCurrentUtterance = false
         val prevIdx = (_uiState.value.activeUtteranceIndex - 1).coerceAtLeast(0)
         val item = utterances[prevIdx]
         _uiState.update {
@@ -1341,6 +1643,7 @@ class ReaderTtsController(
                 activeUtteranceIndex = prevIdx,
                 activeBlockIndex = item.blockIndex,
                 currentSnippet = item.text.take(48),
+                engineErrorMessage = null,
             )
         }
         ensureEngineAndSpeakCurrent(appLanguage)
@@ -1348,6 +1651,9 @@ class ReaderTtsController(
 
     fun skipNext(appLanguage: Wenku8API.AppLanguage) {
         if (utterances.isEmpty()) return
+        pausedByTransientAudioFocus = false
+        consecutiveUtteranceErrors = 0
+        retriedCurrentUtterance = false
         val nextIdx = (_uiState.value.activeUtteranceIndex + 1).coerceAtMost(utterances.lastIndex)
         val item = utterances[nextIdx]
         _uiState.update {
@@ -1356,31 +1662,118 @@ class ReaderTtsController(
                 activeUtteranceIndex = nextIdx,
                 activeBlockIndex = item.blockIndex,
                 currentSnippet = item.text.take(48),
+                engineErrorMessage = null,
             )
         }
         ensureEngineAndSpeakCurrent(appLanguage)
     }
 
-    fun cycleSpeechRate(appLanguage: Wenku8API.AppLanguage) {
+    fun cycleSpeechRate(appLanguage: Wenku8API.AppLanguage): Float {
         val rates = ReaderTtsUiState.SUPPORTED_SPEECH_RATES
         val curIdx = rates.indexOfFirst { kotlin.math.abs(it - _uiState.value.speechRate) < 0.05f }
         val nextRate = rates[(curIdx + 1) % rates.size]
-        _uiState.update { it.copy(speechRate = nextRate) }
-        engineAdapter.setSpeechRate(nextRate)
+        setSpeechRate(nextRate, appLanguage)
+        return nextRate
+    }
+
+    fun setSpeechRate(rate: Float, appLanguage: Wenku8API.AppLanguage) {
+        val clamped = rate.coerceIn(
+            Wenku8UserPreferences.MIN_TTS_SPEECH_RATE,
+            Wenku8UserPreferences.MAX_TTS_SPEECH_RATE,
+        )
+        activeConfig = activeConfig.copy(speechRate = clamped)
+        _uiState.update { it.copy(speechRate = clamped) }
+        engineAdapter.setSpeechRate(clamped)
         if (_uiState.value.isSpeaking) {
             ensureEngineAndSpeakCurrent(appLanguage)
+        }
+    }
+
+    fun setPitch(pitch: Float, appLanguage: Wenku8API.AppLanguage) {
+        val clamped = pitch.coerceIn(
+            Wenku8UserPreferences.MIN_TTS_PITCH,
+            Wenku8UserPreferences.MAX_TTS_PITCH,
+        )
+        activeConfig = activeConfig.copy(pitch = clamped)
+        _uiState.update { it.copy(pitch = clamped) }
+        engineAdapter.setPitch(clamped)
+        if (_uiState.value.isSpeaking) {
+            ensureEngineAndSpeakCurrent(appLanguage)
+        }
+    }
+
+    fun setSleepTimer(minutes: Int) {
+        cancelSleepTimerJob()
+        when {
+            minutes == Wenku8UserPreferences.TTS_SLEEP_TIMER_END_OF_CHAPTER -> {
+                _uiState.update {
+                    it.copy(
+                        sleepTimerModeMinutes = Wenku8UserPreferences.TTS_SLEEP_TIMER_END_OF_CHAPTER,
+                        sleepTimerRemainingSec = 0,
+                        stopAfterCurrentChapter = true,
+                    )
+                }
+            }
+            minutes <= 0 -> {
+                _uiState.update {
+                    it.copy(
+                        sleepTimerModeMinutes = Wenku8UserPreferences.TTS_SLEEP_TIMER_OFF,
+                        sleepTimerRemainingSec = 0,
+                        stopAfterCurrentChapter = false,
+                    )
+                }
+            }
+            else -> {
+                val clampedMin = minutes.coerceAtMost(Wenku8UserPreferences.MAX_TTS_SLEEP_TIMER_MINUTES)
+                val totalSec = clampedMin * 60
+                _uiState.update {
+                    it.copy(
+                        sleepTimerModeMinutes = clampedMin,
+                        sleepTimerRemainingSec = totalSec,
+                        stopAfterCurrentChapter = false,
+                    )
+                }
+                sleepTimerJob = scope.launch {
+                    var remaining = totalSec
+                    while (remaining > 0) {
+                        delay(1_000L)
+                        remaining -= 1
+                        _uiState.update { it.copy(sleepTimerRemainingSec = remaining) }
+                    }
+                    // Timer expired -> pause playback cleanly without dismissing reader progress.
+                    generationCounter++
+                    pausedByTransientAudioFocus = false
+                    engineAdapter.stop()
+                    audioFocusController.abandonFocus()
+                    _uiState.update {
+                        it.copy(
+                            isSpeaking = false,
+                            sleepTimerModeMinutes = Wenku8UserPreferences.TTS_SLEEP_TIMER_OFF,
+                            sleepTimerRemainingSec = 0,
+                        )
+                    }
+                }
+            }
         }
     }
 
     fun stopAndDismiss() {
         generationCounter++
         pendingSpeakAfterInit = false
+        pausedByTransientAudioFocus = false
+        cancelSleepTimerJob()
         engineAdapter.stop()
+        audioFocusController.abandonFocus()
         _uiState.update {
             it.copy(
                 isSessionOpen = false,
                 isSpeaking = false,
                 engineErrorMessage = null,
+                fallbackNoticeMessage = null,
+                diagnosticReason = TtsDiagnosticReason.NONE,
+                sleepTimerModeMinutes = Wenku8UserPreferences.TTS_SLEEP_TIMER_OFF,
+                sleepTimerRemainingSec = 0,
+                stopAfterCurrentChapter = false,
             )
         }
     }
@@ -1388,9 +1781,21 @@ class ReaderTtsController(
     fun close() {
         generationCounter++
         pendingSpeakAfterInit = false
+        pausedByTransientAudioFocus = false
+        cancelSleepTimerJob()
         engineInitialized = false
         engineInitializing = false
+        audioFocusController.abandonFocus()
         engineAdapter.shutdown()
+    }
+
+    private fun cancelSleepTimerJob() {
+        sleepTimerJob?.cancel()
+        sleepTimerJob = null
+    }
+
+    companion object {
+        private const val CIRCUIT_BREAKER_ERROR_THRESHOLD = 2
     }
 }
 
