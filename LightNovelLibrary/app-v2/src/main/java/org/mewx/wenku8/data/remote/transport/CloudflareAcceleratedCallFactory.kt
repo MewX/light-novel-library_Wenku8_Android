@@ -18,6 +18,8 @@ import okio.BufferedSource
 import okio.ForwardingSource
 import okio.Timeout
 import okio.buffer
+import org.mewx.wenku8.data.media.WenkuHttpsRedirectUpgradeInterceptor
+import org.mewx.wenku8.data.media.WenkuImageUrlPolicy
 import org.mewx.wenku8.data.remote.diagnostics.IpAddressFamily
 import org.mewx.wenku8.data.remote.diagnostics.IpLiteralParser
 import org.mewx.wenku8.data.remote.diagnostics.OkHttpProbeTransport
@@ -71,6 +73,15 @@ fun interface CloudflareEdgeRouteProvider {
 }
 
 /**
+ * Redacted trace of attempted endpoints (`scheme://host`) attached via `Call.tag(MirrorAttemptTrace::class)`
+ * when illustration mirror fallback runs, enabling accurate collapsed Artbook diagnostics without
+ * exposing raw IPs, paths, or cookies.
+ */
+data class MirrorAttemptTrace(
+    val attemptedEndpoints: List<String>,
+)
+
+/**
  * OkHttp [Call.Factory] that routes general app `GET`/`HEAD` requests (covers, chapter
  * illustrations, redirect targets like `pic.777743.xyz`, avatars, notices, and version checks on
  * `wenku8.mewx.org` / `wenku8.app`) through the active verified Cloudflare Anycast preferred IP
@@ -107,6 +118,7 @@ class CloudflareAcceleratedCallFactory(
     private val hardHostBypassDurationMillis: Long = DEFAULT_HARD_HOST_BYPASS_MS,
     private val transientHostBypassDurationMillis: Long = DEFAULT_TRANSIENT_HOST_BYPASS_MS,
     private val ipv6BulkBypassDurationMillis: Long = DEFAULT_IPV6_BULK_BYPASS_MS,
+    private val mirrorCooldownDurationMillis: Long = DEFAULT_MIRROR_COOLDOWN_MS,
     private val transientFailuresBeforeBypass: Int = DEFAULT_TRANSIENT_FAILURES_BEFORE_BYPASS,
     private val monotonicClockMillis: () -> Long = { SystemClock.elapsedRealtime() },
     private val fallbackExecutor: Executor = baseOkHttpClient.dispatcher.executorService,
@@ -120,6 +132,7 @@ class CloudflareAcceleratedCallFactory(
         const val DEFAULT_HARD_HOST_BYPASS_MS: Long = 30L * 60L * 1_000L
         const val DEFAULT_TRANSIENT_HOST_BYPASS_MS: Long = 10L * 60L * 1_000L
         const val DEFAULT_IPV6_BULK_BYPASS_MS: Long = 30L * 60L * 1_000L
+        const val DEFAULT_MIRROR_COOLDOWN_MS: Long = 30L * 60L * 1_000L
         const val DEFAULT_TRANSIENT_FAILURES_BEFORE_BYPASS: Int = 2
 
         private val SAFE_IDEMPOTENT_METHODS = setOf("GET", "HEAD")
@@ -226,6 +239,16 @@ class CloudflareAcceleratedCallFactory(
     // IPv6 PMTU blackholes / bulk throttling where 180B probes succeed but 1MB JPEGs stall).
     @Volatile private var ipv6EdgeBypassedUntilMonoMs: Long = 0L
 
+    // Remembered healthy fallback mirror (e.g. `pic.wenku8.com` -> `pic.777743.xyz`) when the
+    // primary illustration host is reset by DPI/SNI filtering, avoiding repeated RST stalls across
+    // the remaining illustrations and thumbnails in a chapter.
+    private data class ActiveMirrorOverride(
+        val mirror: WenkuImageUrlPolicy.IllustrationMirror,
+        val expiresAtMonoMs: Long,
+    )
+
+    private val preferredMirrorByHost = ConcurrentHashMap<String, ActiveMirrorOverride>()
+
     private val systemDnsClient: OkHttpClient by lazy {
         baseOkHttpClient.newBuilder()
             .cookieJar(CookieJar.NO_COOKIES)
@@ -237,6 +260,7 @@ class CloudflareAcceleratedCallFactory(
             .connectTimeout(connectTimeoutMillis, TimeUnit.MILLISECONDS)
             .readTimeout(readTimeoutMillis, TimeUnit.MILLISECONDS)
             .writeTimeout(writeTimeoutMillis, TimeUnit.MILLISECONDS)
+            .addNetworkInterceptor(WenkuHttpsRedirectUpgradeInterceptor)
             .apply {
                 for (interceptor in networkInterceptors) {
                     addNetworkInterceptor(interceptor)
@@ -246,11 +270,39 @@ class CloudflareAcceleratedCallFactory(
     }
 
     override fun newCall(request: Request): Call {
-        val method = request.method.uppercase(Locale.ROOT)
+        val upgradedRequest = WenkuImageUrlPolicy.upgradeRequestUrlIfSupported(request)
+        val method = upgradedRequest.method.uppercase(Locale.ROOT)
         if (method !in SAFE_IDEMPOTENT_METHODS) {
-            return systemDnsClient.newCall(request)
+            return systemDnsClient.newCall(upgradedRequest)
         }
 
+        val primaryHost = normalizeHost(upgradedRequest.url.host)
+        val rememberedMirror = currentPreferredMirrorForHostOrNull(primaryHost)
+        val candidateUrls = WenkuImageUrlPolicy.buildOrderedIllustrationAttemptUrls(
+            url = upgradedRequest.url,
+            preferredMirror = rememberedMirror,
+        )
+        if (candidateUrls.size > 1) {
+            val attemptRequests = candidateUrls.map { candidateUrl ->
+                if (candidateUrl == upgradedRequest.url) {
+                    upgradedRequest
+                } else {
+                    upgradedRequest.newBuilder().url(candidateUrl).build()
+                }
+            }
+            return MirrorFallbackCall(
+                factory = this,
+                originalRequest = upgradedRequest,
+                primaryHost = primaryHost,
+                attemptRequests = attemptRequests,
+                directSystemDnsOnly = false,
+            )
+        }
+
+        return newSingleUrlCall(upgradedRequest)
+    }
+
+    private fun newSingleUrlCall(request: Request): Call {
         val edgeRoute = edgeRouteProvider.currentActiveEdgeRouteOrNull()
         if (edgeRoute == null) {
             retireActivePinnedGenerationIfAny()
@@ -278,9 +330,38 @@ class CloudflareAcceleratedCallFactory(
 
     /**
      * Creates a direct call using [systemDns] (`fastFallback(true)` Happy Eyeballs), bypassing any
-     * pinned Cloudflare edge IP. Used for mid-body stream retries and explicit user reload actions.
+     * pinned Cloudflare edge IP while preserving HTTPS upgrade and illustration mirror fallback.
+     * Used for mid-body stream retries and explicit user reload actions.
      */
-    fun newDirectSystemDnsCall(request: Request): Call = systemDnsClient.newCall(request)
+    fun newDirectSystemDnsCall(request: Request): Call {
+        val upgradedRequest = WenkuImageUrlPolicy.upgradeRequestUrlIfSupported(request)
+        val method = upgradedRequest.method.uppercase(Locale.ROOT)
+        if (method in SAFE_IDEMPOTENT_METHODS) {
+            val primaryHost = normalizeHost(upgradedRequest.url.host)
+            val rememberedMirror = currentPreferredMirrorForHostOrNull(primaryHost)
+            val candidateUrls = WenkuImageUrlPolicy.buildOrderedIllustrationAttemptUrls(
+                url = upgradedRequest.url,
+                preferredMirror = rememberedMirror,
+            )
+            if (candidateUrls.size > 1) {
+                val attemptRequests = candidateUrls.map { candidateUrl ->
+                    if (candidateUrl == upgradedRequest.url) {
+                        upgradedRequest
+                    } else {
+                        upgradedRequest.newBuilder().url(candidateUrl).build()
+                    }
+                }
+                return MirrorFallbackCall(
+                    factory = this,
+                    originalRequest = upgradedRequest,
+                    primaryHost = primaryHost,
+                    attemptRequests = attemptRequests,
+                    directSystemDnsOnly = true,
+                )
+            }
+        }
+        return systemDnsClient.newCall(upgradedRequest)
+    }
 
     /**
      * Returns the address family (`IPV4` or `IPV6`) that will be used if [host] is dialed through
@@ -290,7 +371,9 @@ class CloudflareAcceleratedCallFactory(
         val edgeRoute = edgeRouteProvider.currentActiveEdgeRouteOrNull() ?: return null
         val family = IpAddressFamily.fromRawBytesOrNull(edgeRoute.rawIpBytes) ?: return null
         if (family == IpAddressFamily.IPV6 && isIpv6EdgeCurrentlyBypassed()) return null
-        return if (shouldPinHost(normalizeHost(host))) family else null
+        val normalized = normalizeHost(host)
+        val effectiveHost = currentPreferredMirrorForHostOrNull(normalized)?.host ?: normalized
+        return if (shouldPinHost(effectiveHost)) family else null
     }
 
     /**
@@ -308,12 +391,44 @@ class CloudflareAcceleratedCallFactory(
         recordTransientHostFailure(host)
     }
 
-    /** Clears all host & IPv6 bulk cooldown entries (e.g. when the user resets network routing). */
+    /** Clears all host, mirror, & IPv6 bulk cooldown entries (e.g. when the user resets network routing). */
     fun clearHostBypasses() {
         hardBypassedHostsUntilMonoMs.clear()
         transientBypassedHostsUntilMonoMs.clear()
         consecutiveTransientFailuresByHost.clear()
+        preferredMirrorByHost.clear()
         ipv6EdgeBypassedUntilMonoMs = 0L
+    }
+
+    internal fun currentPreferredMirrorForHostOrNull(host: String): WenkuImageUrlPolicy.IllustrationMirror? {
+        val normalized = normalizeHost(host)
+        if (normalized.isEmpty()) return null
+        val entry = preferredMirrorByHost[normalized] ?: return null
+        return if (monotonicClockMillis() < entry.expiresAtMonoMs) {
+            entry.mirror
+        } else {
+            preferredMirrorByHost.remove(normalized, entry)
+            null
+        }
+    }
+
+    private fun rememberPreferredMirror(
+        primaryHost: String,
+        mirror: WenkuImageUrlPolicy.IllustrationMirror,
+    ) {
+        val normalized = normalizeHost(primaryHost)
+        if (normalized.isEmpty() || mirror.host == normalized) return
+        preferredMirrorByHost[normalized] = ActiveMirrorOverride(
+            mirror = mirror,
+            expiresAtMonoMs = monotonicClockMillis() + mirrorCooldownDurationMillis,
+        )
+    }
+
+    private fun clearPreferredMirror(primaryHost: String) {
+        val normalized = normalizeHost(primaryHost)
+        if (normalized.isNotEmpty()) {
+            preferredMirrorByHost.remove(normalized)
+        }
     }
 
     internal fun isIpv6EdgeCurrentlyBypassed(): Boolean {
@@ -425,6 +540,7 @@ class CloudflareAcceleratedCallFactory(
                 .connectTimeout(pinnedConnectTimeoutMillis, TimeUnit.MILLISECONDS)
                 .readTimeout(readTimeoutMillis, TimeUnit.MILLISECONDS)
                 .writeTimeout(writeTimeoutMillis, TimeUnit.MILLISECONDS)
+                .addNetworkInterceptor(WenkuHttpsRedirectUpgradeInterceptor)
                 .apply {
                     for (interceptor in networkInterceptors) {
                         addNetworkInterceptor(interceptor)
@@ -606,6 +722,7 @@ class CloudflareAcceleratedCallFactory(
 
             val tracker = LastHostTracker(originalRequest.url.host)
             val pinnedCall = buildPinnedAttemptCall(tracker)
+            var deferredPinnedIoFailure: Pair<String, IOException>? = null
             pinnedGeneration.acquire()
             try {
                 if (!activateInnerCall(pinnedCall)) {
@@ -630,7 +747,7 @@ class CloudflareAcceleratedCallFactory(
                     throw ioError
                 }
                 if (!tracker.observedNonDirectProxy) {
-                    recordIoFailure(tracker.lastAttemptedHost, ioError)
+                    deferredPinnedIoFailure = tracker.lastAttemptedHost to ioError
                 }
             } finally {
                 pinnedGeneration.release(factory.fallbackExecutor)
@@ -642,7 +759,14 @@ class CloudflareAcceleratedCallFactory(
             if (!activateInnerCall(fallbackCall)) {
                 throw IOException("Canceled")
             }
-            return fallbackCall.execute()
+            val fallbackResponse = fallbackCall.execute()
+            // Only blame the pinned edge IP if System DNS actually succeeded; if BOTH pinned and
+            // System DNS fail (e.g. GFW RST against `pic.wenku8.com` or temporary loss of signal),
+            // avoid falsely poisoning the IPv6 edge for healthy hosts like `pic.777743.xyz`!
+            deferredPinnedIoFailure?.let { (failedHost, err) ->
+                recordIoFailure(failedHost, err)
+            }
+            return fallbackResponse
         }
 
         override fun enqueue(responseCallback: Callback) {
@@ -690,7 +814,7 @@ class CloudflareAcceleratedCallFactory(
                         if (!tracker.observedNonDirectProxy) {
                             recordResponseFallback(failedHost, fallbackReason)
                         }
-                        enqueueSystemDnsFallback(responseCallback)
+                        enqueueSystemDnsFallback(responseCallback, deferredPinnedIoFailure = null)
                     }
 
                     override fun onFailure(call: Call, e: IOException) {
@@ -702,16 +826,21 @@ class CloudflareAcceleratedCallFactory(
                             return
                         }
 
-                        if (!tracker.observedNonDirectProxy) {
-                            recordIoFailure(tracker.lastAttemptedHost, e)
+                        val deferredFailure = if (!tracker.observedNonDirectProxy) {
+                            tracker.lastAttemptedHost to e
+                        } else {
+                            null
                         }
-                        enqueueSystemDnsFallback(responseCallback)
+                        enqueueSystemDnsFallback(responseCallback, deferredPinnedIoFailure = deferredFailure)
                     }
                 },
             )
         }
 
-        private fun enqueueSystemDnsFallback(responseCallback: Callback) {
+        private fun enqueueSystemDnsFallback(
+            responseCallback: Callback,
+            deferredPinnedIoFailure: Pair<String, IOException>?,
+        ) {
             if (canceled.get()) {
                 responseCallback.onFailure(this, IOException("Canceled"))
                 return
@@ -724,6 +853,9 @@ class CloudflareAcceleratedCallFactory(
             fallbackCall.enqueue(
                 object : Callback {
                     override fun onResponse(call: Call, response: Response) {
+                        deferredPinnedIoFailure?.let { (failedHost, err) ->
+                            recordIoFailure(failedHost, err)
+                        }
                         responseCallback.onResponse(this@FallbackDelegatingCall, response)
                     }
 
@@ -802,6 +934,232 @@ class CloudflareAcceleratedCallFactory(
 
         override fun close() {
             delegate.close()
+        }
+    }
+
+    /**
+     * Thread-safe OkHttp [Call] wrapping illustration requests (`pic.wenku8.com` / `pic.wenku8.cn`)
+     * with automatic mirror fallback (`pic.777743.xyz`, `pic.wenku8.cn`) across both synchronous
+     * [execute] (Artbook, offline downloads) and asynchronous [enqueue] (Coil 3 thumbnails & inline
+     * reader illustrations).
+     *
+     * Authoritative 404 responses from the primary host stop immediately; transport/TLS resets
+     * (such as GFW SNI/HTTP RST against `pic.wenku8.com`) or 5xx/CF edge errors advance seamlessly
+     * to the next mirror, remembering the working mirror for 30 minutes to eliminate repeat stalls.
+     */
+    private class MirrorFallbackCall(
+        private val factory: CloudflareAcceleratedCallFactory,
+        private val originalRequest: Request,
+        private val primaryHost: String,
+        private val attemptRequests: List<Request>,
+        private val directSystemDnsOnly: Boolean,
+    ) : Call {
+
+        private val executed = AtomicBoolean(false)
+        private val canceled = AtomicBoolean(false)
+        private val activeCallRef = AtomicReference<Call?>(null)
+        private val extraEventListeners = CopyOnWriteArrayList<EventListener>()
+        private val tags = ConcurrentHashMap<KClass<*>, Any>()
+        private val attemptedEndpoints = CopyOnWriteArrayList<String>()
+
+        override fun request(): Request = originalRequest
+
+        override fun isExecuted(): Boolean = executed.get()
+
+        override fun isCanceled(): Boolean = canceled.get()
+
+        override fun cancel() {
+            if (canceled.compareAndSet(false, true)) {
+                activeCallRef.get()?.let { active ->
+                    OkHttpProbeTransport.cancelCallSafely(active, factory.fallbackExecutor)
+                }
+            }
+        }
+
+        override fun clone(): Call = if (directSystemDnsOnly) {
+            factory.newDirectSystemDnsCall(originalRequest)
+        } else {
+            factory.newCall(originalRequest)
+        }
+
+        override fun timeout(): Timeout = activeCallRef.get()?.timeout() ?: Timeout.NONE
+
+        override fun addEventListener(eventListener: EventListener) {
+            extraEventListeners.add(eventListener)
+            activeCallRef.get()?.addEventListener(eventListener)
+        }
+
+        @Suppress("UNCHECKED_CAST")
+        override fun <T : Any> tag(type: KClass<T>): T? {
+            if (type == MirrorAttemptTrace::class) {
+                return MirrorAttemptTrace(attemptedEndpoints.toList()) as T
+            }
+            return tags[type] as T?
+        }
+
+        @Suppress("UNCHECKED_CAST")
+        override fun <T> tag(type: Class<out T>): T? {
+            if (type == MirrorAttemptTrace::class.java) {
+                return MirrorAttemptTrace(attemptedEndpoints.toList()) as T
+            }
+            return tags[type.kotlin] as T?
+        }
+
+        @Suppress("UNCHECKED_CAST")
+        override fun <T : Any> tag(type: KClass<T>, computeIfAbsent: () -> T): T {
+            if (type == MirrorAttemptTrace::class) {
+                return MirrorAttemptTrace(attemptedEndpoints.toList()) as T
+            }
+            return tags.computeIfAbsent(type) { computeIfAbsent() } as T
+        }
+
+        @Suppress("UNCHECKED_CAST")
+        override fun <T : Any> tag(type: Class<T>, computeIfAbsent: () -> T): T {
+            if (type == MirrorAttemptTrace::class.java) {
+                return MirrorAttemptTrace(attemptedEndpoints.toList()) as T
+            }
+            return tags.computeIfAbsent(type.kotlin) { computeIfAbsent() } as T
+        }
+
+        private fun createAttemptCall(attemptRequest: Request): Call {
+            return if (directSystemDnsOnly) {
+                factory.systemDnsClient.newCall(attemptRequest)
+            } else {
+                factory.newSingleUrlCall(attemptRequest)
+            }
+        }
+
+        private fun activateInnerCall(innerCall: Call): Boolean {
+            for (listener in extraEventListeners) {
+                innerCall.addEventListener(listener)
+            }
+            activeCallRef.set(innerCall)
+            if (canceled.get()) {
+                OkHttpProbeTransport.cancelCallSafely(innerCall, factory.fallbackExecutor)
+                return false
+            }
+            return true
+        }
+
+        private fun shouldAdvanceToNextMirror(response: Response, attemptHost: String): Boolean {
+            val code = response.code
+            if (code in 500..599) return true
+            if (code == 409 || code == 421) return true
+            if (code == 403) {
+                val contentType = response.header("Content-Type").orEmpty().lowercase(Locale.ROOT)
+                if (!contentType.startsWith("image/")) return true
+            }
+            // A 404 on a non-authoritative fallback mirror may mean the upstream CDN migrated
+            // away from that mirror, so keep trying remaining candidates (including the primary).
+            if (code == 404 && attemptHost != primaryHost) return true
+            return false
+        }
+
+        private fun recordSuccessMirrorState(attemptHost: String) {
+            if (attemptHost != primaryHost) {
+                WenkuImageUrlPolicy.mirrorForHostOrNull(attemptHost)?.let { mirror ->
+                    factory.rememberPreferredMirror(primaryHost, mirror)
+                }
+            } else {
+                factory.clearPreferredMirror(primaryHost)
+            }
+        }
+
+        override fun execute(): Response {
+            check(executed.compareAndSet(false, true)) { "Already Executed" }
+            if (canceled.get()) throw IOException("Canceled")
+
+            var lastIoError: IOException? = null
+            for (index in attemptRequests.indices) {
+                if (canceled.get()) throw IOException("Canceled")
+                val attemptRequest = attemptRequests[index]
+                val attemptHost = normalizeHost(attemptRequest.url.host)
+                attemptedEndpoints.add("${attemptRequest.url.scheme}://$attemptHost")
+                val innerCall = createAttemptCall(attemptRequest)
+                if (!activateInnerCall(innerCall)) {
+                    throw IOException("Canceled")
+                }
+                try {
+                    val response = innerCall.execute()
+                    if (response.isSuccessful) {
+                        recordSuccessMirrorState(attemptHost)
+                        return response
+                    }
+                    val hasNext = index < attemptRequests.lastIndex
+                    if (hasNext && !canceled.get() && shouldAdvanceToNextMirror(response, attemptHost)) {
+                        response.close()
+                        continue
+                    }
+                    return response
+                } catch (ioError: IOException) {
+                    if (canceled.get()) throw ioError
+                    lastIoError = ioError
+                    if (index == attemptRequests.lastIndex) {
+                        throw ioError
+                    }
+                }
+            }
+            throw lastIoError ?: IOException("All illustration mirrors failed")
+        }
+
+        override fun enqueue(responseCallback: Callback) {
+            check(executed.compareAndSet(false, true)) { "Already Executed" }
+            if (canceled.get()) {
+                responseCallback.onFailure(this, IOException("Canceled"))
+                return
+            }
+            enqueueAttempt(index = 0, responseCallback = responseCallback)
+        }
+
+        private fun enqueueAttempt(index: Int, responseCallback: Callback) {
+            if (canceled.get()) {
+                responseCallback.onFailure(this, IOException("Canceled"))
+                return
+            }
+            val attemptRequest = attemptRequests[index]
+            val attemptHost = normalizeHost(attemptRequest.url.host)
+            attemptedEndpoints.add("${attemptRequest.url.scheme}://$attemptHost")
+            val innerCall = createAttemptCall(attemptRequest)
+            if (!activateInnerCall(innerCall)) {
+                responseCallback.onFailure(this, IOException("Canceled"))
+                return
+            }
+            innerCall.enqueue(
+                object : Callback {
+                    override fun onResponse(call: Call, response: Response) {
+                        if (canceled.get()) {
+                            response.close()
+                            responseCallback.onFailure(this@MirrorFallbackCall, IOException("Canceled"))
+                            return
+                        }
+                        if (response.isSuccessful) {
+                            recordSuccessMirrorState(attemptHost)
+                            responseCallback.onResponse(this@MirrorFallbackCall, response)
+                            return
+                        }
+                        val hasNext = index < attemptRequests.lastIndex
+                        if (hasNext && shouldAdvanceToNextMirror(response, attemptHost)) {
+                            response.close()
+                            enqueueAttempt(index + 1, responseCallback)
+                            return
+                        }
+                        responseCallback.onResponse(this@MirrorFallbackCall, response)
+                    }
+
+                    override fun onFailure(call: Call, e: IOException) {
+                        if (canceled.get()) {
+                            responseCallback.onFailure(this@MirrorFallbackCall, e)
+                            return
+                        }
+                        val hasNext = index < attemptRequests.lastIndex
+                        if (hasNext) {
+                            enqueueAttempt(index + 1, responseCallback)
+                        } else {
+                            responseCallback.onFailure(this@MirrorFallbackCall, e)
+                        }
+                    }
+                },
+            )
         }
     }
 }
