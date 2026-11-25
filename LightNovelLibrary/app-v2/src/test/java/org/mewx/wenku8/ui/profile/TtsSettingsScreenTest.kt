@@ -10,6 +10,7 @@ import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextClearance
 import androidx.compose.ui.test.performTextInput
@@ -233,6 +234,110 @@ class TtsSettingsScreenTest {
         composeTestRule.onNodeWithTag(ProfileStudioTestTags.SUBSCREEN_LIST)
             .performScrollToNode(hasTestTag(TtsSettingsTestTags.OEM_KEEPALIVE_CARD))
         composeTestRule.onNodeWithText("华为 / HarmonyOS 防断播提示").assertIsDisplayed()
+    }
+
+    @Test
+    fun ttsSettings_moreFreeEnginesRowOpensInstantModalSheetWithClearStatusAndFeedback() {
+        val sampleEngines = listOf(
+            KnownTtsEngineCatalog.describe(KnownTtsEngineCatalog.GOOGLE_TTS_PACKAGE, isSystemDefault = true),
+        )
+        val readyAdapter = SettingsFakeSpeechAdapter(
+            initResult = TtsInitResult(
+                success = true,
+                activeEnginePackage = KnownTtsEngineCatalog.GOOGLE_TTS_PACKAGE,
+                activeEngineLabel = "Google 语音识别与合成",
+            ),
+        )
+        val launched = ArrayList<TtsGuidanceAction>()
+
+        composeTestRule.setContent {
+            Wenku8ExpressiveTheme(themeMode = Wenku8ThemeMode.ARCHIVAL_DAY) {
+                TtsSettingsBody(
+                    preferences = Wenku8UserPreferences(),
+                    horizontalPadding = 16.dp,
+                    isPlayStoreChannel = true,
+                    ttsPreferencesActions = TtsPreferencesActions(),
+                    speechEngineAdapterFactory = { readyAdapter },
+                    installedEnginesProvider = { sampleEngines },
+                    guidanceActionHandler = { _, action ->
+                        launched.add(action)
+                        true
+                    },
+                    manufacturerOverride = "Xiaomi",
+                )
+            }
+        }
+        composeTestRule.waitForIdle()
+
+        // Tapping "获取更多官方 / 开源免费语音引擎" opens ModalBottomSheet immediately with clear status!
+        composeTestRule.onNodeWithTag(ProfileStudioTestTags.SUBSCREEN_LIST)
+            .performScrollToNode(hasTestTag(TtsSettingsTestTags.MORE_ENGINES_ROW))
+        composeTestRule.onNodeWithTag(TtsSettingsTestTags.MORE_ENGINES_ROW).performClick()
+        composeTestRule.waitForIdle()
+
+        composeTestRule.onNodeWithTag(TtsSettingsTestTags.MORE_ENGINES_SHEET).assertIsDisplayed()
+        composeTestRule.onNodeWithTag(TtsSettingsTestTags.MORE_ENGINES_SHEET_STATUS).assertIsDisplayed()
+        composeTestRule.onNodeWithTag("${TtsSettingsTestTags.ONBOARDING_ACTION_PREFIX}play_search_more_tts")
+            .performScrollTo()
+            .performClick()
+        composeTestRule.waitForIdle()
+        assertTrue(launched.single() is TtsGuidanceAction.OpenPlayStoreSearch)
+
+        // Closing sheet returns cleanly without list jitter.
+        composeTestRule.onNodeWithTag(TtsSettingsTestTags.MORE_ENGINES_SHEET_CLOSE)
+            .performScrollTo()
+            .performClick()
+        composeTestRule.waitForIdle()
+        assertEquals(
+            0,
+            composeTestRule
+                .onAllNodesWithTag(TtsSettingsTestTags.MORE_ENGINES_SHEET)
+                .fetchSemanticsNodes()
+                .size,
+        )
+    }
+
+    @Test
+    fun ttsSettings_whileProbingShowsExplicitLinearProgressIndicator() {
+        val pendingAdapter = object : SpeechEngineAdapter {
+            override fun initialize(
+                appLanguage: Wenku8API.AppLanguage,
+                onInitialized: (Boolean) -> Unit,
+                onUtteranceStarted: (String) -> Unit,
+                onUtteranceDone: (String) -> Unit,
+                onUtteranceError: (String) -> Unit,
+            ) = Unit
+
+            override fun initializeConfigured(
+                appLanguage: Wenku8API.AppLanguage,
+                config: TtsPlaybackConfig,
+                excludedEnginePackages: Set<String>,
+                onInitialized: (TtsInitResult) -> Unit,
+                onUtteranceStarted: (String) -> Unit,
+                onUtteranceDone: (String) -> Unit,
+                onUtteranceError: (String) -> Unit,
+            ) = Unit // intentionally stays pending to verify probing progress bar
+
+            override fun setSpeechRate(rate: Float) = Unit
+            override fun speakFlush(text: String, utteranceId: String): Boolean = false
+            override fun stop() = Unit
+            override fun shutdown() = Unit
+        }
+
+        composeTestRule.setContent {
+            Wenku8ExpressiveTheme(themeMode = Wenku8ThemeMode.CLASSIC_BLUE) {
+                TtsSettingsBody(
+                    preferences = Wenku8UserPreferences(),
+                    horizontalPadding = 16.dp,
+                    isPlayStoreChannel = false,
+                    ttsPreferencesActions = TtsPreferencesActions(),
+                    speechEngineAdapterFactory = { pendingAdapter },
+                    installedEnginesProvider = { emptyList() },
+                )
+            }
+        }
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag(TtsSettingsTestTags.PROBING_PROGRESS_BAR).assertIsDisplayed()
     }
 }
 
