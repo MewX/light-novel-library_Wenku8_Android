@@ -475,20 +475,60 @@ class RelayHttpTransport(
                 return@withContext null
             }
 
-            val callFactory: Call.Factory = directGetCallFactory ?: cookieFreeGetClient
-            val call = callFactory.newCall(request)
-            try {
-                awaitCall(call).use { response ->
-                    if (response.code != 200) return@use null
-                    readDecodedResponseBytes(response)
-                }
-            } catch (cancelled: kotlinx.coroutines.CancellationException) {
-                OkHttpProbeTransport.cancelCallSafely(call, baseOkHttpClient.dispatcher.executorService)
-                throw cancelled
-            } catch (_: IOException) {
-                null
+            val cfFactory = directGetCallFactory as? CloudflareAcceleratedCallFactory
+            val pinnedFamily = cfFactory?.activePinnedFamilyForHostOrNull(request.url.host)
+            val primaryFactory: Call.Factory = directGetCallFactory ?: cookieFreeGetClient
+
+            val firstAttempt = executeGetBytesAttempt(primaryFactory, request)
+            if (firstAttempt != null) {
+                return@withContext firstAttempt
             }
+
+            // If the body transfer failed/truncated mid-stream on a pinned Cloudflare edge IP
+            // (after HTTP 200 headers arrived), report the body failure and transparently retry
+            // once over System DNS Happy Eyeballs.
+            if (cfFactory != null && pinnedFamily != null) {
+                cfFactory.reportPinnedBodyReadFailure(request.url.host, pinnedFamily)
+                return@withContext executeGetBytesAttempt(
+                    callFactory = Call.Factory { cfFactory.newDirectSystemDnsCall(it) },
+                    request = request,
+                )
+            }
+            null
         }
+    }
+
+    private suspend fun executeGetBytesAttempt(
+        callFactory: Call.Factory,
+        request: Request,
+    ): ByteArray? {
+        val call = callFactory.newCall(request)
+        return try {
+            awaitCall(call).use { response ->
+                if (response.code != 200) return@use null
+                readDecodedResponseBytesStrict(response)
+            }
+        } catch (cancelled: kotlinx.coroutines.CancellationException) {
+            OkHttpProbeTransport.cancelCallSafely(call, baseOkHttpClient.dispatcher.executorService)
+            throw cancelled
+        } catch (_: IOException) {
+            null
+        }
+    }
+
+    private fun readDecodedResponseBytesStrict(response: Response): ByteArray {
+        val contentEncoding = response.header("Content-Encoding")?.lowercase(Locale.ROOT).orEmpty()
+        val expectedWireLength = response.body.contentLength()
+        val isGzip = contentEncoding.contains("gzip")
+        val decoded = readDecodedResponseBytes(response)
+        // For uncompressed payloads (e.g. JPEGs / PNGs / WebP), verify we received the exact
+        // declared Content-Length so a clean TCP FIN truncation never silently returns a half-image.
+        if (!isGzip && expectedWireLength > 0L && decoded.size.toLong() != expectedWireLength) {
+            throw IOException(
+                "Truncated response body: expected $expectedWireLength bytes, got ${decoded.size}",
+            )
+        }
+        return decoded
     }
 
     override fun clearSessionCookie() {

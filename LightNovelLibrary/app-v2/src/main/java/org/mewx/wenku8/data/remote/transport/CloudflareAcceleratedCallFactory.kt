@@ -12,7 +12,13 @@ import okhttp3.OkHttpClient
 import okhttp3.Protocol
 import okhttp3.Request
 import okhttp3.Response
+import okhttp3.ResponseBody
+import okio.Buffer
+import okio.BufferedSource
+import okio.ForwardingSource
 import okio.Timeout
+import okio.buffer
+import org.mewx.wenku8.data.remote.diagnostics.IpAddressFamily
 import org.mewx.wenku8.data.remote.diagnostics.IpLiteralParser
 import org.mewx.wenku8.data.remote.diagnostics.OkHttpProbeTransport
 import java.io.IOException
@@ -100,6 +106,7 @@ class CloudflareAcceleratedCallFactory(
     private val followSslRedirects: Boolean = true,
     private val hardHostBypassDurationMillis: Long = DEFAULT_HARD_HOST_BYPASS_MS,
     private val transientHostBypassDurationMillis: Long = DEFAULT_TRANSIENT_HOST_BYPASS_MS,
+    private val ipv6BulkBypassDurationMillis: Long = DEFAULT_IPV6_BULK_BYPASS_MS,
     private val transientFailuresBeforeBypass: Int = DEFAULT_TRANSIENT_FAILURES_BEFORE_BYPASS,
     private val monotonicClockMillis: () -> Long = { SystemClock.elapsedRealtime() },
     private val fallbackExecutor: Executor = baseOkHttpClient.dispatcher.executorService,
@@ -112,6 +119,7 @@ class CloudflareAcceleratedCallFactory(
         const val DEFAULT_WRITE_TIMEOUT_MS: Long = 15_000L
         const val DEFAULT_HARD_HOST_BYPASS_MS: Long = 30L * 60L * 1_000L
         const val DEFAULT_TRANSIENT_HOST_BYPASS_MS: Long = 10L * 60L * 1_000L
+        const val DEFAULT_IPV6_BULK_BYPASS_MS: Long = 30L * 60L * 1_000L
         const val DEFAULT_TRANSIENT_FAILURES_BEFORE_BYPASS: Int = 2
 
         private val SAFE_IDEMPOTENT_METHODS = setOf("GET", "HEAD")
@@ -179,6 +187,7 @@ class CloudflareAcceleratedCallFactory(
     private class PinnedGenerationEntry(
         val generationId: Long,
         val candidateId: String,
+        val family: IpAddressFamily,
         val client: OkHttpClient,
         val connectionPool: ConnectionPool,
     ) {
@@ -213,6 +222,10 @@ class CloudflareAcceleratedCallFactory(
     private val transientBypassedHostsUntilMonoMs = ConcurrentHashMap<String, Long>()
     private val consecutiveTransientFailuresByHost = ConcurrentHashMap<String, AtomicInteger>()
 
+    // Circuit breaker when a pinned IPv6 edge fails mid-body on bulk media transfers (e.g. cellular
+    // IPv6 PMTU blackholes / bulk throttling where 180B probes succeed but 1MB JPEGs stall).
+    @Volatile private var ipv6EdgeBypassedUntilMonoMs: Long = 0L
+
     private val systemDnsClient: OkHttpClient by lazy {
         baseOkHttpClient.newBuilder()
             .cookieJar(CookieJar.NO_COOKIES)
@@ -244,6 +257,11 @@ class CloudflareAcceleratedCallFactory(
             return systemDnsClient.newCall(request)
         }
 
+        val isIpv6Edge = edgeRoute.rawIpBytes.size == 16
+        if (isIpv6Edge && isIpv6EdgeCurrentlyBypassed()) {
+            return systemDnsClient.newCall(request)
+        }
+
         val initialHost = normalizeHost(request.url.host)
         if (!shouldPinHost(initialHost)) {
             return systemDnsClient.newCall(request)
@@ -258,11 +276,55 @@ class CloudflareAcceleratedCallFactory(
         )
     }
 
-    /** Clears all host cooldown entries (e.g. when the user manually resets network routing). */
+    /**
+     * Creates a direct call using [systemDns] (`fastFallback(true)` Happy Eyeballs), bypassing any
+     * pinned Cloudflare edge IP. Used for mid-body stream retries and explicit user reload actions.
+     */
+    fun newDirectSystemDnsCall(request: Request): Call = systemDnsClient.newCall(request)
+
+    /**
+     * Returns the address family (`IPV4` or `IPV6`) that will be used if [host] is dialed through
+     * the currently active pinned Cloudflare edge IP, or `null` when System DNS will be used.
+     */
+    fun activePinnedFamilyForHostOrNull(host: String): IpAddressFamily? {
+        val edgeRoute = edgeRouteProvider.currentActiveEdgeRouteOrNull() ?: return null
+        val family = IpAddressFamily.fromRawBytesOrNull(edgeRoute.rawIpBytes) ?: return null
+        if (family == IpAddressFamily.IPV6 && isIpv6EdgeCurrentlyBypassed()) return null
+        return if (shouldPinHost(normalizeHost(host))) family else null
+    }
+
+    /**
+     * Reports a mid-body stream failure (read timeout, truncated `Content-Length`, reset, or
+     * non-image/corrupt payload) observed AFTER HTTP response headers arrived via a pinned edge IP.
+     *
+     * On IPv6 edges, a single bulk-body failure immediately trips [ipv6EdgeBypassedUntilMonoMs] so
+     * subsequent image fetches fall back to System DNS Happy Eyeballs instead of stalling for 6h,
+     * without ever revoking the relay's small-packet API lease.
+     */
+    fun reportPinnedBodyReadFailure(host: String, family: IpAddressFamily?) {
+        if (family == IpAddressFamily.IPV6) {
+            ipv6EdgeBypassedUntilMonoMs = monotonicClockMillis() + ipv6BulkBypassDurationMillis
+        }
+        recordTransientHostFailure(host)
+    }
+
+    /** Clears all host & IPv6 bulk cooldown entries (e.g. when the user resets network routing). */
     fun clearHostBypasses() {
         hardBypassedHostsUntilMonoMs.clear()
         transientBypassedHostsUntilMonoMs.clear()
         consecutiveTransientFailuresByHost.clear()
+        ipv6EdgeBypassedUntilMonoMs = 0L
+    }
+
+    internal fun isIpv6EdgeCurrentlyBypassed(): Boolean {
+        val until = ipv6EdgeBypassedUntilMonoMs
+        if (until <= 0L) return false
+        return if (monotonicClockMillis() < until) {
+            true
+        } else {
+            ipv6EdgeBypassedUntilMonoMs = 0L
+            false
+        }
     }
 
     internal fun isHostCurrentlyBypassed(host: String): Boolean {
@@ -335,11 +397,13 @@ class CloudflareAcceleratedCallFactory(
                 current.markRetiredAndEvictIfIdle(fallbackExecutor)
             }
 
-            // A fresh Cloudflare IP generation gets a clean slate for transient timeouts while
-            // keeping hard non-CF host bypasses intact.
+            // A fresh Cloudflare IP generation gets a clean slate for transient timeouts & IPv6
+            // bulk cooldown while keeping hard non-CF host bypasses intact.
             transientBypassedHostsUntilMonoMs.clear()
             consecutiveTransientFailuresByHost.clear()
+            ipv6EdgeBypassedUntilMonoMs = 0L
 
+            val family = IpAddressFamily.fromRawBytesOrNull(edgeRoute.rawIpBytes) ?: IpAddressFamily.IPV4
             val pool = ConnectionPool(8, 5, TimeUnit.MINUTES)
             val dnsAdapter = DynamicCloudflareEdgeDns(
                 generationId = edgeRoute.generationId,
@@ -371,6 +435,7 @@ class CloudflareAcceleratedCallFactory(
             val created = PinnedGenerationEntry(
                 generationId = edgeRoute.generationId,
                 candidateId = edgeRoute.candidateId,
+                family = family,
                 client = client,
                 connectionPool = pool,
             )
@@ -550,7 +615,10 @@ class CloudflareAcceleratedCallFactory(
                 val fallbackReason = classifyCloudflareFallbackResponse(response)
                 if (fallbackReason == null) {
                     factory.recordPinnedSuccess(response.request.url.host)
-                    return response
+                    return wrapResponseBodyForFailureMonitoring(
+                        response = response,
+                        observedNonDirectProxy = tracker.observedNonDirectProxy,
+                    )
                 }
                 val failedHost = response.request.url.host
                 response.close()
@@ -609,7 +677,11 @@ class CloudflareAcceleratedCallFactory(
                         val fallbackReason = classifyCloudflareFallbackResponse(response)
                         if (fallbackReason == null) {
                             factory.recordPinnedSuccess(response.request.url.host)
-                            responseCallback.onResponse(this@FallbackDelegatingCall, response)
+                            val monitored = wrapResponseBodyForFailureMonitoring(
+                                response = response,
+                                observedNonDirectProxy = tracker.observedNonDirectProxy,
+                            )
+                            responseCallback.onResponse(this@FallbackDelegatingCall, monitored)
                             return
                         }
 
@@ -673,8 +745,63 @@ class CloudflareAcceleratedCallFactory(
             if (error is SSLException) {
                 factory.recordHardHostBypass(host)
             } else {
-                factory.recordTransientHostFailure(host)
+                if (pinnedGeneration.family == IpAddressFamily.IPV6) {
+                    factory.reportPinnedBodyReadFailure(host, IpAddressFamily.IPV6)
+                } else {
+                    factory.recordTransientHostFailure(host)
+                }
             }
+        }
+
+        private fun wrapResponseBodyForFailureMonitoring(
+            response: Response,
+            observedNonDirectProxy: Boolean,
+        ): Response {
+            if (observedNonDirectProxy) return response
+            val delegateBody = response.body
+            val finalHost = response.request.url.host
+            val monitoredBody = BodyFailureMonitoringResponseBody(
+                delegate = delegateBody,
+                onBodyIoFailure = {
+                    if (!canceled.get()) {
+                        factory.reportPinnedBodyReadFailure(finalHost, pinnedGeneration.family)
+                    }
+                },
+            )
+            return response.newBuilder()
+                .body(monitoredBody)
+                .build()
+        }
+    }
+
+    private class BodyFailureMonitoringResponseBody(
+        private val delegate: ResponseBody,
+        private val onBodyIoFailure: () -> Unit,
+    ) : ResponseBody() {
+        private val reportedFailure = AtomicBoolean(false)
+        private val wrappedSource: BufferedSource by lazy {
+            object : ForwardingSource(delegate.source()) {
+                override fun read(sink: Buffer, byteCount: Long): Long {
+                    return try {
+                        super.read(sink, byteCount)
+                    } catch (ioError: IOException) {
+                        if (reportedFailure.compareAndSet(false, true)) {
+                            onBodyIoFailure()
+                        }
+                        throw ioError
+                    }
+                }
+            }.buffer()
+        }
+
+        override fun contentType() = delegate.contentType()
+
+        override fun contentLength() = delegate.contentLength()
+
+        override fun source(): BufferedSource = wrappedSource
+
+        override fun close() {
+            delegate.close()
         }
     }
 }

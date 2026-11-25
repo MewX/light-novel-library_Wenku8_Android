@@ -526,4 +526,275 @@ class CloudflareAcceleratedCallFactoryTest {
             scope.cancel()
         }
     }
+
+    @Test
+    fun midBodyTruncationOnPinnedIpv6Edge_tripsIpv6Breaker_fallsBackToSystemDns_andIgnoresCanceledCalls() =
+        runBlocking {
+            MockWebServer().use { systemOrigin ->
+                MockWebServer().use { pinnedEdge ->
+                    systemOrigin.start(InetAddress.getByName("127.0.0.1"), 0)
+                    val sharedPort = systemOrigin.port
+                    pinnedEdge.start(InetAddress.getByName("127.0.0.2"), sharedPort)
+
+                    // 16-byte IPv4-mapped IPv6 address `::ffff:127.0.0.2`: treated as IpAddressFamily.IPV6
+                    // while dialing local MockWebServer on 127.0.0.2 even on IPv4-only CI hosts!
+                    val pinnedIpv6MappedBytes = byteArrayOf(
+                        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0xFF.toByte(), 0xFF.toByte(), 127, 0, 0, 2,
+                    )
+                    val systemBytes = IpLiteralParser.parseNumericIpBytes("127.0.0.1", requirePublicUnicast = false)!!
+                    val monoClock = AtomicLong(200_000L)
+
+                    val activeEdgeRef = AtomicReference(
+                        ActiveCloudflareEdgeRoute(
+                            generationId = 99L,
+                            candidateId = "cf-v6-edge-flaky",
+                            rawIpBytes = pinnedIpv6MappedBytes,
+                        ),
+                    )
+                    val fakeSystemDns = Dns { host ->
+                        listOf(InetAddress.getByAddress(host, systemBytes))
+                    }
+                    val factory = CloudflareAcceleratedCallFactory(
+                        edgeRouteProvider = { activeEdgeRef.get() },
+                        systemDns = fakeSystemDns,
+                        monotonicClockMillis = { monoClock.get() },
+                    )
+
+                    assertEquals(
+                        IpAddressFamily.IPV6,
+                        factory.activePinnedFamilyForHostOrNull("pic.777743.xyz"),
+                    )
+                    assertFalse(factory.isIpv6EdgeCurrentlyBypassed())
+
+                    // 1. Pinned IPv6 edge sends HTTP 200 headers with Content-Length: 4096 but closes mid-body!
+                    //    RelayHttpTransport.getBytes() must detect the mid-body truncation, trip the IPv6
+                    //    bulk breaker, and transparently succeed via System DNS on the same call!
+                    pinnedEdge.enqueue(
+                        MockResponse.Builder()
+                            .code(200)
+                            .addHeader("Server", "cloudflare")
+                            .addHeader("Content-Type", "image/jpeg")
+                            .body("TRUNCATED")
+                            .setHeader("Content-Length", "4096")
+                            .setHeader("Connection", "close")
+                            .build(),
+                    )
+                    systemOrigin.enqueue(
+                        MockResponse.Builder()
+                            .code(200)
+                            .addHeader("Content-Type", "image/jpeg")
+                            .body("FULL-IMAGE-VIA-SYSTEM-DNS")
+                            .build(),
+                    )
+
+                    val relayTransport = RelayHttpTransport(
+                        directGetCallFactory = factory,
+                        systemDns = fakeSystemDns,
+                    )
+                    val downloaded = relayTransport.getBytes("http://pic.777743.xyz:$sharedPort/3/3770/1.jpg")
+                    assertEquals("FULL-IMAGE-VIA-SYSTEM-DNS", downloaded?.toString(StandardCharsets.UTF_8))
+                    assertEquals(1, pinnedEdge.requestCount)
+                    assertEquals(1, systemOrigin.requestCount)
+                    assertTrue(
+                        "Single mid-body failure on pinned IPv6 edge must trip 30-min IPv6 bulk bypass",
+                        factory.isIpv6EdgeCurrentlyBypassed(),
+                    )
+                    assertNull(factory.activePinnedFamilyForHostOrNull("pic.777743.xyz"))
+
+                    // 2. Subsequent Coil/image GETs immediately route via System DNS while IPv6 cooldown is active
+                    systemOrigin.enqueue(MockResponse.Builder().code(200).body("COIL-SYSTEM-DIRECT").build())
+                    factory.newCall(
+                        Request.Builder()
+                            .url("http://img.wenku8.com:$sharedPort/image/3/3770/3770s.jpg")
+                            .get()
+                            .build(),
+                    ).execute().use { resp ->
+                        assertEquals("COIL-SYSTEM-DIRECT", resp.body.string())
+                    }
+                    assertEquals(1, pinnedEdge.requestCount)
+                    assertEquals(2, systemOrigin.requestCount)
+
+                    // 3. After 30-min cooldown expires, IPv6 pinning re-enables; canceling a call mid-body
+                    //    MUST NOT trip the IPv6 breaker!
+                    monoClock.addAndGet(CloudflareAcceleratedCallFactory.DEFAULT_IPV6_BULK_BYPASS_MS + 1_000L)
+                    assertFalse(factory.isIpv6EdgeCurrentlyBypassed())
+
+                    pinnedEdge.enqueue(
+                        MockResponse.Builder()
+                            .code(200)
+                            .addHeader("Server", "cloudflare")
+                            .body("PARTIAL-BEFORE-CANCEL")
+                            .setHeader("Content-Length", "4096")
+                            .setHeader("Connection", "close")
+                            .build(),
+                    )
+                    val cancelableCall = factory.newCall(
+                        Request.Builder()
+                            .url("http://pic.777743.xyz:$sharedPort/3/3770/2.jpg")
+                            .get()
+                            .build(),
+                    )
+                    cancelableCall.execute().use { resp ->
+                        cancelableCall.cancel()
+                        runCatching { resp.body.bytes() }
+                    }
+                    assertFalse(
+                        "User-canceled call must not falsely trip IPv6 bulk breaker",
+                        factory.isIpv6EdgeCurrentlyBypassed(),
+                    )
+                }
+            }
+        }
+
+    @Test
+    fun relayRouteControllerDiscovery_prefersComparableIpv4OverIpv6_andKeepsIpv6WhenIpv4SlowerOrFailed() =
+        runBlocking {
+            val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
+            try {
+                val dsFile = File(tempFolder.newFolder("ds_v4pref"), "v4pref.preferences_pb")
+                val store = RoutingLocalStore(
+                    PreferenceDataStoreFactory.create(scope = scope, produceFile = { dsFile }),
+                )
+                val nowWall = 1_762_740_000_000L
+                val monoClock = AtomicLong(10_000L)
+                val networkFlow = MutableStateFlow(
+                    NetworkSnapshot(
+                        internalNetworkHandleKey = "cell-5g-vivo",
+                        isConnected = true,
+                        underlyingTransports = setOf(UnderlyingTransportKind.CELLULAR),
+                        isMetered = true,
+                    ),
+                )
+                val observer = object : NetworkConnectivityObserver {
+                    override fun currentSnapshot(): NetworkSnapshot = networkFlow.value
+                    override fun observeDefaultNetworkSnapshots(): Flow<NetworkSnapshot> = networkFlow
+                }
+                val endpoint = (
+                    DiagnosticsEndpointConfig.parseAndValidate("https://wenku8-relay.mewx.org/")
+                        as DiagnosticsEndpointResolution.Available
+                    ).endpoint
+                val manifestRepo = ManifestRepository(
+                    localStore = store,
+                    wallClockEpochMillis = { nowWall },
+                    monotonicClockMillis = { monoClock.get() },
+                )
+                manifestRepo.ingestManifestPayload(
+                    rawJson = """
+                        {
+                          "schema": "wenku8-ip-candidates-v1",
+                          "revision": "rev-v4-tiebreak",
+                          "hostname": "wenku8-relay.mewx.org",
+                          "enabled": true,
+                          "minAppVersionCode": 0,
+                          "rolloutPermille": 1000,
+                          "issuedAt": "2025-11-10T00:00:00Z",
+                          "expiresAt": "2025-11-10T12:00:00Z",
+                          "candidates": [
+                            { "id": "cf-v6-fast", "ip": "2606:4700::6810:84e5" },
+                            { "id": "cf-v4-near", "ip": "104.16.132.229" }
+                          ]
+                        }
+                    """.trimIndent(),
+                    expectedRelayHostname = "wenku8-relay.mewx.org",
+                )
+
+                var v4LatencyMs = 110L // +30ms slower than v6 (80ms), within 40ms margin -> prefer IPv4!
+                var v4Succeeded = true
+                val probeTransport = object : DiagnosticsProbeTransport {
+                    override suspend fun executeProbe(
+                        endpoint: ValidatedRelayEndpoint,
+                        armConfig: ProbeArmConfig,
+                        sampleIndex: Int,
+                        explicitNonce: String?,
+                    ): ProbeSampleResult {
+                        val candidateId = (armConfig.dnsPolicy as? ProbeDnsPolicy.PinnedCandidate)?.candidateId
+                        val isWarm = armConfig.armId.startsWith("discover_warm:")
+                        val isV4 = candidateId == "cf-v4-near"
+                        return ProbeSampleResult(
+                            sampleIndex = sampleIndex,
+                            armId = armConfig.armId,
+                            candidateId = candidateId,
+                            succeeded = if (isV4) v4Succeeded else true,
+                            httpStatusCode = if (isV4 && !v4Succeeded) null else 200,
+                            retryAfterSeconds = null,
+                            errorCategory = null,
+                            fullResponseElapsedMs = if (isV4) v4LatencyMs else 80L,
+                            responseHeadersStartMs = 40L,
+                            dnsDurationMs = null,
+                            tcpConnectDurationMs = if (isWarm) null else 20L,
+                            tlsHandshakeDurationMs = if (isWarm) null else 20L,
+                            connectionReused = isWarm,
+                            connectAttemptCount = if (isWarm) 0 else 1,
+                            observedProxyType = Proxy.Type.DIRECT,
+                            localSocketFamily = if (isV4) IpAddressFamily.IPV4 else IpAddressFamily.IPV6,
+                            negotiatedProtocol = "h2",
+                            responseBodyBytesRead = 180,
+                            bodyComplete = true,
+                            serverPayload = if (isV4 && !v4Succeeded) {
+                                null
+                            } else {
+                                ParsedServerProbePayload(
+                                    schema = OkHttpProbeTransport.PROBE_SCHEMA_V1,
+                                    nonce = "0123456789abcdef0123456789abcdef",
+                                    endpointRole = "placed-relay",
+                                    ingressColo = "HKG",
+                                    country = "CN",
+                                    asn = 4134L,
+                                    clientIpFamily = if (isV4) IpAddressFamily.IPV4 else IpAddressFamily.IPV6,
+                                    httpProtocol = "HTTP/2",
+                                    transportRttMs = 20L,
+                                    transportRttSource = "tcp",
+                                    handlerElapsedMs = 1L,
+                                )
+                            },
+                            observedEvents = listOf("callStart", "connectionAcquired", "callEnd"),
+                        )
+                    }
+                }
+
+                val controller = RelayRouteController(
+                    applicationScope = scope,
+                    endpointResolutionProvider = { DiagnosticsEndpointResolution.Available(endpoint) },
+                    probeTransport = probeTransport,
+                    manifestRepository = manifestRepo,
+                    routingLocalStore = store,
+                    networkObserver = observer,
+                    autoProbeGapMillis = 0L,
+                    initialAutoOptimizeEnabled = true,
+                    allowAutoSelectOnEnable = true,
+                    monotonicClockMillis = { monoClock.get() },
+                    wallClockEpochMillis = { nowWall },
+                )
+
+                // 1. IPv4 is 110ms vs IPv6 80ms (+30ms <= 40ms) -> selects IPv4 for cellular bulk stability!
+                val pickedComparable = controller.discoverAndRecordPreferredCandidate(
+                    applyIfEnabled = true,
+                    invokedFromManualCheck = true,
+                    userInitiated = true,
+                )
+                assertEquals("cf-v4-near", pickedComparable?.candidateId)
+                assertEquals("104.16.132.229", pickedComparable?.ipLiteral)
+
+                // 2. When IPv4 is much slower (260ms vs 80ms), IPv6 still wins cleanly!
+                v4LatencyMs = 260L
+                val pickedWhenV4Slow = controller.discoverAndRecordPreferredCandidate(
+                    applyIfEnabled = true,
+                    invokedFromManualCheck = true,
+                    userInitiated = true,
+                )
+                assertEquals("cf-v6-fast", pickedWhenV4Slow?.candidateId)
+                assertEquals("2606:4700::6810:84e5", pickedWhenV4Slow?.ipLiteral)
+
+                // 3. When IPv4 fails completely, IPv6 still wins cleanly!
+                v4Succeeded = false
+                val pickedWhenV4Blocked = controller.discoverAndRecordPreferredCandidate(
+                    applyIfEnabled = true,
+                    invokedFromManualCheck = true,
+                    userInitiated = true,
+                )
+                assertEquals("cf-v6-fast", pickedWhenV4Blocked?.candidateId)
+            } finally {
+                scope.cancel()
+            }
+        }
 }

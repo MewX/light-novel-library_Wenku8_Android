@@ -1054,9 +1054,24 @@ class RelayRouteController(
                 }
             }
 
-            val best = screened.minByOrNull { it.sample.fullResponseElapsedMs } ?: run {
+            // Prefer healthy IPv4 over IPv6 when IPv4 is comparable (within 40 ms or 20% of the
+            // fastest IPv6 probe): on cellular networks, IPv6 frequently wins tiny 180 B pings by
+            // a few milliseconds while suffering bulk-transfer throttling or PMTU stalls on large
+            // illustrations. When IPv4 is blocked/unreachable or substantially slower, IPv6 still wins.
+            val fastestOverall = screened.minByOrNull { it.sample.fullResponseElapsedMs } ?: run {
                 refreshUiState()
                 return@withLock null
+            }
+            val fastestV4 = screened
+                .filter { it.candidate.family == IpAddressFamily.IPV4 }
+                .minByOrNull { it.sample.fullResponseElapsedMs }
+            val best = if (fastestOverall.candidate.family == IpAddressFamily.IPV6 && fastestV4 != null) {
+                val v6Ms = fastestOverall.sample.fullResponseElapsedMs
+                val v4Ms = fastestV4.sample.fullResponseElapsedMs
+                val withinMargin = v4Ms <= v6Ms + 40L || v4Ms * 5L <= v6Ms * 6L
+                if (withinMargin) fastestV4 else fastestOverall
+            } else {
+                fastestOverall
             }
 
             // Verify warm HTTP/2 connection reuse on the winning candidate's pool before recording/promoting.
