@@ -442,7 +442,7 @@ class NovelDetailBannerAdHolder internal constructor(
             savedWidthDp > 0
         hasRecordedImpression = false
 
-        if (shouldRecycle && existingBanner != null) {
+        if (shouldRecycle) {
             runCatching { existingBanner.adEventCallback = null }
             if (existing != null) {
                 runCatching { existing.unregisterBannerAd() }
@@ -609,9 +609,21 @@ fun rememberNovelDetailBannerAdHolder(
 }
 
 /**
- * Bounded LRU pool of [NovelDetailBannerAdHolder] instances scoped to a Discovery feed (`最新` /
+ * Optional host-scoped [DiscoveryFeedInlineAdPool] provided by `AdaptiveMainScaffold` outside
+ * `AnimatedContent` so navigating into `NovelDetailScreen` and back preserves already-displayed
+ * Discovery feed ads intact with zero reload or refresh.
+ */
+val LocalDiscoveryFeedInlineAdPool = compositionLocalOf<DiscoveryFeedInlineAdPool?> { null }
+
+/**
+ * Bounded LRU pool of [NovelDetailBannerAdHolder] instances scoped to Discovery feeds (`最新` /
  * `排行`), capping concurrent live WebView-backed `AdView`s to [maxCachedSlots] while keeping
- * recently scrolled slots warm so scrolling back up reuses the loaded banner without re-requesting.
+ * rendered pagination slots alive across `LazyColumn` scrolling and `NovelDetailScreen` round-trips
+ * without destroying or reloading them.
+ *
+ * Also latches per-slot cache-gated pagination decisions (`true` = bound from preloader and
+ * inserted at the start of Page 2+, `false` = skipped cleanly when cache was empty) so slots
+ * never pop in retroactively and cause layout shift.
  */
 @Stable
 class DiscoveryFeedInlineAdPool internal constructor(
@@ -623,9 +635,15 @@ class DiscoveryFeedInlineAdPool internal constructor(
         /* loadFactor = */ 0.75f,
         /* accessOrder = */ true,
     )
+    private val latchedDecisions = LinkedHashMap<String, Boolean>()
 
     val isAdSlotEligible: Boolean
         get() = initialPhase != BannerAdLoadPhase.Collapsed
+
+    fun getOrNull(slotKey: String): NovelDetailBannerAdHolder? {
+        val existing = holders[slotKey]
+        return if (existing != null && !existing.isDisposed) existing else null
+    }
 
     fun getOrCreate(slotKey: String): NovelDetailBannerAdHolder {
         val existing = holders[slotKey]
@@ -636,14 +654,126 @@ class DiscoveryFeedInlineAdPool internal constructor(
             initialPhase = initialPhase,
             placement = InlineBannerPlacement.DISCOVERY_FEED_INLINE,
         )
-        holders[slotKey] = created
+        putHolderAndEnforceLru(slotKey, created)
+        return created
+    }
+
+    /**
+     * Resolves (or latches on first evaluation) whether pagination boundary [slotKey] should
+     * display a preloaded inline ad:
+     * - If an existing live/preview holder is already bound for [slotKey] (e.g., returning from
+     *   `NovelDetailScreen`), reuses it immediately with zero refresh.
+     * - If previously latched to `false`, stays `false` until [clearSort] or [destroyAll].
+     * - On first evaluation in live mode, synchronously polls [ServerSupportBannerPreloader] and
+     *   binds the ad; if no preloaded ad is ready, latches `false` so zero blank card is inserted.
+     */
+    fun resolveOrLatchPaginationAd(
+        slotKey: String,
+        hostContext: Context?,
+        availableWidthDp: Int,
+        canRequestAds: Boolean,
+        staticPreviewReady: Boolean = true,
+    ): Boolean {
+        if (!isAdSlotEligible) {
+            return false
+        }
+        val existingDecision = latchedDecisions[slotKey]
+        if (existingDecision == false) {
+            return false
+        }
+        if (existingDecision == true) {
+            val liveHolder = holders[slotKey]
+            if (liveHolder != null && !liveHolder.isDisposed) {
+                return true
+            }
+            // Holder was evicted by LRU after deep scrolling; only re-show if cache has a ready ad
+            // (or in StaticPreview test mode), never reverting to a blank Loading card.
+            if (initialPhase == BannerAdLoadPhase.StaticPreview) {
+                if (staticPreviewReady) {
+                    putHolderAndEnforceLru(
+                        slotKey,
+                        NovelDetailBannerAdHolder(
+                            initialPhase = BannerAdLoadPhase.StaticPreview,
+                            placement = InlineBannerPlacement.DISCOVERY_FEED_INLINE,
+                        ),
+                    )
+                    return true
+                }
+                latchedDecisions[slotKey] = false
+                return false
+            }
+            if (hostContext != null && canRequestAds) {
+                val rebound = NovelDetailBannerAdHolder(
+                    initialPhase = BannerAdLoadPhase.Collapsed,
+                    placement = InlineBannerPlacement.DISCOVERY_FEED_INLINE,
+                )
+                if (bindPreloadedBannerToHolder(rebound, hostContext, availableWidthDp, canRequestAds)) {
+                    putHolderAndEnforceLru(slotKey, rebound)
+                    return true
+                }
+            }
+            latchedDecisions[slotKey] = false
+            return false
+        }
+
+        // First-time evaluation when the next page boundary enters the list.
+        if (initialPhase == BannerAdLoadPhase.StaticPreview) {
+            latchedDecisions[slotKey] = staticPreviewReady
+            if (staticPreviewReady) {
+                putHolderAndEnforceLru(
+                    slotKey,
+                    NovelDetailBannerAdHolder(
+                        initialPhase = BannerAdLoadPhase.StaticPreview,
+                        placement = InlineBannerPlacement.DISCOVERY_FEED_INLINE,
+                    ),
+                )
+            }
+            return staticPreviewReady
+        }
+
+        if (hostContext == null || !canRequestAds) {
+            latchedDecisions[slotKey] = false
+            return false
+        }
+        val candidate = NovelDetailBannerAdHolder(
+            initialPhase = BannerAdLoadPhase.Collapsed,
+            placement = InlineBannerPlacement.DISCOVERY_FEED_INLINE,
+        )
+        val bound = bindPreloadedBannerToHolder(
+            holder = candidate,
+            hostContext = hostContext,
+            availableWidthDp = availableWidthDp,
+            canRequestAds = canRequestAds,
+        )
+        latchedDecisions[slotKey] = bound
+        if (bound) {
+            putHolderAndEnforceLru(slotKey, candidate)
+        }
+        return bound
+    }
+
+    /**
+     * Clears latched slot decisions and holders belonging to [sortName] (invoked on explicit
+     * pull-to-refresh so freshly paginated feeds evaluate fresh preloaded ads cleanly).
+     */
+    fun clearSort(sortName: String) {
+        val prefix = "${sortName}_slot_"
+        val keysToRemove = latchedDecisions.keys.filter { it.startsWith(prefix) }
+        keysToRemove.forEach { latchedDecisions.remove(it) }
+        val holderKeysToRemove = holders.keys.filter { it.startsWith(prefix) }
+        holderKeysToRemove.forEach { key ->
+            holders.remove(key)?.destroy(markDisposed = true, recycleIfUnimpressed = true)
+        }
+    }
+
+    private fun putHolderAndEnforceLru(slotKey: String, holder: NovelDetailBannerAdHolder) {
+        holders[slotKey] = holder
         val limit = maxCachedSlots.coerceAtLeast(1)
         while (holders.size > limit) {
             val eldest = holders.entries.iterator().next()
             holders.remove(eldest.key)
-            eldest.value.destroy(markDisposed = true)
+            eldest.value.destroy(markDisposed = true, recycleIfUnimpressed = true)
         }
-        return created
     }
 
     internal fun activeSlotKeys(): Set<String> = holders.keys.toSet()
@@ -651,11 +781,12 @@ class DiscoveryFeedInlineAdPool internal constructor(
     internal fun destroyAll() {
         val snapshot = holders.values.toList()
         holders.clear()
+        latchedDecisions.clear()
         snapshot.forEach { it.destroy(markDisposed = true) }
     }
 
     companion object {
-        const val DEFAULT_MAX_CACHED_SLOTS = 3
+        const val DEFAULT_MAX_CACHED_SLOTS = 4
     }
 }
 

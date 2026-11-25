@@ -562,51 +562,53 @@ class DiscoveryScreensTest {
 
         assertTrue(buildDiscoveryFeedEntries(emptyList(), adsEnabled = true).isEmpty())
 
-        // Sub-page (< 10 novels) emits 0 inline ads
+        // Page 1 (<= 10 novels) emits 0 inline ads so cold-start prioritizes NovelDetailScreen
         val nineItems = buildDiscoveryFeedEntries(sampleItems(9), adsEnabled = true)
         assertEquals(9, nineItems.size)
         assertTrue(nineItems.none { it is DiscoveryFeedEntry.InlineAd })
 
-        // Page 1 (10 novels) -> 1 ad right after #10 (index 10)
         val tenItems = buildDiscoveryFeedEntries(sampleItems(10), adsEnabled = true)
-        assertEquals(11, tenItems.size)
-        assertEquals(DiscoveryFeedEntry.InlineAd(slotIndex = 0), tenItems[10])
+        assertEquals(10, tenItems.size)
+        assertTrue(tenItems.none { it is DiscoveryFeedEntry.InlineAd })
 
-        // When append error footer is visible at tail, trailing ad after #10 is suppressed
-        val tenItemsWithError = buildDiscoveryFeedEntries(
-            items = sampleItems(10),
-            adsEnabled = true,
-            suppressTrailingAd = true,
-        )
-        assertEquals(10, tenItemsWithError.size)
-        assertTrue(tenItemsWithError.none { it is DiscoveryFeedEntry.InlineAd })
-
-        // Two full pages (20 novels) -> ads right after #10 (index 10) and #20 (index 21)
+        // Page 2 loaded (11..20 novels) -> slot 0 placed as the FIRST item of Page 2 (before #11)
         val twentyItems = buildDiscoveryFeedEntries(sampleItems(20), adsEnabled = true)
-        assertEquals(22, twentyItems.size)
+        assertEquals(21, twentyItems.size)
         assertEquals(DiscoveryFeedEntry.InlineAd(slotIndex = 0), twentyItems[10])
         assertEquals(10, (twentyItems[11] as DiscoveryFeedEntry.Novel).novelIndex)
-        assertEquals(DiscoveryFeedEntry.InlineAd(slotIndex = 1), twentyItems[21])
+        assertEquals(19, (twentyItems[20] as DiscoveryFeedEntry.Novel).novelIndex)
 
-        // Append error after 2 pages keeps page-1 ad (#10) and suppresses only trailing #20 slot
-        val twentyItemsWithError = buildDiscoveryFeedEntries(
-            items = sampleItems(20),
-            adsEnabled = true,
-            suppressTrailingAd = true,
-        )
-        assertEquals(21, twentyItemsWithError.size)
-        assertEquals(
-            listOf(0),
-            twentyItemsWithError.filterIsInstance<DiscoveryFeedEntry.InlineAd>().map { it.slotIndex },
-        )
-
-        // 25 novels -> 2 ads after #10 and #20
+        // Page 3 loaded (25 novels) -> ads at start of Page 2 (index 10, before #11) and Page 3 (index 21, before #21)
         val twentyFiveItems = buildDiscoveryFeedEntries(sampleItems(25), adsEnabled = true)
         assertEquals(27, twentyFiveItems.size)
+        assertEquals(DiscoveryFeedEntry.InlineAd(slotIndex = 0), twentyFiveItems[10])
+        assertEquals(DiscoveryFeedEntry.InlineAd(slotIndex = 1), twentyFiveItems[21])
+        assertEquals(20, (twentyFiveItems[22] as DiscoveryFeedEntry.Novel).novelIndex)
         assertEquals(
             listOf(0, 1),
             twentyFiveItems.filterIsInstance<DiscoveryFeedEntry.InlineAd>().map { it.slotIndex },
         )
+
+        // Cache-gated slot filtering: only boundaries with ready cached ads are inserted
+        val onlyPage3Cached = buildDiscoveryFeedEntries(
+            items = sampleItems(25),
+            adsEnabled = true,
+            enabledAdSlotIndices = setOf(1),
+        )
+        assertEquals(26, onlyPage3Cached.size)
+        assertEquals(
+            listOf(1),
+            onlyPage3Cached.filterIsInstance<DiscoveryFeedEntry.InlineAd>().map { it.slotIndex },
+        )
+        assertEquals(DiscoveryFeedEntry.InlineAd(slotIndex = 1), onlyPage3Cached[20])
+
+        val noneCached = buildDiscoveryFeedEntries(
+            items = sampleItems(25),
+            adsEnabled = true,
+            enabledAdSlotIndices = emptySet(),
+        )
+        assertEquals(25, noneCached.size)
+        assertTrue(noneCached.none { it is DiscoveryFeedEntry.InlineAd })
 
         // Disabled ads -> exact 1:1 novel list with zero inline ad entries
         val disabled = buildDiscoveryFeedEntries(sampleItems(25), adsEnabled = false)
@@ -616,7 +618,7 @@ class DiscoveryScreensTest {
 
     @Test
     fun findUpcomingInlineAdSlotsToPrefetch_triggersOnlyWithinLookaheadWindow() {
-        val sampleTwenty = (1..20).map { idx ->
+        val sampleTwentyFive = (1..25).map { idx ->
             DiscoveryNovelCardItem(
                 aid = 7100 + idx,
                 title = "作品-$idx",
@@ -629,8 +631,8 @@ class DiscoveryScreensTest {
                 inLocalBookshelf = false,
             )
         }
-        // Entries: 0..9 novels, 10 InlineAd(0), 11..20 novels, 21 InlineAd(1)
-        val entries = buildDiscoveryFeedEntries(sampleTwenty, adsEnabled = true)
+        // Entries: 0..9 novels, 10 InlineAd(0), 11..20 novels, 21 InlineAd(1), 22..26 novels
+        val entries = buildDiscoveryFeedEntries(sampleTwentyFive, adsEnabled = true)
 
         assertTrue(findUpcomingInlineAdSlotsToPrefetch(emptyList(), lastVisibleIndex = 0).isEmpty())
         assertTrue(findUpcomingInlineAdSlotsToPrefetch(entries, lastVisibleIndex = -1).isEmpty())
@@ -745,6 +747,56 @@ class DiscoveryScreensTest {
         composeTestRule.onNodeWithTag("${DiscoveryTestTags.FEED_AD_CARD_PREFIX}1").assertIsDisplayed()
         composeTestRule.onNodeWithText("#21").assertIsDisplayed()
         composeTestRule.onNodeWithText("榜单作品-21").assertIsDisplayed()
+    }
+
+    @Test
+    fun rankingsScreenInlineAds_skipsAllPaginationAdsWhenNoPreloadedAdIsCached() {
+        val weekItems = (1..22).map { rank ->
+            ParsedNovelListItem(
+                aid = 8200 + rank,
+                title = "无缓存榜单-$rank",
+                author = "作者-$rank",
+                bookStatus = "连载中",
+                lastUpdate = "2026-11-25",
+                tagsCsv = "奇幻",
+                introShort = "作品简介-$rank",
+            )
+        }
+        val gateway = FakeDiscoveryGateway().apply {
+            pagesBySort[Wenku8API.NovelSortedBy.weekVisit] =
+                WenkuApiResult.Success(ParsedNovelListPage(totalPages = 3, items = weekItems))
+        }
+        val repository = DiscoveryRepository(database = database, apiClient = gateway)
+
+        composeTestRule.setContent {
+            Box(modifier = Modifier.size(width = 412.dp, height = 892.dp)) {
+                Wenku8ExpressiveTheme(themeMode = Wenku8ThemeMode.ARCHIVAL_DAY) {
+                    RankingsScreen(
+                        discoveryRepository = repository,
+                        appLanguage = Wenku8API.AppLanguage.SC,
+                        onOpenSearch = {},
+                        onNovelClicked = {},
+                        onOpenNetworkDiagnostics = {},
+                        isNetworkAvailableForAdOverride = true,
+                        isGmsAvailableForAdOverride = true,
+                        canRequestAdsForAdOverride = true,
+                        enableLiveAdViewInflation = false,
+                        hasPreloadedFeedAdOverride = false,
+                    )
+                }
+            }
+        }
+
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag(DiscoveryTestTags.FEED_LIST).performScrollToIndex(10)
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag("${DiscoveryTestTags.FEED_AD_CARD_PREFIX}0").assertDoesNotExist()
+        composeTestRule.onNodeWithText("无缓存榜单-11").assertIsDisplayed()
+
+        composeTestRule.onNodeWithTag(DiscoveryTestTags.FEED_LIST).performScrollToIndex(20)
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag("${DiscoveryTestTags.FEED_AD_CARD_PREFIX}1").assertDoesNotExist()
+        composeTestRule.onNodeWithText("无缓存榜单-21").assertIsDisplayed()
     }
 
     @Test

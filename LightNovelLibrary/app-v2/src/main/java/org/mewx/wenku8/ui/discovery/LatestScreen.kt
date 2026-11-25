@@ -58,6 +58,7 @@ fun LatestScreen(
     isGmsAvailableForAdOverride: Boolean? = null,
     canRequestAdsForAdOverride: Boolean? = null,
     enableLiveAdViewInflation: Boolean = true,
+    hasPreloadedFeedAdOverride: Boolean? = null,
 ) {
     val isEink = LocalEinkMode.current
     val categories = LatestFeedCategory.entries
@@ -216,6 +217,7 @@ fun LatestScreen(
                 isGmsAvailableForAdOverride = isGmsAvailableForAdOverride,
                 canRequestAdsForAdOverride = canRequestAdsForAdOverride,
                 enableLiveAdViewInflation = enableLiveAdViewInflation,
+                hasPreloadedFeedAdOverride = hasPreloadedFeedAdOverride,
                 modifier = Modifier.fillMaxSize(),
             )
         }

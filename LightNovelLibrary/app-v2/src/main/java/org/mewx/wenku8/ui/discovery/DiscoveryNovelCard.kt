@@ -79,10 +79,10 @@ import org.mewx.wenku8.domain.model.FeedScrollPosition
 import org.mewx.wenku8.domain.model.PaginatedNovelFeedState
 import org.mewx.wenku8.domain.model.normalizeBookStatusText
 import org.mewx.wenku8.ui.detail.BannerAdLoadPhase
+import org.mewx.wenku8.ui.detail.LocalDiscoveryFeedInlineAdPool
 import org.mewx.wenku8.ui.detail.ServerSupportBannerAd
 import org.mewx.wenku8.ui.detail.findHostActivity
 import org.mewx.wenku8.ui.detail.rememberDiscoveryFeedInlineAdPool
-import org.mewx.wenku8.ui.detail.startHolderBannerLoad
 import org.mewx.wenku8.ui.theme.LocalEinkMode
 import org.mewx.wenku8.ui.theme.Wenku8SharedElementKeys
 import org.mewx.wenku8.ui.theme.einkHairlineBorder
@@ -540,23 +540,17 @@ fun rememberDiscoveryFeedScrollStateHolder(
 }
 
 /**
- * Policy-compliant interleaving cadence for in-feed Discovery (`最新` / `排行`) inline adaptive
- * banners:
- * - Wenku8 paginates feed APIs at [ITEMS_PER_PAGE] (`10`) novels per page, so one compact inline
- *   banner is placed right after every page boundary (`#10`, `#20`, `#30`, ...).
- * - When an append error footer (`pagination_retry_footer`) is visible at the tail of the list,
- *   a trailing ad at the final boundary is suppressed so an ad is never directly adjacent to the
- *   clickable retry button.
+ * Policy-compliant, zero-placeholder interleaving cadence for in-feed Discovery (`最新` / `排行`)
+ * inline adaptive banners:
+ * - Page 1 (novels `#1..#10`) contains **zero** ad slots so cold-start preloading prioritizes
+ *   `NovelDetailScreen` and initial browsing stays uncluttered.
+ * - On pagination (Page 2+, starting at `#11`, `#21`, `#31`, ...), an inline banner is inserted
+ *   as the **first item of the next page** if and only if a preloaded ad is already cached in
+ *   memory (latched per page boundary so slots never pop in retroactively or render blank cards).
  */
 object DiscoveryFeedAdCadence {
     const val ITEMS_PER_PAGE = 10
 
-    /**
-     * Trigger detached in-memory prefetch when the user's scroll viewport comes within this many
-     * list entries of an upcoming page-end ad slot (e.g., scrolling past novel #6/#7 for slot 0
-     * after #10). Keeps top-of-list glances at 0 requests while letting the ad finish loading
-     * before entering the viewport.
-     */
     const val PREFETCH_LOOKAHEAD_ITEMS = 4
 }
 
@@ -574,7 +568,7 @@ sealed interface DiscoveryFeedEntry {
 fun buildDiscoveryFeedEntries(
     items: List<DiscoveryNovelCardItem>,
     adsEnabled: Boolean,
-    suppressTrailingAd: Boolean = false,
+    enabledAdSlotIndices: Set<Int>? = null,
 ): List<DiscoveryFeedEntry> {
     if (items.isEmpty()) return emptyList()
     if (!adsEnabled) {
@@ -583,17 +577,14 @@ fun buildDiscoveryFeedEntries(
         }
     }
     return buildList(items.size + (items.size / DiscoveryFeedAdCadence.ITEMS_PER_PAGE)) {
-        var nextSlotIndex = 0
-        val lastNovelIndex = items.lastIndex
         items.forEachIndexed { novelIndex, item ->
-            add(DiscoveryFeedEntry.Novel(novelIndex = novelIndex, item = item))
-            val novelsShown = novelIndex + 1
-            val isPageBoundary = novelsShown % DiscoveryFeedAdCadence.ITEMS_PER_PAGE == 0
-            val isSuppressedTrailingSlot = suppressTrailingAd && novelIndex == lastNovelIndex
-            if (isPageBoundary && !isSuppressedTrailingSlot) {
-                add(DiscoveryFeedEntry.InlineAd(slotIndex = nextSlotIndex))
-                nextSlotIndex += 1
+            if (novelIndex > 0 && novelIndex % DiscoveryFeedAdCadence.ITEMS_PER_PAGE == 0) {
+                val slotIndex = (novelIndex / DiscoveryFeedAdCadence.ITEMS_PER_PAGE) - 1
+                if (enabledAdSlotIndices == null || slotIndex in enabledAdSlotIndices) {
+                    add(DiscoveryFeedEntry.InlineAd(slotIndex = slotIndex))
+                }
             }
+            add(DiscoveryFeedEntry.Novel(novelIndex = novelIndex, item = item))
         }
     }
 }
@@ -639,25 +630,23 @@ fun PaginatedNovelFeedContent(
     isGmsAvailableForAdOverride: Boolean? = null,
     canRequestAdsForAdOverride: Boolean? = null,
     enableLiveAdViewInflation: Boolean = true,
+    hasPreloadedFeedAdOverride: Boolean? = null,
 ) {
     val isEink = LocalEinkMode.current
     val canRequestAds = canRequestAdsForAdOverride ?: org.mewx.wenku8.ui.detail.LocalAdConsentCanRequestAds.current
     val hasLoadedItems = feedState.items.isNotEmpty()
-    val inlineAdPool = rememberDiscoveryFeedInlineAdPool(
+    val hasAdTestOverrides = isNetworkAvailableForAdOverride != null ||
+        isGmsAvailableForAdOverride != null ||
+        canRequestAdsForAdOverride != null ||
+        !enableLiveAdViewInflation
+    val sharedPool = if (hasAdTestOverrides) null else LocalDiscoveryFeedInlineAdPool.current
+    val inlineAdPool = sharedPool ?: rememberDiscoveryFeedInlineAdPool(
         poolScopeKey = feedState.sortedBy,
         isNetworkAvailableOverride = isNetworkAvailableForAdOverride,
         isGmsAvailableOverride = isGmsAvailableForAdOverride,
         canRequestAdsOverride = canRequestAdsForAdOverride,
         enableLiveAdViewInflation = enableLiveAdViewInflation,
     )
-    val hasAppendErrorFooter = feedState.errorKind != null && feedState.items.isNotEmpty()
-    val feedEntries = remember(feedState.items, inlineAdPool.isAdSlotEligible, hasAppendErrorFooter) {
-        buildDiscoveryFeedEntries(
-            items = feedState.items,
-            adsEnabled = inlineAdPool.isAdSlotEligible,
-            suppressTrailingAd = hasAppendErrorFooter,
-        )
-    }
 
     LaunchedEffect(feedState.sortedBy, listState, hasLoadedItems, onScrollPositionChanged) {
         val callback = onScrollPositionChanged ?: return@LaunchedEffect
@@ -671,26 +660,12 @@ fun PaginatedNovelFeedContent(
             }
     }
 
-    val shouldTriggerLoadMore by remember(listState, feedEntries.size, feedState.canLoadMorePages) {
-        derivedStateOf {
-            if (!feedState.canLoadMorePages || feedEntries.isEmpty()) {
-                false
-            } else {
-                val lastVisibleIndex = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
-                lastVisibleIndex >= (feedEntries.size - 3).coerceAtLeast(0)
-            }
-        }
-    }
-
-    LaunchedEffect(feedState.sortedBy, shouldTriggerLoadMore) {
-        if (shouldTriggerLoadMore) {
-            onLoadNextPage()
-        }
-    }
-
     PullToRefreshBox(
         isRefreshing = feedState.isRefreshing,
-        onRefresh = onRefresh,
+        onRefresh = {
+            inlineAdPool.clearSort(feedState.sortedBy.name)
+            onRefresh()
+        },
         modifier = modifier.fillMaxSize(),
     ) {
         when {
@@ -741,58 +716,71 @@ fun PaginatedNovelFeedContent(
                 key(feedState.sortedBy) {
                     val context = LocalContext.current
                     val hostActivity = remember(context) { context.findHostActivity() }
-                    val prefetchScope = rememberCoroutineScope()
-                    val upcomingAdSlotsToPrefetch by remember(listState, feedEntries, inlineAdPool.isAdSlotEligible) {
-                        derivedStateOf {
-                            if (!inlineAdPool.isAdSlotEligible || feedEntries.isEmpty()) {
-                                emptyList()
-                            } else {
-                                val lastVisibleIndex = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: -1
-                                findUpcomingInlineAdSlotsToPrefetch(
-                                    entries = feedEntries,
-                                    lastVisibleIndex = lastVisibleIndex,
-                                )
-                            }
-                        }
-                    }
 
                     BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
                         val adSlotWidthDp = (maxWidth - 32.dp).value.toInt().coerceAtLeast(160)
-                        val hasInlineAdSlot = remember(feedEntries) {
-                            feedEntries.any { it is DiscoveryFeedEntry.InlineAd }
-                        }
-                        // Start the SDK-managed Discovery feed BannerAdPreloader as soon as page 1
-                        // produces an inline ad boundary so slot 0 is ready well before scroll-down.
-                        LaunchedEffect(canRequestAds, enableLiveAdViewInflation, hasInlineAdSlot, adSlotWidthDp) {
-                            if (canRequestAds && enableLiveAdViewInflation && hasInlineAdSlot) {
-                                org.mewx.wenku8.ui.detail.ServerSupportBannerPreloader.ensurePreloading(
-                                    context = context,
-                                    placement = org.mewx.wenku8.ui.detail.InlineBannerPlacement.DISCOVERY_FEED_INLINE,
-                                    availableWidthDp = adSlotWidthDp,
-                                    canRequestAds = canRequestAds,
-                                )
-                            }
-                        }
-                        LaunchedEffect(inlineAdPool, upcomingAdSlotsToPrefetch, adSlotWidthDp, canRequestAds) {
-                            if (!canRequestAds || upcomingAdSlotsToPrefetch.isEmpty()) return@LaunchedEffect
-                            for (slotIndex in upcomingAdSlotsToPrefetch) {
-                                val slotKey = "${feedState.sortedBy.name}_slot_$slotIndex"
-                                val slotHolder = inlineAdPool.getOrCreate(slotKey)
-                                if (!slotHolder.isDisposed &&
-                                    slotHolder.phase == BannerAdLoadPhase.Loading &&
-                                    slotHolder.adView == null &&
-                                    !slotHolder.loadInProgress
-                                ) {
-                                    prefetchScope.launch {
-                                        startHolderBannerLoad(
-                                            holder = slotHolder,
-                                            context = context,
+                        val paginationBoundaryCount =
+                            ((feedState.items.size - 1) / DiscoveryFeedAdCadence.ITEMS_PER_PAGE)
+                                .coerceAtLeast(0)
+                        val enabledAdSlotIndices = remember(
+                            feedState.sortedBy,
+                            paginationBoundaryCount,
+                            inlineAdPool,
+                            canRequestAds,
+                            adSlotWidthDp,
+                            hasPreloadedFeedAdOverride,
+                        ) {
+                            if (!inlineAdPool.isAdSlotEligible || paginationBoundaryCount <= 0) {
+                                emptySet()
+                            } else {
+                                buildSet {
+                                    for (slotIndex in 0 until paginationBoundaryCount) {
+                                        val slotKey = "${feedState.sortedBy.name}_slot_$slotIndex"
+                                        val showSlot = inlineAdPool.resolveOrLatchPaginationAd(
+                                            slotKey = slotKey,
                                             hostContext = hostActivity ?: context,
                                             availableWidthDp = adSlotWidthDp,
                                             canRequestAds = canRequestAds,
+                                            staticPreviewReady = hasPreloadedFeedAdOverride ?: true,
                                         )
+                                        if (showSlot) {
+                                            add(slotIndex)
+                                        }
                                     }
                                 }
+                            }
+                        }
+                        val feedEntries = remember(
+                            feedState.items,
+                            inlineAdPool.isAdSlotEligible,
+                            enabledAdSlotIndices,
+                        ) {
+                            buildDiscoveryFeedEntries(
+                                items = feedState.items,
+                                adsEnabled = inlineAdPool.isAdSlotEligible,
+                                enabledAdSlotIndices = enabledAdSlotIndices,
+                            )
+                        }
+
+                        val shouldTriggerLoadMore by remember(
+                            listState,
+                            feedEntries.size,
+                            feedState.canLoadMorePages,
+                        ) {
+                            derivedStateOf {
+                                if (!feedState.canLoadMorePages || feedEntries.isEmpty()) {
+                                    false
+                                } else {
+                                    val lastVisibleIndex =
+                                        listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
+                                    lastVisibleIndex >= (feedEntries.size - 3).coerceAtLeast(0)
+                                }
+                            }
+                        }
+
+                        LaunchedEffect(feedState.sortedBy, shouldTriggerLoadMore) {
+                            if (shouldTriggerLoadMore) {
+                                onLoadNextPage()
                             }
                         }
 
@@ -831,15 +819,17 @@ fun PaginatedNovelFeedContent(
 
                                     is DiscoveryFeedEntry.InlineAd -> {
                                         val slotKey = "${feedState.sortedBy.name}_slot_${entry.slotIndex}"
-                                        val slotHolder = inlineAdPool.getOrCreate(slotKey)
-                                        ServerSupportBannerAd(
-                                            holder = slotHolder,
-                                            cardTestTag = DiscoveryTestTags.FEED_AD_CARD_PREFIX + entry.slotIndex,
-                                            slotTestTag = DiscoveryTestTags.FEED_AD_SLOT_PREFIX + entry.slotIndex,
-                                            useElevatedTonalContainer = true,
-                                            canRequestAdsOverride = canRequestAdsForAdOverride,
-                                            modifier = Modifier.padding(vertical = 4.dp),
-                                        )
+                                        val slotHolder = inlineAdPool.getOrNull(slotKey)
+                                        if (slotHolder != null) {
+                                            ServerSupportBannerAd(
+                                                holder = slotHolder,
+                                                cardTestTag = DiscoveryTestTags.FEED_AD_CARD_PREFIX + entry.slotIndex,
+                                                slotTestTag = DiscoveryTestTags.FEED_AD_SLOT_PREFIX + entry.slotIndex,
+                                                useElevatedTonalContainer = true,
+                                                canRequestAdsOverride = canRequestAdsForAdOverride,
+                                                modifier = Modifier.padding(vertical = 4.dp),
+                                            )
+                                        }
                                     }
                                 }
                             }
