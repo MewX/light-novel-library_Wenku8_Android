@@ -412,6 +412,7 @@ fun NovelDetailScreen(
 
     val doneFormat = stringResource(R.string.download_done_snackbar_format)
     val partialFormat = stringResource(R.string.download_partial_snackbar_format)
+    val partialImagesOnlyFormat = stringResource(R.string.download_partial_images_snackbar_format)
     val cancelledText = stringResource(R.string.download_cancelled_snackbar)
 
     LaunchedEffect(currentDownloadProgress?.state) {
@@ -424,14 +425,22 @@ fun NovelDetailScreen(
                 novelDownloadRepository.clearFinishedStatus(aid)
             }
             NovelDownloadRunState.PARTIAL_FAILURE -> {
-                snackbarHostState.showSnackbar(
+                val msg = if (dl.failedChapters == 0 && dl.failedImages > 0) {
+                    String.format(
+                        Locale.getDefault(),
+                        partialImagesOnlyFormat,
+                        dl.completedChapters,
+                        dl.failedImages,
+                    )
+                } else {
                     String.format(
                         Locale.getDefault(),
                         partialFormat,
                         dl.completedChapters,
                         dl.failedChapters,
-                    ),
-                )
+                    )
+                }
+                snackbarHostState.showSnackbar(msg)
                 novelDownloadRepository.clearFinishedStatus(aid)
             }
             NovelDownloadRunState.CANCELLED -> {

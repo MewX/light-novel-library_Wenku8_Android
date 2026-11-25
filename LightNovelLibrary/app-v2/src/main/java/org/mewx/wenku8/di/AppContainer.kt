@@ -277,6 +277,7 @@ class AppContainer(context: Context) {
             database = database,
             cacheRootProvider = { appContext.cacheDir },
             assetRootsProvider = ::resolveLocalAssetRoots,
+            appContext = appContext,
         )
     }
 
@@ -303,6 +304,9 @@ class AppContainer(context: Context) {
             catalogGateway = wenkuApiClient,
             novelTocSyncRepository = novelTocSyncRepository,
             userSessionRepository = userSessionRepository,
+            assetRootsProvider = ::resolveLocalAssetRoots,
+            cacheRootProvider = { appContext.cacheDir },
+            appContext = appContext,
         )
     }
 

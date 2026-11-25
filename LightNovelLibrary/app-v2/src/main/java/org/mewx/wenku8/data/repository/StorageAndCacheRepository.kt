@@ -1,7 +1,9 @@
 package org.mewx.wenku8.data.repository
 
 import android.content.ContentResolver
+import android.content.Context
 import android.net.Uri
+import coil3.SingletonImageLoader
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
@@ -9,6 +11,7 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.mewx.wenku8.data.local.db.Wenku8Database
+import org.mewx.wenku8.data.media.WenkuImageValidator
 import org.mewx.wenku8.data.remote.parser.WenkuXmlParsers
 import java.io.File
 import java.io.IOException
@@ -39,6 +42,7 @@ class StorageAndCacheRepository(
     private val database: Wenku8Database,
     private val cacheRootProvider: () -> File,
     private val assetRootsProvider: () -> List<File>,
+    private val appContext: Context? = null,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
     companion object {
@@ -77,6 +81,16 @@ class StorageAndCacheRepository(
         var deletedCount = 0
         var reclaimedBytes = 0L
         val nowMs = System.currentTimeMillis()
+
+        // 0. Safely clear Coil's live MemoryCache & DiskCache before sweeping cacheDir files so
+        //    DiskLruCache's open journal never drifts out of sync with deleted files on disk.
+        appContext?.let { ctx ->
+            runCatching {
+                val loader = SingletonImageLoader.get(ctx)
+                loader.memoryCache?.clear()
+                loader.diskCache?.clear()
+            }
+        }
 
         // 1. Clean temporary cache directory
         val cacheRoot = cacheRootProvider()
@@ -180,7 +194,9 @@ class StorageAndCacheRepository(
         for (file in candidateFiles) {
             currentCoroutineContext().ensureActive()
             scanned++
-            if (file.name !in liveFileNames) {
+            val isOrphan = file.name !in liveFileNames
+            val isCorrupt = !isOrphan && !WenkuImageValidator.hasValidImageStructure(file)
+            if (isOrphan || isCorrupt) {
                 val len = file.length().coerceAtLeast(0L)
                 if (file.delete()) {
                     orphanDeleted++

@@ -495,6 +495,7 @@
     <string name="download_cancel_action">取消下載</string>
     <string name="download_done_snackbar_format">離線快取完成：共儲存 %1$d 章</string>
     <string name="download_partial_snackbar_format">已快取 %1$d 章，%2$d 章下載未成功（可稍後用「僅下載未快取章節」補齊）</string>
+    <string name="download_partial_images_snackbar_format">已快取 %1$d 章，另有 %2$d 張插圖未下載成功（可稍後用「智能更新」自動補齊）</string>
     <string name="download_cancelled_snackbar">已取消離線快取任務</string>
 
     <!-- Reading Footprint, Heatmap, Bookmarks Hub & Home Widget (P5.4) -->

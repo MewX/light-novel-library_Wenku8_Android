@@ -31,6 +31,7 @@ import org.mewx.wenku8.data.local.db.entity.ChapterContentEntity
 import org.mewx.wenku8.data.local.db.entity.ChapterEntity
 import org.mewx.wenku8.data.media.OfflineFirstWenkuImageFetcher
 import org.mewx.wenku8.data.media.WenkuImageRequests
+import org.mewx.wenku8.data.media.WenkuImageValidator
 import org.mewx.wenku8.data.local.db.entity.NovelEntity
 import org.mewx.wenku8.data.remote.api.WenkuApiResult
 import org.mewx.wenku8.data.remote.api.isEffectivelyBlankWenkuText
@@ -83,6 +84,7 @@ data class NovelDownloadProgress(
     val currentChapterTitle: String,
     val downloadedImages: Int,
     val failedChapters: Int = 0,
+    val failedImages: Int = 0,
     val state: NovelDownloadRunState = NovelDownloadRunState.RUNNING,
 )
 
@@ -93,6 +95,7 @@ data class NovelDownloadOutcome(
     val totalTargetChapters: Int,
     val downloadedImages: Int,
     val failedChapters: Int,
+    val failedImages: Int = 0,
 )
 
 /**
@@ -262,7 +265,33 @@ class NovelDownloadRepository(
                     NovelDownloadMode.OVERWRITE_ALL -> orderedChapters
                 }
 
-                if (targetChapters.isEmpty()) {
+                // Also repair missing or corrupt offline illustrations inside already-cached
+                // chapters (matching v1.30 NovelInfoActivity behavior so previously skipped or
+                // interrupted image chapters heal automatically on SMART_UPDATE / UNCACHED_ONLY).
+                val repairCandidateCids: Set<Int> = when (request.mode) {
+                    NovelDownloadMode.SMART_UPDATE,
+                    NovelDownloadMode.UNCACHED_ONLY,
+                    -> cachedCids
+
+                    NovelDownloadMode.SELECT_VOLUMES -> {
+                        if (request.overwriteSelectedVolumes) {
+                            emptySet()
+                        } else {
+                            orderedChapters
+                                .filter { it.vid in request.selectedVolumeIds && it.cid in cachedCids }
+                                .map { it.cid }
+                                .toHashSet()
+                        }
+                    }
+
+                    NovelDownloadMode.OVERWRITE_ALL -> emptySet()
+                }
+                val missingCachedImageUrls = collectMissingIllustrationUrlsForCachedChapters(
+                    aid = aid,
+                    candidateCids = repairCandidateCids,
+                )
+
+                if (targetChapters.isEmpty() && missingCachedImageUrls.isEmpty()) {
                     updateTerminalState(
                         aid = aid,
                         state = NovelDownloadRunState.SUCCEEDED,
@@ -270,6 +299,7 @@ class NovelDownloadRepository(
                         total = 0,
                         images = 0,
                         failed = 0,
+                        failedImages = 0,
                     )
                     return@withLock NovelDownloadOutcome(
                         aid = aid,
@@ -278,12 +308,14 @@ class NovelDownloadRepository(
                         totalTargetChapters = 0,
                         downloadedImages = 0,
                         failedChapters = 0,
+                        failedImages = 0,
                     )
                 }
 
                 var completedCount = 0
                 var failedCount = 0
                 var savedImageCount = 0
+                var failedImageCount = 0
 
                 for (chapter in targetChapters) {
                     currentCoroutineContext().ensureActive()
@@ -297,6 +329,7 @@ class NovelDownloadRepository(
                             currentChapterTitle = chapter.chapterTitle,
                             downloadedImages = savedImageCount,
                             failedChapters = failedCount,
+                            failedImages = failedImageCount,
                             state = NovelDownloadRunState.RUNNING,
                         ),
                     )
@@ -334,6 +367,8 @@ class NovelDownloadRepository(
                             )
                             if (savedNewOrExisting) {
                                 savedImageCount++
+                            } else {
+                                failedImageCount++
                             }
                         }
 
@@ -343,9 +378,24 @@ class NovelDownloadRepository(
                     }
                 }
 
+                for (missingImageUrl in missingCachedImageUrls) {
+                    currentCoroutineContext().ensureActive()
+                    val repaired = downloadChapterIllustrationOffline(
+                        imageUrl = missingImageUrl,
+                        overwriteExisting = false,
+                    )
+                    if (repaired) {
+                        savedImageCount++
+                    } else {
+                        failedImageCount++
+                    }
+                }
+
                 val finalState = when {
-                    completedCount == 0 && failedCount > 0 -> NovelDownloadRunState.FAILED
-                    failedCount > 0 -> NovelDownloadRunState.PARTIAL_FAILURE
+                    completedCount == 0 && savedImageCount == 0 && (failedCount > 0 || failedImageCount > 0) -> {
+                        if (failedCount > 0) NovelDownloadRunState.FAILED else NovelDownloadRunState.PARTIAL_FAILURE
+                    }
+                    failedCount > 0 || failedImageCount > 0 -> NovelDownloadRunState.PARTIAL_FAILURE
                     else -> NovelDownloadRunState.SUCCEEDED
                 }
 
@@ -356,6 +406,7 @@ class NovelDownloadRepository(
                     total = targetChapters.size,
                     images = savedImageCount,
                     failed = failedCount,
+                    failedImages = failedImageCount,
                 )
 
                 NovelDownloadOutcome(
@@ -365,6 +416,7 @@ class NovelDownloadRepository(
                     totalTargetChapters = targetChapters.size,
                     downloadedImages = savedImageCount,
                     failedChapters = failedCount,
+                    failedImages = failedImageCount,
                 )
             } catch (cancelled: CancellationException) {
                 updateTerminalState(aid, NovelDownloadRunState.CANCELLED, 0, 0, 0, 0)
@@ -448,10 +500,56 @@ class NovelDownloadRepository(
         }
     }
 
+    private suspend fun collectMissingIllustrationUrlsForCachedChapters(
+        aid: Int,
+        candidateCids: Set<Int>,
+    ): List<String> {
+        if (candidateCids.isEmpty()) return emptyList()
+        val roots = assetRootsProvider()
+        if (roots.isEmpty()) return emptyList()
+        val cachedRows = chapterContentDao.getCachedImageChaptersForNovel(aid)
+        if (cachedRows.isEmpty()) return emptyList()
+
+        val missing = LinkedHashSet<String>()
+        for (row in cachedRows) {
+            if (row.cid !in candidateCids) continue
+            val urls = parseImageUrlsJson(row.imageUrlsJson)
+            for (url in urls) {
+                val fileName = WenkuXmlParsers.generateLegacyImageFileName(url)
+                if (fileName.isBlank()) continue
+                val hasValidOnDisk = roots.any { root ->
+                    val file = File(root, "saves/imgs/$fileName")
+                    file.isFile && WenkuImageValidator.hasValidImageStructure(file)
+                }
+                if (!hasValidOnDisk) {
+                    missing.add(url)
+                }
+            }
+        }
+        return missing.toList()
+    }
+
+    private fun parseImageUrlsJson(rawJson: String): List<String> {
+        val trimmed = rawJson.trim()
+        if (trimmed.isEmpty() || trimmed == "[]") return emptyList()
+        return runCatching {
+            val array = org.json.JSONArray(trimmed)
+            buildList(array.length()) {
+                for (i in 0 until array.length()) {
+                    val url = array.optString(i).trim()
+                    if (url.isNotEmpty()) add(url)
+                }
+            }
+        }.getOrDefault(emptyList())
+    }
+
     private suspend fun downloadCoverImageOfflineBestEffort(aid: Int) {
         val primaryRoot = assetRootsProvider().firstOrNull() ?: return
         val targetFile = File(primaryRoot, "saves/imgs/$aid.jpg")
-        if (targetFile.isFile && targetFile.length() > 0L) return
+        if (targetFile.isFile) {
+            if (WenkuImageValidator.hasValidImageStructure(targetFile)) return
+            runCatching { targetFile.delete() }
+        }
 
         val coverUrl = catalogGateway.resolveCoverUrl(aid)
         if (coverUrl.isBlank()) return
@@ -466,7 +564,7 @@ class NovelDownloadRepository(
         }
 
         val bytes = catalogGateway.downloadBinaryBytes(coverUrl) ?: return
-        if (bytes.isEmpty()) return
+        if (!WenkuImageValidator.hasValidImageStructure(bytes)) return
         writeBytesAtomically(targetFile, bytes)
     }
 
@@ -479,8 +577,12 @@ class NovelDownloadRepository(
         if (fileName.isBlank()) return false
 
         val targetFile = File(primaryRoot, "saves/imgs/$fileName")
-        if (!overwriteExisting && targetFile.isFile && targetFile.length() > 0L) {
-            return true
+        if (!overwriteExisting && targetFile.isFile) {
+            if (WenkuImageValidator.hasValidImageStructure(targetFile)) {
+                return true
+            }
+            // Self-heal corrupt/truncated offline file before re-fetching.
+            runCatching { targetFile.delete() }
         }
 
         if (!overwriteExisting &&
@@ -493,8 +595,24 @@ class NovelDownloadRepository(
             return true
         }
 
-        val bytes = catalogGateway.downloadBinaryBytes(imageUrl) ?: return false
-        if (bytes.isEmpty()) return false
+        if (overwriteExisting) {
+            // Clear stale temporary/Coil copies so a corrupt cache entry cannot linger after overwrite.
+            WenkuImageValidator.purgeCachedImageForUrl(
+                imageUrl = imageUrl,
+                storageRoots = emptyList(),
+                cacheRoot = appContext?.cacheDir,
+                appContext = appContext,
+                includePermanentOfflineFiles = false,
+            )
+        }
+
+        val bytes = catalogGateway.downloadBinaryBytes(imageUrl)
+        if (bytes == null || !WenkuImageValidator.hasValidImageStructure(bytes)) {
+            if (targetFile.isFile && !WenkuImageValidator.hasValidImageStructure(targetFile)) {
+                runCatching { targetFile.delete() }
+            }
+            return false
+        }
         return writeBytesAtomically(targetFile, bytes)
     }
 
@@ -516,7 +634,7 @@ class NovelDownloadRepository(
         if (existingFile != null &&
             existingFile.absolutePath != targetFile.absolutePath &&
             existingFile.isFile &&
-            existingFile.length() > 0L
+            WenkuImageValidator.hasValidImageStructure(existingFile)
         ) {
             val copied = runCatching {
                 writeBytesAtomically(targetFile, existingFile.readBytes())
@@ -531,7 +649,7 @@ class NovelDownloadRepository(
                 val snapshot = runCatching { diskCache?.openSnapshot(key) }.getOrNull() ?: continue
                 val copied = snapshot.use { snap ->
                     val cachedDataFile = snap.data.toFile()
-                    if (cachedDataFile.isFile && cachedDataFile.length() > 0L) {
+                    if (cachedDataFile.isFile && WenkuImageValidator.hasValidImageStructure(cachedDataFile)) {
                         runCatching {
                             writeBytesAtomically(targetFile, cachedDataFile.readBytes())
                         }.getOrDefault(false)
@@ -549,7 +667,7 @@ class NovelDownloadRepository(
         return try {
             val parent = targetFile.parentFile ?: return false
             if (!parent.exists() && !parent.mkdirs()) return false
-            val tempFile = File(parent, "${targetFile.name}.tmp")
+            val tempFile = File(parent, "${targetFile.name}.${System.nanoTime()}.tmp")
             tempFile.writeBytes(bytes)
             if (targetFile.exists() && !targetFile.delete()) {
                 tempFile.delete()
@@ -576,6 +694,7 @@ class NovelDownloadRepository(
         total: Int,
         images: Int,
         failed: Int,
+        failedImages: Int = 0,
     ) {
         var resolvedMode = NovelDownloadMode.SMART_UPDATE
         _activeDownloadsFlow.update { current ->
@@ -590,6 +709,7 @@ class NovelDownloadRepository(
                 currentChapterTitle = "",
                 downloadedImages = images,
                 failedChapters = failed,
+                failedImages = failedImages,
                 state = state,
             )
             current + (aid to updated)
