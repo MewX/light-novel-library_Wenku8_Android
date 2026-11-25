@@ -66,6 +66,7 @@ import androidx.compose.material3.WideNavigationRailItem
 import androidx.compose.material3.WideNavigationRailValue
 import androidx.compose.material3.rememberWideNavigationRailState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -125,11 +126,13 @@ import org.mewx.wenku8.ui.bookshelf.BookshelfScreen
 import org.mewx.wenku8.ui.components.TooltipIconButton
 import org.mewx.wenku8.ui.detail.InlineBannerPlacement
 import org.mewx.wenku8.ui.detail.LocalAdConsentCanRequestAds
+import org.mewx.wenku8.ui.detail.LocalDiscoveryFeedInlineAdPool
 import org.mewx.wenku8.ui.detail.NovelDetailScreen
 import org.mewx.wenku8.ui.detail.PostReadingAdElevationToken
 import org.mewx.wenku8.ui.detail.PostReadingAdElevationTracker
 import org.mewx.wenku8.ui.detail.ReaderLaunchRequest
 import org.mewx.wenku8.ui.detail.ServerSupportBannerPreloader
+import org.mewx.wenku8.ui.detail.rememberDiscoveryFeedInlineAdPool
 import org.mewx.wenku8.ui.diagnostics.NetworkDiagnosticsScreen
 import org.mewx.wenku8.ui.diagnostics.NetworkDiagnosticsViewModel
 import org.mewx.wenku8.ui.discovery.LatestScreen
@@ -782,6 +785,15 @@ fun AdaptiveMainScaffold(
         val scaffoldContext = LocalContext.current
         val scaffoldCoroutineScope = rememberCoroutineScope()
         val canRequestAds = LocalAdConsentCanRequestAds.current
+        val detailReadyBannerCount by ServerSupportBannerPreloader
+            .readyCountFlow(InlineBannerPlacement.NOVEL_DETAIL_STANDARD)
+            .collectAsStateWithLifecycle()
+        // Shared Discovery inline ad pool scoped ABOVE AnimatedContent so navigating into
+        // CompactNovelDetail and returning to Latest/Rankings preserves already-displayed feed
+        // banners intact with 0ms re-attach and zero refresh.
+        val sharedDiscoveryFeedAdPool = rememberDiscoveryFeedInlineAdPool(
+            poolScopeKey = "scaffold_discovery_shared",
+        )
         val estimatedDetailBannerWidthDp = remember(maxWidth) {
             if (maxWidth >= TwoPaneDetailWindowWidthBreakpoint) {
                 ((maxWidth.value - 80f) * 0.56f - 32f).toInt().coerceAtLeast(160)
@@ -807,24 +819,8 @@ fun AdaptiveMainScaffold(
             is ScaffoldSceneState.CompactNovelDetail -> true
             else -> false
         }
-        val shouldPreloadDiscoveryFeedBanner = canRequestAds &&
-            activeScene == ScaffoldSceneState.HomeShell &&
-            (selectedDestination == TopLevelDestination.LATEST ||
-                selectedDestination == TopLevelDestination.RANKINGS)
-        // Start Discovery feed preloader (`bufferSize = 5`) as soon as user enters Latest/Rankings
-        // without waiting for page-1 API responses so scrolling past #10/#20/#30 hits warm buffers.
-        LaunchedEffect(shouldPreloadDiscoveryFeedBanner, estimatedDiscoveryBannerWidthDp) {
-            if (!shouldPreloadDiscoveryFeedBanner) return@LaunchedEffect
-            withFrameNanos { }
-            ServerSupportBannerPreloader.ensurePreloading(
-                context = scaffoldContext,
-                placement = InlineBannerPlacement.DISCOVERY_FEED_INLINE,
-                availableWidthDp = estimatedDiscoveryBannerWidthDp,
-                canRequestAds = canRequestAds,
-            )
-        }
-        // Keep 2 SDK-managed standard Novel Detail banners ready while browsing novel lists,
-        // bookshelf, search, or reading history so consecutive detail visits render instantly.
+        // Priority 1: Always warm Novel Detail standard banners (`bufferSize = 3`) first so opening
+        // any book achieves maximum 0ms cache-hit reliability.
         LaunchedEffect(shouldPreloadStandardDetailBanner, estimatedDetailBannerWidthDp) {
             if (!shouldPreloadStandardDetailBanner) return@LaunchedEffect
             withFrameNanos { }
@@ -835,11 +831,38 @@ fun AdaptiveMainScaffold(
                 canRequestAds = canRequestAds,
             )
         }
-        // Mid-session one-shot preload for the 250dp post-reading banner: triggers only once the
-        // active reading session crosses 10 min (outside 30-min cooldown) and will return to an
-        // open NovelDetailScreen, delivering 0ms display upon exiting the reader with zero waste.
-        LaunchedEffect(activeScene, activeDetailNovelAid, activeReaderStartedAtMonoMs, canRequestAds) {
-            if (!canRequestAds || activeScene !is ScaffoldSceneState.Reader || activeDetailNovelAid <= 0) {
+        val shouldPreloadDiscoveryFeedBanner = canRequestAds &&
+            detailReadyBannerCount >= 1 &&
+            activeScene == ScaffoldSceneState.HomeShell &&
+            (selectedDestination == TopLevelDestination.LATEST ||
+                selectedDestination == TopLevelDestination.RANKINGS)
+        // Priority 2: Start Discovery feed preloader (`bufferSize = 2`) only after at least one
+        // Novel Detail banner is cached so cold-start detail reliability is never starved.
+        LaunchedEffect(shouldPreloadDiscoveryFeedBanner, estimatedDiscoveryBannerWidthDp) {
+            if (!shouldPreloadDiscoveryFeedBanner) return@LaunchedEffect
+            withFrameNanos { }
+            ServerSupportBannerPreloader.ensurePreloading(
+                context = scaffoldContext,
+                placement = InlineBannerPlacement.DISCOVERY_FEED_INLINE,
+                availableWidthDp = estimatedDiscoveryBannerWidthDp,
+                canRequestAds = canRequestAds,
+            )
+        }
+        // Priority 3: Mid-session one-shot preload (`bufferSize = 1`, total 3+2+1=6) for the 250dp
+        // post-reading banner once reading crosses 10 min (outside 30-min cooldown) and Detail
+        // already has cached inventory ready.
+        LaunchedEffect(
+            activeScene,
+            activeDetailNovelAid,
+            activeReaderStartedAtMonoMs,
+            canRequestAds,
+            detailReadyBannerCount,
+        ) {
+            if (!canRequestAds ||
+                activeScene !is ScaffoldSceneState.Reader ||
+                activeDetailNovelAid <= 0 ||
+                detailReadyBannerCount < 1
+            ) {
                 return@LaunchedEffect
             }
             val remainingMs = postReadingAdTracker.remainingMsUntilPreloadEligible(
@@ -967,6 +990,7 @@ fun AdaptiveMainScaffold(
             }
         }
 
+        CompositionLocalProvider(LocalDiscoveryFeedInlineAdPool provides sharedDiscoveryFeedAdPool) {
         SharedTransitionLayout(modifier = Modifier.fillMaxSize()) {
             AnimatedContent(
                 targetState = activeScene,
@@ -1609,6 +1633,7 @@ fun AdaptiveMainScaffold(
                     }
                 }
             }
+        }
         }
 
         if (isLoginBottomSheetOpen && userSessionRepository != null) {

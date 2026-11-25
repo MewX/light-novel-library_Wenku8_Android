@@ -398,6 +398,94 @@ class ServerSupportBannerPreloaderTest {
     }
 
     @Test
+    fun discoveryFeedInlineAdPool_latchesCacheDecisionsPreservesAcrossDetailReturnAndClearsOnRefresh() = runBlocking {
+        val placement = InlineBannerPlacement.DISCOVERY_FEED_INLINE
+        val preloadId = ServerSupportBannerPreloader.preloadIdFor(placement)
+        ServerSupportBannerPreloader.ensurePreloading(
+            context = appContext,
+            placement = placement,
+            availableWidthDp = 380,
+            canRequestAds = true,
+        )
+
+        val pool = DiscoveryFeedInlineAdPool(
+            initialPhase = BannerAdLoadPhase.Loading,
+            maxCachedSlots = 4,
+        )
+
+        // 1. Slot 0 evaluated while cache is empty -> latches false (never inserts blank card)
+        assertFalse(
+            pool.resolveOrLatchPaginationAd(
+                slotKey = "lastUpdate_slot_0",
+                hostContext = activity,
+                availableWidthDp = 380,
+                canRequestAds = true,
+            ),
+        )
+        assertNull(pool.getOrNull("lastUpdate_slot_0"))
+
+        // Even after preloader fills later, slot 0 stays latched false (zero retroactive CLS!)
+        val ad1 = FakeBannerAd(ServerSupportAdConstants.PRODUCTION_DISCOVERY_FEED_BANNER_AD_UNIT_ID)
+        fakeClient.enqueueAd(preloadId, ad1)
+        val stubAdView1 = AdView(activity)
+        testBindPreloadedAdAction = { _, _, _ -> stubAdView1 }
+        assertFalse(
+            pool.resolveOrLatchPaginationAd(
+                slotKey = "lastUpdate_slot_0",
+                hostContext = activity,
+                availableWidthDp = 380,
+                canRequestAds = true,
+            ),
+        )
+
+        // 2. Slot 1 evaluated when cache IS ready -> binds immediately as Loaded
+        assertTrue(
+            pool.resolveOrLatchPaginationAd(
+                slotKey = "lastUpdate_slot_1",
+                hostContext = activity,
+                availableWidthDp = 380,
+                canRequestAds = true,
+            ),
+        )
+        val firstHolder = pool.getOrNull("lastUpdate_slot_1")
+        assertNotNull(firstHolder)
+        assertEquals(BannerAdLoadPhase.Loaded, firstHolder!!.phase)
+        assertSame(stubAdView1, firstHolder.adView)
+
+        // 3. Returning from NovelDetailScreen re-evaluates slot 1 -> reuses EXACT same holder & AdView
+        // without polling another ad or refreshing!
+        val ad2 = FakeBannerAd(ServerSupportAdConstants.PRODUCTION_DISCOVERY_FEED_BANNER_AD_UNIT_ID)
+        fakeClient.enqueueAd(preloadId, ad2)
+        assertTrue(
+            pool.resolveOrLatchPaginationAd(
+                slotKey = "lastUpdate_slot_1",
+                hostContext = activity,
+                availableWidthDp = 380,
+                canRequestAds = true,
+            ),
+        )
+        assertSame(firstHolder, pool.getOrNull("lastUpdate_slot_1"))
+        assertSame(stubAdView1, pool.getOrNull("lastUpdate_slot_1")?.adView)
+        // ad2 remains untouched in the preloader queue
+        assertTrue(fakeClient.isAdAvailable(preloadId))
+
+        // 4. Pull-to-refresh clears only `lastUpdate` decisions while keeping other sorts intact
+        val otherSortSlot = pool.resolveOrLatchPaginationAd(
+            slotKey = "weekVisit_slot_0",
+            hostContext = activity,
+            availableWidthDp = 380,
+            canRequestAds = true,
+        )
+        assertTrue(otherSortSlot)
+        val weekVisitHolder = pool.getOrNull("weekVisit_slot_0")
+        assertNotNull(weekVisitHolder)
+
+        pool.clearSort("lastUpdate")
+        assertNull(pool.getOrNull("lastUpdate_slot_1"))
+        assertSame(weekVisitHolder, pool.getOrNull("weekVisit_slot_0"))
+    }
+
+    @Test
     fun postReadingAdElevationTracker_remainingMsUntilPreloadEligible_tracksDurationAndCooldown() {
         val tracker = PostReadingAdElevationTracker()
         // No active session -> null

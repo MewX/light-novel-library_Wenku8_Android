@@ -69,6 +69,7 @@ fun RankingsScreen(
     isGmsAvailableForAdOverride: Boolean? = null,
     canRequestAdsForAdOverride: Boolean? = null,
     enableLiveAdViewInflation: Boolean = true,
+    hasPreloadedFeedAdOverride: Boolean? = null,
 ) {
     val isEink = LocalEinkMode.current
     var selectedMetric by rememberSaveable {
@@ -306,6 +307,7 @@ fun RankingsScreen(
             isGmsAvailableForAdOverride = isGmsAvailableForAdOverride,
             canRequestAdsForAdOverride = canRequestAdsForAdOverride,
             enableLiveAdViewInflation = enableLiveAdViewInflation,
+            hasPreloadedFeedAdOverride = hasPreloadedFeedAdOverride,
             modifier = Modifier.weight(1f),
         )
     }
