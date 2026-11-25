@@ -27,6 +27,8 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -47,10 +49,13 @@ import androidx.compose.material.icons.outlined.PlayArrow
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.SkipNext
 import androidx.compose.material.icons.outlined.SkipPrevious
+import androidx.compose.material.icons.outlined.Timer
+import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -58,6 +63,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -94,6 +100,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.mewx.wenku8.api.Wenku8API
+import org.mewx.wenku8.BuildConfig
 import org.mewx.wenku8.R
 import org.mewx.wenku8.data.local.db.dao.ChapterContentDao
 import org.mewx.wenku8.data.local.db.dao.OrderedChapterWithVolume
@@ -1799,6 +1806,7 @@ class ReaderTtsController(
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun ReaderTtsFloatingBar(
     state: ReaderTtsUiState,
@@ -1808,6 +1816,10 @@ fun ReaderTtsFloatingBar(
     onCycleSpeechRate: () -> Unit,
     onStopAndDismiss: () -> Unit,
     modifier: Modifier = Modifier,
+    onOpenTtsSettings: (() -> Unit)? = null,
+    onCycleSleepTimer: (() -> Unit)? = null,
+    isPlayStoreChannel: Boolean = BuildConfig.DISTRIBUTION_CHANNEL == "playstore",
+    onQuickInstallGoogleTts: (() -> Unit)? = null,
 ) {
     val isEinkMode = LocalEinkMode.current
     Surface(
@@ -1826,6 +1838,7 @@ fun ReaderTtsFloatingBar(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
@@ -1834,7 +1847,11 @@ fun ReaderTtsFloatingBar(
                 Icon(
                     imageVector = Icons.Outlined.GraphicEq,
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
+                    tint = if (state.engineErrorMessage != null) {
+                        MaterialTheme.colorScheme.error
+                    } else {
+                        MaterialTheme.colorScheme.primary
+                    },
                     modifier = Modifier.size(18.dp),
                 )
                 Spacer(modifier = Modifier.width(8.dp))
@@ -1847,17 +1864,93 @@ fun ReaderTtsFloatingBar(
                     } else {
                         MaterialTheme.colorScheme.onSurface
                     },
-                    maxLines = 1,
+                    maxLines = if (state.engineErrorMessage != null) 2 else 1,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f),
                 )
-                Spacer(modifier = Modifier.width(6.dp))
+                if (onCycleSleepTimer != null &&
+                    (state.sleepTimerRemainingSec > 0 || state.stopAfterCurrentChapter)
+                ) {
+                    Spacer(modifier = Modifier.width(6.dp))
+                    val timerText = if (state.stopAfterCurrentChapter) {
+                        "本章止"
+                    } else {
+                        val m = state.sleepTimerRemainingSec / 60
+                        val s = state.sleepTimerRemainingSec % 60
+                        String.format(Locale.US, "%d:%02d", m, s)
+                    }
+                    Surface(
+                        shape = MaterialTheme.shapes.small,
+                        color = MaterialTheme.colorScheme.secondaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                        modifier = Modifier
+                            .clickable(onClick = onCycleSleepTimer)
+                            .testTag(ReaderTestTags.TTS_TIMER_CHIP),
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.Timer,
+                                contentDescription = null,
+                                modifier = Modifier.size(12.dp),
+                            )
+                            Spacer(modifier = Modifier.width(3.dp))
+                            Text(
+                                text = timerText,
+                                style = MaterialTheme.typography.labelSmall,
+                                maxLines = 1,
+                            )
+                        }
+                    }
+                }
                 if (state.totalUtterances > 0) {
+                    Spacer(modifier = Modifier.width(6.dp))
                     Text(
                         text = "${state.activeUtteranceIndex + 1}/${state.totalUtterances}",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
+                }
+            }
+
+            // Actionable diagnostic recovery buttons when TTS engine fails or lacks Chinese data.
+            val hasDiagnosticError = state.engineErrorMessage != null ||
+                state.diagnosticReason != TtsDiagnosticReason.NONE
+            if (hasDiagnosticError && (onOpenTtsSettings != null || onQuickInstallGoogleTts != null)) {
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    if (isPlayStoreChannel &&
+                        state.diagnosticReason == TtsDiagnosticReason.NO_ENGINE_INSTALLED &&
+                        onQuickInstallGoogleTts != null
+                    ) {
+                        FilledTonalButton(
+                            onClick = onQuickInstallGoogleTts,
+                            modifier = Modifier.testTag(ReaderTestTags.TTS_INSTALL_GOOGLE_BUTTON),
+                        ) {
+                            Text(
+                                text = stringResource(R.string.reader_tts_install_google),
+                                style = MaterialTheme.typography.labelMedium,
+                                maxLines = 1,
+                            )
+                        }
+                    }
+                    if (onOpenTtsSettings != null) {
+                        OutlinedButton(
+                            onClick = onOpenTtsSettings,
+                            modifier = Modifier.testTag(ReaderTestTags.TTS_FIX_ENGINE_BUTTON),
+                        ) {
+                            Text(
+                                text = stringResource(R.string.reader_tts_fix_engine),
+                                style = MaterialTheme.typography.labelMedium,
+                                maxLines = 1,
+                            )
+                        }
+                    }
                 }
             }
 
@@ -1869,7 +1962,7 @@ fun ReaderTtsFloatingBar(
             BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
                 val useCompactTtsControls = maxWidth < 312.dp || fontScale > 1.1f
                 val iconButtonSizeModifier = if (useCompactTtsControls) {
-                    Modifier.size(40.dp)
+                    Modifier.size(36.dp)
                 } else {
                     Modifier
                 }
@@ -1949,17 +2042,51 @@ fun ReaderTtsFloatingBar(
                         }
                     }
 
-                    val stopLabel = stringResource(R.string.reader_tts_stop)
-                    TooltipIconButton(
-                        tooltipText = stopLabel,
-                        onClick = onStopAndDismiss,
-                        anchorPosition = TooltipAnchorPosition.Above,
-                        modifier = iconButtonSizeModifier.testTag(ReaderTestTags.TTS_STOP_BUTTON),
-                    ) {
-                        Icon(
-                            imageVector = Icons.Outlined.Close,
-                            contentDescription = stopLabel,
-                        )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        if (onCycleSleepTimer != null && !useCompactTtsControls) {
+                            TooltipIconButton(
+                                tooltipText = "定时关闭",
+                                onClick = onCycleSleepTimer,
+                                anchorPosition = TooltipAnchorPosition.Above,
+                                modifier = iconButtonSizeModifier.testTag(ReaderTestTags.TTS_TIMER_BUTTON),
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Outlined.Timer,
+                                    contentDescription = "定时关闭",
+                                    tint = if (state.sleepTimerRemainingSec > 0 || state.stopAfterCurrentChapter) {
+                                        MaterialTheme.colorScheme.primary
+                                    } else {
+                                        MaterialTheme.colorScheme.onSurfaceVariant
+                                    },
+                                )
+                            }
+                        }
+                        if (onOpenTtsSettings != null) {
+                            val settingsLabel = stringResource(R.string.reader_tts_settings)
+                            TooltipIconButton(
+                                tooltipText = settingsLabel,
+                                onClick = onOpenTtsSettings,
+                                anchorPosition = TooltipAnchorPosition.Above,
+                                modifier = iconButtonSizeModifier.testTag(ReaderTestTags.TTS_SETTINGS_BUTTON),
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Outlined.Tune,
+                                    contentDescription = settingsLabel,
+                                )
+                            }
+                        }
+                        val stopLabel = stringResource(R.string.reader_tts_stop)
+                        TooltipIconButton(
+                            tooltipText = stopLabel,
+                            onClick = onStopAndDismiss,
+                            anchorPosition = TooltipAnchorPosition.Above,
+                            modifier = iconButtonSizeModifier.testTag(ReaderTestTags.TTS_STOP_BUTTON),
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.Close,
+                                contentDescription = stopLabel,
+                            )
+                        }
                     }
                 }
             }

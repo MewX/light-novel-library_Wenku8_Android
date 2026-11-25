@@ -252,6 +252,11 @@ object ReaderTestTags {
     const val TTS_PLAY_PAUSE_BUTTON = "reader_tts_play_pause_button"
     const val TTS_NEXT_BUTTON = "reader_tts_next_button"
     const val TTS_STOP_BUTTON = "reader_tts_stop_button"
+    const val TTS_SETTINGS_BUTTON = "reader_tts_settings_button"
+    const val TTS_TIMER_BUTTON = "reader_tts_timer_button"
+    const val TTS_TIMER_CHIP = "reader_tts_timer_chip"
+    const val TTS_FIX_ENGINE_BUTTON = "reader_tts_fix_engine_button"
+    const val TTS_INSTALL_GOOGLE_BUTTON = "reader_tts_install_google_button"
     const val READER_CLOCK_LABEL = "reader_clock_label"
     const val TTS_HIGHLIGHTED_BLOCK_PREFIX = "reader_tts_highlight_block_"
     const val FOCAL_HIGHLIGHTED_BLOCK_PREFIX = "reader_focal_highlight_block_"
@@ -378,6 +383,9 @@ fun UnifiedReaderScreen(
     onReaderKeepScreenOnChanged: (Boolean) -> Unit = {},
     onReaderEdgeBrightnessDragChanged: (Boolean) -> Unit = {},
     onVolumeKeyPagingChanged: (Boolean) -> Unit = {},
+    onTtsSpeechRateChanged: (Float) -> Unit = {},
+    onOpenTtsSettings: (() -> Unit)? = null,
+    isPlayStoreChannel: Boolean = org.mewx.wenku8.BuildConfig.DISTRIBUTION_CHANNEL == "playstore",
     onIllustrationClicked: (
         chapterTitle: String,
         imageUrlsInChapter: List<String>,
@@ -707,9 +715,27 @@ fun UnifiedReaderScreen(
     var pendingTtsAutoContinueAfterCid by remember { mutableIntStateOf(0) }
     val ttsController = remember(launchRequest.aid, speechEngineAdapter) {
         val adapter = speechEngineAdapter ?: AndroidTextToSpeechEngineAdapter(context.applicationContext)
+        val audioFocus = if (speechEngineAdapter != null) {
+            org.mewx.wenku8.tts.NoOpTtsAudioFocusController
+        } else {
+            org.mewx.wenku8.tts.AndroidTtsAudioFocusController(context.applicationContext)
+        }
         ReaderTtsController(
             engineAdapter = adapter,
             scope = coroutineScope,
+            audioFocusController = audioFocus,
+            initialConfig = org.mewx.wenku8.tts.TtsPlaybackConfig(
+                backendType = preferences.ttsBackendType,
+                preferredEnginePackage = preferences.ttsPreferredEnginePackage,
+                fallbackEnginePackage = preferences.ttsFallbackEnginePackage,
+                autoFallbackEnabled = preferences.ttsAutoFallbackEnabled,
+                preferredVoiceName = preferences.ttsPreferredVoiceName,
+                speechRate = preferences.ttsSpeechRate,
+                pitch = preferences.ttsPitch,
+                defaultSleepTimerMinutes = preferences.ttsDefaultSleepTimerMinutes,
+                followReadingPage = preferences.ttsFollowReadingPage,
+                pauseOnAudioFocusLoss = preferences.ttsPauseOnAudioFocusLoss,
+            ),
             onChapterFinished = { completedCid ->
                 pendingTtsAutoContinueAfterCid = completedCid
             },
@@ -719,6 +745,42 @@ fun UnifiedReaderScreen(
         onDispose { ttsController.close() }
     }
     val ttsUiState by ttsController.uiState.collectAsStateWithLifecycle()
+
+    LaunchedEffect(
+        preferences.ttsBackendType,
+        preferences.ttsPreferredEnginePackage,
+        preferences.ttsFallbackEnginePackage,
+        preferences.ttsAutoFallbackEnabled,
+        preferences.ttsPreferredVoiceName,
+        preferences.ttsSpeechRate,
+        preferences.ttsPitch,
+        preferences.ttsDefaultSleepTimerMinutes,
+        preferences.ttsFollowReadingPage,
+        preferences.ttsPauseOnAudioFocusLoss,
+        latestAppLang,
+    ) {
+        ttsController.updateConfig(
+            newConfig = org.mewx.wenku8.tts.TtsPlaybackConfig(
+                backendType = preferences.ttsBackendType,
+                preferredEnginePackage = preferences.ttsPreferredEnginePackage,
+                fallbackEnginePackage = preferences.ttsFallbackEnginePackage,
+                autoFallbackEnabled = preferences.ttsAutoFallbackEnabled,
+                preferredVoiceName = preferences.ttsPreferredVoiceName,
+                speechRate = preferences.ttsSpeechRate,
+                pitch = preferences.ttsPitch,
+                defaultSleepTimerMinutes = preferences.ttsDefaultSleepTimerMinutes,
+                followReadingPage = preferences.ttsFollowReadingPage,
+                pauseOnAudioFocusLoss = preferences.ttsPauseOnAudioFocusLoss,
+            ),
+            appLanguage = latestAppLang,
+        )
+    }
+
+    LaunchedEffect(ttsUiState.fallbackNoticeMessage) {
+        val msg = ttsUiState.fallbackNoticeMessage ?: return@LaunchedEffect
+        snackbarHostState.showSnackbar(msg)
+        ttsController.clearFallbackNotice()
+    }
 
     val isAnyModalOpen =
         isTocSheetOpen || isPageModeSheetOpen || isBookmarksSheetOpen || isSearchSheetOpen ||
@@ -1707,10 +1769,15 @@ fun UnifiedReaderScreen(
             ttsUiState.isSessionOpen,
             ttsUiState.activeCid,
             ttsUiState.activeBlockIndex,
+            preferences.ttsFollowReadingPage,
             preferences.readerPageTurnMode,
             (snapshot.currentSlot as? ChapterWindowSlot.Loaded)?.chapter?.cid,
         ) {
-            if (!ttsUiState.isSessionOpen || ttsUiState.totalUtterances <= 0 || ttsUiState.activeBlockIndex < 0) {
+            if (!preferences.ttsFollowReadingPage ||
+                !ttsUiState.isSessionOpen ||
+                ttsUiState.totalUtterances <= 0 ||
+                ttsUiState.activeBlockIndex < 0
+            ) {
                 return@LaunchedEffect
             }
             val loadedCur = snapshot.currentSlot as? ChapterWindowSlot.Loaded ?: return@LaunchedEffect
@@ -2386,8 +2453,37 @@ fun UnifiedReaderScreen(
                     onTogglePlayPause = { ttsController.togglePlayPause(latestAppLang) },
                     onSkipPrevious = { ttsController.skipPrevious(latestAppLang) },
                     onSkipNext = { ttsController.skipNext(latestAppLang) },
-                    onCycleSpeechRate = { ttsController.cycleSpeechRate(latestAppLang) },
+                    onCycleSpeechRate = {
+                        val nextRate = ttsController.cycleSpeechRate(latestAppLang)
+                        onTtsSpeechRateChanged(nextRate)
+                    },
                     onStopAndDismiss = { ttsController.stopAndDismiss() },
+                    onOpenTtsSettings = onOpenTtsSettings,
+                    onCycleSleepTimer = {
+                        val cycle = listOf(
+                            Wenku8UserPreferences.TTS_SLEEP_TIMER_OFF,
+                            15,
+                            30,
+                            60,
+                            Wenku8UserPreferences.TTS_SLEEP_TIMER_END_OF_CHAPTER,
+                        )
+                        val curIdx = cycle.indexOf(ttsUiState.sleepTimerModeMinutes)
+                        val next = cycle[(curIdx + 1) % cycle.size]
+                        ttsController.setSleepTimer(next)
+                        val label = when (next) {
+                            Wenku8UserPreferences.TTS_SLEEP_TIMER_OFF -> "已关闭定时停止"
+                            Wenku8UserPreferences.TTS_SLEEP_TIMER_END_OF_CHAPTER -> "将在本章朗读完毕后停止"
+                            else -> "已设定 $next 分钟后自动停止朗读"
+                        }
+                        coroutineScope.launch { snackbarHostState.showSnackbar(label) }
+                    },
+                    isPlayStoreChannel = isPlayStoreChannel,
+                    onQuickInstallGoogleTts = {
+                        org.mewx.wenku8.tts.TtsSystemIntents.openPlayStoreApp(
+                            context,
+                            org.mewx.wenku8.tts.KnownTtsEngineCatalog.GOOGLE_TTS_PACKAGE,
+                        )
+                    },
                     modifier = Modifier
                         .widthIn(max = 640.dp)
                         .padding(bottom = 8.dp),

@@ -485,6 +485,82 @@ class ArtbookSearchAndTtsTest {
     }
 
     @Test
+    fun systemTts_whenUnavailableOnPlayStore_surfacesInstallGoogleAndFixSettingsActions() {
+        seedTwoChapterNovelWithDistinctKeyword()
+        val unavailableAdapter = object : SpeechEngineAdapter {
+            override fun initialize(
+                appLanguage: Wenku8API.AppLanguage,
+                onInitialized: (Boolean) -> Unit,
+                onUtteranceStarted: (String) -> Unit,
+                onUtteranceDone: (String) -> Unit,
+                onUtteranceError: (String) -> Unit,
+            ) = onInitialized(false)
+
+            override fun initializeConfigured(
+                appLanguage: Wenku8API.AppLanguage,
+                config: org.mewx.wenku8.tts.TtsPlaybackConfig,
+                excludedEnginePackages: Set<String>,
+                onInitialized: (org.mewx.wenku8.tts.TtsInitResult) -> Unit,
+                onUtteranceStarted: (String) -> Unit,
+                onUtteranceDone: (String) -> Unit,
+                onUtteranceError: (String) -> Unit,
+            ) {
+                onInitialized(
+                    org.mewx.wenku8.tts.TtsInitResult(
+                        success = false,
+                        diagnosticReason = org.mewx.wenku8.tts.TtsDiagnosticReason.NO_ENGINE_INSTALLED,
+                        diagnosticMessage = "未检测到支持中文的语音朗读引擎",
+                    ),
+                )
+            }
+
+            override fun setSpeechRate(rate: Float) = Unit
+            override fun speakFlush(text: String, utteranceId: String): Boolean = false
+            override fun stop() = Unit
+            override fun shutdown() = Unit
+        }
+        var openedSettingsCount = 0
+
+        composeTestRule.setContent {
+            Wenku8ExpressiveTheme(themeMode = Wenku8ThemeMode.ARCHIVAL_DAY) {
+                UnifiedReaderScreen(
+                    launchRequest = ReaderLaunchRequest(
+                        aid = 2048,
+                        novelTitle = "星海方舟",
+                        vid = 701,
+                        volumeTitle = "第一卷",
+                        cid = 7101,
+                        chapterTitle = "第一章 启航",
+                        startWithTts = true,
+                    ),
+                    database = database,
+                    catalogGateway = fakeGateway,
+                    novelTocSyncRepository = tocSyncRepository,
+                    preferences = Wenku8UserPreferences(),
+                    onReaderTypographyChanged = { _, _, _, _ -> },
+                    onOpenTtsSettings = { openedSettingsCount++ },
+                    isPlayStoreChannel = true,
+                    onNavigateBack = {},
+                    lineBreaker = DeterministicCellLineBreaker,
+                    speechEngineAdapter = unavailableAdapter,
+                    ioDispatcher = Dispatchers.Main.immediate,
+                    computeDispatcher = Dispatchers.Main.immediate,
+                )
+            }
+        }
+
+        composeTestRule.waitUntil(timeoutMillis = 5_000L) {
+            composeTestRule
+                .onAllNodesWithTag(ReaderTestTags.TTS_FIX_ENGINE_BUTTON)
+                .fetchSemanticsNodes()
+                .isNotEmpty()
+        }
+        composeTestRule.onNodeWithTag(ReaderTestTags.TTS_INSTALL_GOOGLE_BUTTON).assertIsDisplayed()
+        composeTestRule.onNodeWithTag(ReaderTestTags.TTS_FIX_ENGINE_BUTTON).assertIsDisplayed().performClick()
+        assertEquals(1, openedSettingsCount)
+    }
+
+    @Test
     fun ttsReadAloud_highlightsActiveParagraph_andAutoFollowsAcrossPagesInAllSixModes() {
         seedMultiPageTwoChapterNovel()
         var activeMode by mutableStateOf(ReaderPageTurnMode.COVER_SLIDE)

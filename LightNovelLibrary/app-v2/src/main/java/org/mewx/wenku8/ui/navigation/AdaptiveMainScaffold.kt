@@ -685,6 +685,9 @@ fun AdaptiveMainScaffold(
             isNetworkDiagnosticsOpen && networkDiagnosticsViewModelFactory != null -> {
                 ScaffoldSceneState.NetworkDiagnostics
             }
+            activeProfileSettingsSection == ProfileSettingsSection.TTS_SETTINGS -> {
+                ScaffoldSceneState.ProfileSettings(ProfileSettingsSection.TTS_SETTINGS)
+            }
             activeReaderRequest != null &&
                 database != null &&
                 catalogGateway != null &&
@@ -1594,6 +1597,12 @@ fun AdaptiveMainScaffold(
                                     onReaderKeepScreenOnChanged = onReaderKeepScreenOnChanged,
                                     onReaderEdgeBrightnessDragChanged = onReaderEdgeBrightnessDragChanged,
                                     onVolumeKeyPagingChanged = onVolumeKeyPagingChanged,
+                                    onTtsSpeechRateChanged = ttsPreferencesActions.onSpeechRateChanged,
+                                    onOpenTtsSettings = {
+                                        activeProfileSettingsSection = ProfileSettingsSection.TTS_SETTINGS
+                                    },
+                                    isPlayStoreChannel = appUpdateCoordinator?.isPlayStoreChannel
+                                        ?: (org.mewx.wenku8.BuildConfig.DISTRIBUTION_CHANNEL == "playstore"),
                                     onOpenNetworkDiagnostics = handleOpenNetworkDiagnostics,
                                     onNavigateBack = {
                                         val nowMono = SystemClock.elapsedRealtime()
