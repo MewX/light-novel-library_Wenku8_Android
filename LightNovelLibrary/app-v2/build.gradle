@@ -268,11 +268,15 @@ tasks.register('jacocoDefaultDebugUnitTestReport', JacocoReport) {
         html.required = true
     }
     classDirectories.setFrom(files([
-            fileTree(dir: layout.buildDirectory.dir('tmp/kotlin-classes/defaultDebug').get(),
+            // AGP 9 with android.builtInKotlin=true compiles Kotlin into intermediates/built_in_kotlinc
+            // rather than the legacy KGP tmp/kotlin-classes directory.
+            fileTree(dir: layout.buildDirectory.dir('intermediates/built_in_kotlinc/defaultDebug/compileDefaultDebugKotlin/classes'),
+                    excludes: v2GeneratedExcludes),
+            fileTree(dir: layout.buildDirectory.dir('intermediates/javac/defaultDebug/compileDefaultDebugJavaWithJavac/classes'),
                     excludes: v2GeneratedExcludes),
     ]))
-    sourceDirectories.setFrom(files(['src/main/java']))
-    executionData.setFrom(fileTree(dir: layout.buildDirectory.get().asFile,
+    sourceDirectories.setFrom(files(['src/main/java', 'src/default/java']))
+    executionData.setFrom(fileTree(dir: layout.buildDirectory,
             includes: ['outputs/unit_test_code_coverage/defaultDebugUnitTest/**/*.exec']))
 }
 

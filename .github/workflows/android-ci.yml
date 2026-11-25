@@ -58,8 +58,13 @@ jobs:
           echo "::error::No JVM coverage XML at $XML -- the report task was skipped or produced empty output."
           exit 1
         fi
+        LINE_COUNTER=$(grep -o '<counter type="LINE"[^/]*/>' "$XML" | tail -1 || true)
+        if [ -z "$LINE_COUNTER" ]; then
+          echo "::error::JVM coverage XML at $XML contains no LINE counters -- classDirectories likely matched no compiled classes."
+          exit 1
+        fi
         echo "--- app-v2 JVM report line counter ---"
-        grep -o '<counter type="LINE"[^/]*/>' "$XML" | tail -1
+        echo "$LINE_COUNTER"
 
     - name: Upload unit test reports
       if: always()
