@@ -31,6 +31,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import mockwebserver3.MockResponse
 import mockwebserver3.MockWebServer
+import mockwebserver3.SocketEffect
 import okhttp3.Dns
 import okio.Buffer
 import org.junit.After
@@ -1573,6 +1574,91 @@ class ArtbookSearchAndTtsTest {
             )
         }
     }
+
+    @Test
+    fun artbookImageFileResolver_recoversViaMirrorOnReset_andReportsRedactedTraceWhenAllMirrorsFail() =
+        runBlocking {
+            val context = ApplicationProvider.getApplicationContext<Context>()
+            val validJpegBytes = ByteArrayOutputStream().use { out ->
+                val bmp = Bitmap.createBitmap(64, 96, Bitmap.Config.ARGB_8888).apply {
+                    eraseColor(AndroidColor.rgb(200, 96, 64))
+                }
+                bmp.compress(Bitmap.CompressFormat.JPEG, 90, out)
+                bmp.recycle()
+                out.toByteArray()
+            }
+
+            MockWebServer().use { mirrorServer ->
+                MockWebServer().use { blockedPrimary ->
+                    mirrorServer.start(InetAddress.getByName("127.0.0.1"), 0)
+                    val sharedPort = mirrorServer.port
+                    blockedPrimary.start(InetAddress.getByName("127.0.0.2"), sharedPort)
+
+                    val mirrorBytes = IpLiteralParser.parseNumericIpBytes("127.0.0.1", requirePublicUnicast = false)!!
+                    val blockedBytes = IpLiteralParser.parseNumericIpBytes("127.0.0.2", requirePublicUnicast = false)!!
+
+                    val cfFactory = CloudflareAcceleratedCallFactory(
+                        edgeRouteProvider = { null },
+                        systemDns = Dns { host ->
+                            val ip = if (host.equals("pic.wenku8.com", ignoreCase = true)) blockedBytes else mirrorBytes
+                            listOf(InetAddress.getByAddress(host, ip))
+                        },
+                    )
+                    val assetRoot = tempFolder.newFolder("artbook_mirror_root")
+
+                    // 1. Primary pic.wenku8.com resets socket -> mirror pic.777743.xyz rescues & caches under legacy name!
+                    blockedPrimary.enqueue(MockResponse.Builder().onResponseStart(SocketEffect.CloseSocket()).build())
+                    mirrorServer.enqueue(
+                        MockResponse.Builder()
+                            .code(200)
+                            .addHeader("Content-Type", "image/jpeg")
+                            .body(Buffer().write(validJpegBytes))
+                            .build(),
+                    )
+                    val primaryUrl = "http://pic.wenku8.com:$sharedPort/pictures/3/3770/141001/9.jpg"
+                    val rescued = ArtbookImageFileResolver.resolveWithDiagnostics(
+                        context = context,
+                        imageUrl = primaryUrl,
+                        assetRoots = listOf(assetRoot),
+                        callFactoryOverride = cfFactory,
+                        offlineCheckOverride = { false },
+                        ioDispatcher = Dispatchers.IO,
+                    )
+                    assertTrue("Expected mirror rescue Success, got $rescued", rescued is ArtbookImageResolutionResult.Success)
+                    val savedFile = (rescued as ArtbookImageResolutionResult.Success).file
+                    assertEquals(
+                        WenkuXmlParsers.generateLegacyImageFileName(primaryUrl),
+                        savedFile.name,
+                    )
+                    assertTrue(WenkuImageValidator.isDecodableBitmapFile(savedFile))
+
+                    // 2. When ALL 3 hosts fail with socket close, redacted diagnostic summary lists tried mirrors
+                    cfFactory.clearHostBypasses()
+                    val allBlockedFactory = CloudflareAcceleratedCallFactory(
+                        edgeRouteProvider = { null },
+                        systemDns = Dns { host -> listOf(InetAddress.getByAddress(host, blockedBytes)) },
+                    )
+                    repeat(3) {
+                        blockedPrimary.enqueue(MockResponse.Builder().onResponseStart(SocketEffect.CloseSocket()).build())
+                    }
+                    val allFailedUrl = "http://pic.wenku8.com:$sharedPort/pictures/3/3770/141001/10.jpg"
+                    val allFailed = ArtbookImageFileResolver.resolveWithDiagnostics(
+                        context = context,
+                        imageUrl = allFailedUrl,
+                        assetRoots = listOf(assetRoot),
+                        callFactoryOverride = allBlockedFactory,
+                        offlineCheckOverride = { false },
+                        ioDispatcher = Dispatchers.IO,
+                    )
+                    assertTrue(allFailed is ArtbookImageResolutionResult.Failure)
+                    val summary = (allFailed as ArtbookImageResolutionResult.Failure).failure.formatDiagnosticSummary()
+                    assertTrue("Summary should mention pic.wenku8.com, got:\n$summary", summary.contains("pic.wenku8.com"))
+                    assertTrue("Summary should mention tried mirrors, got:\n$summary", summary.contains("pic.777743.xyz"))
+                    assertTrue("Summary should mention pic.wenku8.cn, got:\n$summary", summary.contains("pic.wenku8.cn"))
+                    assertFalse("Summary must never expose raw IP literals, got:\n$summary", summary.contains("127.0.0.2"))
+                }
+            }
+        }
 }
 
 private class FakeSpeechEngineAdapter : SpeechEngineAdapter {
