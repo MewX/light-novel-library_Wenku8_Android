@@ -45,6 +45,7 @@ import com.google.android.libraries.ads.mobile.sdk.MobileAds
 import com.google.android.libraries.ads.mobile.sdk.banner.AdSize
 import com.google.android.libraries.ads.mobile.sdk.banner.AdView
 import com.google.android.libraries.ads.mobile.sdk.banner.BannerAd
+import com.google.android.libraries.ads.mobile.sdk.banner.BannerAdEventCallback
 import com.google.android.libraries.ads.mobile.sdk.banner.BannerAdRequest
 import com.google.android.libraries.ads.mobile.sdk.common.AdLoadCallback
 import com.google.android.libraries.ads.mobile.sdk.common.LoadAdError
@@ -394,12 +395,14 @@ class NovelDetailBannerAdHolder internal constructor(
     internal var loadInProgress: Boolean = false
     internal var loadedWidthDp: Int = 0
     internal var isDisposed: Boolean = false
+    internal var boundBannerAd: BannerAd? = null
+    internal var hasRecordedImpression: Boolean = false
 
     /**
      * Render the visible, opaque reserved card during [BannerAdLoadPhase.Loading] (preventing
      * layout shift and keeping `AdView` visibly mounted per AdMob policy) as well as when
      * [BannerAdLoadPhase.Loaded] or [BannerAdLoadPhase.StaticPreview]. Collapses completely when
-     * offline, GMS-unavailable ([BannerAdLoadPhase.Collapsed]), or on load failure
+     * offline, GMS-unavailable, cache-empty ([BannerAdLoadPhase.Collapsed]), or on load failure
      * ([BannerAdLoadPhase.Failed]).
      */
     val shouldRenderVisibleCard: Boolean
@@ -419,21 +422,123 @@ class NovelDetailBannerAdHolder internal constructor(
         phase = BannerAdLoadPhase.Collapsed
     }
 
-    internal fun destroy(markDisposed: Boolean = false) {
+    internal fun destroy(
+        markDisposed: Boolean = false,
+        recycleIfUnimpressed: Boolean = false,
+    ) {
         if (markDisposed) {
             isDisposed = true
         }
         loadInProgress = false
+        val savedWidthDp = loadedWidthDp
         loadedWidthDp = 0
         val existing = adView
         adView = null
+        val existingBanner = boundBannerAd
+        boundBannerAd = null
+        val shouldRecycle = recycleIfUnimpressed &&
+            !hasRecordedImpression &&
+            existingBanner != null &&
+            savedWidthDp > 0
+        hasRecordedImpression = false
+
+        if (shouldRecycle && existingBanner != null) {
+            runCatching { existingBanner.adEventCallback = null }
+            if (existing != null) {
+                runCatching { existing.unregisterBannerAd() }
+            }
+            ServerSupportBannerPreloader.recycleUnimpressedAd(
+                placement = placement,
+                widthDp = savedWidthDp,
+                bannerAd = existingBanner,
+            )
+            if (existing != null) {
+                runCatching {
+                    (existing.parent as? ViewGroup)?.removeView(existing)
+                    existing.destroy()
+                }
+            }
+            return
+        }
+
+        if (existingBanner != null) {
+            runCatching { existingBanner.adEventCallback = null }
+        }
         if (existing != null) {
             runCatching {
                 (existing.parent as? ViewGroup)?.removeView(existing)
                 existing.destroy()
             }
+        } else if (existingBanner != null) {
+            runCatching { existingBanner.destroy() }
         }
     }
+}
+
+/**
+ * Synchronously polls a ready [BannerAd] from [ServerSupportBannerPreloader] and binds it onto a
+ * fresh [AdView] inside [holder]. Returns `true` when the holder is immediately ready in
+ * [BannerAdLoadPhase.Loaded] (0ms render, zero placeholder), or `false` if the buffer is empty.
+ */
+internal fun bindPreloadedBannerToHolder(
+    holder: NovelDetailBannerAdHolder,
+    hostContext: Context,
+    availableWidthDp: Int,
+    canRequestAds: Boolean,
+): Boolean {
+    if (!canRequestAds || holder.isDisposed || holder.adView != null) {
+        return false
+    }
+    val hostActivity = hostContext.findHostActivity() ?: return false
+    val safeWidthDp = availableWidthDp.coerceAtLeast(160)
+    val loadStartedAt = SystemClock.elapsedRealtime()
+    val preloadedAd = ServerSupportBannerPreloader.pollReadyAd(
+        placement = holder.placement,
+        requestedWidthDp = safeWidthDp,
+        canRequestAds = canRequestAds,
+    ) ?: return false
+
+    preloadedAd.adEventCallback = object : BannerAdEventCallback {
+        override fun onAdImpression() {
+            holder.hasRecordedImpression = true
+        }
+    }
+
+    val bindOverride = testBindPreloadedAdAction
+    val preloadedAdView = runCatching {
+        if (bindOverride != null) {
+            bindOverride(hostContext, hostActivity, preloadedAd)
+        } else {
+            AdView(hostContext).apply {
+                layoutParams = ViewGroup.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                )
+                registerBannerAd(preloadedAd, hostActivity)
+            }
+        }
+    }.onFailure { t ->
+        runCatching {
+            Log.w(AD_LOG_TAG, "registerBannerAd failed for ${holder.placement}", t)
+        }
+        runCatching { preloadedAd.adEventCallback = null }
+        runCatching { preloadedAd.destroy() }
+    }.getOrNull() ?: return false
+
+    holder.boundBannerAd = preloadedAd
+    holder.hasRecordedImpression = false
+    holder.loadedWidthDp = safeWidthDp
+    holder.adView = preloadedAdView
+    holder.loadInProgress = false
+    holder.phase = BannerAdLoadPhase.Loaded
+    val elapsedMs = (SystemClock.elapsedRealtime() - loadStartedAt).coerceAtLeast(0L)
+    runCatching {
+        Log.d(
+            AD_LOG_TAG,
+            "Banner preload HIT bound (${holder.placement}, ${safeWidthDp}dp) in ${elapsedMs}ms",
+        )
+    }
+    return true
 }
 
 @Composable
@@ -441,12 +546,14 @@ fun rememberNovelDetailBannerAdHolder(
     aid: Int,
     placement: InlineBannerPlacement = InlineBannerPlacement.NOVEL_DETAIL_STANDARD,
     requestNonce: Int = 0,
+    availableWidthDp: Int = 360,
     isNetworkAvailableOverride: Boolean? = null,
     isGmsAvailableOverride: Boolean? = null,
     canRequestAdsOverride: Boolean? = null,
     enableLiveAdViewInflation: Boolean = true,
 ): NovelDetailBannerAdHolder {
     val context = LocalContext.current
+    val hostActivity = remember(context) { context.findHostActivity() }
     val isOnline = isNetworkAvailableOverride ?: remember(aid, placement, requestNonce, context) {
         hasActiveInternetCapability(context)
     }
@@ -464,20 +571,37 @@ fun rememberNovelDetailBannerAdHolder(
         canRequestAds,
         enableLiveAdViewInflation,
     ) {
-        val initialPhase = when {
-            !canRequestAds || !isOnline || !isGmsReady -> BannerAdLoadPhase.Collapsed
-            !enableLiveAdViewInflation -> BannerAdLoadPhase.StaticPreview
-            else -> BannerAdLoadPhase.Loading
+        when {
+            !canRequestAds || !isOnline || !isGmsReady -> NovelDetailBannerAdHolder(
+                initialPhase = BannerAdLoadPhase.Collapsed,
+                placement = placement,
+            )
+            !enableLiveAdViewInflation -> NovelDetailBannerAdHolder(
+                initialPhase = BannerAdLoadPhase.StaticPreview,
+                placement = placement,
+            )
+            else -> {
+                // Cache-only instant display: bind a ready preloaded BannerAd synchronously on
+                // Frame 0 so there is zero blank placeholder and zero layout shift; if the buffer
+                // is empty, stay Collapsed cleanly and let the preloader fill for the next visit.
+                val candidate = NovelDetailBannerAdHolder(
+                    initialPhase = BannerAdLoadPhase.Collapsed,
+                    placement = placement,
+                )
+                bindPreloadedBannerToHolder(
+                    holder = candidate,
+                    hostContext = hostActivity ?: context,
+                    availableWidthDp = availableWidthDp,
+                    canRequestAds = canRequestAds,
+                )
+                candidate
+            }
         }
-        NovelDetailBannerAdHolder(
-            initialPhase = initialPhase,
-            placement = placement,
-        )
     }
 
     DisposableEffect(holder) {
         onDispose {
-            holder.destroy(markDisposed = true)
+            holder.destroy(markDisposed = true, recycleIfUnimpressed = true)
         }
     }
 
@@ -614,61 +738,16 @@ internal suspend fun startHolderBannerLoad(
 
     // Fast path: consume an SDK-preloaded BannerAd from BannerAdPreloader when available so the
     // visible card renders immediately with zero network wait.
-    val hostActivity = hostContext.findHostActivity()
-    if (hostActivity != null) {
-        val preloadedAd = ServerSupportBannerPreloader.pollReadyAd(
-            placement = holder.placement,
-            requestedWidthDp = safeWidthDp,
+    val boundFromPreloader = withContext(Dispatchers.Main.immediate) {
+        bindPreloadedBannerToHolder(
+            holder = holder,
+            hostContext = hostContext,
+            availableWidthDp = safeWidthDp,
             canRequestAds = canRequestAds,
         )
-        if (preloadedAd != null) {
-            val bound = withContext(Dispatchers.Main.immediate) {
-                if (holder.isDisposed || holder.phase != BannerAdLoadPhase.Loading || holder.adView != null) {
-                    runCatching { preloadedAd.destroy() }
-                    holder.loadInProgress = false
-                    return@withContext true
-                }
-                val bindOverride = testBindPreloadedAdAction
-                val preloadedAdView = runCatching {
-                    if (bindOverride != null) {
-                        bindOverride(hostContext, hostActivity, preloadedAd)
-                    } else {
-                        AdView(hostContext).apply {
-                            layoutParams = ViewGroup.LayoutParams(
-                                ViewGroup.LayoutParams.MATCH_PARENT,
-                                ViewGroup.LayoutParams.WRAP_CONTENT,
-                            )
-                            registerBannerAd(preloadedAd, hostActivity)
-                        }
-                    }
-                }.onFailure { t ->
-                    runCatching {
-                        Log.w(AD_LOG_TAG, "registerBannerAd failed; falling back to live load", t)
-                    }
-                    runCatching { preloadedAd.destroy() }
-                }.getOrNull()
-
-                if (preloadedAdView != null) {
-                    holder.loadedWidthDp = safeWidthDp
-                    holder.adView = preloadedAdView
-                    holder.loadInProgress = false
-                    holder.phase = BannerAdLoadPhase.Loaded
-                    val elapsedMs = (SystemClock.elapsedRealtime() - loadStartedAt).coerceAtLeast(0L)
-                    runCatching {
-                        Log.d(
-                            AD_LOG_TAG,
-                            "Banner preload HIT bound (${holder.placement}, ${safeWidthDp}dp) in ${elapsedMs}ms",
-                        )
-                    }
-                    true
-                } else {
-                    false
-                }
-            }
-            if (bound) {
-                return
-            }
-        }
+    }
+    if (boundFromPreloader) {
+        return
     }
 
     val candidateUnits = ServerSupportAdConstants.candidateBannerAdUnitIds(placement = holder.placement)
@@ -894,8 +973,16 @@ fun ServerSupportBannerAd(
                         abs(slotWidthDp - holder.loadedWidthDp) >= 48 &&
                         !holder.loadInProgress
                     if (needsWidthReload) {
-                        holder.destroy()
-                        holder.phase = BannerAdLoadPhase.Loading
+                        holder.destroy(recycleIfUnimpressed = true)
+                        val rebound = bindPreloadedBannerToHolder(
+                            holder = holder,
+                            hostContext = hostActivity ?: context,
+                            availableWidthDp = slotWidthDp,
+                            canRequestAds = canRequestAds,
+                        )
+                        if (!rebound) {
+                            holder.phase = BannerAdLoadPhase.Collapsed
+                        }
                     }
                     if (holder.phase == BannerAdLoadPhase.Loading && holder.adView == null && !holder.loadInProgress) {
                         if (!ServerSupportBannerPreloader.isAdReady(holder.placement)) {
