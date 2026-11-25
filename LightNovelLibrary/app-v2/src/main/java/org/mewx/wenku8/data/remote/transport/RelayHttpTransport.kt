@@ -25,6 +25,8 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.Response
 import org.mewx.wenku8.api.SealedRequest
 import org.mewx.wenku8.api.Wenku8API
+import org.mewx.wenku8.data.media.WenkuHttpsRedirectUpgradeInterceptor
+import org.mewx.wenku8.data.media.WenkuImageUrlPolicy
 import org.mewx.wenku8.data.remote.diagnostics.DiagnosticsEndpointConfig
 import org.mewx.wenku8.data.remote.diagnostics.DiagnosticsEndpointResolution
 import org.mewx.wenku8.data.remote.diagnostics.OkHttpProbeTransport
@@ -451,6 +453,7 @@ class RelayHttpTransport(
         baseOkHttpClient.newBuilder()
             .cookieJar(CookieJar.NO_COOKIES)
             .dns(systemDns)
+            .addNetworkInterceptor(WenkuHttpsRedirectUpgradeInterceptor)
             .connectTimeout(connectTimeoutMillis, TimeUnit.MILLISECONDS)
             .readTimeout(readTimeoutMillis, TimeUnit.MILLISECONDS)
             .callTimeout(totalPostDeadlineMillis, TimeUnit.MILLISECONDS)
@@ -464,10 +467,11 @@ class RelayHttpTransport(
         ) {
             return null
         }
+        val normalizedUrl = WenkuImageUrlPolicy.upgradeToHttpsIfSupported(trimmed)
         return withContext(ioDispatcher) {
             val request = try {
                 Request.Builder()
-                    .url(trimmed)
+                    .url(normalizedUrl)
                     .header("Accept-Encoding", "gzip")
                     .get()
                     .build()

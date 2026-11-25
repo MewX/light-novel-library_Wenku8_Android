@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.runBlocking
 import mockwebserver3.MockResponse
 import mockwebserver3.MockWebServer
+import mockwebserver3.SocketEffect
 import okhttp3.Call
 import okhttp3.Callback
 import okhttp3.Dns
@@ -27,6 +28,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
 import org.junit.runner.RunWith
+import org.mewx.wenku8.data.media.WenkuImageUrlPolicy
 import org.mewx.wenku8.data.remote.diagnostics.DiagnosticsEndpointConfig
 import org.mewx.wenku8.data.remote.diagnostics.DiagnosticsEndpointResolution
 import org.mewx.wenku8.data.remote.diagnostics.DiagnosticsProbeTransport
@@ -795,6 +797,189 @@ class CloudflareAcceleratedCallFactoryTest {
                 assertEquals("cf-v6-fast", pickedWhenV4Blocked?.candidateId)
             } finally {
                 scope.cancel()
+            }
+        }
+
+    @Test
+    fun illustrationMirrorFallback_rescuesResetOnPicWenku8Com_remembersWorkingMirror_andPreservesIpv6Edge() =
+        runBlocking {
+            MockWebServer().use { healthyMirror ->
+                MockWebServer().use { resettingPrimary ->
+                    healthyMirror.start(InetAddress.getByName("127.0.0.1"), 0)
+                    val sharedPort = healthyMirror.port
+                    resettingPrimary.start(InetAddress.getByName("127.0.0.2"), sharedPort)
+
+                    val healthyBytes = IpLiteralParser.parseNumericIpBytes("127.0.0.1", requirePublicUnicast = false)!!
+                    val resetBytes = IpLiteralParser.parseNumericIpBytes("127.0.0.2", requirePublicUnicast = false)!!
+                    val monoClock = AtomicLong(500_000L)
+
+                    val activeEdgeRef = AtomicReference<ActiveCloudflareEdgeRoute?>(null)
+                    val perHostSystemDns = Dns { host ->
+                        val ip = if (host.equals("pic.wenku8.com", ignoreCase = true)) resetBytes else healthyBytes
+                        listOf(InetAddress.getByAddress(host, ip))
+                    }
+
+                    val factory = CloudflareAcceleratedCallFactory(
+                        edgeRouteProvider = { activeEdgeRef.get() },
+                        systemDns = perHostSystemDns,
+                        monotonicClockMillis = { monoClock.get() },
+                    )
+
+                    // 1. System DNS mode: pic.wenku8.com resets connection (simulating GFW RST!) ->
+                    //    transparently falls back to pic.777743.xyz/{strippedPath} and succeeds!
+                    resettingPrimary.enqueue(
+                        MockResponse.Builder()
+                            .onResponseStart(SocketEffect.CloseSocket())
+                            .build(),
+                    )
+                    healthyMirror.enqueue(
+                        MockResponse.Builder()
+                            .code(200)
+                            .addHeader("Content-Type", "image/jpeg")
+                            .body("RESCUED-VIA-777743")
+                            .build(),
+                    )
+
+                    val firstCall = factory.newCall(
+                        Request.Builder()
+                            .url("http://pic.wenku8.com:$sharedPort/pictures/3/3770/141001/1.jpg")
+                            .get()
+                            .build(),
+                    )
+                    firstCall.execute().use { resp ->
+                        assertEquals(200, resp.code)
+                        assertEquals("RESCUED-VIA-777743", resp.body.string())
+                        assertEquals("pic.777743.xyz", resp.request.url.host)
+                        assertEquals("/3/3770/141001/1.jpg", resp.request.url.encodedPath)
+                    }
+                    assertEquals(1, resettingPrimary.requestCount)
+                    assertEquals(1, healthyMirror.requestCount)
+                    assertEquals(
+                        WenkuImageUrlPolicy.IllustrationMirror.PIC_777743,
+                        factory.currentPreferredMirrorForHostOrNull("pic.wenku8.com"),
+                    )
+
+                    // 2. Subsequent async enqueue() (as used by Coil 3 thumbnails!) skips the blocked
+                    //    primary completely and hits remembered mirror pic.777743.xyz immediately!
+                    healthyMirror.enqueue(
+                        MockResponse.Builder()
+                            .code(200)
+                            .addHeader("Content-Type", "image/jpeg")
+                            .body("THUMB-DIRECT-TO-MIRROR")
+                            .build(),
+                    )
+                    val latch = CountDownLatch(1)
+                    val asyncBody = AtomicReference<String?>(null)
+                    factory.newCall(
+                        Request.Builder()
+                            .url("http://pic.wenku8.com:$sharedPort/pictures/3/3770/141001/2.jpg")
+                            .get()
+                            .build(),
+                    ).enqueue(
+                        object : Callback {
+                            override fun onFailure(call: Call, e: IOException) = latch.countDown()
+                            override fun onResponse(call: Call, response: Response) {
+                                response.use { asyncBody.set(it.body.string()) }
+                                latch.countDown()
+                            }
+                        },
+                    )
+                    assertTrue(latch.await(5, TimeUnit.SECONDS))
+                    assertEquals("THUMB-DIRECT-TO-MIRROR", asyncBody.get())
+                    assertEquals(
+                        "Remembered mirror must bypass blocked primary for remaining chapter images",
+                        1,
+                        resettingPrimary.requestCount,
+                    )
+                    assertEquals(2, healthyMirror.requestCount)
+
+                    // 3. If remembered mirror pic.777743.xyz returns 404 (e.g. CDN migrated), falls
+                    //    through to pic.wenku8.cn/pictures/... and succeeds!
+                    healthyMirror.enqueue(MockResponse.Builder().code(404).body("Not Found").build())
+                    healthyMirror.enqueue(
+                        MockResponse.Builder()
+                            .code(200)
+                            .addHeader("Content-Type", "image/jpeg")
+                            .body("RESCUED-VIA-WENKU8-CN")
+                            .build(),
+                    )
+                    factory.newCall(
+                        Request.Builder()
+                            .url("http://pic.wenku8.com:$sharedPort/pictures/3/3770/141001/3.jpg")
+                            .get()
+                            .build(),
+                    ).execute().use { resp ->
+                        assertEquals(200, resp.code)
+                        assertEquals("RESCUED-VIA-WENKU8-CN", resp.body.string())
+                        assertEquals("pic.wenku8.cn", resp.request.url.host)
+                        assertEquals("/pictures/3/3770/141001/3.jpg", resp.request.url.encodedPath)
+                    }
+
+                    // 4. Authoritative 404 from pic.wenku8.com stops immediately without mirror fan-out
+                    factory.clearHostBypasses()
+                    val mirrorCountBefore404 = healthyMirror.requestCount
+                    resettingPrimary.enqueue(MockResponse.Builder().code(404).body("Missing").build())
+                    factory.newCall(
+                        Request.Builder()
+                            .url("http://pic.wenku8.com:$sharedPort/pictures/3/3770/141001/404.jpg")
+                            .get()
+                            .build(),
+                    ).execute().use { resp ->
+                        assertEquals(404, resp.code)
+                    }
+                    assertEquals(
+                        "Authoritative 404 from primary pic.wenku8.com must not trigger mirror retries",
+                        mirrorCountBefore404,
+                        healthyMirror.requestCount,
+                    )
+
+                    // 5. When Cloudflare IPv6 edge is active and BOTH pinned & System DNS fail on
+                    //    pic.wenku8.com (GFW RST), IPv6 bulk breaker MUST NOT falsely trip, so the
+                    //    fallback mirror pic.777743.xyz still rides the healthy IPv6 edge!
+                    val pinnedIpv6Healthy = byteArrayOf(
+                        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0xFF.toByte(), 0xFF.toByte(), 127, 0, 0, 1,
+                    )
+                    activeEdgeRef.set(
+                        ActiveCloudflareEdgeRoute(
+                            generationId = 55L,
+                            candidateId = "cf-v6-healthy",
+                            rawIpBytes = pinnedIpv6Healthy,
+                        ),
+                    )
+                    // Attempt 0 (pic.wenku8.com): pinned (127.0.0.1) resets AND System DNS (127.0.0.2) resets
+                    healthyMirror.enqueue(MockResponse.Builder().onResponseStart(SocketEffect.CloseSocket()).build())
+                    resettingPrimary.enqueue(MockResponse.Builder().onResponseStart(SocketEffect.CloseSocket()).build())
+                    // Attempt 1 (pic.777743.xyz): succeeds right on the healthy pinned IPv6 edge (127.0.0.1)!
+                    healthyMirror.enqueue(
+                        MockResponse.Builder()
+                            .code(200)
+                            .addHeader("Content-Type", "image/jpeg")
+                            .body("MIRROR-OK-VIA-PINNED-IPV6")
+                            .build(),
+                    )
+                    factory.newCall(
+                        Request.Builder()
+                            .url("http://pic.wenku8.com:$sharedPort/pictures/3/3770/141001/5.jpg")
+                            .get()
+                            .build(),
+                    ).execute().use { resp ->
+                        assertEquals(200, resp.code)
+                        assertEquals("MIRROR-OK-VIA-PINNED-IPV6", resp.body.string())
+                    }
+                    assertFalse(
+                        "GFW RST failing on BOTH pinned IPv6 and System DNS must not trip IPv6 breaker",
+                        factory.isIpv6EdgeCurrentlyBypassed(),
+                    )
+                    assertEquals(
+                        WenkuImageUrlPolicy.IllustrationMirror.PIC_777743,
+                        factory.currentPreferredMirrorForHostOrNull("pic.wenku8.com"),
+                    )
+                    assertEquals(
+                        "Effective pinned family for pic.wenku8.com should resolve through remembered mirror",
+                        IpAddressFamily.IPV6,
+                        factory.activePinnedFamilyForHostOrNull("pic.wenku8.com"),
+                    )
+                }
             }
         }
 }
