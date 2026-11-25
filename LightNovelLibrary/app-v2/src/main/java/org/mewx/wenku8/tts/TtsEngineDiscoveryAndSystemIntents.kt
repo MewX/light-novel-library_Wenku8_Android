@@ -360,6 +360,7 @@ enum class TtsSettingsJumpTier {
 /** Actionable free/official TTS onboarding item rendered in channel-aware cards. */
 sealed interface TtsGuidanceAction {
     data class OpenPlayStoreApp(val packageName: String) : TtsGuidanceAction
+    data class OpenPlayStoreSearch(val query: String) : TtsGuidanceAction
     data class OpenInstallVoiceData(val enginePackage: String) : TtsGuidanceAction
     data object OpenSystemTtsSettings : TtsGuidanceAction
     data class OpenExternalFreeUrl(val url: String) : TtsGuidanceAction
@@ -469,7 +470,28 @@ object TtsSystemIntents {
                         action = TtsGuidanceAction.OpenInstallVoiceData(KnownTtsEngineCatalog.GOOGLE_TTS_PACKAGE),
                     ),
                 )
+                items.add(
+                    TtsGuidanceItem(
+                        id = "play_update_google_tts",
+                        title = "检查 / 更新 Speech Recognition & Synthesis",
+                        subtitle = "部分机型预装旧版 Google 语音存在中文初始化异常，前往 Play 商店更新到最新版即可修复。",
+                        badge = "官方免费",
+                        actionLabel = "前往 Play 商店",
+                        action = TtsGuidanceAction.OpenPlayStoreApp(KnownTtsEngineCatalog.GOOGLE_TTS_PACKAGE),
+                    ),
+                )
             }
+
+            items.add(
+                TtsGuidanceItem(
+                    id = "play_search_more_tts",
+                    title = "在 Play 商店探索更多免费中文 TTS 引擎",
+                    subtitle = "可搜索 VoxSherpa 等上架 Google Play 的免费或开源离线语音引擎，安装后返回本页自动识别。",
+                    badge = "更多引擎",
+                    actionLabel = "商店搜索",
+                    action = TtsGuidanceAction.OpenPlayStoreSearch("Text to Speech Chinese"),
+                ),
+            )
 
             if (activeEnginePackage.isNotBlank() &&
                 activeEnginePackage != KnownTtsEngineCatalog.GOOGLE_TTS_PACKAGE &&
@@ -627,6 +649,19 @@ object TtsSystemIntents {
         return startActivitySafely(context, webIntent)
     }
 
+    fun openPlayStoreSearch(context: Context, query: String): Boolean {
+        val q = query.trim()
+        if (q.isEmpty()) return false
+        val encoded = Uri.encode(q)
+        val marketIntent = Intent(Intent.ACTION_VIEW, Uri.parse("market://search?q=$encoded&c=apps"))
+        if (startActivitySafely(context, marketIntent)) return true
+        val webIntent = Intent(
+            Intent.ACTION_VIEW,
+            Uri.parse("https://play.google.com/store/search?q=$encoded&c=apps"),
+        )
+        return startActivitySafely(context, webIntent)
+    }
+
     fun openExternalUrl(context: Context, url: String): Boolean {
         val trimmed = url.trim()
         if (!trimmed.startsWith("https://")) return false
@@ -635,9 +670,23 @@ object TtsSystemIntents {
 
     fun executeGuidanceAction(context: Context, action: TtsGuidanceAction): Boolean = when (action) {
         is TtsGuidanceAction.OpenPlayStoreApp -> openPlayStoreApp(context, action.packageName)
+        is TtsGuidanceAction.OpenPlayStoreSearch -> openPlayStoreSearch(context, action.query)
         is TtsGuidanceAction.OpenInstallVoiceData -> openInstallTtsVoiceData(context, action.enginePackage)
         TtsGuidanceAction.OpenSystemTtsSettings -> openSystemTtsSettings(context) != TtsSettingsJumpTier.FAILED
         is TtsGuidanceAction.OpenExternalFreeUrl -> openExternalUrl(context, action.url)
+    }
+
+    fun describeActionLaunchFeedback(action: TtsGuidanceAction): String = when (action) {
+        is TtsGuidanceAction.OpenPlayStoreApp ->
+            "正在打开 Google Play 商店，安装或更新完成后返回本页将自动检测"
+        is TtsGuidanceAction.OpenPlayStoreSearch ->
+            "正在打开 Play 商店搜索免费中文 TTS 引擎，安装完成后返回本页即可自动识别"
+        is TtsGuidanceAction.OpenInstallVoiceData ->
+            "已尝试打开语音包下载页，下载完成后返回本页将自动重新检测"
+        TtsGuidanceAction.OpenSystemTtsSettings ->
+            "正在打开系统文字转语音设置，修改完成后返回本页即可生效"
+        is TtsGuidanceAction.OpenExternalFreeUrl ->
+            "正在浏览器中打开开源项目页面，安装完成后返回本页将自动识别新引擎"
     }
 
     private fun startActivitySafely(context: Context, intent: Intent): Boolean {

@@ -153,16 +153,23 @@ class TtsDiscoveryAndFallbackTest {
             },
         )
 
-        // Once Google TTS is installed, Play Store card switches to Voice Data Download guidance.
+        // Once Google TTS is installed, Play Store card offers Voice Data Download + update + Play search
+        // and STILL emits zero external sideload URLs.
         val withGooglePlay = TtsSystemIntents.buildChannelGuidanceOptions(
             isPlayStoreChannel = true,
             installedEngines = listOf(KnownTtsEngineCatalog.describe(KnownTtsEngineCatalog.GOOGLE_TTS_PACKAGE)),
             diagnosticReason = TtsDiagnosticReason.MISSING_CHINESE_DATA,
             manufacturer = "Google",
         )
+        assertTrue(withGooglePlay.none { it.action is TtsGuidanceAction.OpenExternalFreeUrl })
         assertTrue(
             withGooglePlay.any {
                 it.action == TtsGuidanceAction.OpenInstallVoiceData(KnownTtsEngineCatalog.GOOGLE_TTS_PACKAGE)
+            },
+        )
+        assertTrue(
+            withGooglePlay.any {
+                it.action is TtsGuidanceAction.OpenPlayStoreSearch
             },
         )
     }

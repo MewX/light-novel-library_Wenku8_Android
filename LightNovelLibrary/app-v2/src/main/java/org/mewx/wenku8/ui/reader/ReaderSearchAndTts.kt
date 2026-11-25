@@ -1131,7 +1131,7 @@ class AndroidTextToSpeechEngineAdapter(
     }
 
     companion object {
-        const val DEFAULT_INIT_TIMEOUT_MS = 4_000L
+        const val DEFAULT_INIT_TIMEOUT_MS = 2_500L
 
         fun diagnosticMessageFor(reason: TtsDiagnosticReason): String = when (reason) {
             TtsDiagnosticReason.NO_ENGINE_INSTALLED ->

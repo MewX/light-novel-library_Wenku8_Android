@@ -3,6 +3,7 @@ package org.mewx.wenku8.ui.profile
 import android.content.Context
 import android.os.Build
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -12,16 +13,20 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.MenuBook
 import androidx.compose.material.icons.automirrored.outlined.VolumeUp
 import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.BatteryAlert
 import androidx.compose.material.icons.outlined.CheckCircle
+import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.ErrorOutline
@@ -40,16 +45,21 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Slider
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -73,7 +83,9 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.mewx.wenku8.data.local.preferences.Wenku8UserPreferences
 import org.mewx.wenku8.tts.KnownTtsEngineCatalog
 import org.mewx.wenku8.tts.TtsDiagnosticReason
@@ -117,9 +129,14 @@ object TtsSettingsTestTags {
     const val PREVIEW_CUSTOM_TEXT_FIELD = "tts_settings_preview_custom_text_field"
     const val PREVIEW_RESET_TEXT_BUTTON = "tts_settings_preview_reset_text_button"
     const val FALLBACK_BANNER = "tts_settings_fallback_banner"
+    const val PROBING_PROGRESS_BAR = "tts_settings_probing_progress_bar"
     const val ONBOARDING_CARD = "tts_settings_onboarding_card"
     const val ONBOARDING_ITEM_PREFIX = "tts_settings_onboarding_item_"
     const val ONBOARDING_ACTION_PREFIX = "tts_settings_onboarding_action_"
+    const val MORE_ENGINES_ROW = "tts_settings_more_engines_row"
+    const val MORE_ENGINES_SHEET = "tts_settings_more_engines_sheet"
+    const val MORE_ENGINES_SHEET_CLOSE = "tts_settings_more_engines_sheet_close"
+    const val MORE_ENGINES_SHEET_STATUS = "tts_settings_more_engines_sheet_status"
     const val ENGINE_AUTO_ROW = "tts_settings_engine_auto_row"
     const val ENGINE_ROW_PREFIX = "tts_settings_engine_row_"
     const val VOICE_CHINESE_ONLY_CHIP = "tts_settings_voice_chinese_only_chip"
@@ -151,7 +168,7 @@ object TtsSettingsTestTags {
  * 5. Playback preferences (rate, pitch, default sleep timer, page follow, audio focus)
  * 6. System tools (download voice pack, 4-tier safe jump to system TTS settings, OEM keep-alive tips)
  */
-@OptIn(ExperimentalLayoutApi::class)
+@OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
 @Composable
 internal fun TtsSettingsBody(
     preferences: Wenku8UserPreferences,
@@ -167,6 +184,7 @@ internal fun TtsSettingsBody(
     val context = LocalContext.current
     val appContext = context.applicationContext
     val coroutineScope = rememberCoroutineScope()
+    val snackbarHostState = remember { SnackbarHostState() }
 
     val adapter = remember(speechEngineAdapterFactory) {
         speechEngineAdapterFactory?.invoke(appContext) ?: AndroidTextToSpeechEngineAdapter(appContext)
@@ -178,8 +196,7 @@ internal fun TtsSettingsBody(
     var refreshEpoch by remember { mutableIntStateOf(0) }
     var installedEngines by remember {
         mutableStateOf(
-            installedEnginesProvider?.invoke(appContext)
-                ?: TtsEngineDiscovery.discoverInstalledEngines(appContext),
+            installedEnginesProvider?.invoke(appContext) ?: emptyList(),
         )
     }
     var isProbing by remember { mutableStateOf(true) }
@@ -198,8 +215,18 @@ internal fun TtsSettingsBody(
     var filterChineseOnly by rememberSaveable { mutableStateOf(true) }
     var filterOfflineOnly by rememberSaveable { mutableStateOf(false) }
     var showAllVoices by rememberSaveable { mutableStateOf(false) }
-    var expandMoreEnginesCard by rememberSaveable { mutableStateOf(false) }
+    var isMoreEnginesSheetOpen by rememberSaveable { mutableStateOf(false) }
+    var lastLaunchedGuidanceId by remember { mutableStateOf<String?>(null) }
+    var sheetStatusFeedback by remember { mutableStateOf<String?>(null) }
     var previewUtteranceSeq by remember { mutableIntStateOf(0) }
+
+    fun showTransientFeedback(message: String) {
+        actionFeedbackMessage = message
+        coroutineScope.launch {
+            snackbarHostState.currentSnackbarData?.dismiss()
+            snackbarHostState.showSnackbar(message)
+        }
+    }
 
     // Automatically re-scan engines when returning from Play Store or System Settings!
     var hasPassedFirstResume by remember { mutableStateOf(false) }
@@ -224,8 +251,13 @@ internal fun TtsSettingsBody(
         isProbing = true
         isPreviewSpeaking = false
         previewingVoiceName = null
-        installedEngines = installedEnginesProvider?.invoke(appContext)
-            ?: TtsEngineDiscovery.discoverInstalledEngines(appContext)
+        installedEngines = if (installedEnginesProvider != null) {
+            installedEnginesProvider.invoke(appContext)
+        } else {
+            withContext(Dispatchers.IO) {
+                TtsEngineDiscovery.discoverInstalledEngines(appContext)
+            }
+        }
         adapter.initializeConfigured(
             appLanguage = preferences.appLanguage,
             config = effectiveConfig,
@@ -253,7 +285,7 @@ internal fun TtsSettingsBody(
                 coroutineScope.launch {
                     isPreviewSpeaking = false
                     previewingVoiceName = null
-                    actionFeedbackMessage = "试听播放失败，请尝试切换其他音色或引擎"
+                    showTransientFeedback("试听播放失败，请尝试切换其他音色或引擎")
                 }
             },
         )
@@ -269,7 +301,7 @@ internal fun TtsSettingsBody(
 
     fun startPreview(voiceOverride: String? = null) {
         if (initResult?.success != true) {
-            actionFeedbackMessage = initResult?.diagnosticMessage ?: "当前暂无可用的中文语音引擎"
+            showTransientFeedback(initResult?.diagnosticMessage ?: "当前暂无可用的中文语音引擎")
             return
         }
         val textToSpeak = customSampleText.trim().ifBlank { defaultSample }
@@ -289,7 +321,7 @@ internal fun TtsSettingsBody(
         } else {
             isPreviewSpeaking = false
             previewingVoiceName = null
-            actionFeedbackMessage = "启动试听失败，请检查所选语音引擎状态"
+            showTransientFeedback("启动试听失败，请检查所选语音引擎状态")
         }
     }
 
@@ -320,11 +352,18 @@ internal fun TtsSettingsBody(
         )
     }
 
-    val handleGuidanceAction: (TtsGuidanceAction) -> Unit = { action ->
+    val handleGuidanceAction: (String?, TtsGuidanceAction) -> Unit = { itemId, action ->
         val ok = guidanceActionHandler?.invoke(context, action)
             ?: TtsSystemIntents.executeGuidanceAction(context, action)
-        if (!ok) {
-            actionFeedbackMessage = "无法直接打开目标界面，请手动前往：${oemGuidance.settingsPathHint}"
+        if (ok) {
+            lastLaunchedGuidanceId = itemId
+            val feedback = TtsSystemIntents.describeActionLaunchFeedback(action)
+            sheetStatusFeedback = feedback
+            showTransientFeedback(feedback)
+        } else {
+            val failMsg = "无法直接打开目标界面，请手动前往：${oemGuidance.settingsPathHint}"
+            sheetStatusFeedback = failMsg
+            showTransientFeedback(failMsg)
         }
     }
 
@@ -343,17 +382,24 @@ internal fun TtsSettingsBody(
         }
     }
 
-    LazyColumn(
-        modifier = modifier
-            .fillMaxSize()
-            .testTag(ProfileStudioTestTags.SUBSCREEN_LIST),
-        contentPadding = PaddingValues(horizontal = horizontalPadding, vertical = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(18.dp),
-    ) {
+    Box(modifier = modifier.fillMaxSize()) {
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .testTag(ProfileStudioTestTags.SUBSCREEN_LIST),
+            contentPadding = PaddingValues(
+                start = horizontalPadding,
+                end = horizontalPadding,
+                top = 16.dp,
+                bottom = 84.dp,
+            ),
+            verticalArrangement = Arrangement.spacedBy(18.dp),
+        ) {
         // 1. Top Live Engine Status & Light-Novel Voice Preview Card
         item(key = "tts_preview_card") {
             TtsStatusAndPreviewCard(
                 isProbing = isProbing,
+                installedEngineCount = installedEngines.size,
                 initResult = initResult,
                 isPreviewSpeaking = isPreviewSpeaking,
                 sampleText = customSampleText,
@@ -382,7 +428,8 @@ internal fun TtsSettingsBody(
                     isPlayStoreChannel = isPlayStoreChannel,
                     isUrgent = true,
                     items = guidanceItems,
-                    onActionClicked = handleGuidanceAction,
+                    lastLaunchedId = lastLaunchedGuidanceId,
+                    onActionClicked = { item -> handleGuidanceAction(item.id, item.action) },
                 )
             }
         }
@@ -771,26 +818,25 @@ internal fun TtsSettingsBody(
             }
         }
 
-        // 7. System Tools, OEM Guidance, and Optional More Free Engines Section
+        // 7. System Tools, OEM Guidance, and Instant Free Engines Modal Sheet Trigger
         item(key = "tts_section_tools") {
             ProfileSegmentedListSection(title = "系统工具与防断播") {
-                val toolCount = if (isEngineReady) 4 else 3
-                var rowIdx = 0
+                val toolCount = 4
                 ProfileSegmentedSettingRow(
-                    index = rowIdx++,
+                    index = 0,
                     count = toolCount,
                     icon = Icons.Outlined.Download,
                     title = "下载 / 管理当前引擎语音包",
                     subtitle = "若中文朗读无声或提示缺失语音数据，点击拉起引擎语音包下载页",
                     onClick = {
                         val targetPkg = activeEnginePkg.ifBlank { preferences.ttsPreferredEnginePackage }
-                        handleGuidanceAction(TtsGuidanceAction.OpenInstallVoiceData(targetPkg))
+                        handleGuidanceAction(null, TtsGuidanceAction.OpenInstallVoiceData(targetPkg))
                     },
                     modifier = Modifier.testTag(TtsSettingsTestTags.DOWNLOAD_VOICE_DATA_ROW),
                 )
 
                 ProfileSegmentedSettingRow(
-                    index = rowIdx++,
+                    index = 1,
                     count = toolCount,
                     icon = Icons.Outlined.Settings,
                     title = "打开系统文字转语音 (TTS) 设置",
@@ -798,29 +844,33 @@ internal fun TtsSettingsBody(
                     onClick = {
                         val tier = TtsSystemIntents.openSystemTtsSettings(context)
                         if (tier != TtsSettingsJumpTier.DIRECT_TTS_SETTINGS) {
-                            actionFeedbackMessage = "已为您打开系统设置，请前往：${oemGuidance.settingsPathHint}"
+                            showTransientFeedback("已为您打开系统设置，请前往：${oemGuidance.settingsPathHint}")
+                        } else {
+                            showTransientFeedback("正在打开系统文字转语音设置")
                         }
                     },
                     modifier = Modifier.testTag(TtsSettingsTestTags.OPEN_SYSTEM_SETTINGS_ROW),
                 )
 
-                if (isEngineReady) {
-                    ProfileSegmentedSettingRow(
-                        index = rowIdx++,
-                        count = toolCount,
-                        icon = Icons.Outlined.AutoAwesome,
-                        title = if (expandMoreEnginesCard) "收起免费语音引擎推荐" else "获取更多官方 / 开源免费语音引擎",
-                        subtitle = if (isPlayStoreChannel) {
-                            "查看 Play 商店官方免费语音方案与语音包下载入口"
-                        } else {
-                            "支持 SherpaTTS、VoxSherpa、TTS Server、MultiTTS 等开源免费方案"
-                        },
-                        onClick = { expandMoreEnginesCard = !expandMoreEnginesCard },
-                    )
-                }
+                ProfileSegmentedSettingRow(
+                    index = 2,
+                    count = toolCount,
+                    icon = Icons.Outlined.AutoAwesome,
+                    title = "获取更多官方 / 开源免费语音引擎",
+                    subtitle = if (isPlayStoreChannel) {
+                        "共 ${guidanceItems.size} 项官方免费方案与 Play 商店入口（点击立即查看）"
+                    } else {
+                        "共 ${guidanceItems.size} 项开源离线 / 社区免费方案（点击立即查看）"
+                    },
+                    onClick = {
+                        sheetStatusFeedback = null
+                        isMoreEnginesSheetOpen = true
+                    },
+                    modifier = Modifier.testTag(TtsSettingsTestTags.MORE_ENGINES_ROW),
+                )
 
                 ProfileSegmentedSettingRow(
-                    index = rowIdx,
+                    index = 3,
                     count = toolCount,
                     icon = Icons.Outlined.RestartAlt,
                     title = "恢复默认语音设置",
@@ -828,20 +878,9 @@ internal fun TtsSettingsBody(
                     onClick = {
                         stopPreview()
                         ttsPreferencesActions.onResetDefaults()
-                        actionFeedbackMessage = "已恢复默认语音朗读设置"
+                        showTransientFeedback("已恢复默认语音朗读设置")
                     },
                     modifier = Modifier.testTag(TtsSettingsTestTags.RESET_DEFAULTS_ROW),
-                )
-            }
-        }
-
-        if (isEngineReady && expandMoreEnginesCard) {
-            item(key = "tts_onboarding_optional") {
-                TtsChannelOnboardingCard(
-                    isPlayStoreChannel = isPlayStoreChannel,
-                    isUrgent = false,
-                    items = guidanceItems,
-                    onActionClicked = handleGuidanceAction,
                 )
             }
         }
@@ -882,6 +921,192 @@ internal fun TtsSettingsBody(
                 }
             }
         }
+        }
+
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(horizontal = horizontalPadding, vertical = 12.dp),
+        )
+    }
+
+    if (isMoreEnginesSheetOpen) {
+        TtsFreeEnginesGuideSheet(
+            isPlayStoreChannel = isPlayStoreChannel,
+            isProbing = isProbing,
+            installedEngineCount = installedEngines.size,
+            items = guidanceItems,
+            lastLaunchedId = lastLaunchedGuidanceId,
+            statusFeedback = sheetStatusFeedback,
+            onActionClicked = { item -> handleGuidanceAction(item.id, item.action) },
+            onDismiss = { isMoreEnginesSheetOpen = false },
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun TtsFreeEnginesGuideSheet(
+    isPlayStoreChannel: Boolean,
+    isProbing: Boolean,
+    installedEngineCount: Int,
+    items: List<TtsGuidanceItem>,
+    lastLaunchedId: String?,
+    statusFeedback: String?,
+    onActionClicked: (TtsGuidanceItem) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        modifier = Modifier.testTag(TtsSettingsTestTags.MORE_ENGINES_SHEET),
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(max = 600.dp)
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 20.dp)
+                .padding(bottom = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = if (isPlayStoreChannel) {
+                            "官方免费语音引擎（Google Play）"
+                        } else {
+                            "官方与开源免费语音方案"
+                        },
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    Text(
+                        text = if (isProbing) {
+                            "正在检测本机已安装引擎…"
+                        } else {
+                            "方案列表已就绪（本地即时展示，无需等待联网）· 本机已发现 $installedEngineCount 个引擎"
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.testTag(TtsSettingsTestTags.MORE_ENGINES_SHEET_STATUS),
+                    )
+                }
+                IconButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.testTag(TtsSettingsTestTags.MORE_ENGINES_SHEET_CLOSE),
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.Close,
+                        contentDescription = "关闭",
+                    )
+                }
+            }
+
+            if (isProbing) {
+                LinearProgressIndicator(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag(TtsSettingsTestTags.PROBING_PROGRESS_BAR),
+                )
+            }
+
+            Surface(
+                shape = MaterialTheme.shapes.medium,
+                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(
+                    text = statusFeedback
+                        ?: "点击下方任意方案即可前往安装或下载语音包；完成后返回本页会自动重新检测，也可随时关闭此窗口。",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                )
+            }
+
+            items.forEachIndexed { idx, item ->
+                if (idx > 0) {
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                }
+                TtsGuidanceItemRow(
+                    item = item,
+                    wasLaunched = lastLaunchedId == item.id,
+                    onClick = { onActionClicked(item) },
+                )
+            }
+
+            Spacer(modifier = Modifier.height(4.dp))
+            OutlinedButton(
+                onClick = onDismiss,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text("关闭")
+            }
+        }
+    }
+}
+
+@Composable
+private fun TtsGuidanceItemRow(
+    item: TtsGuidanceItem,
+    wasLaunched: Boolean,
+    onClick: () -> Unit,
+) {
+    Column(
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag("${TtsSettingsTestTags.ONBOARDING_ITEM_PREFIX}${item.id}"),
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Text(
+                text = item.title,
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Medium,
+                modifier = Modifier.weight(1f),
+            )
+            Surface(
+                shape = MaterialTheme.shapes.small,
+                color = MaterialTheme.colorScheme.primaryContainer,
+                contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+            ) {
+                Text(
+                    text = item.badge,
+                    style = MaterialTheme.typography.labelSmall,
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+                )
+            }
+        }
+        Text(
+            text = item.subtitle,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            FilledTonalButton(
+                onClick = onClick,
+                modifier = Modifier.testTag("${TtsSettingsTestTags.ONBOARDING_ACTION_PREFIX}${item.id}"),
+            ) {
+                Text(item.actionLabel)
+            }
+            if (wasLaunched) {
+                Text(
+                    text = "已发起跳转，安装后返回自动检测",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            }
+        }
     }
 }
 
@@ -889,6 +1114,7 @@ internal fun TtsSettingsBody(
 @Composable
 private fun TtsStatusAndPreviewCard(
     isProbing: Boolean,
+    installedEngineCount: Int,
     initResult: TtsInitResult?,
     isPreviewSpeaking: Boolean,
     sampleText: String,
@@ -969,7 +1195,11 @@ private fun TtsStatusAndPreviewCard(
                             overflow = TextOverflow.Ellipsis,
                         )
                         val detailLine = when {
-                            isProbing -> "正在校验中文语音数据包与可用音色"
+                            isProbing -> if (installedEngineCount > 0) {
+                                "已发现 $installedEngineCount 个系统引擎，正在逐项校验中文支持（请稍候）"
+                            } else {
+                                "正在扫描已安装的语音引擎与中文语音包…"
+                            }
                             ready -> buildString {
                                 append("语速 ${formatOneOrTwoDecimals(speechRate)}x · 音调 ${formatOneOrTwoDecimals(pitch)}x")
                                 val voiceName = initResult.activeVoiceName
@@ -991,6 +1221,14 @@ private fun TtsStatusAndPreviewCard(
                         )
                     }
                 }
+            }
+
+            if (isProbing) {
+                LinearProgressIndicator(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag(TtsSettingsTestTags.PROBING_PROGRESS_BAR),
+                )
             }
 
             // Fallback warning strip if currently degraded to backup engine
@@ -1146,7 +1384,8 @@ private fun TtsChannelOnboardingCard(
     isPlayStoreChannel: Boolean,
     isUrgent: Boolean,
     items: List<TtsGuidanceItem>,
-    onActionClicked: (TtsGuidanceAction) -> Unit,
+    lastLaunchedId: String?,
+    onActionClicked: (TtsGuidanceItem) -> Unit,
 ) {
     Card(
         shape = MaterialTheme.shapes.extraLarge,
@@ -1191,46 +1430,11 @@ private fun TtsChannelOnboardingCard(
                 if (idx > 0) {
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
                 }
-                Column(
-                    verticalArrangement = Arrangement.spacedBy(6.dp),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .testTag("${TtsSettingsTestTags.ONBOARDING_ITEM_PREFIX}${item.id}"),
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        Text(
-                            text = item.title,
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.Medium,
-                            modifier = Modifier.weight(1f),
-                        )
-                        Surface(
-                            shape = MaterialTheme.shapes.small,
-                            color = MaterialTheme.colorScheme.primaryContainer,
-                            contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                        ) {
-                            Text(
-                                text = item.badge,
-                                style = MaterialTheme.typography.labelSmall,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
-                            )
-                        }
-                    }
-                    Text(
-                        text = item.subtitle,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    FilledTonalButton(
-                        onClick = { onActionClicked(item.action) },
-                        modifier = Modifier.testTag("${TtsSettingsTestTags.ONBOARDING_ACTION_PREFIX}${item.id}"),
-                    ) {
-                        Text(item.actionLabel)
-                    }
-                }
+                TtsGuidanceItemRow(
+                    item = item,
+                    wasLaunched = lastLaunchedId == item.id,
+                    onClick = { onActionClicked(item) },
+                )
             }
         }
     }
