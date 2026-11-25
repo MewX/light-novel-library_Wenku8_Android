@@ -3,8 +3,21 @@ package org.mewx.wenku8.ui.reader
 import android.content.Context
 import android.media.AudioAttributes
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
+import android.speech.tts.Voice
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicReference
+import org.mewx.wenku8.tts.KnownTtsEngineCatalog
+import org.mewx.wenku8.tts.TtsDiagnosticReason
+import org.mewx.wenku8.tts.TtsEngineDescriptor
+import org.mewx.wenku8.tts.TtsEngineDiscovery
+import org.mewx.wenku8.tts.TtsInitResult
+import org.mewx.wenku8.tts.TtsPlaybackConfig
+import org.mewx.wenku8.tts.TtsVoiceDescriptor
+import org.mewx.wenku8.tts.TtsVoiceFormatter
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -581,9 +594,55 @@ interface SpeechEngineAdapter {
         onUtteranceError: (String) -> Unit,
     )
 
+    /**
+     * Enhanced configuration-aware initialization with engine enumeration, strict Chinese language
+     * verification, offline voice fallback, and multi-engine probe fallback (`docs/designs/v2/tts`).
+     */
+    fun initializeConfigured(
+        appLanguage: Wenku8API.AppLanguage,
+        config: TtsPlaybackConfig,
+        excludedEnginePackages: Set<String> = emptySet(),
+        onInitialized: (TtsInitResult) -> Unit,
+        onUtteranceStarted: (String) -> Unit,
+        onUtteranceDone: (String) -> Unit,
+        onUtteranceError: (String) -> Unit,
+    ) {
+        initialize(
+            appLanguage = appLanguage,
+            onInitialized = { ok ->
+                onInitialized(
+                    TtsInitResult(
+                        success = ok,
+                        activeEnginePackage = activeEnginePackage(),
+                        activeEngineLabel = activeEnginePackage().ifBlank { "系统语音引擎" },
+                        diagnosticReason = if (ok) TtsDiagnosticReason.NONE else TtsDiagnosticReason.ENGINE_BIND_FAILED,
+                        diagnosticMessage = if (ok) null else "系统语音朗读引擎不可用，请检查系统 TTS 设置",
+                    ),
+                )
+            },
+            onUtteranceStarted = onUtteranceStarted,
+            onUtteranceDone = onUtteranceDone,
+            onUtteranceError = onUtteranceError,
+        )
+    }
+
     fun setSpeechRate(rate: Float)
 
+    fun setPitch(pitch: Float) {}
+
     fun speakFlush(text: String, utteranceId: String): Boolean
+
+    fun speakWithVoiceOverride(
+        text: String,
+        utteranceId: String,
+        voiceNameOverride: String?,
+    ): Boolean = speakFlush(text, utteranceId)
+
+    fun listInstalledEngines(): List<TtsEngineDescriptor> = emptyList()
+
+    fun listVoicesForActiveEngine(appLanguage: Wenku8API.AppLanguage): List<TtsVoiceDescriptor> = emptyList()
+
+    fun activeEnginePackage(): String = ""
 
     fun stop()
 
@@ -592,9 +651,34 @@ interface SpeechEngineAdapter {
 
 class AndroidTextToSpeechEngineAdapter(
     private val appContext: Context,
+    private val initTimeoutMs: Long = DEFAULT_INIT_TIMEOUT_MS,
 ) : SpeechEngineAdapter {
 
     private var tts: TextToSpeech? = null
+    private var activePkg: String = ""
+    private var activeVoiceName: String = ""
+    private var cachedRawVoices: List<Voice> = emptyList()
+    private val mainHandler = Handler(Looper.getMainLooper())
+    private var probeGeneration: Long = 0L
+
+    override fun listInstalledEngines(): List<TtsEngineDescriptor> =
+        TtsEngineDiscovery.discoverInstalledEngines(appContext)
+
+    override fun listVoicesForActiveEngine(appLanguage: Wenku8API.AppLanguage): List<TtsVoiceDescriptor> {
+        val raw = cachedRawVoices.ifEmpty {
+            runCatching { tts?.voices?.toList().orEmpty() }.getOrDefault(emptyList())
+        }
+        return raw.map { TtsVoiceFormatter.describeVoice(it) }.sortedWith(
+            compareBy<TtsVoiceDescriptor>(
+                { if (it.isChinese) 0 else 1 },
+                { if (it.isNetworkRequired) 1 else 0 },
+                { -it.qualityScore },
+                { it.displayLabel },
+            ),
+        )
+    }
+
+    override fun activeEnginePackage(): String = activePkg
 
     override fun initialize(
         appLanguage: Wenku8API.AppLanguage,
@@ -603,64 +687,416 @@ class AndroidTextToSpeechEngineAdapter(
         onUtteranceDone: (String) -> Unit,
         onUtteranceError: (String) -> Unit,
     ) {
+        initializeConfigured(
+            appLanguage = appLanguage,
+            config = TtsPlaybackConfig(),
+            excludedEnginePackages = emptySet(),
+            onInitialized = { result -> onInitialized(result.success) },
+            onUtteranceStarted = onUtteranceStarted,
+            onUtteranceDone = onUtteranceDone,
+            onUtteranceError = onUtteranceError,
+        )
+    }
+
+    override fun initializeConfigured(
+        appLanguage: Wenku8API.AppLanguage,
+        config: TtsPlaybackConfig,
+        excludedEnginePackages: Set<String>,
+        onInitialized: (TtsInitResult) -> Unit,
+        onUtteranceStarted: (String) -> Unit,
+        onUtteranceDone: (String) -> Unit,
+        onUtteranceError: (String) -> Unit,
+    ) {
         shutdown()
-        var createdTts: TextToSpeech? = null
-        createdTts = TextToSpeech(appContext) { status ->
-            val engine = createdTts
-            if (status != TextToSpeech.SUCCESS || engine == null) {
-                onInitialized(false)
-                return@TextToSpeech
-            }
-            val preferredLocale = if (appLanguage == Wenku8API.AppLanguage.TC) {
-                Locale.TRADITIONAL_CHINESE
+        val myGen = ++probeGeneration
+        val installed = TtsEngineDiscovery.discoverInstalledEngines(appContext)
+        val candidates = TtsEngineDiscovery.buildFallbackOrder(
+            installedEngines = installed,
+            preferredEnginePackage = config.preferredEnginePackage,
+            fallbackEnginePackage = config.fallbackEnginePackage,
+            autoFallbackEnabled = config.autoFallbackEnabled,
+            excludedPackages = excludedEnginePackages,
+        )
+
+        val preferredPkg = config.preferredEnginePackage.trim()
+        val hasOnlyUnsupported = installed.isNotEmpty() && installed.all { it.isKnownUnsupportedChinese }
+
+        if (candidates.isEmpty()) {
+            // If PackageManager returned nothing (rare OEM/test quirk) and user hasn't excluded everything,
+            // attempt one direct 2-arg system default bind before declaring NO_ENGINE_INSTALLED.
+            if (installed.isEmpty() && excludedEnginePackages.isEmpty()) {
+                probeSingleCandidate(
+                    generation = myGen,
+                    candidate = null,
+                    remaining = emptyList(),
+                    appLanguage = appLanguage,
+                    config = config,
+                    sawMissingChineseData = false,
+                    sawBindFailure = false,
+                    preferredWasAttemptedOrMissing = preferredPkg.isNotEmpty(),
+                    hasOnlyUnsupported = false,
+                    onInitialized = onInitialized,
+                    onUtteranceStarted = onUtteranceStarted,
+                    onUtteranceDone = onUtteranceDone,
+                    onUtteranceError = onUtteranceError,
+                )
             } else {
-                Locale.SIMPLIFIED_CHINESE
-            }
-            val langRes = engine.setLanguage(preferredLocale)
-            if (langRes == TextToSpeech.LANG_MISSING_DATA || langRes == TextToSpeech.LANG_NOT_SUPPORTED) {
-                engine.setLanguage(Locale.CHINESE)
-            }
-            runCatching {
-                engine.setAudioAttributes(
-                    AudioAttributes.Builder()
-                        .setUsage(AudioAttributes.USAGE_MEDIA)
-                        .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
-                        .build(),
+                val reason = if (installed.isEmpty() || hasOnlyUnsupported) {
+                    TtsDiagnosticReason.NO_ENGINE_INSTALLED
+                } else {
+                    TtsDiagnosticReason.ENGINE_BIND_FAILED
+                }
+                onInitialized(
+                    TtsInitResult(
+                        success = false,
+                        diagnosticReason = reason,
+                        diagnosticMessage = diagnosticMessageFor(reason),
+                    ),
                 )
             }
-            engine.setOnUtteranceProgressListener(
-                object : UtteranceProgressListener() {
-                    override fun onStart(utteranceId: String?) {
-                        if (utteranceId != null) onUtteranceStarted(utteranceId)
-                    }
-
-                    override fun onDone(utteranceId: String?) {
-                        if (utteranceId != null) onUtteranceDone(utteranceId)
-                    }
-
-                    @Deprecated("Deprecated in Java")
-                    override fun onError(utteranceId: String?) {
-                        if (utteranceId != null) onUtteranceError(utteranceId)
-                    }
-
-                    override fun onError(utteranceId: String?, errorCode: Int) {
-                        if (utteranceId != null) onUtteranceError(utteranceId)
-                    }
-                },
-            )
-            onInitialized(true)
+            return
         }
-        tts = createdTts
+
+        val preferredMissingFromDevice =
+            preferredPkg.isNotEmpty() && installed.none { it.packageName == preferredPkg }
+
+        probeSingleCandidate(
+            generation = myGen,
+            candidate = candidates.first(),
+            remaining = candidates.drop(1),
+            appLanguage = appLanguage,
+            config = config,
+            sawMissingChineseData = false,
+            sawBindFailure = false,
+            preferredWasAttemptedOrMissing = preferredMissingFromDevice,
+            hasOnlyUnsupported = hasOnlyUnsupported,
+            onInitialized = onInitialized,
+            onUtteranceStarted = onUtteranceStarted,
+            onUtteranceDone = onUtteranceDone,
+            onUtteranceError = onUtteranceError,
+        )
+    }
+
+    private fun probeSingleCandidate(
+        generation: Long,
+        candidate: TtsEngineDescriptor?,
+        remaining: List<TtsEngineDescriptor>,
+        appLanguage: Wenku8API.AppLanguage,
+        config: TtsPlaybackConfig,
+        sawMissingChineseData: Boolean,
+        sawBindFailure: Boolean,
+        preferredWasAttemptedOrMissing: Boolean,
+        hasOnlyUnsupported: Boolean,
+        onInitialized: (TtsInitResult) -> Unit,
+        onUtteranceStarted: (String) -> Unit,
+        onUtteranceDone: (String) -> Unit,
+        onUtteranceError: (String) -> Unit,
+    ) {
+        if (generation != probeGeneration) return
+
+        val ttsRef = AtomicReference<TextToSpeech?>(null)
+        val settled = AtomicBoolean(false)
+        val timeoutRunnable = Runnable {
+            if (!settled.compareAndSet(false, true)) return@Runnable
+            safeShutdownInstance(ttsRef.getAndSet(null))
+            if (generation != probeGeneration) return@Runnable
+            advanceOrFail(
+                generation = generation,
+                remaining = remaining,
+                appLanguage = appLanguage,
+                config = config,
+                sawMissingChineseData = sawMissingChineseData,
+                sawBindFailure = true,
+                preferredWasAttemptedOrMissing = true,
+                hasOnlyUnsupported = hasOnlyUnsupported,
+                onInitialized = onInitialized,
+                onUtteranceStarted = onUtteranceStarted,
+                onUtteranceDone = onUtteranceDone,
+                onUtteranceError = onUtteranceError,
+            )
+        }
+        mainHandler.postDelayed(timeoutRunnable, initTimeoutMs)
+
+        val listener = TextToSpeech.OnInitListener { status ->
+            // Always dispatch onto the main looper after constructor assignment completes to
+            // eliminate the synchronous-callback `ttsRef.get() == null` race condition.
+            mainHandler.post {
+                if (!settled.compareAndSet(false, true)) return@post
+                mainHandler.removeCallbacks(timeoutRunnable)
+                val engine = ttsRef.get()
+                if (generation != probeGeneration) {
+                    safeShutdownInstance(engine)
+                    return@post
+                }
+                if (status != TextToSpeech.SUCCESS || engine == null) {
+                    safeShutdownInstance(engine)
+                    advanceOrFail(
+                        generation = generation,
+                        remaining = remaining,
+                        appLanguage = appLanguage,
+                        config = config,
+                        sawMissingChineseData = sawMissingChineseData,
+                        sawBindFailure = true,
+                        preferredWasAttemptedOrMissing = true,
+                        hasOnlyUnsupported = hasOnlyUnsupported,
+                        onInitialized = onInitialized,
+                        onUtteranceStarted = onUtteranceStarted,
+                        onUtteranceDone = onUtteranceDone,
+                        onUtteranceError = onUtteranceError,
+                    )
+                    return@post
+                }
+
+                // Strictly verify Chinese language & data availability across the SC/TC fallback chain.
+                val langCheck = applyChineseLanguageChain(engine, appLanguage)
+                if (!langCheck.supported) {
+                    safeShutdownInstance(engine)
+                    advanceOrFail(
+                        generation = generation,
+                        remaining = remaining,
+                        appLanguage = appLanguage,
+                        config = config,
+                        sawMissingChineseData = sawMissingChineseData || langCheck.missingData,
+                        sawBindFailure = sawBindFailure,
+                        preferredWasAttemptedOrMissing = true,
+                        hasOnlyUnsupported = hasOnlyUnsupported,
+                        onInitialized = onInitialized,
+                        onUtteranceStarted = onUtteranceStarted,
+                        onUtteranceDone = onUtteranceDone,
+                        onUtteranceError = onUtteranceError,
+                    )
+                    return@post
+                }
+
+                // Engine is healthy and speaks Chinese! Configure audio attributes, voice, rate & pitch.
+                val resolvedPkg = candidate?.packageName
+                    ?: runCatching { engine.defaultEngine.orEmpty() }.getOrDefault("")
+                val resolvedDesc = candidate ?: KnownTtsEngineCatalog.describe(resolvedPkg)
+
+                val rawVoices = runCatching { engine.voices?.toList().orEmpty() }.getOrDefault(emptyList())
+                val descriptors = rawVoices.map { TtsVoiceFormatter.describeVoice(it) }
+                val online = TtsEngineDiscovery.isNetworkConnected(appContext)
+                val selectedVoiceDesc = TtsVoiceFormatter.selectBestVoice(
+                    voices = descriptors,
+                    preferredVoiceName = config.preferredVoiceName,
+                    appLanguage = appLanguage,
+                    isNetworkAvailable = online,
+                )
+                if (selectedVoiceDesc != null) {
+                    rawVoices.firstOrNull { it.name == selectedVoiceDesc.name }?.let { rawVoice ->
+                        runCatching { engine.voice = rawVoice }
+                    }
+                }
+
+                runCatching {
+                    engine.setAudioAttributes(
+                        AudioAttributes.Builder()
+                            .setUsage(AudioAttributes.USAGE_MEDIA)
+                            .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                            .build(),
+                    )
+                }
+                val safeRate = KnownTtsEngineCatalog.clampSpeechRateForEngine(resolvedPkg, config.speechRate)
+                runCatching { engine.setSpeechRate(safeRate) }
+                runCatching {
+                    engine.setPitch(
+                        config.pitch.coerceIn(
+                            org.mewx.wenku8.data.local.preferences.Wenku8UserPreferences.MIN_TTS_PITCH,
+                            org.mewx.wenku8.data.local.preferences.Wenku8UserPreferences.MAX_TTS_PITCH,
+                        ),
+                    )
+                }
+
+                engine.setOnUtteranceProgressListener(
+                    object : UtteranceProgressListener() {
+                        override fun onStart(utteranceId: String?) {
+                            if (utteranceId != null) onUtteranceStarted(utteranceId)
+                        }
+
+                        override fun onDone(utteranceId: String?) {
+                            if (utteranceId != null) onUtteranceDone(utteranceId)
+                        }
+
+                        @Deprecated("Deprecated in Java")
+                        override fun onError(utteranceId: String?) {
+                            if (utteranceId != null) onUtteranceError(utteranceId)
+                        }
+
+                        override fun onError(utteranceId: String?, errorCode: Int) {
+                            if (utteranceId != null) onUtteranceError(utteranceId)
+                        }
+                    },
+                )
+
+                tts = engine
+                activePkg = resolvedPkg
+                activeVoiceName = selectedVoiceDesc?.name.orEmpty()
+                cachedRawVoices = rawVoices
+
+                val preferredPkg = config.preferredEnginePackage.trim()
+                val isFallback = (preferredPkg.isNotEmpty() && resolvedPkg != preferredPkg) ||
+                    preferredWasAttemptedOrMissing
+                val notice = if (isFallback) {
+                    "首选语音引擎暂不可用，已自动回退至 ${resolvedDesc.displayName}"
+                } else {
+                    null
+                }
+                onInitialized(
+                    TtsInitResult(
+                        success = true,
+                        activeEnginePackage = resolvedPkg,
+                        activeEngineLabel = resolvedDesc.displayName,
+                        activeVoiceName = activeVoiceName,
+                        isFallbackActive = isFallback,
+                        fallbackNoticeMessage = notice,
+                        diagnosticReason = TtsDiagnosticReason.NONE,
+                        availableVoices = listVoicesForActiveEngine(appLanguage),
+                    ),
+                )
+            }
+        }
+
+        val created = runCatching {
+            if (candidate != null && candidate.packageName.isNotBlank()) {
+                TextToSpeech(appContext, listener, candidate.packageName)
+            } else {
+                TextToSpeech(appContext, listener)
+            }
+        }.getOrNull()
+
+        if (created == null) {
+            if (settled.compareAndSet(false, true)) {
+                mainHandler.removeCallbacks(timeoutRunnable)
+                advanceOrFail(
+                    generation = generation,
+                    remaining = remaining,
+                    appLanguage = appLanguage,
+                    config = config,
+                    sawMissingChineseData = sawMissingChineseData,
+                    sawBindFailure = true,
+                    preferredWasAttemptedOrMissing = true,
+                    hasOnlyUnsupported = hasOnlyUnsupported,
+                    onInitialized = onInitialized,
+                    onUtteranceStarted = onUtteranceStarted,
+                    onUtteranceDone = onUtteranceDone,
+                    onUtteranceError = onUtteranceError,
+                )
+            }
+            return
+        }
+        ttsRef.set(created)
+    }
+
+    private fun advanceOrFail(
+        generation: Long,
+        remaining: List<TtsEngineDescriptor>,
+        appLanguage: Wenku8API.AppLanguage,
+        config: TtsPlaybackConfig,
+        sawMissingChineseData: Boolean,
+        sawBindFailure: Boolean,
+        preferredWasAttemptedOrMissing: Boolean,
+        hasOnlyUnsupported: Boolean,
+        onInitialized: (TtsInitResult) -> Unit,
+        onUtteranceStarted: (String) -> Unit,
+        onUtteranceDone: (String) -> Unit,
+        onUtteranceError: (String) -> Unit,
+    ) {
+        if (generation != probeGeneration) return
+        if (remaining.isNotEmpty()) {
+            probeSingleCandidate(
+                generation = generation,
+                candidate = remaining.first(),
+                remaining = remaining.drop(1),
+                appLanguage = appLanguage,
+                config = config,
+                sawMissingChineseData = sawMissingChineseData,
+                sawBindFailure = sawBindFailure,
+                preferredWasAttemptedOrMissing = preferredWasAttemptedOrMissing,
+                hasOnlyUnsupported = hasOnlyUnsupported,
+                onInitialized = onInitialized,
+                onUtteranceStarted = onUtteranceStarted,
+                onUtteranceDone = onUtteranceDone,
+                onUtteranceError = onUtteranceError,
+            )
+            return
+        }
+
+        val reason = when {
+            sawMissingChineseData -> TtsDiagnosticReason.MISSING_CHINESE_DATA
+            hasOnlyUnsupported -> TtsDiagnosticReason.NO_ENGINE_INSTALLED
+            sawBindFailure -> TtsDiagnosticReason.ENGINE_BIND_FAILED
+            else -> TtsDiagnosticReason.NO_ENGINE_INSTALLED
+        }
+        onInitialized(
+            TtsInitResult(
+                success = false,
+                diagnosticReason = reason,
+                diagnosticMessage = diagnosticMessageFor(reason),
+            ),
+        )
+    }
+
+    private data class LanguageCheckResult(
+        val supported: Boolean,
+        val missingData: Boolean,
+    )
+
+    private fun applyChineseLanguageChain(
+        engine: TextToSpeech,
+        appLanguage: Wenku8API.AppLanguage,
+    ): LanguageCheckResult {
+        var sawMissing = false
+        for (locale in TtsVoiceFormatter.preferredLocaleChain(appLanguage)) {
+            val res = runCatching { engine.setLanguage(locale) }
+                .getOrDefault(TextToSpeech.LANG_NOT_SUPPORTED)
+            if (res >= TextToSpeech.LANG_AVAILABLE) {
+                return LanguageCheckResult(supported = true, missingData = false)
+            }
+            if (res == TextToSpeech.LANG_MISSING_DATA) {
+                sawMissing = true
+            }
+        }
+        return LanguageCheckResult(supported = false, missingData = sawMissing)
     }
 
     override fun setSpeechRate(rate: Float) {
-        tts?.setSpeechRate(rate.coerceIn(0.5f, 2.5f))
+        val clamped = KnownTtsEngineCatalog.clampSpeechRateForEngine(activePkg, rate)
+        runCatching { tts?.setSpeechRate(clamped) }
+    }
+
+    override fun setPitch(pitch: Float) {
+        val clamped = pitch.coerceIn(
+            org.mewx.wenku8.data.local.preferences.Wenku8UserPreferences.MIN_TTS_PITCH,
+            org.mewx.wenku8.data.local.preferences.Wenku8UserPreferences.MAX_TTS_PITCH,
+        )
+        runCatching { tts?.setPitch(clamped) }
     }
 
     override fun speakFlush(text: String, utteranceId: String): Boolean {
         val engine = tts ?: return false
-        val res = engine.speak(text, TextToSpeech.QUEUE_FLUSH, Bundle.EMPTY, utteranceId)
+        val res = runCatching {
+            engine.speak(text, TextToSpeech.QUEUE_FLUSH, Bundle.EMPTY, utteranceId)
+        }.getOrDefault(TextToSpeech.ERROR)
         return res == TextToSpeech.SUCCESS
+    }
+
+    override fun speakWithVoiceOverride(
+        text: String,
+        utteranceId: String,
+        voiceNameOverride: String?,
+    ): Boolean {
+        val engine = tts ?: return false
+        val targetVoiceName = voiceNameOverride?.trim().orEmpty()
+        if (targetVoiceName.isNotEmpty()) {
+            cachedRawVoices.firstOrNull { it.name == targetVoiceName }?.let { rawVoice ->
+                runCatching { engine.voice = rawVoice }
+            }
+        } else if (activeVoiceName.isNotEmpty()) {
+            cachedRawVoices.firstOrNull { it.name == activeVoiceName }?.let { rawVoice ->
+                runCatching { engine.voice = rawVoice }
+            }
+        }
+        return speakFlush(text, utteranceId)
     }
 
     override fun stop() {
@@ -668,11 +1104,34 @@ class AndroidTextToSpeechEngineAdapter(
     }
 
     override fun shutdown() {
-        runCatching {
-            tts?.stop()
-            tts?.shutdown()
-        }
+        probeGeneration++
+        safeShutdownInstance(tts)
         tts = null
+        activePkg = ""
+        activeVoiceName = ""
+        cachedRawVoices = emptyList()
+    }
+
+    private fun safeShutdownInstance(instance: TextToSpeech?) {
+        if (instance == null) return
+        runCatching { instance.stop() }
+        runCatching { instance.shutdown() }
+    }
+
+    companion object {
+        const val DEFAULT_INIT_TIMEOUT_MS = 4_000L
+
+        fun diagnosticMessageFor(reason: TtsDiagnosticReason): String = when (reason) {
+            TtsDiagnosticReason.NO_ENGINE_INSTALLED ->
+                "未检测到支持中文的语音朗读引擎，点击查看免费安装引导"
+            TtsDiagnosticReason.MISSING_CHINESE_DATA ->
+                "当前语音引擎缺少中文离线语音包，点击下载语音数据或切换引擎"
+            TtsDiagnosticReason.ENGINE_BIND_FAILED ->
+                "系统语音引擎初始化失败或被拦截，点击切换引擎或检查系统 TTS 设置"
+            TtsDiagnosticReason.PLAYBACK_INTERRUPTED ->
+                "语音合成连续中断，点击重试或切换备用引擎"
+            TtsDiagnosticReason.NONE -> ""
+        }
     }
 }
 
