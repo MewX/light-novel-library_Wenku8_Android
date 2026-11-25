@@ -37,12 +37,14 @@ class ServerSupportBannerPreloaderTest {
     private lateinit var activity: Activity
     private lateinit var fakeClient: FakeBannerPreloaderClient
     private var initCalls = 0
+    private var fakeMonoClockMs = 10_000L
 
     @Before
     fun setUp() {
         appContext = ApplicationProvider.getApplicationContext()
         activity = Robolectric.buildActivity(Activity::class.java).create().get()
         initCalls = 0
+        fakeMonoClockMs = 10_000L
         ServerSupportAdInitializer.resetForTests()
         ServerSupportAdInitializer.testInitAction = { _, onComplete ->
             initCalls += 1
@@ -54,6 +56,7 @@ class ServerSupportBannerPreloaderTest {
         ServerSupportBannerPreloader.isOnlineProvider = { true }
         ServerSupportBannerPreloader.isGmsReadyProvider = { true }
         ServerSupportBannerPreloader.isDebugBuildProvider = { false }
+        ServerSupportBannerPreloader.monotonicTimeMsProvider = { fakeMonoClockMs }
         testBindPreloadedAdAction = null
     }
 
@@ -123,7 +126,7 @@ class ServerSupportBannerPreloaderTest {
             ServerSupportBannerPreloader.preloadIdFor(InlineBannerPlacement.NOVEL_DETAIL_STANDARD),
             firstCall.preloadId,
         )
-        assertEquals(2, firstCall.config.bufferSize)
+        assertEquals(3, firstCall.config.bufferSize)
         val firstRequest = firstCall.config.request as BannerAdRequest
         assertEquals(ServerSupportAdConstants.PRODUCTION_BANNER_AD_UNIT_ID, firstRequest.adUnitId)
         assertEquals(380, firstRequest.adSize.width)
@@ -189,10 +192,11 @@ class ServerSupportBannerPreloaderTest {
         assertSame(fakeAd, polled)
         assertFalse(ServerSupportBannerPreloader.isPlacementPreloading(placement))
         assertTrue(fakeClient.destroyedIds.contains(preloadId))
+        assertEquals(0, ServerSupportBannerPreloader.readyCount(placement))
     }
 
     @Test
-    fun consentRevocation_destroysAllBufferedPreloadersImmediately() = runBlocking {
+    fun consentRevocation_destroysAllBufferedPreloadersAndRecycledAdsImmediately() = runBlocking {
         ServerSupportBannerPreloader.ensurePreloading(
             context = appContext,
             placement = InlineBannerPlacement.NOVEL_DETAIL_STANDARD,
@@ -205,18 +209,68 @@ class ServerSupportBannerPreloaderTest {
             availableWidthDp = 380,
             canRequestAds = true,
         )
+        val recycledAd = FakeBannerAd(ServerSupportAdConstants.PRODUCTION_BANNER_AD_UNIT_ID)
+        ServerSupportBannerPreloader.recycleUnimpressedAd(
+            placement = InlineBannerPlacement.NOVEL_DETAIL_STANDARD,
+            widthDp = 380,
+            bannerAd = recycledAd,
+        )
+
         assertTrue(ServerSupportBannerPreloader.isPlacementPreloading(InlineBannerPlacement.NOVEL_DETAIL_STANDARD))
         assertTrue(ServerSupportBannerPreloader.isPlacementPreloading(InlineBannerPlacement.DISCOVERY_FEED_INLINE))
-        assertEquals(5, ServerSupportBannerPreloader.defaultBufferSizeFor(InlineBannerPlacement.DISCOVERY_FEED_INLINE))
-        assertEquals(2, ServerSupportBannerPreloader.defaultBufferSizeFor(InlineBannerPlacement.NOVEL_DETAIL_STANDARD))
+        // Total global buffer cap: 3 + 2 + 1 = 6 (matches Next-Gen SDK's 6-ad cap)
+        assertEquals(3, ServerSupportBannerPreloader.defaultBufferSizeFor(InlineBannerPlacement.NOVEL_DETAIL_STANDARD))
+        assertEquals(2, ServerSupportBannerPreloader.defaultBufferSizeFor(InlineBannerPlacement.DISCOVERY_FEED_INLINE))
         assertEquals(1, ServerSupportBannerPreloader.defaultBufferSizeFor(InlineBannerPlacement.NOVEL_DETAIL_POST_READING_LARGE))
-        assertEquals(5, fakeClient.startCalls.last().config.bufferSize)
+        assertEquals(2, fakeClient.startCalls.last().config.bufferSize)
+        assertEquals(1, ServerSupportBannerPreloader.readyCount(InlineBannerPlacement.NOVEL_DETAIL_STANDARD))
 
         ServerSupportBannerPreloader.onConsentStateChanged(canRequestAds = false)
 
         assertEquals(1, fakeClient.destroyAllCalls)
+        assertTrue(recycledAd.destroyed)
         assertFalse(ServerSupportBannerPreloader.isPlacementPreloading(InlineBannerPlacement.NOVEL_DETAIL_STANDARD))
         assertFalse(ServerSupportBannerPreloader.isPlacementPreloading(InlineBannerPlacement.DISCOVERY_FEED_INLINE))
+        assertEquals(0, ServerSupportBannerPreloader.readyCount(InlineBannerPlacement.NOVEL_DETAIL_STANDARD))
+    }
+
+    @Test
+    fun readyCountFlow_tracksPreloadFillPollExhaustAndRecycledUnimpressedAds() = runBlocking {
+        val placement = InlineBannerPlacement.NOVEL_DETAIL_STANDARD
+        val preloadId = ServerSupportBannerPreloader.preloadIdFor(placement)
+        assertEquals(0, ServerSupportBannerPreloader.readyCountFlow(placement).value)
+
+        ServerSupportBannerPreloader.ensurePreloading(
+            context = appContext,
+            placement = placement,
+            availableWidthDp = 380,
+            canRequestAds = true,
+        )
+        val ad1 = FakeBannerAd(ServerSupportAdConstants.PRODUCTION_BANNER_AD_UNIT_ID)
+        val ad2 = FakeBannerAd(ServerSupportAdConstants.PRODUCTION_BANNER_AD_UNIT_ID)
+        fakeClient.enqueueAd(preloadId, ad1)
+        fakeClient.enqueueAd(preloadId, ad2)
+        // Simulate SDK PreloadCallback.onAdPreloaded notification
+        fakeClient.notifyPreloaded(preloadId)
+        assertEquals(2, ServerSupportBannerPreloader.readyCountFlow(placement).value)
+        assertTrue(ServerSupportBannerPreloader.isAdReady(placement, requestedWidthDp = 380))
+
+        // Poll 1 ad -> readyCount drops to 1
+        assertSame(ad1, ServerSupportBannerPreloader.pollReadyAd(placement, 380, canRequestAds = true))
+        assertEquals(1, ServerSupportBannerPreloader.readyCountFlow(placement).value)
+
+        // Recycle ad1 (unimpressed) -> readyCount returns to 2 and next poll returns ad1 first
+        ServerSupportBannerPreloader.recycleUnimpressedAd(placement, 380, ad1)
+        assertEquals(2, ServerSupportBannerPreloader.readyCountFlow(placement).value)
+        assertSame(ad1, ServerSupportBannerPreloader.pollReadyAd(placement, 380, canRequestAds = true))
+        assertEquals(1, ServerSupportBannerPreloader.readyCountFlow(placement).value)
+
+        // Expired recycled ad is destroyed instead of returned
+        ServerSupportBannerPreloader.recycleUnimpressedAd(placement, 380, ad1)
+        fakeMonoClockMs += ServerSupportBannerPreloader.RECYCLED_AD_TTL_MS + 1_000L
+        assertSame(ad2, ServerSupportBannerPreloader.pollReadyAd(placement, 380, canRequestAds = true))
+        assertTrue(ad1.destroyed)
+        assertEquals(0, ServerSupportBannerPreloader.readyCountFlow(placement).value)
     }
 
     @Test
@@ -321,9 +375,15 @@ class ServerSupportBannerPreloaderTest {
         val destroyedIds = mutableListOf<String>()
         var destroyAllCalls = 0
         private val queues = mutableMapOf<String, ArrayDeque<BannerAd>>()
+        private val callbacks = mutableMapOf<String, PreloadCallback>()
 
         fun enqueueAd(preloadId: String, ad: BannerAd) {
             queues.getOrPut(preloadId) { ArrayDeque() }.addLast(ad)
+        }
+
+        fun notifyPreloaded(preloadId: String) {
+            // Trigger ready-count refresh without needing a real ResponseInfo instance
+            callbacks[preloadId]?.onAdsExhausted(preloadId)
         }
 
         override fun start(
@@ -332,6 +392,7 @@ class ServerSupportBannerPreloaderTest {
             callback: PreloadCallback,
         ): Boolean {
             startCalls.add(RecordedStart(preloadId, config, callback))
+            callbacks[preloadId] = callback
             return true
         }
 
@@ -339,15 +400,19 @@ class ServerSupportBannerPreloaderTest {
 
         override fun isAdAvailable(preloadId: String): Boolean = !queues[preloadId].isNullOrEmpty()
 
+        override fun getNumAdsAvailable(preloadId: String): Int = queues[preloadId]?.size ?: 0
+
         override fun destroy(preloadId: String): Boolean {
             destroyedIds.add(preloadId)
             queues.remove(preloadId)
+            callbacks.remove(preloadId)
             return true
         }
 
         override fun destroyAll() {
             destroyAllCalls += 1
             queues.clear()
+            callbacks.clear()
         }
     }
 
