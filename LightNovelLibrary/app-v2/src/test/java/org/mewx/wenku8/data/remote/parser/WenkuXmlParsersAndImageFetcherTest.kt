@@ -19,8 +19,18 @@ import org.junit.Test
 import org.junit.rules.TemporaryFolder
 import org.junit.runner.RunWith
 import org.mewx.wenku8.data.media.OfflineFirstWenkuImageFetcher
+import org.mewx.wenku8.data.media.WenkuHttpsRedirectUpgradeInterceptor
 import org.mewx.wenku8.data.media.WenkuImageRequests
+import org.mewx.wenku8.data.media.WenkuImageUrlPolicy
 import org.mewx.wenku8.data.media.WenkuImageValidator
+import okhttp3.HttpUrl.Companion.toHttpUrl
+import okhttp3.OkHttpClient
+import okhttp3.Protocol
+import okhttp3.Request
+import okhttp3.Response
+import okhttp3.ResponseBody.Companion.toResponseBody
+import java.io.IOException
+import java.net.SocketException
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import java.io.ByteArrayOutputStream
@@ -403,5 +413,114 @@ class WenkuXmlParsersAndImageFetcherTest {
         assertFalse(validSaves.exists())
         assertFalse(validArtbook.exists())
         assertFalse(validCover.exists())
+    }
+
+    @Test
+    fun wenkuImageUrlPolicy_upgradesDefaultPortHttpToHttps_ordersMirrors_andSanitizesIoReasons() {
+        // 1. Default port 80 Wenku8 image hosts upgrade to HTTPS; custom ports & unrelated hosts stay untouched
+        assertEquals(
+            "https://pic.wenku8.com/pictures/3/3770/141001/1.jpg",
+            WenkuImageUrlPolicy.upgradeToHttpsIfSupported("http://pic.wenku8.com/pictures/3/3770/141001/1.jpg"),
+        )
+        assertEquals(
+            "https://pic.wenku8.cn/pictures/1/1305/41759/50471.jpg",
+            WenkuImageUrlPolicy.upgradeToHttpsIfSupported("http://pic.wenku8.cn/pictures/1/1305/41759/50471.jpg"),
+        )
+        assertEquals(
+            "https://pic.777743.xyz/3/3770/141001/1.jpg",
+            WenkuImageUrlPolicy.upgradeToHttpsIfSupported("http://pic.777743.xyz/3/3770/141001/1.jpg"),
+        )
+        assertEquals(
+            "https://img.wenku8.com/image/3/3770/3770s.jpg",
+            WenkuImageUrlPolicy.upgradeToHttpsIfSupported("http://img.wenku8.com/image/3/3770/3770s.jpg"),
+        )
+        assertEquals(
+            "https://avatar.wenku8.com/avatar.php?uid=1",
+            WenkuImageUrlPolicy.upgradeToHttpsIfSupported("http://avatar.wenku8.com/avatar.php?uid=1"),
+        )
+        assertEquals(
+            "http://pic.wenku8.com:48123/pictures/3/3770/1.jpg",
+            WenkuImageUrlPolicy.upgradeToHttpsIfSupported("http://pic.wenku8.com:48123/pictures/3/3770/1.jpg"),
+        )
+        assertEquals(
+            "http://example.com/pictures/1.jpg",
+            WenkuImageUrlPolicy.upgradeToHttpsIfSupported("http://example.com/pictures/1.jpg"),
+        )
+
+        // Coil request builders also normalize default-port HTTP URLs to HTTPS with identical cache keys
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val illusReq = WenkuImageRequests.buildIllustrationImageRequest(
+            context = context,
+            imageUrl = "http://pic.wenku8.com/pictures/3/3770/141001/1.jpg",
+        )
+        assertNotNull(illusReq)
+        assertEquals("https://pic.wenku8.com/pictures/3/3770/141001/1.jpg", illusReq!!.data)
+        assertEquals("wenku8_illus_pictures337701410011.jpg", illusReq.diskCacheKey)
+
+        // 2. Mirror candidate ordering for pic.wenku8.com & pic.wenku8.cn (and single-entry for covers)
+        val picComUrl = "https://pic.wenku8.com/pictures/3/3770/141001/1.jpg".toHttpUrl()
+        assertEquals(
+            listOf(
+                "https://pic.wenku8.com/pictures/3/3770/141001/1.jpg",
+                "https://pic.777743.xyz/3/3770/141001/1.jpg",
+                "https://pic.wenku8.cn/pictures/3/3770/141001/1.jpg",
+            ),
+            WenkuImageUrlPolicy.buildOrderedIllustrationAttemptUrls(picComUrl).map { it.toString() },
+        )
+        assertEquals(
+            listOf(
+                "https://pic.777743.xyz/3/3770/141001/1.jpg",
+                "https://pic.wenku8.cn/pictures/3/3770/141001/1.jpg",
+                "https://pic.wenku8.com/pictures/3/3770/141001/1.jpg",
+            ),
+            WenkuImageUrlPolicy.buildOrderedIllustrationAttemptUrls(
+                url = picComUrl,
+                preferredMirror = WenkuImageUrlPolicy.IllustrationMirror.PIC_777743,
+            ).map { it.toString() },
+        )
+        val coverUrl = "https://img.wenku8.com/image/3/3770/3770s.jpg".toHttpUrl()
+        assertEquals(
+            listOf("https://img.wenku8.com/image/3/3770/3770s.jpg"),
+            WenkuImageUrlPolicy.buildOrderedIllustrationAttemptUrls(coverUrl).map { it.toString() },
+        )
+
+        // 3. Redirect Location header upgrade interceptor upgrades `http://pic.777743.xyz/...` -> `https://...`
+        val redirectTestClient = OkHttpClient.Builder()
+            .followRedirects(false)
+            .followSslRedirects(false)
+            .addInterceptor(WenkuHttpsRedirectUpgradeInterceptor)
+            .addInterceptor { chain ->
+                Response.Builder()
+                    .request(chain.request())
+                    .protocol(Protocol.HTTP_2)
+                    .code(301)
+                    .message("Moved Permanently")
+                    .header("Location", "http://pic.777743.xyz/pictures/1/1305/41759/50471.jpg")
+                    .body("".toResponseBody())
+                    .build()
+            }
+            .build()
+        redirectTestClient.newCall(
+            Request.Builder()
+                .url("https://pic.wenku8.cn/pictures/1/1305/41759/50471.jpg")
+                .get()
+                .build(),
+        ).execute().use { upgradedRedirect ->
+            assertEquals(
+                "https://pic.777743.xyz/pictures/1/1305/41759/50471.jpg",
+                upgradedRedirect.header("Location"),
+            )
+        }
+
+        // 4. Redacted IO reason strips raw IPs & native pointers while keeping actionable OS reason
+        val conscryptError = IOException(
+            "Read error: ssl=0x7f1a2b3c4d: I/O error during system call, Connection reset by peer (104.21.83.104:443)",
+        )
+        val sanitized = WenkuImageUrlPolicy.sanitizeIoExceptionReason(conscryptError)
+        assertEquals("Connection reset by peer", sanitized)
+        assertEquals(
+            "Connection reset",
+            WenkuImageUrlPolicy.sanitizeIoExceptionReason(SocketException("Connection reset")),
+        )
     }
 }
