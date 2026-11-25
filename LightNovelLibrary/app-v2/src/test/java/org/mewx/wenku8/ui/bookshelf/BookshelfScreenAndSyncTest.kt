@@ -669,6 +669,87 @@ class BookshelfScreenAndSyncTest {
         assertEquals(1, newlyCached!!.imageCount)
     }
 
+    @Test
+    fun clearCachedChaptersForNovels_purgesOfflineIllustrationFilesAndArtbookCache_andSmartUpdateDownloadsIllustrations() =
+        runTest {
+            val tempRoot = Files.createTempDirectory("wenku8_shelf_img_clear").toFile()
+            val tempFilesDir = File(tempRoot, "files").apply { mkdirs() }
+            val tempCacheDir = File(tempRoot, "cache").apply { mkdirs() }
+            try {
+                database.novelDao().upsertNovel(
+                    NovelEntity(aid = 1749, title = "无职转生", inBookshelf = true),
+                )
+                database.chapterContentDao().upsertChapterContent(
+                    ChapterContentEntity(
+                        cid = 501,
+                        aid = 1749,
+                        contentLang = "SC",
+                        contentText = "已缓存第一章",
+                        byteLength = 18,
+                        imageUrlsJson = "[]",
+                        imageCount = 0,
+                        sha256Checksum = "abc",
+                        downloadedAtMs = 1_000L,
+                    ),
+                )
+
+                val illustUrl = "http://pic.wenku8.cn/pictures/1/1749/502/888.jpg"
+                val legacyName = WenkuXmlParsers.generateLegacyImageFileName(illustUrl)
+                val validJpeg = byteArrayOf(0xFF.toByte(), 0xD8.toByte(), 0xFF.toByte(), 0xD9.toByte())
+
+                val gateway = FakeBookshelfCatalogGateway().apply {
+                    tocByAid[1749] = listOf(
+                        ParsedVolumeToc(
+                            vid = 500,
+                            volumeTitle = "第一卷",
+                            chapters = listOf(
+                                ParsedChapterToc(cid = 501, chapterTitle = "第一话"),
+                                ParsedChapterToc(cid = 502, chapterTitle = "插图"),
+                            ),
+                        ),
+                    )
+                    chapterTextByCid[502] = "第一卷插图\n<!--image-->$illustUrl<!--image-->"
+                    binaryBytesByUrl[illustUrl] = validJpeg
+                }
+
+                val repository = BookshelfRepository(
+                    database = database,
+                    catalogGateway = gateway,
+                    novelTocSyncRepository = tocSyncRepository,
+                    assetRootsProvider = { listOf(tempFilesDir) },
+                    cacheRootProvider = { tempCacheDir },
+                )
+
+                // 1. Smart update downloads chapter 502 AND its validated illustration into saves/imgs/
+                val summary = repository.smartUpdateShelfNovels(
+                    aids = listOf(1749),
+                    appLanguage = Wenku8API.AppLanguage.SC,
+                )
+                assertEquals(1, summary.newlyDownloadedChapterCount)
+                val savedIllust = File(tempFilesDir, "saves/imgs/$legacyName")
+                assertTrue("Smart update must persist offline illustration into saves/imgs/", savedIllust.isFile)
+
+                // Also seed a matching Artbook cache file AND an unrelated book's offline illustration
+                val artbookIllust = File(tempCacheDir, "artbook_images/$legacyName").apply {
+                    parentFile?.mkdirs()
+                    writeBytes(validJpeg)
+                }
+                val otherBookIllust = File(tempFilesDir, "saves/imgs/pictures999999.jpg").apply {
+                    writeBytes(validJpeg)
+                }
+
+                // 2. Clearing cached chapters for novel 1749 must delete SQLite rows AND local image files!
+                repository.clearCachedChaptersForNovels(listOf(1749))
+                assertNull(database.chapterContentDao().getChapterHeader(501))
+                assertNull(database.chapterContentDao().getChapterHeader(502))
+                assertFalse("saves/imgs file must be purged on cache clear", savedIllust.exists())
+                assertFalse("artbook_images file must be purged on cache clear", artbookIllust.exists())
+                assertTrue("Unrelated book's illustration must remain untouched", otherBookIllust.exists())
+            } finally {
+                tempRoot.deleteRecursively()
+            }
+        }
+
     @OptIn(ExperimentalTestApi::class)
     @Test
     fun bookshelfScreen_rendersCarousel_localSearch_viewModes_andMultiSelectToolbar() = runBlocking {
@@ -1782,8 +1863,11 @@ class BookshelfScreenAndSyncTest {
         val tocByAid = mutableMapOf<Int, List<ParsedVolumeToc>>()
         val chapterTextByCid = mutableMapOf<Int, String>()
         val fetchedChapterCids = mutableListOf<Int>()
+        val binaryBytesByUrl = mutableMapOf<String, ByteArray?>()
 
         override fun resolveCoverUrl(aid: Int): String = ""
+
+        override suspend fun downloadBinaryBytes(url: String): ByteArray? = binaryBytesByUrl[url]
 
         override suspend fun fetchNovelListPage(
             sortedBy: Wenku8API.NovelSortedBy,

@@ -495,6 +495,7 @@
     <string name="download_cancel_action">取消下载</string>
     <string name="download_done_snackbar_format">离线缓存完成：共保存 %1$d 章</string>
     <string name="download_partial_snackbar_format">已缓存 %1$d 章，%2$d 章下载未成功（可稍后用「仅下载未缓存章节」补齐）</string>
+    <string name="download_partial_images_snackbar_format">已缓存 %1$d 章，另有 %2$d 张插图未下载成功（可稍后用「智能更新」自动补齐）</string>
     <string name="download_cancelled_snackbar">已取消离线缓存任务</string>
 
     <!-- Reading Footprint, Heatmap, Bookmarks Hub & Home Widget (P5.4) -->

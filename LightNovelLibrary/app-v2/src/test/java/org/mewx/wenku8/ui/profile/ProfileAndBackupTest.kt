@@ -161,15 +161,27 @@ class ProfileAndBackupTest {
                     NovelEntity(aid = 2002, title = "路过作品", inBookshelf = false),
                 )
 
-                // Offline chapter referencing one illustration URL, plus an orphan illustration file
+                // Offline chapter referencing one valid illustration + one corrupt illustration, plus an orphan file
                 val liveIllustUrl = "https://pic.wenku8.com/pictures/1/1306/42001/55001.jpg"
+                val corruptLiveIllustUrl = "https://pic.wenku8.com/pictures/1/1306/42001/55002.jpg"
                 val liveLegacyName = WenkuXmlParsers.generateLegacyImageFileName(liveIllustUrl)
+                val corruptLiveLegacyName = WenkuXmlParsers.generateLegacyImageFileName(corruptLiveIllustUrl)
                 val savesImgsDir = File(File(filesDir, "saves"), "imgs").apply { mkdirs() }
+                val validJpegPayload = ByteArray(4096).also { buf ->
+                    buf[0] = 0xFF.toByte()
+                    buf[1] = 0xD8.toByte()
+                    buf[2] = 0xFF.toByte()
+                    buf[buf.lastIndex - 1] = 0xFF.toByte()
+                    buf[buf.lastIndex] = 0xD9.toByte()
+                }
                 val liveIllustFile = File(savesImgsDir, liveLegacyName).apply {
-                    writeBytes(ByteArray(4096))
+                    writeBytes(validJpegPayload)
+                }
+                val corruptLiveIllustFile = File(savesImgsDir, corruptLiveLegacyName).apply {
+                    writeText("<html>Corrupt cached response</html>")
                 }
                 val orphanIllustFile = File(savesImgsDir, "orphan_unreferenced.jpg").apply {
-                    writeBytes(ByteArray(3072))
+                    writeBytes(validJpegPayload)
                 }
 
                 db.chapterContentDao().upsertChapterContent(
@@ -179,8 +191,8 @@ class ProfileAndBackupTest {
                         contentLang = "SC",
                         contentText = "正文插图测试",
                         byteLength = 18,
-                        imageUrlsJson = "[\"$liveIllustUrl\"]",
-                        imageCount = 1,
+                        imageUrlsJson = "[\"$liveIllustUrl\",\"$corruptLiveIllustUrl\"]",
+                        imageCount = 2,
                         sha256Checksum = "abc",
                         downloadedAtMs = 1000L,
                     ),
@@ -203,14 +215,16 @@ class ProfileAndBackupTest {
                 assertEquals(1, fastSummary.prunedTransientNovelRows)
                 assertNull(db.novelDao().getNovelByAid(2002))
 
-                // 2. Deep Orphan Clean deletes unreferenced saves/imgs/ file while preserving live illustration
+                // 2. Deep Orphan Clean deletes BOTH unreferenced orphan files AND corrupt referenced files
+                //    while preserving valid referenced illustrations!
                 val progressUpdates = mutableListOf<Int>()
                 val deepSummary = repo.runDeepOrphanCacheClean { progress ->
                     progressUpdates.add(progress.scannedFiles)
                 }
                 assertTrue(liveIllustFile.exists())
                 assertFalse(orphanIllustFile.exists())
-                assertEquals(1, deepSummary.deletedFileCount)
+                assertFalse("Corrupt referenced illustration must be removed during deep clean", corruptLiveIllustFile.exists())
+                assertEquals(2, deepSummary.deletedFileCount)
                 assertTrue(progressUpdates.isNotEmpty())
             } finally {
                 db.close()

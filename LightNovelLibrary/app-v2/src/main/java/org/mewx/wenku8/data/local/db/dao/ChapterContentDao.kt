@@ -27,6 +27,11 @@ data class NovelCachedChapterCount(
     @ColumnInfo(name = "cached_count") val cachedCount: Int,
 )
 
+data class CachedChapterImagesRow(
+    @ColumnInfo(name = "cid") val cid: Int,
+    @ColumnInfo(name = "image_urls_json") val imageUrlsJson: String,
+)
+
 /**
  * DAO for `chapter_contents` with strict `2 MB` `CursorWindow` protection.
  *
@@ -92,6 +97,12 @@ interface ChapterContentDao {
 
     @Query("SELECT image_urls_json FROM chapter_contents WHERE image_count > 0")
     suspend fun getAllNonEmptyImageUrlsJson(): List<String>
+
+    @Query("SELECT image_urls_json FROM chapter_contents WHERE aid IN (:aids) AND image_count > 0")
+    suspend fun getImageUrlsJsonForNovels(aids: List<Int>): List<String>
+
+    @Query("SELECT cid, image_urls_json FROM chapter_contents WHERE aid = :aid AND image_count > 0")
+    suspend fun getCachedImageChaptersForNovel(aid: Int): List<CachedChapterImagesRow>
 
     @Query("DELETE FROM chapter_contents WHERE cid = :cid")
     suspend fun deleteChapterContent(cid: Int)

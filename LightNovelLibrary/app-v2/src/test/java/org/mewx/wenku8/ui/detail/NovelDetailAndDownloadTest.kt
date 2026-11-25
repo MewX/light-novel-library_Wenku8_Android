@@ -46,6 +46,7 @@ import org.mewx.wenku8.data.download.NovelDownloadRunState
 import org.mewx.wenku8.data.local.db.Wenku8Database
 import org.mewx.wenku8.data.local.db.entity.NovelEntity
 import org.mewx.wenku8.data.local.db.entity.ReadingProgressEntity
+import org.mewx.wenku8.data.media.WenkuImageValidator
 import org.mewx.wenku8.data.remote.api.OnlineSearchField
 import org.mewx.wenku8.data.remote.api.WenkuApiResult
 import org.mewx.wenku8.data.remote.api.WenkuCatalogGateway
@@ -243,6 +244,78 @@ class NovelDetailAndDownloadTest {
         assertNotNull(database.chapterContentDao().getChapterHeader(102))
         assertNull(database.chapterContentDao().getChapterHeader(201))
     }
+
+    @Test
+    fun downloadRepository_rejectsCorruptImages_surfacesPartialFailure_andBackfillsMissingOrCorruptIllustrations() =
+        runBlocking {
+            val illustFile = File(tempAssetRoot, "saves/imgs/pictures05102999.jpg")
+
+            // 1. Corrupt HTML payload for illustration must NOT be saved to disk and must surface PARTIAL_FAILURE!
+            fakeGateway.customBinaryResponseProvider = { url ->
+                if (url.contains("999.jpg")) "<html>Blocked</html>".toByteArray() else null
+            }
+            val corruptOutcome = downloadRepository.executeDownload(
+                NovelDownloadRequest(
+                    aid = 5,
+                    appLanguage = Wenku8API.AppLanguage.SC,
+                    mode = NovelDownloadMode.SELECT_VOLUMES,
+                    selectedVolumeIds = setOf(10),
+                    overwriteSelectedVolumes = false,
+                ),
+            )
+            assertEquals(NovelDownloadRunState.PARTIAL_FAILURE, corruptOutcome.state)
+            assertEquals(2, corruptOutcome.downloadedChapters)
+            assertEquals(0, corruptOutcome.failedChapters)
+            assertEquals(0, corruptOutcome.downloadedImages)
+            assertEquals(1, corruptOutcome.failedImages)
+            assertFalse("Corrupt HTML bytes must never be persisted to saves/imgs/", illustFile.exists())
+
+            // 2. SMART_UPDATE repairs missing offline illustrations inside already-cached chapters without re-downloading text!
+            val validJpeg = byteArrayOf(0xFF.toByte(), 0xD8.toByte(), 0xFF.toByte(), 0xE0.toByte(), 0xFF.toByte(), 0xD9.toByte())
+            fakeGateway.customBinaryResponseProvider = { validJpeg }
+            fakeGateway.requestedChapterCids.clear()
+            val backfillOutcome = downloadRepository.executeDownload(
+                NovelDownloadRequest(
+                    aid = 5,
+                    appLanguage = Wenku8API.AppLanguage.SC,
+                    mode = NovelDownloadMode.SMART_UPDATE,
+                ),
+            )
+            assertEquals(NovelDownloadRunState.SUCCEEDED, backfillOutcome.state)
+            assertEquals(0, backfillOutcome.failedImages)
+            assertEquals(1, backfillOutcome.downloadedImages)
+            assertFalse("Already-cached chapter 102 text need not be re-fetched", 102 in fakeGateway.requestedChapterCids)
+            assertTrue(illustFile.isFile)
+            assertTrue(WenkuImageValidator.hasValidImageStructure(illustFile))
+
+            // 3. Corrupt file on disk gets detected & repaired on UNCACHED_ONLY
+            illustFile.writeBytes(byteArrayOf(0xFF.toByte(), 0xD8.toByte(), 0xFF.toByte(), 0xE0.toByte(), 0x00, 0x10))
+            assertFalse(WenkuImageValidator.hasValidImageStructure(illustFile))
+            val repairOutcome = downloadRepository.executeDownload(
+                NovelDownloadRequest(
+                    aid = 5,
+                    appLanguage = Wenku8API.AppLanguage.SC,
+                    mode = NovelDownloadMode.UNCACHED_ONLY,
+                ),
+            )
+            assertEquals(NovelDownloadRunState.SUCCEEDED, repairOutcome.state)
+            assertEquals(1, repairOutcome.downloadedImages)
+            assertTrue(WenkuImageValidator.hasValidImageStructure(illustFile))
+
+            // 4. OVERWRITE_ALL deletes stale corrupt file when network image re-download fails
+            illustFile.writeBytes("<html>Broken</html>".toByteArray())
+            fakeGateway.customBinaryResponseProvider = { null }
+            val overwriteFailOutcome = downloadRepository.executeDownload(
+                NovelDownloadRequest(
+                    aid = 5,
+                    appLanguage = Wenku8API.AppLanguage.SC,
+                    mode = NovelDownloadMode.OVERWRITE_ALL,
+                ),
+            )
+            assertEquals(NovelDownloadRunState.PARTIAL_FAILURE, overwriteFailOutcome.state)
+            assertEquals(1, overwriteFailOutcome.failedImages)
+            assertFalse("Stale corrupt file must be deleted when overwrite re-download fails", illustFile.exists())
+        }
 
     @Test
     fun offlineDetailRefresh_preservesCachedMetadataSynopsisAndVolumes() = runBlocking {
@@ -1126,12 +1199,18 @@ private class FakeDetailAndDownloadGateway : WenkuCatalogGateway {
     var introRequestCount: Int = 0
     var tocRequestCount: Int = 0
     val requestedChapterCids = mutableListOf<Int>()
+    val requestedBinaryUrls = mutableListOf<String>()
     val customChapterResults = mutableMapOf<Int, WenkuApiResult<String>>()
+    var customBinaryResponseProvider: ((String) -> ByteArray?)? = null
 
     override fun resolveCoverUrl(aid: Int): String = coverUrlForBinaryTest
 
     override suspend fun downloadBinaryBytes(url: String): ByteArray? {
+        requestedBinaryUrls.add(url)
         if (simulateNetworkOffline) return null
+        customBinaryResponseProvider?.let { provider ->
+            return provider(url)
+        }
         return byteArrayOf(0xFF.toByte(), 0xD8.toByte(), 0xFF.toByte(), 0xD9.toByte())
     }
 

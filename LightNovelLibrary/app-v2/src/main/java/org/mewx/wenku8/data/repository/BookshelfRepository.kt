@@ -1,5 +1,6 @@
 package org.mewx.wenku8.data.repository
 
+import android.content.Context
 import androidx.room.withTransaction
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
@@ -24,12 +25,14 @@ import org.mewx.wenku8.data.local.db.entity.ChapterContentEntity
 import org.mewx.wenku8.data.local.db.entity.CloudBookcaseLedgerEntity
 import org.mewx.wenku8.data.local.db.entity.NovelEntity
 import org.mewx.wenku8.data.local.db.entity.ReadingProgressEntity
+import org.mewx.wenku8.data.media.WenkuImageValidator
 import org.mewx.wenku8.data.remote.api.WenkuApiResult
 import org.mewx.wenku8.data.remote.api.WenkuCatalogGateway
 import org.mewx.wenku8.data.remote.api.isEffectivelyBlankWenkuText
 import org.mewx.wenku8.data.remote.parser.ParsedCloudBookshelfEntry
 import org.mewx.wenku8.data.remote.parser.WenkuXmlParsers
 import org.mewx.wenku8.util.DigestUtils
+import java.io.File
 import java.nio.charset.StandardCharsets
 import java.text.Collator
 import java.util.Locale
@@ -161,6 +164,9 @@ class BookshelfRepository(
     private val catalogGateway: WenkuCatalogGateway,
     private val novelTocSyncRepository: NovelTocSyncRepository,
     private val userSessionRepository: UserSessionRepository? = null,
+    private val assetRootsProvider: () -> List<File> = { emptyList() },
+    private val cacheRootProvider: () -> File? = { null },
+    private val appContext: Context? = null,
     private val wallClockMs: () -> Long = { System.currentTimeMillis() },
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
@@ -904,6 +910,13 @@ class BookshelfRepository(
                                                 downloadedAtMs = wallClockMs(),
                                             ),
                                         )
+                                        // Best-effort offline save of illustrations for newly updated chapters.
+                                        val primaryRoot = assetRootsProvider().firstOrNull()
+                                        if (primaryRoot != null) {
+                                            for (imageUrl in imageUrls) {
+                                                saveValidatedIllustrationBestEffort(primaryRoot, imageUrl)
+                                            }
+                                        }
                                         downloadedChapters++
                                     }
                                 }
@@ -1128,7 +1141,52 @@ class BookshelfRepository(
     suspend fun clearCachedChaptersForNovels(aids: List<Int>) = withContext(ioDispatcher) {
         val targetAids = aids.distinct().filter { it > 0 }
         if (targetAids.isEmpty()) return@withContext
+
+        val imageUrlJsonRows = database.chapterContentDao().getImageUrlsJsonForNovels(targetAids)
         database.chapterContentDao().deleteChapterContentsForNovels(targetAids)
+
+        val roots = assetRootsProvider()
+        val cacheRoot = cacheRootProvider()
+        val ctx = appContext
+        if (roots.isEmpty() && cacheRoot == null && ctx == null) return@withContext
+
+        for (rawJson in imageUrlJsonRows) {
+            runCatching {
+                val arr = JSONArray(rawJson)
+                for (i in 0 until arr.length()) {
+                    val url = arr.optString(i).trim()
+                    if (url.isNotEmpty()) {
+                        WenkuImageValidator.purgeCachedImageForUrl(
+                            imageUrl = url,
+                            storageRoots = roots,
+                            cacheRoot = cacheRoot,
+                            appContext = ctx,
+                            includePermanentOfflineFiles = true,
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    private suspend fun saveValidatedIllustrationBestEffort(primaryRoot: File, imageUrl: String) {
+        val fileName = WenkuXmlParsers.generateLegacyImageFileName(imageUrl)
+        if (fileName.isBlank()) return
+        val targetFile = File(primaryRoot, "saves/imgs/$fileName")
+        if (targetFile.isFile && WenkuImageValidator.hasValidImageStructure(targetFile)) return
+        val bytes = catalogGateway.downloadBinaryBytes(imageUrl) ?: return
+        if (!WenkuImageValidator.hasValidImageStructure(bytes)) return
+        runCatching {
+            val parent = targetFile.parentFile ?: return@runCatching
+            if (!parent.exists()) parent.mkdirs()
+            val tmp = File(parent, "${targetFile.name}.${System.nanoTime()}.tmp")
+            tmp.writeBytes(bytes)
+            if (targetFile.exists()) targetFile.delete()
+            if (!tmp.renameTo(targetFile)) {
+                targetFile.writeBytes(bytes)
+                tmp.delete()
+            }
+        }
     }
 
     suspend fun pinNovelsToTop(aids: List<Int>) = withContext(ioDispatcher) {
