@@ -707,6 +707,7 @@ class NarrowScreenLayoutRegressionTest {
                         onSkipNext = {},
                         onCycleSpeechRate = {},
                         onStopAndDismiss = {},
+                        onOpenTtsSettings = {},
                     )
                 }
             }
@@ -734,6 +735,7 @@ class NarrowScreenLayoutRegressionTest {
             ReaderTestTags.TTS_PREV_BUTTON,
             ReaderTestTags.TTS_PLAY_PAUSE_BUTTON,
             ReaderTestTags.TTS_NEXT_BUTTON,
+            ReaderTestTags.TTS_SETTINGS_BUTTON,
             ReaderTestTags.TTS_STOP_BUTTON,
         ).forEach { tag ->
             composeTestRule.onNodeWithTag(tag).assertIsDisplayed().assertWithinViewport(320.dp)
