@@ -108,14 +108,15 @@ object WenkuImageRequests {
     ): ImageRequest? {
         val trimmedUrl = coverUrl.trim()
         if (trimmedUrl.isEmpty()) return null
-        val resolvedAid = if (aid > 0) aid else (extractCoverAidFromUrl(trimmedUrl) ?: 0)
+        val normalizedUrl = WenkuImageUrlPolicy.upgradeToHttpsIfSupported(trimmedUrl)
+        val resolvedAid = if (aid > 0) aid else (extractCoverAidFromUrl(normalizedUrl) ?: 0)
         val cacheKey = if (resolvedAid > 0) {
             canonicalCoverCacheKey(resolvedAid)
         } else {
-            canonicalCacheKeyForUrl(trimmedUrl) ?: trimmedUrl
+            canonicalCacheKeyForUrl(normalizedUrl) ?: normalizedUrl
         }
         return ImageRequest.Builder(context)
-            .data(trimmedUrl)
+            .data(normalizedUrl)
             .memoryCacheKey(cacheKey)
             .diskCacheKey(cacheKey)
             .placeholderMemoryCacheKey(cacheKey)
@@ -150,10 +151,11 @@ object WenkuImageRequests {
     ): ImageRequest? {
         val trimmedUrl = imageUrl.trim()
         if (trimmedUrl.isEmpty()) return null
-        val cacheKey = canonicalIllustrationCacheKey(trimmedUrl)
-            ?: canonicalCacheKeyForUrl(trimmedUrl)
+        val normalizedUrl = WenkuImageUrlPolicy.upgradeToHttpsIfSupported(trimmedUrl)
+        val cacheKey = canonicalIllustrationCacheKey(normalizedUrl)
+            ?: canonicalCacheKeyForUrl(normalizedUrl)
         return ImageRequest.Builder(context)
-            .data(trimmedUrl)
+            .data(normalizedUrl)
             .apply {
                 if (cacheKey != null) {
                     memoryCacheKey(cacheKey)
