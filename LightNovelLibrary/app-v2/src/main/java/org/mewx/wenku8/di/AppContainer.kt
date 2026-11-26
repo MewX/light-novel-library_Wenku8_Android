@@ -98,6 +98,7 @@ class AppContainer(context: Context) {
             edgeRouteProvider = relayRouteController,
             systemDns = Dns.SYSTEM,
             networkInterceptors = listOf(WenkuImmutableImageCacheInterceptor),
+            dynamicPictureMirrorsProvider = { manifestRepository.currentDynamicPictureMirrorsOrEmpty() },
         )
     }
 
@@ -133,7 +134,16 @@ class AppContainer(context: Context) {
             dohTxtDomain = ManifestRepository.DEFAULT_DOH_TXT_CONFIG_DOMAIN,
             dohEndpoints = ManifestRepository.defaultDomesticDohEndpoints(),
             bundledCandidateSpecs = ManifestRepository.defaultVerifiedCloudflareSubnetSpecs(),
-        )
+        ).also { repo ->
+            // Warm any locally persisted manifest (including dynamic `pm=` picture mirrors)
+            // asynchronously so cold-start image loads can pick them up immediately.
+            applicationScope.launch {
+                val resolved = DiagnosticsEndpointConfig.resolveFromCompiledApi()
+                if (resolved is DiagnosticsEndpointResolution.Available) {
+                    runCatching { repo.loadCachedOrInMemoryManifest(resolved.endpoint.relayHost) }
+                }
+            }
+        }
     }
 
     val okHttpProbeTransport: OkHttpProbeTransport by lazy {

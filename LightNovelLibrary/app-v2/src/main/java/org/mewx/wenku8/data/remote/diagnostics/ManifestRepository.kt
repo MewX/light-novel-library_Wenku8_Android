@@ -25,6 +25,7 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONArray
 import org.json.JSONObject
+import org.mewx.wenku8.data.media.WenkuImageUrlPolicy
 import java.io.ByteArrayOutputStream
 import java.io.IOException
 import java.net.InetAddress
@@ -77,6 +78,7 @@ data class ValidatedCandidateManifest(
     val acceptedAtMonotonicMs: Long,
     val authorizedLifetimeMs: Long,
     val candidateSpecs: List<CandidateAddressSpec> = emptyList(),
+    val pictureMirrors: List<WenkuImageUrlPolicy.PictureMirrorEndpoint> = emptyList(),
 ) {
     fun sampleCandidates(
         random: Random = defaultManifestRandom,
@@ -624,6 +626,12 @@ class ManifestRepository(
                 ?.filter { it.isNotEmpty() && shippedFallbackIds.contains(it) }
                 .orEmpty()
 
+            // Optional dynamic illustration mirror list (`pm=pic.777743.xyz,pic.wenku8.com,pic.wenku8.cn/pictures`).
+            // Malformed individual tokens are silently discarded so a typo never invalidates relay IPs.
+            val dynamicPictureMirrors = primary["pm"]?.split(',')
+                ?.let { WenkuImageUrlPolicy.parseDynamicMirrorSpecs(it) }
+                .orEmpty()
+
             // Gather `c=` tokens from primary + matching `wk8-txt-ext1` continuation records sorted by `p`.
             val extShards = parsedKvMaps
                 .filter { it["v"] == TXT_CONTINUATION_SCHEMA_V1 && it["rev"]?.trim() == revision }
@@ -697,6 +705,12 @@ class ManifestRepository(
                 .put("issuedAt", Instant.ofEpochMilli(issuedAtMs).toString())
                 .put("expiresAt", Instant.ofEpochMilli(expiresAtMs).toString())
                 .put("candidates", canonicalJsonCandidates)
+            if (dynamicPictureMirrors.isNotEmpty()) {
+                canonicalJsonObj.put(
+                    "pictureMirrors",
+                    JSONArray(dynamicPictureMirrors.map { it.toWireSpec() }),
+                )
+            }
             val canonicalJson = canonicalJsonObj.toString()
 
             val validated = parseAndValidateManifestJson(
@@ -828,6 +842,22 @@ class ManifestRepository(
                 initialSampledCandidates.add(sampledEntry)
             }
 
+            val pictureMirrors = if (root.has("pictureMirrors") && !root.isNull("pictureMirrors")) {
+                val arr = root.opt("pictureMirrors") as? JSONArray
+                if (arr != null) {
+                    val rawSpecs = buildList(arr.length()) {
+                        for (i in 0 until arr.length()) {
+                            (arr.opt(i) as? String)?.let { add(it) }
+                        }
+                    }
+                    WenkuImageUrlPolicy.parseDynamicMirrorSpecs(rawSpecs)
+                } else {
+                    emptyList()
+                }
+            } else {
+                emptyList()
+            }
+
             val rawRemainingMs = (expiresAtMs - nowWallEpochMs).coerceAtLeast(0L)
             val authorizedLifetimeMs = minOf(MAX_AUTHORIZATION_LIFETIME_MS, rawRemainingMs)
 
@@ -845,6 +875,7 @@ class ManifestRepository(
                 acceptedAtMonotonicMs = nowMonotonicMs,
                 authorizedLifetimeMs = authorizedLifetimeMs,
                 candidateSpecs = parsedSpecs,
+                pictureMirrors = pictureMirrors,
             )
         }
 
@@ -867,6 +898,14 @@ class ManifestRepository(
     @Volatile private var inMemoryManifest: ValidatedCandidateManifest? = null
     @Volatile private var inMemoryDohValidUntilMonotonicMs: Long = 0L
     @Volatile private var inMemoryDohNegativeUntilMonotonicMs: Long = 0L
+
+    /**
+     * Non-blocking read of any dynamically configured illustration mirrors (`pm=`) from the
+     * currently loaded `_network_cfg.wenku8.app` manifest, or empty list to use built-in defaults.
+     */
+    fun currentDynamicPictureMirrorsOrEmpty(): List<WenkuImageUrlPolicy.PictureMirrorEndpoint> {
+        return inMemoryManifest?.pictureMirrors.orEmpty()
+    }
 
     fun bundledDiscoverySeeds(): List<CandidateIpEntry> {
         if (bundledCandidateSpecs.isNotEmpty()) {
