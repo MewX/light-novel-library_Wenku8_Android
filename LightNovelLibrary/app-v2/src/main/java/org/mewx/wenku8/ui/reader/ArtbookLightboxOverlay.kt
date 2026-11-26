@@ -494,7 +494,7 @@ object ArtbookImageFileResolver {
     private val cdnHttpClient: OkHttpClient by lazy {
         OkHttpClient.Builder()
             .dns(Dns.SYSTEM)
-            .addNetworkInterceptor(WenkuHttpsRedirectUpgradeInterceptor)
+            .addNetworkInterceptor(WenkuHttpsRedirectUpgradeInterceptor.DEFAULT)
             .connectTimeout(12, TimeUnit.SECONDS)
             .readTimeout(25, TimeUnit.SECONDS)
             .followRedirects(true)

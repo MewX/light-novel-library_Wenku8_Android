@@ -456,39 +456,101 @@ class WenkuXmlParsersAndImageFetcherTest {
         assertNotNull(illusReq)
         assertEquals("https://pic.wenku8.com/pictures/3/3770/141001/1.jpg", illusReq!!.data)
         assertEquals("wenku8_illus_pictures337701410011.jpg", illusReq.diskCacheKey)
-
-        // 2. Mirror candidate ordering for pic.wenku8.com & pic.wenku8.cn (and single-entry for covers)
-        val picComUrl = "https://pic.wenku8.com/pictures/3/3770/141001/1.jpg".toHttpUrl()
         assertEquals(
-            listOf(
-                "https://pic.wenku8.com/pictures/3/3770/141001/1.jpg",
-                "https://pic.777743.xyz/3/3770/141001/1.jpg",
-                "https://pic.wenku8.cn/pictures/3/3770/141001/1.jpg",
-            ),
-            WenkuImageUrlPolicy.buildOrderedIllustrationAttemptUrls(picComUrl).map { it.toString() },
+            "Direct pic.777743.xyz URL must normalize to identical canonical illustration cache key",
+            "wenku8_illus_pictures337701410011.jpg",
+            WenkuImageRequests.canonicalIllustrationCacheKey("https://pic.777743.xyz/3/3770/141001/1.jpg"),
+        )
+
+        // 2. Option A interchangeable illustration pool: pic.777743.xyz -> pic.wenku8.com (direct) -> pic.wenku8.cn (legacy last)
+        val expectedOptionA = listOf(
+            "https://pic.777743.xyz/3/3770/141001/1.jpg",
+            "https://pic.wenku8.com/3/3770/141001/1.jpg",
+            "https://pic.wenku8.cn/pictures/3/3770/141001/1.jpg",
         )
         assertEquals(
-            listOf(
-                "https://pic.777743.xyz/3/3770/141001/1.jpg",
-                "https://pic.wenku8.cn/pictures/3/3770/141001/1.jpg",
-                "https://pic.wenku8.com/pictures/3/3770/141001/1.jpg",
-            ),
+            expectedOptionA,
             WenkuImageUrlPolicy.buildOrderedIllustrationAttemptUrls(
-                url = picComUrl,
-                preferredMirror = WenkuImageUrlPolicy.IllustrationMirror.PIC_777743,
+                "https://pic.wenku8.com/pictures/3/3770/141001/1.jpg".toHttpUrl(),
             ).map { it.toString() },
         )
+        assertEquals(
+            "Legacy China-Mobile-blocked pic.wenku8.cn must be demoted to last automatically",
+            expectedOptionA,
+            WenkuImageUrlPolicy.buildOrderedIllustrationAttemptUrls(
+                "https://pic.wenku8.cn/pictures/3/3770/141001/1.jpg".toHttpUrl(),
+            ).map { it.toString() },
+        )
+        assertEquals(
+            "Direct pic.777743.xyz input participates bidirectionally in mirror failover",
+            expectedOptionA,
+            WenkuImageUrlPolicy.buildOrderedIllustrationAttemptUrls(
+                "https://pic.777743.xyz/3/3770/141001/1.jpg".toHttpUrl(),
+            ).map { it.toString() },
+        )
+        assertEquals(
+            listOf(
+                "https://pic.wenku8.com/3/3770/141001/1.jpg",
+                "https://pic.777743.xyz/3/3770/141001/1.jpg",
+                "https://pic.wenku8.cn/pictures/3/3770/141001/1.jpg",
+            ),
+            WenkuImageUrlPolicy.buildOrderedIllustrationAttemptUrls(
+                url = "https://pic.wenku8.com/pictures/3/3770/141001/1.jpg".toHttpUrl(),
+                preferredMirror = WenkuImageUrlPolicy.MIRROR_PIC_WENKU8_COM,
+            ).map { it.toString() },
+        )
+
+        // Dynamic `pm=` mirrors strictly reject IPs/localhost/ports/paths and prepend ahead of defaults
+        val parsedDynamic = WenkuImageUrlPolicy.parseDynamicMirrorSpecs(
+            listOf(
+                "pic.newcdn.xyz",
+                "127.0.0.1",
+                "104.21.83.104",
+                "localhost",
+                "bad.local",
+                "pic.evil.xyz:8443",
+                "https://pic.evil.xyz",
+                "pic.evil.xyz/admin",
+                "cdn2.example.org/pictures",
+            ),
+        )
+        assertEquals(
+            listOf(
+                WenkuImageUrlPolicy.PictureMirrorEndpoint("pic.newcdn.xyz", usesPicturesPrefix = false),
+                WenkuImageUrlPolicy.PictureMirrorEndpoint("cdn2.example.org", usesPicturesPrefix = true),
+            ),
+            parsedDynamic,
+        )
+        assertEquals(
+            "https://pic.newcdn.xyz/3/3770/141001/1.jpg",
+            WenkuImageUrlPolicy.upgradeToHttpsIfSupported("http://pic.newcdn.xyz/3/3770/141001/1.jpg", parsedDynamic),
+        )
+        assertEquals(
+            listOf(
+                "https://pic.newcdn.xyz/3/3770/141001/1.jpg",
+                "https://cdn2.example.org/pictures/3/3770/141001/1.jpg",
+                "https://pic.777743.xyz/3/3770/141001/1.jpg",
+                "https://pic.wenku8.com/3/3770/141001/1.jpg",
+                "https://pic.wenku8.cn/pictures/3/3770/141001/1.jpg",
+            ),
+            WenkuImageUrlPolicy.buildOrderedIllustrationAttemptUrls(
+                url = "https://pic.wenku8.com/pictures/3/3770/141001/1.jpg".toHttpUrl(),
+                dynamicMirrors = parsedDynamic,
+            ).map { it.toString() },
+        )
+
         val coverUrl = "https://img.wenku8.com/image/3/3770/3770s.jpg".toHttpUrl()
         assertEquals(
             listOf("https://img.wenku8.com/image/3/3770/3770s.jpg"),
-            WenkuImageUrlPolicy.buildOrderedIllustrationAttemptUrls(coverUrl).map { it.toString() },
+            WenkuImageUrlPolicy.buildOrderedIllustrationAttemptUrls(coverUrl, dynamicMirrors = parsedDynamic)
+                .map { it.toString() },
         )
 
         // 3. Redirect Location header upgrade interceptor upgrades `http://pic.777743.xyz/...` -> `https://...`
         val redirectTestClient = OkHttpClient.Builder()
             .followRedirects(false)
             .followSslRedirects(false)
-            .addInterceptor(WenkuHttpsRedirectUpgradeInterceptor)
+            .addInterceptor(WenkuHttpsRedirectUpgradeInterceptor.DEFAULT)
             .addInterceptor { chain ->
                 Response.Builder()
                     .request(chain.request())

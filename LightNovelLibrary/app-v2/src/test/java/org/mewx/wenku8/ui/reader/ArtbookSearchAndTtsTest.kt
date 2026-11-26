@@ -1606,8 +1606,8 @@ class ArtbookSearchAndTtsTest {
                     )
                     val assetRoot = tempFolder.newFolder("artbook_mirror_root")
 
-                    // 1. Primary pic.wenku8.com resets socket -> mirror pic.777743.xyz rescues & caches under legacy name!
-                    blockedPrimary.enqueue(MockResponse.Builder().onResponseStart(SocketEffect.CloseSocket()).build())
+                    // 1. Option A: pic.wenku8.com URL goes directly to pic.777743.xyz (zero hit on blocked pic.wenku8.com!)
+                    //    and caches under the original legacy filename!
                     mirrorServer.enqueue(
                         MockResponse.Builder()
                             .code(200)
@@ -1624,7 +1624,8 @@ class ArtbookSearchAndTtsTest {
                         offlineCheckOverride = { false },
                         ioDispatcher = Dispatchers.IO,
                     )
-                    assertTrue("Expected mirror rescue Success, got $rescued", rescued is ArtbookImageResolutionResult.Success)
+                    assertTrue("Expected Option A mirror Success, got $rescued", rescued is ArtbookImageResolutionResult.Success)
+                    assertEquals("Option A must bypass blocked pic.wenku8.com directly", 0, blockedPrimary.requestCount)
                     val savedFile = (rescued as ArtbookImageResolutionResult.Success).file
                     assertEquals(
                         WenkuXmlParsers.generateLegacyImageFileName(primaryUrl),
@@ -1652,9 +1653,9 @@ class ArtbookSearchAndTtsTest {
                     )
                     assertTrue(allFailed is ArtbookImageResolutionResult.Failure)
                     val summary = (allFailed as ArtbookImageResolutionResult.Failure).failure.formatDiagnosticSummary()
-                    assertTrue("Summary should mention pic.wenku8.com, got:\n$summary", summary.contains("pic.wenku8.com"))
-                    assertTrue("Summary should mention tried mirrors, got:\n$summary", summary.contains("pic.777743.xyz"))
-                    assertTrue("Summary should mention pic.wenku8.cn, got:\n$summary", summary.contains("pic.wenku8.cn"))
+                    assertTrue("Summary should start with Option A pic.777743.xyz, got:\n$summary", summary.contains("pic.777743.xyz"))
+                    assertTrue("Summary should mention fallback pic.wenku8.com, got:\n$summary", summary.contains("pic.wenku8.com"))
+                    assertTrue("Summary should mention fallback pic.wenku8.cn, got:\n$summary", summary.contains("pic.wenku8.cn"))
                     assertFalse("Summary must never expose raw IP literals, got:\n$summary", summary.contains("127.0.0.2"))
                 }
             }
