@@ -28,6 +28,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
 import org.junit.runner.RunWith
+import org.mewx.wenku8.data.media.WenkuImageUrlPolicy
 import org.mewx.wenku8.data.remote.transport.ActiveRelayRoute
 import org.mewx.wenku8.data.remote.transport.PinnedRelayCandidate
 import org.mewx.wenku8.data.remote.transport.RelayHttpTransport
@@ -134,6 +135,48 @@ class DohTxtSubnetRoutingAndLiveServiceTest {
         defaultSeeds.forEach { spec ->
             assertNotNull("Failed to sample ${spec.canonicalSpec}", spec.sampleCandidateEntry(deterministicRng))
         }
+    }
+
+    @Test
+    fun dohTxtParserSupportsOptionalDynamicPictureMirrorsAndPersistsAcrossRestarts() = runBlocking {
+        val nowWall = 1_763_460_000_000L
+        val monoClock = AtomicLong(5_000L)
+
+        val txtWithMirrors = listOf(
+            "v=wk8-txt-v1;rev=20261126-pm;en=1;iat=1763459500;exp=1763546400;c=104.16.80.0/24;" +
+                "pm=pic.newcdn.xyz,127.0.0.1,localhost,pic.backup.org/pictures,bad:8080",
+        )
+        val pmOutcome = ManifestRepository.parseTxtConfigStrings(
+            txtStrings = txtWithMirrors,
+            minTtlSeconds = 300,
+            expectedRelayHostname = "wenku8-relay.mewx.org",
+            nowWallEpochMs = nowWall,
+            nowMonotonicMs = monoClock.get(),
+        )
+        assertTrue(pmOutcome is ManifestRepository.DohTxtParseOutcome.ValidManifest)
+        val pmValid = pmOutcome as ManifestRepository.DohTxtParseOutcome.ValidManifest
+        val expectedDynamicMirrors = listOf(
+            WenkuImageUrlPolicy.PictureMirrorEndpoint("pic.newcdn.xyz", usesPicturesPrefix = false),
+            WenkuImageUrlPolicy.PictureMirrorEndpoint("pic.backup.org", usesPicturesPrefix = true),
+        )
+        assertEquals(expectedDynamicMirrors, pmValid.manifest.pictureMirrors)
+
+        val repoForPm = ManifestRepository(
+            localStore = routingLocalStore,
+            wallClockEpochMillis = { nowWall },
+            monotonicClockMillis = { monoClock.get() },
+        )
+        assertNotNull(repoForPm.ingestManifestPayload(pmValid.canonicalJson, "wenku8-relay.mewx.org"))
+        assertEquals(expectedDynamicMirrors, repoForPm.currentDynamicPictureMirrorsOrEmpty())
+
+        // Cold-start ManifestRepository instance recovers persisted `pictureMirrors` from RoutingLocalStore!
+        val coldStartRepo = ManifestRepository(
+            localStore = routingLocalStore,
+            wallClockEpochMillis = { nowWall },
+            monotonicClockMillis = { monoClock.get() },
+        )
+        assertNotNull(coldStartRepo.loadCachedOrInMemoryManifest("wenku8-relay.mewx.org"))
+        assertEquals(expectedDynamicMirrors, coldStartRepo.currentDynamicPictureMirrorsOrEmpty())
     }
 
     @Test
