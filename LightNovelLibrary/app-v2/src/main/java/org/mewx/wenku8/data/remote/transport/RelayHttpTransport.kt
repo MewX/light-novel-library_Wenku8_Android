@@ -453,7 +453,7 @@ class RelayHttpTransport(
         baseOkHttpClient.newBuilder()
             .cookieJar(CookieJar.NO_COOKIES)
             .dns(systemDns)
-            .addNetworkInterceptor(WenkuHttpsRedirectUpgradeInterceptor)
+            .addNetworkInterceptor(WenkuHttpsRedirectUpgradeInterceptor.DEFAULT)
             .connectTimeout(connectTimeoutMillis, TimeUnit.MILLISECONDS)
             .readTimeout(readTimeoutMillis, TimeUnit.MILLISECONDS)
             .callTimeout(totalPostDeadlineMillis, TimeUnit.MILLISECONDS)

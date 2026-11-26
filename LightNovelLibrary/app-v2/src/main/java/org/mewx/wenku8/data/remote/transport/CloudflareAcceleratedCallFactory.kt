@@ -111,6 +111,7 @@ class CloudflareAcceleratedCallFactory(
     private val networkInterceptors: List<Interceptor> = emptyList(),
     private val connectTimeoutMillis: Long = DEFAULT_CONNECT_TIMEOUT_MS,
     private val pinnedConnectTimeoutMillis: Long = DEFAULT_PINNED_CONNECT_TIMEOUT_MS,
+    private val mirrorFailoverConnectTimeoutMillis: Long = DEFAULT_MIRROR_FAILOVER_CONNECT_TIMEOUT_MS,
     private val readTimeoutMillis: Long = DEFAULT_READ_TIMEOUT_MS,
     private val writeTimeoutMillis: Long = DEFAULT_WRITE_TIMEOUT_MS,
     private val followRedirects: Boolean = true,
@@ -120,6 +121,7 @@ class CloudflareAcceleratedCallFactory(
     private val ipv6BulkBypassDurationMillis: Long = DEFAULT_IPV6_BULK_BYPASS_MS,
     private val mirrorCooldownDurationMillis: Long = DEFAULT_MIRROR_COOLDOWN_MS,
     private val transientFailuresBeforeBypass: Int = DEFAULT_TRANSIENT_FAILURES_BEFORE_BYPASS,
+    private val dynamicPictureMirrorsProvider: () -> List<WenkuImageUrlPolicy.PictureMirrorEndpoint> = { emptyList() },
     private val monotonicClockMillis: () -> Long = { SystemClock.elapsedRealtime() },
     private val fallbackExecutor: Executor = baseOkHttpClient.dispatcher.executorService,
 ) : Call.Factory {
@@ -127,6 +129,7 @@ class CloudflareAcceleratedCallFactory(
     companion object {
         const val DEFAULT_CONNECT_TIMEOUT_MS: Long = 12_000L
         const val DEFAULT_PINNED_CONNECT_TIMEOUT_MS: Long = 6_000L
+        const val DEFAULT_MIRROR_FAILOVER_CONNECT_TIMEOUT_MS: Long = 5_000L
         const val DEFAULT_READ_TIMEOUT_MS: Long = 25_000L
         const val DEFAULT_WRITE_TIMEOUT_MS: Long = 15_000L
         const val DEFAULT_HARD_HOST_BYPASS_MS: Long = 30L * 60L * 1_000L
@@ -239,15 +242,18 @@ class CloudflareAcceleratedCallFactory(
     // IPv6 PMTU blackholes / bulk throttling where 180B probes succeed but 1MB JPEGs stall).
     @Volatile private var ipv6EdgeBypassedUntilMonoMs: Long = 0L
 
-    // Remembered healthy fallback mirror (e.g. `pic.wenku8.com` -> `pic.777743.xyz`) when the
-    // primary illustration host is reset by DPI/SNI filtering, avoiding repeated RST stalls across
-    // the remaining illustrations and thumbnails in a chapter.
+    // Remembered healthy mirror shared across the ENTIRE interchangeable illustration pool
+    // (`pic.777743.xyz`, `pic.wenku8.com`, `pic.wenku8.cn`, and any `pm=` dynamic mirrors) when
+    // the default #1 mirror fails on the current network, eliminating repeated RST/blackhole
+    // stalls across both new (`pic.wenku8.com`) and legacy (`pic.wenku8.cn`) chapters.
     private data class ActiveMirrorOverride(
-        val mirror: WenkuImageUrlPolicy.IllustrationMirror,
+        val mirror: WenkuImageUrlPolicy.PictureMirrorEndpoint,
         val expiresAtMonoMs: Long,
     )
 
-    private val preferredMirrorByHost = ConcurrentHashMap<String, ActiveMirrorOverride>()
+    @Volatile private var preferredIllustrationMirror: ActiveMirrorOverride? = null
+
+    private val redirectUpgradeInterceptor = WenkuHttpsRedirectUpgradeInterceptor(dynamicPictureMirrorsProvider)
 
     private val systemDnsClient: OkHttpClient by lazy {
         baseOkHttpClient.newBuilder()
@@ -260,7 +266,7 @@ class CloudflareAcceleratedCallFactory(
             .connectTimeout(connectTimeoutMillis, TimeUnit.MILLISECONDS)
             .readTimeout(readTimeoutMillis, TimeUnit.MILLISECONDS)
             .writeTimeout(writeTimeoutMillis, TimeUnit.MILLISECONDS)
-            .addNetworkInterceptor(WenkuHttpsRedirectUpgradeInterceptor)
+            .addNetworkInterceptor(redirectUpgradeInterceptor)
             .apply {
                 for (interceptor in networkInterceptors) {
                     addNetworkInterceptor(interceptor)
@@ -269,54 +275,88 @@ class CloudflareAcceleratedCallFactory(
             .build()
     }
 
+    // Tighter connect timeout (default 5s) shared with `systemDnsClient`'s ConnectionPool &
+    // Dispatcher for non-final mirror attempts so silent-drop ISP blackholes fail over quickly!
+    private val fastFailoverSystemDnsClient: OkHttpClient by lazy {
+        val fastConnectMs = minOf(connectTimeoutMillis, mirrorFailoverConnectTimeoutMillis).coerceAtLeast(1_000L)
+        if (fastConnectMs >= connectTimeoutMillis) {
+            systemDnsClient
+        } else {
+            systemDnsClient.newBuilder()
+                .connectTimeout(fastConnectMs, TimeUnit.MILLISECONDS)
+                .build()
+        }
+    }
+
     override fun newCall(request: Request): Call {
-        val upgradedRequest = WenkuImageUrlPolicy.upgradeRequestUrlIfSupported(request)
+        val dynamicMirrors = dynamicPictureMirrorsProvider()
+        val upgradedRequest = WenkuImageUrlPolicy.upgradeRequestUrlIfSupported(request, dynamicMirrors)
         val method = upgradedRequest.method.uppercase(Locale.ROOT)
         if (method !in SAFE_IDEMPOTENT_METHODS) {
             return systemDnsClient.newCall(upgradedRequest)
         }
 
-        val primaryHost = normalizeHost(upgradedRequest.url.host)
-        val rememberedMirror = currentPreferredMirrorForHostOrNull(primaryHost)
+        val mirrorCall = maybeBuildMirrorFallbackCall(
+            upgradedRequest = upgradedRequest,
+            dynamicMirrors = dynamicMirrors,
+            directSystemDnsOnly = false,
+        )
+        if (mirrorCall != null) return mirrorCall
+
+        return newSingleUrlCall(upgradedRequest, useFastFailoverConnectTimeout = false)
+    }
+
+    private fun maybeBuildMirrorFallbackCall(
+        upgradedRequest: Request,
+        dynamicMirrors: List<WenkuImageUrlPolicy.PictureMirrorEndpoint>,
+        directSystemDnsOnly: Boolean,
+    ): Call? {
+        val rememberedMirror = currentPreferredIllustrationMirrorOrNull()
         val candidateUrls = WenkuImageUrlPolicy.buildOrderedIllustrationAttemptUrls(
             url = upgradedRequest.url,
             preferredMirror = rememberedMirror,
+            dynamicMirrors = dynamicMirrors,
         )
-        if (candidateUrls.size > 1) {
-            val attemptRequests = candidateUrls.map { candidateUrl ->
-                if (candidateUrl == upgradedRequest.url) {
-                    upgradedRequest
-                } else {
-                    upgradedRequest.newBuilder().url(candidateUrl).build()
-                }
-            }
-            return MirrorFallbackCall(
-                factory = this,
-                originalRequest = upgradedRequest,
-                primaryHost = primaryHost,
-                attemptRequests = attemptRequests,
-                directSystemDnsOnly = false,
-            )
-        }
+        if (candidateUrls.size <= 1) return null
 
-        return newSingleUrlCall(upgradedRequest)
+        val pool = WenkuImageUrlPolicy.effectiveMirrorPool(dynamicMirrors)
+        val defaultFirstMirror = pool.first()
+        val attemptRequests = candidateUrls.map { candidateUrl ->
+            if (candidateUrl == upgradedRequest.url) {
+                upgradedRequest
+            } else {
+                upgradedRequest.newBuilder().url(candidateUrl).build()
+            }
+        }
+        return MirrorFallbackCall(
+            factory = this,
+            originalRequest = upgradedRequest,
+            defaultFirstMirror = defaultFirstMirror,
+            dynamicMirrors = dynamicMirrors,
+            attemptRequests = attemptRequests,
+            directSystemDnsOnly = directSystemDnsOnly,
+        )
     }
 
-    private fun newSingleUrlCall(request: Request): Call {
+    private fun newSingleUrlCall(
+        request: Request,
+        useFastFailoverConnectTimeout: Boolean,
+    ): Call {
+        val fallbackClient = if (useFastFailoverConnectTimeout) fastFailoverSystemDnsClient else systemDnsClient
         val edgeRoute = edgeRouteProvider.currentActiveEdgeRouteOrNull()
         if (edgeRoute == null) {
             retireActivePinnedGenerationIfAny()
-            return systemDnsClient.newCall(request)
+            return fallbackClient.newCall(request)
         }
 
         val isIpv6Edge = edgeRoute.rawIpBytes.size == 16
         if (isIpv6Edge && isIpv6EdgeCurrentlyBypassed()) {
-            return systemDnsClient.newCall(request)
+            return fallbackClient.newCall(request)
         }
 
         val initialHost = normalizeHost(request.url.host)
         if (!shouldPinHost(initialHost)) {
-            return systemDnsClient.newCall(request)
+            return fallbackClient.newCall(request)
         }
 
         val pinnedGeneration = obtainPinnedGeneration(edgeRoute)
@@ -324,7 +364,7 @@ class CloudflareAcceleratedCallFactory(
             factory = this,
             originalRequest = request,
             pinnedGeneration = pinnedGeneration,
-            systemDnsClient = systemDnsClient,
+            systemDnsClient = fallbackClient,
         )
     }
 
@@ -334,31 +374,16 @@ class CloudflareAcceleratedCallFactory(
      * Used for mid-body stream retries and explicit user reload actions.
      */
     fun newDirectSystemDnsCall(request: Request): Call {
-        val upgradedRequest = WenkuImageUrlPolicy.upgradeRequestUrlIfSupported(request)
+        val dynamicMirrors = dynamicPictureMirrorsProvider()
+        val upgradedRequest = WenkuImageUrlPolicy.upgradeRequestUrlIfSupported(request, dynamicMirrors)
         val method = upgradedRequest.method.uppercase(Locale.ROOT)
         if (method in SAFE_IDEMPOTENT_METHODS) {
-            val primaryHost = normalizeHost(upgradedRequest.url.host)
-            val rememberedMirror = currentPreferredMirrorForHostOrNull(primaryHost)
-            val candidateUrls = WenkuImageUrlPolicy.buildOrderedIllustrationAttemptUrls(
-                url = upgradedRequest.url,
-                preferredMirror = rememberedMirror,
+            val mirrorCall = maybeBuildMirrorFallbackCall(
+                upgradedRequest = upgradedRequest,
+                dynamicMirrors = dynamicMirrors,
+                directSystemDnsOnly = true,
             )
-            if (candidateUrls.size > 1) {
-                val attemptRequests = candidateUrls.map { candidateUrl ->
-                    if (candidateUrl == upgradedRequest.url) {
-                        upgradedRequest
-                    } else {
-                        upgradedRequest.newBuilder().url(candidateUrl).build()
-                    }
-                }
-                return MirrorFallbackCall(
-                    factory = this,
-                    originalRequest = upgradedRequest,
-                    primaryHost = primaryHost,
-                    attemptRequests = attemptRequests,
-                    directSystemDnsOnly = true,
-                )
-            }
+            if (mirrorCall != null) return mirrorCall
         }
         return systemDnsClient.newCall(upgradedRequest)
     }
@@ -372,7 +397,13 @@ class CloudflareAcceleratedCallFactory(
         val family = IpAddressFamily.fromRawBytesOrNull(edgeRoute.rawIpBytes) ?: return null
         if (family == IpAddressFamily.IPV6 && isIpv6EdgeCurrentlyBypassed()) return null
         val normalized = normalizeHost(host)
-        val effectiveHost = currentPreferredMirrorForHostOrNull(normalized)?.host ?: normalized
+        val dynamicMirrors = dynamicPictureMirrorsProvider()
+        val effectiveHost = if (WenkuImageUrlPolicy.isIllustrationPoolHost(normalized, dynamicMirrors)) {
+            currentPreferredIllustrationMirrorOrNull()?.host
+                ?: WenkuImageUrlPolicy.effectiveMirrorPool(dynamicMirrors).first().host
+        } else {
+            normalized
+        }
         return if (shouldPinHost(effectiveHost)) family else null
     }
 
@@ -396,39 +427,29 @@ class CloudflareAcceleratedCallFactory(
         hardBypassedHostsUntilMonoMs.clear()
         transientBypassedHostsUntilMonoMs.clear()
         consecutiveTransientFailuresByHost.clear()
-        preferredMirrorByHost.clear()
+        preferredIllustrationMirror = null
         ipv6EdgeBypassedUntilMonoMs = 0L
     }
 
-    internal fun currentPreferredMirrorForHostOrNull(host: String): WenkuImageUrlPolicy.IllustrationMirror? {
-        val normalized = normalizeHost(host)
-        if (normalized.isEmpty()) return null
-        val entry = preferredMirrorByHost[normalized] ?: return null
+    internal fun currentPreferredIllustrationMirrorOrNull(): WenkuImageUrlPolicy.PictureMirrorEndpoint? {
+        val entry = preferredIllustrationMirror ?: return null
         return if (monotonicClockMillis() < entry.expiresAtMonoMs) {
             entry.mirror
         } else {
-            preferredMirrorByHost.remove(normalized, entry)
+            preferredIllustrationMirror = null
             null
         }
     }
 
-    private fun rememberPreferredMirror(
-        primaryHost: String,
-        mirror: WenkuImageUrlPolicy.IllustrationMirror,
-    ) {
-        val normalized = normalizeHost(primaryHost)
-        if (normalized.isEmpty() || mirror.host == normalized) return
-        preferredMirrorByHost[normalized] = ActiveMirrorOverride(
+    private fun rememberPreferredIllustrationMirror(mirror: WenkuImageUrlPolicy.PictureMirrorEndpoint) {
+        preferredIllustrationMirror = ActiveMirrorOverride(
             mirror = mirror,
             expiresAtMonoMs = monotonicClockMillis() + mirrorCooldownDurationMillis,
         )
     }
 
-    private fun clearPreferredMirror(primaryHost: String) {
-        val normalized = normalizeHost(primaryHost)
-        if (normalized.isNotEmpty()) {
-            preferredMirrorByHost.remove(normalized)
-        }
+    private fun clearPreferredIllustrationMirror() {
+        preferredIllustrationMirror = null
     }
 
     internal fun isIpv6EdgeCurrentlyBypassed(): Boolean {
@@ -512,10 +533,11 @@ class CloudflareAcceleratedCallFactory(
                 current.markRetiredAndEvictIfIdle(fallbackExecutor)
             }
 
-            // A fresh Cloudflare IP generation gets a clean slate for transient timeouts & IPv6
-            // bulk cooldown while keeping hard non-CF host bypasses intact.
+            // A fresh Cloudflare IP generation gets a clean slate for transient timeouts, shared
+            // mirror choice, & IPv6 bulk cooldown while keeping hard non-CF host bypasses intact.
             transientBypassedHostsUntilMonoMs.clear()
             consecutiveTransientFailuresByHost.clear()
+            preferredIllustrationMirror = null
             ipv6EdgeBypassedUntilMonoMs = 0L
 
             val family = IpAddressFamily.fromRawBytesOrNull(edgeRoute.rawIpBytes) ?: IpAddressFamily.IPV4
@@ -540,7 +562,7 @@ class CloudflareAcceleratedCallFactory(
                 .connectTimeout(pinnedConnectTimeoutMillis, TimeUnit.MILLISECONDS)
                 .readTimeout(readTimeoutMillis, TimeUnit.MILLISECONDS)
                 .writeTimeout(writeTimeoutMillis, TimeUnit.MILLISECONDS)
-                .addNetworkInterceptor(WenkuHttpsRedirectUpgradeInterceptor)
+                .addNetworkInterceptor(redirectUpgradeInterceptor)
                 .apply {
                     for (interceptor in networkInterceptors) {
                         addNetworkInterceptor(interceptor)
@@ -938,19 +960,24 @@ class CloudflareAcceleratedCallFactory(
     }
 
     /**
-     * Thread-safe OkHttp [Call] wrapping illustration requests (`pic.wenku8.com` / `pic.wenku8.cn`)
-     * with automatic mirror fallback (`pic.777743.xyz`, `pic.wenku8.cn`) across both synchronous
-     * [execute] (Artbook, offline downloads) and asynchronous [enqueue] (Coil 3 thumbnails & inline
-     * reader illustrations).
+     * Thread-safe OkHttp [Call] wrapping interchangeable illustration requests (`pic.777743.xyz`,
+     * `pic.wenku8.com`, `pic.wenku8.cn`, and dynamic `pm=` mirrors) with automatic mirror failover
+     * across both synchronous [execute] (Artbook, offline downloads) and asynchronous [enqueue]
+     * (Coil 3 thumbnails & inline reader illustrations).
      *
-     * Authoritative 404 responses from the primary host stop immediately; transport/TLS resets
-     * (such as GFW SNI/HTTP RST against `pic.wenku8.com`) or 5xx/CF edge errors advance seamlessly
-     * to the next mirror, remembering the working mirror for 30 minutes to eliminate repeat stalls.
+     * - Non-final mirror attempts use [fastFailoverSystemDnsClient] (5s connect timeout) so
+     *   silent-drop ISP blackholes fail over rapidly without hanging 12s per mirror.
+     * - Two consecutive 404 responses (e.g. `pic.777743.xyz` + `pic.wenku8.com`) stop immediately
+     *   as an authoritative missing image without wasting a request to China-Mobile-blocked
+     *   `pic.wenku8.cn`.
+     * - Any successful fallback mirror is remembered globally across the shared illustration pool
+     *   for 30 minutes so subsequent new & legacy chapters skip the failing mirror immediately.
      */
     private class MirrorFallbackCall(
         private val factory: CloudflareAcceleratedCallFactory,
         private val originalRequest: Request,
-        private val primaryHost: String,
+        private val defaultFirstMirror: WenkuImageUrlPolicy.PictureMirrorEndpoint,
+        private val dynamicMirrors: List<WenkuImageUrlPolicy.PictureMirrorEndpoint>,
         private val attemptRequests: List<Request>,
         private val directSystemDnsOnly: Boolean,
     ) : Call {
@@ -961,6 +988,7 @@ class CloudflareAcceleratedCallFactory(
         private val extraEventListeners = CopyOnWriteArrayList<EventListener>()
         private val tags = ConcurrentHashMap<KClass<*>, Any>()
         private val attemptedEndpoints = CopyOnWriteArrayList<String>()
+        private val consecutive404Count = AtomicInteger(0)
 
         override fun request(): Request = originalRequest
 
@@ -1021,11 +1049,13 @@ class CloudflareAcceleratedCallFactory(
             return tags.computeIfAbsent(type.kotlin) { computeIfAbsent() } as T
         }
 
-        private fun createAttemptCall(attemptRequest: Request): Call {
+        private fun createAttemptCall(attemptRequest: Request, isFinalAttempt: Boolean): Call {
+            val useFastConnect = !isFinalAttempt
             return if (directSystemDnsOnly) {
-                factory.systemDnsClient.newCall(attemptRequest)
+                val client = if (useFastConnect) factory.fastFailoverSystemDnsClient else factory.systemDnsClient
+                client.newCall(attemptRequest)
             } else {
-                factory.newSingleUrlCall(attemptRequest)
+                factory.newSingleUrlCall(attemptRequest, useFastFailoverConnectTimeout = useFastConnect)
             }
         }
 
@@ -1041,7 +1071,7 @@ class CloudflareAcceleratedCallFactory(
             return true
         }
 
-        private fun shouldAdvanceToNextMirror(response: Response, attemptHost: String): Boolean {
+        private fun shouldAdvanceToNextMirror(response: Response): Boolean {
             val code = response.code
             if (code in 500..599) return true
             if (code == 409 || code == 421) return true
@@ -1049,19 +1079,21 @@ class CloudflareAcceleratedCallFactory(
                 val contentType = response.header("Content-Type").orEmpty().lowercase(Locale.ROOT)
                 if (!contentType.startsWith("image/")) return true
             }
-            // A 404 on a non-authoritative fallback mirror may mean the upstream CDN migrated
-            // away from that mirror, so keep trying remaining candidates (including the primary).
-            if (code == 404 && attemptHost != primaryHost) return true
+            // A single 404 may indicate CDN migration away from mirror #1; advance ONCE so
+            // mirror #2 can confirm or rescue, then stop on the 2nd 404 to avoid hitting legacy
+            // China-Mobile-blocked `pic.wenku8.cn` for genuinely missing files.
+            if (code == 404) {
+                return consecutive404Count.incrementAndGet() < 2
+            }
             return false
         }
 
         private fun recordSuccessMirrorState(attemptHost: String) {
-            if (attemptHost != primaryHost) {
-                WenkuImageUrlPolicy.mirrorForHostOrNull(attemptHost)?.let { mirror ->
-                    factory.rememberPreferredMirror(primaryHost, mirror)
-                }
+            val resolvedMirror = WenkuImageUrlPolicy.mirrorForHostOrNull(attemptHost, dynamicMirrors) ?: return
+            if (resolvedMirror == defaultFirstMirror) {
+                factory.clearPreferredIllustrationMirror()
             } else {
-                factory.clearPreferredMirror(primaryHost)
+                factory.rememberPreferredIllustrationMirror(resolvedMirror)
             }
         }
 
@@ -1074,8 +1106,9 @@ class CloudflareAcceleratedCallFactory(
                 if (canceled.get()) throw IOException("Canceled")
                 val attemptRequest = attemptRequests[index]
                 val attemptHost = normalizeHost(attemptRequest.url.host)
+                val isFinalAttempt = index == attemptRequests.lastIndex
                 attemptedEndpoints.add("${attemptRequest.url.scheme}://$attemptHost")
-                val innerCall = createAttemptCall(attemptRequest)
+                val innerCall = createAttemptCall(attemptRequest, isFinalAttempt = isFinalAttempt)
                 if (!activateInnerCall(innerCall)) {
                     throw IOException("Canceled")
                 }
@@ -1085,8 +1118,7 @@ class CloudflareAcceleratedCallFactory(
                         recordSuccessMirrorState(attemptHost)
                         return response
                     }
-                    val hasNext = index < attemptRequests.lastIndex
-                    if (hasNext && !canceled.get() && shouldAdvanceToNextMirror(response, attemptHost)) {
+                    if (!isFinalAttempt && !canceled.get() && shouldAdvanceToNextMirror(response)) {
                         response.close()
                         continue
                     }
@@ -1094,7 +1126,7 @@ class CloudflareAcceleratedCallFactory(
                 } catch (ioError: IOException) {
                     if (canceled.get()) throw ioError
                     lastIoError = ioError
-                    if (index == attemptRequests.lastIndex) {
+                    if (isFinalAttempt) {
                         throw ioError
                     }
                 }
@@ -1118,8 +1150,9 @@ class CloudflareAcceleratedCallFactory(
             }
             val attemptRequest = attemptRequests[index]
             val attemptHost = normalizeHost(attemptRequest.url.host)
+            val isFinalAttempt = index == attemptRequests.lastIndex
             attemptedEndpoints.add("${attemptRequest.url.scheme}://$attemptHost")
-            val innerCall = createAttemptCall(attemptRequest)
+            val innerCall = createAttemptCall(attemptRequest, isFinalAttempt = isFinalAttempt)
             if (!activateInnerCall(innerCall)) {
                 responseCallback.onFailure(this, IOException("Canceled"))
                 return
@@ -1137,8 +1170,7 @@ class CloudflareAcceleratedCallFactory(
                             responseCallback.onResponse(this@MirrorFallbackCall, response)
                             return
                         }
-                        val hasNext = index < attemptRequests.lastIndex
-                        if (hasNext && shouldAdvanceToNextMirror(response, attemptHost)) {
+                        if (!isFinalAttempt && shouldAdvanceToNextMirror(response)) {
                             response.close()
                             enqueueAttempt(index + 1, responseCallback)
                             return
@@ -1151,8 +1183,7 @@ class CloudflareAcceleratedCallFactory(
                             responseCallback.onFailure(this@MirrorFallbackCall, e)
                             return
                         }
-                        val hasNext = index < attemptRequests.lastIndex
-                        if (hasNext) {
+                        if (!isFinalAttempt) {
                             enqueueAttempt(index + 1, responseCallback)
                         } else {
                             responseCallback.onFailure(this@MirrorFallbackCall, e)

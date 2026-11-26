@@ -53,13 +53,23 @@ object WenkuImageRequests {
 
     fun canonicalIllustrationCacheKey(imageUrl: String): String? {
         val clean = imageUrl.substringBefore('?').trim()
-        if (!clean.contains("/pictures/", ignoreCase = true)) return null
-        val legacyFileName = WenkuXmlParsers.generateLegacyImageFileName(clean)
-        return if (legacyFileName.isNotEmpty()) {
-            "wenku8_illus_$legacyFileName"
-        } else {
-            null
+        if (clean.contains("/pictures/", ignoreCase = true)) {
+            val legacyFileName = WenkuXmlParsers.generateLegacyImageFileName(clean)
+            return if (legacyFileName.isNotEmpty()) {
+                "wenku8_illus_$legacyFileName"
+            } else {
+                null
+            }
         }
+        // Also normalize direct mirror URLs without `/pictures/` (e.g. `https://pic.777743.xyz/3/3770/...`)
+        // to the exact same canonical illustration cache key as `http://pic.wenku8.com/pictures/3/3770/...`!
+        val parsed = runCatching { java.net.URI(clean) }.getOrNull() ?: return null
+        val host = parsed.host?.trim()?.lowercase().orEmpty()
+        if (!WenkuImageUrlPolicy.isIllustrationPoolHost(host)) return null
+        val relPath = WenkuImageUrlPolicy.extractCanonicalPictureRelativePath(parsed.rawPath.orEmpty())
+            ?: return null
+        val normalizedLegacyName = "pictures" + relPath.replace("/", "")
+        return "wenku8_illus_$normalizedLegacyName"
     }
 
     /**
