@@ -1133,7 +1133,7 @@ private fun NewReviewThreadBottomSheet(
                     Text(
                         text = stringResource(
                             R.string.review_title_field_label,
-                            liveValidation.minRequiredChars,
+                            liveValidation.minRequiredBytes,
                         ),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
@@ -1155,7 +1155,7 @@ private fun NewReviewThreadBottomSheet(
                     Text(
                         text = stringResource(
                             R.string.review_content_field_label,
-                            liveValidation.minRequiredChars,
+                            liveValidation.minRequiredBytes,
                         ),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
@@ -1289,7 +1289,7 @@ private fun StickyReplyComposerBar(
                                     Text(
                                         text = stringResource(
                                             R.string.review_reply_field_placeholder,
-                                            validation.minRequiredChars,
+                                            validation.minRequiredBytes,
                                         ),
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis,
@@ -1451,9 +1451,9 @@ private fun ReviewValidationChipsRow(validation: ReviewComposerValidation) {
 private fun ReviewValidationChipsContent(validation: ReviewComposerValidation) {
     StatusPillChip(
         text = if (validation.lengthSatisfied) {
-            stringResource(R.string.review_chip_length_ok_format, validation.minRequiredChars)
+            stringResource(R.string.review_chip_length_ok_format, validation.minRequiredBytes)
         } else {
-            stringResource(R.string.review_chip_length_pending_format, validation.minRequiredChars)
+            stringResource(R.string.review_chip_length_pending_format, validation.minRequiredBytes)
         },
         isPositive = validation.lengthSatisfied,
         isError = false,
@@ -1474,7 +1474,7 @@ private fun ReviewValidationChipsContent(validation: ReviewComposerValidation) {
 
     StatusPillChip(
         text = if (validation.cooldownReady) {
-            stringResource(R.string.review_chip_cooldown_ok)
+            stringResource(R.string.review_chip_cooldown_ok, validation.cooldownSeconds)
         } else {
             stringResource(R.string.review_chip_cooldown_wait_format, validation.cooldownRemainingSeconds)
         },
