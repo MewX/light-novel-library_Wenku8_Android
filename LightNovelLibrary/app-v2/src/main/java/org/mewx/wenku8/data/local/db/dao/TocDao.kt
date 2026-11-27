@@ -107,6 +107,26 @@ interface TocDao {
     @Query("SELECT cid FROM chapters WHERE aid = :aid")
     suspend fun getChapterIdsForNovel(aid: Int): List<Int>
 
+    @Query("SELECT * FROM volumes WHERE aid IN (:aids) ORDER BY aid ASC, volume_order ASC")
+    suspend fun getVolumesForNovelsChunk(aids: List<Int>): List<VolumeEntity>
+
+    @Query("SELECT * FROM chapters WHERE aid IN (:aids) ORDER BY aid ASC, vid ASC, chapter_order ASC")
+    suspend fun getChaptersForNovelsChunk(aids: List<Int>): List<ChapterEntity>
+
+    suspend fun getVolumesForNovels(aids: List<Int>): List<VolumeEntity> {
+        if (aids.isEmpty()) return emptyList()
+        return aids.distinct().chunked(SQLITE_SAFE_BIND_CHUNK_SIZE).flatMap { chunk ->
+            getVolumesForNovelsChunk(chunk)
+        }
+    }
+
+    suspend fun getChaptersForNovels(aids: List<Int>): List<ChapterEntity> {
+        if (aids.isEmpty()) return emptyList()
+        return aids.distinct().chunked(SQLITE_SAFE_BIND_CHUNK_SIZE).flatMap { chunk ->
+            getChaptersForNovelsChunk(chunk)
+        }
+    }
+
     @Query("SELECT cid, aid FROM chapters")
     suspend fun getAllChapterToNovelMappings(): List<ChapterNovelMapping>
 

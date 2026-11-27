@@ -30,6 +30,15 @@ data class NovelFullIntroProjection(
 )
 
 /**
+ * Lightweight projection for Custom Cache Cleanup book listings without loading synopsis blobs.
+ */
+data class CachedNovelCacheSummary(
+    @ColumnInfo(name = "aid") val aid: Int,
+    @ColumnInfo(name = "title") val title: String,
+    @ColumnInfo(name = "in_bookshelf") val inBookshelf: Boolean,
+)
+
+/**
  * DAO for `novels` (`OnConflictStrategy.REPLACE` is strictly banned across the entire database so
  * SQLite never executes `DELETE + INSERT` and never triggers `ON DELETE CASCADE` on child tables).
  */
@@ -161,6 +170,19 @@ interface NovelDao {
 
     @Query("SELECT aid FROM novels WHERE in_bookshelf = 0")
     suspend fun getNonBookshelfNovelIds(): List<Int>
+
+    @Query("SELECT COUNT(*) FROM novels WHERE in_bookshelf = 0")
+    suspend fun countNonBookshelfNovels(): Int
+
+    @Query("SELECT aid, title, in_bookshelf FROM novels WHERE aid IN (:aids)")
+    suspend fun getCachedNovelSummariesByAidsChunk(aids: List<Int>): List<CachedNovelCacheSummary>
+
+    suspend fun getCachedNovelSummariesByAids(aids: List<Int>): List<CachedNovelCacheSummary> {
+        if (aids.isEmpty()) return emptyList()
+        return aids.distinct().chunked(400).flatMap { chunk ->
+            getCachedNovelSummariesByAidsChunk(chunk)
+        }
+    }
 
     @Query("DELETE FROM novels WHERE in_bookshelf = 0")
     suspend fun deleteAllNonBookshelfNovels(): Int

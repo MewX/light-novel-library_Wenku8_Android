@@ -1138,35 +1138,32 @@ class BookshelfRepository(
         }
     }
 
+    suspend fun clearCachedChapters(cids: Collection<Int>): CustomCacheCleanResult = withContext(ioDispatcher) {
+        StorageAndCacheRepository.clearCachedChaptersInternal(
+            database = database,
+            cids = cids,
+            assetRoots = assetRootsProvider(),
+            cacheRoot = cacheRootProvider(),
+            appContext = appContext,
+            purgeNonBookshelfCoverIfEmptied = true,
+            coverUrlProvider = catalogGateway::resolveCoverUrl,
+        )
+    }
+
     suspend fun clearCachedChaptersForNovels(aids: List<Int>) = withContext(ioDispatcher) {
         val targetAids = aids.distinct().filter { it > 0 }
         if (targetAids.isEmpty()) return@withContext
-
-        val imageUrlJsonRows = database.chapterContentDao().getImageUrlsJsonForNovels(targetAids)
-        database.chapterContentDao().deleteChapterContentsForNovels(targetAids)
-
-        val roots = assetRootsProvider()
-        val cacheRoot = cacheRootProvider()
-        val ctx = appContext
-        if (roots.isEmpty() && cacheRoot == null && ctx == null) return@withContext
-
-        for (rawJson in imageUrlJsonRows) {
-            runCatching {
-                val arr = JSONArray(rawJson)
-                for (i in 0 until arr.length()) {
-                    val url = arr.optString(i).trim()
-                    if (url.isNotEmpty()) {
-                        WenkuImageValidator.purgeCachedImageForUrl(
-                            imageUrl = url,
-                            storageRoots = roots,
-                            cacheRoot = cacheRoot,
-                            appContext = ctx,
-                            includePermanentOfflineFiles = true,
-                        )
-                    }
-                }
-            }
-        }
+        val cids = database.chapterContentDao().getCachedChapterIdsForNovels(targetAids)
+        if (cids.isEmpty()) return@withContext
+        StorageAndCacheRepository.clearCachedChaptersInternal(
+            database = database,
+            cids = cids,
+            assetRoots = assetRootsProvider(),
+            cacheRoot = cacheRootProvider(),
+            appContext = appContext,
+            purgeNonBookshelfCoverIfEmptied = false,
+            coverUrlProvider = catalogGateway::resolveCoverUrl,
+        )
     }
 
     private suspend fun saveValidatedIllustrationBestEffort(primaryRoot: File, imageUrl: String) {
