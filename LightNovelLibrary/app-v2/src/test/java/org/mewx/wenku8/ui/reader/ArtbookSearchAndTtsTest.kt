@@ -2500,6 +2500,180 @@ class ArtbookSearchAndTtsTest {
         }
     }
 
+    @Test
+    @Config(sdk = [34], qualifiers = "w1024dp-h640dp")
+    fun readerInlineIllustration_dualColumnSpread_facingColumnsAndFullBleedWideSpreadAlignBadges() {
+        ReaderIllustrationAspectRatioCache.clear()
+        val rightColWideUrl = "https://pic.wenku8.com/pictures/dual_test/col_wide_0.jpg"
+        val leftColNarrowUrl = "https://pic.wenku8.com/pictures/dual_test/col_narrow_1.jpg"
+        val rightColWideUrl2 = "https://pic.wenku8.com/pictures/dual_test/col_wide_2.jpg"
+        val spreadFullUrl = "https://pic.wenku8.com/pictures/dual_test/spread_full.jpg"
+        val sampleFile = writeTestJpegFile("dual_spread_sample.jpg", width = 320, height = 200)
+
+        ReaderIllustrationAspectRatioCache.put(rightColWideUrl, 2.0f)
+        ReaderIllustrationAspectRatioCache.put(leftColNarrowUrl, 0.45f)
+        ReaderIllustrationAspectRatioCache.put(rightColWideUrl2, 2.0f)
+        ReaderIllustrationAspectRatioCache.put(spreadFullUrl, 1.6f)
+
+        try {
+            runBlocking {
+                database.novelDao().upsertNovel(
+                    NovelEntity(
+                        aid = 4604,
+                        title = "双栏插图测试",
+                        author = "测试作者",
+                        metaSyncedAtMs = 1_000L,
+                    ),
+                )
+                tocSyncRepository.syncNovelIndexAtomically(
+                    aid = 4604,
+                    language = Wenku8API.AppLanguage.SC,
+                    requestStartedAtMs = 2_000L,
+                    parsedVolumes = listOf(
+                        ParsedVolumeToc(
+                            vid = 963,
+                            volumeTitle = "第一卷",
+                            chapters = listOf(
+                                ParsedChapterToc(cid = 9604, chapterTitle = "第一章 双栏插图"),
+                                ParsedChapterToc(cid = 9605, chapterTitle = "插图"),
+                            ),
+                        ),
+                    ),
+                )
+                // Short intro prose stays at top of Left column on Spread 0 -> img 0 fits inline
+                // below prose in Left column, while img 1 advances to the facing Right column on
+                // the SAME dual-column Spread 0!
+                val mixedText = buildString {
+                    appendLine("第一章 双栏插图")
+                    appendLine("    双栏图文混排首段内容，用于验证左栏内嵌插图与右栏对页插图同时渲染。")
+                    appendLine("<!--image-->$rightColWideUrl<!--image-->")
+                    appendLine("<!--image-->$leftColNarrowUrl<!--image-->")
+                    appendLine("    尾声段落确保图文混排章节不会自动触发纯画集模式。")
+                }
+                val galleryText = buildString {
+                    appendLine("第一卷 插图")
+                    appendLine("<!--image-->$leftColNarrowUrl<!--image-->")
+                    appendLine("<!--image-->$spreadFullUrl<!--image-->")
+                }
+                database.chapterContentDao().upsertChapterContents(
+                    listOf(
+                        ChapterContentEntity(
+                            cid = 9604,
+                            aid = 4604,
+                            contentLang = Wenku8API.AppLanguage.SC.name,
+                            contentText = mixedText,
+                            byteLength = mixedText.toByteArray().size,
+                            sha256Checksum = "sha_9604",
+                            downloadedAtMs = 1_700_000_000_000L,
+                        ),
+                        ChapterContentEntity(
+                            cid = 9605,
+                            aid = 4604,
+                            contentLang = Wenku8API.AppLanguage.SC.name,
+                            contentText = galleryText,
+                            byteLength = galleryText.toByteArray().size,
+                            sha256Checksum = "sha_9605",
+                            downloadedAtMs = 1_700_000_000_000L,
+                        ),
+                    ),
+                )
+            }
+
+            var activeCid by mutableStateOf(9604)
+            composeTestRule.setContent {
+                Wenku8ExpressiveTheme(themeMode = Wenku8ThemeMode.ARCHIVAL_DAY) {
+                    key(activeCid) {
+                        UnifiedReaderScreen(
+                            launchRequest = ReaderLaunchRequest(
+                                aid = 4604,
+                                novelTitle = "双栏插图测试",
+                                vid = 963,
+                                volumeTitle = "第一卷",
+                                cid = activeCid,
+                                chapterTitle = if (activeCid == 9604) "第一章 双栏插图" else "插图",
+                            ),
+                            database = database,
+                            catalogGateway = fakeGateway,
+                            novelTocSyncRepository = tocSyncRepository,
+                            preferences = Wenku8UserPreferences(
+                                readerPageTurnMode = ReaderPageTurnMode.COVER_SLIDE,
+                                readerColumnMode = org.mewx.wenku8.reader.model.ReaderColumnMode.DUAL,
+                            ),
+                            onReaderTypographyChanged = { _, _, _, _ -> },
+                            onNavigateBack = {},
+                            lineBreaker = DeterministicCellLineBreaker,
+                            artbookImageFileResolver = { sampleFile },
+                            ioDispatcher = Dispatchers.Main.immediate,
+                            computeDispatcher = Dispatchers.Main.immediate,
+                        )
+                    }
+                }
+            }
+
+            // 1. Spread 0: img 0 (2.0f landscape) in Left column + img 1 (0.45f narrow) in Right column simultaneously!
+            composeTestRule.waitUntil(5_000) {
+                composeTestRule
+                    .onAllNodesWithTag(ReaderTestTags.DUAL_COLUMN_SPINE_DIVIDER)
+                    .fetchSemanticsNodes()
+                    .isNotEmpty()
+            }
+            val img0 = composeTestRule.onNodeWithTag("${ReaderTestTags.INLINE_IMAGE_PREFIX}0")
+                .assertIsDisplayed()
+                .getUnclippedBoundsInRoot()
+            val btn0 = composeTestRule.onNodeWithTag("${ReaderTestTags.INLINE_IMAGE_LIGHTBOX_BUTTON_PREFIX}0")
+                .assertIsDisplayed()
+                .getUnclippedBoundsInRoot()
+            val img1 = composeTestRule.onNodeWithTag("${ReaderTestTags.INLINE_IMAGE_PREFIX}1")
+                .assertIsDisplayed()
+                .getUnclippedBoundsInRoot()
+            val btn1 = composeTestRule.onNodeWithTag("${ReaderTestTags.INLINE_IMAGE_LIGHTBOX_BUTTON_PREFIX}1")
+                .assertIsDisplayed()
+                .getUnclippedBoundsInRoot()
+
+            assertTrue("Left-column image must stay left of center spine (right=${img0.right})", img0.right <= 514.dp)
+            assertTrue("Right-column image must stay right of center spine (left=${img1.left})", img1.left >= 510.dp)
+            assertEquals(2.0f, (img0.right - img0.left).value / (img0.bottom - img0.top).value, 0.08f)
+            assertEquals(0.45f, (img1.right - img1.left).value / (img1.bottom - img1.top).value, 0.08f)
+            assertEquals(img0.right.value, btn0.right.value, 2f)
+            assertEquals(img0.bottom.value, btn0.bottom.value, 2f)
+            assertEquals(img1.right.value, btn1.right.value, 2f)
+            assertEquals(img1.bottom.value, btn1.bottom.value, 2f)
+
+            // Tapping right-column image's corner button opens lightbox directly
+            composeTestRule.onNodeWithTag("${ReaderTestTags.INLINE_IMAGE_LIGHTBOX_BUTTON_PREFIX}1").performClick()
+            composeTestRule.waitForIdle()
+            composeTestRule.onNodeWithTag(ArtbookTestTags.OVERLAY).assertIsDisplayed()
+
+            // 2. Standalone full-bleed wide spread (1.6f) in dedicated illustration chapter expands across
+            //    the full 1024x640 dual-column viewport (NOT boxed into a narrow 0.71f slice!)
+            composeTestRule.runOnIdle { activeCid = 9605 }
+            composeTestRule.waitUntil(5_000) {
+                composeTestRule.onAllNodesWithTag(ArtbookTestTags.READER_MODE_CHIP).fetchSemanticsNodes().isNotEmpty()
+            }
+            composeTestRule.onNodeWithTag(ArtbookTestTags.READER_MODE_CHIP).performClick()
+            composeTestRule.waitForIdle()
+            composeTestRule.onNodeWithTag(ReaderTestTags.VIEWPORT_CONTAINER).performTouchInput {
+                click(Offset(width * 0.9f, height * 0.5f))
+            }
+            composeTestRule.waitForIdle()
+            val fullSpreadImg = composeTestRule.onNodeWithTag("${ReaderTestTags.INLINE_IMAGE_PREFIX}1")
+                .assertIsDisplayed()
+                .getUnclippedBoundsInRoot()
+            val fullSpreadBtn = composeTestRule.onNodeWithTag("${ReaderTestTags.INLINE_IMAGE_LIGHTBOX_BUTTON_PREFIX}1")
+                .assertIsDisplayed()
+                .getUnclippedBoundsInRoot()
+            val fullWidth = (fullSpreadImg.right - fullSpreadImg.left).value
+            assertTrue(
+                "Standalone 1.6f wide spread on 1024x640 dual-column screen must span full spread width (got $fullWidth dp)",
+                fullWidth > 900f,
+            )
+            assertEquals(fullSpreadImg.right.value, fullSpreadBtn.right.value, 2f)
+            assertEquals(fullSpreadImg.bottom.value, fullSpreadBtn.bottom.value, 2f)
+        } finally {
+            ReaderIllustrationAspectRatioCache.clear()
+        }
+    }
+
     private fun writeTestJpegFile(
         fileName: String,
         width: Int = 120,

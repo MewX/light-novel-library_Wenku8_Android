@@ -2372,26 +2372,40 @@ private fun ReaderCanvasPage(
         // the Material 3 bottom-right corner button or a long press opens the lightbox.
         for (element in page.elements) {
             if (element is ReaderPageElement.ImageSlot) {
-                val widthDp = with(density) { element.widthPx.toDp() }
-                val heightDp = with(density) { element.heightPx.toDp() }
-                ReaderInlineIllustrationCard(
-                    imageUrl = element.imageUrl,
-                    imageIndexInChapter = element.imageIndexInChapter,
-                    palette = palette,
-                    shape = MaterialTheme.shapes.small,
-                    surfaceAlpha = 0.4f,
-                    onOpenLightbox = {
-                        onIllustrationClicked(element.imageUrl, element.imageIndexInChapter)
-                    },
-                    modifier = Modifier
-                        .offset {
-                            IntOffset(
-                                x = element.leftPx.roundToInt(),
-                                y = element.topPx.roundToInt(),
-                            )
-                        }
-                        .size(width = widthDp, height = heightDp),
-                )
+                key(element.imageIndexInChapter, element.imageUrl) {
+                    val isStandaloneFullBleedPlate = page.isFullBleedArtbookPage &&
+                        page.elements.size == 1 &&
+                        element.isFullBleedArtbookSlot
+                    val slotModifier = if (isStandaloneFullBleedPlate) {
+                        // Standalone artbook plate has no header/footer/text/spine on the page, so
+                        // give the decoded image the full viewport to fit naturally (e.g. wide
+                        // double-page spreads span both columns on tablets, tall plates fill phone
+                        // height) while `ReaderInlineIllustrationCard` hugs its exact fitted bounds.
+                        Modifier.fillMaxSize()
+                    } else {
+                        val widthDp = with(density) { element.widthPx.toDp() }
+                        val heightDp = with(density) { element.heightPx.toDp() }
+                        Modifier
+                            .offset {
+                                IntOffset(
+                                    x = element.leftPx.roundToInt(),
+                                    y = element.topPx.roundToInt(),
+                                )
+                            }
+                            .size(width = widthDp, height = heightDp)
+                    }
+                    ReaderInlineIllustrationCard(
+                        imageUrl = element.imageUrl,
+                        imageIndexInChapter = element.imageIndexInChapter,
+                        palette = palette,
+                        shape = MaterialTheme.shapes.small,
+                        surfaceAlpha = 0.4f,
+                        onOpenLightbox = {
+                            onIllustrationClicked(element.imageUrl, element.imageIndexInChapter)
+                        },
+                        modifier = slotModifier,
+                    )
+                }
             }
         }
     }
