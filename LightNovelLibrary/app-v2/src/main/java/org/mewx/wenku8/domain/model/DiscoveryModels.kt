@@ -81,6 +81,7 @@ data class DiscoveryNovelCardItem(
     val coverUrl: String,
     val inLocalBookshelf: Boolean = false,
     val isHydratingMetadata: Boolean = false,
+    val isIntroTruncatedPreview: Boolean = true,
 ) {
     /**
      * Completeness score modeled on `v1.31`'s `NovelItemInfoUpdate.populatedFieldCount()` so a
@@ -120,6 +121,75 @@ fun normalizeBookStatusText(
         }
         else -> trimmed
     }
+}
+
+private val INTRO_PREVIEW_WHITESPACE_REGEX = Regex("[\\u3000\\s]+")
+private val TRAILING_ELLIPSIS_REGEX = Regex("[\\s]*([.]{3,}|…+)+$")
+
+private val SENTENCE_TERMINAL_CHARS = setOf('。', '！', '？', '!', '?')
+private val CLOSING_WRAPPER_CHARS = setOf('」', '』', '”', '’', '）', ')', '》', '】', ']')
+private val DANGLING_TRAILING_PUNCTUATION = setOf(
+    '，', ',', '、', '：', ':', '；', ';',
+    '（', '(', '「', '『', '《', '“', '‘',
+    '—', '-', '·', '・', '～', '~', '【', '[', '〈',
+)
+
+/**
+ * Collapses ideographic full-width indentation (`U+3000`), hard line breaks, and repeated
+ * whitespace into single spaces so multi-paragraph synopses flow naturally inside compact cards.
+ */
+fun flattenIntroForPreview(rawIntro: String): String {
+    if (rawIntro.isBlank()) return ""
+    return rawIntro.replace(INTRO_PREVIEW_WHITESPACE_REGEX, " ").trim()
+}
+
+/**
+ * Formats a novel synopsis preview for compact cards (`最新`, `排行`, `搜索`, `3D 书脊详情`).
+ *
+ * - Normalizes upstream `do=bookinfo` literal `...` / `……` (including preceding stray spaces) into
+ *   a single typographic ellipsis `…` (`U+2026`) matching Compose's `TextOverflow.Ellipsis`.
+ * - For server-truncated previews ([allowTruncationEllipsis] = `true`, e.g. `action=novellist`
+ *   which hard-cuts `IntroPreview` around ~20 CJK chars without an ellipsis), trims dangling
+ *   non-terminal punctuation (such as `，`, `、`, `「`, `——`) and appends `…` unless the preview
+ *   already finishes cleanly on sentence-terminal punctuation (`。`, `！`, `？`, `!`, `?`).
+ * - Leaves locally cached full synopses and non-synopsis fallbacks (such as AID direct lookup's
+ *   `latestSectionName`) untouched when [allowTruncationEllipsis] is `false`.
+ */
+fun formatCardIntroPreview(
+    rawIntro: String,
+    allowTruncationEllipsis: Boolean = true,
+): String {
+    val flattened = flattenIntroForPreview(rawIntro)
+    if (flattened.isEmpty()) return ""
+
+    val ellipsisMatch = TRAILING_ELLIPSIS_REGEX.find(flattened)
+    if (ellipsisMatch != null) {
+        val base = flattened.substring(0, ellipsisMatch.range.first)
+            .trimEnd { it in DANGLING_TRAILING_PUNCTUATION || it.isWhitespace() }
+        return if (base.isEmpty()) "…" else "$base…"
+    }
+
+    if (!allowTruncationEllipsis) {
+        return flattened
+    }
+
+    if (endsWithSentenceTerminal(flattened)) {
+        return flattened
+    }
+
+    val cleaned = flattened.trimEnd { it in DANGLING_TRAILING_PUNCTUATION || it.isWhitespace() }
+    val base = cleaned.ifEmpty { flattened }
+    return "$base…"
+}
+
+private fun endsWithSentenceTerminal(text: String): Boolean {
+    if (text.isEmpty()) return false
+    val last = text.last()
+    if (last in SENTENCE_TERMINAL_CHARS) return true
+    if (last in CLOSING_WRAPPER_CHARS && text.length >= 2) {
+        return text[text.length - 2] in SENTENCE_TERMINAL_CHARS
+    }
+    return false
 }
 
 enum class DiscoveryFeedErrorKind {
