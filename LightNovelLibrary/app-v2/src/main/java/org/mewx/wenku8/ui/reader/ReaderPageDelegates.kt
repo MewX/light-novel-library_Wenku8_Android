@@ -14,6 +14,7 @@ import android.graphics.Shader
 import android.graphics.Typeface
 import android.os.Build
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -22,6 +23,7 @@ import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.waitForUpOrCancellation
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -48,14 +50,19 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.PagerDefaults
 import androidx.compose.foundation.pager.PagerState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.OpenInFull
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.CircularWavyProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -82,18 +89,23 @@ import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.ShaderBrush
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
@@ -104,6 +116,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
@@ -2349,17 +2362,22 @@ private fun ReaderCanvasPage(
             }
         }
 
-        // Interactive inline / full-bleed `<!--image-->` illustration overlays.
+        // Inline / full-bleed `<!--image-->` illustration overlays.
+        // Single taps pass through to the reader's nine-zone tap / HUD toggle handler;
+        // the Material 3 bottom-right corner button or a long press opens the lightbox.
         for (element in page.elements) {
             if (element is ReaderPageElement.ImageSlot) {
                 val widthDp = with(density) { element.widthPx.toDp() }
                 val heightDp = with(density) { element.heightPx.toDp() }
-                Surface(
-                    onClick = {
+                ReaderInlineIllustrationCard(
+                    imageUrl = element.imageUrl,
+                    imageIndexInChapter = element.imageIndexInChapter,
+                    palette = palette,
+                    shape = MaterialTheme.shapes.small,
+                    surfaceAlpha = 0.4f,
+                    onOpenLightbox = {
                         onIllustrationClicked(element.imageUrl, element.imageIndexInChapter)
                     },
-                    color = palette.backgroundColor.copy(alpha = 0.4f),
-                    shape = MaterialTheme.shapes.small,
                     modifier = Modifier
                         .offset {
                             IntOffset(
@@ -2367,20 +2385,8 @@ private fun ReaderCanvasPage(
                                 y = element.topPx.roundToInt(),
                             )
                         }
-                        .size(width = widthDp, height = heightDp)
-                        .einkHairlineBorder(MaterialTheme.shapes.small)
-                        .clip(MaterialTheme.shapes.small)
-                        .testTag("${ReaderTestTags.INLINE_IMAGE_PREFIX}${element.imageIndexInChapter}"),
-                ) {
-                    if (element.imageUrl.isNotBlank()) {
-                        AsyncImage(
-                            model = WenkuImageRequests.rememberIllustrationImageRequest(element.imageUrl),
-                            contentDescription = "插图 ${element.imageIndexInChapter + 1}",
-                            contentScale = ContentScale.Fit,
-                            modifier = Modifier.fillMaxSize(),
-                        )
-                    }
-                }
+                        .size(width = widthDp, height = heightDp),
+                )
             }
         }
     }
@@ -2739,28 +2745,19 @@ private fun ContinuousScrollReaderDelegate(
 
                         is ChapterBlock.IllustrationBlock -> {
                             val ratio = (block.cachedAspectRatio ?: 0.71f).coerceIn(0.3f, 2.5f)
-                            Surface(
-                                onClick = {
+                            ReaderInlineIllustrationCard(
+                                imageUrl = block.imageUrl,
+                                imageIndexInChapter = block.imageIndexInChapter,
+                                palette = palette,
+                                shape = MaterialTheme.shapes.medium,
+                                surfaceAlpha = 0.5f,
+                                onOpenLightbox = {
                                     onIllustrationClicked(block.imageUrl, block.imageIndexInChapter)
                                 },
-                                color = palette.backgroundColor.copy(alpha = 0.5f),
-                                shape = MaterialTheme.shapes.medium,
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .aspectRatio(ratio)
-                                    .einkHairlineBorder(MaterialTheme.shapes.medium)
-                                    .clip(MaterialTheme.shapes.medium)
-                                    .testTag("${ReaderTestTags.INLINE_IMAGE_PREFIX}${block.imageIndexInChapter}"),
-                            ) {
-                                if (block.imageUrl.isNotBlank()) {
-                                    AsyncImage(
-                                        model = WenkuImageRequests.rememberIllustrationImageRequest(block.imageUrl),
-                                        contentDescription = "插图 ${block.imageIndexInChapter + 1}",
-                                        contentScale = ContentScale.Fit,
-                                        modifier = Modifier.fillMaxSize(),
-                                    )
-                                }
-                            }
+                                    .aspectRatio(ratio),
+                            )
                         }
                     }
                 }
@@ -2836,6 +2833,222 @@ private fun ContinuousScrollReaderDelegate(
 }
 
 internal val CONTINUOUS_SCROLL_MAX_READABLE_WIDTH_DP = 680.dp
+
+internal data class ReaderIllustrationBadgeStyle(
+    val containerColor: Color,
+    val contentColor: Color,
+    val borderColor: Color,
+    val outerHaloColor: Color,
+    val borderWidth: Dp,
+    val shadowElevation: Dp,
+)
+
+/**
+ * Resolves Material 3 overlay colors for the inline illustration corner lightbox button so it
+ * stays unmistakably legible across pure-white illustrations, pure-black illustrations, and
+ * monochrome E-Ink panels (zero grey dithering on E-Ink).
+ */
+internal fun resolveReaderIllustrationBadgeStyle(
+    isEinkMode: Boolean,
+    einkSurfaceColor: Color,
+    einkContentColor: Color,
+    einkBorderColor: Color,
+): ReaderIllustrationBadgeStyle = if (isEinkMode) {
+    ReaderIllustrationBadgeStyle(
+        containerColor = einkSurfaceColor,
+        contentColor = einkContentColor,
+        borderColor = einkBorderColor,
+        outerHaloColor = einkSurfaceColor,
+        borderWidth = 1.5.dp,
+        shadowElevation = 0.dp,
+    )
+} else {
+    ReaderIllustrationBadgeStyle(
+        containerColor = Color(0xA812151C),
+        contentColor = Color(0xFFF8FAFC),
+        borderColor = Color(0x73FFFFFF),
+        outerHaloColor = Color.Transparent,
+        borderWidth = 1.dp,
+        shadowElevation = 3.dp,
+    )
+}
+
+/**
+ * Detects a stationary single-finger long press to open the full-screen Artbook lightbox
+ * WITHOUT consuming `down`, drag, or short-tap `up` events so single taps pass straight through
+ * to the reader's nine-zone tap / HUD toggle handlers with zero delay (no double-tap gesture).
+ */
+private fun Modifier.readerIllustrationLongPress(
+    key: Any?,
+    onLongPress: () -> Unit,
+): Modifier = pointerInput(key) {
+    awaitEachGesture {
+        val down = awaitFirstDown(
+            requireUnconsumed = false,
+            pass = PointerEventPass.Main,
+        )
+        if (down.isConsumed) return@awaitEachGesture
+
+        val pointerId = down.id
+        val touchSlop = viewConfiguration.touchSlop
+        val longPressTimeoutMs = viewConfiguration.longPressTimeoutMillis
+
+        var cancelledOrReleasedBeforeTimeout = false
+        withTimeoutOrNull(longPressTimeoutMs) {
+            while (true) {
+                val event = awaitPointerEvent(pass = PointerEventPass.Main)
+                if (event.changes.count { it.pressed } > 1) {
+                    cancelledOrReleasedBeforeTimeout = true
+                    break
+                }
+                val change = event.changes.firstOrNull { it.id == pointerId }
+                if (change == null || !change.pressed || change.isConsumed) {
+                    cancelledOrReleasedBeforeTimeout = true
+                    break
+                }
+                val dx = change.position.x - down.position.x
+                val dy = change.position.y - down.position.y
+                if (abs(dx) > touchSlop || abs(dy) > touchSlop) {
+                    cancelledOrReleasedBeforeTimeout = true
+                    break
+                }
+            }
+        }
+
+        if (!cancelledOrReleasedBeforeTimeout) {
+            onLongPress()
+            while (true) {
+                val event = awaitPointerEvent(pass = PointerEventPass.Main)
+                val change = event.changes.firstOrNull { it.id == pointerId } ?: break
+                change.consume()
+                if (!change.pressed) break
+            }
+        }
+    }
+}
+
+@Composable
+private fun ReaderInlineIllustrationCard(
+    imageUrl: String,
+    imageIndexInChapter: Int,
+    palette: ReaderVisualPalette,
+    shape: Shape,
+    surfaceAlpha: Float,
+    onOpenLightbox: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val haptic = LocalHapticFeedback.current
+    val latestOnOpenLightbox by rememberUpdatedState(onOpenLightbox)
+    val openLightboxLabel = stringResource(R.string.reader_action_open_illustration_lightbox)
+    val hasValidUrl = imageUrl.isNotBlank()
+
+    Surface(
+        color = palette.backgroundColor.copy(alpha = surfaceAlpha),
+        shape = shape,
+        modifier = modifier
+            .einkHairlineBorder(shape)
+            .clip(shape)
+            .then(
+                if (hasValidUrl) {
+                    Modifier.readerIllustrationLongPress(
+                        key = imageUrl to imageIndexInChapter,
+                        onLongPress = {
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            latestOnOpenLightbox()
+                        },
+                    )
+                } else {
+                    Modifier
+                },
+            )
+            .testTag("${ReaderTestTags.INLINE_IMAGE_PREFIX}$imageIndexInChapter"),
+    ) {
+        Box(modifier = Modifier.fillMaxSize()) {
+            if (hasValidUrl) {
+                AsyncImage(
+                    model = WenkuImageRequests.rememberIllustrationImageRequest(imageUrl),
+                    contentDescription = "插图 ${imageIndexInChapter + 1}",
+                    contentScale = ContentScale.Fit,
+                    modifier = Modifier.fillMaxSize(),
+                )
+                ReaderIllustrationLightboxBadge(
+                    contentDescription = openLightboxLabel,
+                    onClick = { latestOnOpenLightbox() },
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .testTag("${ReaderTestTags.INLINE_IMAGE_LIGHTBOX_BUTTON_PREFIX}$imageIndexInChapter"),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ReaderIllustrationLightboxBadge(
+    contentDescription: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val isEinkMode = LocalEinkMode.current
+    val badgeStyle = resolveReaderIllustrationBadgeStyle(
+        isEinkMode = isEinkMode,
+        einkSurfaceColor = MaterialTheme.colorScheme.surface,
+        einkContentColor = MaterialTheme.colorScheme.onSurface,
+        einkBorderColor = MaterialTheme.colorScheme.outline,
+    )
+    val interactionSource = remember { MutableInteractionSource() }
+
+    // 48dp Material 3 minimum touch target wrapping a compact 36dp high-contrast badge.
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = modifier
+            .size(48.dp)
+            .clip(CircleShape)
+            .clickable(
+                interactionSource = interactionSource,
+                indication = if (isEinkMode) {
+                    null
+                } else {
+                    ripple(bounded = true, radius = 24.dp, color = badgeStyle.contentColor)
+                },
+                role = Role.Button,
+                onClickLabel = contentDescription,
+                onClick = onClick,
+            ),
+    ) {
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier
+                .then(
+                    if (badgeStyle.outerHaloColor != Color.Transparent) {
+                        Modifier
+                            .background(badgeStyle.outerHaloColor, CircleShape)
+                            .padding(1.5.dp)
+                    } else {
+                        Modifier
+                    },
+                ),
+        ) {
+            Surface(
+                shape = CircleShape,
+                color = badgeStyle.containerColor,
+                contentColor = badgeStyle.contentColor,
+                border = BorderStroke(width = badgeStyle.borderWidth, color = badgeStyle.borderColor),
+                shadowElevation = badgeStyle.shadowElevation,
+                modifier = Modifier.size(36.dp),
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = Icons.Outlined.OpenInFull,
+                        contentDescription = contentDescription,
+                        tint = badgeStyle.contentColor,
+                        modifier = Modifier.size(18.dp),
+                    )
+                }
+            }
+        }
+    }
+}
 
 private fun buildHighlightedScrollText(
     displayText: String,

@@ -14,11 +14,13 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -27,6 +29,7 @@ import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeLeft
 import androidx.compose.ui.test.swipeRight
+import androidx.compose.ui.unit.dp
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import kotlinx.coroutines.Dispatchers
@@ -69,7 +72,11 @@ import org.mewx.wenku8.data.remote.transport.CloudflareAcceleratedCallFactory
 import org.mewx.wenku8.data.repository.NovelTocSyncRepository
 import org.mewx.wenku8.data.repository.ParsedChapterToc
 import org.mewx.wenku8.data.repository.ParsedVolumeToc
+import org.mewx.wenku8.reader.engine.ChapterBlock
 import org.mewx.wenku8.reader.engine.DeterministicCellLineBreaker
+import org.mewx.wenku8.reader.engine.ReaderPage
+import org.mewx.wenku8.reader.engine.ReaderPageElement
+import org.mewx.wenku8.reader.engine.ReadingAnchor
 import org.mewx.wenku8.reader.model.ReaderPageTurnMode
 import org.mewx.wenku8.ui.detail.ReaderLaunchRequest
 import org.mewx.wenku8.ui.theme.Wenku8ExpressiveTheme
@@ -325,9 +332,28 @@ class ArtbookSearchAndTtsTest {
             composeTestRule.onAllNodesWithTag(ArtbookTestTags.OVERLAY).fetchSemanticsNodes().size,
         )
 
-        // Tap inline illustration card on Page 1 -> re-opens ArtbookLightboxOverlay!
+        // Single-tapping the center of the inline illustration now toggles the Reader HUD
+        // instead of re-opening the lightbox, exposing the top-bar `"插图 (3)"` entry!
         composeTestRule
             .onNodeWithTag("${ReaderTestTags.INLINE_IMAGE_PREFIX}0")
+            .assertIsDisplayed()
+            .performTouchInput { click(center) }
+        composeTestRule.waitForIdle()
+        assertEquals(
+            "Single-tapping illustration body must not hijack HUD toggle back into lightbox",
+            0,
+            composeTestRule.onAllNodesWithTag(ArtbookTestTags.OVERLAY).fetchSemanticsNodes().size,
+        )
+        composeTestRule.onNodeWithTag(ReaderTestTags.HUD_TOP_BAR).assertIsDisplayed()
+        composeTestRule.onNodeWithTag(ReaderTestTags.HUD_VIEW_ILLUSTRATIONS_CHIP).assertIsDisplayed()
+
+        // Dismiss HUD with another center tap, then tap the M3 bottom-right corner button -> opens lightbox!
+        composeTestRule
+            .onNodeWithTag("${ReaderTestTags.INLINE_IMAGE_PREFIX}0")
+            .performTouchInput { click(center) }
+        composeTestRule.waitForIdle()
+        composeTestRule
+            .onNodeWithTag("${ReaderTestTags.INLINE_IMAGE_LIGHTBOX_BUTTON_PREFIX}0")
             .assertIsDisplayed()
             .performClick()
 
@@ -1877,6 +1903,347 @@ class ArtbookSearchAndTtsTest {
             "Opening at index 10 should center thumb 10 immediately (carouselCenter=$carouselCenterX, thumbCenter=$thumbCenterX)",
             abs(thumbCenterX - carouselCenterX) <= 12f,
         )
+    }
+
+    @Test
+    fun readerIllustrationBadgeStyle_andHudIllustrationIndexResolution() {
+        val standardStyle = resolveReaderIllustrationBadgeStyle(
+            isEinkMode = false,
+            einkSurfaceColor = Color.White,
+            einkContentColor = Color.Black,
+            einkBorderColor = Color(0xFF111111),
+        )
+        assertTrue("Standard scrim must be semi-opaque dark for bright images", standardStyle.containerColor.alpha >= 0.6f)
+        assertTrue("Standard luminous border must be visible over dark images", standardStyle.borderColor.alpha >= 0.4f)
+        assertEquals(Color.Transparent, standardStyle.outerHaloColor)
+        assertTrue("Standard badge uses subtle Material elevation", standardStyle.shadowElevation > 0.dp)
+
+        val einkStyle = resolveReaderIllustrationBadgeStyle(
+            isEinkMode = true,
+            einkSurfaceColor = Color.White,
+            einkContentColor = Color.Black,
+            einkBorderColor = Color(0xFF111111),
+        )
+        assertEquals(Color.White, einkStyle.containerColor)
+        assertEquals(Color.Black, einkStyle.contentColor)
+        assertEquals(Color(0xFF111111), einkStyle.borderColor)
+        assertEquals(Color.White, einkStyle.outerHaloColor)
+        assertEquals(0.dp, einkStyle.shadowElevation)
+
+        val blocks = listOf(
+            ChapterBlock.IllustrationBlock(blockIndex = 2, imageIndexInChapter = 0, imageUrl = "https://pic.wenku8.com/0.jpg"),
+            ChapterBlock.IllustrationBlock(blockIndex = 6, imageIndexInChapter = 1, imageUrl = "https://pic.wenku8.com/1.jpg"),
+        )
+        assertEquals(
+            0,
+            resolveActiveIllustrationIndexForHud(
+                pageTurnMode = ReaderPageTurnMode.COVER_SLIDE,
+                activeReaderPage = null,
+                continuousScrollParagraphIndex = 0,
+                illustrationBlocks = emptyList(),
+            ),
+        )
+        val pageWithSecondImage = ReaderPage(
+            cid = 1,
+            pageIndexInChapter = 1,
+            totalPagesInChapter = 2,
+            startAnchor = ReadingAnchor(6, 0),
+            endAnchor = ReadingAnchor(6, 0),
+            characterCountOnPage = 0,
+            isFullBleedArtbookPage = false,
+            elements = listOf(
+                ReaderPageElement.ImageSlot(
+                    blockIndex = 6,
+                    imageIndexInChapter = 1,
+                    imageUrl = "https://pic.wenku8.com/1.jpg",
+                    leftPx = 0f,
+                    topPx = 0f,
+                    widthPx = 300f,
+                    heightPx = 400f,
+                    aspectRatio = 0.75f,
+                    isFullBleedArtbookSlot = false,
+                ),
+            ),
+        )
+        assertEquals(
+            1,
+            resolveActiveIllustrationIndexForHud(
+                pageTurnMode = ReaderPageTurnMode.COVER_SLIDE,
+                activeReaderPage = pageWithSecondImage,
+                continuousScrollParagraphIndex = 0,
+                illustrationBlocks = blocks,
+            ),
+        )
+        assertEquals(
+            0,
+            resolveActiveIllustrationIndexForHud(
+                pageTurnMode = ReaderPageTurnMode.COVER_SLIDE,
+                activeReaderPage = null,
+                continuousScrollParagraphIndex = 8,
+                illustrationBlocks = blocks,
+            ),
+        )
+        assertEquals(
+            0,
+            resolveActiveIllustrationIndexForHud(
+                pageTurnMode = ReaderPageTurnMode.CONTINUOUS_SCROLL,
+                activeReaderPage = null,
+                continuousScrollParagraphIndex = 0,
+                illustrationBlocks = blocks,
+            ),
+        )
+        assertEquals(
+            1,
+            resolveActiveIllustrationIndexForHud(
+                pageTurnMode = ReaderPageTurnMode.CONTINUOUS_SCROLL,
+                activeReaderPage = null,
+                continuousScrollParagraphIndex = 7,
+                illustrationBlocks = blocks,
+            ),
+        )
+    }
+
+    @Test
+    fun readerInlineIllustration_continuousScrollMode_tapTogglesHud_cornerButtonAndLongPressAndTopBarOpenLightbox() {
+        val sampleFile = writeTestJpegFile("scroll_inline_0.jpg")
+        val url0 = "https://pic.wenku8.com/pictures/scroll/0.jpg"
+        runBlocking {
+            database.novelDao().upsertNovel(
+                NovelEntity(
+                    aid = 4601,
+                    title = "连续滚动插图测试",
+                    author = "测试作者",
+                    metaSyncedAtMs = 1_000L,
+                ),
+            )
+            tocSyncRepository.syncNovelIndexAtomically(
+                aid = 4601,
+                language = Wenku8API.AppLanguage.SC,
+                requestStartedAtMs = 2_000L,
+                parsedVolumes = listOf(
+                    ParsedVolumeToc(
+                        vid = 960,
+                        volumeTitle = "第一卷",
+                        chapters = listOf(
+                            ParsedChapterToc(cid = 9601, chapterTitle = "第一章 图文混排"),
+                        ),
+                    ),
+                ),
+            )
+            val rawText = buildString {
+                appendLine("第一章 图文混排")
+                appendLine("    第一段正文内容，用来确保该章节不会自动进入纯画集模式。")
+                appendLine("<!--image-->$url0<!--image-->")
+                appendLine("    插图之后的第二段正文内容。")
+            }
+            database.chapterContentDao().upsertChapterContent(
+                ChapterContentEntity(
+                    cid = 9601,
+                    aid = 4601,
+                    contentLang = Wenku8API.AppLanguage.SC.name,
+                    contentText = rawText,
+                    byteLength = rawText.toByteArray().size,
+                    sha256Checksum = "sha_9601",
+                    downloadedAtMs = 1_700_000_000_000L,
+                ),
+            )
+        }
+
+        composeTestRule.setContent {
+            Wenku8ExpressiveTheme(themeMode = Wenku8ThemeMode.ARCHIVAL_DAY) {
+                UnifiedReaderScreen(
+                    launchRequest = ReaderLaunchRequest(
+                        aid = 4601,
+                        novelTitle = "连续滚动插图测试",
+                        vid = 960,
+                        volumeTitle = "第一卷",
+                        cid = 9601,
+                        chapterTitle = "第一章 图文混排",
+                    ),
+                    database = database,
+                    catalogGateway = fakeGateway,
+                    novelTocSyncRepository = tocSyncRepository,
+                    preferences = Wenku8UserPreferences(
+                        readerPageTurnMode = ReaderPageTurnMode.CONTINUOUS_SCROLL,
+                    ),
+                    onReaderTypographyChanged = { _, _, _, _ -> },
+                    onNavigateBack = {},
+                    lineBreaker = DeterministicCellLineBreaker,
+                    artbookImageFileResolver = { sampleFile },
+                    ioDispatcher = Dispatchers.Main.immediate,
+                    computeDispatcher = Dispatchers.Main.immediate,
+                )
+            }
+        }
+        composeTestRule.waitForIdle()
+
+        // 1. Single-tap on illustration center immediately toggles HUD (zero double-tap delay, does NOT open lightbox).
+        composeTestRule.onNodeWithTag("${ReaderTestTags.INLINE_IMAGE_PREFIX}0")
+            .assertIsDisplayed()
+            .performTouchInput { click(center) }
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag(ReaderTestTags.HUD_TOP_BAR).assertIsDisplayed()
+        composeTestRule.onNodeWithTag(ReaderTestTags.HUD_VIEW_ILLUSTRATIONS_CHIP).assertIsDisplayed()
+        assertEquals(
+            0,
+            composeTestRule.onAllNodesWithTag(ArtbookTestTags.OVERLAY).fetchSemanticsNodes().size,
+        )
+
+        // 2. Top-bar `"插图 (1)"` chip opens the lightbox and closes HUD.
+        composeTestRule.onNodeWithTag(ReaderTestTags.HUD_VIEW_ILLUSTRATIONS_CHIP).performClick()
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag(ArtbookTestTags.OVERLAY).assertIsDisplayed()
+        composeTestRule.onNodeWithTag(ArtbookTestTags.CLOSE_BUTTON).performClick()
+        composeTestRule.waitForIdle()
+        assertEquals(0, composeTestRule.onAllNodesWithTag(ArtbookTestTags.OVERLAY).fetchSemanticsNodes().size)
+        assertEquals(0, composeTestRule.onAllNodesWithTag(ReaderTestTags.HUD_TOP_BAR).fetchSemanticsNodes().size)
+
+        // 3. Bottom-right corner button meets Material 3 48dp minimum touch target and opens lightbox in 1 tap.
+        val imageBounds = composeTestRule.onNodeWithTag("${ReaderTestTags.INLINE_IMAGE_PREFIX}0")
+            .getUnclippedBoundsInRoot()
+        val buttonBounds = composeTestRule.onNodeWithTag("${ReaderTestTags.INLINE_IMAGE_LIGHTBOX_BUTTON_PREFIX}0")
+            .assertIsDisplayed()
+            .getUnclippedBoundsInRoot()
+        assertTrue(
+            "Corner button width must meet 48dp M3 touch target, got ${buttonBounds.right - buttonBounds.left}",
+            (buttonBounds.right - buttonBounds.left) >= 47.5.dp,
+        )
+        assertTrue(
+            "Corner button height must meet 48dp M3 touch target, got ${buttonBounds.bottom - buttonBounds.top}",
+            (buttonBounds.bottom - buttonBounds.top) >= 47.5.dp,
+        )
+        assertTrue(
+            "Corner button must align to bottom-right of illustration",
+            abs(buttonBounds.right.value - imageBounds.right.value) <= 2f &&
+                abs(buttonBounds.bottom.value - imageBounds.bottom.value) <= 2f,
+        )
+        composeTestRule.onNodeWithTag("${ReaderTestTags.INLINE_IMAGE_LIGHTBOX_BUTTON_PREFIX}0").performClick()
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag(ArtbookTestTags.OVERLAY).assertIsDisplayed()
+        assertEquals(
+            "Clicking corner button must not toggle Reader HUD underneath",
+            0,
+            composeTestRule.onAllNodesWithTag(ReaderTestTags.HUD_TOP_BAR).fetchSemanticsNodes().size,
+        )
+        composeTestRule.onNodeWithTag(ArtbookTestTags.CLOSE_BUTTON).performClick()
+        composeTestRule.waitForIdle()
+
+        // 4. Long-pressing the illustration body opens lightbox cleanly without toggling HUD underneath.
+        composeTestRule.onNodeWithTag("${ReaderTestTags.INLINE_IMAGE_PREFIX}0").performTouchInput {
+            longClick(center)
+        }
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag(ArtbookTestTags.OVERLAY).assertIsDisplayed()
+        assertEquals(
+            "Long-press must consume release and must not toggle Reader HUD",
+            0,
+            composeTestRule.onAllNodesWithTag(ReaderTestTags.HUD_TOP_BAR).fetchSemanticsNodes().size,
+        )
+    }
+
+    @Test
+    fun readerInlineIllustration_verticalBunkobonEinkMode_tapTogglesHud_longPressAndCornerButtonOpenLightbox() {
+        val sampleFile = writeTestJpegFile("eink_vertical_0.jpg")
+        val url0 = "https://pic.wenku8.com/pictures/eink/0.jpg"
+        runBlocking {
+            database.novelDao().upsertNovel(
+                NovelEntity(
+                    aid = 4602,
+                    title = "墨水屏竖排测试",
+                    author = "测试作者",
+                    metaSyncedAtMs = 1_000L,
+                ),
+            )
+            tocSyncRepository.syncNovelIndexAtomically(
+                aid = 4602,
+                language = Wenku8API.AppLanguage.SC,
+                requestStartedAtMs = 2_000L,
+                parsedVolumes = listOf(
+                    ParsedVolumeToc(
+                        vid = 961,
+                        volumeTitle = "第一卷",
+                        chapters = listOf(
+                            ParsedChapterToc(cid = 9602, chapterTitle = "插图"),
+                        ),
+                    ),
+                ),
+            )
+            val rawText = "第一卷 插图\n<!--image-->$url0<!--image-->\n"
+            database.chapterContentDao().upsertChapterContent(
+                ChapterContentEntity(
+                    cid = 9602,
+                    aid = 4602,
+                    contentLang = Wenku8API.AppLanguage.SC.name,
+                    contentText = rawText,
+                    byteLength = rawText.toByteArray().size,
+                    sha256Checksum = "sha_9602",
+                    downloadedAtMs = 1_700_000_000_000L,
+                ),
+            )
+        }
+
+        composeTestRule.setContent {
+            Wenku8ExpressiveTheme(themeMode = Wenku8ThemeMode.E_INK) {
+                UnifiedReaderScreen(
+                    launchRequest = ReaderLaunchRequest(
+                        aid = 4602,
+                        novelTitle = "墨水屏竖排测试",
+                        vid = 961,
+                        volumeTitle = "第一卷",
+                        cid = 9602,
+                        chapterTitle = "插图",
+                    ),
+                    database = database,
+                    catalogGateway = fakeGateway,
+                    novelTocSyncRepository = tocSyncRepository,
+                    preferences = Wenku8UserPreferences(
+                        readerPageTurnMode = ReaderPageTurnMode.VERTICAL_BUNKOBON,
+                    ),
+                    onReaderTypographyChanged = { _, _, _, _ -> },
+                    onNavigateBack = {},
+                    lineBreaker = DeterministicCellLineBreaker,
+                    artbookImageFileResolver = { sampleFile },
+                    ioDispatcher = Dispatchers.Main.immediate,
+                    computeDispatcher = Dispatchers.Main.immediate,
+                )
+            }
+        }
+
+        // Pure-illustration chapter auto-enters lightbox -> switch to Novel Reading Mode.
+        composeTestRule.waitUntil(timeoutMillis = 5_000L) {
+            composeTestRule.onAllNodesWithTag(ArtbookTestTags.OVERLAY).fetchSemanticsNodes().isNotEmpty()
+        }
+        composeTestRule.onNodeWithTag(ArtbookTestTags.READER_MODE_CHIP).performClick()
+        composeTestRule.waitForIdle()
+
+        // 1. Center single-tap on full-bleed E-Ink vertical illustration toggles HUD cleanly.
+        composeTestRule.onNodeWithTag(ReaderTestTags.VIEWPORT_CONTAINER).performTouchInput {
+            click(center)
+        }
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag(ReaderTestTags.HUD_TOP_BAR).assertIsDisplayed()
+        composeTestRule.onNodeWithTag(ReaderTestTags.HUD_VIEW_ILLUSTRATIONS_CHIP).assertIsDisplayed()
+        assertEquals(0, composeTestRule.onAllNodesWithTag(ArtbookTestTags.OVERLAY).fetchSemanticsNodes().size)
+
+        // Dismiss HUD, then verify long-press on illustration opens lightbox cleanly in E-Ink mode.
+        composeTestRule.onNodeWithTag(ReaderTestTags.VIEWPORT_CONTAINER).performTouchInput {
+            click(center)
+        }
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag("${ReaderTestTags.INLINE_IMAGE_PREFIX}0").performTouchInput {
+            longClick(center)
+        }
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag(ArtbookTestTags.OVERLAY).assertIsDisplayed()
+        composeTestRule.onNodeWithTag(ArtbookTestTags.READER_MODE_CHIP).performClick()
+        composeTestRule.waitForIdle()
+
+        // 2. E-Ink bottom-right corner button is visible and opens lightbox in 1 tap.
+        composeTestRule.onNodeWithTag("${ReaderTestTags.INLINE_IMAGE_LIGHTBOX_BUTTON_PREFIX}0")
+            .assertIsDisplayed()
+            .performClick()
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag(ArtbookTestTags.OVERLAY).assertIsDisplayed()
     }
 
     private fun writeTestJpegFile(fileName: String): File {

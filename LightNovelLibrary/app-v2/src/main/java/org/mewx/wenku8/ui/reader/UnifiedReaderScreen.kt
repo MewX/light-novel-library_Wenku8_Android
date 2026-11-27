@@ -172,6 +172,7 @@ import org.mewx.wenku8.reader.engine.ChapterWindowSlot
 import org.mewx.wenku8.reader.engine.ParagraphLineBreaker
 import org.mewx.wenku8.reader.engine.AndroidStaticLayoutLineBreaker
 import org.mewx.wenku8.reader.engine.ReaderLayoutConfig
+import org.mewx.wenku8.reader.engine.ReaderPage
 import org.mewx.wenku8.reader.engine.ReaderPageElement
 import org.mewx.wenku8.reader.engine.ReaderVerticalHingeBounds
 import org.mewx.wenku8.reader.engine.ReaderWindowSnapshot
@@ -202,6 +203,7 @@ object ReaderTestTags {
     const val PAGE_CANVAS_PREFIX = "reader_page_canvas_"
     const val DUAL_COLUMN_SPINE_DIVIDER = "reader_dual_column_spine_divider"
     const val INLINE_IMAGE_PREFIX = "reader_inline_image_"
+    const val INLINE_IMAGE_LIGHTBOX_BUTTON_PREFIX = "reader_inline_image_lightbox_button_"
     const val LOADING_SLOT = "reader_loading_slot"
     const val ERROR_SLOT = "reader_error_slot"
     const val ERROR_OPEN_WEB_BUTTON = "reader_error_open_web_button"
@@ -2051,9 +2053,12 @@ fun UnifiedReaderScreen(
                         }
 
                         val openCurrentIllustrations = {
-                            val curImgIdx = snapshot.activeReaderPage?.elements?.firstNotNullOfOrNull { el ->
-                                (el as? ReaderPageElement.ImageSlot)?.imageIndexInChapter
-                            } ?: 0
+                            val curImgIdx = resolveActiveIllustrationIndexForHud(
+                                pageTurnMode = preferences.readerPageTurnMode,
+                                activeReaderPage = snapshot.activeReaderPage,
+                                continuousScrollParagraphIndex = continuousScrollAnchor.paragraphIndex,
+                                illustrationBlocks = activeChapterAst?.illustrationBlocks.orEmpty(),
+                            )
                             isHudVisible = false
                             openArtbookGallery(
                                 cid = snapshot.activeChapter?.cid ?: launchRequest.cid,
@@ -3517,6 +3522,27 @@ fun UnifiedReaderScreen(
             )
         }
     }
+}
+
+/**
+ * Resolves which illustration index the reader top-bar `"插图 (N)"` action should open on,
+ * supporting both paged modes (active page's `ImageSlot`) and [ReaderPageTurnMode.CONTINUOUS_SCROLL].
+ */
+internal fun resolveActiveIllustrationIndexForHud(
+    pageTurnMode: ReaderPageTurnMode,
+    activeReaderPage: ReaderPage?,
+    continuousScrollParagraphIndex: Int,
+    illustrationBlocks: List<ChapterBlock.IllustrationBlock>,
+): Int {
+    if (illustrationBlocks.isEmpty()) return 0
+    if (pageTurnMode == ReaderPageTurnMode.CONTINUOUS_SCROLL) {
+        val nearest = illustrationBlocks.lastOrNull { it.blockIndex <= continuousScrollParagraphIndex }
+            ?: illustrationBlocks.first()
+        return nearest.imageIndexInChapter
+    }
+    return activeReaderPage?.elements?.firstNotNullOfOrNull { el ->
+        (el as? ReaderPageElement.ImageSlot)?.imageIndexInChapter
+    } ?: 0
 }
 
 @Composable
