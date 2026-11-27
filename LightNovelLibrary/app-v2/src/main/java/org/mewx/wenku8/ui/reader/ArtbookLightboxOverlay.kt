@@ -51,6 +51,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
@@ -88,8 +90,6 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.carousel.HorizontalMultiBrowseCarousel
-import androidx.compose.material3.carousel.rememberCarouselState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -102,6 +102,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -128,6 +129,7 @@ import coil3.SingletonImageLoader
 import coil3.compose.AsyncImage
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import okhttp3.Call
@@ -327,6 +329,39 @@ fun findEntryIndexContainingImage(
 ): Int {
     val hit = entries.indexOfFirst { targetImageIndex in it.containedIndices }
     return if (hit >= 0) hit else 0
+}
+
+private val ARTBOOK_FILMSTRIP_ITEM_WIDTH = 68.dp
+private val ARTBOOK_FILMSTRIP_ITEM_HEIGHT = 72.dp
+private val ARTBOOK_FILMSTRIP_ITEM_SPACING = 8.dp
+private val ARTBOOK_FILMSTRIP_HORIZONTAL_PADDING = 16.dp
+private val ARTBOOK_FILMSTRIP_VERTICAL_PADDING = 10.dp
+
+/**
+ * Determines whether the bottom thumbnail filmstrip should be visible.
+ *
+ * Reader illustration lightboxes (`isSingleImagePreview == false`) show the filmstrip even for a
+ * single illustration so readers can immediately tell how many images belong to the chapter,
+ * whereas standalone cover previews (`isSingleImagePreview == true`) stay clean without a strip.
+ */
+internal fun shouldShowArtbookThumbnailStrip(
+    imageCount: Int,
+    isSingleImagePreview: Boolean,
+): Boolean = imageCount > 1 || (imageCount == 1 && !isSingleImagePreview)
+
+/**
+ * Computes the `scrollOffset` passed to `LazyListState.scrollToItem` / `animateScrollToItem`
+ * so the target thumbnail card is horizontally centered inside the filmstrip viewport.
+ */
+internal fun computeCenteredFilmstripScrollOffsetPx(
+    viewportWidthPx: Int,
+    itemWidthPx: Int,
+    beforeContentPaddingPx: Int,
+): Int {
+    if (viewportWidthPx <= 0 || itemWidthPx <= 0) return 0
+    val targetStartFromViewportLeft = (viewportWidthPx - itemWidthPx) / 2f
+    val targetStartFromContentStart = targetStartFromViewportLeft - beforeContentPaddingPx
+    return (-targetStartFromContentStart).roundToInt().coerceAtMost(0)
 }
 
 /**
@@ -1157,6 +1192,40 @@ fun ArtbookLightboxOverlay(
         }
     }
 
+    val showThumbnailStrip = shouldShowArtbookThumbnailStrip(
+        imageCount = imageUrls.size,
+        isSingleImagePreview = isSingleImagePreview,
+    )
+    // Hoist `LazyListState` outside `AnimatedVisibility` so toggling chrome preserves manual
+    // scroll position, while main-pager / chapter changes smoothly keep the active thumb centered.
+    val thumbnailListState = rememberLazyListState(
+        initialFirstVisibleItemIndex = initialImageIndex.coerceIn(0, imageUrls.lastIndex),
+    )
+    var lastSyncedFilmstripKey by remember { mutableStateOf<Pair<List<String>, Int>?>(null) }
+
+    LaunchedEffect(showThumbnailStrip, isChromeVisible, imageUrls, activePrimaryImageIndex, isEinkMode) {
+        if (!showThumbnailStrip || !isChromeVisible) return@LaunchedEffect
+        val targetIndex = activePrimaryImageIndex.coerceIn(0, imageUrls.lastIndex)
+        val syncKey = imageUrls to targetIndex
+        if (lastSyncedFilmstripKey == syncKey) return@LaunchedEffect
+        val viewportWidthPx = snapshotFlow { thumbnailListState.layoutInfo.viewportSize.width }
+            .first { it > 0 }
+        val itemWidthPx = with(density) { ARTBOOK_FILMSTRIP_ITEM_WIDTH.roundToPx() }
+        val beforePaddingPx = with(density) { ARTBOOK_FILMSTRIP_HORIZONTAL_PADDING.roundToPx() }
+        val centeredOffset = computeCenteredFilmstripScrollOffsetPx(
+            viewportWidthPx = viewportWidthPx,
+            itemWidthPx = itemWidthPx,
+            beforeContentPaddingPx = beforePaddingPx,
+        )
+        val isSameGallery = lastSyncedFilmstripKey?.first == imageUrls
+        if (!isSameGallery || isEinkMode) {
+            thumbnailListState.scrollToItem(targetIndex, centeredOffset)
+        } else {
+            thumbnailListState.animateScrollToItem(targetIndex, centeredOffset)
+        }
+        lastSyncedFilmstripKey = syncKey
+    }
+
     var currentPageZoom by remember { mutableFloatStateOf(1f) }
     var verticalDismissOffsetPx by remember { mutableFloatStateOf(0f) }
     val dismissThresholdPx = with(density) { 128.dp.toPx() }
@@ -1583,7 +1652,7 @@ fun ArtbookLightboxOverlay(
             }
         }
 
-        // Bottom Chrome: Snackbar + M3e HorizontalMultiBrowseCarousel Thumbnail Filmstrip.
+        // Bottom Chrome: Snackbar + Free-Scrolling Inertial LazyRow Thumbnail Filmstrip.
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier
@@ -1597,7 +1666,7 @@ fun ArtbookLightboxOverlay(
             )
 
             AnimatedVisibility(
-                visible = isChromeVisible && imageUrls.size > 1,
+                visible = isChromeVisible && showThumbnailStrip,
                 enter = if (isEinkMode) fadeIn(snap()) else fadeIn(),
                 exit = if (isEinkMode) fadeOut(snap()) else fadeOut(),
             ) {
@@ -1606,64 +1675,77 @@ fun ArtbookLightboxOverlay(
                     contentColor = Color.White,
                     modifier = Modifier.fillMaxWidth(),
                 ) {
-                    val carouselState = rememberCarouselState { imageUrls.size }
-                    HorizontalMultiBrowseCarousel(
-                        state = carouselState,
-                        preferredItemWidth = 68.dp,
-                        itemSpacing = 8.dp,
-                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp),
+                    LazyRow(
+                        state = thumbnailListState,
+                        contentPadding = PaddingValues(
+                            horizontal = ARTBOOK_FILMSTRIP_HORIZONTAL_PADDING,
+                            vertical = ARTBOOK_FILMSTRIP_VERTICAL_PADDING,
+                        ),
+                        horizontalArrangement = Arrangement.spacedBy(
+                            space = ARTBOOK_FILMSTRIP_ITEM_SPACING,
+                            alignment = Alignment.CenterHorizontally,
+                        ),
+                        verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(92.dp)
                             .testTag(ArtbookTestTags.CAROUSEL),
-                    ) { thumbIdx ->
-                        val isHighlighted = thumbIdx in currentEntry.containedIndices
-                        val borderColor = if (isHighlighted) {
-                            MaterialTheme.colorScheme.primary
-                        } else {
-                            Color(0x55FFFFFF)
-                        }
-                        Box(
-                            modifier = Modifier
-                                .height(72.dp)
-                                .maskClip(MaterialTheme.shapes.small)
-                                .border(
-                                    width = if (isHighlighted) 2.5.dp else 1.dp,
-                                    color = borderColor,
-                                    shape = MaterialTheme.shapes.small,
-                                )
-                                .clickable {
-                                    activePrimaryImageIndex = thumbIdx
-                                    onPrimaryImageIndexChanged?.invoke(thumbIdx)
-                                    val targetEntry = findEntryIndexContainingImage(entries, thumbIdx)
-                                    coroutineScope.launch {
-                                        pagerState.animateScrollToPage(targetEntry)
-                                    }
-                                }
-                                .testTag("${ArtbookTestTags.THUMBNAIL_PREFIX}$thumbIdx"),
-                        ) {
-                            androidx.compose.runtime.key(thumbnailRefreshEpoch, imageUrls[thumbIdx]) {
-                                AsyncImage(
-                                    model = WenkuImageRequests.rememberIllustrationImageRequest(imageUrls[thumbIdx]),
-                                    contentDescription = "插图 ${thumbIdx + 1}",
-                                    contentScale = ContentScale.Crop,
-                                    modifier = Modifier.fillMaxSize(),
-                                )
+                    ) {
+                        items(
+                            count = imageUrls.size,
+                            key = { thumbIdx -> "$thumbIdx:${imageUrls[thumbIdx]}" },
+                        ) { thumbIdx ->
+                            val isHighlighted = thumbIdx in currentEntry.containedIndices
+                            val borderColor = if (isHighlighted) {
+                                MaterialTheme.colorScheme.primary
+                            } else {
+                                Color(0x55FFFFFF)
                             }
-                            Surface(
-                                shape = CircleShape,
-                                color = Color(0xAA000000),
-                                contentColor = Color.White,
+                            Box(
                                 modifier = Modifier
-                                    .align(Alignment.BottomEnd)
-                                    .padding(3.dp),
+                                    .size(
+                                        width = ARTBOOK_FILMSTRIP_ITEM_WIDTH,
+                                        height = ARTBOOK_FILMSTRIP_ITEM_HEIGHT,
+                                    )
+                                    .clip(MaterialTheme.shapes.small)
+                                    .border(
+                                        width = if (isHighlighted) 2.5.dp else 1.dp,
+                                        color = borderColor,
+                                        shape = MaterialTheme.shapes.small,
+                                    )
+                                    .clickable {
+                                        activePrimaryImageIndex = thumbIdx
+                                        onPrimaryImageIndexChanged?.invoke(thumbIdx)
+                                        val targetEntry = findEntryIndexContainingImage(entries, thumbIdx)
+                                        coroutineScope.launch {
+                                            pagerState.animateScrollToPage(targetEntry)
+                                        }
+                                    }
+                                    .testTag("${ArtbookTestTags.THUMBNAIL_PREFIX}$thumbIdx"),
                             ) {
-                                Text(
-                                    text = "${thumbIdx + 1}",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = Color.White,
-                                    modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp),
-                                )
+                                androidx.compose.runtime.key(thumbnailRefreshEpoch, imageUrls[thumbIdx]) {
+                                    AsyncImage(
+                                        model = WenkuImageRequests.rememberIllustrationImageRequest(imageUrls[thumbIdx]),
+                                        contentDescription = "插图 ${thumbIdx + 1}",
+                                        contentScale = ContentScale.Crop,
+                                        modifier = Modifier.fillMaxSize(),
+                                    )
+                                }
+                                Surface(
+                                    shape = CircleShape,
+                                    color = Color(0xAA000000),
+                                    contentColor = Color.White,
+                                    modifier = Modifier
+                                        .align(Alignment.BottomEnd)
+                                        .padding(3.dp),
+                                ) {
+                                    Text(
+                                        text = "${thumbIdx + 1}",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = Color.White,
+                                        modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp),
+                                    )
+                                }
                             }
                         }
                     }

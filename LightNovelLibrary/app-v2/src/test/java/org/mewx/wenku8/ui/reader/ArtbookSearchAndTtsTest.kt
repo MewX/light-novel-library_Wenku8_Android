@@ -17,6 +17,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.click
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
@@ -24,13 +25,16 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipeLeft
 import androidx.compose.ui.test.swipeRight
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
+import mockwebserver3.Dispatcher
 import mockwebserver3.MockResponse
 import mockwebserver3.MockWebServer
+import mockwebserver3.RecordedRequest
 import mockwebserver3.SocketEffect
 import okhttp3.Dns
 import okio.Buffer
@@ -79,7 +83,9 @@ import java.io.File
 import java.io.FileOutputStream
 import java.net.InetAddress
 import java.util.concurrent.Executor
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
+import kotlin.math.abs
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], qualifiers = "w412dp-h892dp")
@@ -1501,21 +1507,24 @@ class ArtbookSearchAndTtsTest {
         }
 
         MockWebServer().use { server ->
+            val failWith503 = AtomicBoolean(true)
+            server.dispatcher = object : Dispatcher() {
+                override fun dispatch(request: RecordedRequest): MockResponse {
+                    return if (failWith503.get()) {
+                        MockResponse.Builder()
+                            .code(503)
+                            .body("Service Unavailable")
+                            .build()
+                    } else {
+                        MockResponse.Builder()
+                            .code(200)
+                            .addHeader("Content-Type", "image/jpeg")
+                            .body(Buffer().write(validJpegBytes))
+                            .build()
+                    }
+                }
+            }
             server.start(InetAddress.getByName("127.0.0.1"), 0)
-            // First load fails with HTTP 503; user retry returns a valid JPEG!
-            server.enqueue(
-                MockResponse.Builder()
-                    .code(503)
-                    .body("Service Unavailable")
-                    .build(),
-            )
-            server.enqueue(
-                MockResponse.Builder()
-                    .code(200)
-                    .addHeader("Content-Type", "image/jpeg")
-                    .body(Buffer().write(validJpegBytes))
-                    .build(),
-            )
             val testUrl = "http://127.0.0.1:${server.port}/pictures/3/3770/retry_test_${System.nanoTime()}.jpg"
             val assetRoot = tempFolder.newFolder("artbook_ui_retry_root")
 
@@ -1561,6 +1570,7 @@ class ArtbookSearchAndTtsTest {
             assertTrue("Copied diagnostic summary should include host, got: $copiedText", copiedText.contains("127.0.0.1"))
 
             // 3. Clicking retry re-fetches over System DNS and recovers cleanly to canvas!
+            failWith503.set(false)
             composeTestRule.onNodeWithTag(ArtbookTestTags.RETRY_BUTTON).performClick()
             composeTestRule.waitUntil(timeoutMillis = 5_000L) {
                 composeTestRule.onAllNodesWithTag("${ArtbookTestTags.CANVAS_PREFIX}0")
@@ -1660,6 +1670,226 @@ class ArtbookSearchAndTtsTest {
                 }
             }
         }
+
+    @Test
+    fun artbookFilmstripHelpers_visibilityAndCenteringOffsetMath() {
+        assertFalse(shouldShowArtbookThumbnailStrip(imageCount = 0, isSingleImagePreview = false))
+        assertFalse(shouldShowArtbookThumbnailStrip(imageCount = 0, isSingleImagePreview = true))
+        assertFalse(shouldShowArtbookThumbnailStrip(imageCount = 1, isSingleImagePreview = true))
+        assertTrue(shouldShowArtbookThumbnailStrip(imageCount = 1, isSingleImagePreview = false))
+        assertTrue(shouldShowArtbookThumbnailStrip(imageCount = 2, isSingleImagePreview = false))
+        assertTrue(shouldShowArtbookThumbnailStrip(imageCount = 2, isSingleImagePreview = true))
+
+        assertEquals(0, computeCenteredFilmstripScrollOffsetPx(viewportWidthPx = 0, itemWidthPx = 68, beforeContentPaddingPx = 16))
+        assertEquals(0, computeCenteredFilmstripScrollOffsetPx(viewportWidthPx = 400, itemWidthPx = 0, beforeContentPaddingPx = 16))
+        assertEquals(-150, computeCenteredFilmstripScrollOffsetPx(viewportWidthPx = 400, itemWidthPx = 68, beforeContentPaddingPx = 16))
+        assertEquals(0, computeCenteredFilmstripScrollOffsetPx(viewportWidthPx = 80, itemWidthPx = 68, beforeContentPaddingPx = 16))
+    }
+
+    @Test
+    fun artbookLightboxOverlay_singleAndFewReaderImagesCenterFilmstrip_whileCoverPreviewHidesIt() {
+        val sampleFile = writeTestJpegFile("filmstrip_single.jpg")
+        var urls by mutableStateOf(listOf("https://pic.wenku8.com/test/single.jpg"))
+        var isSinglePreview by mutableStateOf(false)
+
+        composeTestRule.setContent {
+            Wenku8ExpressiveTheme(themeMode = Wenku8ThemeMode.ARCHIVAL_DAY) {
+                ArtbookLightboxOverlay(
+                    novelTitle = "单图测试",
+                    chapterTitle = "插图",
+                    imageUrls = urls,
+                    isSingleImagePreview = isSinglePreview,
+                    imageFileResolver = { sampleFile },
+                    ioDispatcher = Dispatchers.IO,
+                    onDismiss = {},
+                )
+            }
+        }
+        composeTestRule.waitForIdle()
+
+        // 1. Reader lightbox with a single illustration shows the bottom filmstrip centered horizontally.
+        composeTestRule.onNodeWithTag(ArtbookTestTags.CAROUSEL).assertIsDisplayed()
+        composeTestRule.onNodeWithTag("${ArtbookTestTags.THUMBNAIL_PREFIX}0").assertIsDisplayed()
+        val carouselBounds = composeTestRule.onNodeWithTag(ArtbookTestTags.CAROUSEL).getUnclippedBoundsInRoot()
+        val singleThumbBounds = composeTestRule.onNodeWithTag("${ArtbookTestTags.THUMBNAIL_PREFIX}0").getUnclippedBoundsInRoot()
+        val carouselCenterX = (carouselBounds.left.value + carouselBounds.right.value) / 2f
+        val singleThumbCenterX = (singleThumbBounds.left.value + singleThumbBounds.right.value) / 2f
+        assertTrue(
+            "Single reader thumbnail should be horizontally centered (carouselCenter=$carouselCenterX, thumbCenter=$singleThumbCenterX)",
+            abs(singleThumbCenterX - carouselCenterX) <= 1.5f,
+        )
+
+        // 2. Few illustrations (e.g. 2 images, narrower than 412dp) also center horizontally as a group.
+        urls = listOf(
+            "https://pic.wenku8.com/test/pair_0.jpg",
+            "https://pic.wenku8.com/test/pair_1.jpg",
+        )
+        composeTestRule.waitForIdle()
+        val thumb0Bounds = composeTestRule.onNodeWithTag("${ArtbookTestTags.THUMBNAIL_PREFIX}0").getUnclippedBoundsInRoot()
+        val thumb1Bounds = composeTestRule.onNodeWithTag("${ArtbookTestTags.THUMBNAIL_PREFIX}1").getUnclippedBoundsInRoot()
+        val groupCenterX = (thumb0Bounds.left.value + thumb1Bounds.right.value) / 2f
+        assertTrue(
+            "Few-image filmstrip group should stay centered (carouselCenter=$carouselCenterX, groupCenter=$groupCenterX)",
+            abs(groupCenterX - carouselCenterX) <= 1.5f,
+        )
+
+        // 3. Standalone cover preview (`isSingleImagePreview = true`) keeps the bottom filmstrip hidden.
+        urls = listOf("https://pic.wenku8.com/test/cover.jpg")
+        isSinglePreview = true
+        composeTestRule.waitForIdle()
+        assertEquals(
+            0,
+            composeTestRule.onAllNodesWithTag(ArtbookTestTags.CAROUSEL).fetchSemanticsNodes().size,
+        )
+    }
+
+    @Test
+    fun artbookLightboxOverlay_longFilmstripHasInertialFling_preservesScrollAcrossChromeToggle_andFollowsPager() {
+        val sampleFile = writeTestJpegFile("filmstrip_long.jpg")
+        val urls = (0 until 24).map { idx -> "https://pic.wenku8.com/test/gallery_$idx.jpg" }
+
+        composeTestRule.setContent {
+            Wenku8ExpressiveTheme(themeMode = Wenku8ThemeMode.ARCHIVAL_DAY) {
+                ArtbookLightboxOverlay(
+                    novelTitle = "长画集测试",
+                    chapterTitle = "插图",
+                    imageUrls = urls,
+                    imageFileResolver = { sampleFile },
+                    ioDispatcher = Dispatchers.IO,
+                    onDismiss = {},
+                )
+            }
+        }
+        composeTestRule.waitUntil(timeoutMillis = 5_000L) {
+            composeTestRule.onAllNodesWithTag("${ArtbookTestTags.CANVAS_PREFIX}0")
+                .fetchSemanticsNodes()
+                .isNotEmpty()
+        }
+        composeTestRule.waitForIdle()
+
+        // 1. Initially shows thumb 0, while far-away thumb 12 is off-screen.
+        composeTestRule.onNodeWithTag("${ArtbookTestTags.THUMBNAIL_PREFIX}0").assertIsDisplayed()
+        assertEquals(
+            0,
+            composeTestRule.onAllNodesWithTag("${ArtbookTestTags.THUMBNAIL_PREFIX}12").fetchSemanticsNodes().size,
+        )
+
+        // 2. Single fast fling across the filmstrip carries momentum far beyond 1 item (unlike singleAdvanceFlingBehavior).
+        composeTestRule.onNodeWithTag(ArtbookTestTags.CAROUSEL).performTouchInput {
+            swipeLeft(
+                startX = right - 16f,
+                endX = left + 16f,
+                durationMillis = 60L,
+            )
+        }
+        composeTestRule.waitForIdle()
+
+        val visibleIndicesAfterFling = (0 until 24).filter { idx ->
+            composeTestRule.onAllNodesWithTag("${ArtbookTestTags.THUMBNAIL_PREFIX}$idx")
+                .fetchSemanticsNodes()
+                .isNotEmpty()
+        }
+        assertTrue(
+            "Fast fling should advance well past 1 item with inertia; visible indices=$visibleIndicesAfterFling",
+            visibleIndicesAfterFling.isNotEmpty() &&
+                0 !in visibleIndicesAfterFling &&
+                visibleIndicesAfterFling.max() >= 8,
+        )
+        val anchorThumbAfterFling = visibleIndicesAfterFling[visibleIndicesAfterFling.size / 2]
+
+        // 3. Toggling chrome off and back on must NOT reset the hoisted filmstrip scroll position.
+        composeTestRule.onNodeWithTag("${ArtbookTestTags.CANVAS_PREFIX}0").performTouchInput {
+            click(center)
+        }
+        composeTestRule.mainClock.advanceTimeBy(500L)
+        composeTestRule.waitForIdle()
+        assertEquals(
+            "Chrome toggle should hide bottom filmstrip",
+            0,
+            composeTestRule.onAllNodesWithTag(ArtbookTestTags.CAROUSEL).fetchSemanticsNodes().size,
+        )
+
+        composeTestRule.onNodeWithTag("${ArtbookTestTags.CANVAS_PREFIX}0").performTouchInput {
+            click(center)
+        }
+        composeTestRule.mainClock.advanceTimeBy(500L)
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag(ArtbookTestTags.CAROUSEL).assertIsDisplayed()
+        composeTestRule.onNodeWithTag("${ArtbookTestTags.THUMBNAIL_PREFIX}$anchorThumbAfterFling")
+            .assertIsDisplayed()
+
+        // 4. Tapping a far thumbnail jumps the main pager and keeps the selected thumbnail centered.
+        composeTestRule.onNodeWithTag("${ArtbookTestTags.THUMBNAIL_PREFIX}$anchorThumbAfterFling")
+            .performClick()
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag(ArtbookTestTags.PAGE_INDICATOR)
+            .assertTextEquals("${anchorThumbAfterFling + 1} / 24")
+
+        // 5. Swiping the main pager automatically scrolls the filmstrip to follow and center the new page.
+        val nextIndex = (anchorThumbAfterFling + 1).coerceAtMost(23)
+        composeTestRule.onNodeWithTag(ArtbookTestTags.PAGER).performTouchInput {
+            swipeLeft(startX = right - 40f, endX = left + 40f, durationMillis = 120L)
+        }
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag(ArtbookTestTags.PAGE_INDICATOR)
+            .assertTextEquals("${nextIndex + 1} / 24")
+        composeTestRule.onNodeWithTag("${ArtbookTestTags.THUMBNAIL_PREFIX}$nextIndex")
+            .assertIsDisplayed()
+        val carouselBounds = composeTestRule.onNodeWithTag(ArtbookTestTags.CAROUSEL).getUnclippedBoundsInRoot()
+        val activeThumbBounds = composeTestRule.onNodeWithTag("${ArtbookTestTags.THUMBNAIL_PREFIX}$nextIndex")
+            .getUnclippedBoundsInRoot()
+        val carouselCenterX = (carouselBounds.left.value + carouselBounds.right.value) / 2f
+        val activeThumbCenterX = (activeThumbBounds.left.value + activeThumbBounds.right.value) / 2f
+        assertTrue(
+            "Main pager swipe should keep the active thumbnail centered in filmstrip (carouselCenter=$carouselCenterX, thumbCenter=$activeThumbCenterX)",
+            abs(activeThumbCenterX - carouselCenterX) <= 12f,
+        )
+    }
+
+    @Test
+    fun artbookLightboxOverlay_initialNonZeroIndexCentersFilmstripImmediatelyInEinkMode() {
+        val sampleFile = writeTestJpegFile("filmstrip_eink.jpg")
+        val urls = (0 until 20).map { idx -> "https://pic.wenku8.com/test/eink_$idx.jpg" }
+
+        composeTestRule.setContent {
+            Wenku8ExpressiveTheme(themeMode = Wenku8ThemeMode.E_INK) {
+                ArtbookLightboxOverlay(
+                    novelTitle = "墨水屏测试",
+                    chapterTitle = "插图",
+                    imageUrls = urls,
+                    initialImageIndex = 10,
+                    imageFileResolver = { sampleFile },
+                    ioDispatcher = Dispatchers.IO,
+                    onDismiss = {},
+                )
+            }
+        }
+        composeTestRule.waitForIdle()
+
+        composeTestRule.onNodeWithTag(ArtbookTestTags.PAGE_INDICATOR).assertTextEquals("11 / 20")
+        composeTestRule.onNodeWithTag("${ArtbookTestTags.THUMBNAIL_PREFIX}10").assertIsDisplayed()
+        val carouselBounds = composeTestRule.onNodeWithTag(ArtbookTestTags.CAROUSEL).getUnclippedBoundsInRoot()
+        val thumbBounds = composeTestRule.onNodeWithTag("${ArtbookTestTags.THUMBNAIL_PREFIX}10")
+            .getUnclippedBoundsInRoot()
+        val carouselCenterX = (carouselBounds.left.value + carouselBounds.right.value) / 2f
+        val thumbCenterX = (thumbBounds.left.value + thumbBounds.right.value) / 2f
+        assertTrue(
+            "Opening at index 10 should center thumb 10 immediately (carouselCenter=$carouselCenterX, thumbCenter=$thumbCenterX)",
+            abs(thumbCenterX - carouselCenterX) <= 12f,
+        )
+    }
+
+    private fun writeTestJpegFile(fileName: String): File {
+        val file = tempFolder.newFile(fileName)
+        val bmp = Bitmap.createBitmap(120, 160, Bitmap.Config.ARGB_8888).apply {
+            eraseColor(AndroidColor.rgb(64, 128, 192))
+        }
+        FileOutputStream(file).use { out ->
+            bmp.compress(Bitmap.CompressFormat.JPEG, 90, out)
+        }
+        bmp.recycle()
+        return file
+    }
 }
 
 private class FakeSpeechEngineAdapter : SpeechEngineAdapter {
