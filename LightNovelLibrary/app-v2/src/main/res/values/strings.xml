@@ -578,6 +578,7 @@
     <string name="detail_cover_lightbox_subtitle">封面</string>
     <string name="reader_action_peek_volume_illustrations">本卷插图</string>
     <string name="reader_action_peek_volume_illustrations_tooltip">临时查看本卷插图（不改变阅读进度）</string>
+    <string name="reader_action_open_illustration_lightbox">查看高清大图</string>
     <string name="reader_peek_volume_illustrations_loading">正在加载插图…</string>
     <string name="reader_toc_current_volume_header_format">本卷目录 (%1$d)</string>
     <string name="reader_toc_illustration_badge">🖼 插图</string>
