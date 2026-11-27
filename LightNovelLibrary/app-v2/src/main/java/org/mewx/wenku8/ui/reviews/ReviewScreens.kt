@@ -145,6 +145,7 @@ object ReviewScreensTestTags {
 }
 
 private const val DRAFT_AUTOSAVE_DEBOUNCE_MS = 400L
+private const val MAX_AUTO_CATCHUP_PAGES_AFTER_REPLY = 5
 
 private enum class ReviewLoadErrorType {
     NONE,
@@ -527,6 +528,8 @@ fun ReviewThreadScreen(
     var floorItems by remember(thread.rid, appLanguage) { mutableStateOf<List<ReviewReplyFloorItem>>(emptyList()) }
     var currentPage by remember(thread.rid, appLanguage) { mutableIntStateOf(0) }
     var totalPages by remember(thread.rid, appLanguage) { mutableIntStateOf(1) }
+    var lastPageStartIndex by remember(thread.rid, appLanguage) { mutableIntStateOf(0) }
+    var displayedReplyCount by remember(thread.rid) { mutableIntStateOf(thread.replyCount) }
     var isInitialOrRefreshLoading by remember(thread.rid, appLanguage) { mutableStateOf(false) }
     var isLoadingNextPage by remember(thread.rid, appLanguage) { mutableStateOf(false) }
     var errorType by remember(thread.rid, appLanguage) { mutableStateOf(ReviewLoadErrorType.NONE) }
@@ -628,10 +631,18 @@ fun ReviewThreadScreen(
                         if (activeLoadGeneration != generation) return@launch
                         currentPage = res.data.currentPage
                         totalPages = res.data.totalPages
-                        floorItems = if (replaceExisting) {
-                            res.data.items
+                        if (replaceExisting) {
+                            lastPageStartIndex = 0
+                            floorItems = res.data.items
                         } else {
-                            floorItems + res.data.items
+                            lastPageStartIndex = floorItems.size
+                            floorItems = floorItems + res.data.items
+                        }
+                        if (currentPage == totalPages && floorItems.isNotEmpty()) {
+                            displayedReplyCount = maxOf(
+                                displayedReplyCount,
+                                (floorItems.size - 1).coerceAtLeast(0),
+                            )
                         }
                     }
                     WenkuApiResult.ApiNotConfigured -> {
@@ -648,6 +659,118 @@ fun ReviewThreadScreen(
                         if (activeLoadGeneration != generation) return@launch
                         errorType = ReviewLoadErrorType.NETWORK_OR_SERVER
                     }
+                }
+            } finally {
+                if (activeLoadGeneration == generation) {
+                    isInitialOrRefreshLoading = false
+                    isLoadingNextPage = false
+                    activeLoadJob = null
+                }
+            }
+        }
+    }
+
+    /**
+     * Refreshes the thread after a reply is published without discarding earlier loaded pages.
+     * Because Wenku8 orders replies chronologically (oldest on page 1, newest on the last page),
+     * re-fetches the tail page and automatically catches up through newly created trailing pages
+     * (bounded by [MAX_AUTO_CATCHUP_PAGES_AFTER_REPLY]) before scrolling to the new floor.
+     */
+    fun launchRefreshAfterReply() {
+        activeLoadJob?.cancel()
+        val generation = activeLoadGeneration + 1
+        activeLoadGeneration = generation
+
+        val loadedPage = currentPage
+        val knownTotalPages = totalPages.coerceAtLeast(1)
+        val existingFloors = floorItems
+        val tailStart = lastPageStartIndex.coerceIn(0, existingFloors.size)
+
+        val startFromNextPage = loadedPage in 1 until knownTotalPages &&
+            (knownTotalPages - loadedPage) <= MAX_AUTO_CATCHUP_PAGES_AFTER_REPLY
+        val firstPageToFetch = when {
+            loadedPage <= 0 -> 1
+            startFromNextPage -> loadedPage + 1
+            else -> loadedPage
+        }
+        val shouldReplaceExisting = firstPageToFetch == 1 && !startFromNextPage
+
+        if (shouldReplaceExisting) {
+            isInitialOrRefreshLoading = true
+            isLoadingNextPage = false
+        } else {
+            isInitialOrRefreshLoading = false
+            isLoadingNextPage = true
+        }
+        errorType = ReviewLoadErrorType.NONE
+
+        activeLoadJob = coroutineScope.launch {
+            try {
+                var accumulatedFloors = when {
+                    shouldReplaceExisting -> emptyList()
+                    startFromNextPage -> existingFloors
+                    else -> existingFloors.take(tailStart)
+                }
+                var pageToFetch = firstPageToFetch
+                var fetchedCount = 0
+                var reachedFinalPage = false
+
+                while (fetchedCount < MAX_AUTO_CATCHUP_PAGES_AFTER_REPLY + 1) {
+                    val pageStartOffset = accumulatedFloors.size
+                    when (
+                        val res = reviewsRepository.fetchReplyPage(
+                            rid = thread.rid,
+                            pageNumber = pageToFetch,
+                            startingFloorOffset = pageStartOffset,
+                            appLanguage = appLanguage,
+                        )
+                    ) {
+                        is WenkuApiResult.Success -> {
+                            if (activeLoadGeneration != generation) return@launch
+                            fetchedCount++
+                            accumulatedFloors = accumulatedFloors + res.data.items
+                            currentPage = res.data.currentPage
+                            totalPages = res.data.totalPages
+                            lastPageStartIndex = pageStartOffset
+                            floorItems = accumulatedFloors
+                            if (currentPage == totalPages && accumulatedFloors.isNotEmpty()) {
+                                displayedReplyCount = maxOf(
+                                    displayedReplyCount,
+                                    (accumulatedFloors.size - 1).coerceAtLeast(0),
+                                )
+                            }
+
+                            val remainingPages = res.data.totalPages - res.data.currentPage
+                            if (remainingPages <= 0) {
+                                reachedFinalPage = true
+                                break
+                            }
+                            if (remainingPages > MAX_AUTO_CATCHUP_PAGES_AFTER_REPLY) {
+                                break
+                            }
+                            pageToFetch = res.data.currentPage + 1
+                        }
+                        WenkuApiResult.ApiNotConfigured -> {
+                            if (activeLoadGeneration != generation) return@launch
+                            errorType = ReviewLoadErrorType.API_UNAVAILABLE
+                            return@launch
+                        }
+                        is WenkuApiResult.UpgradeRequired,
+                        WenkuApiResult.AuthRejected,
+                        is WenkuApiResult.NetworkError,
+                        is WenkuApiResult.ServerErrorCode,
+                        WenkuApiResult.EmptyResponse,
+                        is WenkuApiResult.ParseError,
+                        -> {
+                            if (activeLoadGeneration != generation) return@launch
+                            errorType = ReviewLoadErrorType.NETWORK_OR_SERVER
+                            return@launch
+                        }
+                    }
+                }
+
+                if (reachedFinalPage && activeLoadGeneration == generation && floorItems.isNotEmpty()) {
+                    listState.animateScrollToItem(floorItems.lastIndex)
                 }
             } finally {
                 if (activeLoadGeneration == generation) {
@@ -694,7 +817,7 @@ fun ReviewThreadScreen(
                             overflow = TextOverflow.Ellipsis,
                         )
                         Text(
-                            text = stringResource(R.string.review_reply_count_format, thread.replyCount),
+                            text = stringResource(R.string.review_reply_count_format, displayedReplyCount),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             maxLines = 1,
@@ -758,7 +881,8 @@ fun ReviewThreadScreen(
                                     replyContent = ""
                                     lastPersistedDraftContent = ""
                                     draftSavedIndicatorVisible = false
-                                    launchLoadFloorsPage(targetPage = 1, replaceExisting = true)
+                                    displayedReplyCount += 1
+                                    launchRefreshAfterReply()
                                     snackbarHostState.showSnackbar(replySuccessMsg)
                                 }
                                 ReviewSubmitOutcome.NotLoggedIn -> {
