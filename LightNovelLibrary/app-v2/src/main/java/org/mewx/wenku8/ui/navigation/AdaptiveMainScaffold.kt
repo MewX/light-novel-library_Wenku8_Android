@@ -74,6 +74,7 @@ import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
@@ -258,6 +259,100 @@ private fun ScaffoldSceneState.saveableKey(): String = when (this) {
 }
 
 /**
+ * Type-safe [Saver] for nullable [ReaderLaunchRequest] so Activity recreation (e.g. system dark
+ * mode toggle, locale change, or process death) never drops the active reading screen back to the
+ * previous screen (`#229`). Uses strictly safe casts to avoid `ClassCastException` across upgrades.
+ */
+internal val ReaderLaunchRequestNullableSaver: Saver<ReaderLaunchRequest?, Any> = Saver(
+    save = { request ->
+        if (request == null) {
+            null
+        } else {
+            arrayListOf<Any>(
+                request.aid,
+                request.vid,
+                request.cid,
+                request.novelTitle,
+                request.volumeTitle,
+                request.chapterTitle,
+                request.startWithTts,
+                request.initialParagraphIndex,
+                request.initialCharOffset,
+            )
+        }
+    },
+    restore = { raw ->
+        val saved = raw as? List<*> ?: return@Saver null
+        if (saved.size < 9) return@Saver null
+        val aid = saved[0] as? Int ?: return@Saver null
+        val vid = saved[1] as? Int ?: return@Saver null
+        val cid = saved[2] as? Int ?: return@Saver null
+        val novelTitle = saved[3] as? String ?: return@Saver null
+        val volumeTitle = saved[4] as? String ?: return@Saver null
+        val chapterTitle = saved[5] as? String ?: return@Saver null
+        val startWithTts = saved[6] as? Boolean ?: return@Saver null
+        val initialParagraphIndex = saved[7] as? Int ?: return@Saver null
+        val initialCharOffset = saved[8] as? Int ?: return@Saver null
+        ReaderLaunchRequest(
+            aid = aid,
+            vid = vid,
+            cid = cid,
+            novelTitle = novelTitle,
+            volumeTitle = volumeTitle,
+            chapterTitle = chapterTitle,
+            startWithTts = startWithTts,
+            initialParagraphIndex = initialParagraphIndex,
+            initialCharOffset = initialCharOffset,
+        )
+    },
+)
+
+/**
+ * Type-safe [Saver] for nullable [ReviewThreadCardItem] so Activity recreation inside a book review
+ * thread preserves the active thread instead of falling back to the review list.
+ */
+internal val ReviewThreadCardItemNullableSaver: Saver<ReviewThreadCardItem?, Any> = Saver(
+    save = { thread ->
+        if (thread == null) {
+            null
+        } else {
+            arrayListOf<Any>(
+                thread.rid,
+                thread.title,
+                thread.uid,
+                thread.userName,
+                thread.avatarUrl,
+                thread.replyCount,
+                thread.postTimeFormatted,
+                thread.lastReplyTimeFormatted,
+            )
+        }
+    },
+    restore = { raw ->
+        val saved = raw as? List<*> ?: return@Saver null
+        if (saved.size < 8) return@Saver null
+        val rid = saved[0] as? Int ?: return@Saver null
+        val title = saved[1] as? String ?: return@Saver null
+        val uid = saved[2] as? Int ?: return@Saver null
+        val userName = saved[3] as? String ?: return@Saver null
+        val avatarUrl = saved[4] as? String ?: return@Saver null
+        val replyCount = saved[5] as? Int ?: return@Saver null
+        val postTimeFormatted = saved[6] as? String ?: return@Saver null
+        val lastReplyTimeFormatted = saved[7] as? String ?: return@Saver null
+        ReviewThreadCardItem(
+            rid = rid,
+            title = title,
+            uid = uid,
+            userName = userName,
+            avatarUrl = avatarUrl,
+            replyCount = replyCount,
+            postTimeFormatted = postTimeFormatted,
+            lastReplyTimeFormatted = lastReplyTimeFormatted,
+        )
+    },
+)
+
+/**
  * Adaptive Material 3 Expressive (`M3e`) 4-destination shell for Wenku8 `:app-v2`.
  *
  * Layout adaptation (`02-information-architecture-and-navigation.md` §3):
@@ -417,10 +512,10 @@ fun AdaptiveMainScaffold(
     var activeReviewsNovelTitle by rememberSaveable {
         mutableStateOf(initialOpenReviewsTitle)
     }
-    var activeReviewThread by androidx.compose.runtime.remember {
+    var activeReviewThread by rememberSaveable(stateSaver = ReviewThreadCardItemNullableSaver) {
         mutableStateOf<ReviewThreadCardItem?>(null)
     }
-    var activeReaderRequest by androidx.compose.runtime.remember {
+    var activeReaderRequest by rememberSaveable(stateSaver = ReaderLaunchRequestNullableSaver) {
         mutableStateOf<ReaderLaunchRequest?>(null)
     }
     var activeFootprintTab by rememberSaveable {
@@ -443,7 +538,7 @@ fun AdaptiveMainScaffold(
     var postReadingElevationToken by remember {
         mutableStateOf<PostReadingAdElevationToken?>(null)
     }
-    var activeReaderStartedAtMonoMs by remember { mutableLongStateOf(0L) }
+    var activeReaderStartedAtMonoMs by rememberSaveable { mutableLongStateOf(0L) }
 
     val handleOpenCoverLightbox: (String, String) -> Unit = { title, coverUrl ->
         if (coverUrl.isNotBlank()) {
