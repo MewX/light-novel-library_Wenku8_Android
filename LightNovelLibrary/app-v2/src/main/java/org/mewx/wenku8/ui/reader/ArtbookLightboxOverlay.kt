@@ -1824,6 +1824,12 @@ private fun ArtbookEntryViewport(
                         is ArtbookImageResolutionResult.Failure -> null to res.failure
                     }
                 }
+                if (decoded != null && decoded.intrinsicWidth > 0 && decoded.intrinsicHeight > 0) {
+                    ReaderIllustrationAspectRatioCache.put(
+                        imageUrl = entry.imageUrl,
+                        aspectRatio = decoded.intrinsicWidth.toFloat() / decoded.intrinsicHeight.toFloat(),
+                    )
+                }
                 leftSource = decoded
                 rightSource = null
                 loadFailed = decoded == null
@@ -1851,6 +1857,18 @@ private fun ArtbookEntryViewport(
                             null
                         }
                     Triple(bmpL, bmpR, firstFail)
+                }
+                if (decodedL != null && decodedL.intrinsicWidth > 0 && decodedL.intrinsicHeight > 0) {
+                    ReaderIllustrationAspectRatioCache.put(
+                        imageUrl = entry.leftImageUrl,
+                        aspectRatio = decodedL.intrinsicWidth.toFloat() / decodedL.intrinsicHeight.toFloat(),
+                    )
+                }
+                if (decodedR != null && decodedR.intrinsicWidth > 0 && decodedR.intrinsicHeight > 0) {
+                    ReaderIllustrationAspectRatioCache.put(
+                        imageUrl = entry.rightImageUrl,
+                        aspectRatio = decodedR.intrinsicWidth.toFloat() / decodedR.intrinsicHeight.toFloat(),
+                    )
                 }
                 leftSource = decodedL
                 rightSource = decodedR
