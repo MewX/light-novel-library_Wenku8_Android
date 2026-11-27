@@ -603,6 +603,88 @@ class DiscoveryRepositoryAndApiClientTest {
         assertEquals("9 橙色的魔法使", volume3.chapters[1].chapterTitle)
     }
 
+    @Test
+    fun formatCardIntroPreview_handlesNovellistCutoffsBookinfoEllipsisAndNonTruncatedText() {
+        assertEquals("", org.mewx.wenku8.domain.model.formatCardIntroPreview(""))
+        assertEquals("", org.mewx.wenku8.domain.model.formatCardIntroPreview(" \u3000\n\t "))
+
+        // novellist mid-word cutoff without ellipsis -> appends typographic '…'
+        assertEquals(
+            "真实的侦探和小说不同，那不是光彩的职业。他…",
+            org.mewx.wenku8.domain.model.formatCardIntroPreview("真实的侦探和小说不同，那不是光彩的职业。他"),
+        )
+        assertEquals(
+            "真正的实力、平等究竟为何？ 几乎百分之百实…",
+            org.mewx.wenku8.domain.model.formatCardIntroPreview("真正的实力、平等究竟为何？\u3000几乎百分之百实"),
+        )
+
+        // novellist cutoff on dangling pause / opening punctuation -> strips punctuation before '…'
+        assertEquals(
+            "她——宫城很奇怪，居然每周一次花上五千圆…",
+            org.mewx.wenku8.domain.model.formatCardIntroPreview("她——宫城很奇怪，居然每周一次花上五千圆，"),
+        )
+        assertEquals(
+            "某个少年…",
+            org.mewx.wenku8.domain.model.formatCardIntroPreview("某个少年——"),
+        )
+        assertEquals(
+            "故事开始于…",
+            org.mewx.wenku8.domain.model.formatCardIntroPreview("故事开始于「"),
+        )
+        assertEquals(
+            "，，，…",
+            org.mewx.wenku8.domain.model.formatCardIntroPreview("，，，"),
+        )
+
+        // bookinfo literal '...' / '……' (with optional stray spaces) -> unified single '…'
+        assertEquals(
+            "走出便利商店要回家的高中生·菜月昴突然被召唤到异世界。…",
+            org.mewx.wenku8.domain.model.formatCardIntroPreview("走出便利商店要回家的高中生·菜月昴突然被召唤到异世界。 ..."),
+        )
+        assertEquals(
+            "那孩子差不多该醒了。妈妈在等她。 为了在这个奇妙…",
+            org.mewx.wenku8.domain.model.formatCardIntroPreview("那孩子差不多该醒了。妈妈在等她。 为了在这个奇妙..."),
+        )
+        assertEquals(
+            "故事刚刚开始…",
+            org.mewx.wenku8.domain.model.formatCardIntroPreview("故事刚刚开始，……"),
+        )
+        assertEquals(
+            "…",
+            org.mewx.wenku8.domain.model.formatCardIntroPreview("..."),
+        )
+
+        // Complete sentence-ending punctuation -> preserved without trailing '…'
+        assertEquals(
+            "共和国前线战记。",
+            org.mewx.wenku8.domain.model.formatCardIntroPreview("共和国前线战记。"),
+        )
+        assertEquals(
+            "「世界并不美丽。」",
+            org.mewx.wenku8.domain.model.formatCardIntroPreview("「世界并不美丽。」"),
+        )
+        assertEquals(
+            "真的吗？！",
+            org.mewx.wenku8.domain.model.formatCardIntroPreview("真的吗？！"),
+        )
+
+        // Non-truncated preview (cached fullIntro or AID direct lookup chapter title) -> untouched
+        assertEquals(
+            "第十二卷 后记",
+            org.mewx.wenku8.domain.model.formatCardIntroPreview(
+                rawIntro = "第十二卷 后记",
+                allowTruncationEllipsis = false,
+            ),
+        )
+        assertEquals(
+            "第一段内容 第二段内容",
+            org.mewx.wenku8.domain.model.formatCardIntroPreview(
+                rawIntro = "　　第一段内容\n　　第二段内容",
+                allowTruncationEllipsis = false,
+            ),
+        )
+    }
+
     private class FakeCatalogGateway : WenkuCatalogGateway {
         override val isApiConfigured: Boolean = true
 

@@ -77,6 +77,7 @@ import org.mewx.wenku8.domain.model.DiscoveryFeedErrorKind
 import org.mewx.wenku8.domain.model.DiscoveryNovelCardItem
 import org.mewx.wenku8.domain.model.FeedScrollPosition
 import org.mewx.wenku8.domain.model.PaginatedNovelFeedState
+import org.mewx.wenku8.domain.model.formatCardIntroPreview
 import org.mewx.wenku8.domain.model.normalizeBookStatusText
 import org.mewx.wenku8.ui.detail.BannerAdLoadPhase
 import org.mewx.wenku8.ui.detail.LocalDiscoveryFeedInlineAdPool
@@ -428,9 +429,15 @@ fun DiscoveryNovelCard(
                         }
                     }
 
-                    if (item.introShort.isNotBlank()) {
+                    val formattedIntro = remember(item.introShort, item.isIntroTruncatedPreview) {
+                        formatCardIntroPreview(
+                            rawIntro = item.introShort,
+                            allowTruncationEllipsis = item.isIntroTruncatedPreview,
+                        )
+                    }
+                    if (formattedIntro.isNotEmpty()) {
                         Text(
-                            text = item.introShort,
+                            text = formattedIntro,
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             maxLines = 2,

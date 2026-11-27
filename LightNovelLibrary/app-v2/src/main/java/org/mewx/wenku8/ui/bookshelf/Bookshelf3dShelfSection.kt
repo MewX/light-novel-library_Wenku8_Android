@@ -2120,7 +2120,10 @@ private fun Bookshelf3dWideSpotlightPanel(
                     )
                 }
 
-                val intro = target.novel.introShort.trim()
+                val intro = org.mewx.wenku8.domain.model.formatCardIntroPreview(
+                    rawIntro = target.novel.introShort,
+                    allowTruncationEllipsis = true,
+                )
                 if (intro.isNotEmpty()) {
                     Text(
                         text = intro,

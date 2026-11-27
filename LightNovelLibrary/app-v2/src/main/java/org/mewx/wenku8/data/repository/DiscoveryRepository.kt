@@ -650,6 +650,7 @@ class DiscoveryRepository(
             coverUrl = apiClient.resolveCoverUrl(aid),
             inLocalBookshelf = inBookshelf,
             isHydratingMetadata = false,
+            isIntroTruncatedPreview = false,
         )
     }
 

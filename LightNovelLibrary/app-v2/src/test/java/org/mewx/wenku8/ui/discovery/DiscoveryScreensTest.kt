@@ -887,6 +887,63 @@ class DiscoveryScreensTest {
         composeTestRule.onNodeWithText("离线最新-6").assertIsDisplayed()
     }
 
+    @Test
+    fun discoveryNovelCard_rendersNormalizedEllipsisForTruncatedPreviewsAndPreservesNonTruncatedLabels() {
+        composeTestRule.setContent {
+            Wenku8ExpressiveTheme(themeMode = Wenku8ThemeMode.ARCHIVAL_DAY) {
+                androidx.compose.foundation.layout.Column {
+                    DiscoveryNovelCard(
+                        item = org.mewx.wenku8.domain.model.DiscoveryNovelCardItem(
+                            aid = 3001,
+                            title = "武士之血",
+                            author = "松时之介",
+                            bookStatus = "已完结",
+                            lastUpdate = "2026-11-17",
+                            tags = listOf("奇幻"),
+                            introShort = "战国风云儿·织田信长借阴阳道之力统一天下，",
+                            coverUrl = "",
+                            isIntroTruncatedPreview = true,
+                        ),
+                        onClick = {},
+                    )
+                    DiscoveryNovelCard(
+                        item = org.mewx.wenku8.domain.model.DiscoveryNovelCardItem(
+                            aid = 3002,
+                            title = "Re:从零开始的异世界生活",
+                            author = "长月达平",
+                            bookStatus = "连载中",
+                            lastUpdate = "2026-09-17",
+                            tags = listOf("穿越"),
+                            introShort = "走出便利商店要回家的高中生·菜月昴突然被召唤到异世界。 ...",
+                            coverUrl = "",
+                            isIntroTruncatedPreview = true,
+                        ),
+                        onClick = {},
+                    )
+                    DiscoveryNovelCard(
+                        item = org.mewx.wenku8.domain.model.DiscoveryNovelCardItem(
+                            aid = 3003,
+                            title = "义妹生活",
+                            author = "三河ごーすと",
+                            bookStatus = "连载中",
+                            lastUpdate = "2026-09-12",
+                            tags = listOf("MF文库J"),
+                            introShort = "第十二卷 后记",
+                            coverUrl = "",
+                            isIntroTruncatedPreview = false,
+                        ),
+                        onClick = {},
+                    )
+                }
+            }
+        }
+
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithText("战国风云儿·织田信长借阴阳道之力统一天下…").assertIsDisplayed()
+        composeTestRule.onNodeWithText("走出便利商店要回家的高中生·菜月昴突然被召唤到异世界。…").assertIsDisplayed()
+        composeTestRule.onNodeWithText("第十二卷 后记").assertIsDisplayed()
+    }
+
     private class FakeDiscoveryGateway : WenkuCatalogGateway {
         override val isApiConfigured: Boolean = true
         val pagesBySort = mutableMapOf<Wenku8API.NovelSortedBy, WenkuApiResult<ParsedNovelListPage>>()
