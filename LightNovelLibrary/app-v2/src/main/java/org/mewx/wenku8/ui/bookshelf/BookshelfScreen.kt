@@ -2456,6 +2456,10 @@ private fun decodeFilterKey(raw: String): BookshelfFilter = when {
 }
 
 internal fun BookshelfItemModel.toDiscoveryCardItem(): DiscoveryNovelCardItem {
+    val (resolvedIntro, isTruncatedPreview) = org.mewx.wenku8.domain.model.resolvePreferredCardIntro(
+        fullIntro = novel.fullIntro,
+        introShort = novel.introShort,
+    )
     return DiscoveryNovelCardItem(
         aid = novel.aid,
         title = novel.title,
@@ -2463,8 +2467,9 @@ internal fun BookshelfItemModel.toDiscoveryCardItem(): DiscoveryNovelCardItem {
         bookStatus = novel.bookStatus,
         lastUpdate = novel.lastUpdate,
         tags = tags,
-        introShort = novel.introShort,
+        introShort = resolvedIntro,
         coverUrl = coverUrl,
         inLocalBookshelf = novel.inBookshelf,
+        isIntroTruncatedPreview = isTruncatedPreview,
     )
 }

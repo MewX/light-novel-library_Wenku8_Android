@@ -126,6 +126,8 @@ fun normalizeBookStatusText(
 private val INTRO_PREVIEW_WHITESPACE_REGEX = Regex("[\\u3000\\s]+")
 private val TRAILING_ELLIPSIS_REGEX = Regex("[\\s]*([.]{3,}|…+)+$")
 
+const val MAX_CARD_FULL_INTRO_PREVIEW_CHARS: Int = 240
+
 private val SENTENCE_TERMINAL_CHARS = setOf('。', '！', '？', '!', '?')
 private val CLOSING_WRAPPER_CHARS = setOf('」', '』', '”', '’', '）', ')', '》', '】', ']')
 private val DANGLING_TRAILING_PUNCTUATION = setOf(
@@ -141,6 +143,30 @@ private val DANGLING_TRAILING_PUNCTUATION = setOf(
 fun flattenIntroForPreview(rawIntro: String): String {
     if (rawIntro.isBlank()) return ""
     return rawIntro.replace(INTRO_PREVIEW_WHITESPACE_REGEX, " ").trim()
+}
+
+/**
+ * Selects the richest available synopsis preview for list cards: prefers a locally cached
+ * [fullIntro] (flattened and capped at [MAX_CARD_FULL_INTRO_PREVIEW_CHARS] chars so Compose's
+ * `maxLines` + `TextOverflow.Ellipsis` clips cleanly at the trailing edge), falling back to the
+ * server-truncated [introShort].
+ *
+ * Returns `Pair(introText, isIntroTruncatedPreview)`.
+ */
+fun resolvePreferredCardIntro(
+    fullIntro: String?,
+    introShort: String?,
+): Pair<String, Boolean> {
+    val flattenedFull = flattenIntroForPreview(fullIntro.orEmpty())
+    if (flattenedFull.isNotEmpty()) {
+        val bounded = if (flattenedFull.length > MAX_CARD_FULL_INTRO_PREVIEW_CHARS) {
+            flattenedFull.substring(0, MAX_CARD_FULL_INTRO_PREVIEW_CHARS)
+        } else {
+            flattenedFull
+        }
+        return bounded to false
+    }
+    return introShort.orEmpty() to true
 }
 
 /**

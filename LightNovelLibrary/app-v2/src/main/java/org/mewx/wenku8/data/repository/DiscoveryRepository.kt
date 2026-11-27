@@ -158,8 +158,13 @@ class DiscoveryRepository(
 
             when (val response = apiClient.fetchNovelListPage(sortedBy, pageNumber = 1, appLanguage = appLanguage)) {
                 is WenkuApiResult.Success -> {
+                    val cachedFullIntros = loadCachedFullIntroMap(response.data.items.map { it.aid })
                     val mappedItems = response.data.items.map { parsed ->
-                        mergeAndCacheParsedItem(parsed, bookshelfAidSet.contains(parsed.aid))
+                        mergeAndCacheParsedItem(
+                            parsed = parsed,
+                            inBookshelf = bookshelfAidSet.contains(parsed.aid),
+                            cachedFullIntro = cachedFullIntros[parsed.aid],
+                        )
                     }
                     if (forceRefresh) {
                         feedScrollPositions[sortedBy] = FeedScrollPosition(0, 0)
@@ -223,8 +228,13 @@ class DiscoveryRepository(
 
             when (val response = apiClient.fetchNovelListPage(sortedBy, pageNumber = targetPage, appLanguage = appLanguage)) {
                 is WenkuApiResult.Success -> {
+                    val cachedFullIntros = loadCachedFullIntroMap(response.data.items.map { it.aid })
                     val incomingCards = response.data.items.map { parsed ->
-                        mergeAndCacheParsedItem(parsed, bookshelfAidSet.contains(parsed.aid))
+                        mergeAndCacheParsedItem(
+                            parsed = parsed,
+                            inBookshelf = bookshelfAidSet.contains(parsed.aid),
+                            cachedFullIntro = cachedFullIntros[parsed.aid],
+                        )
                     }
                     stateFlow.update { current ->
                         val mergedByAid = LinkedHashMap<Int, DiscoveryNovelCardItem>(
@@ -488,6 +498,7 @@ class DiscoveryRepository(
             is WenkuApiResult.Success -> {
                 val card = metaResult.data.toCardItem(
                     inBookshelf = localNovel?.inBookshelf ?: false,
+                    cachedFullIntro = localNovel?.fullIntro,
                 )
                 cardCache[aid] = mergeCardsMonotonically(cardCache[aid], card)
                 _onlineSearchState.value = OnlineSearchExecutionState(
@@ -531,6 +542,7 @@ class DiscoveryRepository(
             .take(INITIAL_HYDRATION_BATCH_SIZE)
         if (candidatesToHydrate.isEmpty()) return
 
+        val cachedFullIntros = loadCachedFullIntroMap(candidatesToHydrate.map { it.aid })
         val semaphore = Semaphore(SEARCH_HYDRATION_CONCURRENCY)
         val hydratedByAid = coroutineScope {
             candidatesToHydrate.map { placeholder ->
@@ -541,6 +553,7 @@ class DiscoveryRepository(
                             placeholder.aid to mergeAndCacheParsedItem(
                                 parsed = response.data,
                                 inBookshelf = bookshelfAids.contains(placeholder.aid),
+                                cachedFullIntro = cachedFullIntros[placeholder.aid],
                             )
                         } else {
                             placeholder.aid to placeholder.copy(isHydratingMetadata = false)
@@ -579,10 +592,23 @@ class DiscoveryRepository(
         }
     }
 
+    private suspend fun loadCachedFullIntroMap(aids: List<Int>): Map<Int, String> {
+        val distinctAids = aids.filter { it > 0 }.distinct()
+        if (distinctAids.isEmpty()) return emptyMap()
+        return database.novelDao()
+            .getCachedFullIntrosByAids(distinctAids)
+            .associate { it.aid to it.fullIntro }
+    }
+
     private fun mergeAndCacheParsedItem(
         parsed: ParsedNovelListItem,
         inBookshelf: Boolean,
+        cachedFullIntro: String? = null,
     ): DiscoveryNovelCardItem {
+        val (resolvedIntro, isTruncatedPreview) = org.mewx.wenku8.domain.model.resolvePreferredCardIntro(
+            fullIntro = cachedFullIntro,
+            introShort = parsed.introShort,
+        )
         val incoming = DiscoveryNovelCardItem(
             aid = parsed.aid,
             title = parsed.title.ifBlank { "AID #${parsed.aid}" },
@@ -590,10 +616,11 @@ class DiscoveryRepository(
             bookStatus = parsed.bookStatus,
             lastUpdate = parsed.lastUpdate,
             tags = splitTags(parsed.tagsCsv),
-            introShort = parsed.introShort,
+            introShort = resolvedIntro,
             coverUrl = apiClient.resolveCoverUrl(parsed.aid),
             inLocalBookshelf = inBookshelf,
             isHydratingMetadata = false,
+            isIntroTruncatedPreview = isTruncatedPreview,
         )
         val merged = mergeCardsMonotonically(cardCache[parsed.aid], incoming)
         cardCache[parsed.aid] = merged
@@ -606,6 +633,14 @@ class DiscoveryRepository(
     ): DiscoveryNovelCardItem {
         if (existing == null) return incoming
         val preferIncomingTitle = incoming.title.isNotBlank() && !incoming.title.startsWith("AID #")
+        val keepExistingRicherIntro = existing.introShort.isNotBlank() && (
+            incoming.introShort.isBlank() ||
+                (
+                    !existing.isIntroTruncatedPreview &&
+                        incoming.isIntroTruncatedPreview &&
+                        existing.introShort.length > incoming.introShort.length
+                    )
+            )
         return DiscoveryNovelCardItem(
             aid = incoming.aid,
             title = if (preferIncomingTitle) incoming.title else existing.title,
@@ -613,17 +648,23 @@ class DiscoveryRepository(
             bookStatus = incoming.bookStatus.ifBlank { existing.bookStatus },
             lastUpdate = incoming.lastUpdate.ifBlank { existing.lastUpdate },
             tags = if (incoming.tags.isNotEmpty()) incoming.tags else existing.tags,
-            introShort = incoming.introShort.ifBlank { existing.introShort },
+            introShort = if (keepExistingRicherIntro) existing.introShort else incoming.introShort,
             coverUrl = incoming.coverUrl.ifBlank { existing.coverUrl },
             inLocalBookshelf = incoming.inLocalBookshelf,
             isHydratingMetadata = false,
+            isIntroTruncatedPreview = if (keepExistingRicherIntro) {
+                existing.isIntroTruncatedPreview
+            } else {
+                incoming.isIntroTruncatedPreview
+            },
         )
     }
 
     private fun NovelEntity.toCardItem(): DiscoveryNovelCardItem {
-        val resolvedIntro = introShort.ifBlank {
-            fullIntro.lineSequence().firstOrNull { it.isNotBlank() }?.trim().orEmpty()
-        }
+        val (resolvedIntro, isTruncatedPreview) = org.mewx.wenku8.domain.model.resolvePreferredCardIntro(
+            fullIntro = fullIntro,
+            introShort = introShort,
+        )
         return DiscoveryNovelCardItem(
             aid = aid,
             title = title,
@@ -635,10 +676,18 @@ class DiscoveryRepository(
             coverUrl = apiClient.resolveCoverUrl(aid),
             inLocalBookshelf = inBookshelf,
             isHydratingMetadata = false,
+            isIntroTruncatedPreview = isTruncatedPreview,
         )
     }
 
-    private fun ParsedNovelFullMeta.toCardItem(inBookshelf: Boolean): DiscoveryNovelCardItem {
+    private fun ParsedNovelFullMeta.toCardItem(
+        inBookshelf: Boolean,
+        cachedFullIntro: String? = null,
+    ): DiscoveryNovelCardItem {
+        val (richFullIntro, _) = org.mewx.wenku8.domain.model.resolvePreferredCardIntro(
+            fullIntro = cachedFullIntro,
+            introShort = latestSectionName,
+        )
         return DiscoveryNovelCardItem(
             aid = aid,
             title = title,
@@ -646,7 +695,7 @@ class DiscoveryRepository(
             bookStatus = bookStatus,
             lastUpdate = lastUpdate,
             tags = listOfNotNull(pressId.takeIf { it.isNotBlank() }),
-            introShort = latestSectionName,
+            introShort = richFullIntro,
             coverUrl = apiClient.resolveCoverUrl(aid),
             inLocalBookshelf = inBookshelf,
             isHydratingMetadata = false,

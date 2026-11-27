@@ -685,6 +685,159 @@ class DiscoveryRepositoryAndApiClientTest {
         )
     }
 
+    @Test
+    fun discoveryFeedAndLocalSearch_preferCachedFullIntroOverTruncatedNovellistSnippet() = runTest {
+        val richFullIntro = "　　圣玛格诺利亚共和国每天遭受邻国「帝国」无人兵器「军团」的侵略。\n" +
+            "　　为了应对其攻势，共和国也成功研发出同型兵器，勉强在没有人员伤亡的情况下击退了敌军威胁。"
+        val longFullIntro = "甲".repeat(300)
+
+        database.novelDao().upsertNovels(
+            listOf(
+                NovelEntity(
+                    aid = 2500,
+                    title = "86-不存在的战区-",
+                    author = "安里アサト",
+                    introShort = "圣玛格诺利亚共和国每天遭受邻国「帝国」",
+                    fullIntro = richFullIntro,
+                    inBookshelf = true,
+                ),
+                NovelEntity(
+                    aid = 2600,
+                    title = "超长简介测试作品",
+                    author = "测试作者",
+                    introShort = "超长简介前二十字",
+                    fullIntro = longFullIntro,
+                    inBookshelf = true,
+                ),
+            ),
+        )
+
+        val gateway = FakeCatalogGateway().apply {
+            listPages[1] = WenkuApiResult.Success(
+                ParsedNovelListPage(
+                    totalPages = 2,
+                    items = listOf(
+                        ParsedNovelListItem(
+                            aid = 2500,
+                            title = "86-不存在的战区-",
+                            author = "安里アサト",
+                            bookStatus = "连载中",
+                            lastUpdate = "2026-11-27",
+                            tagsCsv = "科幻 机甲",
+                            introShort = "圣玛格诺利亚共和国每天遭受邻国「帝国」",
+                        ),
+                        ParsedNovelListItem(
+                            aid = 2700,
+                            title = "未点开过的新书",
+                            author = "新作者",
+                            bookStatus = "连载中",
+                            lastUpdate = "2026-11-27",
+                            tagsCsv = "奇幻",
+                            introShort = "战国风云儿·织田信长借阴阳道之力统一天下，",
+                        ),
+                    ),
+                ),
+            )
+            listPages[2] = WenkuApiResult.Success(
+                ParsedNovelListPage(
+                    totalPages = 2,
+                    items = listOf(
+                        ParsedNovelListItem(
+                            aid = 2600,
+                            title = "超长简介测试作品",
+                            author = "测试作者",
+                            bookStatus = "已完结",
+                            lastUpdate = "2026-11-27",
+                            tagsCsv = "校园",
+                            introShort = "超长简介前二十字",
+                        ),
+                    ),
+                ),
+            )
+            fullMetaByAid[2500] = ParsedNovelFullMeta(
+                aid = 2500,
+                title = "86-不存在的战区-",
+                author = "安里アサト",
+                pressId = "电击文库",
+                bookStatus = "连载中",
+                lastUpdate = "2026-11-27",
+                latestSectionName = "第十三卷 终章",
+            )
+        }
+
+        val repository = DiscoveryRepository(database = database, apiClient = gateway)
+        val sort = Wenku8API.NovelSortedBy.lastUpdate
+
+        // Page 1: cached aid 2500 gets full flattened intro (non-truncated), while uncached aid 2700 keeps truncated snippet.
+        repository.loadInitialOrRefreshFeed(sort, Wenku8API.AppLanguage.SC)
+        val page1Items = repository.observeFeedState(sort).value.items
+        assertEquals(2, page1Items.size)
+        assertEquals(
+            "圣玛格诺利亚共和国每天遭受邻国「帝国」无人兵器「军团」的侵略。 为了应对其攻势，共和国也成功研发出同型兵器，勉强在没有人员伤亡的情况下击退了敌军威胁。",
+            page1Items[0].introShort,
+        )
+        assertFalse(page1Items[0].isIntroTruncatedPreview)
+        assertEquals("战国风云儿·织田信长借阴阳道之力统一天下，", page1Items[1].introShort)
+        assertTrue(page1Items[1].isIntroTruncatedPreview)
+
+        // Page 2: very long cached fullIntro is bounded to MAX_CARD_FULL_INTRO_PREVIEW_CHARS.
+        repository.loadNextFeedPage(sort, Wenku8API.AppLanguage.SC)
+        val page2Items = repository.observeFeedState(sort).value.items
+        val longCard = page2Items.first { it.aid == 2600 }
+        assertEquals(
+            org.mewx.wenku8.domain.model.MAX_CARD_FULL_INTRO_PREVIEW_CHARS,
+            longCard.introShort.length,
+        )
+        assertFalse(longCard.isIntroTruncatedPreview)
+
+        // Subsequent forceRefresh when Room no longer has fullIntro (e.g. shorter novellist payload)
+        // must still preserve the richer cached card intro monotonically in memory.
+        database.novelDao().upsertNovel(
+            NovelEntity(
+                aid = 2500,
+                title = "86-不存在的战区-",
+                author = "安里アサト",
+                introShort = "圣玛格诺利亚共和国每天遭受邻国「帝国」",
+                fullIntro = "",
+                inBookshelf = true,
+            ),
+        )
+        repository.loadInitialOrRefreshFeed(sort, Wenku8API.AppLanguage.SC, forceRefresh = true)
+        val refreshed2500 = repository.observeFeedState(sort).value.items.first { it.aid == 2500 }
+        assertFalse(refreshed2500.isIntroTruncatedPreview)
+        assertTrue(refreshed2500.introShort.contains("为了应对其攻势"))
+
+        // Local bookshelf search prefers fullIntro over introShort.
+        val localMatches = repository.filterLocalLibraryInstant("超长简介")
+        assertEquals(1, localMatches.size)
+        assertEquals(
+            org.mewx.wenku8.domain.model.MAX_CARD_FULL_INTRO_PREVIEW_CHARS,
+            localMatches[0].introShort.length,
+        )
+        assertFalse(localMatches[0].isIntroTruncatedPreview)
+
+        // Direct AID lookup uses cached fullIntro if available, otherwise non-truncated latestSectionName.
+        database.novelDao().upsertNovel(
+            NovelEntity(
+                aid = 2500,
+                title = "86-不存在的战区-",
+                author = "安里アサト",
+                fullIntro = richFullIntro,
+                inBookshelf = true,
+            ),
+        )
+        repository.submitOnlineSearch(
+            scope = this,
+            rawQuery = "2500",
+            mode = UnifiedSearchMode.DIRECT_AID,
+            appLanguage = Wenku8API.AppLanguage.SC,
+        )
+        testScheduler.runCurrent()
+        val aidCard = repository.onlineSearchState.value.results.single()
+        assertFalse(aidCard.isIntroTruncatedPreview)
+        assertTrue(aidCard.introShort.contains("为了应对其攻势"))
+    }
+
     private class FakeCatalogGateway : WenkuCatalogGateway {
         override val isApiConfigured: Boolean = true
 

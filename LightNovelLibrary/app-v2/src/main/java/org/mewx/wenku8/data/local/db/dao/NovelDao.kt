@@ -21,6 +21,15 @@ data class NovelSyncHeader(
 )
 
 /**
+ * Lightweight projection read by `DiscoveryRepository` to enrich list cards with a locally
+ * cached `full_intro` for fuller 2-line previews without loading full novel rows.
+ */
+data class NovelFullIntroProjection(
+    @ColumnInfo(name = "aid") val aid: Int,
+    @ColumnInfo(name = "full_intro") val fullIntro: String,
+)
+
+/**
  * DAO for `novels` (`OnConflictStrategy.REPLACE` is strictly banned across the entire database so
  * SQLite never executes `DELETE + INSERT` and never triggers `ON DELETE CASCADE` on child tables).
  */
@@ -81,6 +90,9 @@ interface NovelDao {
 
     @Query("SELECT aid FROM novels WHERE in_bookshelf = 1 ORDER BY shelf_sort_order ASC")
     suspend fun getBookshelfNovelIds(): List<Int>
+
+    @Query("SELECT aid, full_intro FROM novels WHERE aid IN (:aids) AND full_intro != ''")
+    suspend fun getCachedFullIntrosByAids(aids: List<Int>): List<NovelFullIntroProjection>
 
     @Query(
         """
