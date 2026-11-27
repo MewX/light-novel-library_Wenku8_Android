@@ -475,6 +475,15 @@
     <string name="detail_chapter_reading_now_format">正在阅读 · %1$d%%</string>
     <string name="detail_chapter_cached_badge">已缓存</string>
     <string name="detail_chapter_illustration_badge">插图画集</string>
+    <string name="detail_volume_more_actions">本卷更多操作</string>
+    <string name="detail_volume_clear_cache_action">清除本卷缓存</string>
+    <string name="detail_volume_redownload_action">重新下载本卷</string>
+    <string name="detail_clear_volume_cache_dialog_title">清除本卷缓存</string>
+    <string name="detail_clear_volume_cache_dialog_message_format">确定清除《%1$s》中已缓存的 %2$d 个章节及其插图？阅读进度与书签将保留。</string>
+    <string name="detail_clear_chapter_cache_dialog_title">清除本章缓存</string>
+    <string name="detail_clear_chapter_cache_dialog_message_format">确定清除《%1$s》的离线缓存及其插图？阅读进度与书签将保留。</string>
+    <string name="detail_clear_cache_confirm_action">清除缓存</string>
+    <string name="detail_clear_cache_success_snackbar_format">已清除 %1$d 章缓存，释放 %2$s</string>
     <string name="detail_toc_empty_loading">正在同步分卷目录…</string>
     <string name="detail_toc_empty_offline">当前离线且尚未缓存目录，联网后点击刷新即可获取</string>
     <string name="detail_offline_preserved_banner">当前网络连接不可用，已为您展示本地保存的详情与目录</string>
