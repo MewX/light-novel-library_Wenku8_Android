@@ -5,8 +5,10 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -38,11 +40,13 @@ import androidx.compose.material.icons.outlined.BookmarkAdded
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.CloudOff
 import androidx.compose.material.icons.outlined.ContentCopy
+import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material.icons.outlined.DownloadDone
 import androidx.compose.material.icons.outlined.ExpandLess
 import androidx.compose.material.icons.outlined.ExpandMore
 import androidx.compose.material.icons.outlined.Image
+import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material.icons.outlined.PlayArrow
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.RestartAlt
@@ -141,6 +145,7 @@ import org.mewx.wenku8.ui.components.ActionTooltipBox
 import org.mewx.wenku8.ui.components.TooltipIconButton
 import org.mewx.wenku8.ui.discovery.bookStatusLeadingIcon
 import org.mewx.wenku8.ui.discovery.formatBookStatusLabel
+import org.mewx.wenku8.ui.profile.formatByteSize
 import org.mewx.wenku8.ui.reader.ArtbookLightboxOverlay
 import org.mewx.wenku8.ui.theme.CoverThemeEngine
 import org.mewx.wenku8.ui.theme.LocalEinkMode
@@ -184,8 +189,13 @@ object NovelDetailTestTags {
     const val TOC_SEARCH_INPUT = "novel_detail_toc_search_input"
     const val TOC_ORDER_TOGGLE = "novel_detail_toc_order_toggle"
     const val VOLUME_HEADER_PREFIX = "novel_detail_volume_header_"
+    const val VOLUME_MENU_BUTTON_PREFIX = "novel_detail_volume_menu_"
+    const val VOLUME_MENU_CLEAR_CACHE = "novel_detail_volume_menu_clear_cache"
+    const val VOLUME_MENU_REDOWNLOAD = "novel_detail_volume_menu_redownload"
     const val VOLUME_ILLUS_CHIP_PREFIX = "novel_detail_volume_illus_chip_"
     const val CHAPTER_ROW_PREFIX = "novel_detail_chapter_row_"
+    const val CLEAR_CACHE_CONFIRM_DIALOG = "novel_detail_clear_cache_confirm_dialog"
+    const val CLEAR_CACHE_CONFIRM_BUTTON = "novel_detail_clear_cache_confirm_button"
     const val DOWNLOADER_SHEET = "novel_detail_downloader_sheet"
     const val DOWNLOAD_MODE_PREFIX = "novel_detail_download_mode_"
     const val DOWNLOAD_VOLUME_CHECK_PREFIX = "novel_detail_download_vol_"
@@ -304,6 +314,7 @@ fun NovelDetailScreen(
     var isReverseVolumeOrder by rememberSaveable(aid) { mutableStateOf(false) }
     var isDownloaderSheetOpen by rememberSaveable(aid) { mutableStateOf(false) }
     var showInlineCoverLightbox by rememberSaveable(aid) { mutableStateOf(false) }
+    var pendingCacheClearTarget by remember(aid) { mutableStateOf<PendingDetailCacheClearTarget?>(null) }
 
     // Auto-expand either the volume containing reading progress or the first volume on the very
     // first frame `volumes` arrives so there is never a 1-frame collapsed-then-pop-open flash.
@@ -929,6 +940,50 @@ fun NovelDetailScreen(
                                         prog?.charOffset ?: 0,
                                     )
                                 },
+                                onRequestClearVolumeCache = {
+                                    val cachedCids = volume.chapters
+                                        .filter { it.isCached }
+                                        .map { it.cid }
+                                    if (cachedCids.isNotEmpty()) {
+                                        pendingCacheClearTarget = PendingDetailCacheClearTarget.Volume(
+                                            vid = volume.vid,
+                                            volumeTitle = volume.volumeTitle,
+                                            cachedCids = cachedCids,
+                                        )
+                                    }
+                                },
+                                onRequestRedownloadVolume = {
+                                    if (!inBookshelf) {
+                                        coroutineScope.launch {
+                                            val baseEntity = snapshot.novel ?: NovelEntity(
+                                                aid = aid,
+                                                title = displayTitle,
+                                                author = displayAuthor,
+                                            )
+                                            bookshelfRepository.addNovelToBookshelf(
+                                                novel = baseEntity,
+                                                syncToCloudIfSignedIn = true,
+                                            )
+                                        }
+                                    }
+                                    novelDownloadRepository.startDownload(
+                                        NovelDownloadRequest(
+                                            aid = aid,
+                                            appLanguage = appLanguage,
+                                            mode = NovelDownloadMode.SELECT_VOLUMES,
+                                            selectedVolumeIds = setOf(volume.vid),
+                                            overwriteSelectedVolumes = true,
+                                        ),
+                                    )
+                                },
+                                onRequestClearChapterCache = { chap ->
+                                    if (chap.isCached) {
+                                        pendingCacheClearTarget = PendingDetailCacheClearTarget.Chapter(
+                                            cid = chap.cid,
+                                            chapterTitle = chap.chapterTitle,
+                                        )
+                                    }
+                                },
                             )
                         }
                     }
@@ -1038,6 +1093,65 @@ fun NovelDetailScreen(
                 },
             )
         }
+
+            val activeCacheClear = pendingCacheClearTarget
+            if (activeCacheClear != null) {
+                val (dialogTitle, dialogBody, targetCids) = when (activeCacheClear) {
+                    is PendingDetailCacheClearTarget.Volume -> Triple(
+                        stringResource(R.string.detail_clear_volume_cache_dialog_title),
+                        stringResource(
+                            R.string.detail_clear_volume_cache_dialog_message_format,
+                            activeCacheClear.volumeTitle,
+                            activeCacheClear.cachedCids.size,
+                        ),
+                        activeCacheClear.cachedCids,
+                    )
+                    is PendingDetailCacheClearTarget.Chapter -> Triple(
+                        stringResource(R.string.detail_clear_chapter_cache_dialog_title),
+                        stringResource(
+                            R.string.detail_clear_chapter_cache_dialog_message_format,
+                            activeCacheClear.chapterTitle,
+                        ),
+                        listOf(activeCacheClear.cid),
+                    )
+                }
+                AlertDialog(
+                    onDismissRequest = { pendingCacheClearTarget = null },
+                    modifier = Modifier.testTag(NovelDetailTestTags.CLEAR_CACHE_CONFIRM_DIALOG),
+                    title = { Text(text = dialogTitle) },
+                    text = { Text(text = dialogBody) },
+                    confirmButton = {
+                        TextButton(
+                            onClick = {
+                                pendingCacheClearTarget = null
+                                coroutineScope.launch {
+                                    val result = bookshelfRepository.clearCachedChapters(targetCids)
+                                    if (result.deletedChaptersCount > 0) {
+                                        snackbarHostState.showSnackbar(
+                                            context.getString(
+                                                R.string.detail_clear_cache_success_snackbar_format,
+                                                result.deletedChaptersCount,
+                                                formatByteSize(result.reclaimedBytes),
+                                            ),
+                                        )
+                                    }
+                                }
+                            },
+                            modifier = Modifier.testTag(NovelDetailTestTags.CLEAR_CACHE_CONFIRM_BUTTON),
+                        ) {
+                            Text(
+                                text = stringResource(R.string.detail_clear_cache_confirm_action),
+                                color = MaterialTheme.colorScheme.error,
+                            )
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { pendingCacheClearTarget = null }) {
+                            Text(text = stringResource(R.string.action_cancel))
+                        }
+                    },
+                )
+            }
 
             if (showInlineCoverLightbox && effectiveCoverUrl.isNotBlank()) {
                 ArtbookLightboxOverlay(
@@ -2087,6 +2201,20 @@ private fun VolumeDirectoryHeader(
 }
 
 @OptIn(ExperimentalLayoutApi::class)
+private sealed interface PendingDetailCacheClearTarget {
+    data class Volume(
+        val vid: Int,
+        val volumeTitle: String,
+        val cachedCids: List<Int>,
+    ) : PendingDetailCacheClearTarget
+
+    data class Chapter(
+        val cid: Int,
+        val chapterTitle: String,
+    ) : PendingDetailCacheClearTarget
+}
+
+@OptIn(ExperimentalLayoutApi::class, ExperimentalFoundationApi::class)
 @Composable
 private fun VolumeAccordionCard(
     volume: VolumeAccordionModel,
@@ -2094,8 +2222,15 @@ private fun VolumeAccordionCard(
     readingProgressPercent: Int,
     onToggleExpand: () -> Unit,
     onChapterClicked: (ChapterRowModel) -> Unit,
+    onRequestClearVolumeCache: () -> Unit,
+    onRequestRedownloadVolume: () -> Unit,
+    onRequestClearChapterCache: (ChapterRowModel) -> Unit,
 ) {
     val fontScale = LocalDensity.current.fontScale
+    var showVolumeMenu by remember(volume.vid) { mutableStateOf(false) }
+    val hasVolumeCache = volume.cachedChapterCount > 0
+    val volumeMoreActionsLabel = stringResource(R.string.detail_volume_more_actions)
+
     Card(
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
@@ -2112,9 +2247,22 @@ private fun VolumeAccordionCard(
                     modifier = Modifier
                         .fillMaxWidth()
                         .heightIn(min = 48.dp)
-                        .clickable(onClick = onToggleExpand)
-                        .padding(horizontal = 14.dp, vertical = 12.dp)
-                        .testTag(NovelDetailTestTags.VOLUME_HEADER_PREFIX + volume.vid),
+                        .combinedClickable(
+                            onClick = onToggleExpand,
+                            onLongClick = {
+                                if (hasVolumeCache) {
+                                    onRequestClearVolumeCache()
+                                }
+                            },
+                            hapticFeedbackEnabled = hasVolumeCache,
+                        )
+                        .testTag(NovelDetailTestTags.VOLUME_HEADER_PREFIX + volume.vid)
+                        .padding(
+                            start = 14.dp,
+                            end = if (hasVolumeCache) 4.dp else 14.dp,
+                            top = 12.dp,
+                            bottom = 12.dp,
+                        ),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
@@ -2193,6 +2341,63 @@ private fun VolumeAccordionCard(
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
+
+                    if (hasVolumeCache) {
+                        Box {
+                            TooltipIconButton(
+                                tooltipText = volumeMoreActionsLabel,
+                                onClick = { showVolumeMenu = true },
+                                modifier = Modifier.testTag(NovelDetailTestTags.VOLUME_MENU_BUTTON_PREFIX + volume.vid),
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Outlined.MoreVert,
+                                    contentDescription = volumeMoreActionsLabel,
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                            DropdownMenu(
+                                expanded = showVolumeMenu,
+                                onDismissRequest = { showVolumeMenu = false },
+                            ) {
+                                DropdownMenuItem(
+                                    text = {
+                                        Text(
+                                            text = stringResource(R.string.detail_volume_clear_cache_action),
+                                            color = MaterialTheme.colorScheme.error,
+                                        )
+                                    },
+                                    leadingIcon = {
+                                        Icon(
+                                            imageVector = Icons.Outlined.DeleteOutline,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.error,
+                                        )
+                                    },
+                                    onClick = {
+                                        showVolumeMenu = false
+                                        onRequestClearVolumeCache()
+                                    },
+                                    modifier = Modifier.testTag(NovelDetailTestTags.VOLUME_MENU_CLEAR_CACHE),
+                                )
+                                DropdownMenuItem(
+                                    text = {
+                                        Text(text = stringResource(R.string.detail_volume_redownload_action))
+                                    },
+                                    leadingIcon = {
+                                        Icon(
+                                            imageVector = Icons.Outlined.Download,
+                                            contentDescription = null,
+                                        )
+                                    },
+                                    onClick = {
+                                        showVolumeMenu = false
+                                        onRequestRedownloadVolume()
+                                    },
+                                    modifier = Modifier.testTag(NovelDetailTestTags.VOLUME_MENU_REDOWNLOAD),
+                                )
+                            }
+                        }
+                    }
                 }
 
                 if (isExpanded && volume.chapters.isNotEmpty()) {
@@ -2210,9 +2415,17 @@ private fun VolumeAccordionCard(
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clickable { onChapterClicked(chapter) }
-                                .padding(horizontal = 16.dp, vertical = 12.dp)
-                                .testTag(NovelDetailTestTags.CHAPTER_ROW_PREFIX + chapter.cid),
+                                .combinedClickable(
+                                    onClick = { onChapterClicked(chapter) },
+                                    onLongClick = {
+                                        if (chapter.isCached) {
+                                            onRequestClearChapterCache(chapter)
+                                        }
+                                    },
+                                    hapticFeedbackEnabled = chapter.isCached,
+                                )
+                                .testTag(NovelDetailTestTags.CHAPTER_ROW_PREFIX + chapter.cid)
+                                .padding(horizontal = 16.dp, vertical = 12.dp),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                         ) {

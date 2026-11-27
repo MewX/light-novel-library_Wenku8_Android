@@ -475,6 +475,15 @@
     <string name="detail_chapter_reading_now_format">正在閱讀 · %1$d%%</string>
     <string name="detail_chapter_cached_badge">已快取</string>
     <string name="detail_chapter_illustration_badge">插圖畫集</string>
+    <string name="detail_volume_more_actions">本卷更多操作</string>
+    <string name="detail_volume_clear_cache_action">清除本卷快取</string>
+    <string name="detail_volume_redownload_action">重新下載本卷</string>
+    <string name="detail_clear_volume_cache_dialog_title">清除本卷快取</string>
+    <string name="detail_clear_volume_cache_dialog_message_format">確定清除《%1$s》中已快取的 %2$d 個章節及其插圖？閱讀進度與書籤將保留。</string>
+    <string name="detail_clear_chapter_cache_dialog_title">清除本章快取</string>
+    <string name="detail_clear_chapter_cache_dialog_message_format">確定清除《%1$s》的離線快取及其插圖？閱讀進度與書籤將保留。</string>
+    <string name="detail_clear_cache_confirm_action">清除快取</string>
+    <string name="detail_clear_cache_success_snackbar_format">已清除 %1$d 章快取，釋放 %2$s</string>
     <string name="detail_toc_empty_loading">正在同步分卷目錄…</string>
     <string name="detail_toc_empty_offline">目前離線且尚未快取目錄，連網後點擊重新整理即可取得</string>
     <string name="detail_offline_preserved_banner">目前網絡連線不可用，已為您顯示本地儲存的詳情與目錄</string>

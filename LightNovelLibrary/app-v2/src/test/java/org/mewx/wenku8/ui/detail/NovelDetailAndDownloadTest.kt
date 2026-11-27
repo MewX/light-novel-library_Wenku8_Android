@@ -118,6 +118,7 @@ class NovelDetailAndDownloadTest {
             catalogGateway = fakeGateway,
             novelTocSyncRepository = tocSyncRepository,
             userSessionRepository = null,
+            assetRootsProvider = { listOf(tempAssetRoot) },
             ioDispatcher = Dispatchers.Unconfined,
         )
         downloadRepository = NovelDownloadRepository(
@@ -1183,6 +1184,145 @@ class NovelDetailAndDownloadTest {
         assertEquals(testCoverUrl, capturedUrl)
         // Host owns the full-screen overlay so inline overlay stays closed
         composeTestRule.onNodeWithTag(ArtbookTestTags.OVERLAY).assertDoesNotExist()
+    }
+
+    @Test
+    fun volumeAndChapterCacheClear_onlyCachedShowConfirm_volumeMenuAndLongPressClearGranularly() {
+        runBlocking {
+            detailRepository.refreshNovelDetail(5, Wenku8API.AppLanguage.SC)
+            // Download Volume 1 (cids 101 & 102 with illustration) only; leave Volume 2 (cid 201) uncached.
+            downloadRepository.executeDownload(
+                NovelDownloadRequest(
+                    aid = 5,
+                    appLanguage = Wenku8API.AppLanguage.SC,
+                    mode = NovelDownloadMode.SELECT_VOLUMES,
+                    selectedVolumeIds = setOf(10),
+                    overwriteSelectedVolumes = true,
+                ),
+            )
+            database.readingProgressDao().upsertProgress(
+                ReadingProgressEntity(
+                    aid = 5,
+                    vid = 10,
+                    cid = 101,
+                    volumeTitle = "第一卷 旅途的开端",
+                    chapterTitle = "第一话 贤狼与商人",
+                    paragraphIndex = 5,
+                    charOffset = 0,
+                    legacyScrollPx = 0,
+                    progressPermille = 250,
+                    updatedAtMs = 9_000L,
+                ),
+            )
+        }
+
+        val illusLegacyName = org.mewx.wenku8.data.remote.parser.WenkuXmlParsers
+            .generateLegacyImageFileName("http://pic.wenku8.cn/pictures/0/5/102/999.jpg")
+        val offlineIllusFile = File(tempAssetRoot, "saves/imgs/$illusLegacyName")
+        assertTrue("Downloaded illustration file should exist before clearing", offlineIllusFile.exists())
+
+        composeTestRule.setContent {
+            Wenku8ExpressiveTheme(themeMode = Wenku8ThemeMode.ARCHIVAL_DAY) {
+                NovelDetailScreen(
+                    aid = 5,
+                    novelDetailRepository = detailRepository,
+                    bookshelfRepository = bookshelfRepository,
+                    novelDownloadRepository = downloadRepository,
+                    appLanguage = Wenku8API.AppLanguage.SC,
+                    themeMode = Wenku8ThemeMode.ARCHIVAL_DAY,
+                    enableLiveAdViewInflation = false,
+                )
+            }
+        }
+        composeTestRule.waitForIdle()
+
+        val listNode = composeTestRule.onNodeWithTag(NovelDetailTestTags.SCREEN_ROOT + "_list")
+
+        // 1. Cached Volume 10 shows ⋮ menu button; uncached Volume 20 does NOT show ⋮ menu button.
+        listNode.performScrollToNode(hasTestTag(NovelDetailTestTags.VOLUME_HEADER_PREFIX + 10))
+        composeTestRule.onNodeWithTag(NovelDetailTestTags.VOLUME_MENU_BUTTON_PREFIX + 10)
+            .assertIsDisplayed()
+        assertEquals(
+            "Uncached volume must not display overflow menu button",
+            0,
+            composeTestRule.onAllNodesWithTag(NovelDetailTestTags.VOLUME_MENU_BUTTON_PREFIX + 20)
+                .fetchSemanticsNodes().size,
+        )
+
+        // 2. Long-pressing cached Chapter 101 opens confirm dialog and clears ONLY Chapter 101.
+        listNode.performScrollToNode(hasTestTag(NovelDetailTestTags.CHAPTER_ROW_PREFIX + 101))
+        composeTestRule.onNodeWithTag(NovelDetailTestTags.CHAPTER_ROW_PREFIX + 101)
+            .performTouchInput { longClick(center) }
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag(NovelDetailTestTags.CLEAR_CACHE_CONFIRM_DIALOG).assertIsDisplayed()
+        composeTestRule.onNodeWithTag(NovelDetailTestTags.CLEAR_CACHE_CONFIRM_BUTTON).performClick()
+        composeTestRule.waitForIdle()
+
+        runBlocking {
+            val remainingCids = database.chapterContentDao().getCachedChapterIdsForNovel(5)
+            assertEquals("Only chapter 101 should be cleared; chapter 102 must remain", listOf(102), remainingCids)
+            assertNotNull("Reading progress must remain intact", database.readingProgressDao().getProgressForNovel(5))
+        }
+        assertTrue("Chapter 102 illustration must survive clearing chapter 101", offlineIllusFile.exists())
+
+        // 3. Long-pressing cached Volume 10 header opens confirm dialog (cancel first), then
+        //    tapping Volume 10's ⋮ menu -> "清除本卷缓存" clears remaining Chapter 102 + offline illustration!
+        listNode.performScrollToNode(hasTestTag(NovelDetailTestTags.VOLUME_HEADER_PREFIX + 10))
+        composeTestRule.onNodeWithTag(NovelDetailTestTags.VOLUME_HEADER_PREFIX + 10)
+            .performTouchInput { longClick(center) }
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag(NovelDetailTestTags.CLEAR_CACHE_CONFIRM_DIALOG).assertIsDisplayed()
+        composeTestRule.onNodeWithText("取消").performClick()
+        composeTestRule.waitForIdle()
+
+        composeTestRule.onNodeWithTag(NovelDetailTestTags.VOLUME_MENU_BUTTON_PREFIX + 10).performClick()
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag(NovelDetailTestTags.VOLUME_MENU_CLEAR_CACHE)
+            .assertIsDisplayed()
+            .performClick()
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag(NovelDetailTestTags.CLEAR_CACHE_CONFIRM_DIALOG).assertIsDisplayed()
+        composeTestRule.onNodeWithTag(NovelDetailTestTags.CLEAR_CACHE_CONFIRM_BUTTON).performClick()
+        composeTestRule.waitForIdle()
+
+        runBlocking {
+            val remainingCids = database.chapterContentDao().getCachedChapterIdsForNovel(5)
+            assertTrue("All cached chapters in Volume 10 should now be cleared", remainingCids.isEmpty())
+            assertNotNull("Reading progress must remain intact", database.readingProgressDao().getProgressForNovel(5))
+        }
+        assertFalse("Volume 10 illustration file must be deleted when clearing Volume 10", offlineIllusFile.exists())
+        assertEquals(
+            "Overflow menu button disappears once volume has zero cached chapters",
+            0,
+            composeTestRule.onAllNodesWithTag(NovelDetailTestTags.VOLUME_MENU_BUTTON_PREFIX + 10)
+                .fetchSemanticsNodes().size,
+        )
+
+        // 4. Long-pressing uncached Volume 20 and uncached Chapter 201 must NOT open confirmation dialog.
+        // Collapse Volume 10 first so Volume 20 and its expanded chapters sit cleanly in the viewport.
+        composeTestRule.onNodeWithTag(NovelDetailTestTags.VOLUME_HEADER_PREFIX + 10).performClick()
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag(NovelDetailTestTags.VOLUME_HEADER_PREFIX + 20)
+            .performTouchInput { longClick(center) }
+        composeTestRule.waitForIdle()
+        assertEquals(
+            "Long-pressing uncached volume must do nothing",
+            0,
+            composeTestRule.onAllNodesWithTag(NovelDetailTestTags.CLEAR_CACHE_CONFIRM_DIALOG)
+                .fetchSemanticsNodes().size,
+        )
+        composeTestRule.onNodeWithTag(NovelDetailTestTags.VOLUME_HEADER_PREFIX + 20).performClick()
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag(NovelDetailTestTags.CHAPTER_ROW_PREFIX + 201)
+            .assertIsDisplayed()
+            .performTouchInput { longClick(center) }
+        composeTestRule.waitForIdle()
+        assertEquals(
+            "Long-pressing uncached chapter must do nothing",
+            0,
+            composeTestRule.onAllNodesWithTag(NovelDetailTestTags.CLEAR_CACHE_CONFIRM_DIALOG)
+                .fetchSemanticsNodes().size,
+        )
     }
 }
 
