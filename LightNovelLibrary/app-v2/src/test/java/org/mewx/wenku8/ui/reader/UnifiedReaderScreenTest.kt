@@ -6,13 +6,17 @@ import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.Color as AndroidColor
 import android.view.KeyEvent as AndroidKeyEvent
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.SaverScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asAndroidBitmap
@@ -24,6 +28,7 @@ import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
+import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
@@ -2591,6 +2596,246 @@ class UnifiedReaderScreenTest {
                 sha256Checksum = "sha_$cid",
                 downloadedAtMs = 1_700_000_000_000L,
             ),
+        )
+    }
+
+    @Test
+    fun readerArtbookStateSaver_roundTripsValidState_andRejectsMalformedPayloadsSafely() {
+        val scope = SaverScope { true }
+        assertNull(with(ReaderActiveArtbookStateNullableSaver) { scope.save(null) })
+
+        val state = ReaderActiveArtbookState(
+            cid = 9502,
+            volumeVid = 950,
+            chapterTitle = "第二章",
+            imageUrls = listOf("https://pic.wenku8.com/1.jpg", "https://pic.wenku8.com/2.jpg"),
+            initialIndex = 1,
+            entryMode = ReaderArtbookEntryMode.TEMPORARY_VOLUME_PEEK,
+        )
+        val saved = with(ReaderActiveArtbookStateNullableSaver) { scope.save(state) }!!
+        assertEquals(state, ReaderActiveArtbookStateNullableSaver.restore(saved))
+
+        assertNull(ReaderActiveArtbookStateNullableSaver.restore("bad"))
+        assertNull(ReaderActiveArtbookStateNullableSaver.restore(listOf(1, 2)))
+        assertNull(ReaderActiveArtbookStateNullableSaver.restore(listOf("bad", 1, "t", listOf("u"), 0, "INLINE_CHAPTER_GALLERY")))
+        assertNull(ReaderActiveArtbookStateNullableSaver.restore(listOf(1, "bad", "t", listOf("u"), 0, "INLINE_CHAPTER_GALLERY")))
+        assertNull(ReaderActiveArtbookStateNullableSaver.restore(listOf(1, 1, 999, listOf("u"), 0, "INLINE_CHAPTER_GALLERY")))
+        assertNull(ReaderActiveArtbookStateNullableSaver.restore(listOf(1, 1, "t", "notList", 0, "INLINE_CHAPTER_GALLERY")))
+        assertNull(ReaderActiveArtbookStateNullableSaver.restore(listOf(1, 1, "t", emptyList<String>(), 0, "INLINE_CHAPTER_GALLERY")))
+        assertNull(ReaderActiveArtbookStateNullableSaver.restore(listOf(1, 1, "t", listOf("u", 123), 0, "INLINE_CHAPTER_GALLERY")))
+        assertNull(ReaderActiveArtbookStateNullableSaver.restore(listOf(1, 1, "t", listOf("u"), "bad", "INLINE_CHAPTER_GALLERY")))
+        assertNull(ReaderActiveArtbookStateNullableSaver.restore(listOf(1, 1, "t", listOf("u"), 0, 999)))
+        assertNull(ReaderActiveArtbookStateNullableSaver.restore(listOf(1, 1, "t", listOf("u"), 0, "UNKNOWN_MODE")))
+    }
+
+    @Test
+    fun stateRestoration_afterCrossChapterReadingAndLightboxOpen_preservesChapterAnchorAndLightbox() {
+        runBlocking {
+            database.novelDao().upsertNovel(
+                NovelEntity(
+                    aid = 2501,
+                    title = "跨章状态恢复测试",
+                    author = "测试作者",
+                    inBookshelf = true,
+                    metaSyncedAtMs = 1_000L,
+                ),
+            )
+            tocSyncRepository.syncNovelIndexAtomically(
+                aid = 2501,
+                language = Wenku8API.AppLanguage.SC,
+                requestStartedAtMs = 2_000L,
+                parsedVolumes = listOf(
+                    ParsedVolumeToc(
+                        vid = 950,
+                        volumeTitle = "第一卷",
+                        chapters = listOf(
+                            ParsedChapterToc(cid = 9501, chapterTitle = "第一章 起点"),
+                            ParsedChapterToc(cid = 9502, chapterTitle = "第二章 旅途"),
+                        ),
+                    ),
+                ),
+            )
+            val ch1Text = buildString {
+                appendLine("第一卷 第一章 起点")
+                repeat(25) { idx ->
+                    appendLine("    第一章第${idx + 1}段测试正文内容，用于生成足够页数以便翻阅与跨章验证。")
+                }
+            }
+            val ch2Text = buildString {
+                appendLine("第一卷 第二章 旅途")
+                repeat(20) { idx ->
+                    appendLine("    第二章第${idx + 1}段测试正文内容，重建后必须继续停留在第二章当前阅读锚点。")
+                }
+                appendLine("<!--image-->https://pic.wenku8.com/pictures/restore/0.jpg<!--image-->")
+                repeat(15) { idx ->
+                    appendLine("    第二章插图后的第${idx + 1}段后续内容。")
+                }
+            }
+            database.chapterContentDao().upsertChapterContents(
+                listOf(
+                    ChapterContentEntity(
+                        cid = 9501,
+                        aid = 2501,
+                        contentLang = Wenku8API.AppLanguage.SC.name,
+                        contentText = ch1Text,
+                        byteLength = ch1Text.toByteArray().size,
+                        sha256Checksum = "sha_9501",
+                        downloadedAtMs = 1_700_000_000_000L,
+                    ),
+                    ChapterContentEntity(
+                        cid = 9502,
+                        aid = 2501,
+                        contentLang = Wenku8API.AppLanguage.SC.name,
+                        contentText = ch2Text,
+                        byteLength = ch2Text.toByteArray().size,
+                        sha256Checksum = "sha_9502",
+                        downloadedAtMs = 1_700_000_000_000L,
+                    ),
+                ),
+            )
+        }
+
+        val restorationTester = StateRestorationTester(composeTestRule)
+        restorationTester.setContent {
+            Wenku8ExpressiveTheme(themeMode = Wenku8ThemeMode.ARCHIVAL_DAY) {
+                UnifiedReaderScreen(
+                    launchRequest = ReaderLaunchRequest(
+                        aid = 2501,
+                        vid = 950,
+                        cid = 9501,
+                        novelTitle = "跨章状态恢复测试",
+                        volumeTitle = "第一卷",
+                        chapterTitle = "第一章 起点",
+                        initialParagraphIndex = 2,
+                    ),
+                    database = database,
+                    catalogGateway = fakeGateway,
+                    novelTocSyncRepository = tocSyncRepository,
+                    preferences = Wenku8UserPreferences(
+                        readerPageTurnMode = ReaderPageTurnMode.COVER_SLIDE,
+                    ),
+                    onReaderTypographyChanged = { _, _, _, _ -> },
+                    onNavigateBack = {},
+                    lineBreaker = DeterministicCellLineBreaker,
+                    ioDispatcher = Dispatchers.Main.immediate,
+                    computeDispatcher = Dispatchers.Main.immediate,
+                )
+            }
+        }
+
+        // 1. Open HUD -> TOC -> jump to Chapter 2 (cid = 9502), then advance one page inside Chapter 2
+        composeTestRule.waitUntil(5_000) {
+            composeTestRule.onAllNodesWithTag(ReaderTestTags.VIEWPORT_CONTAINER).fetchSemanticsNodes().isNotEmpty()
+        }
+        composeTestRule.onNodeWithTag(ReaderTestTags.VIEWPORT_CONTAINER).performTouchInput { click(center) }
+        composeTestRule.onNodeWithTag(ReaderTestTags.ACTION_TOC).performClick()
+        composeTestRule.onNodeWithTag("${ReaderTestTags.TOC_CHAPTER_ITEM_PREFIX}9502").performClick()
+        composeTestRule.waitUntil(5_000) {
+            runBlocking { database.readingProgressDao().getProgressForNovel(2501)?.cid == 9502 }
+        }
+        // Turn forward 1 page inside Chapter 2 so paragraphIndex > 0
+        composeTestRule.onNodeWithTag(ReaderTestTags.VIEWPORT_CONTAINER).performTouchInput {
+            click(Offset(width * 0.9f, height * 0.5f))
+        }
+        composeTestRule.waitUntil(5_000) {
+            runBlocking {
+                val p = database.readingProgressDao().getProgressForNovel(2501)
+                p != null && p.cid == 9502 && p.paragraphIndex > 0
+            }
+        }
+        val beforeRestoreProgress = runBlocking { database.readingProgressDao().getProgressForNovel(2501)!! }
+        assertEquals(9502, beforeRestoreProgress.cid)
+        assertTrue("Expected paragraphIndex > 0 inside Ch2, got ${beforeRestoreProgress.paragraphIndex}", beforeRestoreProgress.paragraphIndex > 0)
+
+        // 2. Emulate Activity recreation: MUST stay on Chapter 2 at the same paragraph (no rollback to Ch1!)
+        restorationTester.emulateSavedInstanceStateRestore()
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag(ReaderTestTags.VIEWPORT_CONTAINER).assertIsDisplayed()
+        val afterRestoreProgress = runBlocking { database.readingProgressDao().getProgressForNovel(2501)!! }
+        assertEquals("Cross-chapter restoration must stay on Chapter 2 instead of reverting to launchRequest.cid", 9502, afterRestoreProgress.cid)
+        assertEquals(beforeRestoreProgress.paragraphIndex, afterRestoreProgress.paragraphIndex)
+
+        // 3. Open Artbook lightbox via HUD chip and verify lightbox survives Activity recreation too!
+        composeTestRule.onNodeWithTag(ReaderTestTags.VIEWPORT_CONTAINER).performTouchInput { click(center) }
+        composeTestRule.onNodeWithTag(ReaderTestTags.HUD_VIEW_ILLUSTRATIONS_CHIP).performClick()
+        composeTestRule.onNodeWithTag(ArtbookTestTags.OVERLAY).assertIsDisplayed()
+
+        restorationTester.emulateSavedInstanceStateRestore()
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag(ArtbookTestTags.OVERLAY).assertIsDisplayed()
+    }
+
+    @Test
+    fun viewportRotation_portraitToLandscapeAndBack_staysInReaderAndPreservesProgress() {
+        runBlocking {
+            seedDualColumnChapter(aid = 2502, vid = 951, cid = 9511, novelTitle = "横竖屏无缝旋转测试")
+        }
+        var isLandscape by mutableStateOf(false)
+        composeTestRule.setContent {
+            val boxW = if (isLandscape) 892.dp else 412.dp
+            val boxH = if (isLandscape) 412.dp else 892.dp
+            Box(modifier = Modifier.size(width = boxW, height = boxH)) {
+                Wenku8ExpressiveTheme(themeMode = Wenku8ThemeMode.ARCHIVAL_DAY) {
+                    UnifiedReaderScreen(
+                        launchRequest = ReaderLaunchRequest(
+                            aid = 2502,
+                            vid = 951,
+                            cid = 9511,
+                            novelTitle = "横竖屏无缝旋转测试",
+                            volumeTitle = "第一卷",
+                            chapterTitle = "第一章 双栏序幕",
+                        ),
+                        database = database,
+                        catalogGateway = fakeGateway,
+                        novelTocSyncRepository = tocSyncRepository,
+                        preferences = Wenku8UserPreferences(
+                            readerPageTurnMode = ReaderPageTurnMode.COVER_SLIDE,
+                        ),
+                        onReaderTypographyChanged = { _, _, _, _ -> },
+                        onNavigateBack = {},
+                        lineBreaker = DeterministicCellLineBreaker,
+                        ioDispatcher = Dispatchers.Main.immediate,
+                        computeDispatcher = Dispatchers.Main.immediate,
+                    )
+                }
+            }
+        }
+
+        composeTestRule.waitUntil(5_000) {
+            composeTestRule.onAllNodesWithTag(ReaderTestTags.VIEWPORT_CONTAINER).fetchSemanticsNodes().isNotEmpty()
+        }
+        // Flip forward 2 pages in portrait
+        repeat(2) {
+            composeTestRule.onNodeWithTag(ReaderTestTags.VIEWPORT_CONTAINER).performTouchInput {
+                click(Offset(width * 0.9f, height * 0.5f))
+            }
+            composeTestRule.waitForIdle()
+        }
+        val portraitProgress = runBlocking { database.readingProgressDao().getProgressForNovel(2502)!! }
+        assertTrue("Expected progress beyond start before rotation", portraitProgress.paragraphIndex > 0)
+
+        // Rotate portrait -> landscape -> portrait seamlessly in memory without leaving reader.
+        // Because each reflow maps the previous page's start anchor into the new page that contains
+        // it, the new page's startAnchor is always <= the previous page's startAnchor (and > 0,
+        // never reset back to chapter start or kicked out of the reader).
+        composeTestRule.runOnIdle { isLandscape = true }
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag(ReaderTestTags.VIEWPORT_CONTAINER).assertIsDisplayed()
+        val landscapeProgress = runBlocking { database.readingProgressDao().getProgressForNovel(2502)!! }
+        assertEquals(9511, landscapeProgress.cid)
+        assertTrue(
+            "Landscape page must contain portrait anchor without resetting to start (portrait=${portraitProgress.paragraphIndex}, landscape=${landscapeProgress.paragraphIndex})",
+            landscapeProgress.paragraphIndex in 1..portraitProgress.paragraphIndex,
+        )
+
+        composeTestRule.runOnIdle { isLandscape = false }
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag(ReaderTestTags.VIEWPORT_CONTAINER).assertIsDisplayed()
+        val restoredPortraitProgress = runBlocking { database.readingProgressDao().getProgressForNovel(2502)!! }
+        assertEquals(9511, restoredPortraitProgress.cid)
+        assertTrue(
+            "Returning to portrait must contain landscape anchor without resetting to start (landscape=${landscapeProgress.paragraphIndex}, restored=${restoredPortraitProgress.paragraphIndex})",
+            restoredPortraitProgress.paragraphIndex in 1..landscapeProgress.paragraphIndex,
         )
     }
 }

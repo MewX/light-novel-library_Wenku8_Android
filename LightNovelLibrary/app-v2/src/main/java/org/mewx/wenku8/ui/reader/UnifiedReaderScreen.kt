@@ -110,6 +110,7 @@ import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
@@ -120,6 +121,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
@@ -279,19 +281,63 @@ private data class ReaderUndoJumpState(
     val createdAtElapsedMs: Long,
 )
 
-private enum class ReaderArtbookEntryMode {
+internal enum class ReaderArtbookEntryMode {
     INLINE_CHAPTER_GALLERY,
     PURE_ILLUSTRATION_CHAPTER,
     TEMPORARY_VOLUME_PEEK,
 }
 
-private data class ReaderActiveArtbookState(
+internal data class ReaderActiveArtbookState(
     val cid: Int,
     val volumeVid: Int = 0,
     val chapterTitle: String,
     val imageUrls: List<String>,
     val initialIndex: Int,
     val entryMode: ReaderArtbookEntryMode = ReaderArtbookEntryMode.INLINE_CHAPTER_GALLERY,
+)
+
+/**
+ * Type-safe [Saver] for nullable [ReaderActiveArtbookState] so Activity recreation (e.g. system
+ * dark-mode toggle or process death) preserves an open illustration lightbox cleanly without
+ * risking `ClassCastException` on malformed state bundles.
+ */
+internal val ReaderActiveArtbookStateNullableSaver: Saver<ReaderActiveArtbookState?, Any> = Saver(
+    save = { state ->
+        if (state == null) {
+            null
+        } else {
+            arrayListOf<Any>(
+                state.cid,
+                state.volumeVid,
+                state.chapterTitle,
+                ArrayList(state.imageUrls),
+                state.initialIndex,
+                state.entryMode.name,
+            )
+        }
+    },
+    restore = { raw ->
+        val saved = raw as? List<*> ?: return@Saver null
+        if (saved.size < 6) return@Saver null
+        val cid = saved[0] as? Int ?: return@Saver null
+        val volumeVid = saved[1] as? Int ?: return@Saver null
+        val chapterTitle = saved[2] as? String ?: return@Saver null
+        val rawUrls = saved[3] as? List<*> ?: return@Saver null
+        val imageUrls = rawUrls.mapNotNull { it as? String }
+        if (imageUrls.size != rawUrls.size || imageUrls.isEmpty()) return@Saver null
+        val initialIndex = saved[4] as? Int ?: return@Saver null
+        val modeName = saved[5] as? String ?: return@Saver null
+        val entryMode = ReaderArtbookEntryMode.entries.firstOrNull { it.name == modeName }
+            ?: return@Saver null
+        ReaderActiveArtbookState(
+            cid = cid,
+            volumeVid = volumeVid,
+            chapterTitle = chapterTitle,
+            imageUrls = imageUrls,
+            initialIndex = initialIndex.coerceIn(0, imageUrls.lastIndex),
+            entryMode = entryMode,
+        )
+    },
 )
 
 private data class ActiveFocalHighlightState(
@@ -449,7 +495,22 @@ fun UnifiedReaderScreen(
     var isPageModeSheetOpen by rememberSaveable { mutableStateOf(false) }
     var isBookmarksSheetOpen by rememberSaveable { mutableStateOf(false) }
     var isSearchSheetOpen by rememberSaveable { mutableStateOf(false) }
-    var activeArtbookState by remember { mutableStateOf<ReaderActiveArtbookState?>(null) }
+    var activeArtbookState by rememberSaveable(
+        launchRequest.aid,
+        stateSaver = ReaderActiveArtbookStateNullableSaver,
+    ) {
+        mutableStateOf(null)
+    }
+    // Live reading position persisted in saved instance state so Activity recreation (e.g. system
+    // dark-mode/locale change or process death) restores the exact active chapter & anchor even
+    // after reading across multiple chapters or jumping away from an initial bookmark anchor.
+    var savedLiveCid by rememberSaveable(launchRequest.aid, launchRequest.cid) { mutableIntStateOf(0) }
+    var savedLiveVid by rememberSaveable(launchRequest.aid, launchRequest.cid) { mutableIntStateOf(0) }
+    var savedLiveVolumeTitle by rememberSaveable(launchRequest.aid, launchRequest.cid) { mutableStateOf("") }
+    var savedLiveChapterTitle by rememberSaveable(launchRequest.aid, launchRequest.cid) { mutableStateOf("") }
+    var savedLiveParagraphIndex by rememberSaveable(launchRequest.aid, launchRequest.cid) { mutableIntStateOf(-1) }
+    var savedLiveCharOffset by rememberSaveable(launchRequest.aid, launchRequest.cid) { mutableIntStateOf(0) }
+    var savedLiveProgressPermille by rememberSaveable(launchRequest.aid, launchRequest.cid) { mutableIntStateOf(0) }
     // Chapter IDs where the user tapped "小说阅读" inside an auto-opened pure-illustration chapter.
     var novelModeOverriddenCids by rememberSaveable(launchRequest.aid) { mutableStateOf(intArrayOf()) }
     var lastAutoOpenedGalleryCid by rememberSaveable(launchRequest.aid) { mutableIntStateOf(0) }
@@ -571,7 +632,9 @@ fun UnifiedReaderScreen(
     }.collectAsStateWithLifecycle(initialValue = emptyList())
 
     // Reading session telemetry (`READING_SESSIONS` table for Profile streak & heatmap).
-    var sessionCid by remember { mutableIntStateOf(launchRequest.cid) }
+    var sessionCid by remember {
+        mutableIntStateOf(if (savedLiveCid > 0) savedLiveCid else launchRequest.cid)
+    }
     var sessionStartedElapsedMs by remember { mutableLongStateOf(SystemClock.elapsedRealtime()) }
     val visitedPagesForSession = remember { HashSet<Long>() }
     var accumulatedSessionChars by remember { mutableIntStateOf(0) }
@@ -605,6 +668,13 @@ fun UnifiedReaderScreen(
         chapter: OrderedChapterWithVolume,
         anchor: ReadingAnchor,
     ) {
+        savedLiveCid = chapter.cid
+        savedLiveVid = chapter.vid
+        savedLiveVolumeTitle = chapter.volumeTitle
+        savedLiveChapterTitle = chapter.chapterTitle
+        savedLiveParagraphIndex = anchor.paragraphIndex.coerceAtLeast(0)
+        savedLiveCharOffset = anchor.charOffset.coerceAtLeast(0)
+        savedLiveProgressPermille = anchor.progressPermille.coerceIn(0, 1000)
         withContext(ioDispatcher) {
             val existingNovel = database.novelDao().getSyncHeader(launchRequest.aid)
             if (existingNovel == null) {
@@ -672,6 +742,14 @@ fun UnifiedReaderScreen(
                 chapter = activeChapter,
                 anchor = activePage.toBookmarkOrProgressAnchor(),
             )
+        } else if (savedLiveCid != activeChapter.cid) {
+            savedLiveCid = activeChapter.cid
+            savedLiveVid = activeChapter.vid
+            savedLiveVolumeTitle = activeChapter.volumeTitle
+            savedLiveChapterTitle = activeChapter.chapterTitle
+            savedLiveParagraphIndex = continuousScrollAnchor.paragraphIndex.coerceAtLeast(0)
+            savedLiveCharOffset = continuousScrollAnchor.charOffset.coerceAtLeast(0)
+            savedLiveProgressPermille = continuousScrollAnchor.progressPermille.coerceIn(0, 1000)
         }
     }
 
@@ -962,7 +1040,8 @@ fun UnifiedReaderScreen(
         }
     }
 
-    LaunchedEffect(shouldUseLightBarAppearance, shouldShowStatusBar) {
+    val currentOrientation = LocalConfiguration.current.orientation
+    LaunchedEffect(shouldUseLightBarAppearance, shouldShowStatusBar, currentOrientation) {
         applyReaderSystemBarsState()
     }
 
@@ -1101,12 +1180,35 @@ fun UnifiedReaderScreen(
             )
         }
 
-        // Open requested chapter on initial mount; re-paginate in memory on subsequent config changes!
+        // Open requested chapter on initial mount (or restored live chapter/anchor after Activity
+        // recreation); re-paginate in memory on subsequent layout config changes!
         var didInitialOpen by remember(launchRequest.aid, launchRequest.cid) { mutableStateOf(false) }
         LaunchedEffect(launchRequest.aid, launchRequest.cid, currentLayoutConfig) {
             if (!didInitialOpen) {
-                didInitialOpen = true
-                val resolvedInitialAnchor = if (launchRequest.initialParagraphIndex >= 0) {
+                val restoringFromSavedState = savedLiveCid > 0
+                val targetCid = if (restoringFromSavedState) savedLiveCid else launchRequest.cid
+                val targetVid = if (restoringFromSavedState && savedLiveVid > 0) {
+                    savedLiveVid
+                } else {
+                    launchRequest.vid
+                }
+                val targetVolumeTitle = if (restoringFromSavedState && savedLiveVolumeTitle.isNotBlank()) {
+                    savedLiveVolumeTitle
+                } else {
+                    launchRequest.volumeTitle
+                }
+                val targetChapterTitle = if (restoringFromSavedState && savedLiveChapterTitle.isNotBlank()) {
+                    savedLiveChapterTitle
+                } else {
+                    launchRequest.chapterTitle
+                }
+                val resolvedInitialAnchor = if (restoringFromSavedState) {
+                    ReadingAnchor(
+                        paragraphIndex = savedLiveParagraphIndex.coerceAtLeast(0),
+                        charOffset = savedLiveCharOffset.coerceAtLeast(0),
+                        progressPermille = savedLiveProgressPermille.coerceIn(0, 1000),
+                    )
+                } else if (launchRequest.initialParagraphIndex >= 0) {
                     ReadingAnchor(
                         paragraphIndex = launchRequest.initialParagraphIndex,
                         charOffset = launchRequest.initialCharOffset.coerceAtLeast(0),
@@ -1128,19 +1230,25 @@ fun UnifiedReaderScreen(
                 continuousScrollAnchor = resolvedInitialAnchor
                 if (resolvedInitialAnchor.paragraphIndex > 0) {
                     dispatchContinuousScrollJump(
-                        cid = launchRequest.cid,
+                        cid = targetCid,
                         paragraphIndex = resolvedInitialAnchor.paragraphIndex,
                         animated = false,
                     )
                 }
-                windowBuffer.openChapter(
-                    cid = launchRequest.cid,
-                    initialAnchor = resolvedInitialAnchor,
-                    layoutConfig = currentLayoutConfig,
-                    fallbackVid = launchRequest.vid,
-                    fallbackVolumeTitle = launchRequest.volumeTitle,
-                    fallbackChapterTitle = launchRequest.chapterTitle,
-                )
+                try {
+                    windowBuffer.openChapter(
+                        cid = targetCid,
+                        initialAnchor = resolvedInitialAnchor,
+                        layoutConfig = currentLayoutConfig,
+                        fallbackVid = targetVid,
+                        fallbackVolumeTitle = targetVolumeTitle,
+                        fallbackChapterTitle = targetChapterTitle,
+                    )
+                    didInitialOpen = true
+                } catch (ce: CancellationException) {
+                    didInitialOpen = false
+                    throw ce
+                }
             } else {
                 // Preserve any live/in-flight paged target (e.g. fast Page 1 -> Page 2 flip while
                 // immersive system bars asynchronously hide and expand viewportHeightPx).
@@ -1705,7 +1813,11 @@ fun UnifiedReaderScreen(
 
         // Honor `ReaderLaunchRequest.startWithTts` from NovelDetailScreen's `"朗读本章 (TTS)"` action,
         // and continue automatically into the next chapter when an utterance stream finishes.
-        var didAutoStartInitialTts by remember(launchRequest.aid, launchRequest.cid, launchRequest.startWithTts) {
+        var didAutoStartInitialTts by rememberSaveable(
+            launchRequest.aid,
+            launchRequest.cid,
+            launchRequest.startWithTts,
+        ) {
             mutableStateOf(false)
         }
         var pendingTtsStartOnCid by remember { mutableIntStateOf(0) }
