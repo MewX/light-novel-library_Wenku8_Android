@@ -16,6 +16,8 @@ import org.mewx.wenku8.data.local.db.entity.NovelEntity
 import org.mewx.wenku8.data.local.db.entity.ReviewDraftEntity
 import org.mewx.wenku8.data.remote.api.WenkuApiResult
 import org.mewx.wenku8.data.remote.api.WenkuCatalogGateway
+import java.nio.charset.Charset
+import java.nio.charset.StandardCharsets
 import kotlin.math.ceil
 
 data class ReviewThreadCardItem(
@@ -53,14 +55,15 @@ data class ReviewReplyPageResult(
 
 /**
  * Live pre-submit validation snapshot powering the M3e composer status chips:
- * `✓ 字数 >= 7`, `✓ 无敏感词`, and `✓ 10秒间隔就绪`.
+ * `✓ ≥ 7 字节`, `✓ 无敏感词`, and `✓ 20秒间隔就绪`.
  */
 data class ReviewComposerValidation(
-    val minRequiredChars: Int,
+    val minRequiredBytes: Int,
     val requireTitle: Boolean,
     val titleLengthOk: Boolean,
     val contentLengthOk: Boolean,
     val detectedBadWord: String?,
+    val cooldownSeconds: Int = ReviewsRepository.DEFAULT_POST_COOLDOWN_SECONDS,
     val cooldownRemainingSeconds: Int,
 ) {
     val lengthSatisfied: Boolean
@@ -95,8 +98,8 @@ sealed interface ReviewSubmitOutcome {
  * 1. **Paginated Thread & Floor Loading**: Wraps `action=review&do=list` and `action=review&do=show`,
  *    resolving stub-safe `avatar.wenku8.com` URLs via [WenkuCatalogGateway.resolveAvatarUrl] and
  *    assigning sequential floor numbers (`1楼 · 楼主`, `2楼`, ...).
- * 2. **Live Pre-Submit Validation & `10s` Cooldown**: Enforces `>= MIN_REPLY_TEXT` (`7` chars),
- *    stub-safe `Wenku8API.searchBadWords()` checks across title and body, and Wenku8's `10s`
+ * 2. **Live Pre-Submit Validation & `20s` Cooldown**: Enforces `>= MIN_REPLY_TEXT` (`7` GBK bytes),
+ *    stub-safe `Wenku8API.searchBadWords()` checks across title and body, and Wenku8's `20s`
  *    inter-post rate limit via an injectable monotonic clock.
  * 3. **Bounded Single Re-Login**: Transparently calls
  *    [UserSessionRepository.reauthenticateFromSavedCredentialsIfPossible] at most once if posting
@@ -115,10 +118,23 @@ class ReviewsRepository(
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
     companion object {
-        const val DEFAULT_POST_COOLDOWN_MS: Long = 10_000L
+        const val DEFAULT_POST_COOLDOWN_SECONDS: Int = 20
+        const val DEFAULT_POST_COOLDOWN_MS: Long = DEFAULT_POST_COOLDOWN_SECONDS * 1_000L
         const val NEW_THREAD_DRAFT_RID: Int = 0
         const val SERVER_CODE_NOT_LOGGED_IN: Int = 4
         const val SERVER_CODE_POST_LOCKED_OR_COOLDOWN: Int = 11
+
+        private val WENKU_REVIEW_CHARSET: Charset =
+            runCatching { Charset.forName("GBK") }.getOrElse { StandardCharsets.UTF_8 }
+
+        /**
+         * Measures the encoded byte length sent to Wenku8's GBK PHP backend (ASCII = 1 byte,
+         * CJK characters = 2 bytes), matching `Wenku8API.buildComment*Query`.
+         */
+        fun measureReviewByteLength(text: String): Int {
+            if (text.isEmpty()) return 0
+            return text.toByteArray(WENKU_REVIEW_CHARSET).size
+        }
 
         fun formatFloorQuotePrefix(floorNumber: Int, userName: String): String {
             val cleanUser = userName.trim()
@@ -140,6 +156,12 @@ class ReviewsRepository(
     val minReplyTextLength: Int
         get() = catalogGateway.minReplyTextLength.coerceAtLeast(1)
 
+    val minReplyTextBytes: Int
+        get() = minReplyTextLength
+
+    val postCooldownSeconds: Int
+        get() = ceil(postCooldownMs.coerceAtLeast(0L).toDouble() / 1000.0).toInt().coerceAtLeast(1)
+
     fun remainingCooldownSeconds(nowMonotonicMs: Long = monotonicClockMs()): Int {
         val remainingMs = _cooldownUntilMonotonicMs.value - nowMonotonicMs
         if (remainingMs <= 0L) return 0
@@ -147,8 +169,8 @@ class ReviewsRepository(
     }
 
     /**
-     * Evaluates composer text synchronously for live status chips (`✓ 字数 >= 7`, `✓ 无敏感词`,
-     * `✓ 10秒间隔就绪`) without triggering network calls.
+     * Evaluates composer text synchronously for live status chips (`✓ ≥ 7 字节`, `✓ 无敏感词`,
+     * `✓ 20秒间隔就绪`) without triggering network calls.
      */
     fun evaluateComposer(
         title: String = "",
@@ -156,12 +178,12 @@ class ReviewsRepository(
         requireTitle: Boolean,
         nowMonotonicMs: Long = monotonicClockMs(),
     ): ReviewComposerValidation {
-        val minLen = minReplyTextLength
+        val minBytes = minReplyTextBytes
         val trimmedTitle = title.trim()
         val trimmedContent = content.trim()
 
-        val titleLengthOk = !requireTitle || trimmedTitle.length >= minLen
-        val contentLengthOk = trimmedContent.length >= minLen
+        val titleLengthOk = !requireTitle || measureReviewByteLength(trimmedTitle) >= minBytes
+        val contentLengthOk = measureReviewByteLength(trimmedContent) >= minBytes
 
         val badWordInTitle = if (requireTitle && trimmedTitle.isNotEmpty()) {
             catalogGateway.findBadWord(trimmedTitle)
@@ -175,11 +197,12 @@ class ReviewsRepository(
         }
 
         return ReviewComposerValidation(
-            minRequiredChars = minLen,
+            minRequiredBytes = minBytes,
             requireTitle = requireTitle,
             titleLengthOk = titleLengthOk,
             contentLengthOk = contentLengthOk,
             detectedBadWord = badWordInTitle ?: badWordInContent,
+            cooldownSeconds = postCooldownSeconds,
             cooldownRemainingSeconds = remainingCooldownSeconds(nowMonotonicMs),
         )
     }

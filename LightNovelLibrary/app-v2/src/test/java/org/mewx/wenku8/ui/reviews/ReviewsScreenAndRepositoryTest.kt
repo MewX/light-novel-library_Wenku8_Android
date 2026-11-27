@@ -223,7 +223,6 @@ class ReviewsScreenAndRepositoryTest {
             database = database,
             catalogGateway = gateway,
             userSessionRepository = sessionRepository,
-            postCooldownMs = 10_000L,
             monotonicClockMs = { fakeClockMs },
             wallClockMs = { fakeClockMs },
         )
@@ -240,20 +239,60 @@ class ReviewsScreenAndRepositoryTest {
         assertEquals("这是一段自动保存的草稿内容", loadedDraft!!.draftContent)
         assertNotNull(database.novelDao().getNovelByAid(1306))
 
-        // 2. Too short (< 7 chars) and bad-word rejection.
-        val shortCheck = repo.evaluateComposer(content = "太短了", requireTitle = false)
-        assertFalse(shortCheck.lengthSatisfied)
-        assertFalse(shortCheck.canSubmit)
+        // 2. GBK byte-length boundary checks (< 7 bytes rejected; >= 7 bytes accepted) & bad-word rejection.
+        assertEquals(0, ReviewsRepository.measureReviewByteLength(""))
+        assertEquals(6, ReviewsRepository.measureReviewByteLength("太短了"))
+        assertEquals(7, ReviewsRepository.measureReviewByteLength("真好看!"))
+        assertEquals(8, ReviewsRepository.measureReviewByteLength("真的好看"))
+        assertEquals(6, ReviewsRepository.measureReviewByteLength("abcdef"))
+        assertEquals(7, ReviewsRepository.measureReviewByteLength("abcdefg"))
+
+        val shortCjkCheck = repo.evaluateComposer(content = "太短了", requireTitle = false)
+        assertFalse(shortCjkCheck.lengthSatisfied)
+        assertFalse(shortCjkCheck.canSubmit)
+
+        val shortAsciiCheck = repo.evaluateComposer(content = "abcdef", requireTitle = false)
+        assertFalse(shortAsciiCheck.lengthSatisfied)
+        assertFalse(shortAsciiCheck.canSubmit)
+
+        val exact7BytesMixedCheck = repo.evaluateComposer(content = "真好看!", requireTitle = false)
+        assertTrue(exact7BytesMixedCheck.lengthSatisfied)
+        assertTrue(exact7BytesMixedCheck.canSubmit)
+
+        val fourCjkCharsCheck = repo.evaluateComposer(content = "真的好看", requireTitle = false)
+        assertTrue(fourCjkCharsCheck.lengthSatisfied)
+        assertTrue(fourCjkCharsCheck.canSubmit)
+
+        val exact7BytesAsciiCheck = repo.evaluateComposer(content = "abcdefg", requireTitle = false)
+        assertTrue(exact7BytesAsciiCheck.lengthSatisfied)
+        assertTrue(exact7BytesAsciiCheck.canSubmit)
+
+        val shortTitleCheck = repo.evaluateComposer(
+            title = "太短了",
+            content = "真的好看",
+            requireTitle = true,
+        )
+        assertFalse(shortTitleCheck.titleLengthOk)
+        assertTrue(shortTitleCheck.contentLengthOk)
+        assertFalse(shortTitleCheck.lengthSatisfied)
+
+        val validShortThreadCheck = repo.evaluateComposer(
+            title = "不错哦!",
+            content = "真的好看",
+            requireTitle = true,
+        )
+        assertTrue(validShortThreadCheck.lengthSatisfied)
+        assertTrue(validShortThreadCheck.canSubmit)
 
         val badWordCheck = repo.evaluateComposer(
-            title = "正常书评标题满七个字",
-            content = "正文包含测试违禁词满七个字",
+            title = "正常书评标题",
+            content = "正文包含测试违禁词",
             requireTitle = true,
         )
         assertEquals("测试违禁词", badWordCheck.detectedBadWord)
         assertFalse(badWordCheck.canSubmit)
 
-        // 3. First reply returns ServerErrorCode(4) -> single re-login -> retry succeeds -> clears draft + activates 10s cooldown.
+        // 3. First reply returns ServerErrorCode(4) -> single re-login -> retry succeeds -> clears draft + activates 20s cooldown.
         gateway.replyResponses.addLast(WenkuApiResult.ServerErrorCode(4))
         gateway.replyResponses.addLast(WenkuApiResult.Success(Unit))
 
@@ -261,30 +300,50 @@ class ReviewsScreenAndRepositoryTest {
             aid = 1306,
             novelTitleHint = "奇诺之旅",
             rid = 9001,
-            content = "非常精彩的书评分析，感谢分享！",
+            content = "真的好看",
         )
         assertEquals(ReviewSubmitOutcome.Success, submitResult)
         assertEquals(2, loginCallCount)
         assertNull(repo.loadDraft(aid = 1306, rid = 9001))
-        assertEquals(10, repo.remainingCooldownSeconds(fakeClockMs))
+        assertEquals(20, repo.remainingCooldownSeconds(fakeClockMs))
 
-        // 4. Attempting another post 3s later is blocked by 10s cooldown; after 10s it succeeds.
+        // 4. Attempting another post 3s or 15s later is blocked by 20s cooldown; after 20s it succeeds.
         fakeClockMs += 3_000L
-        val duringCooldown = repo.submitReply(
+        val duringEarlyCooldown = repo.submitReply(
             aid = 1306,
             rid = 9001,
-            content = "间隔不足十秒的第二次回复测试",
+            content = "三秒冷却测试",
         )
-        assertTrue(duringCooldown is ReviewSubmitOutcome.PostLockedOrCooldown)
+        assertEquals(ReviewSubmitOutcome.PostLockedOrCooldown(17), duringEarlyCooldown)
 
-        fakeClockMs += 7_500L
+        fakeClockMs += 12_000L // 15s elapsed total: still within 20s cooldown.
+        val duringLateCooldown = repo.submitNewThread(
+            aid = 1306,
+            title = "十五秒标题",
+            content = "十五秒冷却测试",
+        )
+        assertEquals(ReviewSubmitOutcome.PostLockedOrCooldown(5), duringLateCooldown)
+
+        fakeClockMs += 5_500L // 20.5s elapsed total: cooldown cleared.
         gateway.replyResponses.addLast(WenkuApiResult.Success(Unit))
         val afterCooldown = repo.submitReply(
             aid = 1306,
             rid = 9001,
-            content = "十秒冷却结束后的第二次正常回复",
+            content = "二十秒后回复",
         )
         assertEquals(ReviewSubmitOutcome.Success, afterCooldown)
+        assertEquals(20, repo.remainingCooldownSeconds(fakeClockMs))
+
+        // 5. Server code 11 (cooldown/locked) also activates the built-in 20s cooldown.
+        fakeClockMs += 21_000L
+        gateway.newThreadResponses.addLast(WenkuApiResult.ServerErrorCode(11))
+        val serverCooldown = repo.submitNewThread(
+            aid = 1306,
+            title = "新帖标题测试",
+            content = "新帖正文测试",
+        )
+        assertEquals(ReviewSubmitOutcome.PostLockedOrCooldown(20), serverCooldown)
+        assertEquals(20, repo.remainingCooldownSeconds(fakeClockMs))
     }
 
     @Test
@@ -327,7 +386,6 @@ class ReviewsScreenAndRepositoryTest {
             database = database,
             catalogGateway = gateway,
             userSessionRepository = null,
-            postCooldownMs = 10_000L,
         )
 
         var openedThread by androidx.compose.runtime.mutableStateOf<ReviewThreadCardItem?>(null)
@@ -381,11 +439,11 @@ class ReviewsScreenAndRepositoryTest {
         composeTestRule.waitForIdle()
 
         composeTestRule.onNodeWithTag(ReviewScreensTestTags.COMPOSER_CHIP_LENGTH)
-            .assertTextContains("✓ 字数 ≥ 7")
+            .assertTextContains("✓ ≥ 7 字节")
         composeTestRule.onNodeWithTag(ReviewScreensTestTags.COMPOSER_CHIP_BAD_WORD)
             .assertTextContains("✓ 无敏感词")
         composeTestRule.onNodeWithTag(ReviewScreensTestTags.COMPOSER_CHIP_COOLDOWN)
-            .assertTextContains("✓ 10秒间隔就绪")
+            .assertTextContains("✓ 20秒间隔就绪")
         composeTestRule.onNodeWithTag(ReviewScreensTestTags.REVIEW_REPLY_SUBMIT_BUTTON).assertIsEnabled()
 
         composeTestRule.waitUntil(timeoutMillis = 3_000L) {
@@ -439,7 +497,6 @@ class ReviewsScreenAndRepositoryTest {
             database = database,
             catalogGateway = gateway,
             userSessionRepository = null,
-            postCooldownMs = 10_000L,
         )
 
         composeTestRule.setContent {
@@ -560,7 +617,6 @@ class ReviewsScreenAndRepositoryTest {
             database = database,
             catalogGateway = gateway,
             userSessionRepository = null,
-            postCooldownMs = 10_000L,
         )
 
         composeTestRule.setContent {
@@ -882,6 +938,116 @@ class ReviewsScreenAndRepositoryTest {
         }
         composeTestRule.onNodeWithText("116 回复").assertIsDisplayed()
         assertEquals(listOf(1, 1), gateway.requestedReplyPages.toList())
+    }
+
+    @Test
+    fun reviewThreadScreen_fourCjkCharsPass7ByteLimitAndActivate20sCooldownChip() {
+        var fakeClockMs = 100_000L
+        val gateway = FakeReviewCatalogGateway().apply {
+            replyPages[1] = ParsedReviewReplyPage(
+                totalPages = 1,
+                items = listOf(
+                    ParsedReviewReplyItem(
+                        uid = 1001,
+                        userName = "楼主",
+                        replyTimeFormatted = "2026-11-27 10:00",
+                        content = "一楼楼主正文内容",
+                    ),
+                ),
+            )
+            onReplySubmitted = { submittedContent ->
+                replyPages[1] = ParsedReviewReplyPage(
+                    totalPages = 1,
+                    items = listOf(
+                        ParsedReviewReplyItem(
+                            uid = 1001,
+                            userName = "楼主",
+                            replyTimeFormatted = "2026-11-27 10:00",
+                            content = "一楼楼主正文内容",
+                        ),
+                        ParsedReviewReplyItem(
+                            uid = 1002,
+                            userName = "我",
+                            replyTimeFormatted = "2026-11-27 10:01",
+                            content = submittedContent,
+                        ),
+                    ),
+                )
+            }
+        }
+        val repo = ReviewsRepository(
+            database = database,
+            catalogGateway = gateway,
+            userSessionRepository = null,
+            monotonicClockMs = { fakeClockMs },
+            wallClockMs = { fakeClockMs },
+        )
+        val thread = ReviewThreadCardItem(
+            rid = 9005,
+            title = "字节限制与冷却测试",
+            uid = 1001,
+            userName = "楼主",
+            avatarUrl = "",
+            replyCount = 0,
+            postTimeFormatted = "2026-11-27 10:00",
+            lastReplyTimeFormatted = "2026-11-27 10:00",
+        )
+
+        composeTestRule.setContent {
+            Wenku8ExpressiveTheme(themeMode = Wenku8ThemeMode.ARCHIVAL_DAY) {
+                ReviewThreadScreen(
+                    aid = 1306,
+                    novelTitle = "奇诺之旅",
+                    thread = thread,
+                    reviewsRepository = repo,
+                    appLanguage = Wenku8API.AppLanguage.SC,
+                    onNavigateBack = {},
+                )
+            }
+        }
+
+        composeTestRule.waitUntil(timeoutMillis = 5_000L) {
+            composeTestRule
+                .onAllNodes(hasTestTag("${ReviewScreensTestTags.REVIEW_FLOOR_CARD_PREFIX}1"))
+                .fetchSemanticsNodes()
+                .isNotEmpty()
+        }
+
+        // 3 CJK chars = 6 GBK bytes -> still pending & button disabled.
+        composeTestRule.onNodeWithTag(ReviewScreensTestTags.REVIEW_REPLY_INPUT).performTextInput("真好看")
+        composeTestRule.onNodeWithTag(ReviewScreensTestTags.COMPOSER_CHIP_LENGTH)
+            .assertTextContains("需 ≥ 7 字节")
+        composeTestRule.onNodeWithTag(ReviewScreensTestTags.REVIEW_REPLY_SUBMIT_BUTTON).assertIsNotEnabled()
+
+        // Adding 1 ASCII char ('!') -> 7 GBK bytes -> length chip green & button enabled!
+        composeTestRule.onNodeWithTag(ReviewScreensTestTags.REVIEW_REPLY_INPUT).performTextInput("!")
+        composeTestRule.onNodeWithTag(ReviewScreensTestTags.COMPOSER_CHIP_LENGTH)
+            .assertTextContains("✓ ≥ 7 字节")
+        composeTestRule.onNodeWithTag(ReviewScreensTestTags.COMPOSER_CHIP_COOLDOWN)
+            .assertTextContains("✓ 20秒间隔就绪")
+        composeTestRule.onNodeWithTag(ReviewScreensTestTags.REVIEW_REPLY_SUBMIT_BUTTON).assertIsEnabled()
+
+        // Submit -> activates 20s cooldown chip & disables submit even after typing another valid reply.
+        composeTestRule.onNodeWithTag(ReviewScreensTestTags.REVIEW_REPLY_SUBMIT_BUTTON).performClick()
+        composeTestRule.waitUntil(timeoutMillis = 5_000L) {
+            composeTestRule
+                .onAllNodes(hasTestTag("${ReviewScreensTestTags.REVIEW_FLOOR_CARD_PREFIX}2"))
+                .fetchSemanticsNodes()
+                .isNotEmpty()
+        }
+        composeTestRule.onNodeWithText("真好看!").assertIsDisplayed()
+        composeTestRule.onNodeWithTag(ReviewScreensTestTags.COMPOSER_CHIP_COOLDOWN)
+            .assertTextContains("发送间隔 20s")
+        composeTestRule.onNodeWithTag(ReviewScreensTestTags.REVIEW_REPLY_INPUT).performTextInput("真的好看")
+        composeTestRule.onNodeWithTag(ReviewScreensTestTags.REVIEW_REPLY_SUBMIT_BUTTON).assertIsNotEnabled()
+
+        // Advance fake clock past 20s and let the 250ms ticker observe expiry -> ready again!
+        fakeClockMs += 20_500L
+        composeTestRule.mainClock.advanceTimeBy(300L)
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag(ReviewScreensTestTags.COMPOSER_CHIP_COOLDOWN)
+            .assertTextContains("✓ 20秒间隔就绪")
+        composeTestRule.onNodeWithTag(ReviewScreensTestTags.REVIEW_REPLY_SUBMIT_BUTTON).assertIsEnabled()
     }
 
     private class FakeReviewCatalogGateway : WenkuCatalogGateway {
