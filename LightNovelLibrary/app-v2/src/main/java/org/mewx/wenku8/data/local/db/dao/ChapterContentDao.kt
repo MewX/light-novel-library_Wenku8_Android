@@ -33,6 +33,18 @@ data class CachedChapterImagesRow(
 )
 
 /**
+ * Lightweight CursorWindow-safe projection for storage inventory & fine-grained cache cleanup.
+ * Deliberately excludes `content_text` so scanning thousands of cached chapters stays fast & safe.
+ */
+data class CachedChapterCacheMeta(
+    @ColumnInfo(name = "cid") val cid: Int,
+    @ColumnInfo(name = "aid") val aid: Int,
+    @ColumnInfo(name = "byte_length") val byteLength: Int,
+    @ColumnInfo(name = "image_urls_json") val imageUrlsJson: String,
+    @ColumnInfo(name = "image_count") val imageCount: Int,
+)
+
+/**
  * DAO for `chapter_contents` with strict `2 MB` `CursorWindow` protection.
  *
  * Why [loadChapterTextSafely] uses `SUBSTR` slices instead of `SELECT content_text`:
@@ -104,14 +116,58 @@ interface ChapterContentDao {
     @Query("SELECT cid, image_urls_json FROM chapter_contents WHERE aid = :aid AND image_count > 0")
     suspend fun getCachedImageChaptersForNovel(aid: Int): List<CachedChapterImagesRow>
 
+    @Query("SELECT cid, aid, byte_length, image_urls_json, image_count FROM chapter_contents")
+    suspend fun getAllCachedChapterCacheMeta(): List<CachedChapterCacheMeta>
+
+    @Query(
+        """
+        SELECT cid, aid, byte_length, image_urls_json, image_count
+        FROM chapter_contents
+        WHERE cid IN (:cids)
+        """,
+    )
+    suspend fun getCachedChapterCacheMetaByCidsChunk(cids: List<Int>): List<CachedChapterCacheMeta>
+
+    @Query("SELECT cid FROM chapter_contents WHERE aid IN (:aids)")
+    suspend fun getCachedChapterIdsForNovelsChunk(aids: List<Int>): List<Int>
+
+    @Query("SELECT COUNT(*) FROM chapter_contents WHERE aid = :aid")
+    suspend fun getCachedChapterCountForNovel(aid: Int): Int
+
     @Query("DELETE FROM chapter_contents WHERE cid = :cid")
     suspend fun deleteChapterContent(cid: Int)
+
+    @Query("DELETE FROM chapter_contents WHERE cid IN (:cids)")
+    suspend fun deleteChapterContentsByCidsChunk(cids: List<Int>): Int
 
     @Query("DELETE FROM chapter_contents WHERE aid = :aid")
     suspend fun deleteAllChapterContentsForNovel(aid: Int)
 
     @Query("DELETE FROM chapter_contents WHERE aid IN (:aids)")
     suspend fun deleteChapterContentsForNovels(aids: List<Int>)
+
+    suspend fun getCachedChapterCacheMetaByCids(cids: List<Int>): List<CachedChapterCacheMeta> {
+        if (cids.isEmpty()) return emptyList()
+        return cids.distinct().chunked(SQLITE_SAFE_BIND_CHUNK_SIZE).flatMap { chunk ->
+            getCachedChapterCacheMetaByCidsChunk(chunk)
+        }
+    }
+
+    suspend fun getCachedChapterIdsForNovels(aids: List<Int>): List<Int> {
+        if (aids.isEmpty()) return emptyList()
+        return aids.distinct().chunked(SQLITE_SAFE_BIND_CHUNK_SIZE).flatMap { chunk ->
+            getCachedChapterIdsForNovelsChunk(chunk)
+        }
+    }
+
+    suspend fun deleteChapterContentsByCids(cids: List<Int>): Int {
+        if (cids.isEmpty()) return 0
+        var totalDeleted = 0
+        cids.distinct().chunked(SQLITE_SAFE_BIND_CHUNK_SIZE).forEach { chunk ->
+            totalDeleted += deleteChapterContentsByCidsChunk(chunk)
+        }
+        return totalDeleted
+    }
 
     /**
      * CursorWindow-safe single-chapter reader: fetches normal chapters (`<= 256,000` chars) in one
@@ -143,5 +199,6 @@ interface ChapterContentDao {
 
     companion object {
         const val SAFE_SLICE_CHAR_COUNT = 256_000
+        private const val SQLITE_SAFE_BIND_CHUNK_SIZE = 400
     }
 }

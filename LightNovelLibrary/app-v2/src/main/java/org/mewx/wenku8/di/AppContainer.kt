@@ -288,6 +288,7 @@ class AppContainer(context: Context) {
             cacheRootProvider = { appContext.cacheDir },
             assetRootsProvider = ::resolveLocalAssetRoots,
             appContext = appContext,
+            coverUrlProvider = wenkuApiClient::resolveCoverUrl,
         )
     }
 

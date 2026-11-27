@@ -74,6 +74,7 @@ import org.mewx.wenku8.data.repository.BookshelfSortMode
 import org.mewx.wenku8.data.repository.BookshelfViewMode
 import org.mewx.wenku8.data.repository.CloudBookshelfSyncOutcome
 import org.mewx.wenku8.data.repository.CustomAssetSlot
+import org.mewx.wenku8.data.repository.CustomCacheCleanRequest
 import org.mewx.wenku8.data.repository.LoginOutcome
 import org.mewx.wenku8.data.repository.NovelTocSyncRepository
 import org.mewx.wenku8.data.repository.ParsedChapterToc
@@ -1355,6 +1356,215 @@ class ProfileAndBackupTest {
             )
         }
     }
+
+    @Test
+    fun customCacheInventoryAndFineGrainedCleanup_preservesSharedImagesProgress_andRemovesEmptiedBooks() =
+        runTest(UnconfinedTestDispatcher()) {
+            val db = buildFileBackedDb("custom_cache_inventory")
+            try {
+                val filesDir = tempFolder.newFolder("custom_clean_files")
+                val cacheDir = tempFolder.newFolder("custom_clean_cache")
+                val imgsDir = File(filesDir, "imgs").apply { mkdirs() }
+                val savesImgsDir = File(filesDir, "saves/imgs").apply { mkdirs() }
+                val diagDir = File(cacheDir, "diagnostics").apply { mkdirs() }
+                val artbookCacheDir = File(
+                    cacheDir,
+                    org.mewx.wenku8.data.media.WenkuImageRequests.ARTBOOK_CACHE_DIR_NAME,
+                ).apply { mkdirs() }
+
+                val tempFile = File(cacheDir, "http_tmp.bin").apply { writeBytes(ByteArray(512) { 1 }) }
+                val freshDiag = File(diagDir, "diag.txt").apply { writeText("keep-me") }
+                val validJpegSmall = byteArrayOf(0xFF.toByte(), 0xD8.toByte(), 0xFF.toByte(), 0xE0.toByte(), 0x00, 0x10, 0xFF.toByte(), 0xD9.toByte())
+                val validJpegLarge = ByteArray(2048) { 0x2A }.apply {
+                    this[0] = 0xFF.toByte()
+                    this[1] = 0xD8.toByte()
+                    this[2] = 0xFF.toByte()
+                    this[3] = 0xE0.toByte()
+                    this[size - 2] = 0xFF.toByte()
+                    this[size - 1] = 0xD9.toByte()
+                }
+
+                // Book 101 (in bookshelf): 2 volumes, 3 cached chapters (shared image + exclusive image)
+                // Book 202 (not in bookshelf): 1 volume, 1 cached chapter + uncategorized chapter (no TOC row) + cover
+                db.novelDao().upsertNovels(
+                    listOf(
+                        NovelEntity(aid = 101, title = "书架大作", inBookshelf = true),
+                        NovelEntity(aid = 202, title = "临时浏览轻小说", inBookshelf = false),
+                    ),
+                )
+                db.tocDao().upsertVolumes(
+                    listOf(
+                        VolumeEntity(vid = 1010, aid = 101, volumeOrder = 0, volumeTitle = "第一卷"),
+                        VolumeEntity(vid = 1011, aid = 101, volumeOrder = 1, volumeTitle = "第二卷"),
+                        VolumeEntity(vid = 2020, aid = 202, volumeOrder = 0, volumeTitle = "第一卷"),
+                    ),
+                )
+                db.tocDao().upsertChapters(
+                    listOf(
+                        ChapterEntity(cid = 10101, vid = 1010, aid = 101, chapterOrder = 0, chapterTitle = "第一章", isIllustrationChapter = false),
+                        ChapterEntity(cid = 10102, vid = 1010, aid = 101, chapterOrder = 1, chapterTitle = "插图", isIllustrationChapter = true),
+                        ChapterEntity(cid = 10111, vid = 1011, aid = 101, chapterOrder = 0, chapterTitle = "二卷第一章", isIllustrationChapter = false),
+                        ChapterEntity(cid = 20201, vid = 2020, aid = 202, chapterOrder = 0, chapterTitle = "序章", isIllustrationChapter = false),
+                    ),
+                )
+                db.readingProgressDao().upsertProgress(
+                    ReadingProgressEntity(
+                        aid = 101,
+                        vid = 1010,
+                        cid = 10101,
+                        volumeTitle = "第一卷",
+                        chapterTitle = "第一章",
+                        paragraphIndex = 12,
+                        charOffset = 0,
+                        legacyScrollPx = 0,
+                        progressPermille = 330,
+                        updatedAtMs = 5_000L,
+                    ),
+                )
+
+                val exclusiveImgUrl = "https://pic.wenku8.com/pictures/1/101/exclusive.jpg"
+                val sharedImgUrl = "https://pic.wenku8.com/pictures/1/101/shared.jpg"
+                val exclusiveLegacy = org.mewx.wenku8.data.remote.parser.WenkuXmlParsers.generateLegacyImageFileName(exclusiveImgUrl)
+                val sharedLegacy = org.mewx.wenku8.data.remote.parser.WenkuXmlParsers.generateLegacyImageFileName(sharedImgUrl)
+                val exclusiveImgFile = File(savesImgsDir, exclusiveLegacy).apply { writeBytes(validJpegLarge) }
+                val artbookExclusiveFile = File(artbookCacheDir, exclusiveLegacy).apply { writeBytes(validJpegSmall) }
+                val sharedImgFile = File(savesImgsDir, sharedLegacy).apply { writeBytes(validJpegSmall) }
+                val orphanImgFile = File(savesImgsDir, "orphan_leftover.jpg").apply { writeBytes(validJpegSmall) }
+                val shelfCover = File(imgsDir, "101.jpg").apply { writeBytes(validJpegSmall) }
+                val nonShelfCover = File(imgsDir, "202.jpg").apply { writeBytes(validJpegSmall) }
+
+                db.chapterContentDao().upsertChapterContents(
+                    listOf(
+                        ChapterContentEntity(
+                            cid = 10101,
+                            aid = 101,
+                            contentLang = "SC",
+                            contentText = "正文内容一",
+                            byteLength = 300,
+                            imageUrlsJson = "[\"$sharedImgUrl\"]",
+                            imageCount = 1,
+                            sha256Checksum = "s1",
+                            downloadedAtMs = 1_000L,
+                        ),
+                        ChapterContentEntity(
+                            cid = 10102,
+                            aid = 101,
+                            contentLang = "SC",
+                            contentText = "插图页",
+                            byteLength = 120,
+                            imageUrlsJson = "[\"$exclusiveImgUrl\",\"$sharedImgUrl\"]",
+                            imageCount = 2,
+                            sha256Checksum = "s2",
+                            downloadedAtMs = 1_000L,
+                        ),
+                        ChapterContentEntity(
+                            cid = 10111,
+                            aid = 101,
+                            contentLang = "SC",
+                            contentText = "第二卷正文",
+                            byteLength = 400,
+                            imageUrlsJson = "[]",
+                            imageCount = 0,
+                            sha256Checksum = "s3",
+                            downloadedAtMs = 1_000L,
+                        ),
+                        ChapterContentEntity(
+                            cid = 20201,
+                            aid = 202,
+                            contentLang = "SC",
+                            contentText = "非书架序章",
+                            byteLength = 200,
+                            imageUrlsJson = "[]",
+                            imageCount = 0,
+                            sha256Checksum = "s4",
+                            downloadedAtMs = 1_000L,
+                        ),
+                        // Unmapped cid without TOC entry -> falls back to "未归类章节"
+                        ChapterContentEntity(
+                            cid = 20299,
+                            aid = 202,
+                            contentLang = "SC",
+                            contentText = "未归类正文",
+                            byteLength = 100,
+                            imageUrlsJson = "[]",
+                            imageCount = 0,
+                            sha256Checksum = "s5",
+                            downloadedAtMs = 1_000L,
+                        ),
+                    ),
+                )
+
+                val repo = StorageAndCacheRepository(
+                    database = db,
+                    cacheRootProvider = { cacheDir },
+                    assetRootsProvider = { listOf(filesDir) },
+                    ioDispatcher = UnconfinedTestDispatcher(testScheduler),
+                    coverUrlProvider = { aid -> "https://img.wenku8.com/image/0/$aid/${aid}s.jpg" },
+                )
+
+                // 1. Inspect inventory: books sorted by totalBytes desc (Book 101 > Book 202), categories measured accurately
+                val inv1 = repo.inspectCustomCacheInventory()
+                assertEquals(1, inv1.tempCacheFileCount - 1) // tempFile + artbookExclusiveFile (diagnostics excluded)
+                assertEquals(512L + validJpegSmall.size, inv1.tempCacheBytes)
+                assertEquals(1, inv1.nonBookshelfCoverCount)
+                assertEquals(1, inv1.nonBookshelfNovelCount)
+                assertEquals(1, inv1.orphanImageFileCount)
+                assertEquals(2, inv1.books.size)
+                assertEquals(101, inv1.books[0].aid)
+                assertEquals("https://img.wenku8.com/image/0/101/101s.jpg", inv1.books[0].coverUrl)
+                assertEquals(2, inv1.books[0].volumes.size)
+                assertEquals(3, inv1.books[0].cachedChapterCount)
+                assertEquals(202, inv1.books[1].aid)
+                assertEquals(2, inv1.books[1].volumes.size) // 第一卷 + 未归类章节
+                assertTrue(inv1.books[1].volumes.any { it.volumeTitle == "未归类章节" })
+
+                // 2. Clear single chapter 10102 -> deletes exclusiveImgFile + artbookExclusiveFile, KEEPS sharedImgFile
+                //    (still referenced by 10101) and KEEPS reading progress!
+                val singleRes = repo.clearCachedChapters(listOf(10102))
+                assertEquals(1, singleRes.deletedChaptersCount)
+                assertFalse("Exclusive illustration must be deleted", exclusiveImgFile.exists())
+                assertFalse("Artbook temp cache for exclusive illustration must be deleted", artbookExclusiveFile.exists())
+                assertTrue("Shared illustration still referenced by 10101 must survive", sharedImgFile.exists())
+                assertNotNull("Reading progress must never be deleted by cache cleanup", db.readingProgressDao().getProgressForNovel(101))
+                assertTrue("Text + image bytes must be counted", singleRes.reclaimedBytes >= 120L + validJpegLarge.size)
+
+                // 3. Clearing ALL remaining chapters of non-bookshelf book 202 removes the book from inventory AND purges its cover
+                val clearBook202 = repo.clearCachedChapters(listOf(20201, 20299))
+                assertEquals(2, clearBook202.deletedChaptersCount)
+                assertEquals(1, clearBook202.purgedCoverCount)
+                assertFalse("Non-bookshelf cover must be purged once all chapters are cleared", nonShelfCover.exists())
+                assertTrue("Bookshelf cover must remain intact", shelfCover.exists())
+
+                val inv2 = repo.inspectCustomCacheInventory()
+                assertEquals("Emptied book 202 must vanish from inventory", listOf(101), inv2.books.map { it.aid })
+
+                // 4. runCustomCacheClean with remaining Book 101 chapters + temp + non-bookshelf + orphan
+                val emptyRes = repo.runCustomCacheClean(CustomCacheCleanRequest())
+                assertEquals(0, emptyRes.deletedChaptersCount)
+
+                val fullCustomRes = repo.runCustomCacheClean(
+                    CustomCacheCleanRequest(
+                        cleanTempCache = true,
+                        cleanNonBookshelfBrowse = true,
+                        cleanOrphanImages = true,
+                        selectedChapterCids = setOf(10101, 10111),
+                    ),
+                )
+                assertEquals(2, fullCustomRes.deletedChaptersCount)
+                assertEquals(1, fullCustomRes.prunedTransientNovelRows)
+                assertFalse(tempFile.exists())
+                assertTrue("Fresh diagnostic report must still be preserved", freshDiag.exists())
+                assertFalse("Shared illustration now unreferenced must be deleted", sharedImgFile.exists())
+                assertFalse("Orphan image must be deleted", orphanImgFile.exists())
+                assertTrue("Bookshelf cover stays on shelf even when book chapters are emptied", shelfCover.exists())
+
+                val inv3 = repo.inspectCustomCacheInventory()
+                assertTrue("All emptied books must disappear completely from custom cache list", inv3.books.isEmpty())
+                assertEquals(0L, inv3.totalBytes)
+            } finally {
+                db.close()
+            }
+        }
 
     private fun Modifier.composeTestTagForLazyList(): Modifier =
         this.testTag(ProfileStudioTestTags.LIST)
