@@ -16,7 +16,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.state.ToggleableState
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
@@ -1565,6 +1571,376 @@ class ProfileAndBackupTest {
                 db.close()
             }
         }
+
+    @Test
+    fun customCacheCleanSelectionHelpers_computeTriStateToggleAndSummaryAccurately() {
+        assertEquals(ToggleableState.Off, computeTriStateForIds(emptySet(), setOf(1)))
+        assertEquals(ToggleableState.Off, computeTriStateForIds(setOf(1, 2), emptySet()))
+        assertEquals(ToggleableState.Indeterminate, computeTriStateForIds(setOf(1, 2), setOf(1)))
+        assertEquals(ToggleableState.On, computeTriStateForIds(setOf(1, 2), setOf(1, 2, 3)))
+
+        assertEquals(setOf(9), toggleIdGroupSelection(setOf(9), emptySet()))
+        assertEquals(setOf(9, 1, 2), toggleIdGroupSelection(setOf(9, 1), setOf(1, 2)))
+        assertEquals(setOf(9), toggleIdGroupSelection(setOf(9, 1, 2), setOf(1, 2)))
+
+        val inventory = org.mewx.wenku8.data.repository.CustomCacheInventory(
+            tempCacheBytes = 500L,
+            tempCacheFileCount = 2,
+            nonBookshelfBrowseBytes = 300L,
+            nonBookshelfCoverCount = 1,
+            nonBookshelfNovelCount = 1,
+            orphanImageBytes = 200L,
+            orphanImageFileCount = 1,
+            books = listOf(
+                org.mewx.wenku8.data.repository.CustomCacheBookItem(
+                    aid = 101,
+                    title = "书架作品",
+                    coverUrl = "https://img.example.test/101.jpg",
+                    inBookshelf = true,
+                    volumes = listOf(
+                        org.mewx.wenku8.data.repository.CustomCacheVolumeItem(
+                            vid = 1010,
+                            aid = 101,
+                            volumeOrder = 0,
+                            volumeTitle = "第一卷",
+                            chapters = listOf(
+                                org.mewx.wenku8.data.repository.CustomCacheChapterItem(
+                                    cid = 10101,
+                                    aid = 101,
+                                    vid = 1010,
+                                    chapterOrder = 0,
+                                    chapterTitle = "第一章",
+                                    textBytes = 1000L,
+                                    imageBytes = 2000L,
+                                    imageCount = 1,
+                                ),
+                                org.mewx.wenku8.data.repository.CustomCacheChapterItem(
+                                    cid = 10102,
+                                    aid = 101,
+                                    vid = 1010,
+                                    chapterOrder = 1,
+                                    chapterTitle = "第二章",
+                                    textBytes = 400L,
+                                    imageBytes = 0L,
+                                    imageCount = 0,
+                                ),
+                            ),
+                        ),
+                    ),
+                ),
+                org.mewx.wenku8.data.repository.CustomCacheBookItem(
+                    aid = 202,
+                    title = "非书架试读",
+                    coverUrl = "https://img.example.test/202.jpg",
+                    inBookshelf = false,
+                    volumes = listOf(
+                        org.mewx.wenku8.data.repository.CustomCacheVolumeItem(
+                            vid = 2020,
+                            aid = 202,
+                            volumeOrder = 0,
+                            volumeTitle = "试读卷",
+                            chapters = listOf(
+                                org.mewx.wenku8.data.repository.CustomCacheChapterItem(
+                                    cid = 20201,
+                                    aid = 202,
+                                    vid = 2020,
+                                    chapterOrder = 0,
+                                    chapterTitle = "试读章",
+                                    textBytes = 250L,
+                                    imageBytes = 0L,
+                                    imageCount = 0,
+                                ),
+                            ),
+                        ),
+                    ),
+                ),
+            ),
+        )
+
+        val emptySummary = computeCustomCleanSelectionSummary(inventory, CustomCacheCleanRequest())
+        assertFalse(emptySummary.hasAnySelection)
+        assertEquals(0L, emptySummary.estimatedReclaimedBytes)
+
+        val partialSummary = computeCustomCleanSelectionSummary(
+            inventory = inventory,
+            request = CustomCacheCleanRequest(
+                cleanTempCache = true,
+                selectedChapterCids = setOf(10101),
+            ),
+        )
+        assertTrue(partialSummary.hasAnySelection)
+        assertEquals(1, partialSummary.selectedCategoryCount)
+        assertEquals(1, partialSummary.selectedChapterCount)
+        assertEquals(500L + 3000L, partialSummary.estimatedReclaimedBytes)
+
+        // Checking cleanNonBookshelfBrowse includes non-bookshelf chapters without double counting
+        val browseOverlapSummary = computeCustomCleanSelectionSummary(
+            inventory = inventory,
+            request = CustomCacheCleanRequest(
+                cleanNonBookshelfBrowse = true,
+                cleanOrphanImages = true,
+                selectedChapterCids = setOf(20201),
+            ),
+        )
+        assertEquals(2, browseOverlapSummary.selectedCategoryCount)
+        assertEquals(1, browseOverlapSummary.selectedChapterCount)
+        assertEquals(300L + 200L + 250L, browseOverlapSummary.estimatedReclaimedBytes)
+    }
+
+    @Test
+    fun customCacheCleanScreen_navigatesSelectsGranularly_removesEmptiedBooks_andSupportsEink() {
+        val db = buildFileBackedDb("ui_custom_clean")
+        try {
+            val filesDir = tempFolder.newFolder("ui_custom_files")
+            val cacheDir = tempFolder.newFolder("ui_custom_cache")
+            val imgsDir = File(filesDir, "imgs").apply { mkdirs() }
+            val savesImgsDir = File(filesDir, "saves/imgs").apply { mkdirs() }
+
+            val validJpeg = ByteArray(2048) { 0x33 }.apply {
+                this[0] = 0xFF.toByte()
+                this[1] = 0xD8.toByte()
+                this[2] = 0xFF.toByte()
+                this[3] = 0xE0.toByte()
+                this[size - 2] = 0xFF.toByte()
+                this[size - 1] = 0xD9.toByte()
+            }
+            val tempFile = File(cacheDir, "http_tmp.bin").apply { writeBytes(ByteArray(512) { 1 }) }
+            val orphanImgFile = File(savesImgsDir, "orphan_img.jpg").apply { writeBytes(ByteArray(64) { 2 }) }
+            val shelfCover = File(imgsDir, "301.jpg").apply { writeBytes(ByteArray(128) { 3 }) }
+            val nonShelfCover = File(imgsDir, "302.jpg").apply { writeBytes(ByteArray(256) { 4 }) }
+            val illustUrl = "https://pic.wenku8.com/pictures/3/301/30102/1.jpg"
+            val illustLegacyName = WenkuXmlParsers.generateLegacyImageFileName(illustUrl)
+            val illustFile = File(savesImgsDir, illustLegacyName).apply { writeBytes(validJpeg) }
+
+            kotlinx.coroutines.runBlocking {
+                db.novelDao().upsertNovels(
+                    listOf(
+                        NovelEntity(aid = 301, title = "奇诺之旅", inBookshelf = true),
+                        NovelEntity(aid = 302, title = "临时试读轻小说", inBookshelf = false),
+                    ),
+                )
+                db.tocDao().upsertVolumes(
+                    listOf(
+                        VolumeEntity(vid = 3010, aid = 301, volumeOrder = 0, volumeTitle = "第一卷"),
+                        VolumeEntity(vid = 3011, aid = 301, volumeOrder = 1, volumeTitle = "第二卷"),
+                        VolumeEntity(vid = 3020, aid = 302, volumeOrder = 0, volumeTitle = "试读卷"),
+                    ),
+                )
+                db.tocDao().upsertChapters(
+                    listOf(
+                        ChapterEntity(cid = 30101, vid = 3010, aid = 301, chapterOrder = 0, chapterTitle = "序章", isIllustrationChapter = false),
+                        ChapterEntity(cid = 30102, vid = 3010, aid = 301, chapterOrder = 1, chapterTitle = "彩色插图", isIllustrationChapter = true),
+                        ChapterEntity(cid = 30111, vid = 3011, aid = 301, chapterOrder = 0, chapterTitle = "旅途", isIllustrationChapter = false),
+                        ChapterEntity(cid = 30201, vid = 3020, aid = 302, chapterOrder = 0, chapterTitle = "试读章节", isIllustrationChapter = false),
+                    ),
+                )
+                db.chapterContentDao().upsertChapterContents(
+                    listOf(
+                        ChapterContentEntity(
+                            cid = 30101,
+                            aid = 301,
+                            contentLang = "SC",
+                            contentText = "序章正文",
+                            byteLength = 300,
+                            imageUrlsJson = "[]",
+                            imageCount = 0,
+                            sha256Checksum = "u1",
+                            downloadedAtMs = 1_000L,
+                        ),
+                        ChapterContentEntity(
+                            cid = 30102,
+                            aid = 301,
+                            contentLang = "SC",
+                            contentText = "插图正文",
+                            byteLength = 100,
+                            imageUrlsJson = "[\"$illustUrl\"]",
+                            imageCount = 1,
+                            sha256Checksum = "u2",
+                            downloadedAtMs = 1_000L,
+                        ),
+                        ChapterContentEntity(
+                            cid = 30111,
+                            aid = 301,
+                            contentLang = "SC",
+                            contentText = "第二卷正文",
+                            byteLength = 400,
+                            imageUrlsJson = "[]",
+                            imageCount = 0,
+                            sha256Checksum = "u3",
+                            downloadedAtMs = 1_000L,
+                        ),
+                        ChapterContentEntity(
+                            cid = 30201,
+                            aid = 302,
+                            contentLang = "SC",
+                            contentText = "试读正文",
+                            byteLength = 200,
+                            imageUrlsJson = "[]",
+                            imageCount = 0,
+                            sha256Checksum = "u4",
+                            downloadedAtMs = 1_000L,
+                        ),
+                    ),
+                )
+            }
+
+            val storageRepo = StorageAndCacheRepository(
+                database = db,
+                cacheRootProvider = { cacheDir },
+                assetRootsProvider = { listOf(filesDir) },
+                coverUrlProvider = { aid -> "https://img.wenku8.com/image/0/$aid/${aid}s.jpg" },
+            )
+
+            var einkMode by mutableStateOf(false)
+            var backNavigations = 0
+
+            composeTestRule.setContent {
+                Box(modifier = Modifier.size(width = 412.dp, height = 892.dp)) {
+                    Wenku8ExpressiveTheme(
+                        themeMode = Wenku8ThemeMode.SYSTEM,
+                        einkModeOverride = einkMode,
+                    ) {
+                        ProfileSettingsSubscreen(
+                            section = ProfileSettingsSection.STORAGE_AND_BACKUP,
+                            preferences = Wenku8UserPreferences(einkModeEnabled = einkMode),
+                            onNavigateBack = { backNavigations++ },
+                            onThemeModeSelected = {},
+                            onDefaultHomeSelected = {},
+                            onAppLanguageSelected = {},
+                            onEinkModeChanged = { einkMode = it },
+                            onReaderTypographyChanged = { _, _, _, _ -> },
+                            onReaderCustomFontPathChanged = {},
+                            onReaderCustomBackgroundPathChanged = {},
+                            onVolumeKeyPagingChanged = {},
+                            storageAndCacheRepository = storageRepo,
+                        )
+                    }
+                }
+            }
+            composeTestRule.waitForIdle()
+
+            // 1. Open M3e Custom Cache Cleanup sub-view from Storage & Backup
+            composeTestRule.onNodeWithTag(ProfileStudioTestTags.SUBSCREEN_LIST)
+                .performScrollToNode(hasTestTag(ProfileStudioTestTags.CUSTOM_CLEAN_BUTTON))
+            composeTestRule.onNodeWithTag(ProfileStudioTestTags.CUSTOM_CLEAN_BUTTON)
+                .assertIsDisplayed()
+                .performClick()
+
+            composeTestRule.waitUntil(timeoutMillis = 5_000L) {
+                composeTestRule
+                    .onAllNodesWithTag(ProfileStudioTestTags.CUSTOM_CLEAN_BOOK_PREFIX + 301)
+                    .fetchSemanticsNodes()
+                    .isNotEmpty()
+            }
+            composeTestRule.onNodeWithText("自定义缓存清理").assertIsDisplayed()
+            composeTestRule.onNodeWithTag(ProfileStudioTestTags.CUSTOM_CLEAN_ACTION_BUTTON).assertIsNotEnabled()
+
+            // 2. Scroll to Book 301 -> expand Book -> expand Volume 3010 -> select single chapter 30102
+            composeTestRule.onNodeWithTag(ProfileStudioTestTags.CUSTOM_CLEAN_LIST)
+                .performScrollToNode(hasTestTag(ProfileStudioTestTags.CUSTOM_CLEAN_BOOK_PREFIX + 301))
+            composeTestRule.onNodeWithText("奇诺之旅").assertIsDisplayed().performClick()
+            composeTestRule.waitForIdle()
+            composeTestRule.onNodeWithTag(ProfileStudioTestTags.CUSTOM_CLEAN_VOLUME_PREFIX + 3010)
+                .assertIsDisplayed()
+                .performClick()
+            composeTestRule.waitForIdle()
+            composeTestRule.onNodeWithTag(ProfileStudioTestTags.CUSTOM_CLEAN_CHAPTER_PREFIX + 30102)
+                .assertIsDisplayed()
+                .performClick()
+            composeTestRule.waitForIdle()
+
+            // Both Volume 3010 and Book 301 TriStateCheckboxes become Indeterminate
+            composeTestRule.onNodeWithTag(ProfileStudioTestTags.CUSTOM_CLEAN_VOLUME_CHECK_PREFIX + 3010)
+                .assert(SemanticsMatcher.expectValue(SemanticsProperties.ToggleableState, ToggleableState.Indeterminate))
+            composeTestRule.onNodeWithTag(ProfileStudioTestTags.CUSTOM_CLEAN_BOOK_CHECK_PREFIX + 301)
+                .assert(SemanticsMatcher.expectValue(SemanticsProperties.ToggleableState, ToggleableState.Indeterminate))
+            composeTestRule.onNodeWithTag(ProfileStudioTestTags.CUSTOM_CLEAN_ACTION_BUTTON).assertIsEnabled()
+
+            // 3. Cancel confirmation dialog -> nothing deleted; then confirm -> single chapter & its image removed
+            composeTestRule.onNodeWithTag(ProfileStudioTestTags.CUSTOM_CLEAN_ACTION_BUTTON).performClick()
+            composeTestRule.onNodeWithTag(ProfileStudioTestTags.CUSTOM_CLEAN_CONFIRM_DIALOG).assertIsDisplayed()
+            composeTestRule.onNodeWithText("取消").performClick()
+            composeTestRule.onNodeWithTag(ProfileStudioTestTags.CUSTOM_CLEAN_CONFIRM_DIALOG).assertDoesNotExist()
+            assertTrue("Canceling dialog must keep illustration file", illustFile.exists())
+
+            composeTestRule.onNodeWithTag(ProfileStudioTestTags.CUSTOM_CLEAN_ACTION_BUTTON).performClick()
+            composeTestRule.onNodeWithTag(ProfileStudioTestTags.CUSTOM_CLEAN_CONFIRM_BUTTON).performClick()
+
+            composeTestRule.waitUntil(timeoutMillis = 5_000L) {
+                !illustFile.exists() &&
+                    composeTestRule
+                        .onAllNodesWithTag(ProfileStudioTestTags.CUSTOM_CLEAN_CHAPTER_PREFIX + 30102)
+                        .fetchSemanticsNodes()
+                        .isEmpty()
+            }
+            // Book 301 still has 2 cached chapters left so its card remains
+            composeTestRule.onNodeWithTag(ProfileStudioTestTags.CUSTOM_CLEAN_BOOK_PREFIX + 301).assertIsDisplayed()
+
+            // 4. Toggle volume TriStateCheckbox + category rows + clear selection + select all -> clean everything
+            composeTestRule.onNodeWithTag(ProfileStudioTestTags.CUSTOM_CLEAN_VOLUME_CHECK_PREFIX + 3011).performClick()
+            composeTestRule.onNodeWithTag(ProfileStudioTestTags.CUSTOM_CLEAN_BOOK_CHECK_PREFIX + 301).performClick()
+            composeTestRule.onNodeWithTag(ProfileStudioTestTags.CUSTOM_CLEAN_BOOK_CHECK_PREFIX + 301)
+                .assert(SemanticsMatcher.expectValue(SemanticsProperties.ToggleableState, ToggleableState.On))
+
+            composeTestRule.onNodeWithTag(ProfileStudioTestTags.CUSTOM_CLEAN_LIST)
+                .performScrollToNode(hasTestTag(ProfileStudioTestTags.CUSTOM_CLEAN_CAT_TEMP))
+            composeTestRule.onNodeWithTag(ProfileStudioTestTags.CUSTOM_CLEAN_CAT_TEMP).performClick()
+            composeTestRule.onNodeWithTag(ProfileStudioTestTags.CUSTOM_CLEAN_CAT_BROWSE).performClick()
+            composeTestRule.onNodeWithTag(ProfileStudioTestTags.CUSTOM_CLEAN_CAT_ORPHAN).performClick()
+
+            composeTestRule.onNodeWithTag(ProfileStudioTestTags.CUSTOM_CLEAN_LIST)
+                .performScrollToNode(hasTestTag(ProfileStudioTestTags.CUSTOM_CLEAN_CLEAR_SELECTION))
+            composeTestRule.onNodeWithTag(ProfileStudioTestTags.CUSTOM_CLEAN_CLEAR_SELECTION).performClick()
+            composeTestRule.onNodeWithTag(ProfileStudioTestTags.CUSTOM_CLEAN_ACTION_BUTTON).assertIsNotEnabled()
+
+            composeTestRule.onNodeWithTag(ProfileStudioTestTags.CUSTOM_CLEAN_SELECT_ALL).performClick()
+            composeTestRule.onNodeWithTag(ProfileStudioTestTags.CUSTOM_CLEAN_ACTION_BUTTON)
+                .assertIsEnabled()
+                .performClick()
+            composeTestRule.onNodeWithTag(ProfileStudioTestTags.CUSTOM_CLEAN_CONFIRM_BUTTON).performClick()
+
+            // Wait until BOTH emptied books completely disappear from the list!
+            composeTestRule.waitUntil(timeoutMillis = 5_000L) {
+                composeTestRule
+                    .onAllNodesWithTag(ProfileStudioTestTags.CUSTOM_CLEAN_BOOK_PREFIX + 301)
+                    .fetchSemanticsNodes()
+                    .isEmpty() &&
+                    composeTestRule
+                        .onAllNodesWithTag(ProfileStudioTestTags.CUSTOM_CLEAN_BOOK_PREFIX + 302)
+                        .fetchSemanticsNodes()
+                        .isEmpty() &&
+                    !tempFile.exists() &&
+                    !orphanImgFile.exists()
+            }
+            assertFalse("Non-bookshelf cover must be purged once emptied", nonShelfCover.exists())
+            assertTrue("Bookshelf cover must stay intact on shelf", shelfCover.exists())
+
+            composeTestRule.onNodeWithTag(ProfileStudioTestTags.CUSTOM_CLEAN_LIST)
+                .performScrollToNode(hasTestTag(ProfileStudioTestTags.STORAGE_STATUS_BANNER))
+            composeTestRule.onNodeWithTag(ProfileStudioTestTags.STORAGE_STATUS_BANNER).assertIsDisplayed()
+            composeTestRule.onNodeWithTag(ProfileStudioTestTags.CUSTOM_CLEAN_LIST)
+                .performScrollToNode(androidx.compose.ui.test.hasText("暂无离线缓存书籍"))
+            composeTestRule.onNodeWithText("暂无离线缓存书籍").assertIsDisplayed()
+
+            // 5. E-Ink mode renders cleanly & Back navigation pops inner custom-clean screen first
+            composeTestRule.runOnIdle { einkMode = true }
+            composeTestRule.waitForIdle()
+            composeTestRule.onNodeWithText("暂无离线缓存书籍").assertIsDisplayed()
+
+            composeTestRule.onNodeWithTag(ProfileStudioTestTags.SUBSCREEN_BACK_BUTTON).performClick()
+            composeTestRule.waitForIdle()
+            assertEquals(0, backNavigations)
+            composeTestRule.onNodeWithTag(ProfileStudioTestTags.SUBSCREEN_LIST)
+                .performScrollToNode(hasTestTag(ProfileStudioTestTags.CUSTOM_CLEAN_BUTTON))
+            composeTestRule.onNodeWithTag(ProfileStudioTestTags.CUSTOM_CLEAN_BUTTON).assertIsDisplayed()
+
+            composeTestRule.onNodeWithTag(ProfileStudioTestTags.SUBSCREEN_BACK_BUTTON).performClick()
+            composeTestRule.waitForIdle()
+            assertEquals(1, backNavigations)
+        } finally {
+            db.close()
+        }
+    }
 
     private fun Modifier.composeTestTagForLazyList(): Modifier =
         this.testTag(ProfileStudioTestTags.LIST)

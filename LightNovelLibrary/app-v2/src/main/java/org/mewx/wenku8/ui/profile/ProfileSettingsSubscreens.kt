@@ -453,9 +453,22 @@ fun ProfileSettingsSubscreen(
     onOpenPrivacyOptions: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
-    BackHandler(onBack = onNavigateBack)
+    var isCustomCacheCleanOpen by rememberSaveable(section) { mutableStateOf(false) }
+    val handleBack: () -> Unit = {
+        if (section == ProfileSettingsSection.STORAGE_AND_BACKUP && isCustomCacheCleanOpen) {
+            isCustomCacheCleanOpen = false
+        } else {
+            onNavigateBack()
+        }
+    }
+    BackHandler(onBack = handleBack)
 
     val backLabel = stringResource(R.string.action_back)
+    val topBarTitle = if (section == ProfileSettingsSection.STORAGE_AND_BACKUP && isCustomCacheCleanOpen) {
+        stringResource(R.string.profile_cache_custom_title)
+    } else {
+        stringResource(section.titleResId)
+    }
     Scaffold(
         modifier = modifier
             .fillMaxSize()
@@ -465,7 +478,7 @@ fun ProfileSettingsSubscreen(
             TopAppBar(
                 title = {
                     Text(
-                        text = stringResource(section.titleResId),
+                        text = topBarTitle,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
@@ -473,7 +486,7 @@ fun ProfileSettingsSubscreen(
                 navigationIcon = {
                     TooltipIconButton(
                         tooltipText = backLabel,
-                        onClick = onNavigateBack,
+                        onClick = handleBack,
                         modifier = Modifier.testTag(ProfileStudioTestTags.SUBSCREEN_BACK_BUTTON),
                     ) {
                         Icon(
@@ -535,13 +548,22 @@ fun ProfileSettingsSubscreen(
                 }
 
                 ProfileSettingsSection.STORAGE_AND_BACKUP -> {
-                    StorageAndBackupSettingsBody(
-                        horizontalPadding = horizontalPadding,
-                        storageAndCacheRepository = storageAndCacheRepository,
-                        backupArchiveRepository = backupArchiveRepository,
-                        legacyV1StorageMigrator = legacyV1StorageMigrator,
-                        modifier = containerModifier,
-                    )
+                    if (isCustomCacheCleanOpen) {
+                        CustomCacheCleanBody(
+                            horizontalPadding = horizontalPadding,
+                            storageAndCacheRepository = storageAndCacheRepository,
+                            modifier = containerModifier,
+                        )
+                    } else {
+                        StorageAndBackupSettingsBody(
+                            horizontalPadding = horizontalPadding,
+                            storageAndCacheRepository = storageAndCacheRepository,
+                            backupArchiveRepository = backupArchiveRepository,
+                            legacyV1StorageMigrator = legacyV1StorageMigrator,
+                            onOpenCustomCacheClean = { isCustomCacheCleanOpen = true },
+                            modifier = containerModifier,
+                        )
+                    }
                 }
 
                 ProfileSettingsSection.ABOUT_AND_FEEDBACK -> {
@@ -1171,6 +1193,7 @@ private fun StorageAndBackupSettingsBody(
     storageAndCacheRepository: StorageAndCacheRepository?,
     backupArchiveRepository: BackupArchiveRepository?,
     legacyV1StorageMigrator: LegacyV1StorageMigrator?,
+    onOpenCustomCacheClean: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
@@ -1324,7 +1347,7 @@ private fun StorageAndBackupSettingsBody(
             ProfileSegmentedListSection(title = stringResource(R.string.profile_storage_cache_section)) {
                 ProfileSegmentedSettingRow(
                     index = 0,
-                    count = 2,
+                    count = 3,
                     icon = Icons.Outlined.CleaningServices,
                     title = stringResource(R.string.profile_cache_fast_action),
                     subtitle = stringResource(R.string.profile_cache_fast_desc),
@@ -1344,7 +1367,7 @@ private fun StorageAndBackupSettingsBody(
                 )
                 ProfileSegmentedSettingRow(
                     index = 1,
-                    count = 2,
+                    count = 3,
                     icon = Icons.Outlined.CleaningServices,
                     title = stringResource(R.string.profile_cache_deep_action),
                     subtitle = stringResource(R.string.profile_cache_deep_desc),
@@ -1370,6 +1393,16 @@ private fun StorageAndBackupSettingsBody(
                         activeDeepCleanJob = job
                     },
                     modifier = Modifier.testTag(ProfileStudioTestTags.DEEP_CLEAN_BUTTON),
+                )
+                ProfileSegmentedSettingRow(
+                    index = 2,
+                    count = 3,
+                    icon = Icons.Outlined.Tune,
+                    title = stringResource(R.string.profile_cache_custom_action),
+                    subtitle = stringResource(R.string.profile_cache_custom_desc),
+                    enabled = storageAndCacheRepository != null,
+                    onClick = onOpenCustomCacheClean,
+                    modifier = Modifier.testTag(ProfileStudioTestTags.CUSTOM_CLEAN_BUTTON),
                 )
             }
         }
