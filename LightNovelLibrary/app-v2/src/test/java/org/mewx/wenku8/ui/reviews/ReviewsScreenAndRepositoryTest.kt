@@ -613,6 +613,277 @@ class ReviewsScreenAndRepositoryTest {
         assertEquals(2, page2Attempts)
     }
 
+    @Test
+    fun reviewThreadScreen_replyOnMultiPageThread_preservesPriorPagesLoadsOverflowAndUpdatesReplyCount() {
+        val gateway = FakeReviewCatalogGateway().apply {
+            replyPages[1] = ParsedReviewReplyPage(
+                totalPages = 2,
+                items = listOf(
+                    ParsedReviewReplyItem(
+                        uid = 1001,
+                        userName = "楼主",
+                        replyTimeFormatted = "2026-11-27 10:00",
+                        content = "一楼楼主正文内容",
+                    ),
+                    ParsedReviewReplyItem(
+                        uid = 1002,
+                        userName = "二楼读者",
+                        replyTimeFormatted = "2026-11-27 10:05",
+                        content = "二楼已有回复内容",
+                    ),
+                ),
+            )
+            replyPages[2] = ParsedReviewReplyPage(
+                totalPages = 2,
+                items = listOf(
+                    ParsedReviewReplyItem(
+                        uid = 1003,
+                        userName = "三楼读者",
+                        replyTimeFormatted = "2026-11-27 10:10",
+                        content = "三楼已有回复内容",
+                    ),
+                ),
+            )
+            onReplySubmitted = { submittedContent ->
+                // Simulate the new reply overflowing page 2 onto a newly created page 3.
+                replyPages[2] = ParsedReviewReplyPage(
+                    totalPages = 3,
+                    items = listOf(
+                        ParsedReviewReplyItem(
+                            uid = 1003,
+                            userName = "三楼读者",
+                            replyTimeFormatted = "2026-11-27 10:10",
+                            content = "三楼已有回复内容",
+                        ),
+                    ),
+                )
+                replyPages[3] = ParsedReviewReplyPage(
+                    totalPages = 3,
+                    items = listOf(
+                        ParsedReviewReplyItem(
+                            uid = 1004,
+                            userName = "我",
+                            replyTimeFormatted = "2026-11-27 10:20",
+                            content = submittedContent,
+                        ),
+                    ),
+                )
+            }
+        }
+        val repo = ReviewsRepository(
+            database = database,
+            catalogGateway = gateway,
+            userSessionRepository = null,
+        )
+        val thread = ReviewThreadCardItem(
+            rid = 9002,
+            title = "多页书评讨论",
+            uid = 1001,
+            userName = "楼主",
+            avatarUrl = "",
+            replyCount = 2,
+            postTimeFormatted = "2026-11-27 10:00",
+            lastReplyTimeFormatted = "2026-11-27 10:10",
+        )
+
+        composeTestRule.setContent {
+            Wenku8ExpressiveTheme(themeMode = Wenku8ThemeMode.ARCHIVAL_DAY) {
+                ReviewThreadScreen(
+                    aid = 1306,
+                    novelTitle = "奇诺之旅",
+                    thread = thread,
+                    reviewsRepository = repo,
+                    appLanguage = Wenku8API.AppLanguage.SC,
+                    onNavigateBack = {},
+                )
+            }
+        }
+
+        // Wait for page 1, then load page 2 via Load More button.
+        composeTestRule.waitUntil(timeoutMillis = 5_000L) {
+            composeTestRule
+                .onAllNodes(hasTestTag("${ReviewScreensTestTags.REVIEW_FLOOR_CARD_PREFIX}1"))
+                .fetchSemanticsNodes()
+                .isNotEmpty()
+        }
+        composeTestRule.onNodeWithTag(ReviewScreensTestTags.REVIEW_LOAD_MORE_BUTTON).performClick()
+        composeTestRule.waitUntil(timeoutMillis = 5_000L) {
+            composeTestRule
+                .onAllNodes(hasTestTag("${ReviewScreensTestTags.REVIEW_FLOOR_CARD_PREFIX}3"))
+                .fetchSemanticsNodes()
+                .isNotEmpty()
+        }
+        assertEquals(listOf(1, 2), gateway.requestedReplyPages.toList())
+
+        // Submit a new reply -> must NOT re-fetch page 1; must refresh page 2 and auto-fetch new page 3.
+        composeTestRule.onNodeWithTag(ReviewScreensTestTags.REVIEW_REPLY_INPUT)
+            .performTextInput("刚刚发布的最新跨页回复测试")
+        composeTestRule.onNodeWithTag(ReviewScreensTestTags.REVIEW_REPLY_SUBMIT_BUTTON).performClick()
+
+        composeTestRule.waitUntil(timeoutMillis = 5_000L) {
+            composeTestRule
+                .onAllNodes(hasTestTag("${ReviewScreensTestTags.REVIEW_FLOOR_CARD_PREFIX}4"))
+                .fetchSemanticsNodes()
+                .isNotEmpty()
+        }
+        composeTestRule.onNodeWithText("刚刚发布的最新跨页回复测试").assertIsDisplayed()
+        composeTestRule.onNodeWithText("4楼").assertIsDisplayed()
+        composeTestRule.onNodeWithText("3 回复").assertIsDisplayed()
+        assertEquals(listOf(1, 2, 2, 3), gateway.requestedReplyPages.toList())
+    }
+
+    @Test
+    fun reviewThreadScreen_replyFromPage1OfMultiPageThread_autoCatchesUpToLastPage() {
+        val gateway = FakeReviewCatalogGateway().apply {
+            replyPages[1] = ParsedReviewReplyPage(
+                totalPages = 2,
+                items = listOf(
+                    ParsedReviewReplyItem(
+                        uid = 1001,
+                        userName = "楼主",
+                        replyTimeFormatted = "2026-11-27 10:00",
+                        content = "一楼楼主正文内容",
+                    ),
+                ),
+            )
+            onReplySubmitted = { submittedContent ->
+                replyPages[2] = ParsedReviewReplyPage(
+                    totalPages = 2,
+                    items = listOf(
+                        ParsedReviewReplyItem(
+                            uid = 1002,
+                            userName = "二楼读者",
+                            replyTimeFormatted = "2026-11-27 10:15",
+                            content = "二楼旧回复内容",
+                        ),
+                        ParsedReviewReplyItem(
+                            uid = 1003,
+                            userName = "我",
+                            replyTimeFormatted = "2026-11-27 10:20",
+                            content = submittedContent,
+                        ),
+                    ),
+                )
+            }
+        }
+        val repo = ReviewsRepository(
+            database = database,
+            catalogGateway = gateway,
+            userSessionRepository = null,
+        )
+        val thread = ReviewThreadCardItem(
+            rid = 9003,
+            title = "首页直接回复多页帖",
+            uid = 1001,
+            userName = "楼主",
+            avatarUrl = "",
+            replyCount = 1,
+            postTimeFormatted = "2026-11-27 10:00",
+            lastReplyTimeFormatted = "2026-11-27 10:15",
+        )
+
+        composeTestRule.setContent {
+            Wenku8ExpressiveTheme(themeMode = Wenku8ThemeMode.ARCHIVAL_DAY) {
+                ReviewThreadScreen(
+                    aid = 1306,
+                    novelTitle = "奇诺之旅",
+                    thread = thread,
+                    reviewsRepository = repo,
+                    appLanguage = Wenku8API.AppLanguage.SC,
+                    onNavigateBack = {},
+                )
+            }
+        }
+
+        composeTestRule.waitUntil(timeoutMillis = 5_000L) {
+            composeTestRule
+                .onAllNodes(hasTestTag("${ReviewScreensTestTags.REVIEW_FLOOR_CARD_PREFIX}1"))
+                .fetchSemanticsNodes()
+                .isNotEmpty()
+        }
+
+        // User replies directly while still viewing page 1 of a 2-page thread -> page 2 loads automatically.
+        composeTestRule.onNodeWithTag(ReviewScreensTestTags.REVIEW_REPLY_INPUT)
+            .performTextInput("首页直接发表的测试回复内容")
+        composeTestRule.onNodeWithTag(ReviewScreensTestTags.REVIEW_REPLY_SUBMIT_BUTTON).performClick()
+
+        composeTestRule.waitUntil(timeoutMillis = 5_000L) {
+            composeTestRule
+                .onAllNodes(hasTestTag("${ReviewScreensTestTags.REVIEW_FLOOR_CARD_PREFIX}3"))
+                .fetchSemanticsNodes()
+                .isNotEmpty()
+        }
+        composeTestRule.onNodeWithText("首页直接发表的测试回复内容").assertIsDisplayed()
+        composeTestRule.onNodeWithText("2 回复").assertIsDisplayed()
+        assertEquals(listOf(1, 2), gateway.requestedReplyPages.toList())
+    }
+
+    @Test
+    fun reviewThreadScreen_replyOnVeryLongThread_boundsAutoFetchRequests() {
+        val gateway = FakeReviewCatalogGateway().apply {
+            replyPages[1] = ParsedReviewReplyPage(
+                totalPages = 12,
+                items = listOf(
+                    ParsedReviewReplyItem(
+                        uid = 1001,
+                        userName = "楼主",
+                        replyTimeFormatted = "2026-11-27 10:00",
+                        content = "超长讨论帖一楼内容",
+                    ),
+                ),
+            )
+        }
+        val repo = ReviewsRepository(
+            database = database,
+            catalogGateway = gateway,
+            userSessionRepository = null,
+        )
+        val thread = ReviewThreadCardItem(
+            rid = 9004,
+            title = "十二页超长书评贴",
+            uid = 1001,
+            userName = "楼主",
+            avatarUrl = "",
+            replyCount = 115,
+            postTimeFormatted = "2026-11-27 10:00",
+            lastReplyTimeFormatted = "2026-11-27 10:15",
+        )
+
+        composeTestRule.setContent {
+            Wenku8ExpressiveTheme(themeMode = Wenku8ThemeMode.ARCHIVAL_DAY) {
+                ReviewThreadScreen(
+                    aid = 1306,
+                    novelTitle = "奇诺之旅",
+                    thread = thread,
+                    reviewsRepository = repo,
+                    appLanguage = Wenku8API.AppLanguage.SC,
+                    onNavigateBack = {},
+                )
+            }
+        }
+
+        composeTestRule.waitUntil(timeoutMillis = 5_000L) {
+            composeTestRule
+                .onAllNodes(hasTestTag("${ReviewScreensTestTags.REVIEW_FLOOR_CARD_PREFIX}1"))
+                .fetchSemanticsNodes()
+                .isNotEmpty()
+        }
+
+        composeTestRule.onNodeWithTag(ReviewScreensTestTags.REVIEW_REPLY_INPUT)
+            .performTextInput("超长贴回复测试不应该刷爆请求")
+        composeTestRule.onNodeWithTag(ReviewScreensTestTags.REVIEW_REPLY_SUBMIT_BUTTON).performClick()
+
+        composeTestRule.waitUntil(timeoutMillis = 5_000L) {
+            gateway.requestedReplyPages.size >= 2 &&
+                composeTestRule
+                    .onAllNodes(hasTestTag(ReviewScreensTestTags.REVIEW_THREAD_LOADING_INDICATOR))
+                    .fetchSemanticsNodes()
+                    .isEmpty()
+        }
+        composeTestRule.onNodeWithText("116 回复").assertIsDisplayed()
+        assertEquals(listOf(1, 1), gateway.requestedReplyPages.toList())
+    }
+
     private class FakeReviewCatalogGateway : WenkuCatalogGateway {
         override val isApiConfigured: Boolean = true
         override val minReplyTextLength: Int = 7
@@ -621,6 +892,8 @@ class ReviewsScreenAndRepositoryTest {
         val threadPageHandlers = mutableMapOf<Int, suspend () -> WenkuApiResult<ParsedReviewThreadPage>>()
         val requestedThreadPages = CopyOnWriteArrayList<Int>()
         val replyPages = mutableMapOf<Int, ParsedReviewReplyPage>()
+        val requestedReplyPages = CopyOnWriteArrayList<Int>()
+        var onReplySubmitted: ((String) -> Unit)? = null
         val replyResponses = ArrayDeque<WenkuApiResult<Unit>>()
         val newThreadResponses = ArrayDeque<WenkuApiResult<Unit>>()
 
@@ -647,6 +920,7 @@ class ReviewsScreenAndRepositoryTest {
             pageNumber: Int,
             appLanguage: Wenku8API.AppLanguage,
         ): WenkuApiResult<ParsedReviewReplyPage> {
+            requestedReplyPages.add(pageNumber)
             val page = replyPages[pageNumber] ?: ParsedReviewReplyPage(totalPages = 1, items = emptyList())
             return WenkuApiResult.Success(page)
         }
@@ -661,8 +935,13 @@ class ReviewsScreenAndRepositoryTest {
         override suspend fun postReviewReply(
             rid: Int,
             content: String,
-        ): WenkuApiResult<Unit> =
-            if (replyResponses.isNotEmpty()) replyResponses.removeFirst() else WenkuApiResult.Success(Unit)
+        ): WenkuApiResult<Unit> {
+            val result = if (replyResponses.isNotEmpty()) replyResponses.removeFirst() else WenkuApiResult.Success(Unit)
+            if (result is WenkuApiResult.Success) {
+                onReplySubmitted?.invoke(content)
+            }
+            return result
+        }
 
         override suspend fun fetchNovelListPage(
             sortedBy: Wenku8API.NovelSortedBy,
