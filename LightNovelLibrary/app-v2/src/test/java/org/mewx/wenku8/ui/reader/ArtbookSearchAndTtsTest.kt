@@ -9,12 +9,17 @@ import android.graphics.Color as AndroidColor
 import android.graphics.Rect
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.click
@@ -2246,9 +2251,262 @@ class ArtbookSearchAndTtsTest {
         composeTestRule.onNodeWithTag(ArtbookTestTags.OVERLAY).assertIsDisplayed()
     }
 
-    private fun writeTestJpegFile(fileName: String): File {
+    @Test
+    fun readerIllustrationFittedSize_andAspectRatioCache_matchContentScaleFitGeometry() {
+        ReaderIllustrationAspectRatioCache.clear()
+        try {
+            // 1. Aspect ratio resolution prefers valid painter intrinsicSize, falls back to image dims
+            assertEquals(
+                2.0f,
+                resolveLoadedImageAspectRatio(100, 100, androidx.compose.ui.geometry.Size(800f, 400f))!!,
+                0.001f,
+            )
+            assertEquals(
+                0.5f,
+                resolveLoadedImageAspectRatio(500, 1000, androidx.compose.ui.geometry.Size.Unspecified)!!,
+                0.001f,
+            )
+            assertNull(resolveLoadedImageAspectRatio(0, 100, androidx.compose.ui.geometry.Size.Unspecified))
+            assertNull(resolveLoadedImageAspectRatio(10, 1000, androidx.compose.ui.geometry.Size.Unspecified))
+
+            // 2. Fitted size matches ContentScale.Fit for landscape, narrow portrait, and unknown ratios
+            val unknown = computeFittedIllustrationSize(400f, 600f, null)
+            assertEquals(400f, unknown.width, 0.01f)
+            assertEquals(600f, unknown.height, 0.01f)
+
+            val landscapeInPortraitSlot = computeFittedIllustrationSize(400f, 600f, 1.6f)
+            assertEquals(400f, landscapeInPortraitSlot.width, 0.01f)
+            assertEquals(250f, landscapeInPortraitSlot.height, 0.01f)
+
+            val narrowInWiderSlot = computeFittedIllustrationSize(400f, 560f, 0.45f)
+            assertEquals(252f, narrowInWiderSlot.width, 0.01f)
+            assertEquals(560f, narrowInWiderSlot.height, 0.01f)
+
+            // 3. Cache normalizes mirror hosts to the same canonical illustration key
+            ReaderIllustrationAspectRatioCache.put("http://pic.wenku8.com/pictures/1/1306/99/1.jpg", 1.5f)
+            assertEquals(
+                1.5f,
+                ReaderIllustrationAspectRatioCache.get("https://pic.wenku8.cn/pictures/1/1306/99/1.jpg")!!,
+                0.001f,
+            )
+            ReaderIllustrationAspectRatioCache.put("https://pic.wenku8.com/pictures/1/1306/99/bad.jpg", Float.NaN)
+            assertNull(ReaderIllustrationAspectRatioCache.get("https://pic.wenku8.com/pictures/1/1306/99/bad.jpg"))
+        } finally {
+            ReaderIllustrationAspectRatioCache.clear()
+        }
+    }
+
+    @Test
+    fun readerInlineIllustration_cornerButtonStaysInsideRenderedBounds_forLandscapeNarrowAndTinyImages() {
+        ReaderIllustrationAspectRatioCache.clear()
+        val landscapeUrl = "https://pic.wenku8.com/pictures/fit/landscape.jpg"
+        val narrowUrl = "https://pic.wenku8.com/pictures/fit/narrow.jpg"
+        val tinyBannerUrl = "https://pic.wenku8.com/pictures/fit/tiny_banner.jpg"
+        ReaderIllustrationAspectRatioCache.put(landscapeUrl, 2.0f) // 300x150 inside 300x420 slot
+        ReaderIllustrationAspectRatioCache.put(narrowUrl, 0.45f) // 189x420 inside 300x420 slot
+        ReaderIllustrationAspectRatioCache.put(tinyBannerUrl, 12.5f) // 300x24 inside 300x420 slot
+
+        var activeIndex by mutableStateOf(0)
+        val urls = listOf(landscapeUrl, narrowUrl, tinyBannerUrl)
+        var openedCount = 0
+
+        try {
+            composeTestRule.setContent {
+                Wenku8ExpressiveTheme(themeMode = Wenku8ThemeMode.ARCHIVAL_DAY) {
+                    val palette = resolveReaderVisualPalette(
+                        paperPreset = org.mewx.wenku8.reader.model.ReaderPaperPreset.PARCHMENT,
+                        isEinkMode = false,
+                        customBackgroundPath = "",
+                        customFontPath = "",
+                    )
+                    Box(
+                        modifier = Modifier
+                            .size(width = 300.dp, height = 420.dp)
+                            .testTag("test_slot_outer"),
+                    ) {
+                        ReaderInlineIllustrationCard(
+                            imageUrl = urls[activeIndex],
+                            imageIndexInChapter = activeIndex,
+                            palette = palette,
+                            shape = androidx.compose.material3.MaterialTheme.shapes.small,
+                            surfaceAlpha = 0.4f,
+                            onOpenLightbox = { openedCount++ },
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    }
+                }
+            }
+            composeTestRule.waitForIdle()
+
+            // 1. Landscape (2.0f) inside 300x420 slot -> fitted 300x150 centered vertically;
+            //    corner button MUST stay inside 300x150 (NOT down at y=420!).
+            val outerBounds = composeTestRule.onNodeWithTag("test_slot_outer").getUnclippedBoundsInRoot()
+            val landscapeImg = composeTestRule.onNodeWithTag("${ReaderTestTags.INLINE_IMAGE_PREFIX}0")
+                .getUnclippedBoundsInRoot()
+            val landscapeBtn = composeTestRule.onNodeWithTag("${ReaderTestTags.INLINE_IMAGE_LIGHTBOX_BUTTON_PREFIX}0")
+                .assertIsDisplayed()
+                .getUnclippedBoundsInRoot()
+
+            assertEquals(300f, (landscapeImg.right - landscapeImg.left).value, 2f)
+            assertEquals(150f, (landscapeImg.bottom - landscapeImg.top).value, 2f)
+            assertTrue(
+                "Landscape image bottom (${landscapeImg.bottom}) must sit well above tall slot bottom (${outerBounds.bottom})",
+                (outerBounds.bottom - landscapeImg.bottom) > 100.dp,
+            )
+            assertEquals(landscapeImg.right.value, landscapeBtn.right.value, 2f)
+            assertEquals(landscapeImg.bottom.value, landscapeBtn.bottom.value, 2f)
+            assertTrue("Button must stay inside landscape image top", landscapeBtn.top >= landscapeImg.top - 1.dp)
+            assertTrue("Button must stay inside landscape image left", landscapeBtn.left >= landscapeImg.left - 1.dp)
+            composeTestRule.onNodeWithTag("${ReaderTestTags.INLINE_IMAGE_LIGHTBOX_BUTTON_PREFIX}0").performClick()
+            assertEquals(1, openedCount)
+
+            // 2. Narrow portrait (0.45f) inside 300x420 slot -> fitted 189x420 centered horizontally;
+            //    corner button MUST stay inside 189x420 (NOT out at x=300!).
+            composeTestRule.runOnIdle { activeIndex = 1 }
+            composeTestRule.waitForIdle()
+            val narrowImg = composeTestRule.onNodeWithTag("${ReaderTestTags.INLINE_IMAGE_PREFIX}1")
+                .getUnclippedBoundsInRoot()
+            val narrowBtn = composeTestRule.onNodeWithTag("${ReaderTestTags.INLINE_IMAGE_LIGHTBOX_BUTTON_PREFIX}1")
+                .assertIsDisplayed()
+                .getUnclippedBoundsInRoot()
+
+            assertEquals(189f, (narrowImg.right - narrowImg.left).value, 2f)
+            assertEquals(420f, (narrowImg.bottom - narrowImg.top).value, 2f)
+            assertTrue(
+                "Narrow image right (${narrowImg.right}) must sit well inside wider slot right (${outerBounds.right})",
+                (outerBounds.right - narrowImg.right) > 40.dp,
+            )
+            assertEquals(narrowImg.right.value, narrowBtn.right.value, 2f)
+            assertEquals(narrowImg.bottom.value, narrowBtn.bottom.value, 2f)
+            assertTrue("Button must stay inside narrow image left", narrowBtn.left >= narrowImg.left - 1.dp)
+
+            // 3. Tiny thin banner (300x24) -> 48dp touch target stays uncrushed, flush right and vertically centered on strip
+            composeTestRule.runOnIdle { activeIndex = 2 }
+            composeTestRule.waitForIdle()
+            val tinyImg = composeTestRule.onNodeWithTag("${ReaderTestTags.INLINE_IMAGE_PREFIX}2")
+                .getUnclippedBoundsInRoot()
+            val tinyBtn = composeTestRule.onNodeWithTag("${ReaderTestTags.INLINE_IMAGE_LIGHTBOX_BUTTON_PREFIX}2")
+                .assertIsDisplayed()
+                .getUnclippedBoundsInRoot()
+            assertEquals(48f, (tinyBtn.right - tinyBtn.left).value, 1.5f)
+            assertEquals(48f, (tinyBtn.bottom - tinyBtn.top).value, 1.5f)
+            assertEquals(tinyImg.right.value, tinyBtn.right.value, 2f)
+            val tinyImgCenterY = (tinyImg.top.value + tinyImg.bottom.value) / 2f
+            val tinyBtnCenterY = (tinyBtn.top.value + tinyBtn.bottom.value) / 2f
+            assertEquals(tinyImgCenterY, tinyBtnCenterY, 2f)
+        } finally {
+            ReaderIllustrationAspectRatioCache.clear()
+        }
+    }
+
+    @Test
+    fun readerInlineIllustration_returningFromLightboxWithLandscapeImage_alignsBadgeToActualImageBottom() {
+        ReaderIllustrationAspectRatioCache.clear()
+        val landscapeFile = writeTestJpegFile("landscape_spread_0.jpg", width = 320, height = 160)
+        val url0 = "https://pic.wenku8.com/pictures/spread_test/0.jpg"
+        try {
+            runBlocking {
+                database.novelDao().upsertNovel(
+                    NovelEntity(
+                        aid = 4603,
+                        title = "横图插图对齐测试",
+                        author = "测试作者",
+                        metaSyncedAtMs = 1_000L,
+                    ),
+                )
+                tocSyncRepository.syncNovelIndexAtomically(
+                    aid = 4603,
+                    language = Wenku8API.AppLanguage.SC,
+                    requestStartedAtMs = 2_000L,
+                    parsedVolumes = listOf(
+                        ParsedVolumeToc(
+                            vid = 962,
+                            volumeTitle = "第一卷",
+                            chapters = listOf(
+                                ParsedChapterToc(cid = 9603, chapterTitle = "插图"),
+                            ),
+                        ),
+                    ),
+                )
+                val rawText = "第一卷 插图\n<!--image-->$url0<!--image-->\n"
+                database.chapterContentDao().upsertChapterContent(
+                    ChapterContentEntity(
+                        cid = 9603,
+                        aid = 4603,
+                        contentLang = Wenku8API.AppLanguage.SC.name,
+                        contentText = rawText,
+                        byteLength = rawText.toByteArray().size,
+                        sha256Checksum = "sha_9603",
+                        downloadedAtMs = 1_700_000_000_000L,
+                    ),
+                )
+            }
+
+            composeTestRule.setContent {
+                Wenku8ExpressiveTheme(themeMode = Wenku8ThemeMode.ARCHIVAL_DAY) {
+                    UnifiedReaderScreen(
+                        launchRequest = ReaderLaunchRequest(
+                            aid = 4603,
+                            novelTitle = "横图插图对齐测试",
+                            vid = 962,
+                            volumeTitle = "第一卷",
+                            cid = 9603,
+                            chapterTitle = "插图",
+                        ),
+                        database = database,
+                        catalogGateway = fakeGateway,
+                        novelTocSyncRepository = tocSyncRepository,
+                        preferences = Wenku8UserPreferences(
+                            readerPageTurnMode = ReaderPageTurnMode.COVER_SLIDE,
+                        ),
+                        onReaderTypographyChanged = { _, _, _, _ -> },
+                        onNavigateBack = {},
+                        lineBreaker = DeterministicCellLineBreaker,
+                        artbookImageFileResolver = { landscapeFile },
+                        ioDispatcher = Dispatchers.Main.immediate,
+                        computeDispatcher = Dispatchers.Main.immediate,
+                    )
+                }
+            }
+
+            // Wait for ArtbookLightboxOverlay to decode the 320x160 landscape JPEG and populate cache
+            composeTestRule.waitUntil(timeoutMillis = 5_000L) {
+                ReaderIllustrationAspectRatioCache.get(url0) != null
+            }
+            assertEquals(2.0f, ReaderIllustrationAspectRatioCache.get(url0)!!, 0.01f)
+
+            // Switch from Lightbox -> Novel Reading Mode
+            composeTestRule.onNodeWithTag(ArtbookTestTags.READER_MODE_CHIP).performClick()
+            composeTestRule.waitForIdle()
+
+            val imgBounds = composeTestRule.onNodeWithTag("${ReaderTestTags.INLINE_IMAGE_PREFIX}0")
+                .assertIsDisplayed()
+                .getUnclippedBoundsInRoot()
+            val btnBounds = composeTestRule.onNodeWithTag("${ReaderTestTags.INLINE_IMAGE_LIGHTBOX_BUTTON_PREFIX}0")
+                .assertIsDisplayed()
+                .getUnclippedBoundsInRoot()
+
+            val renderedAspect = (imgBounds.right - imgBounds.left).value / (imgBounds.bottom - imgBounds.top).value
+            assertEquals(
+                "Rendered inline frame must adopt landscape 2:1 ratio instead of 0.71f default slot",
+                2.0f,
+                renderedAspect,
+                0.08f,
+            )
+            assertEquals(imgBounds.right.value, btnBounds.right.value, 2f)
+            assertEquals(imgBounds.bottom.value, btnBounds.bottom.value, 2f)
+        } finally {
+            ReaderIllustrationAspectRatioCache.clear()
+        }
+    }
+
+    private fun writeTestJpegFile(
+        fileName: String,
+        width: Int = 120,
+        height: Int = 160,
+    ): File {
         val file = tempFolder.newFile(fileName)
-        val bmp = Bitmap.createBitmap(120, 160, Bitmap.Config.ARGB_8888).apply {
+        val bmp = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888).apply {
             eraseColor(AndroidColor.rgb(64, 128, 192))
         }
         FileOutputStream(file).use { out ->

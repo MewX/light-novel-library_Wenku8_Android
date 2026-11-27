@@ -13,6 +13,7 @@ import android.graphics.RuntimeShader
 import android.graphics.Shader
 import android.graphics.Typeface
 import android.os.Build
+import android.util.LruCache
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
@@ -26,6 +27,7 @@ import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -40,6 +42,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
@@ -69,6 +72,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
@@ -83,6 +87,7 @@ import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.geometry.isSpecified
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.FilterQuality
@@ -2744,7 +2749,10 @@ private fun ContinuousScrollReaderDelegate(
                         }
 
                         is ChapterBlock.IllustrationBlock -> {
-                            val ratio = (block.cachedAspectRatio ?: 0.71f).coerceIn(0.3f, 2.5f)
+                            val cachedRatio = ReaderIllustrationAspectRatioCache.observe(block.imageUrl)
+                            var localResolvedRatio by remember(block.imageUrl) { mutableStateOf<Float?>(null) }
+                            val ratio = (localResolvedRatio ?: cachedRatio ?: block.cachedAspectRatio ?: 0.71f)
+                                .coerceIn(0.25f, 4.0f)
                             ReaderInlineIllustrationCard(
                                 imageUrl = block.imageUrl,
                                 imageIndexInChapter = block.imageIndexInChapter,
@@ -2753,6 +2761,9 @@ private fun ContinuousScrollReaderDelegate(
                                 surfaceAlpha = 0.5f,
                                 onOpenLightbox = {
                                     onIllustrationClicked(block.imageUrl, block.imageIndexInChapter)
+                                },
+                                onImageAspectRatioResolved = { aspect ->
+                                    localResolvedRatio = aspect
                                 },
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -2927,8 +2938,109 @@ private fun Modifier.readerIllustrationLongPress(
     }
 }
 
+/**
+ * Bounded thread-safe in-memory cache of decoded illustration aspect ratios (`width / height`),
+ * normalized across Wenku8 image mirror URLs so revisited pages and lightbox-to-reader transitions
+ * immediately fit inline illustration frames and corner badges to exact image bounds on Frame 0.
+ */
+internal object ReaderIllustrationAspectRatioCache {
+    private const val MAX_ENTRIES = 256
+    private val cache = LruCache<String, Float>(MAX_ENTRIES)
+    private var revision by mutableIntStateOf(0)
+
+    private fun normalizeKey(imageUrl: String): String {
+        val trimmed = imageUrl.trim()
+        if (trimmed.isEmpty()) return ""
+        return WenkuImageRequests.canonicalIllustrationCacheKey(trimmed) ?: trimmed
+    }
+
+    /**
+     * Reactive lookup for Composables: subscribes the caller to cache updates so an already-composed
+     * reader page immediately adopts an illustration's true aspect ratio once decoded in the
+     * lightbox or another page slot.
+     */
+    fun observe(imageUrl: String): Float? {
+        @Suppress("UNUSED_VARIABLE")
+        val currentRevision = revision
+        return get(imageUrl)
+    }
+
+    fun get(imageUrl: String): Float? {
+        val key = normalizeKey(imageUrl)
+        if (key.isEmpty()) return null
+        return synchronized(cache) { cache.get(key) }
+    }
+
+    fun put(imageUrl: String, aspectRatio: Float) {
+        val key = normalizeKey(imageUrl)
+        if (key.isEmpty() || !aspectRatio.isFinite() || aspectRatio <= 0.05f) return
+        val changed = synchronized(cache) {
+            val previous = cache.get(key)
+            cache.put(key, aspectRatio)
+            previous == null || abs(previous - aspectRatio) > 0.001f
+        }
+        if (changed) {
+            revision++
+        }
+    }
+
+    fun clear() {
+        synchronized(cache) { cache.evictAll() }
+        revision++
+    }
+}
+
+/**
+ * Resolves the displayed aspect ratio (`width / height`) of a loaded Coil image, preferring
+ * [painterIntrinsicSize] (which matches `ContentScale.Fit` exactly) with fallback to raw image
+ * dimensions.
+ */
+internal fun resolveLoadedImageAspectRatio(
+    imageWidth: Int,
+    imageHeight: Int,
+    painterIntrinsicSize: Size,
+): Float? {
+    if (painterIntrinsicSize.isSpecified &&
+        painterIntrinsicSize.width.isFinite() &&
+        painterIntrinsicSize.height.isFinite() &&
+        painterIntrinsicSize.width > 0f &&
+        painterIntrinsicSize.height > 0f
+    ) {
+        val ratio = painterIntrinsicSize.width / painterIntrinsicSize.height
+        if (ratio.isFinite() && ratio > 0.05f) return ratio
+    }
+    if (imageWidth > 0 && imageHeight > 0) {
+        val ratio = imageWidth.toFloat() / imageHeight.toFloat()
+        if (ratio.isFinite() && ratio > 0.05f) return ratio
+    }
+    return null
+}
+
+/**
+ * Computes the exact pixel dimensions painted by `ContentScale.Fit` inside a container slot of
+ * `[containerWidthPx] × [containerHeightPx]` for an image with [imageAspectRatio]. When the image
+ * aspect ratio is not yet known (`null` or invalid), falls back to filling the slot.
+ */
+internal fun computeFittedIllustrationSize(
+    containerWidthPx: Float,
+    containerHeightPx: Float,
+    imageAspectRatio: Float?,
+): Size {
+    val safeW = containerWidthPx.coerceAtLeast(1f)
+    val safeH = containerHeightPx.coerceAtLeast(1f)
+    if (imageAspectRatio == null || !imageAspectRatio.isFinite() || imageAspectRatio <= 0.05f) {
+        return Size(safeW, safeH)
+    }
+    val widthByHeight = safeH * imageAspectRatio
+    return if (widthByHeight <= safeW) {
+        Size(width = widthByHeight.coerceAtLeast(1f), height = safeH)
+    } else {
+        Size(width = safeW, height = (safeW / imageAspectRatio).coerceAtLeast(1f))
+    }
+}
+
 @Composable
-private fun ReaderInlineIllustrationCard(
+internal fun ReaderInlineIllustrationCard(
     imageUrl: String,
     imageIndexInChapter: Int,
     palette: ReaderVisualPalette,
@@ -2936,41 +3048,81 @@ private fun ReaderInlineIllustrationCard(
     surfaceAlpha: Float,
     onOpenLightbox: () -> Unit,
     modifier: Modifier = Modifier,
+    onImageAspectRatioResolved: ((Float) -> Unit)? = null,
 ) {
     val haptic = LocalHapticFeedback.current
+    val density = LocalDensity.current
     val latestOnOpenLightbox by rememberUpdatedState(onOpenLightbox)
+    val latestOnAspectRatioResolved by rememberUpdatedState(onImageAspectRatioResolved)
     val openLightboxLabel = stringResource(R.string.reader_action_open_illustration_lightbox)
     val hasValidUrl = imageUrl.isNotBlank()
+    val cachedAspectRatio = ReaderIllustrationAspectRatioCache.observe(imageUrl)
+    var localLoadedAspectRatio by remember(imageUrl) { mutableStateOf<Float?>(null) }
+    val loadedAspectRatio = localLoadedAspectRatio ?: cachedAspectRatio
 
-    Surface(
-        color = palette.backgroundColor.copy(alpha = surfaceAlpha),
-        shape = shape,
-        modifier = modifier
-            .einkHairlineBorder(shape)
-            .clip(shape)
-            .then(
-                if (hasValidUrl) {
-                    Modifier.readerIllustrationLongPress(
-                        key = imageUrl to imageIndexInChapter,
-                        onLongPress = {
-                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                            latestOnOpenLightbox()
-                        },
-                    )
-                } else {
-                    Modifier
-                },
-            )
-            .testTag("${ReaderTestTags.INLINE_IMAGE_PREFIX}$imageIndexInChapter"),
+    // Outer container preserves the paginator's exact slot bounds while the inner frame shrinks to
+    // the image's exact `ContentScale.Fit` rendered size so the bottom-right lightbox badge (and
+    // borders / corners) NEVER float outside the actual image into letterbox or pillarbox margins.
+    BoxWithConstraints(
+        contentAlignment = Alignment.Center,
+        modifier = modifier,
     ) {
-        Box(modifier = Modifier.fillMaxSize()) {
-            if (hasValidUrl) {
-                AsyncImage(
-                    model = WenkuImageRequests.rememberIllustrationImageRequest(imageUrl),
-                    contentDescription = "插图 ${imageIndexInChapter + 1}",
-                    contentScale = ContentScale.Fit,
-                    modifier = Modifier.fillMaxSize(),
+        val fittedSizePx = computeFittedIllustrationSize(
+            containerWidthPx = constraints.maxWidth.toFloat(),
+            containerHeightPx = constraints.maxHeight.toFloat(),
+            imageAspectRatio = loadedAspectRatio,
+        )
+        val fittedWidthDp = with(density) { fittedSizePx.width.toDp() }
+        val fittedHeightDp = with(density) { fittedSizePx.height.toDp() }
+
+        Box(
+            modifier = Modifier
+                .size(width = fittedWidthDp, height = fittedHeightDp)
+                .then(
+                    if (hasValidUrl) {
+                        Modifier.readerIllustrationLongPress(
+                            key = imageUrl to imageIndexInChapter,
+                            onLongPress = {
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                latestOnOpenLightbox()
+                            },
+                        )
+                    } else {
+                        Modifier
+                    },
                 )
+                .testTag("${ReaderTestTags.INLINE_IMAGE_PREFIX}$imageIndexInChapter"),
+        ) {
+            Surface(
+                color = palette.backgroundColor.copy(alpha = surfaceAlpha),
+                shape = shape,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .einkHairlineBorder(shape)
+                    .clip(shape),
+            ) {
+                if (hasValidUrl) {
+                    AsyncImage(
+                        model = WenkuImageRequests.rememberIllustrationImageRequest(imageUrl),
+                        contentDescription = "插图 ${imageIndexInChapter + 1}",
+                        contentScale = ContentScale.Fit,
+                        onSuccess = { success ->
+                            val ratio = resolveLoadedImageAspectRatio(
+                                imageWidth = success.result.image.width,
+                                imageHeight = success.result.image.height,
+                                painterIntrinsicSize = success.painter.intrinsicSize,
+                            )
+                            if (ratio != null) {
+                                ReaderIllustrationAspectRatioCache.put(imageUrl, ratio)
+                                localLoadedAspectRatio = ratio
+                                latestOnAspectRatioResolved?.invoke(ratio)
+                            }
+                        },
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                }
+            }
+            if (hasValidUrl) {
                 ReaderIllustrationLightboxBadge(
                     contentDescription = openLightboxLabel,
                     onClick = { latestOnOpenLightbox() },
@@ -3002,7 +3154,7 @@ private fun ReaderIllustrationLightboxBadge(
     Box(
         contentAlignment = Alignment.Center,
         modifier = modifier
-            .size(48.dp)
+            .requiredSize(48.dp)
             .clip(CircleShape)
             .clickable(
                 interactionSource = interactionSource,
